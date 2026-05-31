@@ -1,0 +1,40 @@
+{
+  "_comment": "Declarative CRUD lifecycle definitions. Each entry runs create -> (get/list) -> [update] -> delete in order. Paths/payloads come from the API Reference detail + model pages. {placeholders} are filled from the create response via 'capture'. Mutating steps require SCP_ALLOW_MUTATIONS=true; delete requires SCP_ALLOW_DESTRUCTIVE=true.",
+
+  "lifecycles": [
+    {
+      "id": "example-queueservice-queue",
+      "service": "application-service/queueservice",
+      "enabled": false,
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/queues",
+          "json": {"queueName": "regr-test-queue", "description": "created by regression suite"},
+          "expect_status": [200, 201],
+          "capture": {"queue_id": "$.id"}
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/queues/{queue_id}",
+          "expect_status": [200]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/queues",
+          "expect_status": [200]
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/queues/{queue_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}
