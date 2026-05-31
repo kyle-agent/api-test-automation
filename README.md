@@ -82,3 +82,29 @@ the signing string in one overridable method and the header names configurable
 via env vars (`SCP_HMAC_*`). Confirm them against a real `200` response; if the
 gateway returns `401/403`, adjust `HmacSigner.signing_string` / the header env
 vars. `SCP_AUTH_SCHEME=bearer|none` is also supported.
+
+## CI (GitHub Actions)
+
+`.github/workflows/api-regression.yml` runs the read-only smoke regression on a
+daily schedule (18:00 UTC / 03:00 KST) on a GitHub-hosted runner, and can also
+be run on demand from the **Actions** tab with inputs for category/service and
+the mutation safety gates.
+
+Configure once in **Settings → Secrets and variables → Actions**:
+
+| Type | Name | Notes |
+|------|------|-------|
+| Secret | `SCP_BASE_URL` | gateway base URL |
+| Secret | `SCP_ACCESS_KEY` | |
+| Secret | `SCP_SECRET_KEY` | |
+| Secret | `SCP_PROJECT_ID` | optional |
+| Variable | `SCP_HMAC_*`, `SCP_AUTH_SCHEME` | optional — override auth header names/scheme |
+
+Scheduled runs are **read-only** (mutations stay blocked). Mutating CRUD
+lifecycles only run via a manual dispatch with `allow_mutations` (and
+`allow_destructive` for deletes) checked. Each run uploads `report.html` +
+`junit.xml` as an artifact and writes a pass/fail summary to the run page.
+
+> The gateway must be reachable from GitHub-hosted runners. If it is on a
+> private network/VPN, change `runs-on: ubuntu-latest` to a `self-hosted`
+> runner with network access.

@@ -1,0 +1,115 @@
+name: SCP API Regression
+
+# Scheduled regression run + on-demand manual runs.
+# Secrets/vars are configured in the repo settings (see bottom of README).
+on:
+  schedule:
+    # 18:00 UTC daily (03:00 KST). Read-only smoke regression.
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+    inputs:
+      category:
+        description: "Limit to one category (e.g. compute). Blank = all."
+        required: false
+        default: ""
+      service:
+        description: "Limit to one service (e.g. virtualserver). Blank = all."
+        required: false
+        default: ""
+      refresh_catalog:
+        description: "Re-scrape the API Reference before testing"
+        type: boolean
+        default: false
+      allow_mutations:
+        description: "Run mutating CRUD lifecycles (creates/updates REAL resources)"
+        type: boolean
+        default: false
+      allow_destructive:
+        description: "Also allow DELETE in CRUD lifecycles"
+        type: boolean
+        default: false
+
+concurrency:
+  group: scp-api-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # --- endpoint + credentials (repository secrets) ---
+      SCP_BASE_URL: ${{ secrets.SCP_BASE_URL }}
+      SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
+      SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
+      SCP_PROJECT_ID: ${{ secrets.SCP_PROJECT_ID }}
+      # --- auth scheme (repository variables; safe defaults if unset) ---
+      SCP_AUTH_SCHEME: ${{ vars.SCP_AUTH_SCHEME || 'hmac' }}
+      SCP_HMAC_ACCESS_HEADER: ${{ vars.SCP_HMAC_ACCESS_HEADER || 'x-cmp-accesskey' }}
+      SCP_HMAC_SIGNATURE_HEADER: ${{ vars.SCP_HMAC_SIGNATURE_HEADER || 'x-cmp-signature' }}
+      SCP_HMAC_TIMESTAMP_HEADER: ${{ vars.SCP_HMAC_TIMESTAMP_HEADER || 'x-cmp-timestamp' }}
+      SCP_PROJECT_HEADER: ${{ vars.SCP_PROJECT_HEADER || 'x-cmp-project-id' }}
+      # --- safety gates (only the manual dispatch can turn these on) ---
+      SCP_ALLOW_MUTATIONS: ${{ github.event.inputs.allow_mutations || 'false' }}
+      SCP_ALLOW_DESTRUCTIVE: ${{ github.event.inputs.allow_destructive || 'false' }}
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Verify credentials are configured
+        run: |
+          if [ -z "$SCP_BASE_URL" ] || [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
+            echo "::error::Missing secrets. Set SCP_BASE_URL, SCP_ACCESS_KEY, SCP_SECRET_KEY in repo Settings > Secrets."
+            exit 1
+          fi
+
+      - name: Refresh API catalog
+        if: ${{ github.event.inputs.refresh_catalog == 'true' }}
+        run: python tools/build_catalog.py
+
+      - name: Catalog summary
+        run: python tools/catalog_summary.py >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Run read-only smoke regression
+        run: |
+          ARGS="tests/smoke -m smoke"
+          [ -n "${{ github.event.inputs.category }}" ] && ARGS="$ARGS --category ${{ github.event.inputs.category }}"
+          [ -n "${{ github.event.inputs.service }}" ]  && ARGS="$ARGS --service ${{ github.event.inputs.service }}"
+          echo "pytest $ARGS"
+          pytest $ARGS
+
+      - name: Run CRUD lifecycles (manual + opt-in only)
+        if: ${{ github.event.inputs.allow_mutations == 'true' }}
+        run: pytest tests/crud -m crud
+
+      - name: Test result summary
+        if: ${{ always() }}
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          tot=fail=err=skip=0
+          for f in glob.glob("reports/junit.xml"):
+              for ts in ET.parse(f).getroot().iter("testsuite"):
+                  tot+=int(ts.get("tests",0)); fail+=int(ts.get("failures",0))
+                  err+=int(ts.get("errors",0)); skip+=int(ts.get("skipped",0))
+          print("\n## SCP API Regression\n")
+          print(f"- total: {tot}\n- passed: {tot-fail-err-skip}\n- failed: {fail}\n- errors: {err}\n- skipped: {skip}")
+          PY
+
+      - name: Upload reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-regression-reports
+          path: |
+            reports/report.html
+            reports/junit.xml
+          if-no-files-found: warn
