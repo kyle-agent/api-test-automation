@@ -60,9 +60,13 @@ class ApiClient:
 
     # -- request -------------------------------------------------------------
     def request(self, method: str, path: str, *, params: dict | None = None,
-                json: Any | None = None, headers: dict | None = None) -> Response:
+                json: Any | None = None, headers: dict | None = None,
+                service: str | None = None) -> Response:
         self._guard(method)
-        url = path if path.startswith("http") else f"{self.cfg.base_url}{path}"
+        if path.startswith("http"):
+            url = path
+        else:
+            url = f"{self.cfg.resolve_base_url(service)}{path}"
         body = _json.dumps(json).encode("utf-8") if json is not None else b""
         backoff = 2.0
         last_exc: Exception | None = None

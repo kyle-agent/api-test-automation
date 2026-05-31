@@ -14,7 +14,7 @@ code per endpoint.
 ```
 tools/build_catalog.py        # scrape API Reference -> framework/api_catalog.json
 framework/
-  config.py                   # env-var driven settings (.env), safety gates
+  config.py                   # env-var settings, per-service host resolution, safety gates
   auth.py                     # pluggable Access Key + HMAC-SHA256 signer
   client.py                   # HTTP client: retries/backoff + mutation safety gate
   catalog.py                  # load/query the API inventory
@@ -35,6 +35,23 @@ python tools/build_catalog.py # build/refresh framework/api_catalog.json
 
 `build_catalog.py` uses HTTP Range requests (only the page <head> is needed),
 retries the gateway's intermittent 503s with backoff, and is **resumable**.
+
+## Endpoints (per-service hosts)
+
+SCP Open API endpoints are **per service**, not one gateway:
+
+```
+https://<service>.<region>.<env>.samsungsdscloud.com   + path /v1/...
+e.g.  https://vpc.kr-west1.e.samsungsdscloud.com/v1/vpcs
+```
+
+Path roots collide across services (`/v1/clusters` is used by ske, mariadb,
+mysql, …), so each call targets its own host. Set `SCP_REGION` (+ `SCP_ENV`,
+default `e`) and the suite builds each service's host from the catalog service
+name. If a service's API subdomain differs from its catalog name, override it
+via `SCP_SERVICE_HOSTS` (JSON). `SCP_BASE_URL` is a last-resort single-host
+fallback. Note: `SCP_BASE_URL` must be a concrete URL — a wildcard like
+`*.e.samsungsdscloud.com` is only for network allowlists, not a base URL.
 
 ## Running
 
@@ -94,10 +111,12 @@ Configure once in **Settings → Secrets and variables → Actions**:
 
 | Type | Name | Notes |
 |------|------|-------|
-| Secret | `SCP_BASE_URL` | gateway base URL |
+| Variable | `SCP_REGION` | e.g. `kr-west1` — builds per-service hosts |
+| Variable | `SCP_ENV` | default `e` |
 | Secret | `SCP_ACCESS_KEY` | |
 | Secret | `SCP_SECRET_KEY` | |
 | Secret | `SCP_PROJECT_ID` | optional |
+| Variable | `SCP_SERVICE_HOSTS` | optional JSON overrides for odd subdomains |
 | Variable | `SCP_HMAC_*`, `SCP_AUTH_SCHEME` | optional — override auth header names/scheme |
 
 Scheduled runs are **read-only** (mutations stay blocked). Mutating CRUD

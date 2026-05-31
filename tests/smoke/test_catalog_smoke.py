@@ -40,7 +40,7 @@ def test_endpoint_reachable(endpoint: Endpoint, client):
     if endpoint.has_path_params:
         pytest.skip(f"needs a real resource id: {endpoint.http_path}")
 
-    resp = client.get(endpoint.http_path)
+    resp = client.get(endpoint.http_path, service=endpoint.service)
 
     assert resp.status < 500, (
         f"{endpoint.method} {endpoint.http_path} -> {resp.status} (server error)\n"

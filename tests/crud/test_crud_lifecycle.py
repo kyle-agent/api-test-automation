@@ -60,6 +60,9 @@ def test_crud_lifecycle(lifecycle, client, cfg):
     if not cfg.allow_mutations:
         pytest.skip("set SCP_ALLOW_MUTATIONS=true to run CRUD lifecycle tests")
 
+    # lifecycle "service" is "<category>/<service>"; the host uses the service part.
+    service = lifecycle.get("service", "").split("/")[-1] or None
+
     ctx: dict[str, str] = {}
     created_undeleted: list[str] = []
     try:
@@ -75,7 +78,7 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                     f"SCP_ALLOW_DESTRUCTIVE=true). Manual cleanup needed: {path}")
 
             try:
-                resp = client.request(step["method"], path, json=body)
+                resp = client.request(step["method"], path, json=body, service=service)
             except MutationBlocked as exc:
                 pytest.skip(str(exc))
 

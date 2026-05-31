@@ -38,8 +38,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # --- endpoint + credentials (repository secrets) ---
+      # --- endpoint (per-service hosts: <service>.<region>.<env>.samsungsdscloud.com) ---
+      SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
+      SCP_ENV: ${{ vars.SCP_ENV || 'e' }}
+      SCP_HOST_TEMPLATE: ${{ vars.SCP_HOST_TEMPLATE }}
+      SCP_SERVICE_HOSTS: ${{ vars.SCP_SERVICE_HOSTS }}
       SCP_BASE_URL: ${{ secrets.SCP_BASE_URL }}
+      # --- credentials (repository secrets) ---
       SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
       SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
       SCP_PROJECT_ID: ${{ secrets.SCP_PROJECT_ID }}
@@ -64,10 +69,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Verify credentials are configured
+      - name: Verify configuration
         run: |
-          if [ -z "$SCP_BASE_URL" ] || [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
-            echo "::error::Missing secrets. Set SCP_BASE_URL, SCP_ACCESS_KEY, SCP_SECRET_KEY in repo Settings > Secrets."
+          if [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
+            echo "::error::Missing credentials. Set SCP_ACCESS_KEY and SCP_SECRET_KEY in repo Settings > Secrets."
+            exit 1
+          fi
+          if [ -z "$SCP_REGION" ] && [ -z "$SCP_BASE_URL" ] && [ -z "$SCP_SERVICE_HOSTS" ]; then
+            echo "::error::Set SCP_REGION (variable) so per-service hosts can be built, or SCP_BASE_URL/SCP_SERVICE_HOSTS."
             exit 1
           fi
 
