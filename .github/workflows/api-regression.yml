@@ -3,6 +3,11 @@ name: SCP API Regression
 # Scheduled regression run + on-demand manual runs.
 # Secrets/vars are configured in the repo settings (see bottom of README).
 on:
+  pull_request:
+    # PR runs a small, read-only subset (default: the 'platform' category =
+    # 2 GETs). Override the PR scope with the SCP_PR_CATEGORY repo variable.
+    paths-ignore:
+      - "**/*.md"
   schedule:
     # 18:00 UTC daily (03:00 KST). Read-only smoke regression.
     - cron: "0 18 * * *"
@@ -88,11 +93,20 @@ jobs:
         run: python tools/catalog_summary.py >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Run read-only smoke regression
+        env:
+          PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY || 'platform' }}
+          DISPATCH_CATEGORY: ${{ github.event.inputs.category }}
+          DISPATCH_SERVICE: ${{ github.event.inputs.service }}
         run: |
           ARGS="tests/smoke -m smoke"
-          [ -n "${{ github.event.inputs.category }}" ] && ARGS="$ARGS --category ${{ github.event.inputs.category }}"
-          [ -n "${{ github.event.inputs.service }}" ]  && ARGS="$ARGS --service ${{ github.event.inputs.service }}"
-          echo "pytest $ARGS"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PRs run a small, fast, read-only subset only.
+            ARGS="$ARGS --category $PR_CATEGORY"
+          else
+            [ -n "$DISPATCH_CATEGORY" ] && ARGS="$ARGS --category $DISPATCH_CATEGORY"
+            [ -n "$DISPATCH_SERVICE" ]  && ARGS="$ARGS --service $DISPATCH_SERVICE"
+          fi
+          echo "event=${{ github.event_name }} -> pytest $ARGS"
           pytest $ARGS
 
       - name: Run CRUD lifecycles (manual + opt-in only)
