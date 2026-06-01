@@ -1,102 +1,77 @@
 #!/usr/bin/env python3
-"""One-shot diagnostics for the systemic 404 on SCP API calls.
+"""Discover the real SCP Open API endpoint.
 
-The sandbox can't reach the API backend (edge 503), so this runs in CI where the
-runner CAN reach it. It probes a few request variants against one global and one
-regional endpoint and prints status + response headers + body, so we can tell:
-
-  * no-auth 401 vs 404  -> is this an auth problem or a routing/path problem?
-  * full response headers -> gateway type, any WWW-Authenticate / x-cmp-* hints
-  * path variants (prefix / trailing slash) -> is the path wrong?
-  * header-name variants -> are the auth header names wrong?
-
-Read the output from the PR comment posted by the workflow.
+Every <service>.<...>.samsungsdscloud.com host we've tried returns a Spring
+Cloud Gateway "no route" 404 (incl. requestId) for both no-auth and signed
+requests — so auth isn't even reached; the host/path has no route. This probes
+the root path and a set of candidate host patterns from the CI runner (which
+*can* reach the backend) and reports DNS + status + body, to locate a host/path
+that actually routes.
 """
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
-import time
-from urllib.parse import urlsplit
-
+import socket
 import requests
 
 from framework.config import settings as cfg
 
-INTERESTING_HEADERS = (
-    "server", "www-authenticate", "content-type", "x-cmp-trace-id",
-    "x-request-id", "x-envoy-upstream-service-time", "via", "x-cmp-error",
-)
+TIMEOUT = 12
 
 
-def signed_headers(method: str, url: str, access_overrides=None):
-    ts = str(int(time.time() * 1000))
-    parts = urlsplit(url)
-    resource = parts.path + (("?" + parts.query) if parts.query else "")
-    msg = "\n".join([method.upper(), resource, ts, cfg.access_key]).encode()
-    sig = base64.b64encode(
-        hmac.new(cfg.secret_key.encode(), msg, hashlib.sha256).digest()).decode()
-    h = {
-        cfg.hmac_access_header: cfg.access_key,
-        cfg.hmac_timestamp_header: ts,
-        cfg.hmac_signature_header: sig,
-    }
-    if cfg.project_id:
-        h[cfg.project_header] = cfg.project_id
-    if access_overrides:
-        h.update(access_overrides)
-    return h
-
-
-def show(label: str, method: str, url: str, headers: dict):
-    print(f"\n=== {label}: {method} {url}")
-    print(f"    sent headers: {sorted(headers)}")
+def resolves(host: str) -> str:
     try:
-        r = requests.request(method, url, headers={"Accept": "application/json", **headers},
-                             timeout=25)
+        return socket.getaddrinfo(host, 443)[0][4][0]
+    except OSError as e:
+        return f"DNS-FAIL ({e.errno})"
+
+
+def probe(label: str, url: str):
+    host = url.split("//", 1)[1].split("/", 1)[0]
+    ip = resolves(host)
+    line = f"{label:42} {url}\n    dns={ip}"
+    if ip.startswith("DNS-FAIL"):
+        print(line + " -> skip"); return
+    try:
+        r = requests.get(url, headers={"Accept": "application/json"}, timeout=TIMEOUT,
+                         allow_redirects=False)
+        loc = r.headers.get("location", "")
+        srv = r.headers.get("server", "")
+        body = r.text.replace("\n", " ")[:140]
+        print(line + f" -> {r.status_code} server={srv!r} loc={loc!r}\n    body: {body}")
     except Exception as exc:
-        print(f"    ERROR: {exc!r}")
-        return
-    print(f"    -> HTTP {r.status_code}")
-    for k in INTERESTING_HEADERS:
-        if k in r.headers:
-            print(f"    resp {k}: {r.headers[k]}")
-    body = r.text.replace("\n", " ")[:400]
-    print(f"    body: {body}")
+        print(line + f" -> ERR {exc!r}")
 
 
 def main():
-    print(f"config: region={cfg.region!r} env={cfg.env_code!r} "
-          f"access_key_set={bool(cfg.access_key)} secret_set={bool(cfg.secret_key)} "
-          f"project_id_set={bool(cfg.project_id)}")
-    print(f"auth headers: access={cfg.hmac_access_header} sig={cfg.hmac_signature_header} "
-          f"ts={cfg.hmac_timestamp_header} project={cfg.project_header}")
+    print(f"config: region={cfg.region!r} env={cfg.env_code!r}\n")
 
-    targets = [
-        ("global product", cfg.resolve_base_url("product"), "/v1/products"),
-        ("regional vpc", cfg.resolve_base_url("vpc"), "/v1/vpcs"),
+    print("##### A. root vs /v1 on the current hosts (does the host route anything?)")
+    for base in (cfg.resolve_base_url("vpc"), cfg.resolve_base_url("product")):
+        probe("root /", base + "/")
+        probe("GET /v1/vpcs|products", base + ("/v1/vpcs" if "vpc" in base else "/v1/products"))
+        probe("GET /actuator/health", base + "/actuator/health")
+        probe("GET /swagger-ui/index.html", base + "/swagger-ui/index.html")
+        print()
+
+    print("##### B. candidate API host patterns (probe GET /v1/vpcs)")
+    region, env = cfg.region or "kr-west1", cfg.env_code or "e"
+    candidates = [
+        f"https://vpc-api.{region}.{env}.samsungsdscloud.com/v1/vpcs",
+        f"https://vpc.api.{region}.{env}.samsungsdscloud.com/v1/vpcs",
+        f"https://api-vpc.{region}.{env}.samsungsdscloud.com/v1/vpcs",
+        f"https://api.{region}.{env}.samsungsdscloud.com/v1/vpcs",
+        f"https://api.{region}.{env}.samsungsdscloud.com/vpc/v1/vpcs",
+        f"https://{region}.{env}.samsungsdscloud.com/vpc/v1/vpcs",
+        f"https://api.{env}.samsungsdscloud.com/v1/vpcs",
+        f"https://openapi.{env}.samsungsdscloud.com/v1/vpcs",
+        f"https://openapi.samsungsdscloud.com/v1/vpcs",
+        f"https://api.samsungsdscloud.com/v1/vpcs",
+        f"https://gw.{env}.samsungsdscloud.com/vpc/v1/vpcs",
+        f"https://core.{env}.samsungsdscloud.com/v1/vpcs",
+        f"https://vpc.{region}.{env}.samsungsdscloud.com/v2/vpcs",
     ]
-    for name, base, path in targets:
-        url = base + path
-        print(f"\n########## {name} :: base={base}")
-        # 1. no auth at all -> 401 means auth matters; 404 means path/routing
-        show("no-auth", "GET", url, {})
-        # 2. current signed scheme
-        show("signed (current)", "GET", url, signed_headers("GET", url))
-        # 3. trailing slash
-        show("signed + trailing slash", "GET", url + "/", signed_headers("GET", url + "/"))
-        # 4. Authorization: Bearer <accesskey> (alt scheme)
-        show("bearer access_key", "GET", url, {"Authorization": f"Bearer {cfg.access_key}"})
-        # 5. common alt header names
-        alt = {"X-Cmp-AccessKey": cfg.access_key, "Cmp-AccessKey": cfg.access_key,
-               "apikey": cfg.access_key, "X-Cmp-Api-Key": cfg.access_key}
-        show("alt header names", "GET", url, alt)
-
-    # path-prefix probes on vpc (does the backend want a prefix?)
-    base = cfg.resolve_base_url("vpc")
-    for p in ("/vpc/v1/vpcs", "/api/v1/vpcs", "/networking/v1/vpcs", "/v1/vpc/vpcs"):
-        show(f"path-probe {p}", "GET", base + p, signed_headers("GET", base + p))
+    for url in candidates:
+        probe("candidate", url)
 
 
 if __name__ == "__main__":

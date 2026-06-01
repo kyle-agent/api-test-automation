@@ -71,6 +71,9 @@ jobs:
       SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       PYTHONPATH: ${{ github.workspace }}
+      # Temporary: while hunting the real API endpoint, run ONLY the diagnostic
+      # step (skip smoke/crud noise). Flip to 'false' once the endpoint works.
+      DIAG_ONLY: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -131,6 +134,7 @@ jobs:
         run: python tools/catalog_summary.py >> "$GITHUB_STEP_SUMMARY" || true
 
       - name: Run read-only smoke regression
+        if: ${{ env.DIAG_ONLY != 'true' }}
         env:
           # PR runs the full read-only smoke by default. Narrow it by setting
           # the SCP_PR_CATEGORY / SCP_PR_SERVICE repo variables.
@@ -152,7 +156,7 @@ jobs:
           pytest $ARGS 2>&1 | tee -a reports/pytest.log
 
       - name: Comment result summary on PR
-        if: ${{ always() && github.event_name == 'pull_request' }}
+        if: ${{ always() && github.event_name == 'pull_request' && env.DIAG_ONLY != 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
@@ -211,14 +215,14 @@ jobs:
 
       - name: Run CRUD lifecycles (opt-in only)
         id: crud
-        if: ${{ github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true' }}
+        if: ${{ env.DIAG_ONLY != 'true' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         run: |
           echo "Running CRUD lifecycles (creates/deletes REAL resources)" | tee reports/crud.log
           set -o pipefail
           pytest tests/crud -m crud --junitxml=reports/junit-crud.xml 2>&1 | tee -a reports/crud.log
 
       - name: Comment CRUD result on PR
-        if: ${{ always() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ always() && github.event_name == 'pull_request' && env.DIAG_ONLY != 'true' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
