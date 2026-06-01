@@ -115,7 +115,7 @@ jobs:
               log = open("reports/diag.log").read()
           except FileNotFoundError:
               log = "(no diag.log)"
-          body = "### API request diagnostics\n\n```\n" + log[-9000:] + "\n```"
+          body = "### API request diagnostics\n\n```\n" + log[:60000] + "\n```"
           data = json.dumps({"body": body}).encode()
           req = urllib.request.Request(
               f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR']}/comments",
