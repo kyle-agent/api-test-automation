@@ -191,8 +191,8 @@
     {
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
-      "enabled": false,
-      "_note": "VALIDATED end-to-end (creates a real, billable VM and tears it down). Disabled by default to avoid recurring VM cost on routine runs; set enabled=true to run it on demand.",
+      "enabled": true,
+      "_note": "VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs.",
       "steps": [
         {
           "name": "create-vpc",
