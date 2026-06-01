@@ -93,6 +93,36 @@ jobs:
             exit 1
           fi
 
+      - name: Diagnose systemic 404
+        id: diag
+        continue-on-error: true
+        run: |
+          python tools/diagnose.py 2>&1 | tee reports/diag.log
+
+      - name: Comment diagnostics on PR
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          try:
+              log = open("reports/diag.log").read()
+          except FileNotFoundError:
+              log = "(no diag.log)"
+          body = "### API request diagnostics\n\n```\n" + log[-9000:] + "\n```"
+          data = json.dumps({"body": body}).encode()
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR']}/comments",
+              data=data, method="POST",
+              headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                       "Accept": "application/vnd.github+json"})
+          urllib.request.urlopen(req)
+          print("posted diagnostics")
+          PY
+
       - name: Refresh API catalog
         if: ${{ github.event.inputs.refresh_catalog == 'true' }}
         run: python tools/build_catalog.py
