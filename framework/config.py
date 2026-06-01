@@ -114,16 +114,23 @@ class Settings:
     # The exact HMAC header names + signing string must be confirmed against the
     # SCP User Guide / a real 200 response. They are configurable so the suite
     # can be aligned without code changes. Defaults follow the documented
-    # "Access Key + HMAC-SHA256" pattern.
+    # "Access Key + HMAC-SHA256" pattern (per the SCP OpenAPI security guide).
     auth_scheme: str = field(default_factory=lambda: _env("SCP_AUTH_SCHEME", "hmac"))
     hmac_access_header: str = field(
-        default_factory=lambda: _env("SCP_HMAC_ACCESS_HEADER", "x-cmp-accesskey"))
+        default_factory=lambda: _env("SCP_HMAC_ACCESS_HEADER", "X-Cmp-AccessKey"))
     hmac_signature_header: str = field(
-        default_factory=lambda: _env("SCP_HMAC_SIGNATURE_HEADER", "x-cmp-signature"))
+        default_factory=lambda: _env("SCP_HMAC_SIGNATURE_HEADER", "X-Cmp-Signature"))
     hmac_timestamp_header: str = field(
-        default_factory=lambda: _env("SCP_HMAC_TIMESTAMP_HEADER", "x-cmp-timestamp"))
+        default_factory=lambda: _env("SCP_HMAC_TIMESTAMP_HEADER", "X-Cmp-Timestamp"))
     project_header: str = field(
-        default_factory=lambda: _env("SCP_PROJECT_HEADER", "x-cmp-project-id"))
+        default_factory=lambda: _env("SCP_PROJECT_HEADER", "X-Cmp-ProjectId"))
+    # Client type + language are part of SCP auth (clientType is also signed).
+    client_type_header: str = field(
+        default_factory=lambda: _env("SCP_CLIENT_TYPE_HEADER", "X-Cmp-ClientType"))
+    client_type: str = field(default_factory=lambda: _env("SCP_CLIENT_TYPE", "OpenApi"))
+    language_header: str = field(
+        default_factory=lambda: _env("SCP_LANGUAGE_HEADER", "X-Cmp-Language"))
+    language: str = field(default_factory=lambda: _env("SCP_LANGUAGE", "en-US"))
 
     # --- Run behaviour ------------------------------------------------------
     timeout: int = field(default_factory=lambda: int(os.environ.get("SCP_TIMEOUT", "60")))
@@ -159,6 +166,9 @@ class Settings:
     def require_credentials(self) -> None:
         missing = [n for n, v in (("SCP_ACCESS_KEY", self.access_key),
                                   ("SCP_SECRET_KEY", self.secret_key)) if not v]
+        # SCP signs and sends X-Cmp-ProjectId; it is required for HMAC auth.
+        if self.auth_scheme.lower() == "hmac" and not self.project_id:
+            missing.append("SCP_PROJECT_ID")
         if not self.region and not self.base_url and not self.service_hosts:
             missing.append("SCP_REGION (or SCP_BASE_URL / SCP_SERVICE_HOSTS)")
         if missing:

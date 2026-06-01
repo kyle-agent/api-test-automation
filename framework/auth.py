@@ -20,7 +20,7 @@ import hashlib
 import hmac
 import time
 from typing import Protocol
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from .config import Settings
 
@@ -43,12 +43,25 @@ class BearerSigner:
         return {"Authorization": f"Bearer {self._token}"}
 
 
-class HmacSigner:
-    """Access Key + HMAC-SHA256 signer.
+# Characters JavaScript's encodeURI() leaves unescaped (SCP signs encodeURI(url)).
+# Python's quote() never escapes alphanumerics or "_.-~"; add the rest here.
+_ENCODE_URI_SAFE = "!#$&'()*+,/:;=?@~"
 
-    NOTE: confirm `signing_string` against the SCP User Guide / a real signed
-    request. The structure below (METHOD\\n<path+query>\\n<timestamp>\\n<accesskey>)
-    is the common SCP pattern; adjust here if the gateway rejects it (401).
+
+def _encode_uri(path: str) -> str:
+    """Match JavaScript encodeURI(): escape spaces etc., keep reserved/unreserved."""
+    return quote(path, safe=_ENCODE_URI_SAFE)
+
+
+class HmacSigner:
+    """SCP Open API Access Key + HMAC-SHA256 signer.
+
+    Per the SCP OpenAPI security guide / the official sample (createSignature):
+        encodedUrl = encodeURI(url)                      # url = path (+query)
+        message    = method + encodedUrl + timestamp + accessKey + projectId + clientType
+        signature  = Base64( HMAC_SHA256(message, secretKey) )
+    Required headers: X-Cmp-AccessKey, X-Cmp-Signature, X-Cmp-Timestamp,
+    X-Cmp-ClientType=OpenApi, X-Cmp-ProjectId, X-Cmp-Language.
     """
 
     def __init__(self, cfg: Settings):
@@ -57,21 +70,22 @@ class HmacSigner:
     def signing_string(self, method: str, url: str, ts: str) -> str:
         parts = urlsplit(url)
         resource = parts.path + (("?" + parts.query) if parts.query else "")
-        return "\n".join([method.upper(), resource, ts, self._cfg.access_key])
+        return (method.upper() + _encode_uri(resource) + ts
+                + self._cfg.access_key + self._cfg.project_id + self._cfg.client_type)
 
     def headers(self, method: str, url: str, body: bytes = b"") -> dict[str, str]:
         ts = str(int(time.time() * 1000))
         msg = self.signing_string(method, url, ts).encode("utf-8")
         digest = hmac.new(self._cfg.secret_key.encode("utf-8"), msg, hashlib.sha256).digest()
         signature = base64.b64encode(digest).decode("ascii")
-        h = {
+        return {
             self._cfg.hmac_access_header: self._cfg.access_key,
             self._cfg.hmac_timestamp_header: ts,
             self._cfg.hmac_signature_header: signature,
+            self._cfg.client_type_header: self._cfg.client_type,
+            self._cfg.project_header: self._cfg.project_id,
+            self._cfg.language_header: self._cfg.language,
         }
-        if self._cfg.project_id:
-            h[self._cfg.project_header] = self._cfg.project_id
-        return h
 
 
 def build_signer(cfg: Settings) -> Signer:
