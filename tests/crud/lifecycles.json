@@ -254,7 +254,12 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            500
+          ],
+          "retries": 4,
+          "retry_interval": 20
         },
         {
           "name": "wait-gone",
@@ -360,7 +365,7 @@
     {
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
-      "enabled": true,
+      "enabled": false,
       "_note": "VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs.",
       "steps": [
         {

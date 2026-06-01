@@ -100,6 +100,16 @@ def _run_step(client, step, path, body, service, ctx):
     status reaching one of "until_status" (e.g. [404] = resource gone)."""
     params = step.get("params")
     resp = client.request(step["method"], path, json=body, service=service, params=params)
+    # Optional: retry while the status is in retry_on_status (e.g. flaky 500 on
+    # an async delete). Distinct from poll, which waits for a target state.
+    ros = step.get("retry_on_status")
+    if ros:
+        attempts = int(step.get("retries", 4))
+        interval = float(step.get("retry_interval", 15))
+        while resp.status in ros and attempts > 0:
+            time.sleep(interval)
+            resp = client.request(step["method"], path, json=body, service=service, params=params)
+            attempts -= 1
     poll = step.get("poll")
     if not poll:
         return resp

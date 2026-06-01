@@ -106,10 +106,17 @@ def main() -> int:
     for it in _list(c, "resourcemanager", "/v1/resource-groups", "regr-rg"):
         if _delete(c, "resourcemanager", f"/v1/resource-groups/{it['id']}"):
             deleted += 1
-    # 6. container registries (scr)
+    # 6. container registries (scr) — delete may flaky-500, so retry
     for it in _list(c, "scr", "/v1/container-registries", "regrscr"):
-        if _delete(c, "scr", f"/v1/container-registries/{it.get('id')}"):
-            deleted += 1
+        rid = it.get("id")
+        for _ in range(4):
+            st = _delete(c, "scr", f"/v1/container-registries/{rid}")
+            print(f"  delete registry {_name_of(it)} ({rid}) -> {st}")
+            if st in (200, 202, 204):
+                deleted += 1; break
+            if st == 500:
+                time.sleep(15); continue
+            break
     # 7. filestorage volumes
     for it in _list(c, "filestorage", "/v1/volumes", "regrfs"):
         vid = it.get("volume_id") or it.get("id")
