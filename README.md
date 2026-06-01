@@ -85,13 +85,38 @@ sure a regression run never changes real cloud state by accident:
 The smoke suite only calls read-only `GET`s without path params. Mutating and
 parameterised endpoints are exercised by explicit, ordered CRUD lifecycles.
 
-## Adding CRUD coverage
+## CRUD lifecycles
 
 CRUD lifecycles are **declarative** — add an entry to `tests/crud/lifecycles.json`
-(no new Python). A lifecycle lists ordered steps; `capture` pulls ids out of one
-response (`$.id`) for use in later `{placeholders}`. Set `"enabled": true` to
-activate it. Fill `path`/`json` from each API's detail + model pages in the
-Reference.
+(no new Python) and the runner drives create → read → delete in order. Per-step
+features:
+
+- `capture`: pull a value from a response (`$.vpc.id`, `$.servers[0].id`) into a
+  `{placeholder}` for later steps; `{unique}`/`{region}` are seeded automatically.
+- `service`: override the host for that step — a chain can span services
+  (e.g. `vpc` → `security-group` → `virtualserver`, each its own host).
+- `poll`: wait for async provisioning (`{field, until, timeout, interval}`),
+  e.g. until a server's `state` is `ACTIVE`; `wait` sleeps before a step.
+- `cleanup`: a delete to register for the resource a create made — if the
+  lifecycle fails partway, the runner tears everything down in reverse so a
+  failed run never leaks a **billable** resource (e.g. an orphaned VM).
+- `destructive: true` marks deletes (need `SCP_ALLOW_DESTRUCTIVE`).
+
+Shipped lifecycles (all gated, opt-in): `resourcemanager-resource-group`,
+`networking-vpc-subnet`, and `compute-virtualserver-full` (vpc → subnet →
+security-group → keypair → discover image/server-type → server → poll ACTIVE →
+reverse teardown). Enable/disable per entry via `"enabled"`.
+
+Run them only when you mean it:
+
+```bash
+SCP_ALLOW_MUTATIONS=true SCP_ALLOW_DESTRUCTIVE=true pytest tests/crud -m crud
+```
+
+In CI, set the repo variable **`SCP_RUN_CRUD=true`** to opt a run into CRUD
+(otherwise CRUD is skipped); the result (and any teardown) is posted as a PR
+comment. `compute-virtualserver-full` creates a real, billable VM — keep it
+disabled unless you want that.
 
 ## Authentication
 

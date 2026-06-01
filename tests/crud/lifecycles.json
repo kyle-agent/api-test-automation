@@ -63,6 +63,94 @@
           "wait": 30, "expect_status": [200, 202, 204], "destructive": true
         }
       ]
+    },
+
+    {
+      "id": "compute-virtualserver-full",
+      "service": "virtualserver",
+      "enabled": true,
+      "_note": "Full stack: vpc -> subnet -> security-group -> keypair -> (discover image/server-type) -> server -> poll ACTIVE -> teardown in reverse. Creates a REAL, billable VM. Steps override 'service' for per-host routing; each create registers a 'cleanup' so a partial failure tears resources down. Async waits are best-effort and may need tuning per region.",
+      "steps": [
+        {
+          "name": "create-vpc", "service": "vpc", "method": "POST", "path": "/v1/vpcs",
+          "json": {"name": "regrvpc{unique}", "description": "API regression VS", "cidr": "172.30.0.0/20", "tags": []},
+          "expect_status": [200, 201], "capture": {"vpc_id": "$.vpc.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"}
+        },
+        {
+          "name": "wait-vpc", "service": "vpc", "method": "GET", "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200], "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-subnet", "service": "vpc", "method": "POST", "path": "/v1/subnets",
+          "json": {"name": "regrsub{unique}", "description": "API regression VS", "cidr": "172.30.1.0/24", "type": "GENERAL", "vpc_id": "{vpc_id}", "tags": []},
+          "expect_status": [200, 201], "capture": {"subnet_id": "$.subnet.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"}
+        },
+        {
+          "name": "wait-subnet", "service": "vpc", "method": "GET", "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200], "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-sg", "service": "security-group", "method": "POST", "path": "/v1/security-groups",
+          "json": {"name": "regrsg{unique}", "description": "API regression VS", "loggable": false, "tags": []},
+          "expect_status": [200, 201], "capture": {"sg_id": "$.security_group.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/security-groups/{sg_id}", "service": "security-group"}
+        },
+        {
+          "name": "create-keypair", "method": "POST", "path": "/v1/keypairs",
+          "json": {"name": "regrkey{unique}", "tags": []},
+          "expect_status": [200, 201],
+          "cleanup": {"method": "DELETE", "path": "/v1/keypairs/regrkey{unique}", "service": "virtualserver"}
+        },
+        {
+          "name": "find-image", "method": "GET", "path": "/v1/images", "expect_status": [200],
+          "capture": {"image_id": "$.images[0].id"}
+        },
+        {
+          "name": "find-server-type", "method": "GET", "path": "/v1/server-types", "expect_status": [200],
+          "capture": {"server_type_id": "$.server_types[0].id"}
+        },
+        {
+          "name": "create-server", "method": "POST", "path": "/v1/servers",
+          "json": {
+            "name": "regrsrv{unique}",
+            "image_id": "{image_id}",
+            "server_type_id": "{server_type_id}",
+            "keypair_name": "regrkey{unique}",
+            "product_category": "compute",
+            "product_offering": "virtual_server",
+            "networks": [{"subnet_id": "{subnet_id}"}],
+            "security_groups": ["{sg_id}"]
+          },
+          "expect_status": [200, 201, 202], "capture": {"server_id": "$.servers[0].id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/servers/{server_id}", "service": "virtualserver"}
+        },
+        {
+          "name": "wait-server-active", "method": "GET", "path": "/v1/servers/{server_id}",
+          "expect_status": [200], "poll": {"field": "$.server.state", "until": ["ACTIVE"], "timeout": 600, "interval": 15}
+        },
+        {
+          "name": "delete-server", "method": "DELETE", "path": "/v1/servers/{server_id}",
+          "expect_status": [200, 202, 204], "destructive": true
+        },
+        {
+          "name": "delete-keypair", "method": "DELETE", "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [200, 202, 204], "destructive": true
+        },
+        {
+          "name": "delete-sg", "service": "security-group", "method": "DELETE", "path": "/v1/security-groups/{sg_id}",
+          "wait": 60, "expect_status": [200, 202, 204], "destructive": true
+        },
+        {
+          "name": "delete-subnet", "service": "vpc", "method": "DELETE", "path": "/v1/subnets/{subnet_id}",
+          "wait": 30, "expect_status": [200, 202, 204], "destructive": true
+        },
+        {
+          "name": "delete-vpc", "service": "vpc", "method": "DELETE", "path": "/v1/vpcs/{vpc_id}",
+          "wait": 20, "expect_status": [200, 202, 204], "destructive": true
+        }
+      ]
     }
   ]
 }

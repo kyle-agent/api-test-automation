@@ -91,29 +91,42 @@ def test_crud_lifecycle(lifecycle, client, cfg):
     if not cfg.allow_mutations:
         pytest.skip("set SCP_ALLOW_MUTATIONS=true to run CRUD lifecycle tests")
 
-    # lifecycle "service" is "<category>/<service>"; the host uses the service part.
+    # lifecycle "service" is "<category>/<service>"; the host uses the service
+    # part. Individual steps may override it (chains span several services).
     service = lifecycle.get("service", "").split("/")[-1] or None
 
     # Seed context: {unique} = short lowercase alnum token (safe for name
     # patterns / length limits), {region} for bodies that need it.
     ctx: dict[str, str] = {"unique": format(int(time.time()), "x"), "region": cfg.region}
-    created_undeleted: list[str] = []
+    # Teardown stack of (label, method, path, service) for resources created so
+    # far, used to best-effort clean up if the lifecycle fails partway — so a
+    # failed run never leaks a billable resource (e.g. an orphaned VM).
+    cleanups: list[tuple] = []
+
+    def _teardown():
+        for label, method, path, svc in reversed(cleanups):
+            try:
+                if cfg.allow_destructive:
+                    client.request(method, path, service=svc)
+                    print(f"  cleanup: {method} {path}")
+            except Exception as exc:  # best-effort; report and continue
+                print(f"  cleanup FAILED for {label} ({path}): {exc}")
+
     try:
         for step in lifecycle["steps"]:
+            step_service = step.get("service") or service
             if step.get("wait"):  # let async provisioning settle before this step
                 time.sleep(float(step["wait"]))
             path = _fill(step["path"], ctx)
             body = _fill_obj(step.get("json"), ctx)
-            destructive = step.get("destructive", False)
 
-            if destructive and not cfg.allow_destructive:
-                created_undeleted.append(path)
+            if step.get("destructive") and not cfg.allow_destructive:
                 pytest.xfail(
                     f"destructive step '{step['name']}' skipped (set "
                     f"SCP_ALLOW_DESTRUCTIVE=true). Manual cleanup needed: {path}")
 
             try:
-                resp = _run_step(client, step, path, body, service, ctx)
+                resp = _run_step(client, step, path, body, step_service, ctx)
             except MutationBlocked as exc:
                 pytest.skip(str(exc))
 
@@ -127,7 +140,15 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                 val = _jsonpath_get(resp.body, expr) if resp.body else None
                 assert val is not None, (
                     f"could not capture '{var}' via '{expr}' from {step['name']} response")
-                ctx[var] = val
-    finally:
-        if created_undeleted:
-            print(f"\nWARNING: resources may need manual cleanup: {created_undeleted}")
+                ctx[var] = str(val)
+
+            # Register teardown for a freshly-created resource (runs only on a
+            # later failure; the happy path deletes via its own steps).
+            cu = step.get("cleanup")
+            if cu:
+                cleanups.append((step["name"], cu["method"], _fill(cu["path"], ctx),
+                                 cu.get("service") or step_service))
+    except Exception:
+        print(f"\n[{lifecycle['id']}] failed — attempting teardown of created resources:")
+        _teardown()
+        raise
