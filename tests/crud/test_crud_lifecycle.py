@@ -85,7 +85,8 @@ def _run_step(client, step, path, body, service, ctx):
     (for async provisioning/teardown) or the timeout elapses. The condition is
     either a body field reaching a value ("field"/"until") or the response
     status reaching one of "until_status" (e.g. [404] = resource gone)."""
-    resp = client.request(step["method"], path, json=body, service=service)
+    params = step.get("params")
+    resp = client.request(step["method"], path, json=body, service=service, params=params)
     poll = step.get("poll")
     if not poll:
         return resp
@@ -102,7 +103,7 @@ def _run_step(client, step, path, body, service, ctx):
             if val in until:
                 return resp
         time.sleep(interval)
-        resp = client.request(step["method"], path, json=body, service=service)
+        resp = client.request(step["method"], path, json=body, service=service, params=params)
     return resp
 
 
