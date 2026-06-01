@@ -98,28 +98,6 @@ jobs:
       - name: Catalog summary
         run: python tools/catalog_summary.py >> "$GITHUB_STEP_SUMMARY" || true
 
-      - name: Diagnose archivestorage 401 (temporary)
-        continue-on-error: true
-        run: python tools/diagnose_archive.py 2>&1 | tee reports/archdiag.log
-
-      - name: Comment archivestorage diagnosis (temporary)
-        if: ${{ always() && github.event_name == 'pull_request' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: |
-          python - <<'PY'
-          import json, os, urllib.request
-          try: log=open("reports/archdiag.log").read()
-          except FileNotFoundError: log="(no archdiag.log)"
-          body="### archivestorage 401 diagnosis\n\n```\n"+log[-5000:]+"\n```"
-          req=urllib.request.Request(
-              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR']}/comments",
-              data=json.dumps({"body":body}).encode(), method="POST",
-              headers={"Authorization":f"Bearer {os.environ['GH_TOKEN']}","Accept":"application/vnd.github+json"})
-          urllib.request.urlopen(req); print("posted arch diagnosis")
-          PY
 
 
       - name: Run read-only smoke regression
@@ -153,38 +131,36 @@ jobs:
           python - <<'PY'
           import json, os, urllib.request
           from collections import Counter, defaultdict
-          rows=[]
+          rows=[]  # (status, category, key, path)
           try:
               for ln in open("reports/smoke_status.tsv"):
-                  parts=ln.rstrip("\n").split("\t")
-                  if len(parts)>=4:
-                      rows.append((int(parts[0]), parts[1], parts[2], parts[3]))
+                  p=ln.rstrip("\n").split("\t")
+                  if len(p)>=5:
+                      rows.append((int(p[0]), p[1], p[2], p[4]))
           except FileNotFoundError:
               pass
           if not rows:
               body=("### Read-only smoke — no results\n"
                     "No statuses recorded (run failed before calling endpoints).")
           else:
-              dist=Counter(s for s,_,_,_ in rows)
               called=len(rows)
-              ok2xx=sum(n for s,n in dist.items() if 200<=s<300)
-              hardfail=sum(n for s,n in dist.items() if s==401 or s>=500)
+              cat=Counter(c for _,c,_,_ in rows)
+              dist=Counter(s for s,_,_,_ in rows)
               lines=[f"### Read-only smoke result ({called} endpoints called)",
-                     f"- ✅ 2xx: **{ok2xx}**   ⛔ hard-fail (401/5xx): **{hardfail}**",
-                     "- status distribution: " + ", ".join(
-                         f"`{s}`×{n}" for s,n in sorted(dist.items()))]
-              by=defaultdict(list)
-              for s,key,_,path in rows:
-                  if not (200<=s<300):
-                      by[s].append((key,path))
-              for s in sorted(by):
-                  tag={400:"missing required query params",403:"no permission for this key",
-                       404:"not provisioned / not found",409:"conflict",422:"unprocessable",
-                       500:"SERVER ERROR",502:"SERVER ERROR",503:"SERVER ERROR",401:"AUTH FAIL"}.get(s,"")
-                  items=by[s][:25]
-                  lines.append(f"\n<details><summary><code>{s}</code> ×{len(by[s])} — {tag}</summary>\n")
+                     f"- ✅ ok(2xx): **{cat.get('ok',0)}**   "
+                     f"🟡 soft(params/permission/entitlement): **{cat.get('soft',0)}**   "
+                     f"⛔ fail(real auth/5xx): **{cat.get('fail',0)}**",
+                     "- status distribution: " + ", ".join(f"`{s}`×{n}" for s,n in sorted(dist.items()))]
+              groups=defaultdict(list)
+              for s,c,key,path in rows:
+                  if c!="ok":
+                      groups[(c,s)].append((key,path))
+              label={"fail":"⛔ FAIL","soft":"🟡 soft"}
+              for (c,s) in sorted(groups, key=lambda x:(x[0]!="fail", x[1])):
+                  items=groups[(c,s)][:25]
+                  lines.append(f"\n<details><summary>{label.get(c,c)} <code>{s}</code> ×{len(groups[(c,s)])}</summary>\n")
                   lines += [f"- `{k}` — `{p}`" for k,p in items]
-                  if len(by[s])>len(items): lines.append(f"- … and {len(by[s])-len(items)} more")
+                  if len(groups[(c,s)])>len(items): lines.append(f"- … and {len(groups[(c,s)])-len(items)} more")
                   lines.append("\n</details>")
               body="\n".join(lines)
           data=json.dumps({"body":body}).encode()

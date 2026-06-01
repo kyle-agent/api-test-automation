@@ -37,13 +37,41 @@ def pytest_generate_tests(metafunc):
 _STATUS_FILE = "reports/smoke_status.tsv"
 
 
-def _record(endpoint: Endpoint, status: int) -> None:
-    """Append the observed status so the CI summary can show the distribution."""
+def _record(endpoint: Endpoint, status: int, category: str) -> None:
+    """Append status + category so the CI summary can group results."""
     try:
         with open(_STATUS_FILE, "a") as fh:
-            fh.write(f"{status}\t{endpoint.key}\t{endpoint.method}\t{endpoint.http_path}\n")
+            fh.write(f"{status}\t{category}\t{endpoint.key}\t{endpoint.method}\t{endpoint.http_path}\n")
     except OSError:
         pass
+
+
+def _categorize(status: int, text: str) -> tuple[str, str]:
+    """Classify a read-only response into ok / soft / fail with a reason.
+
+    Hard-fail only on genuine problems:
+      * 401 HmacValidFail   -> our signing is wrong.
+      * 5xx                 -> server error.
+    Everything else is the API responding correctly to a bare list call given
+    this account's params/permissions/entitlements, and is reported, not failed:
+      * 401 "rejected by gateway"/"catalog has not target" -> service not
+        entitled for this account/region (env), not an auth bug.
+      * 403 no permission, 404 not provisioned, 400/409/422 needs params/data.
+    """
+    t = (text or "").lower()
+    if 200 <= status < 300:
+        return "ok", ""
+    if status == 401:
+        if "rejected by gateway" in t or "catalog has not target" in t:
+            return "soft", "service not entitled for this account/region"
+        return "fail", "HmacValidFail — signing/credentials wrong"
+    if status >= 500:
+        return "fail", "server error"
+    if status == 403:
+        return "soft", "no permission for this key"
+    if status == 404:
+        return "soft", "not provisioned / not found"
+    return "soft", "needs required query params / data"  # 400/409/422/etc.
 
 
 def test_endpoint_reachable(endpoint: Endpoint, client):
@@ -53,19 +81,9 @@ def test_endpoint_reachable(endpoint: Endpoint, client):
         pytest.skip(f"needs a real resource id: {endpoint.http_path}")
 
     resp = client.get(endpoint.http_path, service=endpoint.service)
-    _record(endpoint, resp.status)
+    category, reason = _categorize(resp.status, resp.raw_text)
+    _record(endpoint, resp.status, category)
 
-    # Regression gate: the API must authenticate and not error on the server.
-    #  * 401  -> our signing/credentials are broken (hard fail).
-    #  * 5xx  -> server error (hard fail).
-    #  * 2xx  -> works.
-    #  * 400/403/404/409/422 -> the endpoint responded correctly to a request that
-    #    lacks required query params, permissions, or a provisioned resource;
-    #    that is expected for a bare list call and is reported, not failed.
-    if resp.status == 401:
-        pytest.fail(
-            f"{endpoint.http_path} -> 401: authentication rejected. Verify "
-            f"SCP_ACCESS_KEY/SCP_SECRET_KEY and the HMAC signing (framework/auth.py).")
-    assert resp.status < 500, (
-        f"{endpoint.method} {endpoint.http_path} -> {resp.status} (server error)\n"
+    assert category != "fail", (
+        f"{endpoint.method} {endpoint.http_path} -> {resp.status} ({reason})\n"
         f"{resp.raw_text[:300]}")
