@@ -278,7 +278,7 @@
           }
         }
       ],
-      "_note": "Registry CREATE/READ/LIST work, but DELETE returns a persistent 500 (ContactAdminForAssistance) on SCP's side, so each run would leak a registry. Disabled pending decision. Leaked registries need manual console deletion."
+      "_note": "Registry CREATE/READ/LIST pass; DELETE returns 500 (ContactAdminForAssistance) for a while right after creation but becomes deletable later (the leftover sweep, which retries 500, succeeds with 202). Disabled by default to avoid per-run churn; to enable, add a longer wait before delete or rely on the sweep to reap regrscr* registries."
     },
     {
       "id": "filestorage-volume",
