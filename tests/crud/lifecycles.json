@@ -16,7 +16,8 @@
           },
           "expect_status": [
             200,
-            201
+            201,
+            202
           ],
           "capture": {
             "rg_id": "$.resource_group.id"
@@ -68,10 +69,16 @@
           },
           "expect_status": [
             200,
-            201
+            201,
+            202
           ],
           "capture": {
             "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
           }
         },
         {
@@ -112,10 +119,16 @@
           },
           "expect_status": [
             200,
-            201
+            201,
+            202
           ],
           "capture": {
             "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
           }
         },
         {
@@ -178,7 +191,8 @@
           },
           "expect_status": [
             200,
-            201
+            201,
+            202
           ],
           "capture": {
             "vpc_id": "$.vpc.id"
@@ -221,7 +235,8 @@
           },
           "expect_status": [
             200,
-            201
+            201,
+            202
           ],
           "capture": {
             "subnet_id": "$.subnet.id"
@@ -262,7 +277,8 @@
           },
           "expect_status": [
             200,
-            201
+            201,
+            202
           ],
           "capture": {
             "sg_id": "$.security_group.id"
@@ -283,7 +299,8 @@
           },
           "expect_status": [
             200,
-            201
+            201,
+            202
           ],
           "cleanup": {
             "method": "DELETE",

@@ -173,6 +173,11 @@ jobs:
           print("posted smoke summary")
           PY
 
+      - name: Sweep leftover regression resources
+        if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        continue-on-error: true
+        run: python tools/cleanup_regression_resources.py
+
       - name: Run CRUD lifecycles (opt-in only)
         id: crud
         # Runs independently of the smoke outcome (always), when opted in.
