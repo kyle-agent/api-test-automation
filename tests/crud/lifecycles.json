@@ -343,7 +343,13 @@
             200
           ],
           "capture": {
-            "server_type_id": "$.server_types[0].id"
+            "server_type_id": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "get": "id"
+            }
           }
         },
         {

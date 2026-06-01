@@ -46,6 +46,25 @@ def _jsonpath_get(obj, expr: str):
     return cur
 
 
+def _capture(body, expr):
+    """Capture a value from a response. `expr` is either a JSONPath string
+    ("$.a.b", "$.items[0].id") or a filter object that selects the first list
+    element matching a field prefix:
+        {"list": "$.server_types", "where_prefix": {"id": "s"}, "get": "id"}
+    (used to pick a standard server type, skipping GPU 'g*' types, etc.)."""
+    if body is None:
+        return None
+    if isinstance(expr, str):
+        return _jsonpath_get(body, expr)
+    items = _jsonpath_get(body, expr["list"]) or []
+    where = expr.get("where_prefix", {})
+    for item in items:
+        if isinstance(item, dict) and all(
+                str(item.get(k, "")).startswith(v) for k, v in where.items()):
+            return item.get(expr["get"])
+    return None
+
+
 def _fill(template: str, ctx: dict) -> str:
     return _PLACEHOLDER.sub(lambda m: str(ctx.get(m.group(1), m.group(0))), template)
 
@@ -144,9 +163,9 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                 f"{resp.raw_text[:500]}")
 
             for var, expr in step.get("capture", {}).items():
-                val = _jsonpath_get(resp.body, expr) if resp.body else None
+                val = _capture(resp.body, expr)
                 assert val is not None, (
-                    f"could not capture '{var}' via '{expr}' from {step['name']} response")
+                    f"could not capture '{var}' via {expr!r} from {step['name']} response")
                 ctx[var] = str(val)
 
             # Register teardown for a freshly-created resource (runs only on a
