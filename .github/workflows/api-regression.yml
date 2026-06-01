@@ -97,14 +97,16 @@ jobs:
 
       - name: Run read-only smoke regression
         env:
-          PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY || 'platform' }}
+          PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY || 'networking' }}
+          PR_SERVICE: ${{ vars.SCP_PR_SERVICE || 'vpc' }}
           DISPATCH_CATEGORY: ${{ github.event.inputs.category }}
           DISPATCH_SERVICE: ${{ github.event.inputs.service }}
         run: |
           ARGS="tests/smoke -m smoke"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PRs run a small, fast, read-only subset only.
-            ARGS="$ARGS --category $PR_CATEGORY"
+            # PRs run a small, fast, read-only subset only (default: vpc service).
+            [ -n "$PR_CATEGORY" ] && ARGS="$ARGS --category $PR_CATEGORY"
+            [ -n "$PR_SERVICE" ]  && ARGS="$ARGS --service $PR_SERVICE"
           else
             [ -n "$DISPATCH_CATEGORY" ] && ARGS="$ARGS --category $DISPATCH_CATEGORY"
             [ -n "$DISPATCH_SERVICE" ]  && ARGS="$ARGS --service $DISPATCH_SERVICE"
