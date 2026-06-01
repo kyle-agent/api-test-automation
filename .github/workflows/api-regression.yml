@@ -176,7 +176,26 @@ jobs:
       - name: Sweep leftover regression resources
         if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         continue-on-error: true
-        run: python tools/cleanup_regression_resources.py
+        run: python tools/cleanup_regression_resources.py 2>&1 | tee reports/sweep.log
+
+      - name: Comment sweep result on PR
+        if: ${{ always() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          try: log=open("reports/sweep.log").read()
+          except FileNotFoundError: log="(no sweep.log)"
+          body="### Leftover-resource sweep\n\n```\n"+log[-5000:]+"\n```"
+          req=urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR']}/comments",
+              data=json.dumps({"body":body}).encode(), method="POST",
+              headers={"Authorization":f"Bearer {os.environ['GH_TOKEN']}","Accept":"application/vnd.github+json"})
+          urllib.request.urlopen(req); print("posted sweep result")
+          PY
 
       - name: Run CRUD lifecycles (opt-in only)
         id: crud
