@@ -42,16 +42,13 @@ def test_endpoint_reachable(endpoint: Endpoint, client):
 
     resp = client.get(endpoint.http_path, service=endpoint.service)
 
-    assert resp.status < 500, (
-        f"{endpoint.method} {endpoint.http_path} -> {resp.status} (server error)\n"
-        f"{resp.raw_text[:500]}")
     if resp.status in (401, 403):
         pytest.fail(
             f"{endpoint.http_path} -> {resp.status}: authentication/authorization "
             f"rejected. Verify SCP_ACCESS_KEY/SCP_SECRET_KEY and the HMAC signing "
             f"scheme (framework/auth.py).")
-    # 404/400 can be legitimate (resource scope / required query) — record but pass
-    # so a single endpoint's data requirements don't fail the regression gate.
-    assert resp.ok or resp.status in (400, 404, 409, 422), (
-        f"{endpoint.method} {endpoint.http_path} -> unexpected {resp.status}\n"
-        f"{resp.raw_text[:500]}")
+    # A list GET without path params should return 2xx. Anything else (404 "not
+    # found" route, 5xx, etc.) is a real finding, not tolerated.
+    assert resp.ok, (
+        f"{endpoint.method} {endpoint.http_path} -> {resp.status} (expected 2xx)\n"
+        f"{resp.raw_text[:300]}")
