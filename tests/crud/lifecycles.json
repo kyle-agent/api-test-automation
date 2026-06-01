@@ -189,6 +189,175 @@
       ]
     },
     {
+      "id": "container-scr-registry",
+      "service": "container/scr",
+      "enabled": true,
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/container-registries",
+          "json": {
+            "name": "regrscr{unique}",
+            "private_acl_enabled": false,
+            "private_acl_resources": [],
+            "public_acl_resources": [],
+            "public_visible_enabled": false
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "reg_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/container-registries/{reg_id}",
+            "service": "scr"
+          }
+        },
+        {
+          "name": "wait-running",
+          "method": "GET",
+          "path": "/v1/container-registries/{reg_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "Running",
+              "RUNNING",
+              "active",
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/container-registries",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/container-registries/{reg_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-gone",
+          "method": "GET",
+          "path": "/v1/container-registries/{reg_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "filestorage-volume",
+      "service": "storage/filestorage",
+      "enabled": true,
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrfs{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "volume_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-available",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/volumes",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-gone",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        }
+      ]
+    },
+    {
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,

@@ -21,6 +21,13 @@ def _items(body):
     return body if isinstance(body, list) else []
 
 
+def _name_of(it):
+    for k in ("name", "volume_name", "registry_name"):
+        if it.get(k):
+            return str(it[k])
+    return ""
+
+
 def _list(client, service, path, prefix):
     try:
         r = client.get(path, service=service)
@@ -29,7 +36,7 @@ def _list(client, service, path, prefix):
     if not r.ok:
         print(f"  list {path} -> {r.status}"); return []
     return [it for it in _items(r.body)
-            if isinstance(it, dict) and str(it.get("name", "")).startswith(prefix)]
+            if isinstance(it, dict) and _name_of(it).startswith(prefix)]
 
 
 def _delete(client, service, path):
@@ -98,6 +105,15 @@ def main() -> int:
     # 5. resource-groups
     for it in _list(c, "resourcemanager", "/v1/resource-groups", "regr-rg"):
         if _delete(c, "resourcemanager", f"/v1/resource-groups/{it['id']}"):
+            deleted += 1
+    # 6. container registries (scr)
+    for it in _list(c, "scr", "/v1/container-registries", "regrscr"):
+        if _delete(c, "scr", f"/v1/container-registries/{it.get('id')}"):
+            deleted += 1
+    # 7. filestorage volumes
+    for it in _list(c, "filestorage", "/v1/volumes", "regrfs"):
+        vid = it.get("volume_id") or it.get("id")
+        if vid and _delete(c, "filestorage", f"/v1/volumes/{vid}"):
             deleted += 1
     print(f"sweep done: {deleted} resource(s) deleted")
     return 0
