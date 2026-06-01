@@ -159,10 +159,26 @@
           "destructive": true
         },
         {
+          "name": "wait-subnet-gone",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 180,
+            "interval": 10
+          },
+          "service": "vpc"
+        },
+        {
           "name": "delete-vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
-          "wait": 30,
           "expect_status": [
             200,
             202,
@@ -392,6 +408,22 @@
           "destructive": true
         },
         {
+          "name": "wait-server-gone",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 15
+          }
+        },
+        {
           "name": "delete-keypair",
           "method": "DELETE",
           "path": "/v1/keypairs/regrkey{unique}",
@@ -407,7 +439,6 @@
           "service": "security-group",
           "method": "DELETE",
           "path": "/v1/security-groups/{sg_id}",
-          "wait": 60,
           "expect_status": [
             200,
             202,
@@ -420,7 +451,6 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/subnets/{subnet_id}",
-          "wait": 30,
           "expect_status": [
             200,
             202,
@@ -429,11 +459,27 @@
           "destructive": true
         },
         {
+          "name": "wait-subnet-gone",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 180,
+            "interval": 10
+          },
+          "service": "vpc"
+        },
+        {
           "name": "delete-vpc",
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
-          "wait": 20,
           "expect_status": [
             200,
             202,

@@ -62,19 +62,26 @@ def _fill_obj(obj, ctx: dict):
 
 
 def _run_step(client, step, path, body, service, ctx):
-    """Execute a step; if it declares "poll", repeat until a field reaches a
-    target value (for async provisioning) or the timeout elapses."""
+    """Execute a step; if it declares "poll", repeat until a condition holds
+    (for async provisioning/teardown) or the timeout elapses. The condition is
+    either a body field reaching a value ("field"/"until") or the response
+    status reaching one of "until_status" (e.g. [404] = resource gone)."""
     resp = client.request(step["method"], path, json=body, service=service)
     poll = step.get("poll")
     if not poll:
         return resp
-    field, until = poll["field"], poll.get("until", [])
+    until_status = poll.get("until_status")
+    field, until = poll.get("field"), poll.get("until", [])
     timeout, interval = float(poll.get("timeout", 300)), float(poll.get("interval", 10))
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        val = _jsonpath_get(resp.body, field) if resp.body else None
-        if val in until:
-            return resp
+        if until_status is not None:
+            if resp.status in until_status:
+                return resp
+        elif field:
+            val = _jsonpath_get(resp.body, field) if resp.body else None
+            if val in until:
+                return resp
         time.sleep(interval)
         resp = client.request(step["method"], path, json=body, service=service)
     return resp
