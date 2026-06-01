@@ -62,6 +62,9 @@ jobs:
       SCP_HMAC_SIGNATURE_HEADER: ${{ vars.SCP_HMAC_SIGNATURE_HEADER || 'x-cmp-signature' }}
       SCP_HMAC_TIMESTAMP_HEADER: ${{ vars.SCP_HMAC_TIMESTAMP_HEADER || 'x-cmp-timestamp' }}
       SCP_PROJECT_HEADER: ${{ vars.SCP_PROJECT_HEADER || 'x-cmp-project-id' }}
+      # --- run behaviour: fail slow hosts fast so a broad run fits the budget ---
+      SCP_TIMEOUT: ${{ vars.SCP_TIMEOUT || '20' }}
+      SCP_MAX_RETRIES: ${{ vars.SCP_MAX_RETRIES || '2' }}
       # --- safety gates (only the manual dispatch can turn these on) ---
       SCP_ALLOW_MUTATIONS: ${{ github.event.inputs.allow_mutations || 'false' }}
       SCP_ALLOW_DESTRUCTIVE: ${{ github.event.inputs.allow_destructive || 'false' }}
@@ -97,14 +100,15 @@ jobs:
 
       - name: Run read-only smoke regression
         env:
-          PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY || 'platform' }}
-          PR_SERVICE: ${{ vars.SCP_PR_SERVICE || 'product' }}
+          # PR runs the full read-only smoke by default. Narrow it by setting
+          # the SCP_PR_CATEGORY / SCP_PR_SERVICE repo variables.
+          PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY }}
+          PR_SERVICE: ${{ vars.SCP_PR_SERVICE }}
           DISPATCH_CATEGORY: ${{ github.event.inputs.category }}
           DISPATCH_SERVICE: ${{ github.event.inputs.service }}
         run: |
           ARGS="tests/smoke -m smoke"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PRs run a small, fast, read-only subset only (default: vpc service).
             [ -n "$PR_CATEGORY" ] && ARGS="$ARGS --category $PR_CATEGORY"
             [ -n "$PR_SERVICE" ]  && ARGS="$ARGS --service $PR_SERVICE"
           else
@@ -115,31 +119,62 @@ jobs:
           set -o pipefail
           pytest $ARGS 2>&1 | tee -a reports/pytest.log
 
-      - name: Comment failure log on PR
-        if: ${{ failure() && github.event_name == 'pull_request' }}
+      - name: Comment result summary on PR
+        if: ${{ always() && github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
           python - <<'PY'
-          import json, os, urllib.request
-          log = ""
-          try:
-              log = open("reports/pytest.log").read()
-          except FileNotFoundError:
-              log = "(no pytest.log — failed before tests ran; check earlier steps)"
-          tail = "\n".join(log.splitlines()[-60:])
-          body = ("### CI run failed\n\nLast 60 lines of pytest output:\n\n"
-                  "```\n" + tail[-6000:] + "\n```")
-          data = json.dumps({"body": body}).encode()
-          req = urllib.request.Request(
+          import glob, json, os, urllib.request, xml.etree.ElementTree as ET
+          tot=fail=err=skip=0
+          failed=[]
+          files=glob.glob("reports/junit.xml")
+          for f in files:
+              for tc in ET.parse(f).getroot().iter("testcase"):
+                  tot+=1
+                  name=tc.get("name","").replace("test_endpoint_reachable","").strip("[]")
+                  fnode=tc.find("failure"); enode=tc.find("error"); snode=tc.find("skipped")
+                  if fnode is not None or enode is not None:
+                      node=fnode if fnode is not None else enode
+                      if fnode is not None: fail+=1
+                      else: err+=1
+                      msg=(node.get("message") or "").strip().splitlines()
+                      failed.append((name, msg[0][:160] if msg else node.tag))
+                  elif snode is not None:
+                      skip+=1
+          called=tot-skip
+          passed=tot-fail-err-skip
+          if not files:
+              body=("### Read-only smoke — run could not produce results\n"
+                    "No junit.xml (failed before tests ran). Check the earlier steps.")
+          else:
+              lines=[f"### Read-only smoke result",
+                     f"- endpoints collected: **{tot}**",
+                     f"- actually called (read-only GET): **{called}**",
+                     f"- ✅ passed: **{passed}**  ❌ failed: **{fail}**  ⚠️ errors: **{err}**  ⏭️ skipped: **{skip}**"]
+              if failed:
+                  shown=failed[:50]
+                  lines.append("\n<details><summary>Failing endpoints "
+                               f"({len(failed)} shown {len(shown)})</summary>\n")
+                  for nm,reason in shown:
+                      lines.append(f"- `{nm}` — {reason}")
+                  if len(failed)>len(shown):
+                      lines.append(f"- … and {len(failed)-len(shown)} more")
+                  lines.append("\n</details>")
+              else:
+                  lines.append("\nAll called endpoints returned a non-error, "
+                               "authenticated response. 🎉")
+              body="\n".join(lines)
+          data=json.dumps({"body":body}).encode()
+          req=urllib.request.Request(
               f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR']}/comments",
               data=data, method="POST",
               headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
-                       "Accept": "application/vnd.github+json"})
+                       "Accept":"application/vnd.github+json"})
           urllib.request.urlopen(req)
-          print("posted failure log to PR")
+          print(f"posted result summary: called={called} passed={passed} fail={fail} err={err}")
           PY
 
       - name: Run CRUD lifecycles (manual + opt-in only)
