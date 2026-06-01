@@ -98,6 +98,30 @@ jobs:
       - name: Catalog summary
         run: python tools/catalog_summary.py >> "$GITHUB_STEP_SUMMARY" || true
 
+      - name: Diagnose archivestorage 401 (temporary)
+        continue-on-error: true
+        run: python tools/diagnose_archive.py 2>&1 | tee reports/archdiag.log
+
+      - name: Comment archivestorage diagnosis (temporary)
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          try: log=open("reports/archdiag.log").read()
+          except FileNotFoundError: log="(no archdiag.log)"
+          body="### archivestorage 401 diagnosis\n\n```\n"+log[-5000:]+"\n```"
+          req=urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR']}/comments",
+              data=json.dumps({"body":body}).encode(), method="POST",
+              headers={"Authorization":f"Bearer {os.environ['GH_TOKEN']}","Accept":"application/vnd.github+json"})
+          urllib.request.urlopen(req); print("posted arch diagnosis")
+          PY
+
+
       - name: Run read-only smoke regression
         env:
           # PR runs the full read-only smoke by default. Narrow it by setting
