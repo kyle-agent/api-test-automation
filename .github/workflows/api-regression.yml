@@ -65,9 +65,11 @@ jobs:
       # --- run behaviour: fail slow hosts fast so a broad run fits the budget ---
       SCP_TIMEOUT: ${{ vars.SCP_TIMEOUT || '20' }}
       SCP_MAX_RETRIES: ${{ vars.SCP_MAX_RETRIES || '2' }}
-      # --- safety gates (only the manual dispatch can turn these on) ---
-      SCP_ALLOW_MUTATIONS: ${{ github.event.inputs.allow_mutations || 'false' }}
-      SCP_ALLOW_DESTRUCTIVE: ${{ github.event.inputs.allow_destructive || 'false' }}
+      # --- safety gates (default OFF) ---------------------------------------
+      # Enabled by a manual dispatch (allow_mutations / allow_destructive) OR by
+      # setting the repo variable SCP_RUN_CRUD=true to opt a PR run into CRUD.
+      SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+      SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4
@@ -177,9 +179,39 @@ jobs:
           print(f"posted result summary: called={called} passed={passed} fail={fail} err={err}")
           PY
 
-      - name: Run CRUD lifecycles (manual + opt-in only)
-        if: ${{ github.event.inputs.allow_mutations == 'true' }}
-        run: pytest tests/crud -m crud
+      - name: Run CRUD lifecycles (opt-in only)
+        id: crud
+        if: ${{ github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true' }}
+        run: |
+          echo "Running CRUD lifecycles (creates/deletes REAL resources)" | tee reports/crud.log
+          set -o pipefail
+          pytest tests/crud -m crud --junitxml=reports/junit-crud.xml 2>&1 | tee -a reports/crud.log
+
+      - name: Comment CRUD result on PR
+        if: ${{ always() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          try:
+              log = open("reports/crud.log").read()
+          except FileNotFoundError:
+              log = "(no crud.log — step did not run)"
+          tail = "\n".join(log.splitlines()[-70:])
+          body = ("### CRUD lifecycle result (real resources created & deleted)\n\n"
+                  "```\n" + tail[-6000:] + "\n```")
+          data = json.dumps({"body": body}).encode()
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR']}/comments",
+              data=data, method="POST",
+              headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                       "Accept": "application/vnd.github+json"})
+          urllib.request.urlopen(req)
+          print("posted CRUD result to PR")
+          PY
 
       - name: Test result summary
         if: ${{ always() }}

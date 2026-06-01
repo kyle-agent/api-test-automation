@@ -1,38 +1,66 @@
 {
-  "_comment": "Declarative CRUD lifecycle definitions. Each entry runs create -> (get/list) -> [update] -> delete in order. Paths/payloads come from the API Reference detail + model pages. {placeholders} are filled from the create response via 'capture'. Mutating steps require SCP_ALLOW_MUTATIONS=true; delete requires SCP_ALLOW_DESTRUCTIVE=true.",
+  "_comment": "Declarative CRUD lifecycles. Steps run in order: create -> read -> [update] -> delete. {placeholders} are filled from earlier 'capture' values plus {unique} (collision-free token) and {region}. Mutating steps need SCP_ALLOW_MUTATIONS=true; steps marked destructive also need SCP_ALLOW_DESTRUCTIVE=true. A step may declare \"wait\": <s> (sleep before it) or \"poll\": {field, until, timeout, interval} to wait for async provisioning. Enable a lifecycle with \"enabled\": true.",
 
   "lifecycles": [
     {
-      "id": "example-queueservice-queue",
-      "service": "application-service/queueservice",
-      "enabled": false,
+      "id": "resourcemanager-resource-group",
+      "service": "management/resourcemanager",
+      "enabled": true,
       "steps": [
         {
           "name": "create",
           "method": "POST",
-          "path": "/v1/queues",
-          "json": {"queueName": "regr-test-queue", "description": "created by regression suite"},
+          "path": "/v1/resource-groups",
+          "json": {"name": "regr-rg-{unique}", "description": "created by API regression suite"},
           "expect_status": [200, 201],
-          "capture": {"queue_id": "$.id"}
+          "capture": {"rg_id": "$.resource_group.id"}
+        },
+        {"name": "get",  "method": "GET", "path": "/v1/resource-groups/{rg_id}", "expect_status": [200]},
+        {"name": "list", "method": "GET", "path": "/v1/resource-groups", "expect_status": [200]},
+        {
+          "name": "delete", "method": "DELETE", "path": "/v1/resource-groups/{rg_id}",
+          "expect_status": [200, 202, 204], "destructive": true
+        }
+      ]
+    },
+
+    {
+      "id": "networking-vpc-subnet",
+      "service": "networking/vpc",
+      "enabled": true,
+      "steps": [
+        {
+          "name": "create-vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {"name": "regrvpc{unique}", "description": "API regression suite", "cidr": "172.31.0.0/20", "tags": []},
+          "expect_status": [200, 201],
+          "capture": {"vpc_id": "$.vpc.id"}
         },
         {
-          "name": "get",
-          "method": "GET",
-          "path": "/v1/queues/{queue_id}",
-          "expect_status": [200]
+          "name": "get-vpc-active", "method": "GET", "path": "/v1/vpcs/{vpc_id}", "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {"name": "list-vpcs", "method": "GET", "path": "/v1/vpcs", "expect_status": [200]},
+        {
+          "name": "create-subnet",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {"name": "regrsub{unique}", "description": "API regression suite", "cidr": "172.31.1.0/24", "type": "GENERAL", "vpc_id": "{vpc_id}", "tags": []},
+          "expect_status": [200, 201],
+          "capture": {"subnet_id": "$.subnet.id"}
         },
         {
-          "name": "list",
-          "method": "GET",
-          "path": "/v1/queues",
-          "expect_status": [200]
+          "name": "get-subnet-active", "method": "GET", "path": "/v1/subnets/{subnet_id}", "expect_status": [200],
+          "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
         },
         {
-          "name": "delete",
-          "method": "DELETE",
-          "path": "/v1/queues/{queue_id}",
-          "expect_status": [200, 202, 204],
-          "destructive": true
+          "name": "delete-subnet", "method": "DELETE", "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 202, 204], "destructive": true
+        },
+        {
+          "name": "delete-vpc", "method": "DELETE", "path": "/v1/vpcs/{vpc_id}",
+          "wait": 30, "expect_status": [200, 202, 204], "destructive": true
         }
       ]
     }
