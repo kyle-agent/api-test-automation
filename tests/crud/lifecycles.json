@@ -191,7 +191,7 @@
     {
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
-      "enabled": false,
+      "enabled": true,
       "_note": "Full stack: vpc -> subnet -> security-group -> keypair -> (discover image/server-type) -> server -> poll ACTIVE -> teardown in reverse. Creates a REAL, billable VM. Steps override 'service' for per-host routing; each create registers a 'cleanup' so a partial failure tears resources down. Async waits are best-effort and may need tuning per region.",
       "steps": [
         {
