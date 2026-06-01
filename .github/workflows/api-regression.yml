@@ -97,8 +97,8 @@ jobs:
 
       - name: Run read-only smoke regression
         env:
-          PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY || 'networking' }}
-          PR_SERVICE: ${{ vars.SCP_PR_SERVICE || 'vpc' }}
+          PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY || 'platform' }}
+          PR_SERVICE: ${{ vars.SCP_PR_SERVICE || 'product' }}
           DISPATCH_CATEGORY: ${{ github.event.inputs.category }}
           DISPATCH_SERVICE: ${{ github.event.inputs.service }}
         run: |

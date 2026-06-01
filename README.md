@@ -38,20 +38,23 @@ retries the gateway's intermittent 503s with backoff, and is **resumable**.
 
 ## Endpoints (per-service hosts)
 
-SCP Open API endpoints are **per service**, not one gateway:
+SCP Open API endpoints are **per service**, not one gateway, in two flavours:
 
 ```
-https://<service>.<region>.<env>.samsungsdscloud.com   + path /v1/...
-e.g.  https://vpc.kr-west1.e.samsungsdscloud.com/v1/vpcs
+regional: https://<service>.<region>.<env>.samsungsdscloud.com   e.g. vpc.kr-west1.e...
+global  : https://<service>.<env>.samsungsdscloud.com            e.g. product.e...
 ```
 
 Path roots collide across services (`/v1/clusters` is used by ske, mariadb,
 mysql, …), so each call targets its own host. Set `SCP_REGION` (+ `SCP_ENV`,
 default `e`) and the suite builds each service's host from the catalog service
-name. If a service's API subdomain differs from its catalog name, override it
-via `SCP_SERVICE_HOSTS` (JSON). `SCP_BASE_URL` is a last-resort single-host
-fallback. Note: `SCP_BASE_URL` must be a concrete URL — a wildcard like
-`*.e.samsungsdscloud.com` is only for network allowlists, not a base URL.
+name. **Global (account-scoped) services have no region segment** — the built-in
+list (`product, pricing, iam, organization, quota, billingplan, budget,
+costexplorer, cloudcontrol, resourcemanager, support`) was verified by DNS and
+is extendable via `SCP_GLOBAL_SERVICES`. If a service's API subdomain differs
+from its catalog name, override it via `SCP_SERVICE_HOSTS` (JSON). `SCP_BASE_URL`
+is a last-resort single-host fallback — it must be a concrete URL, not a
+wildcard (`*.e.samsungsdscloud.com` is only for network allowlists).
 
 ## Running
 

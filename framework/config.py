@@ -44,6 +44,22 @@ def _bool(name: str, default: bool = False) -> bool:
     return _env(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
+# Account-scoped (region-less) services, verified by DNS against the platform:
+# their host is <service>.<env>.samsungsdscloud.com (no region segment).
+DEFAULT_GLOBAL_SERVICES = frozenset({
+    "billingplan", "budget", "cloudcontrol", "costexplorer", "iam",
+    "organization", "pricing", "product", "quota", "resourcemanager", "support",
+})
+
+
+def _global_services() -> frozenset:
+    """Global-service set; SCP_GLOBAL_SERVICES (comma-separated) overrides the default."""
+    raw = _env("SCP_GLOBAL_SERVICES")
+    if not raw:
+        return DEFAULT_GLOBAL_SERVICES
+    return frozenset(s.strip() for s in raw.split(",") if s.strip())
+
+
 def _json_env(name: str) -> dict:
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -66,14 +82,22 @@ class Settings:
     # Path roots collide across services (e.g. /v1/clusters is used by ske,
     # mariadb, mysql, ...), so each call must target its own service host.
     #
+    # Services come in two flavours (verified by DNS against the platform):
+    #   * regional: https://<service>.<region>.<env>.samsungsdscloud.com  (e.g. vpc)
+    #   * global  : https://<service>.<env>.samsungsdscloud.com           (e.g. product)
     # Resolution order for a given service:
     #   1. SCP_SERVICE_HOSTS override map  (JSON: {"<service>": "<host-or-url>"})
-    #   2. host template + region + env   (the common case)
-    #   3. SCP_BASE_URL                    (explicit single-host fallback)
+    #   2. global template (if service is global)   — no region
+    #   3. regional template + region + env          (the common case)
+    #   4. SCP_BASE_URL                              (explicit single-host fallback)
     region: str = field(default_factory=lambda: _env("SCP_REGION"))
     env_code: str = field(default_factory=lambda: _env("SCP_ENV", "e"))
     host_template: str = field(default_factory=lambda: _env(
         "SCP_HOST_TEMPLATE", "https://{service}.{region}.{env}.samsungsdscloud.com"))
+    global_host_template: str = field(default_factory=lambda: _env(
+        "SCP_GLOBAL_HOST_TEMPLATE", "https://{service}.{env}.samsungsdscloud.com"))
+    # Account-scoped services that have no region segment in their host.
+    global_services: frozenset = field(default_factory=lambda: _global_services())
     # Optional explicit overrides for services whose API subdomain differs from
     # the catalog service name, or to pin a full URL.
     service_hosts: dict = field(default_factory=lambda: _json_env("SCP_SERVICE_HOSTS"))
@@ -111,19 +135,25 @@ class Settings:
     # Extra guard for destructive deletes even when mutations are allowed.
     allow_destructive: bool = field(default_factory=lambda: _bool("SCP_ALLOW_DESTRUCTIVE", False))
 
+    def is_global(self, service: str | None) -> bool:
+        return bool(service) and service in self.global_services
+
     def resolve_base_url(self, service: str | None = None) -> str:
         """Return the API base URL (scheme+host, no trailing slash) for a service."""
         if service and service in self.service_hosts:
             host = self.service_hosts[service]
             return (host if host.startswith("http") else f"https://{host}").rstrip("/")
+        if self.is_global(service) and self.global_host_template:
+            return self.global_host_template.format(
+                service=service, env=self.env_code).rstrip("/")
         if service and self.region and self.host_template:
             return self.host_template.format(
                 service=service, region=self.region, env=self.env_code).rstrip("/")
         if self.base_url:
             return self.base_url
         raise RuntimeError(
-            f"Cannot resolve base URL for service={service!r}. Set SCP_REGION "
-            f"(+ SCP_ENV) to use the host template, add SCP_SERVICE_HOSTS, or set "
+            f"Cannot resolve base URL for service={service!r}. Global services need "
+            f"SCP_ENV; regional services need SCP_REGION. Or set SCP_SERVICE_HOSTS / "
             f"SCP_BASE_URL.")
 
     def require_credentials(self) -> None:
