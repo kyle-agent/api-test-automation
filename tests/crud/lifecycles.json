@@ -191,7 +191,7 @@
     {
       "id": "container-scr-registry",
       "service": "container/scr",
-      "enabled": true,
+      "enabled": false,
       "steps": [
         {
           "name": "create",
@@ -277,7 +277,8 @@
             "interval": 10
           }
         }
-      ]
+      ],
+      "_note": "Registry CREATE/READ/LIST work, but DELETE returns a persistent 500 (ContactAdminForAssistance) on SCP's side, so each run would leak a registry. Disabled pending decision. Leaked registries need manual console deletion."
     },
     {
       "id": "filestorage-volume",
@@ -365,7 +366,7 @@
     {
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
-      "enabled": false,
+      "enabled": true,
       "_note": "VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs.",
       "steps": [
         {
