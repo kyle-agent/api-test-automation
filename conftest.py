@@ -1,4 +1,5 @@
 """Shared pytest fixtures and CLI options for the SCP regression suite."""
+# CRUD lifecycle run: resource-group + vpc/subnet + virtualserver (opt-in).
 from __future__ import annotations
 
 import pytest
