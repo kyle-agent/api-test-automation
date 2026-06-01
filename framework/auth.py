@@ -56,22 +56,28 @@ def _encode_uri(path: str) -> str:
 class HmacSigner:
     """SCP Open API Access Key + HMAC-SHA256 signer.
 
-    Per the SCP OpenAPI security guide / the official sample (createSignature):
-        encodedUrl = encodeURI(url)                      # url = path (+query)
-        message    = method + encodedUrl + timestamp + accessKey + projectId + clientType
-        signature  = Base64( HMAC_SHA256(message, secretKey) )
-    Required headers: X-Cmp-AccessKey, X-Cmp-Signature, X-Cmp-Timestamp,
-    X-Cmp-ClientType=OpenApi, X-Cmp-ProjectId, X-Cmp-Language.
+    Per the SCP API Reference "Common / API 호출하기" guide and its Java/JS sample:
+        url       = encodeURI(url)
+        message   = method + url + timestamp + accessKey + clientType
+        signature = Base64( HMAC_SHA256(message, secretKey) )
+    Headers: Scp-Accesskey, Scp-Signature, Scp-Timestamp,
+             Scp-ClientType=Openapi, Accept-Language. (No project id.)
+    `url` is the full request URL by default (SCP_SIGN_FULL_URL); set it false to
+    sign only the path+query.
     """
 
     def __init__(self, cfg: Settings):
         self._cfg = cfg
 
-    def signing_string(self, method: str, url: str, ts: str) -> str:
+    def _url_for_sign(self, url: str) -> str:
+        if self._cfg.sign_full_url:
+            return url
         parts = urlsplit(url)
-        resource = parts.path + (("?" + parts.query) if parts.query else "")
-        return (method.upper() + _encode_uri(resource) + ts
-                + self._cfg.access_key + self._cfg.project_id + self._cfg.client_type)
+        return parts.path + (("?" + parts.query) if parts.query else "")
+
+    def signing_string(self, method: str, url: str, ts: str) -> str:
+        return (method.upper() + _encode_uri(self._url_for_sign(url)) + ts
+                + self._cfg.access_key + self._cfg.client_type)
 
     def headers(self, method: str, url: str, body: bytes = b"") -> dict[str, str]:
         ts = str(int(time.time() * 1000))
@@ -83,7 +89,6 @@ class HmacSigner:
             self._cfg.hmac_timestamp_header: ts,
             self._cfg.hmac_signature_header: signature,
             self._cfg.client_type_header: self._cfg.client_type,
-            self._cfg.project_header: self._cfg.project_id,
             self._cfg.language_header: self._cfg.language,
         }
 

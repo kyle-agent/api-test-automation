@@ -114,23 +114,24 @@ class Settings:
     # The exact HMAC header names + signing string must be confirmed against the
     # SCP User Guide / a real 200 response. They are configurable so the suite
     # can be aligned without code changes. Defaults follow the documented
-    # "Access Key + HMAC-SHA256" pattern (per the SCP OpenAPI security guide).
+    # Per the SCP API Reference "Common / API 호출하기" guide: HMAC-SHA256 over
+    #   method + encodeURI(url) + timestamp + accessKey + clientType   (no projectId)
+    # Base64-encoded, sent in Scp-* headers; clientType value is "Openapi".
     auth_scheme: str = field(default_factory=lambda: _env("SCP_AUTH_SCHEME", "hmac"))
     hmac_access_header: str = field(
-        default_factory=lambda: _env("SCP_HMAC_ACCESS_HEADER", "X-Cmp-AccessKey"))
+        default_factory=lambda: _env("SCP_HMAC_ACCESS_HEADER", "Scp-Accesskey"))
     hmac_signature_header: str = field(
-        default_factory=lambda: _env("SCP_HMAC_SIGNATURE_HEADER", "X-Cmp-Signature"))
+        default_factory=lambda: _env("SCP_HMAC_SIGNATURE_HEADER", "Scp-Signature"))
     hmac_timestamp_header: str = field(
-        default_factory=lambda: _env("SCP_HMAC_TIMESTAMP_HEADER", "X-Cmp-Timestamp"))
-    project_header: str = field(
-        default_factory=lambda: _env("SCP_PROJECT_HEADER", "X-Cmp-ProjectId"))
-    # Client type + language are part of SCP auth (clientType is also signed).
+        default_factory=lambda: _env("SCP_HMAC_TIMESTAMP_HEADER", "Scp-Timestamp"))
     client_type_header: str = field(
-        default_factory=lambda: _env("SCP_CLIENT_TYPE_HEADER", "X-Cmp-ClientType"))
-    client_type: str = field(default_factory=lambda: _env("SCP_CLIENT_TYPE", "OpenApi"))
+        default_factory=lambda: _env("SCP_CLIENT_TYPE_HEADER", "Scp-ClientType"))
+    client_type: str = field(default_factory=lambda: _env("SCP_CLIENT_TYPE", "Openapi"))
     language_header: str = field(
-        default_factory=lambda: _env("SCP_LANGUAGE_HEADER", "X-Cmp-Language"))
+        default_factory=lambda: _env("SCP_LANGUAGE_HEADER", "Accept-Language"))
     language: str = field(default_factory=lambda: _env("SCP_LANGUAGE", "en-US"))
+    # Whether the signed url is the full URL (default) or just the path+query.
+    sign_full_url: bool = field(default_factory=lambda: _bool("SCP_SIGN_FULL_URL", True))
 
     # --- Run behaviour ------------------------------------------------------
     timeout: int = field(default_factory=lambda: int(os.environ.get("SCP_TIMEOUT", "60")))
@@ -166,9 +167,6 @@ class Settings:
     def require_credentials(self) -> None:
         missing = [n for n, v in (("SCP_ACCESS_KEY", self.access_key),
                                   ("SCP_SECRET_KEY", self.secret_key)) if not v]
-        # SCP signs and sends X-Cmp-ProjectId; it is required for HMAC auth.
-        if self.auth_scheme.lower() == "hmac" and not self.project_id:
-            missing.append("SCP_PROJECT_ID")
         if not self.region and not self.base_url and not self.service_hosts:
             missing.append("SCP_REGION (or SCP_BASE_URL / SCP_SERVICE_HOSTS)")
         if missing:

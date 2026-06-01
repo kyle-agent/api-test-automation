@@ -55,13 +55,10 @@ jobs:
       # --- credentials (repository secrets) ---
       SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
       SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
-      SCP_PROJECT_ID: ${{ secrets.SCP_PROJECT_ID }}
-      # --- auth scheme (repository variables; safe defaults if unset) ---
+      # Auth header names/values default (in framework/config.py) to the SCP
+      # spec: Scp-Accesskey/Signature/Timestamp/ClientType=Openapi, Accept-Language.
+      # Override only via repo variables if ever needed.
       SCP_AUTH_SCHEME: ${{ vars.SCP_AUTH_SCHEME || 'hmac' }}
-      SCP_HMAC_ACCESS_HEADER: ${{ vars.SCP_HMAC_ACCESS_HEADER || 'x-cmp-accesskey' }}
-      SCP_HMAC_SIGNATURE_HEADER: ${{ vars.SCP_HMAC_SIGNATURE_HEADER || 'x-cmp-signature' }}
-      SCP_HMAC_TIMESTAMP_HEADER: ${{ vars.SCP_HMAC_TIMESTAMP_HEADER || 'x-cmp-timestamp' }}
-      SCP_PROJECT_HEADER: ${{ vars.SCP_PROJECT_HEADER || 'x-cmp-project-id' }}
       # --- run behaviour: fail slow hosts fast so a broad run fits the budget ---
       SCP_TIMEOUT: ${{ vars.SCP_TIMEOUT || '20' }}
       SCP_MAX_RETRIES: ${{ vars.SCP_MAX_RETRIES || '2' }}
