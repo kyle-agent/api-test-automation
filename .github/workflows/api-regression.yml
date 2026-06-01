@@ -42,6 +42,9 @@ jobs:
   regression:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
     env:
       # --- endpoint (per-service hosts: <service>.<region>.<env>.samsungsdscloud.com) ---
       SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
@@ -106,8 +109,36 @@ jobs:
             [ -n "$DISPATCH_CATEGORY" ] && ARGS="$ARGS --category $DISPATCH_CATEGORY"
             [ -n "$DISPATCH_SERVICE" ]  && ARGS="$ARGS --service $DISPATCH_SERVICE"
           fi
-          echo "event=${{ github.event_name }} -> pytest $ARGS"
-          pytest $ARGS
+          echo "event=${{ github.event_name }} -> pytest $ARGS" | tee reports/pytest.log
+          set -o pipefail
+          pytest $ARGS 2>&1 | tee -a reports/pytest.log
+
+      - name: Comment failure log on PR
+        if: ${{ failure() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          log = ""
+          try:
+              log = open("reports/pytest.log").read()
+          except FileNotFoundError:
+              log = "(no pytest.log — failed before tests ran; check earlier steps)"
+          tail = "\n".join(log.splitlines()[-60:])
+          body = ("### CI run failed\n\nLast 60 lines of pytest output:\n\n"
+                  "```\n" + tail[-6000:] + "\n```")
+          data = json.dumps({"body": body}).encode()
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['REPO']}/issues/{os.environ['PR']}/comments",
+              data=data, method="POST",
+              headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                       "Accept": "application/vnd.github+json"})
+          urllib.request.urlopen(req)
+          print("posted failure log to PR")
+          PY
 
       - name: Run CRUD lifecycles (manual + opt-in only)
         if: ${{ github.event.inputs.allow_mutations == 'true' }}
