@@ -49,18 +49,31 @@ def _jsonpath_get(obj, expr: str):
 def _capture(body, expr):
     """Capture a value from a response. `expr` is either a JSONPath string
     ("$.a.b", "$.items[0].id") or a filter object that selects the first list
-    element matching a field prefix:
-        {"list": "$.server_types", "where_prefix": {"id": "s"}, "get": "id"}
-    (used to pick a standard server type, skipping GPU 'g*' types, etc.)."""
+    element matching field prefixes:
+        {"list": "$.server_types", "where_prefix": {"id": "s"},
+         "where_not_prefix": {"id": "g"}, "get": "id"}
+    `where_prefix` keeps only items whose field startswith the value; the value
+    of `where_not_prefix` may be a string or list of prefixes to EXCLUDE (e.g.
+    exclude GPU 'g*' server types)."""
     if body is None:
         return None
     if isinstance(expr, str):
         return _jsonpath_get(body, expr)
     items = _jsonpath_get(body, expr["list"]) or []
     where = expr.get("where_prefix", {})
+    wnot = expr.get("where_not_prefix", {})
     for item in items:
-        if isinstance(item, dict) and all(
-                str(item.get(k, "")).startswith(v) for k, v in where.items()):
+        if not isinstance(item, dict):
+            continue
+        if not all(str(item.get(k, "")).startswith(v) for k, v in where.items()):
+            continue
+        excluded = False
+        for k, pfx in wnot.items():
+            prefixes = [pfx] if isinstance(pfx, str) else pfx
+            if any(str(item.get(k, "")).startswith(p) for p in prefixes):
+                excluded = True
+                break
+        if not excluded:
             return item.get(expr["get"])
     return None
 
