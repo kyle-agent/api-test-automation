@@ -30,8 +30,18 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 
+def _env(name: str, default: str = "") -> str:
+    """Like os.environ.get, but an empty value counts as unset.
+
+    CI passes optional inputs as empty strings (e.g. SCP_HOST_TEMPLATE: ${{ vars.X }}
+    with X unset), which would otherwise shadow the intended default.
+    """
+    val = os.environ.get(name)
+    return val if val not in (None, "") else default
+
+
 def _bool(name: str, default: bool = False) -> bool:
-    return os.environ.get(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
+    return _env(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
 def _json_env(name: str) -> dict:
@@ -60,36 +70,36 @@ class Settings:
     #   1. SCP_SERVICE_HOSTS override map  (JSON: {"<service>": "<host-or-url>"})
     #   2. host template + region + env   (the common case)
     #   3. SCP_BASE_URL                    (explicit single-host fallback)
-    region: str = field(default_factory=lambda: os.environ.get("SCP_REGION", ""))
-    env_code: str = field(default_factory=lambda: os.environ.get("SCP_ENV", "e"))
-    host_template: str = field(default_factory=lambda: os.environ.get(
+    region: str = field(default_factory=lambda: _env("SCP_REGION"))
+    env_code: str = field(default_factory=lambda: _env("SCP_ENV", "e"))
+    host_template: str = field(default_factory=lambda: _env(
         "SCP_HOST_TEMPLATE", "https://{service}.{region}.{env}.samsungsdscloud.com"))
     # Optional explicit overrides for services whose API subdomain differs from
     # the catalog service name, or to pin a full URL.
     service_hosts: dict = field(default_factory=lambda: _json_env("SCP_SERVICE_HOSTS"))
     # Explicit single-host fallback (rarely enough on its own — see note above).
-    base_url: str = field(default_factory=lambda: os.environ.get("SCP_BASE_URL", "").rstrip("/"))
+    base_url: str = field(default_factory=lambda: _env("SCP_BASE_URL").rstrip("/"))
 
     # --- Credentials --------------------------------------------------------
-    access_key: str = field(default_factory=lambda: os.environ.get("SCP_ACCESS_KEY", ""))
-    secret_key: str = field(default_factory=lambda: os.environ.get("SCP_SECRET_KEY", ""))
+    access_key: str = field(default_factory=lambda: _env("SCP_ACCESS_KEY"))
+    secret_key: str = field(default_factory=lambda: _env("SCP_SECRET_KEY"))
     # Optional tenant/project scoping headers used by many SCP services.
-    project_id: str = field(default_factory=lambda: os.environ.get("SCP_PROJECT_ID", ""))
+    project_id: str = field(default_factory=lambda: _env("SCP_PROJECT_ID"))
 
     # --- Auth scheme (pluggable / configurable) -----------------------------
     # The exact HMAC header names + signing string must be confirmed against the
     # SCP User Guide / a real 200 response. They are configurable so the suite
     # can be aligned without code changes. Defaults follow the documented
     # "Access Key + HMAC-SHA256" pattern.
-    auth_scheme: str = field(default_factory=lambda: os.environ.get("SCP_AUTH_SCHEME", "hmac"))
+    auth_scheme: str = field(default_factory=lambda: _env("SCP_AUTH_SCHEME", "hmac"))
     hmac_access_header: str = field(
-        default_factory=lambda: os.environ.get("SCP_HMAC_ACCESS_HEADER", "x-cmp-accesskey"))
+        default_factory=lambda: _env("SCP_HMAC_ACCESS_HEADER", "x-cmp-accesskey"))
     hmac_signature_header: str = field(
-        default_factory=lambda: os.environ.get("SCP_HMAC_SIGNATURE_HEADER", "x-cmp-signature"))
+        default_factory=lambda: _env("SCP_HMAC_SIGNATURE_HEADER", "x-cmp-signature"))
     hmac_timestamp_header: str = field(
-        default_factory=lambda: os.environ.get("SCP_HMAC_TIMESTAMP_HEADER", "x-cmp-timestamp"))
+        default_factory=lambda: _env("SCP_HMAC_TIMESTAMP_HEADER", "x-cmp-timestamp"))
     project_header: str = field(
-        default_factory=lambda: os.environ.get("SCP_PROJECT_HEADER", "x-cmp-project-id"))
+        default_factory=lambda: _env("SCP_PROJECT_HEADER", "x-cmp-project-id"))
 
     # --- Run behaviour ------------------------------------------------------
     timeout: int = field(default_factory=lambda: int(os.environ.get("SCP_TIMEOUT", "60")))
