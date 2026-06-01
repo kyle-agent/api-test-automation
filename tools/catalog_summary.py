@@ -6,7 +6,11 @@ read-only smoke suite can exercise directly vs. those needing CRUD lifecycles.
 """
 from __future__ import annotations
 
+import sys
 from collections import Counter, defaultdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from framework.catalog import load_catalog
 

@@ -1,4 +1,5 @@
 """Shared pytest fixtures and CLI options for the SCP regression suite."""
+# CRUD lifecycle run: resource-group + vpc/subnet + virtualserver (opt-in).
 from __future__ import annotations
 
 import pytest
@@ -23,3 +24,13 @@ def cfg():
 def client(cfg):
     cfg.require_credentials()
     return ApiClient(cfg)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _reset_smoke_status():
+    """Start each run with a fresh status log for the CI summary."""
+    from pathlib import Path
+    p = Path("reports/smoke_status.tsv")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("")
+    yield

@@ -60,9 +60,18 @@ class ApiClient:
 
     # -- request -------------------------------------------------------------
     def request(self, method: str, path: str, *, params: dict | None = None,
-                json: Any | None = None, headers: dict | None = None) -> Response:
+                json: Any | None = None, headers: dict | None = None,
+                service: str | None = None) -> Response:
         self._guard(method)
-        url = path if path.startswith("http") else f"{self.cfg.base_url}{path}"
+        if path.startswith("http"):
+            url = path
+        else:
+            url = f"{self.cfg.resolve_base_url(service)}{path}"
+        # Fold query params into the URL BEFORE signing: SCP signs the full URL,
+        # so the signed string must include the query string we actually send.
+        if params:
+            from urllib.parse import urlencode
+            url = url + ("&" if "?" in url else "?") + urlencode(params)
         body = _json.dumps(json).encode("utf-8") if json is not None else b""
         backoff = 2.0
         last_exc: Exception | None = None
@@ -76,7 +85,7 @@ class ApiClient:
             start = time.monotonic()
             try:
                 resp = self.session.request(
-                    method.upper(), url, params=params,
+                    method.upper(), url,
                     data=body if json is not None else None,
                     headers=hdrs, timeout=self.cfg.timeout)
             except requests.RequestException as exc:
