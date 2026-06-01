@@ -127,45 +127,41 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           python - <<'PY'
-          import glob, json, os, urllib.request, xml.etree.ElementTree as ET
-          tot=fail=err=skip=0
-          failed=[]
-          files=glob.glob("reports/junit.xml")
-          for f in files:
-              for tc in ET.parse(f).getroot().iter("testcase"):
-                  tot+=1
-                  name=tc.get("name","").replace("test_endpoint_reachable","").strip("[]")
-                  fnode=tc.find("failure"); enode=tc.find("error"); snode=tc.find("skipped")
-                  if fnode is not None or enode is not None:
-                      node=fnode if fnode is not None else enode
-                      if fnode is not None: fail+=1
-                      else: err+=1
-                      msg=(node.get("message") or "").strip().splitlines()
-                      failed.append((name, msg[0][:160] if msg else node.tag))
-                  elif snode is not None:
-                      skip+=1
-          called=tot-skip
-          passed=tot-fail-err-skip
-          if not files:
-              body=("### Read-only smoke — run could not produce results\n"
-                    "No junit.xml (failed before tests ran). Check the earlier steps.")
+          import json, os, urllib.request
+          from collections import Counter, defaultdict
+          rows=[]
+          try:
+              for ln in open("reports/smoke_status.tsv"):
+                  parts=ln.rstrip("\n").split("\t")
+                  if len(parts)>=4:
+                      rows.append((int(parts[0]), parts[1], parts[2], parts[3]))
+          except FileNotFoundError:
+              pass
+          if not rows:
+              body=("### Read-only smoke — no results\n"
+                    "No statuses recorded (run failed before calling endpoints).")
           else:
-              lines=[f"### Read-only smoke result",
-                     f"- endpoints collected: **{tot}**",
-                     f"- actually called (read-only GET): **{called}**",
-                     f"- ✅ passed: **{passed}**  ❌ failed: **{fail}**  ⚠️ errors: **{err}**  ⏭️ skipped: **{skip}**"]
-              if failed:
-                  shown=failed[:50]
-                  lines.append("\n<details><summary>Failing endpoints "
-                               f"({len(failed)} shown {len(shown)})</summary>\n")
-                  for nm,reason in shown:
-                      lines.append(f"- `{nm}` — {reason}")
-                  if len(failed)>len(shown):
-                      lines.append(f"- … and {len(failed)-len(shown)} more")
+              dist=Counter(s for s,_,_,_ in rows)
+              called=len(rows)
+              ok2xx=sum(n for s,n in dist.items() if 200<=s<300)
+              hardfail=sum(n for s,n in dist.items() if s==401 or s>=500)
+              lines=[f"### Read-only smoke result ({called} endpoints called)",
+                     f"- ✅ 2xx: **{ok2xx}**   ⛔ hard-fail (401/5xx): **{hardfail}**",
+                     "- status distribution: " + ", ".join(
+                         f"`{s}`×{n}" for s,n in sorted(dist.items()))]
+              by=defaultdict(list)
+              for s,key,_,path in rows:
+                  if not (200<=s<300):
+                      by[s].append((key,path))
+              for s in sorted(by):
+                  tag={400:"missing required query params",403:"no permission for this key",
+                       404:"not provisioned / not found",409:"conflict",422:"unprocessable",
+                       500:"SERVER ERROR",502:"SERVER ERROR",503:"SERVER ERROR",401:"AUTH FAIL"}.get(s,"")
+                  items=by[s][:25]
+                  lines.append(f"\n<details><summary><code>{s}</code> ×{len(by[s])} — {tag}</summary>\n")
+                  lines += [f"- `{k}` — `{p}`" for k,p in items]
+                  if len(by[s])>len(items): lines.append(f"- … and {len(by[s])-len(items)} more")
                   lines.append("\n</details>")
-              else:
-                  lines.append("\nAll called endpoints returned a non-error, "
-                               "authenticated response. 🎉")
               body="\n".join(lines)
           data=json.dumps({"body":body}).encode()
           req=urllib.request.Request(
@@ -174,12 +170,13 @@ jobs:
               headers={"Authorization": f"Bearer {os.environ['GH_TOKEN']}",
                        "Accept":"application/vnd.github+json"})
           urllib.request.urlopen(req)
-          print(f"posted result summary: called={called} passed={passed} fail={fail} err={err}")
+          print("posted smoke summary")
           PY
 
       - name: Run CRUD lifecycles (opt-in only)
         id: crud
-        if: ${{ github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true' }}
+        # Runs independently of the smoke outcome (always), when opted in.
+        if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         run: |
           echo "Running CRUD lifecycles (creates/deletes REAL resources)" | tee reports/crud.log
           set -o pipefail
