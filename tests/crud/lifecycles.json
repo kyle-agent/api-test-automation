@@ -4,7 +4,7 @@
     {
       "id": "resourcemanager-resource-group",
       "service": "management/resourcemanager",
-      "enabled": false,
+      "enabled": true,
       "steps": [
         {
           "name": "create",
@@ -55,7 +55,7 @@
     {
       "id": "networking-vpc-subnet",
       "service": "networking/vpc",
-      "enabled": false,
+      "enabled": true,
       "steps": [
         {
           "name": "create-vpc",
@@ -191,7 +191,7 @@
     {
       "id": "container-scr-registry",
       "service": "container/scr",
-      "enabled": false,
+      "enabled": true,
       "steps": [
         {
           "name": "create",
@@ -283,7 +283,7 @@
     {
       "id": "filestorage-volume",
       "service": "storage/filestorage",
-      "enabled": false,
+      "enabled": true,
       "steps": [
         {
           "name": "create",
@@ -367,7 +367,7 @@
       "id": "container-ske-cluster-nodepool",
       "service": "container/ske",
       "enabled": true,
-      "_note": "Full K8s stack: vpc->subnet->sg->keypair->discover k8s version & server type->create cluster->poll RUNNING (slow, ~20min)->create nodepool->poll Running (boots node VMs)->delete nodepool->delete cluster->teardown. SLOW (~40-60min) and BILLABLE (control plane + node VMs). First runs may need field tuning (k8s version currency, volume fields, image_os).",
+      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed.",
       "steps": [
         {
           "name": "create-vpc",
@@ -847,7 +847,7 @@
     {
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
-      "enabled": false,
+      "enabled": true,
       "_note": "VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs.",
       "steps": [
         {
