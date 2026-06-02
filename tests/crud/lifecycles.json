@@ -565,6 +565,198 @@
       ]
     },
     {
+      "id": "networking-security-group",
+      "service": "networking/security-group",
+      "enabled": true,
+      "_note": "Light, self-contained: security groups are account/region-scoped (no VPC needed, per validated VM/ske lifecycles). Create SG + an ingress rule, read, list, delete both.",
+      "steps": [
+        {
+          "name": "create-sg",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "get-sg",
+          "method": "GET",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "create-rule",
+          "method": "POST",
+          "path": "/v1/security-group-rules",
+          "json": {
+            "security_group_id": "{sg_id}",
+            "direction": "ingress",
+            "ethertype": "IPv4",
+            "protocol": "tcp",
+            "port_range_min": "22",
+            "port_range_max": "22",
+            "remote_ip_prefix": "0.0.0.0/0",
+            "remote_group_id": "",
+            "description": "API regression suite"
+          },
+          "expect_status": [
+            200,
+            201
+          ],
+          "capture": {
+            "rule_id": "$.security_group_rule.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-group-rules/{rule_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "get-rule",
+          "method": "GET",
+          "path": "/v1/security-group-rules/{rule_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-rules",
+          "method": "GET",
+          "path": "/v1/security-group-rules",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-rule",
+          "method": "DELETE",
+          "path": "/v1/security-group-rules/{rule_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-sg",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "networking-dns-hostedzone",
+      "service": "networking/dns",
+      "enabled": true,
+      "_note": "Light, self-contained public hosted zone: create (202 async) -> wait active -> read -> delete (202 async) -> wait gone. No VPC/private-dns dependency.",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/hosted-zones",
+          "json": {
+            "name": "regr{unique}.example.com",
+            "description": "API regression suite",
+            "type": "public",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "zone_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/hosted-zones/{zone_id}",
+            "service": "dns"
+          }
+        },
+        {
+          "name": "wait-active",
+          "method": "GET",
+          "path": "/v1/hosted-zones/{zone_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.status",
+            "until": [
+              "ACTIVE",
+              "active",
+              "RUNNING",
+              "CREATED"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/hosted-zones",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/hosted-zones/{zone_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-gone",
+          "method": "GET",
+          "path": "/v1/hosted-zones/{zone_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        }
+      ]
+    },
+    {
       "id": "container-ske-cluster-nodepool",
       "service": "container/ske",
       "enabled": true,
