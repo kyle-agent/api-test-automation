@@ -191,7 +191,7 @@
     {
       "id": "container-scr-registry",
       "service": "container/scr",
-      "enabled": false,
+      "enabled": true,
       "steps": [
         {
           "name": "create",
@@ -258,8 +258,8 @@
           "retry_on_status": [
             500
           ],
-          "retries": 4,
-          "retry_interval": 20
+          "retries": 12,
+          "retry_interval": 30
         },
         {
           "name": "wait-gone",
@@ -278,7 +278,7 @@
           }
         }
       ],
-      "_note": "Registry CREATE/READ/LIST pass; DELETE returns 500 (ContactAdminForAssistance) for a while right after creation but becomes deletable later (the leftover sweep, which retries 500, succeeds with 202). Disabled by default to avoid per-run churn; to enable, add a longer wait before delete or rely on the sweep to reap regrscr* registries."
+      "_note": "Registry DELETE returns 500 for a few minutes right after creation (provisioning race), then succeeds; the delete step retries 500 up to ~6 min. Enabled."
     },
     {
       "id": "filestorage-volume",
@@ -360,6 +360,487 @@
             "timeout": 300,
             "interval": 15
           }
+        }
+      ]
+    },
+    {
+      "id": "container-ske-cluster-nodepool",
+      "service": "container/ske",
+      "enabled": true,
+      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression SKE",
+            "cidr": "10.125.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression SKE",
+            "cidr": "10.125.1.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-sg",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression SKE",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-keypair",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "find-k8s-version",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/kubernetes-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "kube_ver": "$.kubernetes_versions[0].kubernetes_version"
+          }
+        },
+        {
+          "name": "find-server-type",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "server_type_id": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": "g"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-vol",
+          "service": "filestorage",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrfsk{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "ske_vol_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{ske_vol_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-vol",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{ske_vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-cluster",
+          "service": "ske",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrske{unique}",
+            "kubernetes_version": "{kube_ver}",
+            "cloud_logging_enabled": "false",
+            "vpc_id": "{vpc_id}",
+            "subnet_id": "{subnet_id}",
+            "security_group_id_list": [
+              "{sg_id}"
+            ],
+            "private_endpoint_access_control_resources": [],
+            "tags": [],
+            "volume_id": "{ske_vol_id}",
+            "public_endpoint_access_control_ip": "0.0.0.0/0",
+            "service_watch_logging_enabled": "true"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "ske"
+          }
+        },
+        {
+          "name": "wait-cluster",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "create-nodepool",
+          "service": "ske",
+          "method": "POST",
+          "path": "/v1/nodepools",
+          "json": {
+            "cluster_id": "{cluster_id}",
+            "name": "regrnp{unique}",
+            "kubernetes_version": "{kube_ver}",
+            "desired_node_count": "1",
+            "min_node_count": "1",
+            "max_node_count": "2",
+            "server_type_id": "{server_type_id}",
+            "image_os": "ubuntu",
+            "image_os_version": "22.04",
+            "keypair_name": "regrkey{unique}",
+            "volume_size": "104",
+            "volume_type_name": "SSD_Provisioned",
+            "is_auto_recovery": "true",
+            "is_auto_scale": "false",
+            "volume_max_iops": "10000",
+            "volume_max_throughput": "500"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "nodepool_id": "$.nodepool.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/nodepools/{nodepool_id}",
+            "service": "ske"
+          }
+        },
+        {
+          "name": "wait-nodepool",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "list-nodepools",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/nodepools",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-nodepool",
+          "service": "ske",
+          "method": "DELETE",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 30
+        },
+        {
+          "name": "wait-nodepool-gone",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 900,
+            "interval": 30
+          }
+        },
+        {
+          "name": "delete-cluster",
+          "service": "ske",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 8,
+          "retry_interval": 30
+        },
+        {
+          "name": "wait-cluster-gone",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "delete-vol",
+          "service": "filestorage",
+          "method": "DELETE",
+          "path": "/v1/volumes/{ske_vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-keypair",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-sg",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
         }
       ]
     },

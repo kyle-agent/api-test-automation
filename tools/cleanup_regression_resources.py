@@ -122,6 +122,26 @@ def main() -> int:
         vid = it.get("volume_id") or it.get("id")
         if vid and _delete(c, "filestorage", f"/v1/volumes/{vid}"):
             deleted += 1
+    # 8. ske clusters (regrske) — delete their nodepools first, then the cluster
+    for it in _list(c, "ske", "/v1/clusters", "regrske"):
+        cid = it.get("id")
+        try:
+            nps = _items(c.get(f"/v1/clusters/{cid}/nodepools", service="ske").body)
+        except Exception:
+            nps = []
+        for np in nps:
+            npid = np.get("id") if isinstance(np, dict) else None
+            if npid:
+                _delete(c, "ske", f"/v1/nodepools/{npid}")
+                _wait_gone(c, "ske", f"/v1/nodepools/{npid}", 600, 30)
+        for _ in range(8):
+            st = _delete(c, "ske", f"/v1/clusters/{cid}")
+            print(f"  delete cluster {_name_of(it)} ({cid}) -> {st}")
+            if st in (200, 202, 204):
+                deleted += 1; break
+            if st in (409, 500):
+                time.sleep(30); continue
+            break
     print(f"sweep done: {deleted} resource(s) deleted")
     return 0
 
