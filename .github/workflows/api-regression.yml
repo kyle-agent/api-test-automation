@@ -33,6 +33,10 @@ on:
         description: "Also allow DELETE in CRUD lifecycles"
         type: boolean
         default: false
+      run_heavy:
+        description: "Also run HEAVY lifecycles (real VM + K8s cluster, ~40+ min)"
+        type: boolean
+        default: false
 
 concurrency:
   group: scp-api-regression-${{ github.ref }}
@@ -67,6 +71,10 @@ jobs:
       # setting the repo variable SCP_RUN_CRUD=true to opt a PR run into CRUD.
       SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+      # Heavy lifecycles (real VM + K8s cluster) are slow (~40+ min) and run
+      # ONLY via a manual dispatch with run_heavy=true (or repo var SCP_RUN_HEAVY).
+      # Routine PR/scheduled CRUD runs the 4 light lifecycles and skips these.
+      SCP_RUN_HEAVY: ${{ (github.event.inputs.run_heavy == 'true' || vars.SCP_RUN_HEAVY == 'true') }}
       PYTHONPATH: ${{ github.workspace }}
     steps:
       - uses: actions/checkout@v4

@@ -140,6 +140,8 @@ _active = [lc for lc in LIFECYCLES if lc.get("enabled")]
 def test_crud_lifecycle(lifecycle, client, cfg):
     if not cfg.allow_mutations:
         pytest.skip("set SCP_ALLOW_MUTATIONS=true to run CRUD lifecycle tests")
+    if lifecycle.get("heavy") and not cfg.run_heavy:
+        pytest.skip("heavy lifecycle (real VM / K8s) — set SCP_RUN_HEAVY=true (manual dispatch) to run")
 
     # lifecycle "service" is "<category>/<service>"; the host uses the service
     # part. Individual steps may override it (chains span several services).

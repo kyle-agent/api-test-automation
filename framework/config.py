@@ -136,6 +136,8 @@ class Settings:
     # --- Run behaviour ------------------------------------------------------
     timeout: int = field(default_factory=lambda: int(os.environ.get("SCP_TIMEOUT", "60")))
     max_retries: int = field(default_factory=lambda: int(os.environ.get("SCP_MAX_RETRIES", "4")))
+    # Heavy lifecycles (real VM / K8s cluster) only run when opted in.
+    run_heavy: bool = field(default_factory=lambda: _bool("SCP_RUN_HEAVY", False))
     # Safety gate: mutating operations (POST/PUT/PATCH/DELETE) are skipped
     # unless this is explicitly enabled, so a smoke run never creates/deletes
     # real cloud resources by accident.
