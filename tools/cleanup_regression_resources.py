@@ -142,6 +142,16 @@ def main() -> int:
             if st in (409, 500):
                 time.sleep(30); continue
             break
+    # 9. light, self-contained resources (no dependencies): secrets, certs, queues
+    for it in _list(c, "secretsmanager", "/v1/secrets", "regrsec"):
+        if it.get("id") and _delete(c, "secretsmanager", f"/v1/secrets/{it['id']}"):
+            deleted += 1
+    for it in _list(c, "certificatemanager", "/v1/certificatemanager", "regrcert"):
+        if it.get("id") and _delete(c, "certificatemanager", f"/v1/certificatemanager/{it['id']}"):
+            deleted += 1
+    for it in _list(c, "queueservice", "/v1/queues", "regrq"):
+        if it.get("id") and _delete(c, "queueservice", f"/v1/queues/{it['id']}"):
+            deleted += 1
     print(f"sweep done: {deleted} resource(s) deleted")
     return 0
 

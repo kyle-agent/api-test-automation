@@ -364,6 +364,207 @@
       ]
     },
     {
+      "id": "security-secretsmanager-secret",
+      "service": "security/secretsmanager",
+      "enabled": true,
+      "_note": "Light, self-contained (no VPC/KMS dependency): create a secret, read it, list, delete. Synchronous.",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/secrets",
+          "json": {
+            "name": "regrsec{unique}",
+            "secret_value": "{\"k\":\"v\"}",
+            "acl_cidr": "0.0.0.0/0",
+            "private_acl_enabled": "false",
+            "private_acl_resources": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201
+          ],
+          "capture": {
+            "secret_id": "$.secret.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/secrets/{secret_id}",
+            "service": "secretsmanager"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/secrets/{secret_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/secrets",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/secrets/{secret_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-gone",
+          "method": "GET",
+          "path": "/v1/secrets/{secret_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 120,
+            "interval": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "security-certificatemanager-selfsign",
+      "service": "security/certificatemanager",
+      "enabled": true,
+      "_note": "Light, self-contained: issue a self-signed certificate, read it, list, delete. Synchronous.",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/certificatemanager/self-sign",
+          "json": {
+            "cn": "regr{unique}.example.com",
+            "name": "regrcert{unique}",
+            "not_before_dt": "20250101",
+            "not_after_dt": "20300101",
+            "organization": "regression",
+            "recipients": [],
+            "region": "{region}",
+            "tags": [],
+            "timezone": "Asia/Seoul"
+          },
+          "expect_status": [
+            200,
+            201
+          ],
+          "capture": {
+            "cert_id": "$.certificate.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/certificatemanager/{cert_id}",
+            "service": "certificatemanager"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/certificatemanager/{cert_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/certificatemanager",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/certificatemanager/{cert_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "application-queueservice-queue",
+      "service": "application-service/queueservice",
+      "enabled": true,
+      "_note": "Light, self-contained: create a Standard queue, read it, list, delete. Synchronous.",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/queues",
+          "json": {
+            "name": "regrq{unique}",
+            "description": "API regression suite",
+            "message_retention_period": 40,
+            "message_retention_period_unit": "minute",
+            "message_size": 256,
+            "data_key_reuse_period": 40,
+            "data_key_reuse_period_unit": "minute",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201
+          ],
+          "capture": {
+            "queue_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/queues/{queue_id}",
+            "service": "queueservice"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/queues/{queue_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/queues",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/queues/{queue_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
       "id": "container-ske-cluster-nodepool",
       "service": "container/ske",
       "enabled": true,
