@@ -142,10 +142,7 @@ def main() -> int:
             if st in (409, 500):
                 time.sleep(30); continue
             break
-    # 9. light, self-contained resources (no dependencies): secrets, certs, queues
-    for it in _list(c, "secretsmanager", "/v1/secrets", "regrsec"):
-        if it.get("id") and _delete(c, "secretsmanager", f"/v1/secrets/{it['id']}"):
-            deleted += 1
+    # 9. light, self-contained resources (no dependencies): certs, queues
     for it in _list(c, "certificatemanager", "/v1/certificatemanager", "regrcert"):
         if it.get("id") and _delete(c, "certificatemanager", f"/v1/certificatemanager/{it['id']}"):
             deleted += 1

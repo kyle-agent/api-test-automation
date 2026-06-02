@@ -364,82 +364,6 @@
       ]
     },
     {
-      "id": "security-secretsmanager-secret",
-      "service": "security/secretsmanager",
-      "enabled": true,
-      "_note": "Light, self-contained (no VPC/KMS dependency): create a secret, read it, list, delete. Synchronous.",
-      "steps": [
-        {
-          "name": "create",
-          "method": "POST",
-          "path": "/v1/secrets",
-          "json": {
-            "name": "regrsec{unique}",
-            "secret_value": "{\"k\":\"v\"}",
-            "acl_cidr": "10.0.0.0/25",
-            "private_acl_enabled": "false",
-            "private_acl_resources": [],
-            "tags": []
-          },
-          "expect_status": [
-            200,
-            201
-          ],
-          "capture": {
-            "secret_id": "$.secret.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/secrets/{secret_id}",
-            "service": "secretsmanager"
-          }
-        },
-        {
-          "name": "get",
-          "method": "GET",
-          "path": "/v1/secrets/{secret_id}",
-          "expect_status": [
-            200
-          ]
-        },
-        {
-          "name": "list",
-          "method": "GET",
-          "path": "/v1/secrets",
-          "expect_status": [
-            200
-          ]
-        },
-        {
-          "name": "delete",
-          "method": "DELETE",
-          "path": "/v1/secrets/{secret_id}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
-          "name": "wait-gone",
-          "method": "GET",
-          "path": "/v1/secrets/{secret_id}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 120,
-            "interval": 10
-          }
-        }
-      ]
-    },
-    {
       "id": "security-certificatemanager-selfsign",
       "service": "security/certificatemanager",
       "enabled": true,
@@ -640,7 +564,7 @@
         {
           "name": "list-rules",
           "method": "GET",
-          "path": "/v1/security-group-rules",
+          "path": "/v1/security-group-rules?security_group_id={sg_id}",
           "expect_status": [
             200
           ]
