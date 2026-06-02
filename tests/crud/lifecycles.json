@@ -4,7 +4,7 @@
     {
       "id": "resourcemanager-resource-group",
       "service": "management/resourcemanager",
-      "enabled": true,
+      "enabled": false,
       "steps": [
         {
           "name": "create",
@@ -55,7 +55,7 @@
     {
       "id": "networking-vpc-subnet",
       "service": "networking/vpc",
-      "enabled": true,
+      "enabled": false,
       "steps": [
         {
           "name": "create-vpc",
@@ -191,7 +191,7 @@
     {
       "id": "container-scr-registry",
       "service": "container/scr",
-      "enabled": true,
+      "enabled": false,
       "steps": [
         {
           "name": "create",
@@ -283,7 +283,7 @@
     {
       "id": "filestorage-volume",
       "service": "storage/filestorage",
-      "enabled": true,
+      "enabled": false,
       "steps": [
         {
           "name": "create",
@@ -534,6 +534,49 @@
           }
         },
         {
+          "name": "create-vol",
+          "service": "filestorage",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrfsk{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "ske_vol_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{ske_vol_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-vol",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{ske_vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
           "name": "create-cluster",
           "service": "ske",
           "method": "POST",
@@ -548,7 +591,11 @@
               "{sg_id}"
             ],
             "private_endpoint_access_control_resources": [],
-            "tags": []
+            "tags": [],
+            "volume_id": [
+              "{ske_vol_id}"
+            ],
+            "public_endpoint_access_control_ip": "0.0.0.0/0"
           },
           "expect_status": [
             200,
@@ -716,6 +763,18 @@
             "timeout": 1200,
             "interval": 30
           }
+        },
+        {
+          "name": "delete-vol",
+          "service": "filestorage",
+          "method": "DELETE",
+          "path": "/v1/volumes/{ske_vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
         },
         {
           "name": "delete-keypair",
