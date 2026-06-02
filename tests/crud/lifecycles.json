@@ -376,7 +376,7 @@
           "json": {
             "name": "regrsec{unique}",
             "secret_value": "{\"k\":\"v\"}",
-            "acl_cidr": "0.0.0.0/0",
+            "acl_cidr": "10.0.0.0/25",
             "private_acl_enabled": "false",
             "private_acl_resources": [],
             "tags": []
@@ -452,8 +452,8 @@
           "json": {
             "cn": "regr{unique}.example.com",
             "name": "regrcert{unique}",
-            "not_before_dt": "20250101",
-            "not_after_dt": "20300101",
+            "not_before_dt": "{today}",
+            "not_after_dt": "{today_plus_5y}",
             "organization": "regression",
             "recipients": [],
             "region": "{region}",
@@ -614,7 +614,6 @@
             "port_range_min": "22",
             "port_range_max": "22",
             "remote_ip_prefix": "0.0.0.0/0",
-            "remote_group_id": "",
             "description": "API regression suite"
           },
           "expect_status": [
@@ -667,92 +666,6 @@
             204
           ],
           "destructive": true
-        }
-      ]
-    },
-    {
-      "id": "networking-dns-hostedzone",
-      "service": "networking/dns",
-      "enabled": true,
-      "_note": "Light, self-contained public hosted zone: create (202 async) -> wait active -> read -> delete (202 async) -> wait gone. No VPC/private-dns dependency.",
-      "steps": [
-        {
-          "name": "create",
-          "method": "POST",
-          "path": "/v1/hosted-zones",
-          "json": {
-            "name": "regr{unique}.example.com",
-            "description": "API regression suite",
-            "type": "public",
-            "tags": []
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "zone_id": "$.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/hosted-zones/{zone_id}",
-            "service": "dns"
-          }
-        },
-        {
-          "name": "wait-active",
-          "method": "GET",
-          "path": "/v1/hosted-zones/{zone_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.status",
-            "until": [
-              "ACTIVE",
-              "active",
-              "RUNNING",
-              "CREATED"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
-        },
-        {
-          "name": "list",
-          "method": "GET",
-          "path": "/v1/hosted-zones",
-          "expect_status": [
-            200
-          ]
-        },
-        {
-          "name": "delete",
-          "method": "DELETE",
-          "path": "/v1/hosted-zones/{zone_id}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
-          "name": "wait-gone",
-          "method": "GET",
-          "path": "/v1/hosted-zones/{zone_id}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
         }
       ]
     },

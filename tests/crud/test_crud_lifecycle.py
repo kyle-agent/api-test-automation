@@ -148,8 +148,16 @@ def test_crud_lifecycle(lifecycle, client, cfg):
     service = lifecycle.get("service", "").split("/")[-1] or None
 
     # Seed context: {unique} = short lowercase alnum token (safe for name
-    # patterns / length limits), {region} for bodies that need it.
-    ctx: dict[str, str] = {"unique": format(int(time.time()), "x"), "region": cfg.region}
+    # patterns / length limits), {region} for bodies that need it, and
+    # {today}/{today_plus_5y} (YYYYMMDD) for APIs that reject past start dates
+    # (e.g. certificate manager not_before_dt).
+    _now = time.gmtime()
+    ctx: dict[str, str] = {
+        "unique": format(int(time.time()), "x"),
+        "region": cfg.region,
+        "today": time.strftime("%Y%m%d", _now),
+        "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
+    }
     # Teardown stack of (label, method, path, service) for resources created so
     # far, used to best-effort clean up if the lifecycle fails partway — so a
     # failed run never leaks a billable resource (e.g. an orphaned VM).

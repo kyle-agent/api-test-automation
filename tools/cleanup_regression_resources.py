@@ -152,12 +152,9 @@ def main() -> int:
     for it in _list(c, "queueservice", "/v1/queues", "regrq"):
         if it.get("id") and _delete(c, "queueservice", f"/v1/queues/{it['id']}"):
             deleted += 1
-    # security groups created standalone (regrsg) and public hosted zones (regr*.example.com)
+    # security groups created standalone (regrsg)
     for it in _list(c, "security-group", "/v1/security-groups", "regrsg"):
         if it.get("id") and _delete(c, "security-group", f"/v1/security-groups/{it['id']}"):
-            deleted += 1
-    for it in _list(c, "dns", "/v1/hosted-zones", "regr"):
-        if it.get("id") and _delete(c, "dns", f"/v1/hosted-zones/{it['id']}"):
             deleted += 1
     print(f"sweep done: {deleted} resource(s) deleted")
     return 0
