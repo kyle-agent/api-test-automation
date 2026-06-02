@@ -102,10 +102,18 @@ features:
   failed run never leaks a **billable** resource (e.g. an orphaned VM).
 - `destructive: true` marks deletes (need `SCP_ALLOW_DESTRUCTIVE`).
 
-Shipped lifecycles (all gated, opt-in): `resourcemanager-resource-group`,
-`networking-vpc-subnet`, and `compute-virtualserver-full` (vpc → subnet →
-security-group → keypair → discover image/server-type → server → poll ACTIVE →
-reverse teardown). Enable/disable per entry via `"enabled"`.
+Shipped lifecycles (all gated, opt-in). **Light** (run in routine opted-in
+CRUD): `resourcemanager-resource-group`, `networking-vpc-subnet`,
+`container-scr-registry`, `filestorage-volume`,
+`security-certificatemanager-selfsign`, `application-queueservice-queue`,
+`networking-security-group`. **Heavy** (real billable VM / K8s / DB, ~20-40min
+each; run ONLY via dispatch with `run_heavy=true`):
+`compute-virtualserver-full` (vpc → subnet → security-group → keypair →
+discover image/server-type → server → poll ACTIVE → reverse teardown),
+`container-ske-cluster-nodepool` (K8s cluster + worker node pool), and
+`database-mysql-cluster` (MySQL DBaaS cluster on its own vpc/subnet). Enable/
+disable per entry via `"enabled"`; validate a single heavy lifecycle with the
+dispatch `crud_filter` input (e.g. `database-mysql-cluster`).
 
 Run them only when you mean it:
 

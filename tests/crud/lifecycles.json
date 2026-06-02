@@ -1399,6 +1399,301 @@
         }
       ],
       "heavy": true
+    },
+    {
+      "id": "database-mysql-cluster",
+      "service": "database/mysql",
+      "enabled": true,
+      "heavy": true,
+      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address must sit inside the subnet CIDR.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression DBaaS",
+            "cidr": "10.124.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression DBaaS",
+            "cidr": "10.124.1.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "find-engine-version",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "find-server-type",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-cluster",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrdb{unique}",
+            "instance_name_prefix": "regrdb",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": "",
+              "database_case_sensitive": false,
+              "database_character_set": "utf8mb4",
+              "database_name": "regrdb",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.124.1.10/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "mysql"
+          }
+        },
+        {
+          "name": "wait-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-cluster",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-cluster-gone",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
     }
   ]
 }

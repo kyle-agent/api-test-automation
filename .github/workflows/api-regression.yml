@@ -34,9 +34,13 @@ on:
         type: boolean
         default: false
       run_heavy:
-        description: "Also run HEAVY lifecycles (real VM + K8s cluster, ~40+ min)"
+        description: "Also run HEAVY lifecycles (real VM + K8s cluster + DB, ~40+ min each)"
         type: boolean
         default: false
+      crud_filter:
+        description: "Limit CRUD lifecycles to those matching this -k expression (e.g. database-mysql-cluster). Blank = all enabled."
+        required: false
+        default: ""
 
 concurrency:
   group: scp-api-regression-${{ github.ref }}
@@ -71,9 +75,11 @@ jobs:
       # setting the repo variable SCP_RUN_CRUD=true to opt a PR run into CRUD.
       SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
-      # Heavy lifecycles (real VM + K8s cluster) are slow (~40+ min) and run
-      # ONLY via a manual dispatch with run_heavy=true (or repo var SCP_RUN_HEAVY).
-      # Routine PR/scheduled CRUD runs the 4 light lifecycles and skips these.
+      # Heavy lifecycles (real VM + K8s cluster + DBaaS) are slow (~40+ min
+      # each) and run ONLY via a manual dispatch with run_heavy=true (or repo
+      # var SCP_RUN_HEAVY). Routine PR/scheduled CRUD runs the 7 light
+      # lifecycles and skips these. Use the crud_filter input to validate a
+      # single heavy lifecycle (e.g. database-mysql-cluster) on its own.
       SCP_RUN_HEAVY: ${{ (github.event.inputs.run_heavy == 'true' || vars.SCP_RUN_HEAVY == 'true') }}
       PYTHONPATH: ${{ github.workspace }}
     steps:
@@ -209,10 +215,14 @@ jobs:
         id: crud
         # Runs independently of the smoke outcome (always), when opted in.
         if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        env:
+          CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
         run: |
           echo "Running CRUD lifecycles (creates/deletes REAL resources)" | tee reports/crud.log
+          ARGS="tests/crud -m crud --junitxml=reports/junit-crud.xml"
+          [ -n "$CRUD_FILTER" ] && ARGS="$ARGS -k $CRUD_FILTER"
           set -o pipefail
-          pytest tests/crud -m crud --junitxml=reports/junit-crud.xml 2>&1 | tee -a reports/crud.log
+          pytest $ARGS 2>&1 | tee -a reports/crud.log
 
       - name: Comment CRUD result on PR
         if: ${{ always() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
