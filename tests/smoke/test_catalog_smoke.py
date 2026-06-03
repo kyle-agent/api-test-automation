@@ -37,6 +37,18 @@ def pytest_generate_tests(metafunc):
 _STATUS_FILE = "reports/smoke_status.tsv"
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _reset_smoke_status():
+    """Start the smoke session with a fresh status log. Scoped to the smoke
+    suite (not the root conftest) so a later CRUD pytest session does NOT wipe
+    these rows — CRUD's probe-reads append to them for the dashboard's coverage."""
+    from pathlib import Path
+    p = Path(_STATUS_FILE)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("")
+    yield
+
+
 def _record(endpoint: Endpoint, status: int, category: str) -> None:
     """Append status + category so the CI summary can group results."""
     try:
