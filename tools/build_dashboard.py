@@ -85,6 +85,8 @@ def crud_write_ops(lifecycles, cat):
     hit = set()
     for lc in lifecycles:
         for s in lc.get("steps", []):
+            if not s.get("method") or not s.get("path"):
+                continue  # e.g. probe-reads steps carry no single method/path
             m = s["method"].upper()
             if m == "GET":
                 continue

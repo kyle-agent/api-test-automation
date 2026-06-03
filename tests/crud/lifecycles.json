@@ -40,6 +40,12 @@
           ]
         },
         {
+          "name": "probe-reads",
+          "probe_reads": {
+            "resource_group_id": "{rg_id}"
+          }
+        },
+        {
           "name": "delete",
           "method": "DELETE",
           "path": "/v1/resource-groups/{rg_id}",
@@ -148,6 +154,13 @@
           }
         },
         {
+          "name": "probe-reads",
+          "probe_reads": {
+            "vpc_id": "{vpc_id}",
+            "subnet_id": "{subnet_id}"
+          }
+        },
+        {
           "name": "delete-subnet",
           "method": "DELETE",
           "path": "/v1/subnets/{subnet_id}",
@@ -246,6 +259,12 @@
           ]
         },
         {
+          "name": "probe-reads",
+          "probe_reads": {
+            "registry_id": "{reg_id}"
+          }
+        },
+        {
           "name": "delete",
           "method": "DELETE",
           "path": "/v1/container-registries/{reg_id}",
@@ -335,6 +354,12 @@
           ]
         },
         {
+          "name": "probe-reads",
+          "probe_reads": {
+            "volume_id": "{volume_id}"
+          }
+        },
+        {
           "name": "delete",
           "method": "DELETE",
           "path": "/v1/volumes/{volume_id}",
@@ -414,6 +439,12 @@
           ]
         },
         {
+          "name": "probe-reads",
+          "probe_reads": {
+            "certificate_id": "{cert_id}"
+          }
+        },
+        {
           "name": "delete",
           "method": "DELETE",
           "path": "/v1/certificatemanager/{cert_id}",
@@ -474,6 +505,12 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "queue_id": "{queue_id}"
+          }
         },
         {
           "name": "delete",
@@ -568,6 +605,13 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "security_group_id": "{sg_id}",
+            "security_group_rule_id": "{rule_id}"
+          }
         },
         {
           "name": "delete-rule",
@@ -924,6 +968,13 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}",
+            "nodepool_id": "{nodepool_id}"
+          }
         },
         {
           "name": "delete-nodepool",
@@ -1307,6 +1358,12 @@
           }
         },
         {
+          "name": "probe-reads",
+          "probe_reads": {
+            "server_id": "{server_id}"
+          }
+        },
+        {
           "name": "delete-server",
           "method": "DELETE",
           "path": "/v1/servers/{server_id}",
@@ -1624,6 +1681,12 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}"
+          }
         },
         {
           "name": "delete-cluster",

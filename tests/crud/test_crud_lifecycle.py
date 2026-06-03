@@ -29,6 +29,64 @@ from framework.client import MutationBlocked
 LIFECYCLES = json.loads((Path(__file__).parent / "lifecycles.json").read_text())["lifecycles"]
 _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 
+# Catalog + smoke-tsv recording, used by "probe_reads" steps to exercise the
+# path-parameter GETs the read-only smoke must skip (no resource id), reusing a
+# resource a lifecycle just created. Results land in the same tsv the dashboard
+# reads, so they count toward read coverage.
+_CATALOG_PATH = Path(__file__).parents[2] / "framework" / "api_catalog.json"
+_CATALOG = json.loads(_CATALOG_PATH.read_text()) if _CATALOG_PATH.exists() else []
+_SMOKE_TSV = "reports/smoke_status.tsv"
+
+
+def _categorize(status: int, text: str) -> str:
+    """Same ok/soft/fail split as the smoke suite (only 5xx / HMAC-401 are hard
+    fails; everything else is the API answering correctly given this account)."""
+    t = (text or "").lower()
+    if 200 <= status < 300:
+        return "ok"
+    if status == 401:
+        return "soft" if ("rejected by gateway" in t or "catalog has not target" in t) else "fail"
+    if status >= 500:
+        return "fail"
+    return "soft"  # 400/403/404/409/422 — needs params/permission/provisioning
+
+
+def _record_smoke(status, category, key, method, path):
+    import os
+    try:
+        os.makedirs("reports", exist_ok=True)
+        with open(_SMOKE_TSV, "a") as fh:
+            fh.write(f"{status}\t{category}\t{key}\t{method}\t{path}\n")
+    except OSError:
+        pass
+
+
+def _probe_reads(client, mapping, service):
+    """Call every catalog GET in `service` whose path params are all supplied by
+    `mapping` (catalog-param-name -> already-filled value). Read-only and record
+    only — a probe never fails the lifecycle (a 404/403 sub-resource is fine),
+    but a 5xx/auth fail is recorded so the dashboard flags it."""
+    keys = set(mapping)
+    called = 0
+    for e in _CATALOG:
+        if e.get("service") != service or e.get("method") != "GET":
+            continue
+        params = set(_PLACEHOLDER.findall(e["http_path"]))
+        if not params or not params <= keys:
+            continue
+        path = e["http_path"]
+        for p in params:
+            path = path.replace("{%s}" % p, str(mapping[p]))
+        try:
+            resp = client.get(path, service=service)
+        except Exception as exc:  # network/host issue — record nothing, continue
+            print(f"  probe ERROR {path}: {exc}")
+            continue
+        _record_smoke(resp.status, _categorize(resp.status, getattr(resp, "raw_text", "")),
+                      e["key"], "GET", e["http_path"])
+        called += 1
+    print(f"  probe-reads[{service}]: {called} path-param GET(s) exercised")
+
 
 def _jsonpath_get(obj, expr: str):
     """Tiny `$.a.b` / `$.a[0].b` resolver — enough for capturing ids."""
@@ -177,6 +235,13 @@ def test_crud_lifecycle(lifecycle, client, cfg):
             step_service = step.get("service") or service
             if step.get("wait"):  # let async provisioning settle before this step
                 time.sleep(float(step["wait"]))
+
+            # Read-breadth probe: exercise path-param GETs with this live resource.
+            if step.get("probe_reads"):
+                mapping = {k: _fill(v, ctx) for k, v in step["probe_reads"].items()}
+                _probe_reads(client, mapping, step_service)
+                continue
+
             path = _fill(step["path"], ctx)
             body = _fill_obj(step.get("json"), ctx)
 
