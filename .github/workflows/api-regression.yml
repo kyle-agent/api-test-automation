@@ -136,7 +136,7 @@ jobs:
           pytest $ARGS 2>&1 | tee -a reports/pytest.log
 
       - name: Comment result summary on PR
-        if: ${{ always() && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
@@ -193,7 +193,7 @@ jobs:
         run: python tools/cleanup_regression_resources.py 2>&1 | tee reports/sweep.log
 
       - name: Comment sweep result on PR
-        if: ${{ always() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
@@ -213,8 +213,9 @@ jobs:
 
       - name: Run CRUD lifecycles (opt-in only)
         id: crud
-        # Runs independently of the smoke outcome (always), when opted in.
-        if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        # Runs independently of the smoke outcome, when opted in. Skipped on a
+        # cancelled run so a truncated push doesn't kick off a half CRUD pass.
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
         run: |
@@ -225,7 +226,7 @@ jobs:
           pytest $ARGS 2>&1 | tee -a reports/crud.log
 
       - name: Comment CRUD result on PR
-        if: ${{ always() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
@@ -251,7 +252,7 @@ jobs:
           PY
 
       - name: Build dashboard
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         run: |
           mkdir -p dashboard
           # pull cumulative trend history from the data branch (if it exists)
@@ -264,7 +265,7 @@ jobs:
             --branch "${{ github.ref_name }}"
 
       - name: Publish dashboard to data branch
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: |
           pub=$(mktemp -d)
