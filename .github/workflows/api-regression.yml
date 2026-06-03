@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     env:
       # --- endpoint (per-service hosts: <service>.<region>.<env>.samsungsdscloud.com) ---
@@ -250,6 +250,39 @@ jobs:
           print("posted CRUD result to PR")
           PY
 
+      - name: Build dashboard
+        if: ${{ always() }}
+        run: |
+          mkdir -p dashboard
+          # pull cumulative trend history from the data branch (if it exists)
+          git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || \
+            git fetch origin dashboard-data --depth=1 >/dev/null 2>&1 && \
+            git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || true
+          python tools/build_dashboard.py \
+            --run-type "${{ github.event_name }}" \
+            --sha "${{ github.sha }}" \
+            --branch "${{ github.ref_name }}"
+
+      - name: Publish dashboard to data branch
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          pub=$(mktemp -d)
+          cp dashboard/index.html "$pub"/ 2>/dev/null || true
+          cp dashboard/history.jsonl "$pub"/ 2>/dev/null || true
+          # nojekyll so GitHub Pages serves the raw HTML as-is
+          touch "$pub/.nojekyll"
+          cd "$pub"
+          git init -q -b dashboard-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "dashboard @ ${{ github.sha }} (${{ github.event_name }})" || exit 0
+          git push -f \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            dashboard-data
+          echo "published dashboard-data (enable Pages → Deploy from branch → dashboard-data /root)"
+
       - name: Test result summary
         if: ${{ always() }}
         run: |
@@ -272,4 +305,5 @@ jobs:
           path: |
             reports/report.html
             reports/junit.xml
+            dashboard/index.html
           if-no-files-found: warn

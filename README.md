@@ -126,6 +126,30 @@ In CI, set the repo variable **`SCP_RUN_CRUD=true`** to opt a run into CRUD
 comment. `compute-virtualserver-full` creates a real, billable VM — keep it
 disabled unless you want that.
 
+## Dashboard
+
+Every CI run renders a self-contained HTML dashboard via
+`tools/build_dashboard.py` from the run's real artifacts
+(`reports/smoke_status.tsv` + `reports/junit-crud.xml` + `framework/api_catalog.json`)
+and the `known_issues.json` baseline. It shows:
+
+- **health** — new regressions (vs known baseline), pass rate, operation
+  coverage, known-red count;
+- **coverage** — operation `tested/total`, read (GET) and write (CRUD) splits,
+  plus the swagger-coverage/ReadyAPI measurement axes we do / don't cover;
+- **per-category coverage** with blind-spot flags;
+- **failure taxonomy** (ReportPortal-style) + CRUD lifecycle grid;
+- **trends** — pass-rate and coverage over time.
+
+Coverage is operation-level (a method+path is "covered" once called at least
+once). The generated `index.html` + a cumulative `history.jsonl` (trend data)
+are force-pushed to the **`dashboard-data`** branch each run; generated outputs
+are git-ignored on the working branch. To publish it: repo **Settings → Pages →
+Build and deployment → Deploy from a branch → `dashboard-data` / `(root)`**.
+New regressions are anything classified `fail` whose endpoint key is *not* in
+`known_issues.json` — add an entry there to mute a tracked backend bug (e.g. the
+billingplan `500`) so the dashboard only alarms on genuinely new breakage.
+
 ## Authentication
 
 SCP signs Open API calls with **Access Key + HMAC-SHA256**. The exact
