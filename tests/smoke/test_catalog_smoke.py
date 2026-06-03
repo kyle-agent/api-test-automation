@@ -80,7 +80,15 @@ def test_endpoint_reachable(endpoint: Endpoint, client):
     if endpoint.has_path_params:
         pytest.skip(f"needs a real resource id: {endpoint.http_path}")
 
-    resp = client.get(endpoint.http_path, service=endpoint.service)
+    try:
+        resp = client.get(endpoint.http_path, service=endpoint.service)
+    except Exception as exc:
+        # Transient/host failure (timeout, connection reset). Record it as a
+        # fail (status 0) instead of letting it vanish from the tsv, so the
+        # count stays honest and the dashboard surfaces unreachable services.
+        _record(endpoint, 0, "fail")
+        pytest.fail(f"{endpoint.method} {endpoint.http_path} -> unreachable: {exc}")
+
     category, reason = _categorize(resp.status, resp.raw_text)
     _record(endpoint, resp.status, category)
 
