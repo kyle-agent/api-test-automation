@@ -3963,7 +3963,17 @@
             200
           ],
           "capture": {
-            "vm_image_id": "$.images[0].id"
+            "vm_image_id": {
+              "list": "$.images",
+              "where_prefix": {
+                "scp_image_type": "standard",
+                "status": "active"
+              },
+              "where_not_prefix": {
+                "os_distro": "windows"
+              },
+              "get": "id"
+            }
           }
         },
         {
