@@ -2860,7 +2860,7 @@
       "service": "networking/vpc",
       "heavy": true,
       "enabled": true,
-      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 7 dbaas engines (mysql/postgresql/mariadb/epas/cachestore/eventstreams/searchengine) + 1 VM; sqlserver+vertica excluded (require a real license) created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body).",
+      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 5 dbaas engines (mysql/postgresql/mariadb/epas/cachestore) + 1 VM; eventstreams (undocumented topology value_error), searchengine/sqlserver/vertica (require a real license) excluded. Subnet/vpc teardown retries 409 to wait out async cluster termination. created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body).",
       "steps": [
         {
           "name": "create-vpc",
@@ -3485,205 +3485,6 @@
           }
         },
         {
-          "name": "events-find-version",
-          "service": "eventstreams",
-          "group": "eventstreams",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/engine-versions",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "events_ver": {
-              "list": "$.contents",
-              "get": "id"
-            }
-          }
-        },
-        {
-          "name": "events-find-stype",
-          "service": "eventstreams",
-          "group": "eventstreams",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "events_stype": {
-              "list": "$.contents",
-              "get": "name"
-            }
-          }
-        },
-        {
-          "name": "events-create",
-          "service": "eventstreams",
-          "group": "eventstreams",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/clusters",
-          "json": {
-            "nat_enabled": false,
-            "subnet_id": "{subnet_id}",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "tags": [],
-            "maintenance_option": {
-              "period_hour": "5",
-              "starting_day_of_week": "MON",
-              "starting_time": "0000"
-            },
-            "akhq_enabled": false,
-            "is_combined": true,
-            "init_config_option": {
-              "broker_port": 9091,
-              "broker_sasl_id": "regruser",
-              "broker_sasl_password": "Regr1ss@2026",
-              "zookeeper_port": 2180,
-              "zookeeper_sasl_id": "regruser",
-              "zookeeper_sasl_password": "Regr1ss@2026"
-            },
-            "name": "regrk{ualpha}",
-            "instance_name_prefix": "regrk",
-            "dbaas_engine_version_id": "{events_ver}",
-            "instance_groups": [
-              {
-                "role_type": "ZOOKEEPER_BROKER",
-                "server_type_name": "{events_stype}",
-                "block_storage_groups": [
-                  {
-                    "role_type": "OS",
-                    "size_gb": 104,
-                    "volume_type": "SSD"
-                  }
-                ],
-                "instances": [
-                  {
-                    "role_type": "ZOOKEEPER_BROKER",
-                    "public_ip_id": ""
-                  }
-                ]
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "events_cid": "$.resource.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/clusters/{events_cid}",
-            "service": "eventstreams"
-          }
-        },
-        {
-          "name": "search-find-version",
-          "service": "searchengine",
-          "group": "searchengine",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/engine-versions",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "search_ver": {
-              "list": "$.contents",
-              "get": "id"
-            }
-          }
-        },
-        {
-          "name": "search-find-stype",
-          "service": "searchengine",
-          "group": "searchengine",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "search_stype": {
-              "list": "$.contents",
-              "get": "name"
-            }
-          }
-        },
-        {
-          "name": "search-create",
-          "service": "searchengine",
-          "group": "searchengine",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/clusters",
-          "json": {
-            "nat_enabled": false,
-            "subnet_id": "{subnet_id}",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "tags": [],
-            "maintenance_option": {
-              "period_hour": "5",
-              "starting_day_of_week": "MON",
-              "starting_time": "0000"
-            },
-            "is_combined": false,
-            "license": null,
-            "init_config_option": {
-              "backup_option": {
-                "retention_period_day": "7",
-                "starting_time_hour": "2"
-              },
-              "database_port": 9200,
-              "database_user_name": "regruser",
-              "database_user_password": "Regr1ss@2026"
-            },
-            "name": "regrh{ualpha}",
-            "instance_name_prefix": "regrh",
-            "dbaas_engine_version_id": "{search_ver}",
-            "instance_groups": [
-              {
-                "role_type": "MASTER_DATA",
-                "server_type_name": "{search_stype}",
-                "block_storage_groups": [
-                  {
-                    "role_type": "OS",
-                    "size_gb": 104,
-                    "volume_type": "SSD"
-                  }
-                ],
-                "instances": [
-                  {
-                    "role_type": "MASTER_DATA",
-                    "public_ip_id": ""
-                  }
-                ]
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "search_cid": "$.resource.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/clusters/{search_cid}",
-            "service": "searchengine"
-          }
-        },
-        {
           "name": "vm-create-sg",
           "service": "security-group",
           "group": "vm",
@@ -3746,11 +3547,11 @@
             "vm_image_id": {
               "list": "$.images",
               "where_prefix": {
-                "scp_image_type": "standard",
                 "status": "active"
               },
               "where_not_prefix": {
-                "os_distro": "windows"
+                "os_distro": "windows",
+                "scp_image_type": "custom"
               },
               "get": "id"
             }
@@ -3930,48 +3731,6 @@
           }
         },
         {
-          "name": "events-wait",
-          "service": "eventstreams",
-          "group": "eventstreams",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/clusters/{events_cid}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 2400,
-            "interval": 30
-          }
-        },
-        {
-          "name": "search-wait",
-          "service": "searchengine",
-          "group": "searchengine",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/clusters/{search_cid}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 2400,
-            "interval": 30
-          }
-        },
-        {
           "name": "vm-wait-server",
           "service": "virtualserver",
           "group": "vm",
@@ -4033,24 +3792,6 @@
           "probe_reads": {
             "cluster_id": "{cache_cid}",
             "dbaas_engine_version_id": "{cache_ver}"
-          }
-        },
-        {
-          "name": "events-probe",
-          "service": "eventstreams",
-          "group": "eventstreams",
-          "probe_reads": {
-            "cluster_id": "{events_cid}",
-            "dbaas_engine_version_id": "{events_ver}"
-          }
-        },
-        {
-          "name": "search-probe",
-          "service": "searchengine",
-          "group": "searchengine",
-          "probe_reads": {
-            "cluster_id": "{search_cid}",
-            "dbaas_engine_version_id": "{search_ver}"
           }
         },
         {
@@ -4130,32 +3871,6 @@
           "destructive": true
         },
         {
-          "name": "events-delete",
-          "service": "eventstreams",
-          "group": "eventstreams",
-          "method": "DELETE",
-          "path": "/v1/clusters/{events_cid}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
-          "name": "search-delete",
-          "service": "searchengine",
-          "group": "searchengine",
-          "method": "DELETE",
-          "path": "/v1/clusters/{search_cid}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
           "name": "vm-delete-server",
           "service": "virtualserver",
           "group": "vm",
@@ -4182,7 +3897,7 @@
             "until_status": [
               404
             ],
-            "timeout": 1800,
+            "timeout": 2700,
             "interval": 30
           }
         },
@@ -4200,7 +3915,7 @@
             "until_status": [
               404
             ],
-            "timeout": 1800,
+            "timeout": 2700,
             "interval": 30
           }
         },
@@ -4218,7 +3933,7 @@
             "until_status": [
               404
             ],
-            "timeout": 1800,
+            "timeout": 2700,
             "interval": 30
           }
         },
@@ -4236,7 +3951,7 @@
             "until_status": [
               404
             ],
-            "timeout": 1800,
+            "timeout": 2700,
             "interval": 30
           }
         },
@@ -4254,43 +3969,7 @@
             "until_status": [
               404
             ],
-            "timeout": 1800,
-            "interval": 30
-          }
-        },
-        {
-          "name": "events-gone",
-          "service": "eventstreams",
-          "group": "eventstreams",
-          "method": "GET",
-          "path": "/v1/clusters/{events_cid}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 1800,
-            "interval": 30
-          }
-        },
-        {
-          "name": "search-gone",
-          "service": "searchengine",
-          "group": "searchengine",
-          "method": "GET",
-          "path": "/v1/clusters/{search_cid}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 1800,
+            "timeout": 2700,
             "interval": 30
           }
         },
@@ -4357,8 +4036,8 @@
           "retry_on_status": [
             409
           ],
-          "retries": 10,
-          "retry_interval": 20
+          "retries": 40,
+          "retry_interval": 30
         },
         {
           "name": "wait-subnet-gone",
@@ -4391,8 +4070,8 @@
           "retry_on_status": [
             409
           ],
-          "retries": 10,
-          "retry_interval": 20
+          "retries": 40,
+          "retry_interval": 30
         }
       ]
     },
