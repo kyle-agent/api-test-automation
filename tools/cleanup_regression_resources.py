@@ -39,9 +39,9 @@ def _list(client, service, path, prefix):
             if isinstance(it, dict) and _name_of(it).startswith(prefix)]
 
 
-def _delete(client, service, path):
+def _delete(client, service, path, json=None):
     try:
-        r = client.delete(path, service=service)
+        r = client.delete(path, service=service, json=json)
         return r.status
     except MutationBlocked as exc:
         print(f"  blocked: {exc}"); return None
@@ -162,6 +162,17 @@ def main() -> int:
     for it in _list(c, "security-group", "/v1/security-groups", "regrsg"):
         if it.get("id") and _delete(c, "security-group", f"/v1/security-groups/{it['id']}"):
             deleted += 1
+    # 10. secrets (regrsec) — delete needs a waiting_time_ndays body. Sweep these
+    # before their KMS keys, since a secret references a kms_id.
+    for it in _list(c, "secretsmanager", "/v1/secrets", "regrsec"):
+        if it.get("id") and _delete(c, "secretsmanager", f"/v1/secrets/{it['id']}",
+                                    json={"waiting_time_ndays": 7}):
+            deleted += 1
+    # 11. KMS keys created by the kms + secret lifecycles (regrkms / regrskms)
+    for prefix in ("regrkms", "regrskms"):
+        for it in _list(c, "kms", "/v1/kms/transit", prefix):
+            if it.get("id") and _delete(c, "kms", f"/v1/kms/transit/{it['id']}"):
+                deleted += 1
     print(f"sweep done: {deleted} resource(s) deleted")
     return 0
 

@@ -216,16 +216,16 @@ def test_crud_lifecycle(lifecycle, client, cfg):
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
     }
-    # Teardown stack of (label, method, path, service) for resources created so
+    # Teardown stack of (label, method, path, service, json) for resources created so
     # far, used to best-effort clean up if the lifecycle fails partway — so a
     # failed run never leaks a billable resource (e.g. an orphaned VM).
     cleanups: list[tuple] = []
 
     def _teardown():
-        for label, method, path, svc in reversed(cleanups):
+        for label, method, path, svc, cu_json in reversed(cleanups):
             try:
                 if cfg.allow_destructive:
-                    client.request(method, path, service=svc)
+                    client.request(method, path, json=cu_json, service=svc)
                     print(f"  cleanup: {method} {path}")
             except Exception as exc:  # best-effort; report and continue
                 print(f"  cleanup FAILED for {label} ({path}): {exc}")
@@ -297,7 +297,8 @@ def test_crud_lifecycle(lifecycle, client, cfg):
             cu = step.get("cleanup")
             if cu:
                 cleanups.append((step["name"], cu["method"], _fill(cu["path"], ctx),
-                                 cu.get("service") or step_service))
+                                 cu.get("service") or step_service,
+                                 _fill_obj(cu.get("json"), ctx)))
     except Exception:
         print(f"\n[{lifecycle['id']}] failed — attempting teardown of created resources:")
         _teardown()

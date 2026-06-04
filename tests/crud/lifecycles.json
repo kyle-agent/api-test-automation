@@ -2642,7 +2642,7 @@
       "id": "security-secretsmanager-secret",
       "service": "security/secretsmanager",
       "enabled": true,
-      "_note": "Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down last. secret_value must be a JSON STRING; private_acl_enabled is a string 'false'. Captures $.secret.id / $.key.id confirmed from doc response examples.",
+      "_note": "Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down last. secret_value must be a JSON STRING; private_acl_enabled is a string 'false'. Captures $.secret.id / $.key.id confirmed from doc response examples. Secret DELETE requires a body {waiting_time_ndays} (recovery window) — sent on both the delete step and the cleanup.",
       "steps": [
         {
           "name": "create-kms",
@@ -2698,7 +2698,10 @@
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/secrets/{secret_id}",
-            "service": "secretsmanager"
+            "service": "secretsmanager",
+            "json": {
+              "waiting_time_ndays": 7
+            }
           }
         },
         {
@@ -2727,6 +2730,9 @@
           "name": "delete",
           "method": "DELETE",
           "path": "/v1/secrets/{secret_id}",
+          "json": {
+            "waiting_time_ndays": 7
+          },
           "expect_status": [
             200,
             202,
