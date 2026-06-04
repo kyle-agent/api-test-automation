@@ -211,6 +211,22 @@ jobs:
           urllib.request.urlopen(req); print("posted sweep result")
           PY
 
+      - name: Heavy self-trigger (file flag)
+        if: ${{ !cancelled() }}
+        run: |
+          # A committed .github/heavy.txt lets a heavy lifecycle run be driven by
+          # a plain `git push` (no manual dispatch needed): the first non-comment
+          # line is a pytest -k filter (e.g. compute-virtualserver-full), and its
+          # presence turns on SCP_RUN_HEAVY for this run. Clear the file to stop.
+          if [ -s .github/heavy.txt ]; then
+            f="$(grep -vE '^[[:space:]]*#' .github/heavy.txt | head -1 | tr -d '[:space:]')"
+            if [ -n "$f" ]; then
+              echo "SCP_RUN_HEAVY=true" >> "$GITHUB_ENV"
+              echo "HEAVY_FILTER_FILE=$f" >> "$GITHUB_ENV"
+              echo "heavy self-trigger active: run_heavy=true, crud_filter=$f"
+            fi
+          fi
+
       - name: Run CRUD lifecycles (opt-in only)
         id: crud
         # Runs independently of the smoke outcome, when opted in. Skipped on a
@@ -221,7 +237,8 @@ jobs:
         run: |
           echo "Running CRUD lifecycles (creates/deletes REAL resources)" | tee reports/crud.log
           ARGS="tests/crud -m crud --junitxml=reports/junit-crud.xml"
-          [ -n "$CRUD_FILTER" ] && ARGS="$ARGS -k $CRUD_FILTER"
+          FILTER="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
+          [ -n "$FILTER" ] && ARGS="$ARGS -k $FILTER"
           set -o pipefail
           pytest $ARGS 2>&1 | tee -a reports/crud.log
 
