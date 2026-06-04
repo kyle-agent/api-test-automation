@@ -1542,7 +1542,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra-volume create requires size>=100 for SSD (sent 10 -> 400 despite generic '>=8' msg; aligned to boot-volume scale). Remaining best-guess: extra-volume attach body {server_id}, detach, and AVAILABLE/IN_USE states — verify against live responses.",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra-volume create: POST /v1/volumes wants 'size' as a STRING ('100'), not int — int 10 AND int 100 both 400'd with the same generic 'size >=8' msg (value ignored when sent as a number), whereas the nested boot-volume accepts int. Sent as string now. Remaining best-guess: extra-volume attach body {server_id}, detach, and AVAILABLE/IN_USE states — verify against live responses.",
       "steps": [
         {
           "name": "create-vpc",
@@ -1862,7 +1862,7 @@
           "path": "/v1/volumes",
           "json": {
             "name": "regrvol{unique}",
-            "size": 100,
+            "size": "100",
             "type": "SSD",
             "tags": []
           },
