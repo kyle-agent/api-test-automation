@@ -1,0 +1,185 @@
+{
+  "networking/dns/activateprivatedns": {
+    "name": "private-dns01"
+  },
+  "networking/dns/createhostedzone": {
+    "description": "This is description",
+    "name": "my-zone.com",
+    "private_dns_id": "10fjkewefprivatedns3193rud543",
+    "tags": [],
+    "type": "private"
+  },
+  "networking/dns/createhostedzonerecord": {
+    "description": "This is description",
+    "name": "test.app",
+    "records": [
+      "12345.ns.private.kr-west1.dev2.samsungsdscloud.com"
+    ],
+    "ttl": 3600,
+    "type": "A"
+  },
+  "networking/dns/createprivatedns": {
+    "connected_vpc_ids": [],
+    "description": "This is description",
+    "name": "private-dns01",
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ]
+  },
+  "networking/dns/createpublicdomainname": {
+    "address_type": "DOMESTIC",
+    "auto_extension": true,
+    "description": "This is description",
+    "domestic_first_address_en": "125 Olympic-ro 35-gil, Songpa-gu, Seoul",
+    "domestic_first_address_ko": "서울특별시 송파구 올림픽로35길 125 (신천동)",
+    "domestic_second_address_en": "West Campus 1F",
+    "domestic_second_address_ko": "서관 1층",
+    "name": "example.com",
+    "overseas_first_address": "123 Main St",
+    "overseas_second_address": "New York",
+    "overseas_third_address": "NY 10001",
+    "postal_code": "12345",
+    "register_email": "admin@example.com",
+    "register_name_en": "Hong Gildong",
+    "register_name_ko": "홍길동",
+    "register_telno": "010-1234-5678",
+    "tags": []
+  },
+  "networking/dns/sethostedzone": {
+    "description": "This is description"
+  },
+  "networking/dns/sethostedzonerecord": {
+    "records": [
+      "12345.ns.private.kr-west1.dev2.samsungsdscloud.com"
+    ],
+    "ttl": 3600
+  },
+  "networking/dns/setprivatedns": {
+    "connected_vpc_ids": [
+      ""
+    ],
+    "description": "This is description"
+  },
+  "networking/dns/setpublicdomainname": {
+    "auto_extension": true,
+    "description": "This is description"
+  },
+  "networking/dns/setpublicdomainnamewhoisinfo": {
+    "address_type": "DOMESTIC",
+    "domestic_first_address_en": "125 Olympic-ro 35-gil, Songpa-gu, Seoul",
+    "domestic_first_address_ko": "서울특별시 송파구 올림픽로35길 125 (신천동)",
+    "domestic_second_address_en": "West Campus 1F",
+    "domestic_second_address_ko": "서관 1층",
+    "overseas_first_address": "123 Main St",
+    "overseas_second_address": "New York",
+    "overseas_third_address": "NY 10001",
+    "postal_code": "12345",
+    "register_email": "admin@example.com",
+    "register_telno": "010-1234-5678"
+  },
+  "networking/dns/transferpublicdomainname": {
+    "target_account_id": "003dffc50eb123a1cbf4f2e5c71d4f15",
+    "type": "REQUEST"
+  },
+  "security/kms/changerotateinfo": {
+    "auto_rotate": "Y",
+    "rotate_cycle": 7
+  },
+  "security/kms/changestatekey": {
+    "state": "Active"
+  },
+  "security/kms/createkey": {
+    "auto_rotate": "Y",
+    "description": "description1",
+    "key_type": "advanced",
+    "name": "testkey",
+    "purpose": "rsa-2048",
+    "rotate_cycle": 7,
+    "tags": []
+  },
+  "security/kms/datakey": {
+    "key_type": "plaintext"
+  },
+  "security/kms/decryptdata": {
+    "ciphertext": "vault:v283:YiUpW1bpF2fMY0VR332Qpik781Ul2gFPsfdwsypwouccHtPSfRaE40wTHHl4a5AK"
+  },
+  "security/kms/encryptdata": {
+    "plaintext": "dGhlIHF1aWNrIGJyb3duIGZveAo="
+  },
+  "security/kms/hmac": {
+    "input": "dGVzdCBpbnB1dA=="
+  },
+  "security/kms/rewrapdata": {
+    "ciphertext": "vault:v283:YiUpW1bpF2fMY0VR33aQpik781Ul2gFPsfdwsypwouccHtPSfRaE40wTHHl4a5AK"
+  },
+  "security/kms/rotatekey": {
+    "_raw": "{key_id}"
+  },
+  "security/kms/signdata": {
+    "input": "dGVzdCBpbnB1dA=="
+  },
+  "security/kms/updatedescription": {
+    "description": ""
+  },
+  "security/kms/updatemanagedkeydescription": {
+    "description": "description1"
+  },
+  "security/kms/verifydata": {
+    "input": "dGVzdCBpbnB1dA==",
+    "signature": "vault:v142:MEUCIQDt+iM27ZENLTxFCKH2krlvn2xRRuoqt8aU+xP/RYEJpgIgN6V6QjhpK4dA/vwgX95UW140ge167ECnLjccXDPbZAg="
+  },
+  "security/secretsmanager/createsecretsmanager": {
+    "acl_cidr": "192.168.1.1/24, 10.0.0.1/16",
+    "description": "description",
+    "kms_id": "3265ab469f0d406d83073da3e11e7a6c",
+    "name": "name",
+    "private_acl_enabled": "true",
+    "private_acl_resources": [],
+    "secret_value": "{\"key1\":\"value1\",\"key2\":\"value2\"}",
+    "tags": []
+  },
+  "security/secretsmanager/createsecretsmanagerkmskey": {
+    "service_name": ""
+  },
+  "security/secretsmanager/generaterandompassword": {
+    "exclude_characters": "abcdefg",
+    "exclude_lowercase": "false",
+    "exclude_numbers": "false",
+    "exclude_punctuation": "false",
+    "exclude_uppercase": "false",
+    "include_space": "false",
+    "password_length": 32,
+    "require_each_included_type": "true"
+  },
+  "security/secretsmanager/restoresecretsmanager": {
+    "_raw": "{secret_id}"
+  },
+  "security/secretsmanager/setkmsid": {
+    "kms_id": "3265ab469f0d406d83073da3e11e7a6c"
+  },
+  "security/secretsmanager/setprivateacl": {
+    "private_acl_enabled": "true",
+    "private_acl_resources": []
+  },
+  "security/secretsmanager/setsecretaclcidr": {
+    "acl_cidr": "192.168.1.1/24, 10.0.0.1/16"
+  },
+  "security/secretsmanager/setsecretdescription": {
+    "description": "description"
+  },
+  "security/secretsmanager/setsecretsmanagerlabel": {
+    "label": "My Custom Label",
+    "move_to_version_id": "3265ab469f0d406d83073da3e11e7a6c",
+    "remove_from_version_id": "3265ab469f0d406d83073da3e11e7a6c"
+  },
+  "security/secretsmanager/showsecretsmanagersecretvalue": {
+    "label": "CURRENT",
+    "version_id": "e7b638507d9f4feeb6032a22b7640bf7"
+  },
+  "security/secretsmanager/updatesecretsmanagersecretvalue": {
+    "secret_value": "{\"key1\":\"value1\",\"key2\":\"value2\"}"
+  }
+}
