@@ -1,4 +1,4 @@
-"""Read-only GET coverage booster via list->show chaining.
+"""Read-only GET coverage booster via list->show chaining (all services).
 
 The catalog smoke suite (test_catalog_smoke.py) can only call GETs WITHOUT path
 params; every ``show{X}/{id}`` endpoint is skipped because it needs a real
@@ -8,18 +8,18 @@ for heavy services, may be environment-blocked (e.g. VPC quota).
 Many single-path-param GETs, though, take an id that is freely derivable from a
 sibling *list* in the same service: ``/v1/server-types/{server_type_id}`` pairs
 with ``/v1/server-types``. This module exercises those reads with zero resource
-creation: list the parent collection, take the first item's id, and call the
-show endpoint. Catalog-backed collections (server-types, volume-types, images)
-yield coverage on every run; account-dependent ones (snapshots, keypairs, …)
-are covered opportunistically when the account happens to hold such a resource,
-and are skipped (not failed) when the list is empty.
+creation, across EVERY service: list the parent collection, take the first
+item's id, and call the show endpoint. Catalog-backed collections (server-types,
+volume-types, images, regions, …) yield coverage on every run; account-dependent
+ones are covered opportunistically when the account holds such a resource, and
+are skipped (not failed) when the list is empty.
+
+Parent lists are cached per (service, path) for the session so a service with
+many show endpoints under one collection only lists once.
 
 Read-only and record-only, exactly like the CRUD ``probe_reads`` step: results
 land in the same reports/smoke_status.tsv the dashboard reads, so they count
 toward read coverage, and a probe never turns the suite red on its own.
-
-Scope is intentionally limited to the services in ``_CHAIN_SERVICES``; extend
-that list to widen coverage.
 """
 from __future__ import annotations
 
@@ -31,7 +31,8 @@ from framework.catalog import endpoints
 
 pytestmark = pytest.mark.smoke
 
-_CHAIN_SERVICES = ["virtualserver"]
+# None = all services. Set to a list to scope (e.g. ["virtualserver"]).
+_CHAIN_SERVICES = None
 _SMOKE_TSV = "reports/smoke_status.tsv"
 _PLACEHOLDER = re.compile(r"\{([^}]+)\}")
 
@@ -74,30 +75,41 @@ def _list_items(body):
 
 def _id_from(item: dict, param: str):
     """Pull the value a path param wants out of a list item. Try the exact param
-    name, then a generic 'id', then 'name' (keypairs key on name)."""
-    for k in (param, "id", "name", param.replace("_id", ""), param.replace("_name", "")):
+    name, then a generic 'id', then 'name' (keypairs key on name), then the param
+    with common suffixes stripped."""
+    for k in (param, "id", "name", param.replace("_id", ""), param.replace("_name", ""),
+              param.replace("_id", "_name")):
         if k and isinstance(item.get(k), (str, int)) and str(item.get(k)).strip():
             return str(item[k])
     return None
 
 
 def _single_param_get_chains():
-    """virtualserver (and any _CHAIN_SERVICES) GETs with exactly one path param,
-    paired with the parent list = path prefix before the first '{'."""
+    """Every GET with exactly one path param, paired with its parent list = the
+    path prefix before the first '{'. Scoped by _CHAIN_SERVICES (None = all)."""
     out = []
-    for svc in _CHAIN_SERVICES:
-        for e in endpoints(service=svc, method="GET", resolved_only=True):
-            params = _PLACEHOLDER.findall(e.http_path)
-            if len(params) != 1:
-                continue
-            prefix = e.http_path.split("{", 1)[0].rstrip("/")
-            if not prefix:
-                continue
-            out.append((e, params[0], prefix))
+    svc_filter = set(_CHAIN_SERVICES) if _CHAIN_SERVICES else None
+    for e in endpoints(method="GET", resolved_only=True):
+        if svc_filter and e.service not in svc_filter:
+            continue
+        params = _PLACEHOLDER.findall(e.http_path)
+        if len(params) != 1:
+            continue
+        prefix = e.http_path.split("{", 1)[0].rstrip("/")
+        if not prefix:
+            continue
+        out.append((e, params[0], prefix))
     return out
 
 
 _CHAINS = _single_param_get_chains()
+
+
+@pytest.fixture(scope="session")
+def _list_cache():
+    """Cache parent-list responses for the session: many show endpoints share one
+    collection, so we list each (service, path) at most once."""
+    return {}
 
 
 @pytest.mark.parametrize(
@@ -105,12 +117,17 @@ _CHAINS = _single_param_get_chains()
     _CHAINS,
     ids=[e.key for e, _, _ in _CHAINS] or ["none"],
 )
-def test_read_chain(endpoint, param, list_path, client):
+def test_read_chain(endpoint, param, list_path, client, _list_cache):
     """Derive the path-param id from the sibling list and exercise the show GET."""
-    try:
-        lst = client.get(list_path, service=endpoint.service)
-    except Exception as exc:  # parent list unreachable — nothing to derive from
-        pytest.skip(f"parent list {list_path} unreachable: {exc}")
+    cache_key = (endpoint.service, list_path)
+    if cache_key not in _list_cache:
+        try:
+            _list_cache[cache_key] = client.get(list_path, service=endpoint.service)
+        except Exception as exc:
+            _list_cache[cache_key] = exc
+    lst = _list_cache[cache_key]
+    if isinstance(lst, Exception):
+        pytest.skip(f"parent list {list_path} unreachable: {lst}")
     if not lst.ok:
         pytest.skip(f"parent list {list_path} -> {lst.status}; no id to derive")
 
