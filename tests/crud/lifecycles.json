@@ -3803,107 +3803,6 @@
           }
         },
         {
-          "name": "vert-find-version",
-          "service": "vertica",
-          "group": "vertica",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/engine-versions",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "vert_ver": {
-              "list": "$.contents",
-              "get": "id"
-            }
-          }
-        },
-        {
-          "name": "vert-find-stype",
-          "service": "vertica",
-          "group": "vertica",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "vert_stype": {
-              "list": "$.contents",
-              "get": "name"
-            }
-          }
-        },
-        {
-          "name": "vert-create",
-          "service": "vertica",
-          "group": "vertica",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/clusters",
-          "json": {
-            "ha_enabled": false,
-            "nat_enabled": false,
-            "subnet_id": "{subnet_id}",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "tags": [],
-            "maintenance_option": {
-              "period_hour": "5",
-              "starting_day_of_week": "MON",
-              "starting_time": "0000"
-            },
-            "license": "",
-            "init_config_option": {
-              "backup_option": {
-                "retention_period_day": "7",
-                "starting_time_hour": "2"
-              },
-              "database_locale": "ko_KR.utf8",
-              "database_name": "regrvert",
-              "database_user_name": "regruser",
-              "database_user_password": "Regr1ss@2026"
-            },
-            "name": "regrv{ualpha}",
-            "instance_name_prefix": "regrv",
-            "dbaas_engine_version_id": "{vert_ver}",
-            "instance_groups": [
-              {
-                "role_type": "ACTIVE",
-                "server_type_name": "{vert_stype}",
-                "block_storage_groups": [
-                  {
-                    "role_type": "OS",
-                    "size_gb": 104,
-                    "volume_type": "SSD"
-                  }
-                ],
-                "instances": [
-                  {
-                    "role_type": "ACTIVE",
-                    "public_ip_id": ""
-                  }
-                ]
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "vert_cid": "$.resource.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/clusters/{vert_cid}",
-            "service": "vertica"
-          }
-        },
-        {
           "name": "vm-create-sg",
           "service": "security-group",
           "group": "vm",
@@ -4213,27 +4112,6 @@
           }
         },
         {
-          "name": "vert-wait",
-          "service": "vertica",
-          "group": "vertica",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/clusters/{vert_cid}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 2400,
-            "interval": 30
-          }
-        },
-        {
           "name": "vm-wait-server",
           "service": "virtualserver",
           "group": "vm",
@@ -4322,15 +4200,6 @@
           "probe_reads": {
             "cluster_id": "{search_cid}",
             "dbaas_engine_version_id": "{search_ver}"
-          }
-        },
-        {
-          "name": "vert-probe",
-          "service": "vertica",
-          "group": "vertica",
-          "probe_reads": {
-            "cluster_id": "{vert_cid}",
-            "dbaas_engine_version_id": "{vert_ver}"
           }
         },
         {
@@ -4441,19 +4310,6 @@
           "group": "searchengine",
           "method": "DELETE",
           "path": "/v1/clusters/{search_cid}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
-          "name": "vert-delete",
-          "service": "vertica",
-          "group": "vertica",
-          "method": "DELETE",
-          "path": "/v1/clusters/{vert_cid}",
           "expect_status": [
             200,
             202,
@@ -4606,24 +4462,6 @@
           "group": "searchengine",
           "method": "GET",
           "path": "/v1/clusters/{search_cid}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 1800,
-            "interval": 30
-          }
-        },
-        {
-          "name": "vert-gone",
-          "service": "vertica",
-          "group": "vertica",
-          "method": "GET",
-          "path": "/v1/clusters/{vert_cid}",
           "expect_status": [
             200,
             404
