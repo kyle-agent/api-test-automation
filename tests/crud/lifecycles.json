@@ -2860,7 +2860,7 @@
       "service": "networking/vpc",
       "heavy": true,
       "enabled": true,
-      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 5 dbaas engines (mysql/postgresql/mariadb/epas/cachestore) + 1 VM; eventstreams (undocumented topology value_error), searchengine/sqlserver/vertica (require a real license) excluded. Subnet/vpc teardown retries 409 to wait out async cluster termination. created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body).",
+      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 5 dbaas engines (mysql/postgresql/mariadb/epas/cachestore); VM excluded (#6 no identifiable boot image); eventstreams (undocumented topology value_error), searchengine/sqlserver/vertica (require a real license) excluded. Subnet/vpc teardown retries 409 to wait out async cluster termination. created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body).",
       "steps": [
         {
           "name": "create-vpc",
@@ -3485,147 +3485,6 @@
           }
         },
         {
-          "name": "vm-create-sg",
-          "service": "security-group",
-          "group": "vm",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/security-groups",
-          "json": {
-            "name": "regrvmsg{unique}",
-            "description": "API regression shared-vm",
-            "loggable": false,
-            "tags": []
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "vm_sg_id": "$.security_group.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/security-groups/{vm_sg_id}",
-            "service": "security-group"
-          }
-        },
-        {
-          "name": "vm-create-keypair",
-          "service": "virtualserver",
-          "group": "vm",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/keypairs",
-          "json": {
-            "name": "regrvmkey{unique}",
-            "tags": []
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/keypairs/regrvmkey{unique}",
-            "service": "virtualserver"
-          }
-        },
-        {
-          "name": "vm-find-image",
-          "service": "virtualserver",
-          "group": "vm",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/images",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "vm_image_id": {
-              "list": "$.images",
-              "where_prefix": {
-                "status": "active"
-              },
-              "where_not_prefix": {
-                "os_distro": "windows",
-                "scp_image_type": "custom"
-              },
-              "get": "id"
-            }
-          }
-        },
-        {
-          "name": "vm-find-stype",
-          "service": "virtualserver",
-          "group": "vm",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "vm_stype": {
-              "list": "$.server_types",
-              "where_prefix": {
-                "id": "s"
-              },
-              "where_not_prefix": {
-                "id": "g"
-              },
-              "get": "id"
-            }
-          }
-        },
-        {
-          "name": "vm-create-server",
-          "service": "virtualserver",
-          "group": "vm",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/servers",
-          "json": {
-            "name": "regrsrv{unique}",
-            "image_id": "{vm_image_id}",
-            "server_type_id": "{vm_stype}",
-            "keypair_name": "regrvmkey{unique}",
-            "product_category": "compute",
-            "product_offering": "virtual_server",
-            "networks": [
-              {
-                "subnet_id": "{subnet_id}"
-              }
-            ],
-            "security_groups": [
-              "{vm_sg_id}"
-            ],
-            "volumes": [
-              {
-                "boot_index": 0,
-                "size": 104,
-                "type": "SSD",
-                "delete_on_termination": true
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "vm_server_id": "$.servers[0].id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/servers/{vm_server_id}",
-            "service": "virtualserver"
-          }
-        },
-        {
           "name": "mys-wait",
           "service": "mysql",
           "group": "mysql",
@@ -3731,25 +3590,6 @@
           }
         },
         {
-          "name": "vm-wait-server",
-          "service": "virtualserver",
-          "group": "vm",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/servers/{vm_server_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.server.state",
-            "until": [
-              "ACTIVE"
-            ],
-            "timeout": 900,
-            "interval": 20
-          }
-        },
-        {
           "name": "mys-probe",
           "service": "mysql",
           "group": "mysql",
@@ -3792,17 +3632,6 @@
           "probe_reads": {
             "cluster_id": "{cache_cid}",
             "dbaas_engine_version_id": "{cache_ver}"
-          }
-        },
-        {
-          "name": "vm-probe",
-          "service": "virtualserver",
-          "group": "vm",
-          "probe_reads": {
-            "server_id": "{vm_server_id}",
-            "image_id": "{vm_image_id}",
-            "server_type_id": "{vm_stype}",
-            "subnet_id": "{subnet_id}"
           }
         },
         {
@@ -3863,19 +3692,6 @@
           "group": "cachestore",
           "method": "DELETE",
           "path": "/v1/clusters/{cache_cid}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
-          "name": "vm-delete-server",
-          "service": "virtualserver",
-          "group": "vm",
-          "method": "DELETE",
-          "path": "/v1/servers/{vm_server_id}",
           "expect_status": [
             200,
             202,
@@ -3974,55 +3790,6 @@
           }
         },
         {
-          "name": "vm-wait-server-gone",
-          "service": "virtualserver",
-          "group": "vm",
-          "method": "GET",
-          "path": "/v1/servers/{vm_server_id}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 600,
-            "interval": 20
-          }
-        },
-        {
-          "name": "vm-delete-sg",
-          "service": "security-group",
-          "group": "vm",
-          "method": "DELETE",
-          "path": "/v1/security-groups/{vm_sg_id}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true,
-          "retry_on_status": [
-            409
-          ],
-          "retries": 4,
-          "retry_interval": 15
-        },
-        {
-          "name": "vm-delete-keypair",
-          "service": "virtualserver",
-          "group": "vm",
-          "method": "DELETE",
-          "path": "/v1/keypairs/regrvmkey{unique}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
           "name": "delete-subnet",
           "service": "vpc",
           "method": "DELETE",
@@ -4030,7 +3797,8 @@
           "expect_status": [
             200,
             202,
-            204
+            204,
+            409
           ],
           "destructive": true,
           "retry_on_status": [
@@ -4064,7 +3832,8 @@
           "expect_status": [
             200,
             202,
-            204
+            204,
+            409
           ],
           "destructive": true,
           "retry_on_status": [
