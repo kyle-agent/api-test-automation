@@ -1,7 +1,17 @@
 {
+  "compute/virtualserver/attachvirtualserversecuritygroup": {
+    "security_group_id": "c09c3f05-03d9-443f-b27a-40e0f973c75f"
+  },
   "compute/virtualserver/createservervolume": {
     "delete_on_termination": false,
     "device": "/dev/vda",
+    "volume_id": "3f500f00-ed80-4566-a057-e31760226f9a"
+  },
+  "compute/virtualserver/createsnapshot": {
+    "description": "description",
+    "force": true,
+    "metadata": "",
+    "name": "snapshot-1",
     "volume_id": "3f500f00-ed80-4566-a057-e31760226f9a"
   },
   "compute/virtualserver/createvolume": {
@@ -21,6 +31,62 @@
   "compute/virtualserver/createvolumetransfer": {
     "name": "volume01",
     "volume_id": "3f500f00-ed80-4566-a057-e31760226f9a"
+  },
+  "compute/virtualserver/extendvolume": {
+    "size": 104
+  },
+  "compute/virtualserver/lockvirtualserver": {
+    "_raw": "{server_id}"
+  },
+  "compute/virtualserver/rebootvirtualserver": {
+    "reboot_type": "SOFT"
+  },
+  "compute/virtualserver/showvirtualserverpassword": {
+    "private_key": "-----BEGIN RSA PRIVATE KEY-----\nfakeKey\n-----END RSA PRIVATE KEY-----"
+  },
+  "compute/virtualserver/unlockvirtualserver": {
+    "_raw": "{server_id}"
+  },
+  "compute/virtualserver/updateservervolume": {
+    "delete_on_termination": false,
+    "volume_id": "3f500f00-ed80-4566-a057-e31760226f9a"
+  },
+  "container/scr/createrepository": {
+    "description": "Carpe diem.",
+    "lifecycle_policy": {
+      "lifecycle_policy_enabled": true,
+      "outdated_rule_duration": 90,
+      "outdated_rule_enabled": true,
+      "outdated_rule_tag_expression": "*",
+      "untagged_rule_duration": 90,
+      "untagged_rule_enabled": true
+    },
+    "lock_policy": {
+      "locked": true
+    },
+    "name": "sample",
+    "pull_policy": {
+      "critical_limit": 20,
+      "high_limit": 20,
+      "unmodified_excepted": true,
+      "unscanned_image_pull_prevented": true,
+      "vulnerable_image_pull_prevented": true
+    },
+    "registry_id": "rpqtmqgec3174541bbf77eecf2cd3585",
+    "scan_policy": {
+      "auto_scan_enabled": true,
+      "fixed_version_excepted": true,
+      "language_excepted": true,
+      "scan_policy_enabled": true,
+      "secret_excepted": true,
+      "severity_limit": "High"
+    },
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ]
   },
   "container/ske/createcluster": {
     "cloud_logging_enabled": "true",
@@ -143,6 +209,50 @@
     "vip_public_ip_id": "",
     "virtual_ip_address": ""
   },
+  "management/resourcemanager/createresourcegroup": {
+    "description": "resource group 1",
+    "name": "resource-group-1",
+    "region": "kr-west1",
+    "resource_types": "[\"resourcemanager:resource-group\", \"loggingaudit:trail\"]",
+    "tags": "[{\"key\": \"key1\", \"value\": \"value1\"}, {\"key\": \"key2\", \"value\": \"value2\"}]"
+  },
+  "management/resourcemanager/setresourcegroup": {
+    "description": "resource group 1",
+    "resource_types": "[\"resourcemanager:resource-group\", \"loggingaudit:trail\"]",
+    "tags": "[{\"key\": \"key1\", \"value\": \"value1\"}, {\"key\": \"key2\", \"value\": \"value2\"}]"
+  },
+  "management/resourcemanager/updatecomponentstags": {
+    "tags": [
+      {
+        "key": "tag-key",
+        "value": "tag-value"
+      }
+    ]
+  },
+  "management/resourcemanager/updatecomponentstagvalue": {
+    "value": "tag-value"
+  },
+  "management/resourcemanager/updateresourcetags": {
+    "tags": [
+      {
+        "key": "tag-key",
+        "value": "tag-value"
+      }
+    ]
+  },
+  "management/resourcemanager/updateresourcetagvalue": {
+    "value": "tag-value"
+  },
+  "management/resourcemanager/updatetags": {
+    "tags": {
+      "": [
+        {
+          "key": "tag-key",
+          "value": "tag-value"
+        }
+      ]
+    }
+  },
   "networking/dns/activateprivatedns": {
     "name": "private-dns01"
   },
@@ -227,6 +337,113 @@
   "networking/dns/transferpublicdomainname": {
     "target_account_id": "003dffc50eb123a1cbf4f2e5c71d4f15",
     "type": "REQUEST"
+  },
+  "networking/vpc/createnatgateway": {
+    "description": "VpcEndpoint Description",
+    "publicip_id": "12f56e27070248a6a240a497e43fbe18",
+    "subnet_id": "023c57b14f11483689338d085e061492",
+    "tags": "[{'key': 'key', 'value': 'value'}]"
+  },
+  "networking/vpc/createport": {
+    "description": "Port Description",
+    "fixed_ip_address": "",
+    "name": "portName",
+    "security_groups": [],
+    "subnet_id": "",
+    "tags": []
+  },
+  "networking/vpc/createprivatelinkendpoint": {
+    "description": "PrivateLink Endpoint Description",
+    "endpoint_ip_address": "192.167.1.5",
+    "name": "EndpointName",
+    "privatelink_service_id": "e3df2e8e3b374fbb81d4e322b52ca50d",
+    "security_group_ids": "['17776b52-0a64-440d-9e93-b4fc37be935b']",
+    "subnet_id": "023c57b14f11483689338d085e061492",
+    "tags": "[{'key': 'key', 'value': 'value'}]"
+  },
+  "networking/vpc/createprivatelinkservice": {
+    "approval_type": "AUTO",
+    "connected_resource_id": "a3e3a662a4f34442a94166df5ff9f577",
+    "connected_resource_ip_address": "192.167.0.10",
+    "connected_resource_type": "LB",
+    "description": "PrivateLink Service Description",
+    "high_speed_transfer": false,
+    "name": "ServiceName",
+    "security_group_ids": "['00b6af37-73b5-4de2-b080-c295a1a0382e']",
+    "service_ip_address": "192.167.0.5",
+    "subnet_id": "023c57b14f11483689338d085e061492",
+    "tags": "[{'key': 'key', 'value': 'value'}]"
+  },
+  "networking/vpc/createprivatenat": {
+    "cidr": "192.167.0.0/24",
+    "description": "PrivateNat Description",
+    "name": "PrivateNatName",
+    "service_resource_id": "3f342bf9a557405b997c2cf48c89cbc2",
+    "service_type": "DIRECT_CONNECT",
+    "tags": "[{'key': 'key', 'value': 'value'}]"
+  },
+  "networking/vpc/createprivatenatip": {
+    "ip_address": ""
+  },
+  "networking/vpc/createsubnetvip": {
+    "description": "Subnet VIP Description",
+    "virtual_ip_address": "192.168.20.6"
+  },
+  "networking/vpc/createsubnetvipnatip": {
+    "nat_type": "PUBLIC",
+    "publicip_id": "12f56e27070248a6a240a497e43fbe18"
+  },
+  "networking/vpc/createsubnetvipport": {
+    "port_id": "35268a9f2eda4cde83b1d85c1f61f67d"
+  },
+  "networking/vpc/createtransitgateway": {
+    "description": "TransitGateway Description",
+    "name": "TransitGatewayName",
+    "tags": "[{'key': 'key', 'value': 'value'}]"
+  },
+  "networking/vpc/createtransitgatewayfirewall": {
+    "product_type": "TGW_DGW"
+  },
+  "networking/vpc/createtransitgatewayfirewallconnection": {
+    "_raw": "{transit_gateway_id}"
+  },
+  "networking/vpc/createtransitgatewayrule": {
+    "description": "Routing Rule Description",
+    "destination_cidr": "192.167.5.0/24",
+    "destination_type": "VPC",
+    "tgw_connection_vpc_id": "ffeced8e191c478eabd66b6e2cab8e34"
+  },
+  "networking/vpc/createtransitgatewayuplinkrule": {
+    "description": "Routing Rule Description",
+    "destination_cidr": "192.167.5.0/24",
+    "destination_type": "ON_PREMISE"
+  },
+  "networking/vpc/createtransitgatewayvpcconnection": {
+    "vpc_id": "7df8abb4912e4709b1cb237daccca7a8"
+  },
+  "networking/vpc/createvpcendpoint": {
+    "description": "VpcEndpoint Description",
+    "endpoint_ip_address": "192.167.0.5",
+    "name": "VpcEndpointName",
+    "resource_info": "x.samsungsdscloud.com(Registry)",
+    "resource_key": "07c5364702384471b650147321b52173",
+    "resource_type": "FS",
+    "subnet_id": "023c57b14f11483689338d085e061492",
+    "tags": "[{'key': 'key', 'value': 'value'}]",
+    "vpc_id": "7df8abb4912e4709b1cb237daccca7a8"
+  },
+  "networking/vpc/createvpcpeering": {
+    "approver_vpc_account_id": "f1e6c81a2b054582878cb9724dc2ce9f",
+    "approver_vpc_id": "7df8abb4912e4709b1cb237daccca7a8",
+    "description": "vpcPeering Description",
+    "name": "vpcPeeringName",
+    "requester_vpc_id": "7df8abb4912e4709b1cb237daccca7a8",
+    "tags": []
+  },
+  "networking/vpc/createvpcpeeringrule": {
+    "destination_cidr": "",
+    "destination_vpc_type": "REQUESTER_VPC",
+    "tags": []
   },
   "security/kms/changerotateinfo": {
     "auto_rotate": "Y",
@@ -325,5 +542,101 @@
   },
   "security/secretsmanager/updatesecretsmanagersecretvalue": {
     "secret_value": "{\"key1\":\"value1\",\"key2\":\"value2\"}"
+  },
+  "storage/baremetal-blockstorage/createvolume": {
+    "attachments": [
+      {
+        "object_id": "83c3c73d457345e3829ee6d5557c0016",
+        "object_type": "BM"
+      }
+    ],
+    "disk_type": "SSD",
+    "name": "bs-01",
+    "qos": {
+      "iops": 5000,
+      "throughput": 250
+    },
+    "size_gb": 10,
+    "tags": [
+      {
+        "key": "my_tag_1",
+        "value": "my_value_1"
+      }
+    ]
+  },
+  "storage/baremetal-blockstorage/createvolumeattachments": {
+    "attachments": [
+      {
+        "object_id": "83c3c73d457345e3829ee6d5557c0016",
+        "object_type": "BM"
+      }
+    ]
+  },
+  "storage/baremetal-blockstorage/createvolumegroup": {
+    "name": "vg-01",
+    "tags": [
+      {
+        "key": "my_tag_1",
+        "value": "my_value_1"
+      }
+    ],
+    "volume_ids": [
+      "17e0b4fd27784dfb843440ec08bdd148"
+    ]
+  },
+  "storage/baremetal-blockstorage/createvolumegrouprecovery": {
+    "block_storage_name_prefix": "prefix-",
+    "snapshot_id": "05600123-6e78-11f0-a3f0-d039eab8d501"
+  },
+  "storage/baremetal-blockstorage/createvolumegroupreplication": {
+    "cycle": "5MIN",
+    "name": "replica-vg-01",
+    "region": "kr-west1",
+    "replication_volume_name_prefix": "dr"
+  },
+  "storage/baremetal-blockstorage/createvolumegroupsnapshot": {
+    "_raw": "{volume_group_id}"
+  },
+  "storage/baremetal-blockstorage/createvolumegroupsnapshotschedule": {
+    "day_of_week": "SUN",
+    "hour": 18
+  },
+  "storage/baremetal-blockstorage/createvolumerecovery": {
+    "name": "recovery-volume",
+    "snapshot_id": "05600123-6e78-11f0-a3f0-d039eab8d501"
+  },
+  "storage/baremetal-blockstorage/createvolumereplication": {
+    "cycle": "5MIN",
+    "name": "replica-bs-01",
+    "region": "kr-west1"
+  },
+  "storage/baremetal-blockstorage/createvolumesnapshot": {
+    "_raw": "{volume_id}"
+  },
+  "storage/baremetal-blockstorage/createvolumesnapshotrate": {
+    "snapshot_rate": 100
+  },
+  "storage/baremetal-blockstorage/createvolumesnapshotschedule": {
+    "day_of_week": "SUN",
+    "hour": 18
+  },
+  "storage/filestorage/createvolumereplication": {
+    "backup_retention_count": 2,
+    "cifs_password": "cifspwd0!!",
+    "name": "my_volume",
+    "region": "kr-west1",
+    "replication_frequency": "5min",
+    "replication_type": "replication",
+    "volume_id": "bfdbabf2-04d9-4e8b-a205-020f8e6da438"
+  },
+  "storage/parallel-filestorage/createvolume": {
+    "capacity_tb": 100,
+    "name": "my_volume",
+    "tags": [
+      {
+        "key": "key",
+        "value": "value"
+      }
+    ]
   }
 }

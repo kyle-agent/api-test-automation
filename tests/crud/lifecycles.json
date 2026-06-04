@@ -21,6 +21,9 @@
           ],
           "capture": {
             "rg_id": "$.resource_group.id"
+          },
+          "capture_soft": {
+            "rg_srn": "$.resource_group.srn"
           }
         },
         {
@@ -42,7 +45,13 @@
         {
           "name": "probe-reads",
           "probe_reads": {
-            "resource_group_id": "{rg_id}"
+            "resource_group_id": "{rg_id}",
+            "region": "{region}",
+            "service": "resourcemanager",
+            "resource_type": "resource-group",
+            "resource_identifier": "{rg_id}",
+            "key": "key1",
+            "srn": "{rg_srn}"
           }
         },
         {
@@ -154,11 +163,54 @@
           }
         },
         {
+          "name": "create-port",
+          "method": "POST",
+          "path": "/v1/ports",
+          "json": {
+            "name": "regrport{unique}",
+            "description": "API regression suite",
+            "fixed_ip_address": "",
+            "security_groups": [],
+            "subnet_id": "{subnet_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "port_id": "$.port.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/ports/{port_id}",
+            "service": "vpc"
+          }
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "vpc_id": "{vpc_id}",
-            "subnet_id": "{subnet_id}"
+            "subnet_id": "{subnet_id}",
+            "port_id": "{port_id}"
           }
+        },
+        {
+          "name": "delete-port",
+          "method": "DELETE",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15
         },
         {
           "name": "delete-subnet",
@@ -169,7 +221,12 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15
         },
         {
           "name": "wait-subnet-gone",
@@ -251,6 +308,39 @@
           }
         },
         {
+          "name": "create-repo",
+          "method": "POST",
+          "path": "/v1/repositories",
+          "json": {
+            "name": "regrrepo{unique}",
+            "description": "API regression suite",
+            "registry_id": "{reg_id}",
+            "lifecycle_policy": {
+              "lifecycle_policy_enabled": false
+            },
+            "lock_policy": {
+              "locked": false
+            },
+            "scan_policy": {
+              "scan_policy_enabled": false
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "repo_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/repositories/{repo_id}",
+            "service": "scr"
+          }
+        },
+        {
           "name": "list",
           "method": "GET",
           "path": "/v1/container-registries",
@@ -261,8 +351,26 @@
         {
           "name": "probe-reads",
           "probe_reads": {
-            "registry_id": "{reg_id}"
+            "registry_id": "{reg_id}",
+            "repository_id": "{repo_id}"
           }
+        },
+        {
+          "name": "delete-repo",
+          "method": "DELETE",
+          "path": "/v1/repositories/{repo_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 20
         },
         {
           "name": "delete",
@@ -694,6 +802,165 @@
             204
           ],
           "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "compute-virtualserver-volume-snapshot",
+      "service": "compute/virtualserver",
+      "enabled": true,
+      "_note": "Light, no-VPC: create a block volume, snapshot it, probe-read both (showvolume + showsnapshot), then tear down. Volume create body mirrors the VM lifecycle's create-volume (VALIDATED). Snapshot create body grounded from docs (createsnapshot). Captures use $.id (volume id convention confirmed from the VM lifecycle); snapshot id inferred as $.id — regrsnap* swept as insurance.",
+      "steps": [
+        {
+          "name": "create-volume",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrvol{unique}",
+            "description": "API regression suite",
+            "size": 104,
+            "volume_type": "SSD",
+            "max_iops": 10000,
+            "max_throughput": 500,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vol_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{vol_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "wait-volume-available",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-snapshot",
+          "method": "POST",
+          "path": "/v1/snapshots",
+          "json": {
+            "name": "regrsnap{unique}",
+            "description": "API regression suite",
+            "force": true,
+            "metadata": "",
+            "volume_id": "{vol_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "snap_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/snapshots/{snap_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "list-snapshots",
+          "method": "GET",
+          "path": "/v1/snapshots",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "volume_id": "{vol_id}",
+            "snapshot_id": "{snap_id}"
+          }
+        },
+        {
+          "name": "delete-snapshot",
+          "method": "DELETE",
+          "path": "/v1/snapshots/{snap_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-snapshot-gone",
+          "method": "GET",
+          "path": "/v1/snapshots/{snap_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "delete-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-volume-gone",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
         }
       ]
     },

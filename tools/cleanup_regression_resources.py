@@ -77,6 +77,18 @@ def main() -> int:
     for it in _list(c, "security-group", "/v1/security-groups", "regrsg"):
         if _delete(c, "security-group", f"/v1/security-groups/{it['id']}"):
             deleted += 1
+    # 2b. ports (regrport) — subnet children; must go before the subnet pass.
+    for it in _list(c, "vpc", "/v1/ports", "regrport"):
+        if it.get("id") and _delete(c, "vpc", f"/v1/ports/{it['id']}"):
+            deleted += 1
+    # 2c. volume snapshots (regrsnap) then their block volumes (regrvol) —
+    # snapshot first so the volume delete isn't blocked.
+    for it in _list(c, "virtualserver", "/v1/snapshots", "regrsnap"):
+        if it.get("id") and _delete(c, "virtualserver", f"/v1/snapshots/{it['id']}"):
+            deleted += 1; _wait_gone(c, "virtualserver", f"/v1/snapshots/{it['id']}", 300, 15)
+    for it in _list(c, "virtualserver", "/v1/volumes", "regrvol"):
+        if it.get("id") and _delete(c, "virtualserver", f"/v1/volumes/{it['id']}"):
+            deleted += 1
     # 3. subnets — delete all, then wait each is gone
     subnet_ids = []
     for it in _list(c, "vpc", "/v1/subnets", "regrsub"):
@@ -123,6 +135,10 @@ def main() -> int:
         if _delete(c, "resourcemanager", f"/v1/resource-groups/{it['id']}"):
             deleted += 1
     # 6. container registries (scr) — delete may flaky-500, so retry
+    # repositories (regrrepo) — registry children; delete before the registry.
+    for it in _list(c, "scr", "/v1/repositories", "regrrepo"):
+        if it.get("id") and _delete(c, "scr", f"/v1/repositories/{it['id']}"):
+            deleted += 1
     for it in _list(c, "scr", "/v1/container-registries", "regrscr"):
         rid = it.get("id")
         for _ in range(4):
