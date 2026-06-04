@@ -239,6 +239,9 @@ def test_crud_lifecycle(lifecycle, client, cfg):
             # Read-breadth probe: exercise path-param GETs with this live resource.
             if step.get("probe_reads"):
                 mapping = {k: _fill(v, ctx) for k, v in step["probe_reads"].items()}
+                # Drop vars that never got captured (a soft-capture miss leaves
+                # the placeholder unfilled) so we don't probe with a literal "{var}".
+                mapping = {k: v for k, v in mapping.items() if "{" not in v}
                 _probe_reads(client, mapping, step_service)
                 continue
 
@@ -265,6 +268,18 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                 val = _capture(resp.body, expr)
                 assert val is not None, (
                     f"could not capture '{var}' via {expr!r} from {step['name']} response")
+                ctx[var] = str(val)
+
+            # Soft captures feed only read-breadth probes; a best-guess JSONPath
+            # that finds nothing must not sink the whole lifecycle, so capture
+            # best-effort and skip (rather than assert) on a miss — dependent
+            # probes for that var are then simply not exercised.
+            for var, expr in step.get("capture_soft", {}).items():
+                val = _capture(resp.body, expr)
+                if val is None:
+                    print(f"  soft-capture '{var}' via {expr!r} found nothing "
+                          f"from '{step['name']}' — dependent probe(s) skipped")
+                    continue
                 ctx[var] = str(val)
 
             # Register teardown for a freshly-created resource (runs only on a
