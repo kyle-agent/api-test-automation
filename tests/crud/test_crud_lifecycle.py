@@ -259,6 +259,16 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                 pytest.skip(str(exc))
 
             expected = step.get("expect_status", [200])
+            # Account quota limits (e.g. ExceedMaxVpcCountError when the account is
+            # already at its 5-VPC cap with non-regr VPCs) are an environmental
+            # condition, not a regression — tear down anything created so far and
+            # skip, so the dashboard doesn't flag a false NEW regression.
+            if resp.status not in expected and (
+                    "exceed-max-count" in resp.raw_text or "ExceedMax" in resp.raw_text):
+                _teardown()
+                pytest.skip(
+                    f"[{lifecycle['id']}] environmental quota limit at step "
+                    f"'{step['name']}': {resp.raw_text[:200]}")
             assert resp.status in expected, (
                 f"[{lifecycle['id']}] step '{step['name']}' "
                 f"{step['method']} {path} -> {resp.status}, expected {expected}\n"
