@@ -1,4 +1,148 @@
 {
+  "compute/virtualserver/createservervolume": {
+    "delete_on_termination": false,
+    "device": "/dev/vda",
+    "volume_id": "3f500f00-ed80-4566-a057-e31760226f9a"
+  },
+  "compute/virtualserver/createvolume": {
+    "max_iops": 10000,
+    "max_throughput": 500,
+    "name": "volume01",
+    "size": 104,
+    "snapshot_id": "cceed636-1f1e-4bb0-b85c-4e5b9e0bf790",
+    "tags": [
+      {
+        "key": "key",
+        "value": "value"
+      }
+    ],
+    "volume_type": "SSD"
+  },
+  "compute/virtualserver/createvolumetransfer": {
+    "name": "volume01",
+    "volume_id": "3f500f00-ed80-4566-a057-e31760226f9a"
+  },
+  "container/ske/createcluster": {
+    "cloud_logging_enabled": "true",
+    "kubernetes_version": "v1.29.8",
+    "name": "sample-cluster",
+    "private_endpoint_access_control_resources": [],
+    "public_endpoint_access_control_ip": "192.168.0.0",
+    "security_group_id_list": [
+      "bdfda539-bd2e-4a5c-9021-ec6d52d1ca79"
+    ],
+    "service_watch_logging_enabled": "true",
+    "subnet_id": "023c57b14f11483689338d085e061492",
+    "tags": [],
+    "volume_id": [
+      "bfdbabf2-04d9-4e8b-a205-020f8e6da438"
+    ],
+    "vpc_id": "7df8abb4912e4709b1cb237daccca7a8"
+  },
+  "container/ske/createnodepool": {
+    "advanced_settings": {
+      "allowed_unsafe_sysctls": "kernel.msg*,net.ipv4.route.min_pmtu",
+      "container_log_max_files": "5",
+      "container_log_max_size": "10",
+      "image_gc_high_threshold": "85",
+      "image_gc_low_threshold": "80",
+      "max_pods": "110",
+      "pod_max_pids": "4096"
+    },
+    "cluster_id": "70a599e031e749b7b260868f441e862b",
+    "custom_image_id": "10a599e031e749b7b260868f441e862b",
+    "desired_node_count": "2",
+    "image_os": "ubuntu",
+    "image_os_version": "22.04",
+    "is_auto_recovery": "true",
+    "is_auto_scale": "true",
+    "keypair_name": "test_keypair",
+    "kubernetes_version": "v1.29.8",
+    "labels": [
+      {
+        "key": "example.com/my-app",
+        "value": "bar"
+      }
+    ],
+    "linked_resources": [
+      {
+        "id": "res-12345678",
+        "name": "my-resource",
+        "type": "fs"
+      }
+    ],
+    "max_node_count": "5",
+    "min_node_count": "1",
+    "name": "sample-nodepool",
+    "scp_gpu_driver": "",
+    "server_group_id": "2b8d33d5-4de5-40a5-a34c-7e30204133xc",
+    "server_type_id": "s1v1m2",
+    "taints": [
+      {
+        "effect": "NoSchedule",
+        "key": "example.com/my-app",
+        "value": "bar"
+      }
+    ],
+    "volume_max_iops": "5000",
+    "volume_max_throughput": "250",
+    "volume_size": "104",
+    "volume_type_name": "SSD_Provisioned"
+  },
+  "database/mysql/mysqlcreatecluster": {
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+    "ha_enabled": false,
+    "init_config_option": {
+      "audit_enabled": "",
+      "backup_option": {
+        "archive_frequency_minute": "60",
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
+      },
+      "database_case_sensitive": false,
+      "database_character_set": "utf8mb4",
+      "database_name": "",
+      "database_port": 2866,
+      "database_user_name": "",
+      "database_user_password": ""
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "ACTIVE",
+        "server_type_name": ""
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "nat_enabled": false,
+    "origin_cluster_id": "",
+    "service_watch_log_collection": true,
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": [],
+    "timezone": "Asia/Seoul",
+    "vip_public_ip_id": "",
+    "virtual_ip_address": ""
+  },
   "networking/dns/activateprivatedns": {
     "name": "private-dns01"
   },
