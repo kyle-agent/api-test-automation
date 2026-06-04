@@ -825,7 +825,7 @@
       "id": "compute-virtualserver-volume-snapshot",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "Light, no-VPC: create a block volume, snapshot it, probe-read both (showvolume + showsnapshot), then tear down. Volume create body mirrors the VM lifecycle's create-volume (VALIDATED). Snapshot create body grounded from docs (createsnapshot). Captures use $.id (volume id convention confirmed from the VM lifecycle); snapshot id inferred as $.id — regrsnap* swept as insurance.",
+      "_note": "Light, no-VPC: create a block volume, snapshot it, probe-read both (showvolume + showsnapshot), then tear down. Volume create body mirrors the VM lifecycle's create-volume (VALIDATED). Snapshot create body grounded from docs (createsnapshot). Captures use $.id (volume id convention confirmed from the VM lifecycle); snapshot id inferred as $.id \u2014 regrsnap* swept as insurance.",
       "steps": [
         {
           "name": "create-volume",
@@ -1824,7 +1824,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra block-volume re-added: create standalone /v1/volumes (volume_type:'SSD', size:104 int, capture $.id, poll $.state 'available'), attach via POST /v1/servers/{server_id}/volumes (volume_id+device /dev/vdb), then detach + delete on teardown. The field is volume_type NOT type.",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated \u2014 confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra block-volume re-added: create standalone /v1/volumes (volume_type:'SSD', size:104 int, capture $.id, poll $.state 'available'), attach via POST /v1/servers/{server_id}/volumes (volume_id+device /dev/vdb), then detach + delete on teardown. The field is volume_type NOT type.",
       "steps": [
         {
           "name": "create-vpc",
@@ -2856,6 +2856,1174 @@
       ]
     },
     {
+      "id": "heavy-shared-dbaas",
+      "service": "networking/vpc",
+      "heavy": true,
+      "enabled": true,
+      "_note": "Shared-infra parallel DBaaS heavy plan: ONE vpc+subnet (10.130.0.0/20 / 10.130.1.0/24), then all 6 dbaas engines (mysql/postgresql/mariadb/epas/sqlserver/cachestore) created concurrently (creates fired back-to-back -> async provisioning overlaps), waited, probe-read (per-engine service override + cluster_id), and torn down. Each engine is a group with optional create/find/wait steps: a bad engine body skips only that engine (cleaned up) so the others still record GET coverage. Engine bodies grounded per-engine from api_bodies.json (init_config differs: pg/epas encoding+locale, mariadb/mysql charset, sqlserver collation+databases+license, cachestore MASTER+replica_count+dual block-storage). Distinct service IPs .11-.16 within the shared subnet. UNVALIDATED until a heavy run with VPC capacity; expect to iterate on per-engine init_config fields.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression shared-dbaas",
+            "cidr": "10.130.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression shared-dbaas",
+            "cidr": "10.130.1.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "mys-find-version",
+          "service": "mysql",
+          "group": "mysql",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "mys_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "mys-find-server-type",
+          "service": "mysql",
+          "group": "mysql",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "mys_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "mys-create-cluster",
+          "service": "mysql",
+          "group": "mysql",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "init_config_option": {
+              "database_name": "regrmys",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "audit_enabled": "",
+              "database_case_sensitive": false,
+              "database_character_set": "utf8mb4"
+            },
+            "service_watch_log_collection": true,
+            "name": "regrmys{unique}",
+            "instance_name_prefix": "regrmys",
+            "dbaas_engine_version_id": "{mys_ver}",
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{mys_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.130.1.11/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "mys_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{mys_cid}",
+            "service": "mysql"
+          }
+        },
+        {
+          "name": "pg-find-version",
+          "service": "postgresql",
+          "group": "postgresql",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "pg_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "pg-find-server-type",
+          "service": "postgresql",
+          "group": "postgresql",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "pg_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "pg-create-cluster",
+          "service": "postgresql",
+          "group": "postgresql",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "init_config_option": {
+              "database_name": "regrpg",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C"
+            },
+            "name": "regrpg{unique}",
+            "instance_name_prefix": "regrpg",
+            "dbaas_engine_version_id": "{pg_ver}",
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{pg_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.130.1.12/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "pg_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{pg_cid}",
+            "service": "postgresql"
+          }
+        },
+        {
+          "name": "maria-find-version",
+          "service": "mariadb",
+          "group": "mariadb",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "maria_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "maria-find-server-type",
+          "service": "mariadb",
+          "group": "mariadb",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "maria_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "maria-create-cluster",
+          "service": "mariadb",
+          "group": "mariadb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "init_config_option": {
+              "database_name": "regrmaria",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "audit_enabled": false,
+              "database_character_set": "utf8"
+            },
+            "service_watch_log_collection": true,
+            "name": "regrmaria{unique}",
+            "instance_name_prefix": "regrmaria",
+            "dbaas_engine_version_id": "{maria_ver}",
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{maria_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.130.1.13/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "maria_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{maria_cid}",
+            "service": "mariadb"
+          }
+        },
+        {
+          "name": "epas-find-version",
+          "service": "epas",
+          "group": "epas",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "epas_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "epas-find-server-type",
+          "service": "epas",
+          "group": "epas",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "epas_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "epas-create-cluster",
+          "service": "epas",
+          "group": "epas",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "init_config_option": {
+              "database_name": "regrepas",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C"
+            },
+            "name": "regrepas{unique}",
+            "instance_name_prefix": "regrepas",
+            "dbaas_engine_version_id": "{epas_ver}",
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{epas_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.130.1.14/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "epas_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{epas_cid}",
+            "service": "epas"
+          }
+        },
+        {
+          "name": "mssql-find-version",
+          "service": "sqlserver",
+          "group": "sqlserver",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "mssql_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "mssql-find-server-type",
+          "service": "sqlserver",
+          "group": "sqlserver",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "mssql_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "mssql-create-cluster",
+          "service": "sqlserver",
+          "group": "sqlserver",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_collation": "SQL_Latin1_General_CP1_CI_AS",
+              "database_name": "regrdb",
+              "database_port": 2866,
+              "database_service_name": "regrmssql",
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "databases": [
+                {
+                  "database_name": "regrdb",
+                  "drive_letter": "E"
+                }
+              ],
+              "license": "",
+              "backup_option": {
+                "archive_frequency_minute": "",
+                "full_backup_day_of_week": "SUN",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "name": "regrmssql{unique}",
+            "instance_name_prefix": "regrmssql",
+            "dbaas_engine_version_id": "{mssql_ver}",
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{mssql_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.130.1.15/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "mssql_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{mssql_cid}",
+            "service": "sqlserver"
+          }
+        },
+        {
+          "name": "cache-find-version",
+          "service": "cachestore",
+          "group": "cachestore",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "cache_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "cache-find-server-type",
+          "service": "cachestore",
+          "group": "cachestore",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "cache_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "cache-create-cluster",
+          "service": "cachestore",
+          "group": "cachestore",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "replica_count": 0,
+            "init_config_option": {
+              "backup_option": {
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "database_port": 6378,
+              "database_user_password": "test123!",
+              "sentinel_port": 26378
+            },
+            "name": "regrcache{unique}",
+            "instance_name_prefix": "regrcache",
+            "dbaas_engine_version_id": "{cache_ver}",
+            "instance_groups": [
+              {
+                "role_type": "MASTER",
+                "server_type_name": "{cache_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  },
+                  {
+                    "role_type": "DATA",
+                    "size_gb": 56,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "MASTER",
+                    "service_ip_address": "10.130.1.16/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cache_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cache_cid}",
+            "service": "cachestore"
+          }
+        },
+        {
+          "name": "mys-wait-cluster",
+          "service": "mysql",
+          "group": "mysql",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{mys_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "pg-wait-cluster",
+          "service": "postgresql",
+          "group": "postgresql",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{pg_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "maria-wait-cluster",
+          "service": "mariadb",
+          "group": "mariadb",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{maria_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "epas-wait-cluster",
+          "service": "epas",
+          "group": "epas",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{epas_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "mssql-wait-cluster",
+          "service": "sqlserver",
+          "group": "sqlserver",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{mssql_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "cache-wait-cluster",
+          "service": "cachestore",
+          "group": "cachestore",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{cache_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "mys-probe",
+          "service": "mysql",
+          "group": "mysql",
+          "probe_reads": {
+            "cluster_id": "{mys_cid}",
+            "dbaas_engine_version_id": "{mys_ver}"
+          }
+        },
+        {
+          "name": "pg-probe",
+          "service": "postgresql",
+          "group": "postgresql",
+          "probe_reads": {
+            "cluster_id": "{pg_cid}",
+            "dbaas_engine_version_id": "{pg_ver}"
+          }
+        },
+        {
+          "name": "maria-probe",
+          "service": "mariadb",
+          "group": "mariadb",
+          "probe_reads": {
+            "cluster_id": "{maria_cid}",
+            "dbaas_engine_version_id": "{maria_ver}"
+          }
+        },
+        {
+          "name": "epas-probe",
+          "service": "epas",
+          "group": "epas",
+          "probe_reads": {
+            "cluster_id": "{epas_cid}",
+            "dbaas_engine_version_id": "{epas_ver}"
+          }
+        },
+        {
+          "name": "mssql-probe",
+          "service": "sqlserver",
+          "group": "sqlserver",
+          "probe_reads": {
+            "cluster_id": "{mssql_cid}",
+            "dbaas_engine_version_id": "{mssql_ver}"
+          }
+        },
+        {
+          "name": "cache-probe",
+          "service": "cachestore",
+          "group": "cachestore",
+          "probe_reads": {
+            "cluster_id": "{cache_cid}",
+            "dbaas_engine_version_id": "{cache_ver}"
+          }
+        },
+        {
+          "name": "mys-delete-cluster",
+          "service": "mysql",
+          "group": "mysql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{mys_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "pg-delete-cluster",
+          "service": "postgresql",
+          "group": "postgresql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{pg_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "maria-delete-cluster",
+          "service": "mariadb",
+          "group": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{maria_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "epas-delete-cluster",
+          "service": "epas",
+          "group": "epas",
+          "method": "DELETE",
+          "path": "/v1/clusters/{epas_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "mssql-delete-cluster",
+          "service": "sqlserver",
+          "group": "sqlserver",
+          "method": "DELETE",
+          "path": "/v1/clusters/{mssql_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "cache-delete-cluster",
+          "service": "cachestore",
+          "group": "cachestore",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cache_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "mys-wait-gone",
+          "service": "mysql",
+          "group": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{mys_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "pg-wait-gone",
+          "service": "postgresql",
+          "group": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{pg_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "maria-wait-gone",
+          "service": "mariadb",
+          "group": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{maria_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "epas-wait-gone",
+          "service": "epas",
+          "group": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{epas_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "mssql-wait-gone",
+          "service": "sqlserver",
+          "group": "sqlserver",
+          "method": "GET",
+          "path": "/v1/clusters/{mssql_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "cache-wait-gone",
+          "service": "cachestore",
+          "group": "cachestore",
+          "method": "GET",
+          "path": "/v1/clusters/{cache_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 20
+        }
+      ]
+    },
+    {
       "id": "networking-dns-hosted-zone",
       "service": "networking/dns",
       "enabled": false,
@@ -3047,7 +4215,7 @@
       "id": "security-secretsmanager-secret",
       "service": "security/secretsmanager",
       "enabled": true,
-      "_note": "Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down last. secret_value must be a JSON STRING; private_acl_enabled is a string 'false'. Captures $.secret.id / $.key.id confirmed from doc response examples. Secret DELETE requires a body {waiting_time_ndays} (recovery window) — sent on both the delete step and the cleanup.",
+      "_note": "Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down last. secret_value must be a JSON STRING; private_acl_enabled is a string 'false'. Captures $.secret.id / $.key.id confirmed from doc response examples. Secret DELETE requires a body {waiting_time_ndays} (recovery window) \u2014 sent on both the delete step and the cleanup.",
       "steps": [
         {
           "name": "create-kms",

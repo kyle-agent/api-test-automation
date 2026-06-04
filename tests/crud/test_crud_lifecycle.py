@@ -220,18 +220,37 @@ def test_crud_lifecycle(lifecycle, client, cfg):
     # far, used to best-effort clean up if the lifecycle fails partway — so a
     # failed run never leaks a billable resource (e.g. an orphaned VM).
     cleanups: list[tuple] = []
+    failed_groups: set = set()
+
+    def _run_cleanup(entry):
+        label, method, path, svc, cu_json, _grp = entry
+        try:
+            if cfg.allow_destructive:
+                client.request(method, path, json=cu_json, service=svc)
+                print(f"  cleanup: {method} {path}")
+        except Exception as exc:  # best-effort; report and continue
+            print(f"  cleanup FAILED for {label} ({path}): {exc}")
 
     def _teardown():
-        for label, method, path, svc, cu_json in reversed(cleanups):
-            try:
-                if cfg.allow_destructive:
-                    client.request(method, path, json=cu_json, service=svc)
-                    print(f"  cleanup: {method} {path}")
-            except Exception as exc:  # best-effort; report and continue
-                print(f"  cleanup FAILED for {label} ({path}): {exc}")
+        for entry in reversed(cleanups):
+            _run_cleanup(entry)
+
+    def _teardown_group(grp):
+        # An optional step failed: clean up just this group's resources and drop
+        # them from the stack so the final teardown doesn't double-delete.
+        keep = []
+        for entry in reversed(cleanups):
+            if entry[5] == grp:
+                _run_cleanup(entry)
+            else:
+                keep.append(entry)
+        cleanups[:] = list(reversed(keep))
 
     try:
         for step in lifecycle["steps"]:
+            grp = step.get("group")
+            if grp and grp in failed_groups:
+                continue  # an earlier step in this group failed — skip the rest
             step_service = step.get("service") or service
             if step.get("wait"):  # let async provisioning settle before this step
                 time.sleep(float(step["wait"]))
@@ -269,6 +288,26 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                 pytest.skip(
                     f"[{lifecycle['id']}] environmental quota limit at step "
                     f"'{step['name']}': {resp.raw_text[:200]}")
+            # An "optional" step belongs to a "group" (e.g. one dbaas engine in a
+            # multi-engine lifecycle). If it fails (bad status or a capture miss),
+            # don't sink the whole lifecycle: clean up that group's resources, mark
+            # the group failed (its remaining steps are skipped via the check at the
+            # top of the loop), and continue so the other groups still run and
+            # record coverage. A wrong body in one engine thus costs only that
+            # engine, not the entire ~40-min billable run.
+            status_ok = resp.status in expected
+            if status_ok:
+                for var, expr in step.get("capture", {}).items():
+                    if _capture(resp.body, expr) is None:
+                        status_ok = False
+                        break
+            if not status_ok and step.get("optional"):
+                print(f"  optional step '{step['name']}' (group={grp}) failed "
+                      f"-> {resp.status}; skipping group. {resp.raw_text[:200]}")
+                if grp:
+                    failed_groups.add(grp)
+                    _teardown_group(grp)
+                continue
             assert resp.status in expected, (
                 f"[{lifecycle['id']}] step '{step['name']}' "
                 f"{step['method']} {path} -> {resp.status}, expected {expected}\n"
@@ -298,7 +337,7 @@ def test_crud_lifecycle(lifecycle, client, cfg):
             if cu:
                 cleanups.append((step["name"], cu["method"], _fill(cu["path"], ctx),
                                  cu.get("service") or step_service,
-                                 _fill_obj(cu.get("json"), ctx)))
+                                 _fill_obj(cu.get("json"), ctx), grp))
     except Exception:
         print(f"\n[{lifecycle['id']}] failed — attempting teardown of created resources:")
         _teardown()

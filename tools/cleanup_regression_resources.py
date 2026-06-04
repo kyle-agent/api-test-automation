@@ -154,6 +154,14 @@ def main() -> int:
         vid = it.get("volume_id") or it.get("id")
         if vid and _delete(c, "filestorage", f"/v1/volumes/{vid}"):
             deleted += 1
+    # 7b. dbaas clusters (regr* per engine service) — reclaim leaked clusters
+    # from the shared multi-engine heavy lifecycle (each engine routes to its own
+    # /v1/clusters via the service header).
+    for svc in ("mysql", "postgresql", "mariadb", "epas", "sqlserver", "cachestore"):
+        for it in _list(c, svc, "/v1/clusters", "regr"):
+            cid = it.get("id")
+            if cid and _delete(c, svc, f"/v1/clusters/{cid}"):
+                deleted += 1
     # 8. ske clusters (regrske) — delete their nodepools first, then the cluster
     for it in _list(c, "ske", "/v1/clusters", "regrske"):
         cid = it.get("id")
