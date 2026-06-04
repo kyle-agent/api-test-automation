@@ -102,29 +102,56 @@ def _categorize(status: int, text: str) -> tuple[str, str]:
     return "soft", "needs required query params / data"  # 400/409/422/etc.
 
 
+# A handful of read GETs answer 4xx on a bare call because a query param is
+# mandatory (not a permission/entitlement limit). We feed a synthetic value so
+# they actually exercise — non-destructive (a duplication check with an unused
+# name creates nothing). Param names aren't published (docs are JS-rendered), so
+# we try an ordered candidate list and keep the first that returns 2xx; if none
+# do, the endpoint simply stays soft exactly as before (no regression).
+_DUP_NAME = "regrprobesmoke"
+
+
+def _required_param_candidates(endpoint: Endpoint) -> list[dict]:
+    p = endpoint.http_path
+    if p.endswith("/check-duplication") or p.endswith("/check-duplication/name"):
+        return [{"name": _DUP_NAME}, {"productName": _DUP_NAME}, {"resourceName": _DUP_NAME}]
+    if p.endswith("/parameters"):
+        svc = endpoint.service  # e.g. mysql / postgresql / eventstreams
+        return [{"dbType": svc}, {"engine": svc}, {"engineName": svc},
+                {"dbEngine": svc}, {"engineVersion": "1"}, {"version": "1"}]
+    return []
+
+
 def test_endpoint_reachable(endpoint: Endpoint, client):
     if endpoint.is_mutating:
         pytest.skip("mutating endpoint — covered by CRUD lifecycle suites")
     if endpoint.has_path_params:
         pytest.skip(f"needs a real resource id: {endpoint.http_path}")
 
-    try:
-        resp = client.get(endpoint.http_path, service=endpoint.service)
-    except Exception as exc:
-        # Transient/host failure (timeout, connection reset). Record it as a
-        # fail (status 0) instead of letting it vanish from the tsv, so the
-        # count stays honest and the dashboard surfaces unreachable services.
-        _record(endpoint, 0, "fail")
-        pytest.fail(f"{endpoint.method} {endpoint.http_path} -> unreachable: {exc}")
+    # Endpoints needing a mandatory query param: try candidates (first 2xx wins);
+    # everything else makes a single bare call.
+    candidates = _required_param_candidates(endpoint)
+    resp = category = reason = None
+    for params in (candidates or [None]):
+        try:
+            resp = client.get(endpoint.http_path, service=endpoint.service, params=params)
+        except Exception as exc:
+            # Transient/host failure (timeout, connection reset). Record it as a
+            # fail (status 0) instead of letting it vanish from the tsv, so the
+            # count stays honest and the dashboard surfaces unreachable services.
+            _record(endpoint, 0, "fail")
+            pytest.fail(f"{endpoint.method} {endpoint.http_path} -> unreachable: {exc}")
+        category, reason = _categorize(resp.status, resp.raw_text)
+        if category == "ok":
+            break
 
-    category, reason = _categorize(resp.status, resp.raw_text)
     _record(endpoint, resp.status, category)
 
     # Parameter-coverage probe (read-only, record-only): re-issue the same GET
-    # once with pagination params. Only for endpoints that already returned 2xx,
-    # so it never turns a working call into noise; a 400 on params is informative
-    # (recorded soft), not a failure.
-    if resp.ok:
+    # once with pagination params. Only for plain OK list endpoints (skip the
+    # ones we already fed required params, to keep that axis clean); a 400 on
+    # params is informative (recorded soft), not a failure.
+    if resp.ok and not candidates:
         try:
             presp = client.get(endpoint.http_path, service=endpoint.service, params=_PARAM_SET)
             pcat, _ = _categorize(presp.status, presp.raw_text)

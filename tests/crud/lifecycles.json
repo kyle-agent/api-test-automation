@@ -1542,7 +1542,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated \u2014 confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra-volume create requires size>=100 for SSD (sent 10 -> 400 despite generic '>=8' msg; aligned to boot-volume scale). Remaining best-guess: extra-volume attach body {server_id}, detach, and AVAILABLE/IN_USE states \u2014 verify against live responses.",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra-volume create requires size>=100 for SSD (sent 10 -> 400 despite generic '>=8' msg; aligned to boot-volume scale). Remaining best-guess: extra-volume attach body {server_id}, detach, and AVAILABLE/IN_USE states — verify against live responses.",
       "steps": [
         {
           "name": "create-vpc",
@@ -2566,6 +2566,267 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "networking-dns-hosted-zone",
+      "service": "networking/dns",
+      "enabled": true,
+      "heavy": false,
+      "_note": "Light, self-contained, non-billable: create a public DNS hosted zone, add an A record, read both, list, probe path-param GETs, then tear down record + zone in reverse. Synchronous. BEST-GUESS create bodies (catalog has no body schema): hosted-zone body fields {name, description, tags} and record body fields {name, type, ttl, records[]} are inferred from SCP DNS createhostedzone/createhostedzonerecord 1.3 conventions and may need adjustment (e.g. record value key could be 'records' vs 'value', ttl bounds). Capture JSONPaths $.hosted_zone.id and $.record.id are best-guess; if the create envelope differs (e.g. flat $.id), the capture will fail loudly and need correcting.",
+      "steps": [
+        {
+          "name": "create-zone",
+          "method": "POST",
+          "path": "/v1/hosted-zones",
+          "json": {
+            "name": "regr{unique}.example.com",
+            "description": "API regression suite",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "hosted_zone_id": "$.hosted_zone.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/hosted-zones/{hosted_zone_id}",
+            "service": "dns"
+          }
+        },
+        {
+          "name": "get-zone",
+          "method": "GET",
+          "path": "/v1/hosted-zones/{hosted_zone_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-zones",
+          "method": "GET",
+          "path": "/v1/hosted-zones",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "create-record",
+          "method": "POST",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records",
+          "json": {
+            "name": "www.regr{unique}.example.com",
+            "type": "A",
+            "ttl": 300,
+            "records": [
+              "192.0.2.10"
+            ],
+            "description": "API regression suite"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "record_id": "$.record.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+            "service": "dns"
+          }
+        },
+        {
+          "name": "get-record",
+          "method": "GET",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-records",
+          "method": "GET",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "hosted_zone_id": "{hosted_zone_id}",
+            "record_id": "{record_id}"
+          }
+        },
+        {
+          "name": "delete-record",
+          "method": "DELETE",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-zone",
+          "method": "DELETE",
+          "path": "/v1/hosted-zones/{hosted_zone_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "security-kms-key",
+      "service": "security/kms",
+      "enabled": true,
+      "heavy": false,
+      "_note": "Light, self-contained, non-billable: create a KMS transit key, read it, list, probe path-param GETs, then delete (schedule deletion). Synchronous. BEST-GUESS create body (catalog has no body schema): fields {name, key_type, description, tags} inferred from SCP KMS createkey 1.3; key_type 'aes256' is a guess (could be 'symmetric'/'AES_256'/'rsa2048') and may need adjustment. Capture JSONPath $.key.id is best-guess (envelope may be $.id or $.transit.id). DELETE may return 202 if it schedules rather than immediately removes the key.",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/kms/transit",
+          "json": {
+            "name": "regrkms{unique}",
+            "key_type": "aes256",
+            "description": "API regression suite",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "key_id": "$.key.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/kms/transit/{key_id}",
+            "service": "kms"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/kms/transit/{key_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/kms/transit",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "key_id": "{key_id}"
+          }
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/kms/transit/{key_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "security-secretsmanager-secret",
+      "service": "security/secretsmanager",
+      "enabled": true,
+      "heavy": false,
+      "_note": "Light, self-contained, non-billable: create a Secrets Manager secret, read it, list versions, list all, probe path-param GETs, then delete. Synchronous. BEST-GUESS create body (catalog has no body schema): fields {name, description, secret_value, secret_type, tags} inferred from SCP secretsmanager createsecretsmanager 1.2; secret_value as a plain string and secret_type 'text' are guesses (value could need a structured object or base64, type could be 'generic'/'plaintext'). Capture JSONPath $.secret.id is best-guess (envelope may be $.id or $.secret_id).",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/secrets",
+          "json": {
+            "name": "regrsec{unique}",
+            "description": "API regression suite",
+            "secret_value": "regr-value-{unique}",
+            "secret_type": "text",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "secret_id": "$.secret.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/secrets/{secret_id}",
+            "service": "secretsmanager"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/secrets/{secret_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-versions",
+          "method": "GET",
+          "path": "/v1/secrets/{secret_id}/versions",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/secrets",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "secret_id": "{secret_id}"
+          }
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/secrets/{secret_id}",
           "expect_status": [
             200,
             202,
