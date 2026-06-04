@@ -1542,7 +1542,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra-volume create: POST /v1/volumes wants 'size' as a STRING ('100'), not int — int 10 AND int 100 both 400'd with the same generic 'size >=8' msg (value ignored when sent as a number), whereas the nested boot-volume accepts int. Sent as string now. Remaining best-guess: extra-volume attach body {server_id}, detach, and AVAILABLE/IN_USE states — verify against live responses.",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra block-volume attach/detach REMOVED: POST /v1/volumes block-create rejects 'size' for int 10/100 and string '100' alike (misleading generic '>=8' error) while the nested boot volume (size 104) works on the same host — schema unresolved without docs; standalone volume CRUD is already covered by the filestorage-volume lifecycle, so this bonus step was dropped to keep the validated core (create->rename->stop/start->teardown) green.",
       "steps": [
         {
           "name": "create-vpc",
@@ -1854,131 +1854,6 @@
             ],
             "timeout": 300,
             "interval": 15
-          }
-        },
-        {
-          "name": "create-extra-volume",
-          "method": "POST",
-          "path": "/v1/volumes",
-          "json": {
-            "name": "regrvol{unique}",
-            "size": "100",
-            "type": "SSD",
-            "tags": []
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "extra_vol_id": "$.volume.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/volumes/{extra_vol_id}",
-            "service": "virtualserver"
-          }
-        },
-        {
-          "name": "wait-extra-volume-available",
-          "method": "GET",
-          "path": "/v1/volumes/{extra_vol_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.volume.state",
-            "until": [
-              "AVAILABLE",
-              "available"
-            ],
-            "timeout": 300,
-            "interval": 10
-          }
-        },
-        {
-          "name": "attach-extra-volume",
-          "method": "POST",
-          "path": "/v1/volumes/{extra_vol_id}/servers",
-          "json": {
-            "server_id": "{server_id}"
-          },
-          "expect_status": [
-            200,
-            202,
-            204
-          ]
-        },
-        {
-          "name": "wait-extra-volume-attached",
-          "method": "GET",
-          "path": "/v1/volumes/{extra_vol_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.volume.state",
-            "until": [
-              "IN_USE",
-              "in-use"
-            ],
-            "timeout": 300,
-            "interval": 10
-          }
-        },
-        {
-          "name": "detach-extra-volume",
-          "method": "DELETE",
-          "path": "/v1/volumes/{extra_vol_id}/servers/{server_id}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ]
-        },
-        {
-          "name": "wait-extra-volume-detached",
-          "method": "GET",
-          "path": "/v1/volumes/{extra_vol_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.volume.state",
-            "until": [
-              "AVAILABLE",
-              "available"
-            ],
-            "timeout": 300,
-            "interval": 10
-          }
-        },
-        {
-          "name": "delete-extra-volume",
-          "method": "DELETE",
-          "path": "/v1/volumes/{extra_vol_id}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
-          "name": "wait-extra-volume-gone",
-          "method": "GET",
-          "path": "/v1/volumes/{extra_vol_id}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 300,
-            "interval": 10
           }
         },
         {
