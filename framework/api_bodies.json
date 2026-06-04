@@ -155,6 +155,146 @@
     "volume_size": "104",
     "volume_type_name": "SSD_Provisioned"
   },
+  "data-analytics/eventstreams/eventstreamscreatecluster": {
+    "akhq_enabled": false,
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "",
+    "init_config_option": {
+      "akhq_id": "",
+      "akhq_password": "",
+      "broker_port": 9091,
+      "broker_sasl_id": "",
+      "broker_sasl_password": "",
+      "zookeeper_port": 2180,
+      "zookeeper_sasl_id": "",
+      "zookeeper_sasl_password": ""
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "ACTIVE",
+        "server_type_name": ""
+      }
+    ],
+    "instance_name_prefix": "",
+    "is_combined": false,
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "",
+    "nat_enabled": false,
+    "service_watch_log_collection": true,
+    "subnet_id": "",
+    "tags": [],
+    "timezone": ""
+  },
+  "data-analytics/searchengine/searchenginecreatecluster": {
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "",
+    "init_config_option": {
+      "backup_option": {
+        "retention_period_day": "",
+        "starting_time_hour": ""
+      },
+      "database_port": 9200,
+      "database_user_name": "",
+      "database_user_password": ""
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "ACTIVE",
+        "server_type_name": ""
+      }
+    ],
+    "instance_name_prefix": "",
+    "is_combined": false,
+    "license": "",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "",
+    "nat_enabled": false,
+    "subnet_id": "",
+    "tags": [],
+    "timezone": ""
+  },
+  "data-analytics/vertica/verticacreatecluster": {
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "",
+    "init_config_option": {
+      "backup_option": {
+        "retention_period_day": "",
+        "starting_time_hour": ""
+      },
+      "database_locale": "ko_KR.utf8",
+      "database_name": "",
+      "database_user_name": "",
+      "database_user_password": ""
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "ACTIVE",
+        "server_type_name": ""
+      }
+    ],
+    "instance_name_prefix": "",
+    "license": "",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "",
+    "nat_enabled": false,
+    "subnet_id": "",
+    "tags": [],
+    "timezone": ""
+  },
   "database/cachestore/cachestorecreatecluster": {
     "allowable_ip_addresses": [],
     "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",

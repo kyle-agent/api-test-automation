@@ -2860,7 +2860,7 @@
       "service": "networking/vpc",
       "heavy": true,
       "enabled": true,
-      "_note": "Shared-infra parallel DBaaS heavy plan: ONE vpc+subnet (10.130.0.0/20 / 10.130.1.0/24), then all 6 dbaas engines (mysql/postgresql/mariadb/epas/sqlserver/cachestore) created concurrently (creates fired back-to-back -> async provisioning overlaps), waited, probe-read (per-engine service override + cluster_id), and torn down. Each engine is a group with optional create/find/wait steps: a bad engine body skips only that engine (cleaned up) so the others still record GET coverage. Engine bodies grounded per-engine from api_bodies.json (init_config differs: pg/epas encoding+locale, mariadb/mysql charset, sqlserver collation+databases+license, cachestore MASTER+replica_count+dual block-storage). Distinct service IPs .11-.16 within the shared subnet. UNVALIDATED until a heavy run with VPC capacity; expect to iterate on per-engine init_config fields.",
+      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 9 dbaas engines (mysql/postgresql/mariadb/epas/sqlserver/cachestore/eventstreams/searchengine/vertica) + 1 VM created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body).",
       "steps": [
         {
           "name": "create-vpc",
@@ -2869,7 +2869,7 @@
           "path": "/v1/vpcs",
           "json": {
             "name": "regrvpc{unique}",
-            "description": "API regression shared-dbaas",
+            "description": "API regression shared",
             "cidr": "10.130.0.0/20",
             "tags": []
           },
@@ -2913,7 +2913,7 @@
           "path": "/v1/subnets",
           "json": {
             "name": "regrsub{unique}",
-            "description": "API regression shared-dbaas",
+            "description": "API regression shared",
             "cidr": "10.130.1.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
@@ -2968,7 +2968,7 @@
           }
         },
         {
-          "name": "mys-find-server-type",
+          "name": "mys-find-stype",
           "service": "mysql",
           "group": "mysql",
           "optional": true,
@@ -2985,7 +2985,7 @@
           }
         },
         {
-          "name": "mys-create-cluster",
+          "name": "mys-create",
           "service": "mysql",
           "group": "mysql",
           "optional": true,
@@ -3003,6 +3003,7 @@
               "starting_day_of_week": "MON",
               "starting_time": "0000"
             },
+            "service_watch_log_collection": true,
             "origin_cluster_id": "",
             "vip_public_ip_id": "",
             "virtual_ip_address": "",
@@ -3020,7 +3021,6 @@
               "database_case_sensitive": false,
               "database_character_set": "utf8mb4"
             },
-            "service_watch_log_collection": true,
             "name": "regrmys{unique}",
             "instance_name_prefix": "regrmys",
             "dbaas_engine_version_id": "{mys_ver}",
@@ -3077,7 +3077,7 @@
           }
         },
         {
-          "name": "pg-find-server-type",
+          "name": "pg-find-stype",
           "service": "postgresql",
           "group": "postgresql",
           "optional": true,
@@ -3094,7 +3094,7 @@
           }
         },
         {
-          "name": "pg-create-cluster",
+          "name": "pg-create",
           "service": "postgresql",
           "group": "postgresql",
           "optional": true,
@@ -3185,7 +3185,7 @@
           }
         },
         {
-          "name": "maria-find-server-type",
+          "name": "maria-find-stype",
           "service": "mariadb",
           "group": "mariadb",
           "optional": true,
@@ -3202,7 +3202,7 @@
           }
         },
         {
-          "name": "maria-create-cluster",
+          "name": "maria-create",
           "service": "mariadb",
           "group": "mariadb",
           "optional": true,
@@ -3220,6 +3220,7 @@
               "starting_day_of_week": "MON",
               "starting_time": "0000"
             },
+            "service_watch_log_collection": true,
             "origin_cluster_id": "",
             "vip_public_ip_id": "",
             "virtual_ip_address": "",
@@ -3236,7 +3237,6 @@
               "audit_enabled": false,
               "database_character_set": "utf8"
             },
-            "service_watch_log_collection": true,
             "name": "regrmaria{unique}",
             "instance_name_prefix": "regrmaria",
             "dbaas_engine_version_id": "{maria_ver}",
@@ -3293,7 +3293,7 @@
           }
         },
         {
-          "name": "epas-find-server-type",
+          "name": "epas-find-stype",
           "service": "epas",
           "group": "epas",
           "optional": true,
@@ -3310,7 +3310,7 @@
           }
         },
         {
-          "name": "epas-create-cluster",
+          "name": "epas-create",
           "service": "epas",
           "group": "epas",
           "optional": true,
@@ -3401,7 +3401,7 @@
           }
         },
         {
-          "name": "mssql-find-server-type",
+          "name": "mssql-find-stype",
           "service": "sqlserver",
           "group": "sqlserver",
           "optional": true,
@@ -3418,7 +3418,7 @@
           }
         },
         {
-          "name": "mssql-create-cluster",
+          "name": "mssql-create",
           "service": "sqlserver",
           "group": "sqlserver",
           "optional": true,
@@ -3516,7 +3516,7 @@
           }
         },
         {
-          "name": "cache-find-server-type",
+          "name": "cache-find-stype",
           "service": "cachestore",
           "group": "cachestore",
           "optional": true,
@@ -3533,7 +3533,7 @@
           }
         },
         {
-          "name": "cache-create-cluster",
+          "name": "cache-create",
           "service": "cachestore",
           "group": "cachestore",
           "optional": true,
@@ -3605,7 +3605,446 @@
           }
         },
         {
-          "name": "mys-wait-cluster",
+          "name": "events-find-version",
+          "service": "eventstreams",
+          "group": "eventstreams",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "events_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "events-find-stype",
+          "service": "eventstreams",
+          "group": "eventstreams",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "events_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "events-create",
+          "service": "eventstreams",
+          "group": "eventstreams",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "akhq_enabled": false,
+            "is_combined": false,
+            "service_watch_log_collection": true,
+            "init_config_option": {
+              "akhq_id": "",
+              "akhq_password": "",
+              "broker_port": 9091,
+              "broker_sasl_id": "regruser",
+              "broker_sasl_password": "Regr1ss!2026Xy",
+              "zookeeper_port": 2180,
+              "zookeeper_sasl_id": "regruser",
+              "zookeeper_sasl_password": "Regr1ss!2026Xy"
+            },
+            "name": "regrevents{unique}",
+            "instance_name_prefix": "regrevents",
+            "dbaas_engine_version_id": "{events_ver}",
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{events_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.130.1.17/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "events_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{events_cid}",
+            "service": "eventstreams"
+          }
+        },
+        {
+          "name": "search-find-version",
+          "service": "searchengine",
+          "group": "searchengine",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "search_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "search-find-stype",
+          "service": "searchengine",
+          "group": "searchengine",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "search_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "search-create",
+          "service": "searchengine",
+          "group": "searchengine",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "is_combined": false,
+            "license": "",
+            "init_config_option": {
+              "backup_option": {
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "database_port": 9200,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy"
+            },
+            "name": "regrsearch{unique}",
+            "instance_name_prefix": "regrsearch",
+            "dbaas_engine_version_id": "{search_ver}",
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{search_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.130.1.18/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "search_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{search_cid}",
+            "service": "searchengine"
+          }
+        },
+        {
+          "name": "vert-find-version",
+          "service": "vertica",
+          "group": "vertica",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "vert_ver": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "vert-find-stype",
+          "service": "vertica",
+          "group": "vertica",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "vert_stype": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "vert-create",
+          "service": "vertica",
+          "group": "vertica",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "tags": [],
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "license": "",
+            "init_config_option": {
+              "backup_option": {
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "database_locale": "ko_KR.utf8",
+              "database_name": "regrvert",
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy"
+            },
+            "name": "regrvert{unique}",
+            "instance_name_prefix": "regrvert",
+            "dbaas_engine_version_id": "{vert_ver}",
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{vert_stype}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.130.1.19/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vert_cid": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{vert_cid}",
+            "service": "vertica"
+          }
+        },
+        {
+          "name": "vm-create-sg",
+          "service": "security-group",
+          "group": "vm",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrvmsg{unique}",
+            "description": "API regression shared-vm",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vm_sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{vm_sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "vm-create-keypair",
+          "service": "virtualserver",
+          "group": "vm",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrvmkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrvmkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "vm-find-image",
+          "service": "virtualserver",
+          "group": "vm",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/images",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "vm_image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "vm-find-stype",
+          "service": "virtualserver",
+          "group": "vm",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "vm_stype": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": "g"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "vm-create-server",
+          "service": "virtualserver",
+          "group": "vm",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/servers",
+          "json": {
+            "name": "regrsrv{unique}",
+            "image_id": "{vm_image_id}",
+            "server_type_id": "{vm_stype}",
+            "keypair_name": "regrvmkey{unique}",
+            "product_category": "compute",
+            "product_offering": "virtual_server",
+            "networks": [
+              {
+                "subnet_id": "{subnet_id}"
+              }
+            ],
+            "security_groups": [
+              "{vm_sg_id}"
+            ],
+            "volumes": [
+              {
+                "boot_index": 0,
+                "size": 104,
+                "type": "SSD",
+                "delete_on_termination": true
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vm_server_id": "$.servers[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{vm_server_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "mys-wait",
           "service": "mysql",
           "group": "mysql",
           "optional": true,
@@ -3626,7 +4065,7 @@
           }
         },
         {
-          "name": "pg-wait-cluster",
+          "name": "pg-wait",
           "service": "postgresql",
           "group": "postgresql",
           "optional": true,
@@ -3647,7 +4086,7 @@
           }
         },
         {
-          "name": "maria-wait-cluster",
+          "name": "maria-wait",
           "service": "mariadb",
           "group": "mariadb",
           "optional": true,
@@ -3668,7 +4107,7 @@
           }
         },
         {
-          "name": "epas-wait-cluster",
+          "name": "epas-wait",
           "service": "epas",
           "group": "epas",
           "optional": true,
@@ -3689,7 +4128,7 @@
           }
         },
         {
-          "name": "mssql-wait-cluster",
+          "name": "mssql-wait",
           "service": "sqlserver",
           "group": "sqlserver",
           "optional": true,
@@ -3710,7 +4149,7 @@
           }
         },
         {
-          "name": "cache-wait-cluster",
+          "name": "cache-wait",
           "service": "cachestore",
           "group": "cachestore",
           "optional": true,
@@ -3728,6 +4167,88 @@
             ],
             "timeout": 2400,
             "interval": 30
+          }
+        },
+        {
+          "name": "events-wait",
+          "service": "eventstreams",
+          "group": "eventstreams",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{events_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "search-wait",
+          "service": "searchengine",
+          "group": "searchengine",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{search_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "vert-wait",
+          "service": "vertica",
+          "group": "vertica",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/clusters/{vert_cid}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "vm-wait-server",
+          "service": "virtualserver",
+          "group": "vm",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/servers/{vm_server_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 900,
+            "interval": 20
           }
         },
         {
@@ -3785,7 +4306,45 @@
           }
         },
         {
-          "name": "mys-delete-cluster",
+          "name": "events-probe",
+          "service": "eventstreams",
+          "group": "eventstreams",
+          "probe_reads": {
+            "cluster_id": "{events_cid}",
+            "dbaas_engine_version_id": "{events_ver}"
+          }
+        },
+        {
+          "name": "search-probe",
+          "service": "searchengine",
+          "group": "searchengine",
+          "probe_reads": {
+            "cluster_id": "{search_cid}",
+            "dbaas_engine_version_id": "{search_ver}"
+          }
+        },
+        {
+          "name": "vert-probe",
+          "service": "vertica",
+          "group": "vertica",
+          "probe_reads": {
+            "cluster_id": "{vert_cid}",
+            "dbaas_engine_version_id": "{vert_ver}"
+          }
+        },
+        {
+          "name": "vm-probe",
+          "service": "virtualserver",
+          "group": "vm",
+          "probe_reads": {
+            "server_id": "{vm_server_id}",
+            "image_id": "{vm_image_id}",
+            "server_type_id": "{vm_stype}",
+            "subnet_id": "{subnet_id}"
+          }
+        },
+        {
+          "name": "mys-delete",
           "service": "mysql",
           "group": "mysql",
           "method": "DELETE",
@@ -3798,7 +4357,7 @@
           "destructive": true
         },
         {
-          "name": "pg-delete-cluster",
+          "name": "pg-delete",
           "service": "postgresql",
           "group": "postgresql",
           "method": "DELETE",
@@ -3811,7 +4370,7 @@
           "destructive": true
         },
         {
-          "name": "maria-delete-cluster",
+          "name": "maria-delete",
           "service": "mariadb",
           "group": "mariadb",
           "method": "DELETE",
@@ -3824,7 +4383,7 @@
           "destructive": true
         },
         {
-          "name": "epas-delete-cluster",
+          "name": "epas-delete",
           "service": "epas",
           "group": "epas",
           "method": "DELETE",
@@ -3837,7 +4396,7 @@
           "destructive": true
         },
         {
-          "name": "mssql-delete-cluster",
+          "name": "mssql-delete",
           "service": "sqlserver",
           "group": "sqlserver",
           "method": "DELETE",
@@ -3850,7 +4409,7 @@
           "destructive": true
         },
         {
-          "name": "cache-delete-cluster",
+          "name": "cache-delete",
           "service": "cachestore",
           "group": "cachestore",
           "method": "DELETE",
@@ -3863,7 +4422,59 @@
           "destructive": true
         },
         {
-          "name": "mys-wait-gone",
+          "name": "events-delete",
+          "service": "eventstreams",
+          "group": "eventstreams",
+          "method": "DELETE",
+          "path": "/v1/clusters/{events_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "search-delete",
+          "service": "searchengine",
+          "group": "searchengine",
+          "method": "DELETE",
+          "path": "/v1/clusters/{search_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "vert-delete",
+          "service": "vertica",
+          "group": "vertica",
+          "method": "DELETE",
+          "path": "/v1/clusters/{vert_cid}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "vm-delete-server",
+          "service": "virtualserver",
+          "group": "vm",
+          "method": "DELETE",
+          "path": "/v1/servers/{vm_server_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "mys-gone",
           "service": "mysql",
           "group": "mysql",
           "method": "GET",
@@ -3881,7 +4492,7 @@
           }
         },
         {
-          "name": "pg-wait-gone",
+          "name": "pg-gone",
           "service": "postgresql",
           "group": "postgresql",
           "method": "GET",
@@ -3899,7 +4510,7 @@
           }
         },
         {
-          "name": "maria-wait-gone",
+          "name": "maria-gone",
           "service": "mariadb",
           "group": "mariadb",
           "method": "GET",
@@ -3917,7 +4528,7 @@
           }
         },
         {
-          "name": "epas-wait-gone",
+          "name": "epas-gone",
           "service": "epas",
           "group": "epas",
           "method": "GET",
@@ -3935,7 +4546,7 @@
           }
         },
         {
-          "name": "mssql-wait-gone",
+          "name": "mssql-gone",
           "service": "sqlserver",
           "group": "sqlserver",
           "method": "GET",
@@ -3953,7 +4564,7 @@
           }
         },
         {
-          "name": "cache-wait-gone",
+          "name": "cache-gone",
           "service": "cachestore",
           "group": "cachestore",
           "method": "GET",
@@ -3969,6 +4580,109 @@
             "timeout": 1800,
             "interval": 30
           }
+        },
+        {
+          "name": "events-gone",
+          "service": "eventstreams",
+          "group": "eventstreams",
+          "method": "GET",
+          "path": "/v1/clusters/{events_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "search-gone",
+          "service": "searchengine",
+          "group": "searchengine",
+          "method": "GET",
+          "path": "/v1/clusters/{search_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "vert-gone",
+          "service": "vertica",
+          "group": "vertica",
+          "method": "GET",
+          "path": "/v1/clusters/{vert_cid}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "vm-wait-server-gone",
+          "service": "virtualserver",
+          "group": "vm",
+          "method": "GET",
+          "path": "/v1/servers/{vm_server_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "vm-delete-sg",
+          "service": "security-group",
+          "group": "vm",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{vm_sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "vm-delete-keypair",
+          "service": "virtualserver",
+          "group": "vm",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrvmkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
         },
         {
           "name": "delete-subnet",
@@ -3984,7 +4698,7 @@
           "retry_on_status": [
             409
           ],
-          "retries": 8,
+          "retries": 10,
           "retry_interval": 20
         },
         {
@@ -4018,7 +4732,7 @@
           "retry_on_status": [
             409
           ],
-          "retries": 8,
+          "retries": 10,
           "retry_interval": 20
         }
       ]

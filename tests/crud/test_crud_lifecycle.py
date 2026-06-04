@@ -221,6 +221,7 @@ def test_crud_lifecycle(lifecycle, client, cfg):
     # failed run never leaks a billable resource (e.g. an orphaned VM).
     cleanups: list[tuple] = []
     failed_groups: set = set()
+    group_fail_reason: dict = {}
 
     def _run_cleanup(entry):
         label, method, path, svc, cu_json, _grp = entry
@@ -302,10 +303,12 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                         status_ok = False
                         break
             if not status_ok and step.get("optional"):
+                reason = f"{step['name']} -> {resp.status}: {resp.raw_text[:160]}"
                 print(f"  optional step '{step['name']}' (group={grp}) failed "
                       f"-> {resp.status}; skipping group. {resp.raw_text[:200]}")
                 if grp:
                     failed_groups.add(grp)
+                    group_fail_reason.setdefault(grp, reason)
                     _teardown_group(grp)
                 continue
             assert resp.status in expected, (
@@ -342,3 +345,14 @@ def test_crud_lifecycle(lifecycle, client, cfg):
         print(f"\n[{lifecycle['id']}] failed — attempting teardown of created resources:")
         _teardown()
         raise
+
+    # Surface optional-group failures even though the test passed: pytest swallows
+    # captured stdout for passing tests, so emit a warning (shown in the run's
+    # warnings summary + the CRUD PR comment) naming each skipped group and the
+    # exact status/body that skipped it — that's how we debug the per-engine
+    # create bodies without re-reading raw job logs.
+    if failed_groups:
+        import warnings
+        for g in sorted(failed_groups):
+            warnings.warn(f"[{lifecycle['id']}] group '{g}' skipped: "
+                          f"{group_fail_reason.get(g, '?')}")
