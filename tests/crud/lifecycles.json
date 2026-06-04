@@ -1542,7 +1542,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra block-volume removed; the real createvolume body (API ref) is {name,size:104(int),volume_type:'SSD',max_iops,max_throughput,tags:[{key,value}]} — the field is volume_type NOT type, which is why size looked rejected; can be re-added with this body (needs a heavy run to validate).",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra block-volume re-added: create standalone /v1/volumes (volume_type:'SSD', size:104 int, capture $.id, poll $.state 'available'), attach via POST /v1/servers/{server_id}/volumes (volume_id+device /dev/vdb), then detach + delete on teardown. The field is volume_type NOT type.",
       "steps": [
         {
           "name": "create-vpc",
@@ -1792,6 +1792,88 @@
           }
         },
         {
+          "name": "create-volume",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrvol{unique}",
+            "description": "API regression suite",
+            "size": 104,
+            "volume_type": "SSD",
+            "max_iops": 10000,
+            "max_throughput": 500,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vol_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{vol_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "wait-volume-available",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "attach-volume",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/volumes",
+          "json": {
+            "volume_id": "{vol_id}",
+            "device": "/dev/vdb",
+            "delete_on_termination": false
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}/volumes/{vol_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "wait-volume-attached",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "in-use",
+              "IN-USE",
+              "in_use"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
           "name": "rename-server",
           "method": "PUT",
           "path": "/v1/servers/{server_id}",
@@ -1863,9 +1945,49 @@
             "image_id": "{image_id}",
             "server_type_id": "{server_type_id}",
             "port_id": "{port_id}",
-            "volume_id": "{boot_vol_id}",
+            "volume_id": "{vol_id}",
             "subnet_id": "{subnet_id}"
           }
+        },
+        {
+          "name": "detach-volume",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/volumes/{vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-volume-detached",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "delete-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
         },
         {
           "name": "delete-server",

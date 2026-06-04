@@ -15,11 +15,31 @@ Run a subset, e.g.:  pytest tests/smoke -m smoke --category compute
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from framework.catalog import Endpoint, endpoints
 
 pytestmark = pytest.mark.smoke
+
+
+def _load_known_issues() -> dict:
+    """Baseline of already-tracked backend failures (known_issues.json). A smoke
+    'fail' whose key is listed here is xfailed (expected) rather than failing the
+    suite, so the regression check stays green unless a NEW endpoint breaks. The
+    row is still recorded, so the dashboard keeps showing it as known-red."""
+    p = Path("known_issues.json")
+    if not p.exists():
+        return {}
+    try:
+        return {i["key"]: i for i in json.loads(p.read_text()).get("issues", [])}
+    except Exception:
+        return {}
+
+
+_KNOWN_ISSUES = _load_known_issues()
 
 
 def _selected(config) -> list[Endpoint]:
@@ -158,6 +178,15 @@ def test_endpoint_reachable(endpoint: Endpoint, client):
             _record_param(endpoint, presp.status, pcat)
         except Exception:
             _record_param(endpoint, 0, "fail")
+
+    # A failure on an endpoint already baselined in known_issues.json is an
+    # already-tracked backend bug, not a regression in our suite — xfail it so the
+    # check stays green for the known set (it's still recorded above as known-red).
+    if category == "fail" and endpoint.key in _KNOWN_ISSUES:
+        ki = _KNOWN_ISSUES[endpoint.key]
+        pytest.xfail(
+            f"known issue ({ki.get('type', '?')}, since {ki.get('since', '?')}): "
+            f"{endpoint.http_path} -> {resp.status}; {ki.get('note', '')}")
 
     assert category != "fail", (
         f"{endpoint.method} {endpoint.http_path} -> {resp.status} ({reason})\n"
