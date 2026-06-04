@@ -939,7 +939,7 @@
       "id": "container-ske-cluster-nodepool",
       "service": "container/ske",
       "enabled": true,
-      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed.",
+      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed. | EXPANDED (best-guess, validate via heavy dispatch): nodepool scale up/down + label set/clear.",
       "steps": [
         {
           "name": "create-vpc",
@@ -1275,6 +1275,120 @@
           }
         },
         {
+          "name": "scale-up-nodepool",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "json": {
+            "desired_node_count": "2",
+            "min_node_count": "1",
+            "max_node_count": "3",
+            "is_auto_scale": "false",
+            "is_auto_recovery": "true"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "wait-scale-up",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "set-nodepool-labels",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/labels",
+          "json": {
+            "labels": [
+              {
+                "key": "regr",
+                "value": "test"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "read-after-labels",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "clear-nodepool-labels",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/labels",
+          "json": {
+            "labels": []
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "scale-down-nodepool",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "json": {
+            "desired_node_count": "1",
+            "min_node_count": "1",
+            "max_node_count": "2",
+            "is_auto_scale": "false",
+            "is_auto_recovery": "true"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "wait-scale-down",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
           "name": "delete-nodepool",
           "service": "ske",
           "method": "DELETE",
@@ -1428,7 +1542,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs.",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated \u2014 confirm on next HEAVY run): read captures capture-server-port ($.ports[0].id) / capture-server-volume ($.volumes[0].id) feed a 13-GET probe; write ops update-server-tags, stop/start cycle, and extra-volume create/attach/detach/delete are best-guess bodies+states (tags [{key,value}]; volume create $.volume.id; attach body {server_id}; states STOPPED/SHUTOFF, AVAILABLE/IN_USE) \u2014 verify JSONPaths, request bodies, and state strings against live responses.",
       "steps": [
         {
           "name": "create-vpc",
@@ -1656,9 +1770,231 @@
           }
         },
         {
+          "name": "capture-server-port",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/interfaces",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "port_id": "$.ports[0].id"
+          }
+        },
+        {
+          "name": "capture-server-volume",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/volumes",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "boot_vol_id": "$.volumes[0].id"
+          }
+        },
+        {
+          "name": "update-server-tags",
+          "method": "PUT",
+          "path": "/v1/servers/{server_id}",
+          "json": {
+            "tags": [
+              {
+                "key": "regr",
+                "value": "crud{unique}"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "stop-server",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/stop",
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "wait-server-stopped",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "STOPPED",
+              "SHUTOFF"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "start-server",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/start",
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "wait-server-restarted",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-extra-volume",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrvol{unique}",
+            "size": 10,
+            "type": "SSD",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "extra_vol_id": "$.volume.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{extra_vol_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "wait-extra-volume-available",
+          "method": "GET",
+          "path": "/v1/volumes/{extra_vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.volume.state",
+            "until": [
+              "AVAILABLE",
+              "available"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "attach-extra-volume",
+          "method": "POST",
+          "path": "/v1/volumes/{extra_vol_id}/servers",
+          "json": {
+            "server_id": "{server_id}"
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "wait-extra-volume-attached",
+          "method": "GET",
+          "path": "/v1/volumes/{extra_vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.volume.state",
+            "until": [
+              "IN_USE",
+              "in-use"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "detach-extra-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{extra_vol_id}/servers/{server_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "wait-extra-volume-detached",
+          "method": "GET",
+          "path": "/v1/volumes/{extra_vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.volume.state",
+            "until": [
+              "AVAILABLE",
+              "available"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "delete-extra-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{extra_vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-extra-volume-gone",
+          "method": "GET",
+          "path": "/v1/volumes/{extra_vol_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
-            "server_id": "{server_id}"
+            "server_id": "{server_id}",
+            "image_id": "{image_id}",
+            "server_type_id": "{server_type_id}",
+            "port_id": "{port_id}",
+            "volume_id": "{boot_vol_id}",
+            "subnet_id": "{subnet_id}"
           }
         },
         {
@@ -1760,7 +2096,7 @@
       "service": "database/mysql",
       "enabled": true,
       "heavy": true,
-      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address must sit inside the subnet CIDR.",
+      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address must sit inside the subnet CIDR. | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch).",
       "steps": [
         {
           "name": "create-vpc",
@@ -1983,8 +2319,196 @@
         {
           "name": "probe-reads",
           "probe_reads": {
-            "cluster_id": "{cluster_id}"
+            "cluster_id": "{cluster_id}",
+            "dbaas_engine_version_id": "{engine_version_id}"
           }
+        },
+        {
+          "name": "set-maintenance",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "maintenance_option": {
+              "period_hour": "4",
+              "starting_day_of_week": "SUN",
+              "starting_time": "0300"
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-set-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "unset-maintenance",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "wait-after-unset-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "set-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {
+            "backup_option": {
+              "archive_frequency_minute": "30",
+              "retention_period_day": "8",
+              "starting_time_hour": "3"
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-set-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "verify-backup-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200,
+            404
+          ]
+        },
+        {
+          "name": "unset-backup",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "wait-after-unset-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "list-parameter-values-before",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "set-parameter-values",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "json": {
+            "parameters": [
+              {
+                "name": "max_connections",
+                "value": "256"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-set-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          }
+        },
+        {
+          "name": "verify-parameter-values",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [
+            200
+          ]
         },
         {
           "name": "delete-cluster",
