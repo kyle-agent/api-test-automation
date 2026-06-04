@@ -35,17 +35,24 @@ def pytest_generate_tests(metafunc):
 
 
 _STATUS_FILE = "reports/smoke_status.tsv"
+# Parameter-coverage probe: re-issue each OK GET once with a universally-ignorable
+# read-only pagination set, recording to a SEPARATE file so it never inflates the
+# smoke count/coverage. Makes the dashboard's "parameter" axis measurable.
+_PARAM_FILE = "reports/param_status.tsv"
+_PARAM_SET = {"page": 0, "size": 1, "limit": 1}
+_PARAM_REPR = "page=0&size=1&limit=1"
 
 
 @pytest.fixture(scope="session", autouse=True)
 def _reset_smoke_status():
-    """Start the smoke session with a fresh status log. Scoped to the smoke
+    """Start the smoke session with fresh status logs. Scoped to the smoke
     suite (not the root conftest) so a later CRUD pytest session does NOT wipe
     these rows — CRUD's probe-reads append to them for the dashboard's coverage."""
     from pathlib import Path
-    p = Path(_STATUS_FILE)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text("")
+    for f in (_STATUS_FILE, _PARAM_FILE):
+        p = Path(f)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("")
     yield
 
 
@@ -54,6 +61,15 @@ def _record(endpoint: Endpoint, status: int, category: str) -> None:
     try:
         with open(_STATUS_FILE, "a") as fh:
             fh.write(f"{status}\t{category}\t{endpoint.key}\t{endpoint.method}\t{endpoint.http_path}\n")
+    except OSError:
+        pass
+
+
+def _record_param(endpoint: Endpoint, status: int, category: str) -> None:
+    """Append a parameter-coverage result (6th column = the param set used)."""
+    try:
+        with open(_PARAM_FILE, "a") as fh:
+            fh.write(f"{status}\t{category}\t{endpoint.key}\t{endpoint.method}\t{endpoint.http_path}\t{_PARAM_REPR}\n")
     except OSError:
         pass
 
@@ -103,6 +119,18 @@ def test_endpoint_reachable(endpoint: Endpoint, client):
 
     category, reason = _categorize(resp.status, resp.raw_text)
     _record(endpoint, resp.status, category)
+
+    # Parameter-coverage probe (read-only, record-only): re-issue the same GET
+    # once with pagination params. Only for endpoints that already returned 2xx,
+    # so it never turns a working call into noise; a 400 on params is informative
+    # (recorded soft), not a failure.
+    if resp.ok:
+        try:
+            presp = client.get(endpoint.http_path, service=endpoint.service, params=_PARAM_SET)
+            pcat, _ = _categorize(presp.status, presp.raw_text)
+            _record_param(endpoint, presp.status, pcat)
+        except Exception:
+            _record_param(endpoint, 0, "fail")
 
     assert category != "fail", (
         f"{endpoint.method} {endpoint.http_path} -> {resp.status} ({reason})\n"

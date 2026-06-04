@@ -84,6 +84,15 @@ def main() -> int:
             deleted += 1; subnet_ids.append(it["id"])
     for sid in subnet_ids:
         _wait_gone(c, "vpc", f"/v1/subnets/{sid}")
+    # 3b. internet gateways + public IPs (regr*) — children that would 409-block
+    # their VPC; delete them (and wait) before the vpc pass below.
+    for it in _list(c, "vpc", "/v1/internet-gateways", "regr"):
+        if it.get("id") and _delete(c, "vpc", f"/v1/internet-gateways/{it['id']}"):
+            deleted += 1
+            _wait_gone(c, "vpc", f"/v1/internet-gateways/{it['id']}", 300, 15)
+    for it in _list(c, "vpc", "/v1/publicips", "regr"):
+        if it.get("id") and _delete(c, "vpc", f"/v1/publicips/{it['id']}"):
+            deleted += 1
     # 4. vpcs — retry on 409 (lingering child), deleting any stray subnets first
     for it in _list(c, "vpc", "/v1/vpcs", "regrvpc"):
         vid = it["id"]

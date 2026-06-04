@@ -97,7 +97,7 @@ def crud_write_ops(lifecycles, cat):
 
 
 # ----------------------------- computation -----------------------------
-def compute(cat, tsv_rows, crud, lifecycles, known):
+def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
     total = len(cat)
     cat_total = Counter(e["category"] for e in cat)
     cat_get = Counter(e["category"] for e in cat if e["method"] == "GET")
@@ -126,6 +126,11 @@ def compute(cat, tsv_rows, crud, lifecycles, known):
     cov_get = len(tested_keys) / get_total * 100 if get_total else 0
     cov_write = len(write_hit) / nonget_total * 100 if nonget_total else 0
 
+    # parameter coverage: OK GETs re-issued with pagination params (param_status.tsv)
+    param_attempted = len(param_rows)
+    param_accepted = sum(1 for r in param_rows if 200 <= r[0] < 300)
+    cov_param = param_accepted / param_attempted * 100 if param_attempted else 0
+
     # crud rollup
     crud_rows = []
     for lc in lifecycles:
@@ -141,6 +146,8 @@ def compute(cat, tsv_rows, crud, lifecycles, known):
         "get_total": get_total, "nonget_total": nonget_total,
         "write_hit": len(write_hit),
         "ok": ok, "soft": soft,
+        "cov_param": cov_param, "param_attempted": param_attempted,
+        "param_accepted": param_accepted,
         "fail_new": len(new_regressions), "fail_known": len(known_red),
         "new_regressions": new_regressions, "known_red": known_red,
         "dist": dict(dist),
@@ -274,6 +281,11 @@ def render(d, hist, meta):
     cov_series = [h["cov_op"] for h in hist[-12:]]
 
     writeax = "◑" if d["cov_write"] > 0 else "✗"
+    measured = d.get("param_attempted", 0) > 0
+    paramax = "◑" if measured else "✗"
+    param_stat = (f'<div><div style="font-size:22px;font-weight:700">{d["cov_param"]:.0f}%</div>'
+                  f'<div class="mut">파라미터 ({d["param_accepted"]}/{d["param_attempted"]})</div></div>'
+                  ) if measured else ""
     return TEMPLATE.format(
         branch=meta["branch"], when=meta["when"], run_type=meta["run_type"],
         badge=badge, cards=cards, donut=donut(segs, called), legend=legend,
@@ -281,6 +293,7 @@ def render(d, hist, meta):
         cov_get=f'{d["cov_get"]:.1f}', get_total=d["get_total"],
         cov_write=f'{d["cov_write"]:.1f}', write_hit=d["write_hit"],
         nonget_total=d["nonget_total"], writeax=writeax,
+        paramax=paramax, paramax_cls="part" if measured else "off", param_stat=param_stat,
         covbars=covbars, ok=d["ok"], soft=d["soft"],
         fail_new=d["fail_new"], fail_known=d["fail_known"],
         new_cls="ok" if healthy else "bad",
@@ -337,10 +350,10 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <div style="display:flex;gap:28px;align-items:baseline">
 <div><div class="bignum" style="color:#0969da">{cov_op}%</div><div class="mut">operation ({tested}/{total})</div></div>
 <div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">읽기 GET ({tested}/{get_total})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">쓰기 CRUD ({write_hit}/{nonget_total})</div></div></div>
+<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">쓰기 CRUD ({write_hit}/{nonget_total})</div></div>{param_stat}</div>
 <div class="mut" style="margin-top:12px">측정 축 (swagger-coverage/ReadyAPI 기준)</div>
 <div class="axes"><span class="ax on">✓ operation</span><span class="ax part">◑ status-code</span>
-<span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax off">✗ parameter</span><span class="ax off">✗ schema</span></div></div>
+<span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax {paramax_cls}">{paramax} parameter</span><span class="ax off">✗ schema</span></div></div>
 </div></section>
 <section><h2>카테고리별 커버리지 (사각지대 탐지)</h2><div class="panel">{covbars}</div></section>
 <section><div class="grid2">
@@ -367,6 +380,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--catalog", default="framework/api_catalog.json")
     ap.add_argument("--tsv", default="reports/smoke_status.tsv")
+    ap.add_argument("--param-tsv", default="reports/param_status.tsv")
     ap.add_argument("--crud", default="reports/junit-crud.xml")
     ap.add_argument("--lifecycles", default="tests/crud/lifecycles.json")
     ap.add_argument("--known", default="known_issues.json")
@@ -379,13 +393,13 @@ def main():
 
     cat = load_catalog(args.catalog)
     tsv = parse_smoke_tsv(args.tsv)
+    param_rows = parse_smoke_tsv(args.param_tsv)
     crud = parse_crud_junit(args.crud)
     lifecycles = json.load(open(args.lifecycles)).get("lifecycles", []) \
         if os.path.exists(args.lifecycles) else []
     known = json.load(open(args.known)) if os.path.exists(args.known) else {"issues": []}
 
-    d = compute(cat, tsv, crud, lifecycles, known)
-    d["new_regressions"]  # noqa  (kept for clarity)
+    d = compute(cat, tsv, crud, lifecycles, known, param_rows)
     hist = append_history(args.history, d, args.run_type, args.sha)
 
     meta = {"branch": args.branch,

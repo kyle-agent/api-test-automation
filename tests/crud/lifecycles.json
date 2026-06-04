@@ -638,6 +638,304 @@
       ]
     },
     {
+      "id": "virtualserver-keypair",
+      "service": "compute/virtualserver",
+      "enabled": true,
+      "_note": "Light, zero-cost, self-contained: create an SSH keypair (public_key omitted so SCP generates one), read by name, list, probe, delete. Synchronous. VALIDATED-FACT create body (matches the VM lifecycle's keypair step).",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/keypairs",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "keypair_name": "regrkey{unique}"
+          }
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "networking-vpc-publicip",
+      "service": "networking/vpc",
+      "enabled": true,
+      "_note": "Light, self-contained: allocate a public IP (type IGW, unattached), read, list, probe, delete. Best-effort create body from docs (createpublicip 1.2); async create -> $.publicip.id.",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "json": {
+            "description": "API regression suite",
+            "type": "IGW",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "publicip_id": "$.publicip.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/publicips/{publicip_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/publicips",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "publicip_id": "{publicip_id}"
+          }
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-gone",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "networking-vpc-internet-gateway",
+      "service": "networking/vpc",
+      "enabled": true,
+      "_note": "Light, self-contained: create a VPC inline, attach an internet gateway, read both, probe, tear down in reverse. Best-effort create body from docs (createinternetgateway 1.2); $.internet_gateway.id.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression IGW",
+            "cidr": "10.126.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-vpc-active",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-igw",
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "json": {
+            "description": "API regression suite",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "type": "IGW",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "internet_gateway_id": "$.internet_gateway.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/internet-gateways/{internet_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-igw-active",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ATTACHED",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "list-igw",
+          "method": "GET",
+          "path": "/v1/internet-gateways",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "vpc_id": "{vpc_id}",
+            "internet_gateway_id": "{internet_gateway_id}"
+          }
+        },
+        {
+          "name": "delete-igw",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-igw-gone",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          },
+          "service": "vpc"
+        },
+        {
+          "name": "delete-vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15
+        }
+      ]
+    },
+    {
       "id": "container-ske-cluster-nodepool",
       "service": "container/ske",
       "enabled": true,
