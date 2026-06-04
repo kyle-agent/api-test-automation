@@ -169,7 +169,6 @@
           "json": {
             "name": "regrport{unique}",
             "description": "API regression suite",
-            "fixed_ip_address": "",
             "security_groups": [],
             "subnet_id": "{subnet_id}",
             "tags": []
@@ -316,13 +315,30 @@
             "description": "API regression suite",
             "registry_id": "{reg_id}",
             "lifecycle_policy": {
-              "lifecycle_policy_enabled": false
+              "lifecycle_policy_enabled": false,
+              "outdated_rule_enabled": false,
+              "outdated_rule_duration": 90,
+              "outdated_rule_tag_expression": "*",
+              "untagged_rule_enabled": false,
+              "untagged_rule_duration": 90
             },
             "lock_policy": {
               "locked": false
             },
+            "pull_policy": {
+              "critical_limit": 0,
+              "high_limit": 0,
+              "unmodified_excepted": false,
+              "unscanned_image_pull_prevented": false,
+              "vulnerable_image_pull_prevented": false
+            },
             "scan_policy": {
-              "scan_policy_enabled": false
+              "auto_scan_enabled": false,
+              "fixed_version_excepted": false,
+              "language_excepted": false,
+              "scan_policy_enabled": false,
+              "secret_excepted": false,
+              "severity_limit": "High"
             },
             "tags": []
           },
@@ -819,7 +835,7 @@
             "name": "regrvol{unique}",
             "description": "API regression suite",
             "size": 104,
-            "volume_type": "SSD",
+            "volume_type": "SSD_Provisioned",
             "max_iops": 10000,
             "max_throughput": 500,
             "tags": []
@@ -2066,7 +2082,7 @@
             "name": "regrvol{unique}",
             "description": "API regression suite",
             "size": 104,
-            "volume_type": "SSD",
+            "volume_type": "SSD_Provisioned",
             "max_iops": 10000,
             "max_throughput": 500,
             "tags": []
