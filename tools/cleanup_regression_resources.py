@@ -89,6 +89,20 @@ def main() -> int:
     for it in _list(c, "virtualserver", "/v1/volumes", "regrvol"):
         if it.get("id") and _delete(c, "virtualserver", f"/v1/volumes/{it['id']}"):
             deleted += 1
+    # 2d. dbaas clusters (regr* per engine service) — MUST go before subnets/vpcs
+    # (clusters live in the shared subnet; the vpc can't be deleted until they're
+    # gone). Issue all deletes, then wait each is gone so the subnet/vpc pass below
+    # can succeed in the same sweep. Each engine routes to its own /v1/clusters.
+    dbaas_deleted = []
+    for svc in ("mysql", "postgresql", "mariadb", "epas", "cachestore",
+                "eventstreams", "searchengine", "sqlserver", "vertica"):
+        for it in _list(c, svc, "/v1/clusters", "regr"):
+            cid = it.get("id")
+            if cid and _delete(c, svc, f"/v1/clusters/{cid}"):
+                deleted += 1
+                dbaas_deleted.append((svc, cid))
+    for svc, cid in dbaas_deleted:
+        _wait_gone(c, svc, f"/v1/clusters/{cid}", 900, 20)
     # 3. subnets — delete all, then wait each is gone
     subnet_ids = []
     for it in _list(c, "vpc", "/v1/subnets", "regrsub"):
@@ -154,14 +168,6 @@ def main() -> int:
         vid = it.get("volume_id") or it.get("id")
         if vid and _delete(c, "filestorage", f"/v1/volumes/{vid}"):
             deleted += 1
-    # 7b. dbaas clusters (regr* per engine service) — reclaim leaked clusters
-    # from the shared multi-engine heavy lifecycle (each engine routes to its own
-    # /v1/clusters via the service header).
-    for svc in ("mysql", "postgresql", "mariadb", "epas", "sqlserver", "cachestore"):
-        for it in _list(c, svc, "/v1/clusters", "regr"):
-            cid = it.get("id")
-            if cid and _delete(c, svc, f"/v1/clusters/{cid}"):
-                deleted += 1
     # 8. ske clusters (regrske) — delete their nodepools first, then the cluster
     for it in _list(c, "ske", "/v1/clusters", "regrske"):
         cid = it.get("id")
