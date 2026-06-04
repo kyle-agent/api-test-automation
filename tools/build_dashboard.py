@@ -79,11 +79,14 @@ def parse_crud_junit(path):
 
 
 def crud_write_ops(lifecycles, cat):
-    """Distinct catalog non-GET operations exercised by CRUD steps (normalised
-    method+path match) -> for write-coverage."""
+    """Distinct catalog non-GET operations exercised by ENABLED CRUD lifecycles
+    (normalised method+path match) -> for write-coverage. Disabled lifecycles
+    never run, so they must not inflate the number."""
     cat_by = {(e["method"], e["_norm"]) for e in cat if e["method"] != "GET"}
     hit = set()
     for lc in lifecycles:
+        if not lc.get("enabled"):
+            continue
         for s in lc.get("steps", []):
             if not s.get("method") or not s.get("path"):
                 continue  # e.g. probe-reads steps carry no single method/path

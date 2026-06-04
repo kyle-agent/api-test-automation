@@ -2453,9 +2453,9 @@
     {
       "id": "networking-dns-hosted-zone",
       "service": "networking/dns",
-      "enabled": true,
+      "enabled": false,
       "heavy": false,
-      "_note": "Light, self-contained, non-billable: create a public DNS hosted zone, add an A record, read both, list, probe path-param GETs, then tear down record + zone in reverse. Synchronous. BEST-GUESS create bodies (catalog has no body schema): hosted-zone body fields {name, description, tags} and record body fields {name, type, ttl, records[]} are inferred from SCP DNS createhostedzone/createhostedzonerecord 1.3 conventions and may need adjustment (e.g. record value key could be 'records' vs 'value', ttl bounds). Capture JSONPaths $.hosted_zone.id and $.record.id are best-guess; if the create envelope differs (e.g. flat $.id), the capture will fail loudly and need correcting.",
+      "_note": "DISABLED pending request schema. Endpoints exist + path/probe verified, but create body is unknown: the catalog carries only method+path, the API docs are JS-rendered SPAs (no schema), and the gateway returns unnamed 'Field required' errors (KMS also wants a basic|advanced field) — so the required fields can't be derived. Re-enable once a sample request / schema is available. Light, self-contained, non-billable: create a public DNS hosted zone, add an A record, read both, list, probe path-param GETs, then tear down record + zone in reverse. Synchronous. BEST-GUESS create bodies (catalog has no body schema): hosted-zone body fields {name, description, tags} and record body fields {name, type, ttl, records[]} are inferred from SCP DNS createhostedzone/createhostedzonerecord 1.3 conventions and may need adjustment (e.g. record value key could be 'records' vs 'value', ttl bounds). Capture JSONPaths $.hosted_zone.id and $.record.id are best-guess; if the create envelope differs (e.g. flat $.id), the capture will fail loudly and need correcting.",
       "steps": [
         {
           "name": "create-zone",
@@ -2573,9 +2573,9 @@
     {
       "id": "security-kms-key",
       "service": "security/kms",
-      "enabled": true,
+      "enabled": false,
       "heavy": false,
-      "_note": "Light, self-contained, non-billable: create a KMS transit key, read it, list, probe path-param GETs, then delete (schedule deletion). Synchronous. BEST-GUESS create body (catalog has no body schema): fields {name, key_type, description, tags} inferred from SCP KMS createkey 1.3; key_type 'aes256' is a guess (could be 'symmetric'/'AES_256'/'rsa2048') and may need adjustment. Capture JSONPath $.key.id is best-guess (envelope may be $.id or $.transit.id). DELETE may return 202 if it schedules rather than immediately removes the key.",
+      "_note": "DISABLED pending request schema. Endpoints exist + path/probe verified, but create body is unknown: the catalog carries only method+path, the API docs are JS-rendered SPAs (no schema), and the gateway returns unnamed 'Field required' errors (KMS also wants a basic|advanced field) — so the required fields can't be derived. Re-enable once a sample request / schema is available. Light, self-contained, non-billable: create a KMS transit key, read it, list, probe path-param GETs, then delete (schedule deletion). Synchronous. BEST-GUESS create body (catalog has no body schema): fields {name, key_type, description, tags} inferred from SCP KMS createkey 1.3; key_type 'aes256' is a guess (could be 'symmetric'/'AES_256'/'rsa2048') and may need adjustment. Capture JSONPath $.key.id is best-guess (envelope may be $.id or $.transit.id). DELETE may return 202 if it schedules rather than immediately removes the key.",
       "steps": [
         {
           "name": "create",
@@ -2639,9 +2639,9 @@
     {
       "id": "security-secretsmanager-secret",
       "service": "security/secretsmanager",
-      "enabled": true,
+      "enabled": false,
       "heavy": false,
-      "_note": "Light, self-contained, non-billable: create a Secrets Manager secret, read it, list versions, list all, probe path-param GETs, then delete. Synchronous. BEST-GUESS create body (catalog has no body schema): fields {name, description, secret_value, secret_type, tags} inferred from SCP secretsmanager createsecretsmanager 1.2; secret_value as a plain string and secret_type 'text' are guesses (value could need a structured object or base64, type could be 'generic'/'plaintext'). Capture JSONPath $.secret.id is best-guess (envelope may be $.id or $.secret_id).",
+      "_note": "DISABLED pending request schema. Endpoints exist + path/probe verified, but create body is unknown: the catalog carries only method+path, the API docs are JS-rendered SPAs (no schema), and the gateway returns unnamed 'Field required' errors (KMS also wants a basic|advanced field) — so the required fields can't be derived. Re-enable once a sample request / schema is available. Light, self-contained, non-billable: create a Secrets Manager secret, read it, list versions, list all, probe path-param GETs, then delete. Synchronous. BEST-GUESS create body (catalog has no body schema): fields {name, description, secret_value, secret_type, tags} inferred from SCP secretsmanager createsecretsmanager 1.2; secret_value as a plain string and secret_type 'text' are guesses (value could need a structured object or base64, type could be 'generic'/'plaintext'). Capture JSONPath $.secret.id is best-guess (envelope may be $.id or $.secret_id).",
       "steps": [
         {
           "name": "create",
