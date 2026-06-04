@@ -155,6 +155,163 @@
     "volume_size": "104",
     "volume_type_name": "SSD_Provisioned"
   },
+  "database/cachestore/cachestorecreatecluster": {
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+    "ha_enabled": false,
+    "init_config_option": {
+      "backup_option": {
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
+      },
+      "database_port": 6378,
+      "database_user_password": "test123!",
+      "sentinel_port": 26378
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          },
+          {
+            "role_type": "DATA",
+            "size_gb": 56,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "MASTER",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "MASTER",
+        "server_type_name": "redis1v2m4"
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "nat_enabled": false,
+    "replica_count": 0,
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": [],
+    "timezone": "Asia/Seoul"
+  },
+  "database/epas/epascreatecluster": {
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+    "ha_enabled": false,
+    "init_config_option": {
+      "audit_enabled": false,
+      "backup_option": {
+        "archive_frequency_minute": "60",
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
+      },
+      "database_encoding": "UTF-8",
+      "database_locale": "C",
+      "database_name": "",
+      "database_port": 2866,
+      "database_user_name": "",
+      "database_user_password": ""
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "ACTIVE",
+        "server_type_name": ""
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "nat_enabled": false,
+    "origin_cluster_id": "",
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": [],
+    "timezone": "Asia/Seoul",
+    "vip_public_ip_id": "",
+    "virtual_ip_address": ""
+  },
+  "database/mariadb/mariadbcreatecluster": {
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+    "ha_enabled": false,
+    "init_config_option": {
+      "audit_enabled": false,
+      "backup_option": {
+        "archive_frequency_minute": "60",
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
+      },
+      "database_character_set": "utf8",
+      "database_name": "",
+      "database_port": 2866,
+      "database_user_name": "",
+      "database_user_password": ""
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "ACTIVE",
+        "server_type_name": ""
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "nat_enabled": false,
+    "origin_cluster_id": "",
+    "service_watch_log_collection": true,
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": [],
+    "timezone": "Asia/Seoul",
+    "vip_public_ip_id": "",
+    "virtual_ip_address": ""
+  },
   "database/mysql/mysqlcreatecluster": {
     "allowable_ip_addresses": [],
     "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
@@ -203,6 +360,119 @@
     "nat_enabled": false,
     "origin_cluster_id": "",
     "service_watch_log_collection": true,
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": [],
+    "timezone": "Asia/Seoul",
+    "vip_public_ip_id": "",
+    "virtual_ip_address": ""
+  },
+  "database/postgresql/postgresqlcreatecluster": {
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+    "ha_enabled": false,
+    "init_config_option": {
+      "audit_enabled": false,
+      "backup_option": {
+        "archive_frequency_minute": "60",
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
+      },
+      "database_encoding": "UTF-8",
+      "database_locale": "C",
+      "database_name": "",
+      "database_port": 2866,
+      "database_user_name": "",
+      "database_user_password": ""
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "ACTIVE",
+        "server_type_name": ""
+      }
+    ],
+    "instance_name_prefix": "myprefix",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "nat_enabled": false,
+    "origin_cluster_id": "",
+    "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+    "tags": [],
+    "timezone": "Asia/Seoul",
+    "vip_public_ip_id": "",
+    "virtual_ip_address": ""
+  },
+  "database/sqlserver/sqlservercreatecluster": {
+    "allowable_ip_addresses": [],
+    "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+    "ha_enabled": false,
+    "init_config_option": {
+      "audit_enabled": false,
+      "backup_option": {
+        "archive_frequency_minute": "",
+        "full_backup_day_of_week": "SUN",
+        "retention_period_day": "7",
+        "starting_time_hour": "2"
+      },
+      "database_collation": "SQL_Latin1_General_CP1_CI_AS",
+      "database_name": "",
+      "database_port": 2866,
+      "database_service_name": "",
+      "database_user_name": "",
+      "database_user_password": "",
+      "databases": [
+        {
+          "database_name": "",
+          "drive_letter": "E"
+        }
+      ],
+      "license": ""
+    },
+    "instance_groups": [
+      {
+        "block_storage_groups": [
+          {
+            "role_type": "OS",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          }
+        ],
+        "instances": [
+          {
+            "public_ip_id": "",
+            "role_type": "ACTIVE",
+            "service_ip_address": "192.168.10.10/32"
+          }
+        ],
+        "role_type": "",
+        "server_type_name": ""
+      }
+    ],
+    "instance_name_prefix": "",
+    "maintenance_option": {
+      "period_hour": "5",
+      "starting_day_of_week": "MON",
+      "starting_time": "0000"
+    },
+    "name": "mycluster",
+    "nat_enabled": false,
     "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
     "tags": [],
     "timezone": "Asia/Seoul",
