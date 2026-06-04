@@ -94,13 +94,14 @@ def main() -> int:
         if it.get("id") and _delete(c, "vpc", f"/v1/publicips/{it['id']}"):
             deleted += 1
     # 4. vpcs — retry on 409 (lingering child), deleting any stray subnets first
+    deleted_vpc_ids = []
     for it in _list(c, "vpc", "/v1/vpcs", "regrvpc"):
         vid = it["id"]
         for attempt in range(6):
             st = _delete(c, "vpc", f"/v1/vpcs/{vid}")
             print(f"  delete vpc {it['name']} ({vid}) -> {st}")
             if st in (200, 202, 204):
-                deleted += 1; break
+                deleted += 1; deleted_vpc_ids.append(vid); break
             if st == 409:  # children remain — delete this vpc's regr* subnets, retry
                 for sn in _items(c.get("/v1/subnets", service="vpc").body):
                     if (isinstance(sn, dict) and sn.get("id")
@@ -111,6 +112,12 @@ def main() -> int:
                 time.sleep(10)
                 continue
             break
+    # VPC deletion is async (202); wait for each to actually disappear so the
+    # account's VPC quota is freed before a subsequent CRUD run calls create-vpc.
+    # Without this the sweep "deletes" leaked VPCs that are still in `deleting`
+    # state and the next create-vpc hits scp-network.vpc.exceed-max-count.
+    for vid in deleted_vpc_ids:
+        _wait_gone(c, "vpc", f"/v1/vpcs/{vid}", 300, 15)
     # 5. resource-groups
     for it in _list(c, "resourcemanager", "/v1/resource-groups", "regr-rg"):
         if _delete(c, "resourcemanager", f"/v1/resource-groups/{it['id']}"):
