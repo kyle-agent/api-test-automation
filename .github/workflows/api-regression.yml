@@ -288,6 +288,8 @@ jobs:
           pub=$(mktemp -d)
           cp dashboard/index.html "$pub"/ 2>/dev/null || true
           cp dashboard/history.jsonl "$pub"/ 2>/dev/null || true
+          # per-service drill-down pages (dashboard/services/*.html)
+          cp -r dashboard/services "$pub"/services 2>/dev/null || true
           # nojekyll so GitHub Pages serves the raw HTML as-is
           touch "$pub/.nojekyll"
           cd "$pub"

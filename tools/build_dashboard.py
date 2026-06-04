@@ -17,7 +17,7 @@ Coverage is operation-level (method+path), the swagger-coverage / ReadyAPI
 convention: an operation is "covered" once it has been called at least once.
 """
 from __future__ import annotations
-import argparse, json, math, os, time, xml.etree.ElementTree as ET
+import argparse, html, json, math, os, time, xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 
 
@@ -94,6 +94,51 @@ def crud_write_ops(lifecycles, cat):
             if key in cat_by:
                 hit.add(key)
     return hit
+
+
+def slug(category, service):
+    """Filesystem/URL-safe id for a service's drill-down page."""
+    return f"{category}__{service}".replace("/", "-").replace(" ", "-")
+
+
+def per_service(cat, tsv_rows, write_hit):
+    """Group every catalog operation by (category, service) and mark each as
+    covered: a GET is covered once its key was actually called (smoke OR a CRUD
+    probe-read, both recorded in the smoke tsv); a write op is covered once a
+    lifecycle step exercised its method+normalised-path. Returns a list of
+    service dicts (sorted by category, then ascending coverage so blind spots
+    surface first) for the index nav and the per-service pages."""
+    called = {}                       # key -> last observed GET status
+    for status, _category, key, _method, _path in tsv_rows:
+        called[key] = status
+    tested_keys = set(called) or smoke_tested_keys(cat)
+
+    groups = defaultdict(list)
+    for e in cat:
+        groups[(e["category"], e["service"])].append(e)
+
+    services = []
+    for (category, service), ents in groups.items():
+        rows, covn = [], 0
+        gtot = gcov = wtot = wcov = 0
+        for e in sorted(ents, key=lambda x: (x["method"], x["_norm"])):
+            if e["method"] == "GET":
+                gtot += 1
+                covered = e["key"] in tested_keys
+                gcov += covered
+            else:
+                wtot += 1
+                covered = (e["method"], e["_norm"]) in write_hit
+                wcov += covered
+            covn += covered
+            rows.append((e["method"], e["http_path"], e.get("name", ""),
+                         bool(covered), called.get(e["key"])))
+        services.append({
+            "category": category, "service": service, "slug": slug(category, service),
+            "total": len(ents), "covered": covn,
+            "gtot": gtot, "gcov": gcov, "wtot": wtot, "wcov": wcov, "rows": rows})
+    services.sort(key=lambda s: (s["category"], s["covered"] / (s["total"] or 1), s["service"]))
+    return services
 
 
 # ----------------------------- computation -----------------------------
@@ -225,7 +270,98 @@ def spark(series, w=520, h=120, color="#0969da"):
 STATUS_COLORS = {2: "#2da44e", 4: "#bf8700", 5: "#cf222e"}
 
 
-def render(d, hist, meta):
+def cov_color(pct):
+    return ("#cf222e" if pct == 0 else "#bf8700" if pct < 25
+            else "#2da44e" if pct >= 50 else "#0969da")
+
+
+def render_services_nav(services):
+    """Index drill-down: services grouped by category (each links to its page),
+    sorted with the lowest-coverage services first so blind spots stand out."""
+    by_cat = defaultdict(list)
+    for s in services:
+        by_cat[s["category"]].append(s)
+    parts = []
+    for category in sorted(by_cat):
+        svs = by_cat[category]
+        ctot = sum(s["total"] for s in svs) or 1
+        ccov = sum(s["covered"] for s in svs)
+        cards = []
+        for s in svs:
+            pct = s["covered"] / s["total"] * 100 if s["total"] else 0
+            cards.append(
+                f'<a class="svc" href="services/{s["slug"]}.html">'
+                f'<div class="svc-n">{html.escape(s["service"])}</div>'
+                f'<div class="svc-bar"><div style="width:{pct:.0f}%;background:{cov_color(pct)}"></div></div>'
+                f'<div class="svc-m">{s["covered"]}/{s["total"]} ops · {pct:.0f}%</div></a>')
+        parts.append(
+            f'<div class="svc-cat"><h3>{html.escape(category)} '
+            f'<span class="mut">{ccov}/{sum(s["total"] for s in svs)} ops</span></h3>'
+            f'<div class="svc-grid">{"".join(cards)}</div></div>')
+    return "".join(parts)
+
+
+SVC_CSS = """
+:root{--bg:#f6f8fa;--fg:#1f2328;--mut:#656d76;--bd:#d0d7de;--cardbg:#fff}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;background:var(--bg);color:var(--fg)}
+.wrap{max-width:1080px;margin:0 auto;padding:24px}
+.bc{font-size:13px;margin-bottom:10px}.bc a{color:#0969da;text-decoration:none}
+h1{font-size:22px;margin:0 0 4px}h1 .mut{font-size:13px;font-weight:400;text-transform:uppercase;letter-spacing:.04em}
+.mut{color:var(--mut);font-size:13px}
+.sum{background:var(--cardbg);border:1px solid var(--bd);border-radius:10px;padding:16px;margin:14px 0 18px}
+.s-big{font-size:34px;font-weight:800;color:#0969da;line-height:1}.s-sub{font-size:13px;color:var(--mut);margin-top:8px}
+table{width:100%;border-collapse:collapse;font-size:13px;background:var(--cardbg);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--bd)}th{color:var(--mut);font-weight:600;background:#f6f8fa}
+tr.unc{background:#fcfcfd;color:#8a929b}tr.unc code{color:#8a929b}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.ti{color:var(--mut)}
+.m{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;color:#fff}
+.m-GET{background:#1a7f37}.m-POST{background:#0969da}.m-PUT{background:#9a6700}.m-DELETE{background:#cf222e}.m-PATCH{background:#8250df}
+footer{margin-top:18px;font-size:12px}
+"""
+
+
+def render_service_page(s, meta):
+    pct = s["covered"] / s["total"] * 100 if s["total"] else 0
+    gpct = s["gcov"] / s["gtot"] * 100 if s["gtot"] else 0
+    wpct = s["wcov"] / s["wtot"] * 100 if s["wtot"] else 0
+
+    def statcell(st):
+        if st is None:
+            return '<span class="mut">—</span>'
+        col = STATUS_COLORS.get(st // 100, "#656d76")
+        return f'<b style="color:{col}">{st}</b>'
+
+    rows = []
+    for method, path, title, covered, st in s["rows"]:
+        chk = ('<span style="color:#2da44e">✓</span>' if covered
+               else '<span class="mut">·</span>')
+        rcls = "" if covered else ' class="unc"'
+        rows.append(
+            f'<tr{rcls}><td><span class="m m-{method}">{method}</span></td>'
+            f'<td><code>{html.escape(path)}</code></td>'
+            f'<td class="ti">{html.escape(title or "")}</td>'
+            f'<td style="text-align:center">{chk}</td><td>{statcell(st)}</td></tr>')
+    svc = html.escape(s["service"]); category = html.escape(s["category"])
+    return (
+        f'<!doctype html><html lang="ko"><head><meta charset="utf-8">'
+        f'<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f'<title>{category}/{svc} — coverage</title><style>{SVC_CSS}</style></head>'
+        f'<body><div class="wrap">'
+        f'<div class="bc"><a href="../index.html">← 대시보드</a> &nbsp;/&nbsp; {category} &nbsp;/&nbsp; <b>{svc}</b></div>'
+        f'<h1>{svc} <span class="mut">{category}</span></h1>'
+        f'<div class="sum"><div class="s-big">{pct:.0f}%</div>'
+        f'<div class="mut">operation 커버 ({s["covered"]}/{s["total"]})</div>'
+        f'<div class="s-sub">읽기 GET {s["gcov"]}/{s["gtot"]} ({gpct:.0f}%) '
+        f'&nbsp;·&nbsp; 쓰기 {s["wcov"]}/{s["wtot"]} ({wpct:.0f}%)</div></div>'
+        f'<table><thead><tr><th>메서드</th><th>경로</th><th>API</th>'
+        f'<th>커버</th><th>최근 status</th></tr></thead><tbody>{"".join(rows)}</tbody></table>'
+        f'<footer class="mut">생성 {meta["when"]} · branch <code>{html.escape(meta["branch"])}</code>'
+        f' · 커버 기준: GET=실제 호출(smoke 또는 CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행</footer>'
+        f'</div></body></html>')
+
+
+def render(d, hist, meta, services):
     called = d["ok"] + d["soft"] + d["fail_new"] + d["fail_known"]
     pass_rate = (d["ok"] / called * 100) if called else 0
     healthy = d["fail_new"] == 0
@@ -288,6 +424,7 @@ def render(d, hist, meta):
                   ) if measured else ""
     return TEMPLATE.format(
         branch=meta["branch"], when=meta["when"], run_type=meta["run_type"],
+        services_nav=render_services_nav(services),
         badge=badge, cards=cards, donut=donut(segs, called), legend=legend,
         cov_op=f'{d["cov_op"]:.1f}', tested=d["tested"], total=d["total"],
         cov_get=f'{d["cov_get"]:.1f}', get_total=d["get_total"],
@@ -329,6 +466,13 @@ section{{margin-top:22px}}h2{{font-size:14px;text-transform:uppercase;letter-spa
 .cb{{margin:7px 0}}.cb-h{{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}}.cb-n{{color:var(--mut)}}
 .cb-track{{height:8px;background:#eaeef2;border-radius:6px;overflow:hidden}}.cb-fill{{height:100%}}
 .cb.zero .cb-h span:first-child::after{{content:" ⚠ 사각지대";color:#cf222e;font-size:11px}}
+.svc-cat{{margin:16px 0}}.svc-cat h3{{font-size:13px;margin:0 0 8px}}
+.svc-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}}
+.svc{{display:block;text-decoration:none;color:inherit;background:var(--cardbg);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}}
+.svc:hover{{border-color:#0969da;box-shadow:0 1px 5px #0969da22}}
+.svc-n{{font-weight:600;font-size:13px;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.svc-bar{{height:6px;background:#eaeef2;border-radius:6px;overflow:hidden}}.svc-bar>div{{height:100%}}
+.svc-m{{font-size:11px;color:var(--mut);margin-top:5px}}
 .crudgrid{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}}
 .crud{{border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:#fff}}
 .crud.pass{{border-left:3px solid #2da44e}}.crud.skip{{border-left:3px solid #8250df}}.crud.fail{{border-left:3px solid #cf222e}}
@@ -356,6 +500,7 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax {paramax_cls}">{paramax} parameter</span><span class="ax off">✗ schema</span></div></div>
 </div></section>
 <section><h2>카테고리별 커버리지 (사각지대 탐지)</h2><div class="panel">{covbars}</div></section>
+<section><h2>서비스별 드릴다운 <span class="mut" style="text-transform:none">— 서비스 클릭 시 해당 서비스의 API별 커버 현황</span></h2>{services_nav}</section>
 <section><div class="grid2">
 <div class="panel"><h2>실패 분류</h2><table>
 <tr><th>분류</th><th>수</th><th>의미</th></tr>
@@ -401,19 +546,29 @@ def main():
 
     d = compute(cat, tsv, crud, lifecycles, known, param_rows)
     hist = append_history(args.history, d, args.run_type, args.sha)
+    services = per_service(cat, tsv, crud_write_ops(lifecycles, cat))
 
     meta = {"branch": args.branch,
             "when": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
             "run_type": args.run_type}
-    html = render(d, hist, meta)
+    htm = render(d, hist, meta, services)
     # TEMPLATE references writeax_cls; inject it
-    html = html.replace("{writeax_cls}", "part" if d["cov_write"] > 0 else "off")
-    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    open(args.out, "w").write(html)
+    htm = htm.replace("{writeax_cls}", "part" if d["cov_write"] > 0 else "off")
+    outdir = os.path.dirname(args.out) or "."
+    os.makedirs(outdir, exist_ok=True)
+    open(args.out, "w").write(htm)
+
+    # per-service drill-down pages under <outdir>/services/
+    sdir = os.path.join(outdir, "services")
+    os.makedirs(sdir, exist_ok=True)
+    for s in services:
+        open(os.path.join(sdir, s["slug"] + ".html"), "w").write(
+            render_service_page(s, meta))
+
     print(f"dashboard -> {args.out}  (coverage {d['cov_op']:.1f}% op, "
           f"{d['cov_get']:.1f}% GET, {d['cov_write']:.1f}% write; "
           f"ok {d['ok']} soft {d['soft']} new {d['fail_new']} known {d['fail_known']}; "
-          f"{len(hist)} history rows)")
+          f"{len(hist)} history rows; {len(services)} service pages)")
 
 
 if __name__ == "__main__":
