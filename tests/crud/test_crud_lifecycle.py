@@ -303,7 +303,7 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                         status_ok = False
                         break
             if not status_ok and step.get("optional"):
-                reason = f"{step['name']} -> {resp.status}: {resp.raw_text[:160]}"
+                reason = f"{step['name']} -> {resp.status}: {resp.raw_text[:400]}"
                 print(f"  optional step '{step['name']}' (group={grp}) failed "
                       f"-> {resp.status}; skipping group. {resp.raw_text[:200]}")
                 if grp:
