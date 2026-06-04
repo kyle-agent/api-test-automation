@@ -2860,7 +2860,7 @@
       "service": "networking/vpc",
       "heavy": true,
       "enabled": true,
-      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 9 dbaas engines (mysql/postgresql/mariadb/epas/sqlserver/cachestore/eventstreams/searchengine/vertica) + 1 VM created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body).",
+      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 7 dbaas engines (mysql/postgresql/mariadb/epas/cachestore/eventstreams/searchengine) + 1 VM; sqlserver+vertica excluded (require a real license) created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body).",
       "steps": [
         {
           "name": "create-vpc",
@@ -3380,120 +3380,6 @@
           }
         },
         {
-          "name": "mssql-find-version",
-          "service": "sqlserver",
-          "group": "sqlserver",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/engine-versions",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "mssql_ver": {
-              "list": "$.contents",
-              "get": "id"
-            }
-          }
-        },
-        {
-          "name": "mssql-find-stype",
-          "service": "sqlserver",
-          "group": "sqlserver",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "mssql_stype": {
-              "list": "$.contents",
-              "get": "name"
-            }
-          }
-        },
-        {
-          "name": "mssql-create",
-          "service": "sqlserver",
-          "group": "sqlserver",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/clusters",
-          "json": {
-            "ha_enabled": false,
-            "nat_enabled": false,
-            "subnet_id": "{subnet_id}",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "tags": [],
-            "maintenance_option": {
-              "period_hour": "5",
-              "starting_day_of_week": "MON",
-              "starting_time": "0000"
-            },
-            "vip_public_ip_id": "",
-            "virtual_ip_address": "",
-            "init_config_option": {
-              "audit_enabled": false,
-              "database_collation": "SQL_Latin1_General_CP1_CI_AS",
-              "database_name": "regrdb",
-              "database_port": 2866,
-              "database_service_name": "regrmssql",
-              "database_user_name": "regruser",
-              "database_user_password": "Regr1ss@2026",
-              "databases": [
-                {
-                  "database_name": "regrdb",
-                  "drive_letter": "E"
-                }
-              ],
-              "license": "",
-              "backup_option": {
-                "archive_frequency_minute": "",
-                "full_backup_day_of_week": "SUN",
-                "retention_period_day": "7",
-                "starting_time_hour": "2"
-              }
-            },
-            "name": "regrq{ualpha}",
-            "instance_name_prefix": "regrq",
-            "dbaas_engine_version_id": "{mssql_ver}",
-            "instance_groups": [
-              {
-                "role_type": "ACTIVE",
-                "server_type_name": "{mssql_stype}",
-                "block_storage_groups": [
-                  {
-                    "role_type": "OS",
-                    "size_gb": 104,
-                    "volume_type": "SSD"
-                  }
-                ],
-                "instances": [
-                  {
-                    "role_type": "ACTIVE",
-                    "public_ip_id": ""
-                  }
-                ]
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "mssql_cid": "$.resource.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/clusters/{mssql_cid}",
-            "service": "sqlserver"
-          }
-        },
-        {
           "name": "cache-find-version",
           "service": "cachestore",
           "group": "cachestore",
@@ -3640,7 +3526,6 @@
           "method": "POST",
           "path": "/v1/clusters",
           "json": {
-            "ha_enabled": false,
             "nat_enabled": false,
             "subnet_id": "{subnet_id}",
             "timezone": "Asia/Seoul",
@@ -3652,11 +3537,8 @@
               "starting_time": "0000"
             },
             "akhq_enabled": false,
-            "is_combined": false,
-            "service_watch_log_collection": true,
+            "is_combined": true,
             "init_config_option": {
-              "akhq_id": "",
-              "akhq_password": "",
               "broker_port": 9091,
               "broker_sasl_id": "regruser",
               "broker_sasl_password": "Regr1ss@2026",
@@ -3669,7 +3551,7 @@
             "dbaas_engine_version_id": "{events_ver}",
             "instance_groups": [
               {
-                "role_type": "ACTIVE",
+                "role_type": "ZOOKEEPER_BROKER",
                 "server_type_name": "{events_stype}",
                 "block_storage_groups": [
                   {
@@ -3680,7 +3562,7 @@
                 ],
                 "instances": [
                   {
-                    "role_type": "ACTIVE",
+                    "role_type": "ZOOKEEPER_BROKER",
                     "public_ip_id": ""
                   }
                 ]
@@ -3743,7 +3625,6 @@
           "method": "POST",
           "path": "/v1/clusters",
           "json": {
-            "ha_enabled": false,
             "nat_enabled": false,
             "subnet_id": "{subnet_id}",
             "timezone": "Asia/Seoul",
@@ -3755,7 +3636,7 @@
               "starting_time": "0000"
             },
             "is_combined": false,
-            "license": "",
+            "license": null,
             "init_config_option": {
               "backup_option": {
                 "retention_period_day": "7",
@@ -3770,7 +3651,7 @@
             "dbaas_engine_version_id": "{search_ver}",
             "instance_groups": [
               {
-                "role_type": "ACTIVE",
+                "role_type": "MASTER_DATA",
                 "server_type_name": "{search_stype}",
                 "block_storage_groups": [
                   {
@@ -3781,7 +3662,7 @@
                 ],
                 "instances": [
                   {
-                    "role_type": "ACTIVE",
+                    "role_type": "MASTER_DATA",
                     "public_ip_id": ""
                   }
                 ]
@@ -4028,27 +3909,6 @@
           }
         },
         {
-          "name": "mssql-wait",
-          "service": "sqlserver",
-          "group": "sqlserver",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/clusters/{mssql_cid}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 2400,
-            "interval": 30
-          }
-        },
-        {
           "name": "cache-wait",
           "service": "cachestore",
           "group": "cachestore",
@@ -4167,15 +4027,6 @@
           }
         },
         {
-          "name": "mssql-probe",
-          "service": "sqlserver",
-          "group": "sqlserver",
-          "probe_reads": {
-            "cluster_id": "{mssql_cid}",
-            "dbaas_engine_version_id": "{mssql_ver}"
-          }
-        },
-        {
           "name": "cache-probe",
           "service": "cachestore",
           "group": "cachestore",
@@ -4258,19 +4109,6 @@
           "group": "epas",
           "method": "DELETE",
           "path": "/v1/clusters/{epas_cid}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true
-        },
-        {
-          "name": "mssql-delete",
-          "service": "sqlserver",
-          "group": "sqlserver",
-          "method": "DELETE",
-          "path": "/v1/clusters/{mssql_cid}",
           "expect_status": [
             200,
             202,
@@ -4390,24 +4228,6 @@
           "group": "epas",
           "method": "GET",
           "path": "/v1/clusters/{epas_cid}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 1800,
-            "interval": 30
-          }
-        },
-        {
-          "name": "mssql-gone",
-          "service": "sqlserver",
-          "group": "sqlserver",
-          "method": "GET",
-          "path": "/v1/clusters/{mssql_cid}",
           "expect_status": [
             200,
             404
