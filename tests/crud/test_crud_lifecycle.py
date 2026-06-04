@@ -212,6 +212,7 @@ def test_crud_lifecycle(lifecycle, client, cfg):
     _now = time.gmtime()
     ctx: dict[str, str] = {
         "unique": format(int(time.time()), "x"),
+        "ualpha": "".join(chr(ord("a") + int(c, 16)) for c in format(int(time.time()), "x")),
         "region": cfg.region,
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
