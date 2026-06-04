@@ -1542,7 +1542,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated \u2014 confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write ops update-server-tags, stop/start cycle, and extra-volume create/attach/detach/delete are best-guess bodies+states (tags [{key,value}]; volume create $.volume.id; attach body {server_id}; states STOPPED/SHUTOFF, AVAILABLE/IN_USE) \u2014 verify JSONPaths, request bodies, and state strings against live responses.",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated \u2014 confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start cycle and extra-volume create/attach/detach/delete remain best-guess bodies+states (volume create $.volume.id; attach body {server_id}; states STOPPED/SHUTOFF, AVAILABLE/IN_USE) \u2014 verify request bodies and state strings against live responses.",
       "steps": [
         {
           "name": "create-vpc",
@@ -1792,16 +1792,11 @@
           }
         },
         {
-          "name": "update-server-tags",
+          "name": "rename-server",
           "method": "PUT",
           "path": "/v1/servers/{server_id}",
           "json": {
-            "tags": [
-              {
-                "key": "regr",
-                "value": "crud{unique}"
-              }
-            ]
+            "name": "regrsrv{unique}u"
           },
           "expect_status": [
             200,
