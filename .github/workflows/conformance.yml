@@ -72,6 +72,9 @@ jobs:
           git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || true
           git show origin/dashboard-data:smoke_status.tsv > reports/smoke_status.tsv 2>/dev/null || true
           git show origin/dashboard-data:conformance_baseline.json > framework/conformance_baseline.json 2>/dev/null || true
+          [ -s reports/smoke_status.tsv ] || rm -f reports/smoke_status.tsv
+          [ -s dashboard/history.jsonl ] || rm -f dashboard/history.jsonl
+          [ -s framework/conformance_baseline.json ] || rm -f framework/conformance_baseline.json
       - name: Baseline diff (only NEW defects alarm)
         run: |
           EXTRA=""

@@ -33,7 +33,12 @@ def main():
     conf = json.loads(CONF.read_text())
     cur = {k: v["status"] for k, v in conf["by_endpoint"].items()}
     bpath = Path(args.baseline)
-    baseline = json.loads(bpath.read_text()) if bpath.exists() else None
+    baseline = None
+    if bpath.exists() and bpath.read_text().strip():
+        try:
+            baseline = json.loads(bpath.read_text())
+        except (ValueError, json.JSONDecodeError):
+            baseline = None   # empty/corrupt -> treat as absent (seed fresh)
 
     if baseline is None:
         if args.init_if_missing or args.update:
