@@ -4442,8 +4442,8 @@
           "method": "POST",
           "path": "/v1/vpcs",
           "json": {
-            "name": "regrvpc{unique}",
-            "description": "API regression shared-net",
+            "name": "zznetvpc{unique}",
+            "description": "API zznetession shared-net",
             "cidr": "10.140.0.0/20",
             "tags": []
           },
@@ -4486,8 +4486,8 @@
           "method": "POST",
           "path": "/v1/subnets",
           "json": {
-            "name": "regrsub{unique}",
-            "description": "API regression shared-net",
+            "name": "zznetsub{unique}",
+            "description": "API zznetession shared-net",
             "cidr": "10.140.1.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
@@ -4530,7 +4530,7 @@
           "method": "POST",
           "path": "/v1/publicips",
           "json": {
-            "description": "API regression shared-net",
+            "description": "API zznetession shared-net",
             "type": "IGW",
             "tags": []
           },
@@ -4576,7 +4576,7 @@
           "method": "POST",
           "path": "/v1/internet-gateways",
           "json": {
-            "description": "API regression shared-net",
+            "description": "API zznetession shared-net",
             "firewall_enabled": false,
             "firewall_loggable": false,
             "type": "IGW",
@@ -4605,8 +4605,8 @@
           "method": "POST",
           "path": "/v1/ports",
           "json": {
-            "name": "regrport{unique}",
-            "description": "API regression shared-net",
+            "name": "zznetport{unique}",
+            "description": "API zznetession shared-net",
             "security_groups": [],
             "subnet_id": "{subnet_id}",
             "tags": []
@@ -4633,7 +4633,7 @@
           "method": "POST",
           "path": "/v1/nat-gateways",
           "json": {
-            "description": "API regression shared-net",
+            "description": "API zznetession shared-net",
             "publicip_id": "{publicip_id}",
             "subnet_id": "{subnet_id}",
             "tags": []
@@ -4660,8 +4660,8 @@
           "method": "POST",
           "path": "/v1/transit-gateways",
           "json": {
-            "name": "regrtgw{ualpha}",
-            "description": "API regression shared-net",
+            "name": "zznettgw{ualpha}",
+            "description": "API zznetession shared-net",
             "tags": []
           },
           "capture": {
@@ -4686,7 +4686,7 @@
           "method": "POST",
           "path": "/v1/subnets/{subnet_id}/vips",
           "json": {
-            "description": "API regression shared-net",
+            "description": "API zznetession shared-net",
             "virtual_ip_address": "10.140.1.200"
           },
           "capture": {
@@ -4712,14 +4712,14 @@
           "path": "/v1/lb-health-checks",
           "json": {
             "lb_health_check": {
-              "description": "API regression shared-net",
+              "description": "API zznetession shared-net",
               "health_check_count": 3,
               "health_check_interval": 5,
               "health_check_port": 80,
               "health_check_timeout": 5,
               "health_check_url": "/",
               "http_method": "GET",
-              "name": "regrhc{ualpha}",
+              "name": "zznethc{ualpha}",
               "protocol": "TCP",
               "response_code": "200",
               "subnet_id": "{subnet_id}",
@@ -4750,10 +4750,10 @@
           "path": "/v1/lb-server-groups",
           "json": {
             "lb_server_group": {
-              "description": "API regression shared-net",
+              "description": "API zznetession shared-net",
               "lb_health_check_id": "{lb_health_check_id}",
               "lb_method": "ROUND_ROBIN",
-              "name": "regrsg{ualpha}",
+              "name": "zznetsg{ualpha}",
               "protocol": "TCP",
               "subnet_id": "{subnet_id}",
               "tags": [],
@@ -4783,11 +4783,11 @@
           "path": "/v1/loadbalancers",
           "json": {
             "loadbalancer": {
-              "description": "API regression shared-net",
+              "description": "API zznetession shared-net",
               "firewall_enabled": false,
               "firewall_logging_enabled": false,
               "layer_type": "L4",
-              "name": "regrlb{ualpha}",
+              "name": "zznetlb{ualpha}",
               "publicip_id": "",
               "service_ip": "10.140.1.100",
               "source_nat_ip": "",
@@ -4821,8 +4821,8 @@
             "connected_vpc_ids": [
               "{vpc_id}"
             ],
-            "description": "API regression shared-net",
-            "name": "regrpdns{ualpha}",
+            "description": "API zznetession shared-net",
+            "name": "zznetpdns{ualpha}",
             "tags": []
           },
           "capture": {
@@ -4958,9 +4958,9 @@
           "path": "/v1/lb-listeners",
           "json": {
             "listener": {
-              "description": "API regression shared-net",
+              "description": "API zznetession shared-net",
               "loadbalancer_id": "{loadbalancer_id}",
-              "name": "regrls{ualpha}",
+              "name": "zznetls{ualpha}",
               "protocol": "TCP",
               "routing_action": "LB_SERVER_GROUP",
               "server_group_id": "{lb_server_group_id}",
@@ -4997,7 +4997,7 @@
                 "member_port": 80,
                 "member_state": "ENABLE",
                 "member_weight": 100,
-                "name": "regrmbr{ualpha}",
+                "name": "zznetmbr{ualpha}",
                 "object_id": "{port_id}",
                 "object_type": "VM"
               }
@@ -5017,7 +5017,7 @@
           "method": "POST",
           "path": "/v1/private-dns/activate",
           "json": {
-            "name": "regrpdns{ualpha}"
+            "name": "zznetpdns{ualpha}"
           },
           "expect_status": [
             200,
@@ -5056,8 +5056,8 @@
           "method": "POST",
           "path": "/v1/hosted-zones",
           "json": {
-            "name": "regr{ualpha}.example.com",
-            "description": "API regression shared-net",
+            "name": "zznet{ualpha}.example.com",
+            "description": "API zznetession shared-net",
             "private_dns_id": "{private_dns_id}",
             "type": "private",
             "tags": []
@@ -5084,13 +5084,13 @@
           "method": "POST",
           "path": "/v1/hosted-zones/{hosted_zone_id}/records",
           "json": {
-            "name": "www.regr{ualpha}.example.com",
+            "name": "www.zznet{ualpha}.example.com",
             "type": "A",
             "ttl": 300,
             "records": [
               "192.0.2.10"
             ],
-            "description": "API regression shared-net"
+            "description": "API zznetession shared-net"
           },
           "expect_status": [
             200,
