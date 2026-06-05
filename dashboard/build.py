@@ -706,7 +706,7 @@ def build(
     tsv: str = "reports/smoke_status.tsv",
     param_tsv: str = "reports/param_status.tsv",
     crud: str = "reports/junit-crud.xml",
-    lifecycles: str = "tests/crud/lifecycles.json",
+    lifecycles: str = "regression/scenarios/scenarios.json",
     known: str = "data/baselines/known_issues.json",
     conformance: str = "data/conformance.json",
     # Output
@@ -819,7 +819,7 @@ def main():
                     help="Legacy fallback: smoke_status.tsv")
     ap.add_argument("--param-tsv", default="reports/param_status.tsv")
     ap.add_argument("--crud", default="reports/junit-crud.xml")
-    ap.add_argument("--lifecycles", default="tests/crud/lifecycles.json")
+    ap.add_argument("--lifecycles", default="regression/scenarios/scenarios.json")
     ap.add_argument("--known", default="data/baselines/known_issues.json")
     ap.add_argument("--conformance", default="data/conformance.json",
                     help="Legacy fallback: conformance.json")
