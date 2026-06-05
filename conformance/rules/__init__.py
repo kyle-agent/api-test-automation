@@ -104,75 +104,24 @@ class FunctionRule:
         return self.fn(context)
 
 
-# --- example rule plugins (refactored out of the legacy static analysis) ----
-# These prove the pattern: two checks previously inlined in the conformance
-# aggregation are now standalone, registered rules operating on an endpoint doc.
-
-def _endpoint_key(ep: dict) -> str:
-    return f"{ep.get('category')}/{ep.get('service')}/{ep.get('name')}"
-
-
-# Heuristic verb expectations by operation-name prefix -> HTTP method.
-# (Mirrors the spirit of the legacy "method-verb-mismatch" check.)
-_VERB_EXPECT = {
-    "list": "GET", "show": "GET", "get": "GET", "describe": "GET",
-    "create": "POST", "add": "POST",
-    "update": "PUT", "modify": "PUT", "edit": "PUT",
-    "delete": "DELETE", "remove": "DELETE",
-}
-
-
-def _method_verb_mismatch(ep: dict) -> Optional[Finding]:
-    """Operation name implies a verb that disagrees with its HTTP method.
-
-    Refactored from the legacy ``method-verb-mismatch`` finding. Read-only checks
-    only the operation name prefix; ``show*`` reads frequently use POST in this
-    API, so that pairing is tolerated to avoid noise.
-    """
-    name = (ep.get("name") or "").lower()
-    method = (ep.get("method") or "").upper()
-    if not name or not method:
-        return None
-    for prefix, expected in _VERB_EXPECT.items():
-        if name.startswith(prefix):
-            if method == expected:
-                return None
-            # tolerate the well-known read-via-POST idiom (e.g. showXxxPassword)
-            if expected == "GET" and method == "POST" and prefix in ("show", "get"):
-                return None
-            return Finding(
-                endpoint_key=_endpoint_key(ep),
-                rule_id="method-verb.mismatch",
-                severity=YELLOW,
-                detail=f"name '{name}' implies {expected} but method is {method} "
-                       f"({method} {ep.get('path')})",
-                source="static",
-            )
-    return None
-
-
-def _missing_endpoint_description(ep: dict) -> Optional[Finding]:
-    """Endpoint documents no human description.
-
-    Refactored from the legacy ``missing-endpoint-description`` finding.
-    """
-    if (ep.get("description") or "").strip():
-        return None
-    return Finding(
-        endpoint_key=_endpoint_key(ep),
-        rule_id="docs.missing-endpoint-description",
-        severity=YELLOW,
-        detail="endpoint has no description in the spec",
-        source="static",
-    )
+# --- built-in rule plugins --------------------------------------------------
+# The per-endpoint STATIC design/docs checks ported from the conformance
+# session's ``tools/analyze_docs.py`` live in :mod:`conformance.rules.docs`;
+# importing that module registers them via :func:`register`. Whole-spec
+# aggregates (path collisions, validation-discoverability, model-level checks)
+# stay in :mod:`conformance.static` because they emit many findings per scan and
+# need cross-endpoint context that the one-context/one-Finding ``Rule`` protocol
+# cannot carry.
 
 
 def load_builtin_rules() -> None:
-    """Register the built-in example rules (idempotent)."""
-    register(FunctionRule("method-verb.mismatch", YELLOW, SCOPE_ENDPOINT,
-                          _method_verb_mismatch))
-    register(FunctionRule("docs.missing-endpoint-description", YELLOW,
-                          SCOPE_ENDPOINT, _missing_endpoint_description))
+    """Register the built-in rules (idempotent by ``rule.id``).
+
+    Imported lazily to avoid an import cycle (``rules.docs`` imports this module
+    for :class:`FunctionRule` and :func:`register`).
+    """
+    from conformance.rules import docs as _docs  # noqa: F401
+    _docs.load_docs_rules()
 
 
 # Register built-ins on import so `from conformance import rules; rules.rules()`

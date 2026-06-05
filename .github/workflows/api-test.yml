@@ -25,7 +25,10 @@ on:
     # 21:00 UTC daily: conformance refresh (axis 2), distinct slot.
     - cron: "0 21 * * *"
   push:
-    branches: ["claude/run-conformance"]
+    # claude/run-conformance: full conformance refresh (read-only probes).
+    # claude/run-schema-live: also enables the data-based, BILLABLE schema-live
+    # probe (creates+deletes REAL resources) — gated, never on the default path.
+    branches: ["claude/run-conformance", "claude/run-schema-live"]
   workflow_dispatch:
     inputs:
       category:
@@ -57,13 +60,37 @@ on:
         required: false
         default: ""
       probe:
-        description: "Axis-2 runtime probe: schema | status | notfound | errors | validation | all"
+        description: "Axis-2 runtime probe to run (conformance.runtime --probe)."
+        type: choice
         required: false
         default: "all"
+        options:
+          - all
+          - schema
+          - status
+          - notfound
+          - errors
+          - pagination
+          - options
+          - l10n
+          - validation
+          - schema-live
+      probe_category:
+        description: "Limit runtime probes to one category (e.g. database). Blank = all. Falls back to `category` if blank."
+        required: false
+        default: ""
       probe_limit:
         description: "Stop each runtime probe after N targets (0 = all)."
         required: false
         default: "0"
+      probe_filter:
+        description: "schema-live only: limit lifecycles whose id contains this (blank = all light)."
+        required: false
+        default: ""
+      run_schema_live:
+        description: "Enable the data-based, BILLABLE schema-live probe (creates+deletes REAL resources). Opt-in gate."
+        type: boolean
+        default: false
       update_baseline:
         description: "Re-baseline conformance (treat current defects as the new baseline)"
         type: boolean
@@ -339,7 +366,10 @@ jobs:
       contents: read
       pull-requests: write
     env:
-      # The reconciler refuses to delete unless this is true.
+      # The client blocks DELETE unless BOTH gates are set; the reconciler is
+      # safe because it is tag-scoped (deletes only this run's owned/expired
+      # resources), not because of these gates.
+      SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
     steps:
       - uses: actions/checkout@v4
@@ -393,11 +423,21 @@ jobs:
     permissions:
       contents: write
     env:
-      # read-only + empty-body probes only (no resource creation).
+      # read-only + empty-body probes only by default (no resource creation).
+      # `status`/`validation` send empty bodies that fail validation BEFORE
+      # anything is created, so they opt into the mutation gate for themselves.
       SCP_PROBE_RUNTIME: "true"
       SCP_PROBE_VALIDATION: "true"
       SCP_ALLOW_MUTATIONS: "true"
-      SCP_ALLOW_DESTRUCTIVE: "false"
+      # --- schema-live gate (data-based, BILLABLE: creates+deletes REAL
+      # resources). Stays OPT-IN: destructive is enabled ONLY when schema-live
+      # is explicitly requested. Never on the default scheduled read-only path.
+      # Enabled by: dispatch run_schema_live=true, dispatch probe=schema-live,
+      # a push to claude/run-schema-live, or repo var SCP_RUN_SCHEMA_LIVE=true.
+      SCP_RUN_SCHEMA_LIVE: ${{ (github.event.inputs.run_schema_live == 'true' || github.event.inputs.probe == 'schema-live' || github.ref == 'refs/heads/claude/run-schema-live' || vars.SCP_RUN_SCHEMA_LIVE == 'true') }}
+      # Destructive is gated behind the schema-live opt-in. Read-only/empty-body
+      # probes do NOT create resources, so this is false unless schema-live runs.
+      SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.run_schema_live == 'true' || github.event.inputs.probe == 'schema-live' || github.ref == 'refs/heads/claude/run-schema-live' || vars.SCP_RUN_SCHEMA_LIVE == 'true') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -412,15 +452,50 @@ jobs:
       - name: Static conformance analysis (spec)
         run: python -m conformance.static | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Runtime probes (read-only / empty-body)
+        # Read-only + empty-body probes:
+        #   schema status notfound errors pagination options l10n validation all
+        # `schema-live` is data-based + BILLABLE and is handled by the gated step
+        # below, never here. If `probe` is left at schema-live without the gate,
+        # fall back to `all` so the default read-only path still runs safely.
         env:
           PROBE: ${{ github.event.inputs.probe }}
-          PROBE_CATEGORY: ${{ github.event.inputs.category }}
+          # probe_category is the runtime-probe-specific override; fall back to
+          # the shared `category` input when it's blank.
+          PROBE_CATEGORY: ${{ github.event.inputs.probe_category || github.event.inputs.category }}
           PROBE_LIMIT: ${{ github.event.inputs.probe_limit }}
+          RUN_SCHEMA_LIVE: ${{ env.SCP_RUN_SCHEMA_LIVE }}
         run: |
+          PROBE="${PROBE:-all}"
+          # schema-live is gated below; do not run the billable probe here.
+          if [ "$PROBE" = "schema-live" ] && [ "$RUN_SCHEMA_LIVE" != "true" ]; then
+            echo "::notice::probe=schema-live requested without the schema-live gate; running read-only 'all' instead."
+            PROBE="all"
+          fi
+          if [ "$PROBE" = "schema-live" ]; then
+            echo "schema-live handled by the gated step; skipping read-only runtime invocation."
+            exit 0
+          fi
           python -m conformance.runtime \
-            --probe "${PROBE:-all}" \
+            --probe "$PROBE" \
             --category "${PROBE_CATEGORY}" \
             --limit "${PROBE_LIMIT:-0}" | tee -a "$GITHUB_STEP_SUMMARY" || true
+      - name: Runtime probe — schema-live (data-based, BILLABLE; gated)
+        # Creates LIGHT real resources, GETs them, diffs live vs documented model,
+        # then tears everything down. Runs ONLY when the schema-live gate is set
+        # (run_schema_live / probe=schema-live / claude/run-schema-live branch /
+        # repo var). Never on the default scheduled read-only path.
+        if: ${{ env.SCP_RUN_SCHEMA_LIVE == 'true' }}
+        env:
+          PROBE_CATEGORY: ${{ github.event.inputs.probe_category || github.event.inputs.category }}
+          PROBE_LIMIT: ${{ github.event.inputs.probe_limit }}
+          PROBE_FILTER: ${{ github.event.inputs.probe_filter }}
+        run: |
+          set -o pipefail
+          python -m conformance.runtime \
+            --probe schema-live \
+            --category "${PROBE_CATEGORY}" \
+            --limit "${PROBE_LIMIT:-0}" \
+            --filter "${PROBE_FILTER}" | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Pull prior baseline
         run: |
           mkdir -p data
@@ -461,6 +536,9 @@ jobs:
           path: |
             data/conformance.json
             reports/conformance_new.json
+            reports/runtime_*.json
+            reports/validation_probe.json
+            reports/csv/runtime_*.csv
             reports/results
           if-no-files-found: warn
 

@@ -1,13 +1,21 @@
 """AXIS 2 — RUNTIME probes (behavior findings).
 
-Ports ``tools/runtime_probes.py`` + ``tools/probe_validation.py``. These probes
-call the live gateway to surface design/implementation defects, but are
-**non-destructive**:
+Ports ``tools/runtime_probes.py`` + ``tools/probe_validation.py`` +
+``tools/probe_schema_live.py``. These probes call the live gateway to surface
+design/implementation defects. All probes are **non-destructive by default**:
 
-  * ``schema`` / ``notfound`` / ``errors`` are pure GETs.
-  * ``status`` and the validation probe send an *empty* ``{}`` body to create /
-    update ops that have >=1 required field, so the request fails validation
-    (expected 400) *before* anything is created — no billable resource is made.
+  * ``schema`` / ``notfound`` / ``errors`` / ``pagination`` / ``options`` are
+    pure reads (GET / OPTIONS).
+  * ``status``, the ``validation`` probe and ``l10n`` send an *empty* ``{}`` body
+    to create / update ops that have >=1 required field, so the request fails
+    validation (expected 400) *before* anything is created — no billable resource
+    is made.
+  * ``schema-live`` is the one probe that creates real resources: it is
+    double-gated (needs ``SCP_ALLOW_MUTATIONS=true`` AND
+    ``SCP_ALLOW_DESTRUCTIVE=true``), reuses the proven CRUD lifecycles, and tears
+    every created resource down in reverse on completion and on failure. It
+    self-skips (creating nothing) unless both gates are set. See
+    :mod:`conformance.schema_live`.
   * mutating verbs stay double-gated behind the env flags below plus the client's
     own ``SCP_ALLOW_MUTATIONS`` gate.
 
@@ -293,6 +301,146 @@ def probe_errors(client, docs, limit, category):
             "envelope_keys", "excerpt"])
 
 
+# ---------------------------------------------------------------- pagination [GET]
+def probe_pagination(client, docs, limit, category):
+    rows, summ = [], {"checked": 0, "ignores_size": 0, "no_paging_meta": 0, "non_200": 0}
+    n = 0
+    PAGING = {"page", "size", "page_size", "limit", "offset", "total", "total_count",
+              "count", "next", "next_token", "has_next", "total_pages"}
+    for k, e in docs["endpoints"].items():
+        if e.get("method") != "GET" or "{" in (e.get("path") or "{"):
+            continue
+        if not e["name"].startswith("list"):
+            continue
+        if category and category not in e["category"]:
+            continue
+        try:
+            resp = client.request("GET", e["path"], params={"page": 1, "size": 1},
+                                  service=e["service"])
+        except Exception as exc:
+            rows.append({"endpoint": k, "status": "ERR", "note": str(exc)[:100]})
+            continue
+        summ["checked"] += 1
+        if resp.status != 200 or not isinstance(resp.body, dict):
+            summ["non_200"] += 1
+            rows.append({"endpoint": k, "status": resp.status})
+            time.sleep(0.1)
+            continue
+        meta = sorted(set(resp.body.keys()) & PAGING)
+        arr = [v for v in resp.body.values() if isinstance(v, list)]
+        biggest = max((len(a) for a in arr), default=0)
+        ignores = biggest > 1                      # asked size=1 but got >1
+        if ignores:
+            summ["ignores_size"] += 1
+        if not meta:
+            summ["no_paging_meta"] += 1
+        rows.append({"endpoint": k, "status": 200, "returned_items_at_size1": biggest,
+                     "respects_size": not ignores, "paging_meta": ",".join(meta)})
+        # unified findings
+        if ignores:
+            _emit(k, "pagination-ignores-size", "yellow",
+                  f"requested size=1 but response returned {biggest} items")
+        if not meta:
+            _emit(k, "pagination-no-meta", "yellow",
+                  "list response carries no pagination metadata (page/size/total/next/...)")
+        time.sleep(0.1)
+        n += 1
+        if limit and n >= limit:
+            break
+    _write("pagination", summ, rows,
+           ["endpoint", "status", "returned_items_at_size1", "respects_size", "paging_meta", "note"])
+
+
+# ---------------------------------------------------------------- OPTIONS/CORS
+def probe_options(client, docs, limit, category):
+    import requests
+    from core.config import Settings
+    cfg = Settings()
+    rep = {}
+    for k, e in docs["endpoints"].items():
+        if e.get("method") != "GET" or "{" in (e.get("path") or "{"):
+            continue
+        rep.setdefault((e["category"], e["service"]), e)
+    rows, summ = [], {"services": 0, "options_2xx": 0, "has_allow": 0, "has_cors": 0}
+    n = 0
+    for (cat, svc), e in sorted(rep.items()):
+        if category and category not in cat:
+            continue
+        try:
+            url = cfg.resolve_base_url(svc) + e["path"]
+            r = requests.options(url, headers={"Origin": "https://example.com",
+                                 "Access-Control-Request-Method": "GET"}, timeout=cfg.timeout)
+            allow = r.headers.get("Allow", "")
+            acam = r.headers.get("Access-Control-Allow-Methods", "")
+            acao = r.headers.get("Access-Control-Allow-Origin", "")
+            summ["services"] += 1
+            summ["options_2xx"] += int(200 <= r.status_code < 300)
+            summ["has_allow"] += int(bool(allow))
+            summ["has_cors"] += int(bool(acao or acam))
+            rows.append({"service": f"{cat}/{svc}", "path": e["path"], "options_status": r.status_code,
+                         "allow": allow, "cors_allow_methods": acam, "cors_allow_origin": acao})
+            if not (acao or acam):
+                _emit(f"{cat}/{svc}/{e['name']}", "cors-missing", "yellow",
+                      f"OPTIONS preflight -> {r.status_code} with no CORS headers "
+                      f"(Access-Control-Allow-Origin/Methods)")
+        except Exception as exc:
+            rows.append({"service": f"{cat}/{svc}", "path": e["path"], "options_status": "ERR",
+                         "allow": str(exc)[:80]})
+        time.sleep(0.12)
+        n += 1
+        if limit and n >= limit:
+            break
+    _write("options", summ, rows,
+           ["service", "path", "options_status", "allow", "cors_allow_methods", "cors_allow_origin"])
+
+
+# ---------------------------------------------------------------- localization
+def probe_l10n(client, docs, limit, category):
+    HANGUL = re.compile(r"[가-힣]")
+    rows, summ = [], {"checked": 0, "localized": 0, "not_localized": 0}
+    n = 0
+    for k, e in docs["endpoints"].items():
+        if e.get("method") != "POST" or "{" in (e.get("path") or "{"):
+            continue
+        if not any(p["in"] == "body" for p in e.get("parameters", [])):
+            continue
+        if category and category not in e["category"]:
+            continue
+
+        def msg(lang):
+            try:
+                r = client.request("POST", e["path"], json={}, service=e["service"],
+                                   headers={"Accept-Language": lang})
+                return r.status, r.raw_text or ""
+            except Exception as exc:
+                return "ERR", str(exc)
+
+        sk, bk = msg("ko-KR")
+        se, be = msg("en-US")
+        if sk != 400 and se != 400:
+            time.sleep(0.1)
+            continue
+        ko_has = bool(HANGUL.search(bk))
+        en_has = bool(HANGUL.search(be))
+        localized = ko_has != en_has              # language actually changes with header
+        summ["checked"] += 1
+        summ["localized" if localized else "not_localized"] += 1
+        rows.append({"endpoint": k, "ko_status": sk, "en_status": se,
+                     "ko_has_hangul": ko_has, "en_has_hangul": en_has,
+                     "localized": localized, "ko_excerpt": bk.replace("\n", " ")[:120]})
+        # unified findings
+        if not localized:
+            _emit(k, "l10n-not-localized", "yellow",
+                  "error message does not change with Accept-Language (ko-KR vs en-US)")
+        time.sleep(0.15)
+        n += 1
+        if limit and n >= limit:
+            break
+    _write("l10n", summ, rows,
+           ["endpoint", "ko_status", "en_status", "ko_has_hangul", "en_has_hangul",
+            "localized", "ko_excerpt"])
+
+
 # ===================================================================
 # Validation probe (ported from tools/probe_validation.py)
 # empty {} body -> 400; does the error name the offending field?
@@ -389,11 +537,14 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--probe",
-                    choices=["schema", "status", "notfound", "errors", "validation", "all"],
+                    choices=["schema", "status", "notfound", "errors", "validation",
+                             "pagination", "options", "l10n", "schema-live", "all"],
                     default="all")
     ap.add_argument("--category", default="")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--sleep", type=float, default=0.2)
+    ap.add_argument("--filter", default="",
+                    help="schema-live only: substring filter on lifecycle id")
     args = ap.parse_args()
 
     from core.config import Settings
@@ -411,9 +562,23 @@ def main() -> int:
             return
         probe_validation(client, docs, limit, category, sleep=args.sleep)
 
+    # schema-live is double-gated (creates + tears down real resources) and lives
+    # in the conformance.schema_live helper; it reuses the CRUD lifecycles.
+    def _run_schema_live(client, docs, limit, category):
+        if not (cfg.allow_mutations and cfg.allow_destructive):
+            print("Skipping schema-live probe: set SCP_ALLOW_MUTATIONS=true and "
+                  "SCP_ALLOW_DESTRUCTIVE=true (creates + tears down real resources).")
+            return
+        from conformance.schema_live import probe_schema_live
+        probe_schema_live(client, cfg, docs, filter_id=args.filter)
+
     probes = {"schema": probe_schema, "status": probe_status,
               "notfound": probe_notfound, "errors": probe_errors,
-              "validation": _run_validation}
+              "validation": _run_validation,
+              "pagination": probe_pagination, "options": probe_options,
+              "l10n": probe_l10n, "schema-live": _run_schema_live}
+    # `all` runs the safe (non-mutating-by-default) probes; the gated probes
+    # (validation, schema-live) self-skip inside their runners unless opted in.
     todo = probes if args.probe == "all" else {args.probe: probes[args.probe]}
     for name, fn in todo.items():
         try:
