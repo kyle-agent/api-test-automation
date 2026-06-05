@@ -167,6 +167,14 @@ def main() -> int:
                     if (isinstance(sn, dict) and sn.get("id")
                             and str(sn.get("vpc_id")) == vid
                             and str(sn.get("name", "")).startswith(("regrsub", "zznetsub"))):
+                        # a leaked subnet-VIP (subnetvip-create that never tore down)
+                        # 409-blocks the subnet delete — and thus this VPC; clear first.
+                        try:
+                            for vip in _items(c.get(f"/v1/subnets/{sn['id']}/vips", service="vpc").body):
+                                if isinstance(vip, dict) and vip.get("id"):
+                                    _delete(c, "vpc", f"/v1/subnets/{sn['id']}/vips/{vip['id']}")
+                        except Exception:
+                            pass
                         _delete(c, "vpc", f"/v1/subnets/{sn['id']}")
                         _wait_gone(c, "vpc", f"/v1/subnets/{sn['id']}", 120, 10)
                 time.sleep(10)
