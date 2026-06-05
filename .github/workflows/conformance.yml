@@ -1,0 +1,115 @@
+name: SCP Conformance (design/behavior, self-updating)
+
+# Self-contained conformance axis: refresh static findings + run read-only /
+# empty-body runtime probes, rebuild conformance.json, diff vs baseline (only NEW
+# defects alarm), then rebuild & publish the dashboard to dashboard-data WITHOUT a
+# full regression. Pulls the coverage axis's smoke_status.tsv from dashboard-data
+# so the coverage columns are preserved (the two axes share one dashboard).
+on:
+  schedule:
+    - cron: "0 21 * * *"   # 21:00 UTC (distinct from api-regression 18:00)
+  workflow_dispatch:
+    inputs:
+      update_baseline:
+        description: "Re-baseline (treat current defects as the new baseline)"
+        type: boolean
+        default: false
+  push:
+    branches: ["claude/run-conformance"]
+
+concurrency:
+  group: scp-conformance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
+      SCP_ENV: ${{ vars.SCP_ENV || 'e' }}
+      SCP_HOST_TEMPLATE: ${{ vars.SCP_HOST_TEMPLATE }}
+      SCP_SERVICE_HOSTS: ${{ vars.SCP_SERVICE_HOSTS }}
+      SCP_BASE_URL: ${{ secrets.SCP_BASE_URL }}
+      SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
+      SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
+      SCP_PROJECT_ID: ${{ secrets.SCP_PROJECT_ID }}
+      SCP_AUTH_SCHEME: ${{ vars.SCP_AUTH_SCHEME || 'hmac' }}
+      SCP_TIMEOUT: ${{ vars.SCP_TIMEOUT || '20' }}
+      SCP_MAX_RETRIES: ${{ vars.SCP_MAX_RETRIES || '2' }}
+      # read-only + empty-body probes only (no resource creation)
+      SCP_PROBE_RUNTIME: "true"
+      SCP_PROBE_VALIDATION: "true"
+      SCP_ALLOW_MUTATIONS: "true"
+      SCP_ALLOW_DESTRUCTIVE: "false"
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Verify configuration
+        run: |
+          [ -n "$SCP_ACCESS_KEY" ] && [ -n "$SCP_SECRET_KEY" ] || { echo "::error::missing creds"; exit 1; }
+      - name: Refresh STATIC findings
+        run: |
+          python tools/analyze_docs.py || true
+          python tools/analyze_validation.py || true
+      - name: Run read-only / empty-body RUNTIME probes
+        run: |
+          python tools/runtime_probes.py --probe all || true
+          python tools/probe_validation.py || true
+      - name: Build conformance
+        run: python tools/build_conformance.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Pull prior dashboard data (coverage tsv + history + baseline)
+        run: |
+          mkdir -p dashboard reports framework
+          git fetch origin dashboard-data --depth=1 >/dev/null 2>&1 || true
+          git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || true
+          git show origin/dashboard-data:smoke_status.tsv > reports/smoke_status.tsv 2>/dev/null || true
+          git show origin/dashboard-data:conformance_baseline.json > framework/conformance_baseline.json 2>/dev/null || true
+      - name: Baseline diff (only NEW defects alarm)
+        run: |
+          EXTRA=""
+          [ "${{ github.event.inputs.update_baseline }}" = "true" ] && EXTRA="--update"
+          python tools/conformance_baseline.py --init-if-missing $EXTRA | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Build dashboard (coverage preserved via pulled tsv)
+        run: |
+          cp dashboard/history.jsonl /tmp/hist_keep 2>/dev/null || true
+          python tools/build_dashboard.py --run-type conformance \
+            --sha "${{ github.sha }}" --branch "${{ github.ref_name }}"
+          cp /tmp/hist_keep dashboard/history.jsonl 2>/dev/null || true   # keep coverage trend owned by api-regression
+      - name: Publish dashboard to data branch
+        continue-on-error: true
+        run: |
+          pub=$(mktemp -d)
+          cp dashboard/index.html "$pub"/ 2>/dev/null || true
+          cp dashboard/history.jsonl "$pub"/ 2>/dev/null || true
+          cp -r dashboard/services "$pub"/services 2>/dev/null || true
+          cp reports/smoke_status.tsv "$pub"/ 2>/dev/null || true
+          cp framework/conformance.json "$pub"/ 2>/dev/null || true
+          cp framework/conformance_baseline.json "$pub"/ 2>/dev/null || true
+          cp reports/conformance_new.json "$pub"/ 2>/dev/null || true
+          touch "$pub/.nojekyll"
+          cd "$pub"
+          git init -q -b dashboard-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "conformance dashboard @ ${{ github.sha }} (${{ github.event_name }})" || exit 0
+          git push -f \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            dashboard-data
+      - name: Upload artifacts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance
+          path: |
+            framework/conformance.json
+            reports/conformance_new.json
+            reports/runtime_*.json
