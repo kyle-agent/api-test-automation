@@ -4152,7 +4152,7 @@
       "id": "application-apigateway-api-resource",
       "service": "application-service/apigateway",
       "enabled": true,
-      "_note": "Light, VPC-FREE, self-contained. Creates an API (REGION endpoint), reads root resource id, creates a child resource, creates a deployment, probe-reads every {api_id} GET, tears down. Create body grounded from docs createapi 1.3 ({name,description,endpoint_type:REGION,tags:[{key,value}],id:''}; 202 -> $.id). A new API auto-creates a root resource, recovered via listresources (200 -> $.resources[0].id) and used as createresource parent_id. createresource path is /v1/apis/{api_id}/resources/{parent_id} with body {path_part} (200 -> $.id). createapideployment POST /v1/apis/{api_id}/deployments (200 -> $.deployment_id) exercises listapideployments. regrapi{unique} is lowercase-alnum (safe).",
+      "_note": "Light, VPC-FREE, self-contained. Creates an API (REGION endpoint), reads root resource id, creates a child resource, creates a deployment, probe-reads every {api_id} GET, tears down. Create body grounded from docs createapi 1.3 ({name,description,endpoint_type:REGION,tags:[{key,value}],id:''}; 202 -> $.id). A new API auto-creates a root resource, recovered via listresources (200 -> $.resources[0].id) and used as createresource parent_id. createresource path is /v1/apis/{api_id}/resources/{parent_id} with body {path_part} (200 -> $.id). createapideployment POST /v1/apis/{api_id}/deployments (200 -> $.deployment_id) exercises listapideployments. regrapi{unique} is lowercase-alnum (safe). create-deployment removed: deploying requires >=1 API method (NoMethodsExist); not needed for the api/resource GETs, and listapideployments is already covered via api_id.",
       "steps": [
         {
           "name": "create",
@@ -4224,24 +4224,6 @@
             "method": "DELETE",
             "path": "/v1/apis/{api_id}/resources/{resource_id}",
             "service": "apigateway"
-          }
-        },
-        {
-          "name": "create-deployment",
-          "method": "POST",
-          "path": "/v1/apis/{api_id}/deployments",
-          "json": {
-            "description": "API regression suite",
-            "stage_name": "regrstage{ualpha}",
-            "stage_type": "new"
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture_soft": {
-            "deployment_id": "$.deployment_id"
           }
         },
         {
