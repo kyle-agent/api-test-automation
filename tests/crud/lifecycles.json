@@ -4147,6 +4147,1678 @@
           "destructive": true
         }
       ]
+    },
+    {
+      "id": "application-apigateway-api-resource",
+      "service": "application-service/apigateway",
+      "enabled": true,
+      "_note": "Light, VPC-FREE, self-contained. Creates an API (REGION endpoint), reads root resource id, creates a child resource, creates a deployment, probe-reads every {api_id} GET, tears down. Create body grounded from docs createapi 1.3 ({name,description,endpoint_type:REGION,tags:[{key,value}],id:''}; 202 -> $.id). A new API auto-creates a root resource, recovered via listresources (200 -> $.resources[0].id) and used as createresource parent_id. createresource path is /v1/apis/{api_id}/resources/{parent_id} with body {path_part} (200 -> $.id). createapideployment POST /v1/apis/{api_id}/deployments (200 -> $.deployment_id) exercises listapideployments. regrapi{unique} is lowercase-alnum (safe).",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/apis",
+          "json": {
+            "name": "regrapi{unique}",
+            "description": "API regression suite",
+            "endpoint_type": "REGION",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "api_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/apis",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "find-root-resource",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/resources",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "parent_id": "$.resources[0].id"
+          }
+        },
+        {
+          "name": "create-resource",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/resources/{parent_id}",
+          "json": {
+            "path_part": "regr{unique}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "resource_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}/resources/{resource_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "create-deployment",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/deployments",
+          "json": {
+            "description": "API regression suite"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture_soft": {
+            "deployment_id": "$.deployment_id"
+          }
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "api_id": "{api_id}"
+          }
+        },
+        {
+          "name": "delete-resource",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 5,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-gone",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "compute-scf-cloud-function-cronjob-trigger",
+      "service": "compute/scf",
+      "enabled": true,
+      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}].",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/cloud-functions",
+          "json": {
+            "name": "regrscf{unique}",
+            "runtime": "Node.js:20",
+            "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cloud_function_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cloud-functions/{cloud_function_id}",
+            "service": "scf"
+          }
+        },
+        {
+          "name": "wait-ready",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/cloud-functions",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "create-trigger",
+          "method": "POST",
+          "path": "/v1/triggers/cronjob",
+          "json": {
+            "cloud_function_id": "{cloud_function_id}",
+            "schedule": "0 0 * * 0",
+            "timezone": "Asia/Seoul"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "trigger_id": "$.triggers[0].trigger_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/triggers/{trigger_id}",
+            "service": "scf"
+          }
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cloud_function_id": "{cloud_function_id}",
+            "trigger_id": "{trigger_id}"
+          }
+        },
+        {
+          "name": "delete-trigger",
+          "method": "DELETE",
+          "path": "/v1/triggers/{trigger_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 5,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-gone",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "heavy-shared-networking",
+      "service": "networking/vpc",
+      "heavy": true,
+      "enabled": true,
+      "_note": "ONE shared vpc(10.140.0.0/20)+subnet(10.140.1.0/24)+publicip, then networking families created back-to-back as optional groups (igw, port, natgw, tgw, subnetvip, lb chain hc->sg->lb->listener->members, dns chain privatedns->activate->zone->record), probe-read per service, torn down children-first. A bad body skips only its group (cleaned up; runner warns with status+body). Bodies grounded from framework/api_bodies.json. Skipped (need backing/external resource): privatelink-service/-endpoint (need backing LB+approval), vpc-peering (cross-account approval), vpc-endpoint (needs a privatelink service), private-nat (separate flow), lb-certificate (needs an uploaded cert), public-domain-name (real paid domain registration order). layer_type:L4 and several LB enum guesses UNVALIDATED until a heavy run surfaces warnings.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression shared-net",
+            "cidr": "10.140.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression shared-net",
+            "cidr": "10.140.1.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-publicip",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "json": {
+            "description": "API regression shared-net",
+            "type": "IGW",
+            "tags": []
+          },
+          "capture": {
+            "publicip_id": "$.publicip.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/publicips/{publicip_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-publicip",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.publicip.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "igw-create",
+          "service": "vpc",
+          "group": "igw",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "json": {
+            "description": "API regression shared-net",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "type": "IGW",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "internet_gateway_id": "$.internet_gateway.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/internet-gateways/{internet_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "port-create",
+          "service": "vpc",
+          "group": "port",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/ports",
+          "json": {
+            "name": "regrport{unique}",
+            "description": "API regression shared-net",
+            "security_groups": [],
+            "subnet_id": "{subnet_id}",
+            "fixed_ip_address": "",
+            "tags": []
+          },
+          "capture": {
+            "port_id": "$.port.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/ports/{port_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "natgw-create",
+          "service": "vpc",
+          "group": "natgw",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/nat-gateways",
+          "json": {
+            "description": "API regression shared-net",
+            "publicip_id": "{publicip_id}",
+            "subnet_id": "{subnet_id}",
+            "tags": []
+          },
+          "capture": {
+            "nat_gateway_id": "$.nat_gateway.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/nat-gateways/{nat_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "tgw-create",
+          "service": "vpc",
+          "group": "tgw",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/transit-gateways",
+          "json": {
+            "name": "regrtgw{ualpha}",
+            "description": "API regression shared-net",
+            "tags": []
+          },
+          "capture": {
+            "transit_gateway_id": "$.transit_gateway.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/transit-gateways/{transit_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "subnetvip-create",
+          "service": "vpc",
+          "group": "subnetvip",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "json": {
+            "description": "API regression shared-net",
+            "virtual_ip_address": "10.140.1.200"
+          },
+          "capture": {
+            "vip_id": "$.vip.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "lb-healthcheck-create",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "json": {
+            "lb_health_check": {
+              "description": "API regression shared-net",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "health_check_url": "/",
+              "http_method": "GET",
+              "name": "regrhc{ualpha}",
+              "protocol": "TCP",
+              "response_code": "200",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture": {
+            "lb_health_check_id": "$.lb_health_check.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-health-checks/{lb_health_check_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "lb-servergroup-create",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/lb-server-groups",
+          "json": {
+            "lb_server_group": {
+              "description": "API regression shared-net",
+              "lb_health_check_id": "{lb_health_check_id}",
+              "lb_method": "ROUND_ROBIN",
+              "name": "regrsg{ualpha}",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture": {
+            "lb_server_group_id": "$.lb_server_group.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-server-groups/{lb_server_group_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "lb-create",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/loadbalancers",
+          "json": {
+            "loadbalancer": {
+              "description": "API regression shared-net",
+              "firewall_enabled": false,
+              "firewall_logging_enabled": false,
+              "layer_type": "L4",
+              "name": "regrlb{ualpha}",
+              "publicip_id": "",
+              "service_ip": "10.140.1.100",
+              "source_nat_ip": "",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture": {
+            "loadbalancer_id": "$.loadbalancer.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/loadbalancers/{loadbalancer_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "dns-privatedns-create",
+          "service": "dns",
+          "group": "dns",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/private-dns",
+          "json": {
+            "connected_vpc_ids": [
+              "{vpc_id}"
+            ],
+            "description": "API regression shared-net",
+            "name": "regrpdns{ualpha}",
+            "tags": []
+          },
+          "capture": {
+            "private_dns_id": "$.private_dns.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/private-dns/{private_dns_id}",
+            "service": "dns"
+          }
+        },
+        {
+          "name": "igw-wait",
+          "service": "vpc",
+          "group": "igw",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ATTACHED",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "natgw-wait",
+          "service": "vpc",
+          "group": "natgw",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/nat-gateways/{nat_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nat_gateway.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "port-wait",
+          "service": "vpc",
+          "group": "port",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.port.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "DOWN"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "tgw-wait",
+          "service": "vpc",
+          "group": "tgw",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "lb-wait",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.loadbalancer.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "lb-listener-create",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/lb-listeners",
+          "json": {
+            "listener": {
+              "description": "API regression shared-net",
+              "loadbalancer_id": "{loadbalancer_id}",
+              "name": "regrls{ualpha}",
+              "protocol": "TCP",
+              "routing_action": "LB_SERVER_GROUP",
+              "server_group_id": "{lb_server_group_id}",
+              "service_port": "80",
+              "support_http2": false,
+              "tags": []
+            }
+          },
+          "capture": {
+            "listener_id": "$.listener.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-listeners/{listener_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "lb-members-add",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "json": {
+            "members": [
+              {
+                "member_ip": "10.140.1.50",
+                "member_port": 80,
+                "member_state": "ENABLE",
+                "member_weight": 100,
+                "name": "regrmbr{ualpha}",
+                "object_id": "{port_id}",
+                "object_type": "VM"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "dns-activate",
+          "service": "dns",
+          "group": "dns",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/private-dns/activate",
+          "json": {
+            "name": "regrpdns{ualpha}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "dns-privatedns-wait",
+          "service": "dns",
+          "group": "dns",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/private-dns/{private_dns_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.private_dns.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE",
+              "ACTIVATED"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "dns-zone-create",
+          "service": "dns",
+          "group": "dns",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/hosted-zones",
+          "json": {
+            "name": "regr{ualpha}.example.com",
+            "description": "API regression shared-net",
+            "private_dns_id": "{private_dns_id}",
+            "type": "private",
+            "tags": []
+          },
+          "capture": {
+            "hosted_zone_id": "$.hosted_zone.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/hosted-zones/{hosted_zone_id}",
+            "service": "dns"
+          }
+        },
+        {
+          "name": "dns-record-create",
+          "service": "dns",
+          "group": "dns",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records",
+          "json": {
+            "name": "www.regr{ualpha}.example.com",
+            "type": "A",
+            "ttl": 300,
+            "records": [
+              "192.0.2.10"
+            ],
+            "description": "API regression shared-net"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "vpc-probe",
+          "service": "vpc",
+          "probe_reads": {
+            "vpc_id": "{vpc_id}",
+            "subnet_id": "{subnet_id}",
+            "publicip_id": "{publicip_id}",
+            "port_id": "{port_id}",
+            "internet_gateway_id": "{internet_gateway_id}",
+            "nat_gateway_id": "{nat_gateway_id}",
+            "transit_gateway_id": "{transit_gateway_id}"
+          }
+        },
+        {
+          "name": "lb-probe",
+          "service": "loadbalancer",
+          "probe_reads": {
+            "loadbalancer_id": "{loadbalancer_id}",
+            "lb_server_group_id": "{lb_server_group_id}",
+            "listener_id": "{listener_id}",
+            "lb_health_check_id": "{lb_health_check_id}"
+          }
+        },
+        {
+          "name": "dns-probe",
+          "service": "dns",
+          "probe_reads": {
+            "hosted_zone_id": "{hosted_zone_id}",
+            "private_dns_id": "{private_dns_id}"
+          }
+        },
+        {
+          "name": "dns-zone-delete",
+          "service": "dns",
+          "group": "dns",
+          "method": "DELETE",
+          "path": "/v1/hosted-zones/{hosted_zone_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "dns-privatedns-delete",
+          "service": "dns",
+          "group": "dns",
+          "method": "DELETE",
+          "path": "/v1/private-dns/{private_dns_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "lb-listener-delete",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "DELETE",
+          "path": "/v1/lb-listeners/{listener_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "lb-delete",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 10,
+          "retry_interval": 20
+        },
+        {
+          "name": "lb-wait-gone",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "lb-servergroup-delete",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "lb-healthcheck-delete",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "DELETE",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "subnetvip-delete",
+          "service": "vpc",
+          "group": "subnetvip",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "tgw-delete",
+          "service": "vpc",
+          "group": "tgw",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 8,
+          "retry_interval": 20
+        },
+        {
+          "name": "natgw-delete",
+          "service": "vpc",
+          "group": "natgw",
+          "method": "DELETE",
+          "path": "/v1/nat-gateways/{nat_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 8,
+          "retry_interval": 20
+        },
+        {
+          "name": "natgw-wait-gone",
+          "service": "vpc",
+          "group": "natgw",
+          "method": "GET",
+          "path": "/v1/nat-gateways/{nat_gateway_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "port-delete",
+          "service": "vpc",
+          "group": "port",
+          "method": "DELETE",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "igw-delete",
+          "service": "vpc",
+          "group": "igw",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 8,
+          "retry_interval": 20
+        },
+        {
+          "name": "igw-wait-gone",
+          "service": "vpc",
+          "group": "igw",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "publicip-delete",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 20,
+          "retry_interval": 20
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ]
+    },
+    {
+      "id": "iam-group",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light, self-contained: create an IAM group (no path-param POST /v1/groups), read it, probe the 3 group-id path-param GETs, delete. Body grounded on management/iam/creategroup example (api_bodies.json); policy_ids/user_ids sent empty so no pre-existing principals are needed. Create response envelope $.group.id confirmed from the doc 201 example. {ualpha} = letters-only unique token (group names in the example are alphabetic).",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/groups",
+          "json": {
+            "name": "regrgrp{ualpha}",
+            "description": "API regression suite",
+            "policy_ids": [],
+            "user_ids": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "group_id": "$.group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/groups/{group_id}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/groups/{group_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/groups",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "group_id": "{group_id}"
+          }
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/groups/{group_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "iam-policy",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light, self-contained: create a USER_DEFINED identity policy (no path-param POST /v1/policies), read it, probe the 2 policy-id path-param GETs, delete. Body grounded on management/iam/createpolicy example; server-assigned id fields (default_version_id, policy_version.policy_id/policy_version_id) are OMITTED \u2014 they are returned by the API, not supplied on create. policy_document mirrors the example verbatim (Version 2024-07-01). Create response envelope is FLAT: $.id (confirmed from the doc 201 example).",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/policies",
+          "json": {
+            "policy_name": "regrpol{ualpha}",
+            "description": "API regression suite",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{policy_id}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/policies/{policy_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/policies",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "policy_id": "{policy_id}"
+          }
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/policies/{policy_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "iam-role",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light, self-contained: create a USER_DEFINED role (no path-param POST /v1/roles), read it, probe the 2 role-id path-param GETs, delete. Body grounded on management/iam/createrole example; assume_role_policy_document copied verbatim (sts:AssumeRole). policy_ids/principals sent empty to avoid referencing non-existent users. Create response envelope $.role.id confirmed from the doc 202 example. RISK: the trust-policy / principals validation is account-specific \u2014 if the gateway requires a real principal SRN, create returns 400 and this lifecycle should be disabled; everything else is grounded.",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/roles",
+          "json": {
+            "name": "regrrole{ualpha}",
+            "description": "API regression suite",
+            "role_type": "USER_DEFINED",
+            "max_session_duration": 3600,
+            "assume_role_policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "statement1",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
+                  "Condition": {},
+                  "Resource": []
+                }
+              ]
+            },
+            "policy_ids": [],
+            "principals": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "role_id": "$.role.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/roles/{role_id}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/roles/{role_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list",
+          "method": "GET",
+          "path": "/v1/roles",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "role_id": "{role_id}"
+          }
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/roles/{role_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "servicewatch-loggroup-logstream",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "Light child-resource lifecycle: create log group -> create log stream under it -> read both -> probe path-param GETs (covers showloggroup AND showloggrouplogstream) -> delete stream -> delete group. Bodies grounded from createloggroup / createloggrouplogstream; envelopes $.log_group.id and $.log_stream.id / $.log_stream.log_group_id confirmed from doc responses.",
+      "steps": [
+        {
+          "name": "create-group",
+          "method": "POST",
+          "path": "/v1/log-groups",
+          "json": {
+            "name": "regrlg{unique}",
+            "retention_period": 365,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201
+          ],
+          "capture": {
+            "log_group_id": "$.log_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/log-groups",
+            "service": "servicewatch",
+            "json": {
+              "ids": [
+                "{log_group_id}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "create-stream",
+          "method": "POST",
+          "path": "/v1/log-groups/{log_group_id}/log-streams",
+          "json": {
+            "name": "regrls{unique}"
+          },
+          "expect_status": [
+            200,
+            201
+          ],
+          "capture": {
+            "log_stream_id": "$.log_stream.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/log-groups/{log_group_id}/log-streams",
+            "service": "servicewatch",
+            "json": {
+              "ids": [
+                "{log_stream_id}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "get-stream",
+          "method": "GET",
+          "path": "/v1/log-groups/{log_group_id}/log-streams/{log_stream_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "log_group_id": "{log_group_id}",
+            "log_stream_id": "{log_stream_id}"
+          }
+        },
+        {
+          "name": "delete-stream",
+          "method": "DELETE",
+          "path": "/v1/log-groups/{log_group_id}/log-streams",
+          "json": {
+            "ids": [
+              "{log_stream_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-group",
+          "method": "DELETE",
+          "path": "/v1/log-groups",
+          "json": {
+            "ids": [
+              "{log_group_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
     }
   ]
 }
