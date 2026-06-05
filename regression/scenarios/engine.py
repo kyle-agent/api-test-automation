@@ -421,7 +421,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             _is_gateway_block = (resp.status == 417 and (
                 "Request Rejected" in _txt or "request was blocked" in _txt
                 or "Support ID" in _txt))
-            if resp.status not in expected and (_is_quota or _is_gateway_block):
+            # A dependency resource we created was concurrently removed (e.g. a
+            # cross-run prefix-sweep deleting our subnet): the API reports the
+            # parent as not-active/DELETING. That is environmental interference,
+            # not a regression — skip rather than fail.
+            _is_dep_gone = (resp.status == 400 and (
+                "not-active-state" in _tl or "notactivestate" in _tl
+                or "(deleting)" in _tl))
+            if resp.status not in expected and (_is_quota or _is_gateway_block or _is_dep_gone):
                 if bkind:  # the create did not take effect — give the slot back
                     budget.release(bkind)
                     reserved[bkind] = max(0, reserved.get(bkind, 0) - 1)
