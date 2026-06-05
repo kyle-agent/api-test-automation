@@ -51,12 +51,13 @@ def _categorize(status: int, text: str) -> str:
     return "soft"  # 400/403/404/409/422 — needs params/permission/provisioning
 
 
-def _record_smoke(status, category, key, method, path):
+def _record_smoke(status, category, key, method, path, elapsed_ms=None):
     import os
+    ems = "" if elapsed_ms is None else f"{elapsed_ms:.0f}"
     try:
         os.makedirs("reports", exist_ok=True)
         with open(_SMOKE_TSV, "a") as fh:
-            fh.write(f"{status}\t{category}\t{key}\t{method}\t{path}\n")
+            fh.write(f"{status}\t{category}\t{key}\t{method}\t{path}\t{ems}\n")
     except OSError:
         pass
 
@@ -83,7 +84,7 @@ def _probe_reads(client, mapping, service):
             print(f"  probe ERROR {path}: {exc}")
             continue
         _record_smoke(resp.status, _categorize(resp.status, getattr(resp, "raw_text", "")),
-                      e["key"], "GET", e["http_path"])
+                      e["key"], "GET", e["http_path"], getattr(resp, "elapsed_ms", None))
         called += 1
     print(f"  probe-reads[{service}]: {called} path-param GET(s) exercised")
 

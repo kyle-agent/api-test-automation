@@ -50,12 +50,13 @@ def _categorize(status: int, text: str) -> str:
     return "soft"  # 400/403/404/409/422 — needs params/permission/provisioning
 
 
-def _record_smoke(status, category, key, method, path):
+def _record_smoke(status, category, key, method, path, elapsed_ms=None):
     import os
+    ems = "" if elapsed_ms is None else f"{elapsed_ms:.0f}"
     try:
         os.makedirs("reports", exist_ok=True)
         with open(_SMOKE_TSV, "a") as fh:
-            fh.write(f"{status}\t{category}\t{key}\t{method}\t{path}\n")
+            fh.write(f"{status}\t{category}\t{key}\t{method}\t{path}\t{ems}\n")
     except OSError:
         pass
 
@@ -168,7 +169,8 @@ def test_read_chain(endpoint, param, list_path, client, _list_cache):
         pytest.skip(f"{path} unreachable: {exc}")  # record-only; never break the gate
 
     cat = _categorize(resp.status, getattr(resp, "raw_text", ""))
-    _record_smoke(resp.status, cat, endpoint.key, "GET", endpoint.http_path)
+    _record_smoke(resp.status, cat, endpoint.key, "GET", endpoint.http_path,
+                  getattr(resp, "elapsed_ms", None))
     # Record-only (matches CRUD probe_reads): a 4xx/5xx on a derived read is
     # surfaced on the dashboard, not asserted here, so bonus coverage can never
     # by itself turn the regression check red.
@@ -221,5 +223,6 @@ def test_read_chain_2p(endpoint, p1, list1, p2, sublist_tmpl, client, _list_cach
         pytest.skip(f"{path} unreachable: {exc}")  # record-only; never break the gate
 
     cat = _categorize(resp.status, getattr(resp, "raw_text", ""))
-    _record_smoke(resp.status, cat, endpoint.key, "GET", endpoint.http_path)
+    _record_smoke(resp.status, cat, endpoint.key, "GET", endpoint.http_path,
+                  getattr(resp, "elapsed_ms", None))
     # Record-only, exactly like test_read_chain above.

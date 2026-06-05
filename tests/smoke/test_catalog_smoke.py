@@ -76,11 +76,13 @@ def _reset_smoke_status():
     yield
 
 
-def _record(endpoint: Endpoint, status: int, category: str) -> None:
-    """Append status + category so the CI summary can group results."""
+def _record(endpoint: Endpoint, status: int, category: str, elapsed_ms: float | None = None) -> None:
+    """Append status + category so the CI summary can group results. The 6th
+    column is the response time in ms (blank if unknown) for the dashboard."""
+    ems = "" if elapsed_ms is None else f"{elapsed_ms:.0f}"
     try:
         with open(_STATUS_FILE, "a") as fh:
-            fh.write(f"{status}\t{category}\t{endpoint.key}\t{endpoint.method}\t{endpoint.http_path}\n")
+            fh.write(f"{status}\t{category}\t{endpoint.key}\t{endpoint.method}\t{endpoint.http_path}\t{ems}\n")
     except OSError:
         pass
 
@@ -165,7 +167,7 @@ def test_endpoint_reachable(endpoint: Endpoint, client):
         if category == "ok":
             break
 
-    _record(endpoint, resp.status, category)
+    _record(endpoint, resp.status, category, getattr(resp, "elapsed_ms", None))
 
     # Parameter-coverage probe (read-only, record-only): re-issue the same GET
     # once with pagination params. Only for plain OK list endpoints (skip the

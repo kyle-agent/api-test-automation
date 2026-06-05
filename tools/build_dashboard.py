@@ -44,14 +44,16 @@ def smoke_tested_keys(cat):
 
 
 def parse_smoke_tsv(path):
-    """rows: (status:int, category:str, key:str, method, path). May be absent."""
+    """rows: (status:int, category:str, key:str, method, path, elapsed_ms:float|None).
+    The 6th column (response time) is optional and may be absent on older rows."""
     rows = []
     if path and os.path.exists(path):
         for ln in open(path):
             p = ln.rstrip("\n").split("\t")
             if len(p) >= 5:
                 try:
-                    rows.append((int(p[0]), p[1], p[2], p[3], p[4]))
+                    ems = float(p[5]) if len(p) >= 6 and p[5] != "" else None
+                    rows.append((int(p[0]), p[1], p[2], p[3], p[4], ems))
                 except ValueError:
                     pass
     return rows
@@ -111,9 +113,9 @@ def per_service(cat, tsv_rows, write_hit):
     lifecycle step exercised its method+normalised-path. Returns a list of
     service dicts (sorted by category, then ascending coverage so blind spots
     surface first) for the index nav and the per-service pages."""
-    called = {}                       # key -> last observed GET status
-    for status, _category, key, _method, _path in tsv_rows:
-        called[key] = status
+    called = {}                       # key -> (last observed status, elapsed_ms)
+    for status, _category, key, _method, _path, *_rest in tsv_rows:
+        called[key] = (status, _rest[0] if _rest else None)
     tested_keys = set(called) or smoke_tested_keys(cat)
 
     groups = defaultdict(list)
@@ -134,8 +136,9 @@ def per_service(cat, tsv_rows, write_hit):
                 covered = (e["method"], e["_norm"]) in write_hit
                 wcov += covered
             covn += covered
+            st_el = called.get(e["key"]) or (None, None)
             rows.append((e["method"], e["http_path"], e.get("name", ""),
-                         bool(covered), called.get(e["key"])))
+                         bool(covered), st_el[0], st_el[1]))
         services.append({
             "category": category, "service": service, "slug": slug(category, service),
             "total": len(ents), "covered": covn,
@@ -164,7 +167,7 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
 
     known_keys = {i["key"] for i in known.get("issues", [])}
     new_regressions, known_red = [], []
-    for status, category, key, method, path in tsv_rows:
+    for status, category, key, method, path, *_rest in tsv_rows:
         if category == "fail":
             (known_red if key in known_keys else new_regressions).append(
                 (key, status, path))
@@ -386,15 +389,23 @@ def render_service_page(s, meta):
     gpct = s["gcov"] / s["gtot"] * 100 if s["gtot"] else 0
     wpct = s["wcov"] / s["wtot"] * 100 if s["wtot"] else 0
 
-    def statcell(st):
+    def fmt_ms(el):
+        if el is None:
+            return ""
+        txt = f"{el / 1000:.1f}s" if el >= 1000 else f"{el:.0f}ms"
+        # surface slow calls (esp. POST creates): amber >3s, red >10s
+        col = "#cf222e" if el >= 10000 else "#9a6700" if el >= 3000 else "#8c959f"
+        return f' <span style="font-size:11px;color:{col}">· {txt}</span>'
+
+    def statcell(st, el=None):
         if st is None:
             return '<span class="mut">—</span>'
         col = STATUS_COLORS.get(st // 100, "#656d76")
-        return f'<b style="color:{col}">{st}</b>'
+        return f'<b style="color:{col}">{st}</b>{fmt_ms(el)}'
 
     conf = (meta.get("conf") or {}).get("by_endpoint", {})
     rows = []
-    for method, path, title, covered, st in s["rows"]:
+    for method, path, title, covered, st, el in s["rows"]:
         chk = ('<span style="color:#2da44e">✓</span>' if covered
                else '<span class="mut">·</span>')
         rcls = "" if covered else ' class="unc"'
@@ -404,7 +415,7 @@ def render_service_page(s, meta):
             f'<tr{rcls}><td><span class="m m-{method}">{method}</span></td>'
             f'<td><code>{html.escape(path)}</code></td>'
             f'<td class="ti">{html.escape(title or "")}</td>'
-            f'<td style="text-align:center">{chk}</td><td>{statcell(st)}</td>'
+            f'<td style="text-align:center">{chk}</td><td>{statcell(st, el)}</td>'
             f'<td>{cc}</td></tr>')
     svc = html.escape(s["service"]); category = html.escape(s["category"])
     return (
@@ -422,7 +433,7 @@ def render_service_page(s, meta):
         f'실제 호출 응답(테스트 수행 성공 여부) · <b>설계/동작 결함</b>: 호출 성공 여부와 별개로 '
         f'정적+런타임 점검에서 찾은 개선/결함(클릭 시 상세). 빈칸 status는 미호출(커버 X).</p>'
         f'<table><thead><tr><th>메서드</th><th>경로</th><th>API</th>'
-        f'<th>커버</th><th>최근 status<br><span class="mut" style="font-weight:400">회귀 호출결과</span></th>'
+        f'<th>커버</th><th>최근 status<br><span class="mut" style="font-weight:400">회귀 호출결과 · 응답시간</span></th>'
         f'<th>설계/동작 결함<br><span class="mut" style="font-weight:400">별도 점검</span></th>'
         f'</tr></thead><tbody>{"".join(rows)}</tbody></table>'
         f'<footer class="mut">생성 {meta["when"]} · branch <code>{html.escape(meta["branch"])}</code>'
