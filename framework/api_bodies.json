@@ -652,6 +652,140 @@
     "vip_public_ip_id": "",
     "virtual_ip_address": ""
   },
+  "management/iam-identity-center/createaccountassignment": {
+    "accounts": [
+      {
+        "target_account_email": "target_account@example.com",
+        "target_account_id": "3265ab469f0d406d83073da3e11e7a6c",
+        "target_account_name": "target_account@example.com"
+      }
+    ],
+    "instance_id": "ssoins-12345",
+    "permission_sets": [
+      {
+        "custom_policies": [],
+        "inline_policies": [],
+        "managed_policies": [],
+        "permission_set_id": "e8d4b9f2c1a7e5d3f0b6c9a2d8e4f7b1",
+        "permission_set_name": "Permission Set",
+        "permission_set_srn": "srn:<offering>::<project-id>:<region>::permissionSet/${InstanceId}/${permissionId}",
+        "session_duration": 3600
+      }
+    ],
+    "principals": [
+      {
+        "principal_id": "138c2fc8c29a449dbfa8681f8f1d78e2",
+        "principal_type": "USER"
+      }
+    ]
+  },
+  "management/iam-identity-center/createbulkgroupusers": {
+    "instance_id": "ssoins-12345",
+    "user_uuids": [
+      "user-12345",
+      "user-67890"
+    ]
+  },
+  "management/iam-identity-center/creategroup": {
+    "description": "Group for administrators",
+    "instance_id": "ssoins-12345",
+    "name": "Admin_Group",
+    "user_uuids": [
+      "138c2fc8c29a449dbfa8681f8f1d78e2"
+    ]
+  },
+  "management/iam-identity-center/createinstance": {
+    "description": "My Instance Description",
+    "identity_store_config": {
+      "bind_credential": "password",
+      "bind_dn": "CN=Administrator,CN=Users,DC=test,DC=add",
+      "connection_url": "ldaps://test.subdomain.company.com:123",
+      "rdn_ldap_attribute": "cn",
+      "user_object_classes": "person, organizationalPerson, user",
+      "username_ldap_attribute": "sAMAccountName",
+      "users_dn": "OU=Employees,OU=Accounts,DC=sub,DC=org"
+    },
+    "identity_store_type": "ACTIVE_DIRECTORY",
+    "name": "My Instance"
+  },
+  "management/iam-identity-center/createpermissionset": {
+    "custom_policies": [],
+    "description": "My Instance Description",
+    "inline_policies": [],
+    "instance_id": "ssoins-12345",
+    "managed_policies": [],
+    "name": "My Instance",
+    "session_duration": 3600
+  },
+  "management/iam-identity-center/createuser": {
+    "business_unit": "Business Unit A",
+    "department": "Department X",
+    "description": "Description of John Doe",
+    "email": "john.doe@example.com",
+    "employee_id": "emp-12345",
+    "group_ids": [
+      "39520424-440c-41c0-9b9c-f22b2129f6f9",
+      "80c53fe1-4e27-4cce-92be-151cf0f2873e"
+    ],
+    "instance_id": "ssoins-12345",
+    "manager": "Alice Smith",
+    "name": "John Doe",
+    "nation_id": "+82",
+    "password": "",
+    "phone_number": "010-1234-5678",
+    "temporary_password": true,
+    "user_id": "johndoe"
+  },
+  "management/iam-identity-center/setgroup": {
+    "description": "Group for administrators",
+    "instance_id": "ssoins-12345",
+    "name": "Admin_Group"
+  },
+  "management/iam-identity-center/setinstance": {
+    "description": "My Instance Description",
+    "identity_store_config": {
+      "bind_credential": "password",
+      "bind_dn": "CN=Administrator,CN=Users,DC=test,DC=add",
+      "component_id": "HYIK7LLKQL2MFK2K8Jb1ew",
+      "connection_url": "ldaps://test.subdomain.company.com:123",
+      "rdn_ldap_attribute": "cn",
+      "user_object_classes": "person, organizationalPerson, user",
+      "username_ldap_attribute": "sAMAccountName",
+      "users_dn": "OU=Employees,OU=Accounts,DC=sub,DC=org"
+    },
+    "identity_store_type": "IDENTITY_CENTER_DIRECTORY",
+    "name": "My Instance"
+  },
+  "management/iam-identity-center/setpermissionset": {
+    "description": "My Instance Description",
+    "instance_id": "ssoins-12345",
+    "session_duration": 3600
+  },
+  "management/iam-identity-center/setpermissionsetpolicies": {
+    "custom_policies": [
+      ""
+    ],
+    "inline_policies": [
+      ""
+    ],
+    "instance_id": "ssoins-12345",
+    "managed_policies": [
+      ""
+    ]
+  },
+  "management/iam-identity-center/setuser": {
+    "business_unit": "Business Unit A",
+    "department": "Department X",
+    "description": "Description of John Doe",
+    "email": "john.doe@example.com",
+    "employee_id": "emp-12345",
+    "instance_id": "ssoins-12345",
+    "manager": "Alice Smith",
+    "name": "John Doe",
+    "nation_id": "+82",
+    "phone_number": "010-1234-5678",
+    "tz_id": "Asia/Seoul"
+  },
   "management/iam/accesskeycreate": {
     "access_key_type": "PERMANENT",
     "account_id": "f39c460fade34fecb05ede8f904b24b7",
