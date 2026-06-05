@@ -1,17 +1,7 @@
-.env
 __pycache__/
 *.pyc
-.pytest_cache/
-reports/*.html
-reports/*.xml
-framework/.apiref_index.html
-.venv/
-venv/
-
-# generated dashboard outputs (live on the dashboard-data branch)
+.env
+# dashboard build artifacts (generated, not source)
 dashboard/index.html
 dashboard/history.jsonl
-reports/*.tsv
-
-# Claude Code agent worktrees / local runtime
-.claude/
+dashboard/services/
