@@ -4934,7 +4934,8 @@
               "server_group_id": "{lb_server_group_id}",
               "service_port": "80",
               "support_http2": false,
-              "tags": []
+              "tags": [],
+              "session_duration_time": 120
             }
           },
           "capture": {
@@ -4950,32 +4951,6 @@
             "path": "/v1/lb-listeners/{listener_id}",
             "service": "loadbalancer"
           }
-        },
-        {
-          "name": "lb-members-add",
-          "service": "loadbalancer",
-          "group": "lb",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-          "json": {
-            "members": [
-              {
-                "member_ip": "10.140.1.50",
-                "member_port": 80,
-                "member_state": "ENABLE",
-                "member_weight": 100,
-                "name": "zznetmbr{ualpha}",
-                "object_id": "{port_id}",
-                "object_type": "VM"
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ]
         },
         {
           "name": "dns-privatedns-create",
