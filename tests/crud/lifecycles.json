@@ -4609,7 +4609,6 @@
             "description": "API regression shared-net",
             "security_groups": [],
             "subnet_id": "{subnet_id}",
-            "fixed_ip_address": "",
             "tags": []
           },
           "capture": {
@@ -5405,7 +5404,8 @@
             200,
             202,
             204,
-            409
+            409,
+            404
           ],
           "destructive": true,
           "retry_on_status": [
@@ -5423,7 +5423,8 @@
             200,
             202,
             204,
-            409
+            409,
+            404
           ],
           "destructive": true,
           "retry_on_status": [
@@ -5458,7 +5459,8 @@
             200,
             202,
             204,
-            409
+            409,
+            404
           ],
           "destructive": true,
           "retry_on_status": [
