@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Aggregate all static + runtime findings into per-endpoint API conformance.
 
-Output: framework/conformance.json
+Output: data/conformance.json
   {
     "summary": {green, yellow, red, total},
     "systemic": [{type, detail, issue, scope, count}],   # platform-wide (banner)
@@ -21,7 +21,7 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-F = ROOT / "framework"
+F = ROOT / "data"
 R = ROOT / "reports"
 OUT = F / "conformance.json"
 

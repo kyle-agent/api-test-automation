@@ -9,7 +9,7 @@ body — the only machine-readable source of required fields / enum values, sinc
 the rendered docs expose no OpenAPI schema and the gateway returns unnamed
 "Field required" errors.
 
-Output: framework/api_bodies.json  ->  { "<catalog key>": {<example body>}, ... }
+Output: data/api_bodies.json  ->  { "<catalog key>": {<example body>}, ... }
 Resumable: keys already present are skipped. Filter with --key-substr / --method.
 
 Usage:
@@ -21,8 +21,8 @@ import argparse, html, json, re, time, urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CATALOG = ROOT / "framework" / "api_catalog.json"
-OUT = ROOT / "framework" / "api_bodies.json"
+CATALOG = ROOT / "data" / "api_catalog.json"
+OUT = ROOT / "data" / "api_bodies.json"
 WRITE_METHODS = {"POST", "PUT", "PATCH"}
 
 

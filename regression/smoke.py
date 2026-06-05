@@ -40,7 +40,7 @@ _PARAM_REPR = "page=0&size=1&limit=1"
 _DUP_NAME = "regrprobesmoke"
 
 
-def load_known_issues(path: str = "known_issues.json") -> dict:
+def load_known_issues(path: str = "data/baselines/known_issues.json") -> dict:
     """Baseline of already-tracked backend failures. A smoke 'fail' whose key is
     listed here is treated as a known issue (still recorded) rather than a NEW
     regression, so the gate stays green unless a new endpoint breaks."""

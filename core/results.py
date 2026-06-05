@@ -1,7 +1,7 @@
 """Unified results store — one schema both axes write and the dashboard reads.
 
 Today the signals are scattered: regression -> reports/smoke_status.tsv,
-conformance -> framework/conformance.json, runtime -> reports/runtime_*.json.
+conformance -> data/conformance.json, runtime -> reports/runtime_*.json.
 This module is the single home so the dashboard reads ONE place and both axes are
 first-class:
 

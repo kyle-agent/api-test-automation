@@ -39,7 +39,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-DOCS = ROOT / "framework" / "api_docs.json"
+DOCS = ROOT / "data" / "api_docs.json"
 OUT = ROOT / "reports" / "validation_probe.json"
 
 # Does the error name the offending field? SCP wraps the field name in *escaped*

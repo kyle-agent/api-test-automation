@@ -33,7 +33,7 @@ _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 # path-parameter GETs the read-only smoke must skip (no resource id), reusing a
 # resource a lifecycle just created. Results land in the same tsv the dashboard
 # reads, so they count toward read coverage.
-_CATALOG_PATH = Path(__file__).parents[2] / "framework" / "api_catalog.json"
+_CATALOG_PATH = Path(__file__).parents[2] / "data" / "api_catalog.json"
 _CATALOG = json.loads(_CATALOG_PATH.read_text()) if _CATALOG_PATH.exists() else []
 _SMOKE_TSV = "reports/smoke_status.tsv"
 

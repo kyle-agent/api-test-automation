@@ -6,7 +6,7 @@ lets a CI step detect which endpoints changed so only affected tests are
 (re-)triggered rather than the full suite.
 
 Each catalog JSON is a list of endpoint dicts as produced by
-``spec.extract_catalog`` (same schema as ``framework/api_catalog.json``).
+``spec.extract_catalog`` (same schema as ``data/api_catalog.json``).
 
 Public API
 ----------

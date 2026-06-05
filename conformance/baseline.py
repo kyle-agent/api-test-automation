@@ -1,7 +1,7 @@
 """AXIS 2 — conformance baseline so only NEW design/behavior defects alarm.
 
 Ports ``tools/conformance_baseline.py``: compares the current per-endpoint
-conformance colours (``framework/conformance.json``, produced by
+conformance colours (``data/conformance.json``, produced by
 :mod:`conformance.static`) against a stored baseline and reports NEW / regressed /
 fixed endpoints. This is the conformance-axis mirror of the regression
 ``known_issues`` baseline.
@@ -18,9 +18,9 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CONF = ROOT / "framework" / "conformance.json"
+CONF = ROOT / "data" / "conformance.json"
 OUT = ROOT / "reports" / "conformance_new.json"
-DEFAULT_BASELINE = "framework/conformance_baseline.json"
+DEFAULT_BASELINE = "data/baselines/conformance_baseline.json"
 RANK = {"green": 0, "yellow": 1, "red": 2}
 
 

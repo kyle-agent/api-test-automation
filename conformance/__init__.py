@@ -12,7 +12,7 @@ reports them against a baseline so only NEW defects alarm:
 
 All defects are emitted as :class:`core.results.Finding` to the unified results
 store (``source="static"|"runtime"``). For backwards compatibility the legacy
-artifacts (``framework/conformance.json``, ``reports/runtime_*.json``,
+artifacts (``data/conformance.json``, ``reports/runtime_*.json``,
 ``reports/conformance_new.json``) are still written (dual-write) so the current
 dashboard and baseline keep working.
 

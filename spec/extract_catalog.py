@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract all SCP API Reference endpoints into framework/api_catalog.json.
+"""Extract all SCP API Reference endpoints into data/api_catalog.json.
 
 The API Reference site (https://docs.e.samsungsdscloud.com/apireference/) renders
 each API on its own page. Every page embeds the HTTP method + path in the
@@ -14,7 +14,7 @@ The gateway intermittently returns 503 ("upstream connect ... connection
 timeout"), so every request is retried with exponential backoff. The run is
 resumable: already-collected entries are skipped on a re-run.
 
-Output: framework/api_catalog.json  (same path as the original build_catalog.py)
+Output: data/api_catalog.json  (same path as the original build_catalog.py)
 
 Ported from tools/build_catalog.py; logic is unchanged.
 """
@@ -31,8 +31,8 @@ from pathlib import Path
 BASE = "https://docs.e.samsungsdscloud.com"
 INDEX = f"{BASE}/apireference/"
 ROOT = Path(__file__).resolve().parent.parent
-CATALOG = ROOT / "framework" / "api_catalog.json"
-INDEX_CACHE = ROOT / "framework" / ".apiref_index.html"
+CATALOG = ROOT / "data" / "api_catalog.json"
+INDEX_CACHE = ROOT / "data" / ".apiref_index.html"
 
 # href like: /apireference/<category>/<service>/apis/<apiname>/<version>
 HREF_RE = re.compile(

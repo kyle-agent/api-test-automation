@@ -1,4 +1,4 @@
-"""Loader/queries over the generated API catalog (framework/api_catalog.json)."""
+"""Loader/queries over the generated API catalog (data/api_catalog.json)."""
 from __future__ import annotations
 
 import json
@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CATALOG_PATH = ROOT / "framework" / "api_catalog.json"
+CATALOG_PATH = ROOT / "data" / "api_catalog.json"
 
 
 @dataclass(frozen=True)

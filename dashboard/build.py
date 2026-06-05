@@ -2,7 +2,7 @@
 
 Reads the unified results store FIRST via ``core.results``; falls back to the
 legacy flat-file inputs (reports/smoke_status.tsv, reports/param_status.tsv,
-framework/conformance.json, reports/junit-crud.xml) so nothing regresses while
+data/conformance.json, reports/junit-crud.xml) so nothing regresses while
 the migration is in flight.
 
 Both axes are first-class in the output:
@@ -685,7 +685,7 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <div class="panel trendgrid">
 <div><div class="mut">성공률</div>{spark_pr}</div>
 <div><div class="mut">operation 커버리지 %</div>{spark_cov}</div></div></section>
-<section><h2>알려진 이슈 (known_issues.json)</h2><div class="panel"><table>
+<section><h2>알려진 이슈 (data/baselines/known_issues.json)</h2><div class="panel"><table>
 <tr><th>endpoint</th><th>status</th><th>유형</th></tr>{knrows}</table></div></section>
 <footer>생성: <code>dashboard/build.py</code> ← unified results store (reports/results/*.jsonl) + legacy fallback (smoke_status.tsv, junit-crud.xml, api_catalog.json)
 &nbsp;|&nbsp; 추세: <code>dashboard-data</code> 브랜치 <code>history.jsonl</code> &nbsp;|&nbsp; 배포: GitHub Pages</footer>
@@ -702,13 +702,13 @@ def build(
     obs_path=None,
     findings_path=None,
     # Legacy fallback paths
-    catalog: str = "framework/api_catalog.json",
+    catalog: str = "data/api_catalog.json",
     tsv: str = "reports/smoke_status.tsv",
     param_tsv: str = "reports/param_status.tsv",
     crud: str = "reports/junit-crud.xml",
     lifecycles: str = "tests/crud/lifecycles.json",
-    known: str = "known_issues.json",
-    conformance: str = "framework/conformance.json",
+    known: str = "data/baselines/known_issues.json",
+    conformance: str = "data/conformance.json",
     # Output
     out: str = "reports/dashboard/index.html",
     history: str = "dashboard/history.jsonl",
@@ -814,14 +814,14 @@ def main():
                     help="Path to observations.jsonl (unified store); default: core.results.OBSERVATIONS")
     ap.add_argument("--findings", default=None,
                     help="Path to findings.jsonl (unified store); default: core.results.FINDINGS")
-    ap.add_argument("--catalog", default="framework/api_catalog.json")
+    ap.add_argument("--catalog", default="data/api_catalog.json")
     ap.add_argument("--tsv", default="reports/smoke_status.tsv",
                     help="Legacy fallback: smoke_status.tsv")
     ap.add_argument("--param-tsv", default="reports/param_status.tsv")
     ap.add_argument("--crud", default="reports/junit-crud.xml")
     ap.add_argument("--lifecycles", default="tests/crud/lifecycles.json")
-    ap.add_argument("--known", default="known_issues.json")
-    ap.add_argument("--conformance", default="framework/conformance.json",
+    ap.add_argument("--known", default="data/baselines/known_issues.json")
+    ap.add_argument("--conformance", default="data/conformance.json",
                     help="Legacy fallback: conformance.json")
     ap.add_argument("--history", default="dashboard/history.jsonl")
     ap.add_argument("--out", default="reports/dashboard/index.html")

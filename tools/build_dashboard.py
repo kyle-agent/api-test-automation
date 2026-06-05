@@ -2,12 +2,12 @@
 """Render the API-regression dashboard from real run artifacts.
 
 Inputs (all best-effort; the script degrades gracefully when one is missing):
-  * framework/api_catalog.json   -> coverage denominators + the reproducible
+  * data/api_catalog.json   -> coverage denominators + the reproducible
                                      smoke-tested set (non-mutating GETs w/o path params)
   * reports/smoke_status.tsv      -> per-endpoint real result (status, category, key)
   * reports/junit-crud.xml        -> CRUD lifecycle pass/skip/fail
   * tests/crud/lifecycles.json    -> lifecycle metadata (heavy/light)
-  * known_issues.json             -> baseline to split NEW regressions from known-red
+  * data/baselines/known_issues.json             -> baseline to split NEW regressions from known-red
 
 Outputs:
   * dashboard/index.html          -> self-contained page (inline SVG/CSS, no CDN)
@@ -596,7 +596,7 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <div class="panel trendgrid">
 <div><div class="mut">성공률</div>{spark_pr}</div>
 <div><div class="mut">operation 커버리지 %</div>{spark_cov}</div></div></section>
-<section><h2>알려진 이슈 (known_issues.json)</h2><div class="panel"><table>
+<section><h2>알려진 이슈 (data/baselines/known_issues.json)</h2><div class="panel"><table>
 <tr><th>endpoint</th><th>status</th><th>유형</th></tr>{knrows}</table></div></section>
 <footer>생성: <code>tools/build_dashboard.py</code> ← smoke_status.tsv + junit-crud.xml + api_catalog.json
 &nbsp;|&nbsp; 추세: <code>dashboard-data</code> 브랜치 <code>history.jsonl</code> &nbsp;|&nbsp; 배포: GitHub Pages</footer>
@@ -605,13 +605,13 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--catalog", default="framework/api_catalog.json")
+    ap.add_argument("--catalog", default="data/api_catalog.json")
     ap.add_argument("--tsv", default="reports/smoke_status.tsv")
     ap.add_argument("--param-tsv", default="reports/param_status.tsv")
     ap.add_argument("--crud", default="reports/junit-crud.xml")
     ap.add_argument("--lifecycles", default="tests/crud/lifecycles.json")
-    ap.add_argument("--known", default="known_issues.json")
-    ap.add_argument("--conformance", default="framework/conformance.json")
+    ap.add_argument("--known", default="data/baselines/known_issues.json")
+    ap.add_argument("--conformance", default="data/conformance.json")
     ap.add_argument("--history", default="dashboard/history.jsonl")
     ap.add_argument("--out", default="dashboard/index.html")
     ap.add_argument("--run-type", default="local")

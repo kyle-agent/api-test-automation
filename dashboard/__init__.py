@@ -2,7 +2,7 @@
 
 Reads the unified results store (core.results) first; falls back to the legacy
 flat-file inputs (reports/smoke_status.tsv, reports/param_status.tsv,
-framework/conformance.json, reports/junit-crud.xml) so nothing regresses while
+data/conformance.json, reports/junit-crud.xml) so nothing regresses while
 the migration is in flight.
 
 Public surface:

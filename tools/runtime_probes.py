@@ -32,7 +32,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-DOCS = ROOT / "framework" / "api_docs.json"
+DOCS = ROOT / "data" / "api_docs.json"
 OUTDIR = ROOT / "reports"
 CSVDIR = OUTDIR / "csv"
 

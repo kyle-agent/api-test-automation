@@ -1,14 +1,14 @@
 """AXIS 2 — STATIC spec analysis (design findings).
 
 Ports ``tools/build_conformance.py``: aggregates the pre-computed static analysis
-(``framework/findings.json`` + ``framework/validation_findings.json``) and the
+(``data/findings.json`` + ``data/validation_findings.json``) and the
 runtime probe outputs into per-endpoint conformance colours, and additionally
 runs the pluggable :mod:`conformance.rules` lens directly over the spec
-(``framework/api_docs.json``) so the design checks are extensible.
+(``data/api_docs.json``) so the design checks are extensible.
 
 Findings are emitted to the unified results store via
 :func:`core.results.record_finding` (``source="static"``), while the legacy
-``framework/conformance.json`` is *still written* (dual-write) so the existing
+``data/conformance.json`` is *still written* (dual-write) so the existing
 dashboard and baseline keep working unchanged.
 
 Nothing here performs network I/O; everything is local file analysis.
@@ -23,7 +23,7 @@ from core.results import Finding, record_finding
 from conformance import rules as rules_mod
 
 ROOT = Path(__file__).resolve().parent.parent
-F = ROOT / "framework"
+F = ROOT / "data"
 R = ROOT / "reports"
 OUT = F / "conformance.json"          # legacy dual-write target
 DOCS = F / "api_docs.json"
@@ -75,7 +75,7 @@ def run_spec_rules(docs: dict | None = None, *, emit: bool = True) -> list[Findi
 def build(*, emit_findings: bool = True) -> dict:
     """Aggregate static + runtime signals into per-endpoint conformance.
 
-    Dual-writes ``framework/conformance.json`` (legacy) and, when
+    Dual-writes ``data/conformance.json`` (legacy) and, when
     ``emit_findings`` is True, records each per-endpoint item as a unified
     :class:`core.results.Finding` (``source`` carried through from the item).
     Returns the assembled conformance dict.

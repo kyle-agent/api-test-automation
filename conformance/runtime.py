@@ -35,7 +35,7 @@ from pathlib import Path
 from core.results import Finding, record_finding
 
 ROOT = Path(__file__).resolve().parent.parent
-DOCS = ROOT / "framework" / "api_docs.json"
+DOCS = ROOT / "data" / "api_docs.json"
 OUTDIR = ROOT / "reports"
 CSVDIR = OUTDIR / "csv"
 VALIDATION_OUT = OUTDIR / "validation_probe.json"

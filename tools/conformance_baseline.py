@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Compare current conformance vs a baseline so only NEW design/behavior defects
-alarm (mirror of known_issues.json for the coverage axis).
+alarm (mirror of data/baselines/known_issues.json for the coverage axis).
 
 baseline format: {"<endpoint key>": "green|yellow|red", ...}
 
 Usage:
-  python tools/conformance_baseline.py --baseline framework/conformance_baseline.json
+  python tools/conformance_baseline.py --baseline data/baselines/conformance_baseline.json
       [--update]            # rewrite the baseline to the current state
       [--init-if-missing]   # if baseline absent, seed it from current (no NEW)
 Outputs: reports/conformance_new.json + console summary.
@@ -18,14 +18,14 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CONF = ROOT / "framework" / "conformance.json"
+CONF = ROOT / "data" / "conformance.json"
 OUT = ROOT / "reports" / "conformance_new.json"
 RANK = {"green": 0, "yellow": 1, "red": 2}
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", default="framework/conformance_baseline.json")
+    ap.add_argument("--baseline", default="data/baselines/conformance_baseline.json")
     ap.add_argument("--update", action="store_true")
     ap.add_argument("--init-if-missing", action="store_true")
     args = ap.parse_args()

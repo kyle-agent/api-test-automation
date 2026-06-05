@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print a coverage summary of framework/api_catalog.json.
+"""Print a coverage summary of data/api_catalog.json.
 
 Shows totals by category and HTTP method, plus how many endpoints the
 read-only smoke suite can exercise directly vs. those needing CRUD lifecycles.

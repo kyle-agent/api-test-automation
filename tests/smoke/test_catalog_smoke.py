@@ -26,11 +26,11 @@ pytestmark = pytest.mark.smoke
 
 
 def _load_known_issues() -> dict:
-    """Baseline of already-tracked backend failures (known_issues.json). A smoke
+    """Baseline of already-tracked backend failures (data/baselines/known_issues.json). A smoke
     'fail' whose key is listed here is xfailed (expected) rather than failing the
     suite, so the regression check stays green unless a NEW endpoint breaks. The
     row is still recorded, so the dashboard keeps showing it as known-red."""
-    p = Path("known_issues.json")
+    p = Path("data/baselines/known_issues.json")
     if not p.exists():
         return {}
     try:
@@ -181,7 +181,7 @@ def test_endpoint_reachable(endpoint: Endpoint, client):
         except Exception:
             _record_param(endpoint, 0, "fail")
 
-    # A failure on an endpoint already baselined in known_issues.json is an
+    # A failure on an endpoint already baselined in data/baselines/known_issues.json is an
     # already-tracked backend bug, not a regression in our suite — xfail it so the
     # check stays green for the known set (it's still recorded above as known-red).
     if category == "fail" and endpoint.key in _KNOWN_ISSUES:
