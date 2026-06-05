@@ -1,0 +1,73 @@
+name: SCP Runtime Probes (design/impl issues)
+
+# Runtime probes that surface API design/implementation issues by calling the
+# gateway. Read-only except `status`, which sends empty bodies that fail
+# validation before anything is created (no resource is made).
+on:
+  workflow_dispatch:
+    inputs:
+      probe:
+        description: "schema | status | notfound | errors | all"
+        required: false
+        default: "all"
+      category:
+        description: "Limit to one category (e.g. database). Blank = all."
+        required: false
+        default: ""
+      limit:
+        description: "Stop each probe after N targets (0 = all)."
+        required: false
+        default: "0"
+
+concurrency:
+  group: scp-runtime-probes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
+      SCP_ENV: ${{ vars.SCP_ENV || 'e' }}
+      SCP_HOST_TEMPLATE: ${{ vars.SCP_HOST_TEMPLATE }}
+      SCP_SERVICE_HOSTS: ${{ vars.SCP_SERVICE_HOSTS }}
+      SCP_BASE_URL: ${{ secrets.SCP_BASE_URL }}
+      SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
+      SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
+      SCP_PROJECT_ID: ${{ secrets.SCP_PROJECT_ID }}
+      SCP_AUTH_SCHEME: ${{ vars.SCP_AUTH_SCHEME || 'hmac' }}
+      SCP_TIMEOUT: ${{ vars.SCP_TIMEOUT || '20' }}
+      SCP_MAX_RETRIES: ${{ vars.SCP_MAX_RETRIES || '2' }}
+      # read-only probes don't need this; `status` sends empty bodies that fail
+      # validation pre-creation, so it opts into the mutation gate for itself.
+      SCP_PROBE_RUNTIME: "true"
+      SCP_ALLOW_MUTATIONS: "true"
+      SCP_ALLOW_DESTRUCTIVE: "false"
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Verify configuration
+        run: |
+          if [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
+            echo "::error::Missing SCP_ACCESS_KEY/SCP_SECRET_KEY in repo secrets."; exit 1
+          fi
+      - name: Run runtime probes
+        run: |
+          python tools/runtime_probes.py \
+            --probe "${{ github.event.inputs.probe }}" \
+            --category "${{ github.event.inputs.category }}" \
+            --limit "${{ github.event.inputs.limit }}" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-probes
+          path: |
+            reports/runtime_*.json
+            reports/csv/runtime_*.csv
