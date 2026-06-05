@@ -285,7 +285,22 @@ def test_crud_lifecycle(lifecycle, client, cfg):
             # condition, not a regression — tear down anything created so far and
             # skip, so the dashboard doesn't flag a false NEW regression.
             if resp.status not in expected and (
-                    "exceed-max-count" in resp.raw_text or "ExceedMax" in resp.raw_text):
+                    "exceed-max-count" in resp.raw_text or "ExceedMax" in resp.raw_text
+                    or "max-count-exceed" in resp.raw_text):
+                # If the quota limit is on an OPTIONAL group's step (e.g. private-dns
+                # max-count in the shared-networking lifecycle), skip only that group,
+                # NOT the whole lifecycle — otherwise the later probe-reads that record
+                # coverage for the families that DID provision (vpc/lb/gateways) never
+                # run. Only a quota limit on a non-optional (shared infra) step aborts.
+                if step.get("optional"):
+                    reason = f"{step['name']} -> {resp.status} (quota): {resp.raw_text[:300]}"
+                    print(f"  optional step '{step['name']}' (group={grp}) hit a quota "
+                          f"limit -> skipping group. {resp.raw_text[:200]}")
+                    if grp:
+                        failed_groups.add(grp)
+                        group_fail_reason.setdefault(grp, reason)
+                        _teardown_group(grp)
+                    continue
                 _teardown()
                 pytest.skip(
                     f"[{lifecycle['id']}] environmental quota limit at step "

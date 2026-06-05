@@ -119,6 +119,38 @@ def main() -> int:
     for it in _list(c, "vpc", "/v1/publicips", "regr"):
         if it.get("id") and _delete(c, "vpc", f"/v1/publicips/{it['id']}"):
             deleted += 1
+    # 3c. shared-networking lifecycle children with a regr* name. private-dns is
+    # the important one: a leaked regrpdns holds the scp-network.private-dns
+    # max-count quota, which makes the lifecycle's dns group skip every run. The
+    # transit-gateway (regrtgw) and load-balancers would also 409-block the vpc.
+    for it in _list(c, "dns", "/v1/private-dns", "regrpdns"):
+        if it.get("id") and _delete(c, "dns", f"/v1/private-dns/{it['id']}"):
+            deleted += 1
+            _wait_gone(c, "dns", f"/v1/private-dns/{it['id']}", 300, 15)
+    for it in _list(c, "dns", "/v1/hosted-zones", "regr"):
+        if it.get("id") and _delete(c, "dns", f"/v1/hosted-zones/{it['id']}"):
+            deleted += 1
+    for it in _list(c, "vpc", "/v1/transit-gateways", "regrtgw"):
+        if it.get("id") and _delete(c, "vpc", f"/v1/transit-gateways/{it['id']}"):
+            deleted += 1
+            _wait_gone(c, "vpc", f"/v1/transit-gateways/{it['id']}", 300, 15)
+    # load balancers + nat gateways have no regr name; delete any whose vpc_id
+    # matches a regr* vpc (the dedicated shared-networking vpc is short-lived, so
+    # anything in it is ours). These would otherwise 409-block the vpc delete.
+    regr_vpc_ids = {v["id"] for v in _list(c, "vpc", "/v1/vpcs", "regrvpc") if v.get("id")}
+    if regr_vpc_ids:
+        for svc, coll in (("loadbalancer", "/v1/loadbalancers"),
+                          ("vpc", "/v1/nat-gateways")):
+            try:
+                items = _items(c.get(coll, service=svc).body)
+            except Exception:
+                items = []
+            for it in items:
+                if (isinstance(it, dict) and it.get("id")
+                        and str(it.get("vpc_id")) in regr_vpc_ids):
+                    if _delete(c, svc, f"{coll}/{it['id']}"):
+                        deleted += 1
+                        _wait_gone(c, svc, f"{coll}/{it['id']}", 300, 15)
     # 4. vpcs — retry on 409 (lingering child), deleting any stray subnets first
     deleted_vpc_ids = []
     for it in _list(c, "vpc", "/v1/vpcs", "regrvpc"):
