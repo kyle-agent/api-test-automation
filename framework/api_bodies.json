@@ -1,4 +1,37 @@
 {
+  "ai-ml/cloud-ml/createcloudml": {
+    "analytics_resource": {
+      "cpu": 0,
+      "gpu": "",
+      "memory": 0
+    },
+    "application_resource": {
+      "cpu": 0,
+      "memory": 0
+    },
+    "cloud_ml_name": "aiml-test",
+    "cluster_id": "10a599e031e749b7b260868f441e862b",
+    "copilot": {
+      "cpu": 0,
+      "gpu": "",
+      "memory": 0
+    },
+    "custom_registry_access_key": "10a599e031e749b7b260868f441e862b",
+    "custom_registry_access_project_id": "10a599e031e749b7b260868f441e862b",
+    "custom_registry_access_region": "10a599e031e749b7b260868f441e862b",
+    "custom_registry_access_secret_key": "10a599e031e749b7b260868f441e862b",
+    "custom_registry_host": "10a599e031e749b7b260868f441e862b",
+    "description": "147@53A69a",
+    "domain_name": "147@53A69a",
+    "endpoint_type": "147@53A69a",
+    "image_id": "10a599e031e749b7b260868f441e862b",
+    "product_group_id": "10a599e031e749b7b260868f441e862b",
+    "tags": [],
+    "use_copilot": true
+  },
+  "ai-ml/cloud-ml/updatecloudml": {
+    "description": "147@53A69a"
+  },
   "compute/virtualserver/attachvirtualserversecuritygroup": {
     "security_group_id": "c09c3f05-03d9-443f-b27a-40e0f973c75f"
   },
@@ -619,6 +652,303 @@
     "vip_public_ip_id": "",
     "virtual_ip_address": ""
   },
+  "management/iam/accesskeycreate": {
+    "access_key_type": "PERMANENT",
+    "account_id": "f39c460fade34fecb05ede8f904b24b7",
+    "description": "description",
+    "duration": "P1Y2M10DT2H30M15S",
+    "parent_access_key_id": "92d6eid9e9ae4f868s842910k11573a3",
+    "passcode": "000000"
+  },
+  "management/iam/accesskeysendtemporaryotp": {
+    "locale": "ko_KR",
+    "method": "PHONE"
+  },
+  "management/iam/accesskeyset": {
+    "is_enabled": "true"
+  },
+  "management/iam/addgroupmember": {
+    "user_id": "f39c460fade34fecb05ede8f904b24b7"
+  },
+  "management/iam/addgrouppolicybinding": {
+    "policy_ids": [
+      "37f2e31ff86b415698d7e8eeafab445d"
+    ]
+  },
+  "management/iam/addpermission": {
+    "Action": [
+      "virtualserver:ShowVirtualServer"
+    ],
+    "Condition": {
+      "StringEquals": {
+        "scp:RequestedRegion": [
+          "kr-west1"
+        ]
+      }
+    },
+    "Effect": "Allow",
+    "NotAction": [],
+    "Principal": "*",
+    "Resource": [
+      "srn:dev2::1234567890102345690:kr-west1::virtualserver:virtual-server/abcde-1234-5555-6666"
+    ],
+    "Sid": "Statement1"
+  },
+  "management/iam/addrolepolicybindings": {
+    "policy_ids": [
+      ""
+    ]
+  },
+  "management/iam/adduserpolicybinding": {
+    "policy_ids": [
+      ""
+    ]
+  },
+  "management/iam/creategroup": {
+    "description": "Descriptions for group",
+    "name": "TestGroup",
+    "policy_ids": [
+      "37f2e31ff86b415698d7e8eeafab445d"
+    ],
+    "tags": [
+      {
+        "key": "company",
+        "value": "SDS"
+      }
+    ],
+    "user_ids": [
+      "f39c460fade34fecb05ede8f904b24b7"
+    ]
+  },
+  "management/iam/createiamuser": {
+    "description": "",
+    "group_ids": [
+      ""
+    ],
+    "password": "",
+    "policy_ids": [
+      ""
+    ],
+    "tags": [
+      ""
+    ],
+    "temporary_password": "",
+    "user_name": ""
+  },
+  "management/iam/createpolicy": {
+    "default_version_id": "c1b1fc611eb34eccbccfb563f77395ee",
+    "description": "Descriptions for policy",
+    "policy_category": "IDENTITY_BASED",
+    "policy_name": "PolicyName",
+    "policy_type": "USER_DEFINED",
+    "policy_version": {
+      "policy_document": {
+        "Statement": [
+          {
+            "Action": [
+              "iam:*"
+            ],
+            "Condition": {
+              "StringEquals": {
+                "scp:RequestedRegion": [
+                  "kr-west1"
+                ]
+              }
+            },
+            "Effect": "Allow",
+            "Principal": null,
+            "Resource": [
+              "*"
+            ],
+            "Sid": "Statement1"
+          }
+        ],
+        "Version": "2024-07-01"
+      },
+      "policy_id": "37f2e31ff86b415698d7e8eeafab445d",
+      "policy_version_id": "c1b1fc611eb34eccbccfb563f77395ee",
+      "policy_version_name": "PolicyVersion-1"
+    },
+    "service_type": "scp-iam",
+    "tags": [
+      {
+        "key": "foo",
+        "value": "bar"
+      }
+    ]
+  },
+  "management/iam/createrole": {
+    "account_id": "",
+    "assume_role_policy_document": {
+      "Statement": [
+        {
+          "Action": [
+            "sts:AssumeRole"
+          ],
+          "Condition": {},
+          "Effect": "Allow",
+          "Principal": "srn:e:1234:::iam:user/abc1234",
+          "Resource": [],
+          "Sid": "statement1"
+        }
+      ],
+      "Version": "2024-07-01"
+    },
+    "description": "",
+    "max_session_duration": 3600,
+    "name": "",
+    "policy_ids": [
+      "37f2e31ff86b415698d7e8eeafab445d"
+    ],
+    "principals": [
+      {
+        "type": "SRN",
+        "value": "srn:e:1234:::iam:user/abc1234"
+      }
+    ],
+    "role_type": "USER_DEFINED",
+    "tags": [
+      {
+        "key": "company",
+        "value": "SDS"
+      }
+    ]
+  },
+  "management/iam/createsamlprovider": {
+    "_raw": "{'key': 'company', 'value': 'SDS'}"
+  },
+  "management/iam/querypolicy": {
+    "excluded_policy_ids": [
+      "37f2e31ff86b415698d7e8eeafab445d"
+    ]
+  },
+  "management/iam/setgroup": {
+    "description": "Descriptions for group",
+    "name": "TestGroup"
+  },
+  "management/iam/setpermission": {
+    "Action": [
+      "virtualserver:ShowVirtualServer"
+    ],
+    "Condition": {
+      "StringEquals": {
+        "scp:RequestedRegion": [
+          "kr-west1"
+        ]
+      }
+    },
+    "Effect": "Allow",
+    "NotAction": [],
+    "Principal": "*",
+    "Resource": [
+      "srn:dev2::1234567890102345690:kr-west1::virtualserver:virtual-server/abcde-1234-5555-6666"
+    ],
+    "Sid": "Statement1"
+  },
+  "management/iam/setpolicy": {
+    "default_version_id": "c1b1fc611eb34eccbccfb563f77395ee",
+    "description": "Descriptions for policy",
+    "policy_name": "Policy1",
+    "policy_version": {
+      "policy_document": {
+        "Statement": [
+          {
+            "Action": [
+              "iam:*"
+            ],
+            "Condition": {
+              "StringEquals": {
+                "scp:RequestedRegion": [
+                  "kr-west1"
+                ]
+              }
+            },
+            "Effect": "Allow",
+            "Principal": null,
+            "Resource": [
+              "*"
+            ],
+            "Sid": "Statement1"
+          }
+        ],
+        "Version": "2024-07-01"
+      },
+      "policy_id": "37f2e31ff86b415698d7e8eeafab445d",
+      "policy_version_id": "c1b1fc611eb34eccbccfb563f77395ee",
+      "policy_version_name": "PolicyVersion-1"
+    }
+  },
+  "management/iam/setpolicygroupbinding": {
+    "add_ids": [
+      "a946662dc4314dac93da413a32457459"
+    ],
+    "identity_type": "GROUP",
+    "remove_ids": [
+      "a946662dc4314dac93da413a32457459"
+    ]
+  },
+  "management/iam/setresourcepolicy": {
+    "policy_version": {
+      "policy_document": {
+        "Statement": [
+          {
+            "Action": [
+              "virtualserver:ShowVirtualServer"
+            ],
+            "Condition": {
+              "StringEquals": {
+                "scp:RequestedRegion": [
+                  "kr-west1"
+                ]
+              }
+            },
+            "Effect": "Allow",
+            "Principal": "*",
+            "Resource": [
+              "srn:dev2::1234567890102345690:kr-west1::virtualserver:virtual-server/abcde-1234-5555-6666"
+            ],
+            "Sid": "Statement1"
+          }
+        ],
+        "Version": "2024-07-01"
+      },
+      "policy_id": "37f2e31ff86b415698d7e8eeafab445d",
+      "policy_version_id": "c1b1fc611eb34eccbccfb563f77395ee",
+      "policy_version_name": "PolicyVersion-1"
+    }
+  },
+  "management/iam/setrole": {
+    "description": "",
+    "max_session_duration": 3600
+  },
+  "management/iam/setroletrustpolicy": {
+    "assume_role_policy_document": {
+      "Statement": [
+        {
+          "Action": [
+            "sts:AssumeRole"
+          ],
+          "Condition": {},
+          "Effect": "Allow",
+          "Principal": "srn:e:1234:::iam:user/abc1234",
+          "Resource": [],
+          "Sid": "statement1"
+        }
+      ],
+      "Version": "2024-07-01"
+    }
+  },
+  "management/iam/setsamlprovider": {
+    "_raw": "{'key': 'company', 'value': 'SDS'}"
+  },
+  "management/iam/updateiamuser": {
+    "description": "",
+    "password_reuse_count": ""
+  },
+  "management/iam/updateiamuserpassword": {
+    "password": "",
+    "temporary_password": false
+  },
   "management/resourcemanager/createresourcegroup": {
     "description": "resource group 1",
     "name": "resource-group-1",
@@ -662,6 +992,458 @@
         }
       ]
     }
+  },
+  "management/servicewatch/createalert": {
+    "description": "Alert1 Description",
+    "dimension": {
+      "key": "InstanceId",
+      "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+    },
+    "dimensions": [],
+    "evaluation_count": 3,
+    "individual_items": [
+      {
+        "key": "VolumeID",
+        "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+      }
+    ],
+    "level": "HIGH",
+    "lower_bound": 80.0,
+    "metric_id": "d91097ac-0387-4e69-adb2-7b8d453b8db5",
+    "missing_data_option": "BREACHING",
+    "name": "Alert1",
+    "namespace_id": "d583a229-9766-4eb8-96c4-ec389902ba3d",
+    "operator": "RANGE",
+    "period": 300,
+    "recipient_ids": [
+      "1234da92-634a-4f8c-932e-9d650599ab1b",
+      "1234da92-634a-4f8c-932e-9d650599ab1a",
+      "1234da92-634a-4f8c-932e-9d650599ab1c"
+    ],
+    "statistic": "AVG",
+    "tags": [
+      {
+        "key": "key01",
+        "value": "value01"
+      }
+    ],
+    "threshold": 80.0,
+    "upper_bound": 90.0,
+    "violation_count": 2
+  },
+  "management/servicewatch/createcustomlogevents": {
+    "resourceLogs": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "log_stream_value",
+              "value": {
+                "stringValue": "a1e2f3045678901a2b3c4d5e6f7a8b81"
+              }
+            },
+            {
+              "key": "log_group_value",
+              "value": {
+                "stringValue": "b1e2f3045678901a2b3c4d5e6f7a8b81"
+              }
+            },
+            {
+              "key": "account_id",
+              "value": {
+                "stringValue": "c1e2f3045678901a2b3c4d5e6f7a8b81"
+              }
+            }
+          ]
+        },
+        "scopeLogs": [
+          {
+            "logRecords": [
+              {
+                "body": {
+                  "stringValue": "level=info otlp test log"
+                },
+                "timeUnixNano": "1762336464000000000"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "management/servicewatch/createcustomlogstream": {
+    "log_group_name": "testlg01",
+    "log_stream_name": "testls01"
+  },
+  "management/servicewatch/createcustommetricmetas": {
+    "metricMetas": [
+      {
+        "descriptionEn": "filestorage volume total byte",
+        "descriptionKo": "파일스토리지 총 바이트 수",
+        "dimensions": [
+          [
+            "image_id"
+          ]
+        ],
+        "metricName": "Custom_filestorage_volume_total_byte",
+        "storageResolution": 60,
+        "unit": "Bytes"
+      }
+    ],
+    "namespace": "MyCustom/filestorage"
+  },
+  "management/servicewatch/createcustommetrics": {
+    "resource_metrics": [
+      {
+        "resource": {
+          "attributes": [
+            {
+              "key": "",
+              "value": {
+                "array_value": "",
+                "bool_value": "",
+                "byte_value": "",
+                "double_value": "",
+                "int_value": "",
+                "kvlist_value": "",
+                "string_value": ""
+              }
+            }
+          ]
+        },
+        "scope_metrics": [
+          {
+            "metrics": [
+              {
+                "description": "The total number of bytes read successfully.",
+                "gauge": {
+                  "data_points": [
+                    {
+                      "as_double": 0.75,
+                      "as_int": 10,
+                      "attributes": [
+                        {
+                          "key": "",
+                          "value": {
+                            "array_value": "",
+                            "bool_value": "",
+                            "byte_value": "",
+                            "double_value": "",
+                            "int_value": "",
+                            "kvlist_value": "",
+                            "string_value": ""
+                          }
+                        }
+                      ],
+                      "start_time_unix_nano": "1753776789854000000",
+                      "time_unix_nano": "1753776789854000000"
+                    }
+                  ]
+                },
+                "name": "node_disk_read_bytes_total",
+                "sum": {
+                  "aggregation_temporality": "2",
+                  "data_points": [
+                    {
+                      "as_double": 0.75,
+                      "as_int": 10,
+                      "attributes": [
+                        {
+                          "key": "",
+                          "value": {
+                            "array_value": "",
+                            "bool_value": "",
+                            "byte_value": "",
+                            "double_value": "",
+                            "int_value": "",
+                            "kvlist_value": "",
+                            "string_value": ""
+                          }
+                        }
+                      ],
+                      "start_time_unix_nano": "1753776789854000000",
+                      "time_unix_nano": "1753776789854000000"
+                    }
+                  ],
+                  "is_monotonic": true
+                },
+                "unit": "Bytes"
+              }
+            ],
+            "scope": {
+              "name": "ServiceWatch-Agent",
+              "version": "1.0.0"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "management/servicewatch/createdashboard": {
+    "name": "New-Monitoring-Dashboard",
+    "widgets": [
+      {
+        "height": 1,
+        "order": 1,
+        "properties": {
+          "metrics": [
+            {
+              "color": "#ff7f0e",
+              "dimensions": [
+                {
+                  "key": "InstanceId",
+                  "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+                }
+              ],
+              "display_name": "EC2-Prod-CPU",
+              "individual_items": [
+                {
+                  "key": "BucketId",
+                  "value": "b-1234567890abcdef0"
+                }
+              ],
+              "name": "CPUUtilization",
+              "namespace_name": "Virtual Server",
+              "period": 300,
+              "statistic_type": "AVG"
+            }
+          ],
+          "period": 300,
+          "stacked": false,
+          "statistic_type": "AVG",
+          "title": "Virtual Server | CPU Utilization",
+          "view": "line"
+        },
+        "type": "metric",
+        "width": 1
+      }
+    ]
+  },
+  "management/servicewatch/createeventrule": {
+    "description": "Event rule 1 description",
+    "event_ids": [
+      "014cb88ca2a9420e840d5c9ac16cac89",
+      "28520cbbc8c54a3f86f513a9695e6481",
+      "29f97b569020491ca63d37e27b2c7fec",
+      "3339ebd5839e41c982a81803431f6932",
+      "3fb112a5708f44549878c7de7159922d"
+    ],
+    "name": "Event rule 1",
+    "recipient_ids": [
+      "947c6a8559434505b28a5e21fff463d0",
+      "aa57f19630b347f0b294f189acd098a7",
+      "bc086de26abc4ea2b3e1322b14c013f3",
+      "4af4507824924a7a9988a7bd3bd09bb7",
+      "c0e4f5d4b0cf4dc5b8f6f915602949d5"
+    ],
+    "resource_type_id": "596bf16709e84e27b7df397bf59b877c",
+    "service_id": "2778de83d7e247609445bbd570a4eba9",
+    "srn_list": [
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/a58c8645928043a6868277c7d7fef11a",
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/1fd94ff609dd40b3a873b306432059df",
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/a23783834c7c4fd29b015632811b9a76",
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/704c0b21e1be44ba82a552d751d282d2",
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/63b5ea57e1254dfaa934cd76aaf3aade"
+    ],
+    "tags": [
+      {
+        "key": "key01",
+        "value": "value01"
+      },
+      {
+        "key": "key02",
+        "value": "value02"
+      }
+    ]
+  },
+  "management/servicewatch/createloggroup": {
+    "name": "testlg01",
+    "retention_period": 365,
+    "tags": [
+      {
+        "key": "key01",
+        "value": "value01"
+      },
+      {
+        "key": "key02",
+        "value": "value02"
+      }
+    ]
+  },
+  "management/servicewatch/createloggrouplogstream": {
+    "name": "testls01"
+  },
+  "management/servicewatch/downloadmetricdataimage": {
+    "end": 1640995440,
+    "height": 400,
+    "metrics": [
+      {
+        "color": "#0000ff",
+        "dimensions": [
+          {
+            "key": "VolumeID",
+            "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+          }
+        ],
+        "display_name": "Virtual Server | VirtualServer001 | CPU Usage/Core[Basic]",
+        "name": "CPU Usage/Core[Basic]",
+        "namespace_name": "Virtual Server",
+        "period": 300,
+        "statistic_type": "AVG"
+      }
+    ],
+    "period": 300,
+    "start": 1640995200,
+    "statistic_type": "AVG",
+    "timezone": "UTC",
+    "title": "Virtual Server Metric Chart",
+    "width": 600
+  },
+  "management/servicewatch/listmetricdata": {
+    "end": 1640995440,
+    "metrics": [
+      {
+        "dimensions": [
+          {
+            "key": "VolumeID",
+            "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+          }
+        ],
+        "display_name": "Virtual Server | VirtualServer001 | CPU Usage/Core[Basic]",
+        "name": "CPU Usage/Core[Basic]",
+        "namespace_name": "Virtual Server",
+        "period": 300,
+        "statistic_type": "AVG"
+      }
+    ],
+    "period": 300,
+    "start": 1640995200,
+    "statistic_type": "AVG"
+  },
+  "management/servicewatch/listmetricinfos": {
+    "metric_name": "CPU Usage/Core[Basic]",
+    "namespaces": [
+      {
+        "dimensions": "[[\"resource_id\"]]",
+        "name": "Virtual Server"
+      }
+    ],
+    "resource_id": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502",
+    "resource_name": "VirtualServer01",
+    "tags": [
+      {
+        "key": "key01",
+        "value": "value01"
+      }
+    ]
+  },
+  "management/servicewatch/setalert": {
+    "dimension": {
+      "key": "InstanceId",
+      "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+    },
+    "dimensions": [],
+    "evaluation_count": 3,
+    "individual_items": [
+      {
+        "key": "VolumeID",
+        "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+      }
+    ],
+    "level": "HIGH",
+    "lower_bound": 80.0,
+    "metric_id": "d91097ac-0387-4e69-adb2-7b8d453b8db5",
+    "missing_data_option": "BREACHING",
+    "namespace_id": "d583a229-9766-4eb8-96c4-ec389902ba3d",
+    "operator": "RANGE",
+    "period": 300,
+    "statistic": "AVG",
+    "threshold": 80.0,
+    "upper_bound": 90.0,
+    "violation_count": 2
+  },
+  "management/servicewatch/setalertactivated": {
+    "activated_yn": "Y"
+  },
+  "management/servicewatch/setalertdescription": {
+    "description": "Alert1 Description"
+  },
+  "management/servicewatch/setdashboard": {
+    "name": "Renamed-Dashboard",
+    "widgets": [
+      {
+        "height": 1,
+        "order": 1,
+        "properties": {
+          "metrics": [
+            {
+              "color": "#ff7f0e",
+              "dimensions": [
+                {
+                  "key": "InstanceId",
+                  "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+                }
+              ],
+              "display_name": "EC2-Prod-CPU",
+              "individual_items": [
+                {
+                  "key": "BucketId",
+                  "value": "b-1234567890abcdef0"
+                }
+              ],
+              "name": "CPUUtilization",
+              "namespace_name": "Virtual Server",
+              "period": 300,
+              "statistic_type": "AVG"
+            }
+          ],
+          "period": 300,
+          "stacked": false,
+          "statistic_type": "AVG",
+          "title": "Virtual Server | CPU Utilization",
+          "view": "line"
+        },
+        "type": "metric",
+        "width": 1
+      }
+    ]
+  },
+  "management/servicewatch/seteventrule": {
+    "active_yn": "Y",
+    "description": "Event rule 1 description",
+    "event_ids": [
+      "014cb88ca2a9420e840d5c9ac16cac89",
+      "28520cbbc8c54a3f86f513a9695e6481",
+      "29f97b569020491ca63d37e27b2c7fec",
+      "3339ebd5839e41c982a81803431f6932",
+      "3fb112a5708f44549878c7de7159922d"
+    ],
+    "none_attributes": [
+      "description",
+      "resource_type_id",
+      "event_ids",
+      "srn_list",
+      "recipient_ids"
+    ],
+    "recipient_ids": [
+      "947c6a8559434505b28a5e21fff463d0",
+      "aa57f19630b347f0b294f189acd098a7",
+      "bc086de26abc4ea2b3e1322b14c013f3",
+      "4af4507824924a7a9988a7bd3bd09bb7",
+      "c0e4f5d4b0cf4dc5b8f6f915602949d5"
+    ],
+    "resource_type_id": "596bf16709e84e27b7df397bf59b877c",
+    "service_id": "2778de83d7e247609445bbd570a4eba9",
+    "srn_list": [
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/a58c8645928043a6868277c7d7fef11a",
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/1fd94ff609dd40b3a873b306432059df",
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/a23783834c7c4fd29b015632811b9a76",
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/704c0b21e1be44ba82a552d751d282d2",
+      "srn:dev2::1bcf39b344ac41cbaf0466ff0d2bebad:kr-west1::servicewatch:event-rule/63b5ea57e1254dfaa934cd76aaf3aade"
+    ]
+  },
+  "management/servicewatch/setloggroup": {
+    "retention_period": 365
   },
   "networking/dns/activateprivatedns": {
     "name": "private-dns01"
@@ -747,6 +1529,176 @@
   "networking/dns/transferpublicdomainname": {
     "target_account_id": "003dffc50eb123a1cbf4f2e5c71d4f15",
     "type": "REQUEST"
+  },
+  "networking/loadbalancer/addlbservergroupmembers": {
+    "members": [
+      {
+        "member_ip": "192.168.0.1",
+        "member_port": 80,
+        "member_state": "ENABLE",
+        "member_weight": 100,
+        "name": "virtualserver-1",
+        "object_id": "1",
+        "object_type": "VM"
+      }
+    ]
+  },
+  "networking/loadbalancer/createlbhealthcheck": {
+    "lb_health_check": {
+      "description": "this is an lb server group",
+      "health_check_count": 3,
+      "health_check_interval": 5,
+      "health_check_port": 80,
+      "health_check_timeout": 5,
+      "health_check_url": "/test",
+      "http_method": "GET",
+      "name": "ServerGroup01",
+      "protocol": "TCP",
+      "request_data": "username=admin&password=1234",
+      "response_code": "200",
+      "subnet_id": "60fba45cb6c811efba41ba92e4fe7200",
+      "tags": [],
+      "vpc_id": "8acceeb6920c4fc494490d864f67f0b5"
+    }
+  },
+  "networking/loadbalancer/createlblistener": {
+    "listener": {
+      "condition_type": "URL_PATH",
+      "description": "",
+      "hsts_max_age": "",
+      "https_redirection": {
+        "port": "",
+        "protocol": "",
+        "response_code": ""
+      },
+      "idle_timeout": "",
+      "insert_client_ip": "",
+      "loadbalancer_id": "",
+      "name": "",
+      "persistence": "",
+      "protocol": "TCP",
+      "response_timeout": "",
+      "routing_action": "LB_SERVER_GROUP",
+      "server_group_id": "",
+      "service_port": "",
+      "session_duration_time": "",
+      "sni_certificate": [
+        {
+          "domain_name": "",
+          "not_after_dt": "",
+          "sni_cert_id": ""
+        }
+      ],
+      "ssl_certificate": {
+        "client_cert_id": "",
+        "client_cert_level": "",
+        "server_cert_level": ""
+      },
+      "support_http2": false,
+      "tags": [],
+      "url_handler": "",
+      "url_redirection": "",
+      "x_forwarded_for": "",
+      "x_forwarded_port": "",
+      "x_forwarded_proto": ""
+    }
+  },
+  "networking/loadbalancer/createlbservergroup": {
+    "lb_server_group": {
+      "description": "this is an lb server group",
+      "lb_health_check_id": "46c681018e33453085ca7c8db54e0076",
+      "lb_method": "ROUND_ROBIN",
+      "name": "ServerGroup01",
+      "protocol": "TCP",
+      "subnet_id": "60fba45cb6c811efba41ba92e4fe7200",
+      "tags": [],
+      "vpc_id": "8acceeb6920c4fc494490d864f67f0b5"
+    }
+  },
+  "networking/loadbalancer/createloadbalancer": {
+    "loadbalancer": {
+      "description": "",
+      "firewall_enabled": true,
+      "firewall_logging_enabled": true,
+      "health_check_ip_1": "",
+      "health_check_ip_2": "",
+      "layer_type": "",
+      "name": "",
+      "publicip_id": "",
+      "service_ip": "",
+      "source_nat_ip": "",
+      "subnet_id": "",
+      "tags": [],
+      "vpc_id": ""
+    }
+  },
+  "networking/loadbalancer/createloadbalancerprivatenatip": {
+    "static_nat": {
+      "private_nat_id": "",
+      "private_nat_ip_id": ""
+    }
+  },
+  "networking/loadbalancer/createloadbalancerpublicnatip": {
+    "static_nat": {
+      "publicip_id": ""
+    }
+  },
+  "networking/loadbalancer/setlbhealthcheck": {
+    "lb_health_check": {
+      "description": "this is an lb server group",
+      "health_check_count": 3,
+      "health_check_interval": 5,
+      "health_check_port": 80,
+      "health_check_timeout": 5,
+      "health_check_url": "/test",
+      "http_method": "GET",
+      "protocol": "TCP",
+      "request_data": "username=admin&password=1234",
+      "response_code": "200"
+    }
+  },
+  "networking/loadbalancer/setlblistener": {
+    "listener": {
+      "condition_type": "URL_PATH",
+      "description": "",
+      "hsts_max_age": "",
+      "https_redirection": {
+        "port": "",
+        "protocol": "",
+        "response_code": ""
+      },
+      "idle_timeout": "",
+      "insert_client_ip": "",
+      "persistence": "",
+      "response_timeout": "",
+      "server_group_id": "",
+      "session_duration_time": "",
+      "sni_certificate": [
+        {
+          "domain_name": "",
+          "not_after_dt": "",
+          "sni_cert_id": ""
+        }
+      ],
+      "ssl_certificate": {
+        "client_cert_id": "",
+        "client_cert_level": "",
+        "server_cert_level": ""
+      },
+      "support_http2": "",
+      "url_handler": "",
+      "url_redirection": "",
+      "x_forwarded_for": "",
+      "x_forwarded_port": "",
+      "x_forwarded_proto": ""
+    }
+  },
+  "networking/loadbalancer/setlbservergroup": {
+    "lb_server_group": {
+      "description": "this is an lb server group",
+      "lb_health_check_id": "46c681018e33453085ca7c8db54e0076",
+      "lb_method": "ROUND_ROBIN"
+    }
   },
   "networking/vpc/createnatgateway": {
     "description": "VpcEndpoint Description",
@@ -952,6 +1904,100 @@
   },
   "security/secretsmanager/updatesecretsmanagersecretvalue": {
     "secret_value": "{\"key1\":\"value1\",\"key2\":\"value2\"}"
+  },
+  "storage/backup/createbackup": {
+    "dr_enabled": false,
+    "encrypt_enabled": true,
+    "filesystem_paths": [
+      "/aaa",
+      "/bbb"
+    ],
+    "is_all_filesystem": false,
+    "name": "backup-001",
+    "policy_category": "AGENTLESS",
+    "policy_type": "VM_IMAGE",
+    "region": "kr-west1",
+    "retention_period": "WEEK_2",
+    "schedules": [
+      {
+        "frequency": "DAILY",
+        "start_day": "MON",
+        "start_time": "09:00:00",
+        "start_week": "WEEK_2",
+        "type": "FULL"
+      }
+    ],
+    "server_category": "VIRTUAL_SERVER | GPU_SERVER | BAREMETAL_SERVER",
+    "server_guid": "9ab33c66-3dbd-46cd-b0af-abccd3eb3170",
+    "server_uuid": "89f5ef44-1021-4a5c-8e06-fbb289eac366",
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ]
+  },
+  "storage/backup/createbackupagent": {
+    "server_uuid": "89f5ef44-1021-4a5c-8e06-fbb289eac366",
+    "subnet_id": "023c57b14f11483689338d085e061492",
+    "tags": [
+      {
+        "key": "",
+        "value": ""
+      }
+    ]
+  },
+  "storage/backup/manualbackup": {
+    "_raw": "{backup_id}"
+  },
+  "storage/backup/restoreagentbackup": {
+    "filesystem_paths": [
+      {
+        "destination": "/",
+        "source": "/"
+      }
+    ],
+    "overwrite": true,
+    "restore_server_uuid": "89f5ef44-1021-4a5c-8e06-fbb289eac366",
+    "restore_target_id": "ca1a8e76-af49-40ea-93f8-a5989ffe138b"
+  },
+  "storage/backup/restorebackup": {
+    "networks": [
+      {
+        "subnet_id": "023c57b14f11483689338d085e061492"
+      }
+    ],
+    "restore_region": "kr-west1",
+    "restore_server_name": "restoretest1",
+    "restore_target_id": "ca1a8e76-af49-40ea-93f8-a5989ffe138b",
+    "security_groups": [
+      "023c57b14f11483689338d085e061492"
+    ],
+    "server_type_id": "s1v1m2"
+  },
+  "storage/backup/setbackupschedules": {
+    "schedules": [
+      {
+        "frequency": "DAILY",
+        "start_day": "MON",
+        "start_time": "09:00:00",
+        "start_week": "WEEK_2",
+        "type": "FULL"
+      }
+    ]
+  },
+  "storage/backup/setfilesystempath": {
+    "backup_filesystem_paths": [
+      "/aaa",
+      "/bbb"
+    ],
+    "is_all_filesystem": false
+  },
+  "storage/backup/updatereplicationuse": {
+    "dr_enabled": false
+  },
+  "storage/backup/updateretentionperiod": {
+    "retention_period": "WEEK_2"
   },
   "storage/baremetal-blockstorage/createvolume": {
     "attachments": [
