@@ -61,6 +61,44 @@ def _wait_gone(client, service, path, timeout=150, interval=10):
     return False
 
 
+def _purge_vpc_children(client, vid):
+    """Delete EVERY child of a known-ours VPC by vpc_id, name-agnostic — for the
+    stubborn leaked VPCs whose 409 blocker is NOT a regr/zznet-named resource
+    (e.g. a port auto-created by an LB / NAT gateway). LB + NAT + internet gateways
+    first (they own ports), then any remaining ports, then subnets after clearing
+    their VIPs. Safe because we only call this for our own regr*/zznet* VPCs."""
+    n = 0
+    for svc, coll in (("loadbalancer", "/v1/loadbalancers"),
+                      ("vpc", "/v1/nat-gateways"),
+                      ("vpc", "/v1/internet-gateways"),
+                      ("vpc", "/v1/ports")):
+        try:
+            items = _items(client.get(coll, service=svc).body)
+        except Exception:
+            continue
+        for it in items:
+            if isinstance(it, dict) and it.get("id") and str(it.get("vpc_id")) == vid:
+                if _delete(client, svc, f"{coll}/{it['id']}"):
+                    n += 1
+                    _wait_gone(client, svc, f"{coll}/{it['id']}", 180, 10)
+    try:
+        subs = _items(client.get("/v1/subnets", service="vpc").body)
+    except Exception:
+        subs = []
+    for sn in subs:
+        if isinstance(sn, dict) and sn.get("id") and str(sn.get("vpc_id")) == vid:
+            try:
+                for vip in _items(client.get(f"/v1/subnets/{sn['id']}/vips", service="vpc").body):
+                    if isinstance(vip, dict) and vip.get("id"):
+                        _delete(client, "vpc", f"/v1/subnets/{sn['id']}/vips/{vip['id']}")
+            except Exception:
+                pass
+            if _delete(client, "vpc", f"/v1/subnets/{sn['id']}"):
+                n += 1
+                _wait_gone(client, "vpc", f"/v1/subnets/{sn['id']}", 120, 10)
+    return n
+
+
 def main() -> int:
     settings.require_credentials()
     c = ApiClient(settings)
@@ -162,21 +200,9 @@ def main() -> int:
             print(f"  delete vpc {it['name']} ({vid}) -> {st}")
             if st in (200, 202, 204):
                 deleted += 1; deleted_vpc_ids.append(vid); break
-            if st == 409:  # children remain — delete this vpc's regr* subnets, retry
-                for sn in _items(c.get("/v1/subnets", service="vpc").body):
-                    if (isinstance(sn, dict) and sn.get("id")
-                            and str(sn.get("vpc_id")) == vid
-                            and str(sn.get("name", "")).startswith(("regrsub", "zznetsub"))):
-                        # a leaked subnet-VIP (subnetvip-create that never tore down)
-                        # 409-blocks the subnet delete — and thus this VPC; clear first.
-                        try:
-                            for vip in _items(c.get(f"/v1/subnets/{sn['id']}/vips", service="vpc").body):
-                                if isinstance(vip, dict) and vip.get("id"):
-                                    _delete(c, "vpc", f"/v1/subnets/{sn['id']}/vips/{vip['id']}")
-                        except Exception:
-                            pass
-                        _delete(c, "vpc", f"/v1/subnets/{sn['id']}")
-                        _wait_gone(c, "vpc", f"/v1/subnets/{sn['id']}", 120, 10)
+            if st == 409:  # children remain — purge ALL of this vpc's children
+                # (name-agnostic, by vpc_id) to catch un-prefixed leaks, then retry.
+                deleted += _purge_vpc_children(c, vid)
                 time.sleep(10)
                 continue
             break
