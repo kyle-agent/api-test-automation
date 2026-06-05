@@ -42,20 +42,30 @@ sys.path.insert(0, str(ROOT))
 DOCS = ROOT / "framework" / "api_docs.json"
 OUT = ROOT / "reports" / "validation_probe.json"
 
-# Does the error name a field? a field token, a quoted field, or a JSON path.
-NAMES_FIELD = re.compile(
-    r"\bfield\b\s*[\"']?[a-z_][a-z0-9_]*"
-    r"|[\"'][a-z_][a-z0-9_.]*[\"']\s*(is|must|required|invalid|cannot|should)"
-    r"|\$\.[a-z_]"
-    r"|\"field\"\s*:\s*\"[a-z_]",
-    re.IGNORECASE,
-)
+# Does the error name the offending field? SCP wraps the field name in *escaped*
+# quotes inside the JSON detail string (e.g.  Field \"name\" is invalid), so allow
+# optional backslashes around the quotes.
+NAMES_FIELD = re.compile(r'[Ff]ield\s*\\*"?[a-z_][a-z0-9_]*'      # Field \"name\"
+                         r'|\\*"[a-z_][a-z0-9_.]*\\*"\s*(is|must|required|invalid|should)'
+                         r'|"field"\s*:\s*\\*"[a-z_]', re.IGNORECASE)
+# Does it at least state the constraint rule (length / charset / regex / type)?
+RULE = re.compile(r"\d+\s*(to|~|-)\s*\d+|characters|digits|should have|should be|"
+                  r"must be|\^\[|hyphens|lowercase|uppercase|required|valid Type", re.IGNORECASE)
+# Useless: a bare placeholder that names neither the field nor the rule.
+OPAQUE = re.compile(r"value_error|InvalidInputValue|Invalid input data", re.IGNORECASE)
 
 
 def classify(status: int, body: str) -> str:
     if status != 400:
         return "other"
-    return "names_field" if NAMES_FIELD.search(body or "") else "field_less"
+    body = body or ""
+    if OPAQUE.search(body) and not NAMES_FIELD.search(body):
+        return "opaque"                      # neither field nor rule (worst)
+    if NAMES_FIELD.search(body):
+        return "names_field"                 # structured field (often + rule)
+    if RULE.search(body):
+        return "rule_in_prose"               # rule stated, but no structured field
+    return "opaque"
 
 
 def targets(docs, category):
@@ -103,7 +113,7 @@ def main() -> int:
     if args.limit:
         tgts = tgts[: args.limit]
 
-    results, tally = [], {"names_field": 0, "field_less": 0, "other": 0}
+    results, tally = [], {"names_field": 0, "rule_in_prose": 0, "opaque": 0, "other": 0}
     for k, e in tgts:
         try:
             resp = client.request("POST", e["path"], json={}, service=e["service"])
@@ -125,24 +135,19 @@ def main() -> int:
                               indent=2, ensure_ascii=False))
 
     # --- Markdown summary (stdout; CI appends to the job summary) -------------
-    fl = [r for r in results if r["verdict"] == "field_less"]
-    nf = [r for r in results if r["verdict"] == "names_field"]
+    op = [r for r in results if r["verdict"] == "opaque"]
     print("## RUNTIME validation probe (empty body → 400)\n")
     print(f"- probed **{len(tgts)}** create (POST) operations with required fields")
-    print(f"- ✅ names the field: **{tally['names_field']}**")
-    print(f"- ❌ field-less 400 (caller can't tell which field): **{tally['field_less']}**")
-    print(f"- ⚠️ other (non-400): **{tally['other']}**\n")
-    if fl:
-        print("### Field-less 400s (the problem)\n")
-        print("| Endpoint | sample error body |\n|---|---|")
-        for r in fl[:60]:
-            body = (r.get("body") or "").replace("\n", " ").replace("|", "\\|")[:160]
+    print(f"- ✅ names the offending field (structured): **{tally['names_field']}**")
+    print(f"- 🟡 states the rule in prose only: **{tally['rule_in_prose']}**")
+    print(f"- ❌ OPAQUE — neither field nor rule: **{tally['opaque']}**")
+    print(f"- ⚠️ other (non-400: auth/routing): **{tally['other']}**\n")
+    if op:
+        print("### OPAQUE 400s — caller can't tell field OR rule (the real problem)\n")
+        print("| Endpoint | error body |\n|---|---|")
+        for r in op:
+            body = (r.get("body") or r.get("error") or "").replace("\n", " ").replace("|", "\\|")[:160]
             print(f"| `{r['endpoint']}` | {body} |")
-    if nf:
-        print(f"\n<details><summary>{len(nf)} that DO name the field</summary>\n")
-        for r in nf:
-            print(f"- `{r['endpoint']}`")
-        print("\n</details>")
     print(f"\n_wrote {OUT}_")
     return 0
 
