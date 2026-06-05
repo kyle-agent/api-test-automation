@@ -102,7 +102,31 @@ def _single_param_get_chains():
     return out
 
 
+def _two_param_get_chains():
+    """Every GET with exactly two path params, paired with the two lists that feed
+    them: the parent collection for param1 (prefix before the first '{'), and the
+    sub-collection template for param2 (everything up to the second '{', still
+    holding {param1}). E.g. /v1/apis/{api_id}/resources/{resource_id} ->
+    list1=/v1/apis, sublist=/v1/apis/{api_id}/resources. Scoped by _CHAIN_SERVICES."""
+    out = []
+    svc_filter = set(_CHAIN_SERVICES) if _CHAIN_SERVICES else None
+    for e in endpoints(method="GET", resolved_only=True):
+        if svc_filter and e.service not in svc_filter:
+            continue
+        params = _PLACEHOLDER.findall(e.http_path)
+        if len(params) != 2:
+            continue
+        prefix1 = e.http_path.split("{", 1)[0].rstrip("/")
+        second_open = e.http_path.index("{", e.http_path.index("}"))
+        sublist_tmpl = e.http_path[:second_open].rstrip("/")
+        if not prefix1 or not sublist_tmpl:
+            continue
+        out.append((e, params[0], prefix1, params[1], sublist_tmpl))
+    return out
+
+
 _CHAINS = _single_param_get_chains()
+_CHAINS_2P = _two_param_get_chains()
 
 
 @pytest.fixture(scope="session")
@@ -148,3 +172,54 @@ def test_read_chain(endpoint, param, list_path, client, _list_cache):
     # Record-only (matches CRUD probe_reads): a 4xx/5xx on a derived read is
     # surfaced on the dashboard, not asserted here, so bonus coverage can never
     # by itself turn the regression check red.
+
+
+def _derive_id(client, cache, service, list_path, param):
+    """List `list_path` (cached) and return the first usable `param` id, or a
+    (None, skip_reason) pair. Mirrors the 1-param derivation."""
+    ck = (service, list_path)
+    if ck not in cache:
+        try:
+            cache[ck] = client.get(list_path, service=service)
+        except Exception as exc:
+            cache[ck] = exc
+    lst = cache[ck]
+    if isinstance(lst, Exception):
+        return None, f"list {list_path} unreachable: {lst}"
+    if not lst.ok:
+        return None, f"list {list_path} -> {lst.status}; no id to derive"
+    rid = next((_id_from(it, param) for it in _list_items(lst.body)
+                if _id_from(it, param)), None)
+    if rid is None:
+        return None, f"no {param} available from {list_path} (empty/no id field)"
+    return rid, None
+
+
+@pytest.mark.parametrize(
+    "endpoint,p1,list1,p2,sublist_tmpl",
+    _CHAINS_2P,
+    ids=[e.key for e, *_ in _CHAINS_2P] or ["none"],
+)
+def test_read_chain_2p(endpoint, p1, list1, p2, sublist_tmpl, client, _list_cache):
+    """Two-level derive: param1 from the parent list, then param2 from the
+    sub-list (with param1 filled), then exercise the two-param show GET. Covers
+    nested reads (e.g. /v1/apis/{api_id}/resources/{resource_id}) whenever both
+    parent and child resources exist, with zero resource creation."""
+    id1, why = _derive_id(client, _list_cache, endpoint.service, list1, p1)
+    if id1 is None:
+        pytest.skip(why)
+    sublist = sublist_tmpl.replace("{%s}" % p1, id1)
+    id2, why = _derive_id(client, _list_cache, endpoint.service, sublist, p2)
+    if id2 is None:
+        pytest.skip(why)
+
+    path = endpoint.http_path.replace("{%s}" % p1, id1).replace("{%s}" % p2, id2)
+    try:
+        resp = client.get(path, service=endpoint.service)
+    except Exception as exc:
+        _record_smoke(0, "fail", endpoint.key, "GET", endpoint.http_path)
+        pytest.skip(f"{path} unreachable: {exc}")  # record-only; never break the gate
+
+    cat = _categorize(resp.status, getattr(resp, "raw_text", ""))
+    _record_smoke(resp.status, cat, endpoint.key, "GET", endpoint.http_path)
+    # Record-only, exactly like test_read_chain above.
