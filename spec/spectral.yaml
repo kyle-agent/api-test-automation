@@ -1,0 +1,15 @@
+# Ruleset for linting the LOCALLY-GENERATED OpenAPI snapshot of the SCP API
+# Reference (data/openapi/*.json). We extend Spectral's core OAS rules but
+# disable the ones that would only flag artifacts of OUR generation (missing
+# info.contact/license/servers, summaries) rather than genuine source-doc issues.
+extends: ["spectral:oas"]
+rules:
+  info-contact: off
+  info-license: off
+  license-url: off
+  oas3-api-servers: off
+  operation-tag-defined: off
+  info-description: off
+  operation-description: off      # source descriptions live in description; summary is derived
+  operation-tags: off
+  contact-properties: off

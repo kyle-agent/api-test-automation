@@ -1,13 +1,21 @@
 """AXIS 2 — RUNTIME probes (behavior findings).
 
-Ports ``tools/runtime_probes.py`` + ``tools/probe_validation.py``. These probes
-call the live gateway to surface design/implementation defects, but are
-**non-destructive**:
+Ports ``tools/runtime_probes.py`` + ``tools/probe_validation.py`` +
+``tools/probe_schema_live.py``. These probes call the live gateway to surface
+design/implementation defects. All probes are **non-destructive by default**:
 
-  * ``schema`` / ``notfound`` / ``errors`` are pure GETs.
-  * ``status`` and the validation probe send an *empty* ``{}`` body to create /
-    update ops that have >=1 required field, so the request fails validation
-    (expected 400) *before* anything is created — no billable resource is made.
+  * ``schema`` / ``notfound`` / ``errors`` / ``pagination`` / ``options`` are
+    pure reads (GET / OPTIONS).
+  * ``status``, the ``validation`` probe and ``l10n`` send an *empty* ``{}`` body
+    to create / update ops that have >=1 required field, so the request fails
+    validation (expected 400) *before* anything is created — no billable resource
+    is made.
+  * ``schema-live`` is the one probe that creates real resources: it is
+    double-gated (needs ``SCP_ALLOW_MUTATIONS=true`` AND
+    ``SCP_ALLOW_DESTRUCTIVE=true``), reuses the proven CRUD lifecycles, and tears
+    every created resource down in reverse on completion and on failure. It
+    self-skips (creating nothing) unless both gates are set. See
+    :mod:`conformance.schema_live`.
   * mutating verbs stay double-gated behind the env flags below plus the client's
     own ``SCP_ALLOW_MUTATIONS`` gate.
 
@@ -554,9 +562,23 @@ def main() -> int:
             return
         probe_validation(client, docs, limit, category, sleep=args.sleep)
 
+    # schema-live is double-gated (creates + tears down real resources) and lives
+    # in the conformance.schema_live helper; it reuses the CRUD lifecycles.
+    def _run_schema_live(client, docs, limit, category):
+        if not (cfg.allow_mutations and cfg.allow_destructive):
+            print("Skipping schema-live probe: set SCP_ALLOW_MUTATIONS=true and "
+                  "SCP_ALLOW_DESTRUCTIVE=true (creates + tears down real resources).")
+            return
+        from conformance.schema_live import probe_schema_live
+        probe_schema_live(client, cfg, docs, filter_id=args.filter)
+
     probes = {"schema": probe_schema, "status": probe_status,
               "notfound": probe_notfound, "errors": probe_errors,
-              "validation": _run_validation}
+              "validation": _run_validation,
+              "pagination": probe_pagination, "options": probe_options,
+              "l10n": probe_l10n, "schema-live": _run_schema_live}
+    # `all` runs the safe (non-mutating-by-default) probes; the gated probes
+    # (validation, schema-live) self-skip inside their runners unless opted in.
     todo = probes if args.probe == "all" else {args.probe: probes[args.probe]}
     for name, fn in todo.items():
         try:
