@@ -5159,43 +5159,6 @@
           "retry_interval": 15
         },
         {
-          "name": "lb-delete",
-          "service": "loadbalancer",
-          "group": "lb",
-          "method": "DELETE",
-          "path": "/v1/loadbalancers/{loadbalancer_id}",
-          "expect_status": [
-            200,
-            202,
-            204,
-            404
-          ],
-          "destructive": true,
-          "retry_on_status": [
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 20
-        },
-        {
-          "name": "lb-wait-gone",
-          "service": "loadbalancer",
-          "group": "lb",
-          "method": "GET",
-          "path": "/v1/loadbalancers/{loadbalancer_id}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 600,
-            "interval": 20
-          }
-        },
-        {
           "name": "lb-servergroup-delete",
           "service": "loadbalancer",
           "group": "lb",
@@ -5232,6 +5195,43 @@
           ],
           "retries": 8,
           "retry_interval": 15
+        },
+        {
+          "name": "lb-delete",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 10,
+          "retry_interval": 20
+        },
+        {
+          "name": "lb-wait-gone",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
         },
         {
           "name": "subnetvip-delete",
