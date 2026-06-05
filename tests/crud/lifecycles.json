@@ -4598,31 +4598,25 @@
           }
         },
         {
-          "name": "port-create",
+          "name": "igw-wait",
           "service": "vpc",
-          "group": "port",
+          "group": "igw",
           "optional": true,
-          "method": "POST",
-          "path": "/v1/ports",
-          "json": {
-            "name": "zznetport{unique}",
-            "description": "API zznetession shared-net",
-            "security_groups": [],
-            "subnet_id": "{subnet_id}",
-            "tags": []
-          },
-          "capture": {
-            "port_id": "$.port.id"
-          },
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
           "expect_status": [
-            200,
-            201,
-            202
+            200
           ],
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/ports/{port_id}",
-            "service": "vpc"
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ATTACHED",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 15
           }
         },
         {
@@ -4653,6 +4647,78 @@
           }
         },
         {
+          "name": "natgw-wait",
+          "service": "vpc",
+          "group": "natgw",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/nat-gateways/{nat_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nat_gateway.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "port-create",
+          "service": "vpc",
+          "group": "port",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/ports",
+          "json": {
+            "name": "zznetport{unique}",
+            "description": "API zznetession shared-net",
+            "security_groups": [],
+            "subnet_id": "{subnet_id}",
+            "tags": []
+          },
+          "capture": {
+            "port_id": "$.port.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/ports/{port_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "port-wait",
+          "service": "vpc",
+          "group": "port",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.port.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "DOWN"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
           "name": "tgw-create",
           "service": "vpc",
           "group": "tgw",
@@ -4679,6 +4745,28 @@
           }
         },
         {
+          "name": "tgw-wait",
+          "service": "vpc",
+          "group": "tgw",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
           "name": "subnetvip-create",
           "service": "vpc",
           "group": "subnetvip",
@@ -4690,7 +4778,7 @@
             "virtual_ip_address": "10.140.1.200"
           },
           "capture": {
-            "vip_id": "$.vip.id"
+            "vip_id": "$.subnet_vip.id"
           },
           "expect_status": [
             200,
@@ -4701,6 +4789,64 @@
             "method": "DELETE",
             "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
             "service": "vpc"
+          }
+        },
+        {
+          "name": "lb-create",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/loadbalancers",
+          "json": {
+            "loadbalancer": {
+              "description": "API zznetession shared-net",
+              "firewall_enabled": false,
+              "firewall_logging_enabled": false,
+              "layer_type": "L4",
+              "name": "zznetlb{ualpha}",
+              "publicip_id": "",
+              "service_ip": "10.140.1.100",
+              "source_nat_ip": "",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture": {
+            "loadbalancer_id": "$.loadbalancer.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/loadbalancers/{loadbalancer_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "lb-wait",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.loadbalancer.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
           }
         },
         {
@@ -4775,181 +4921,6 @@
           }
         },
         {
-          "name": "lb-create",
-          "service": "loadbalancer",
-          "group": "lb",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/loadbalancers",
-          "json": {
-            "loadbalancer": {
-              "description": "API zznetession shared-net",
-              "firewall_enabled": false,
-              "firewall_logging_enabled": false,
-              "layer_type": "L4",
-              "name": "zznetlb{ualpha}",
-              "publicip_id": "",
-              "service_ip": "10.140.1.100",
-              "source_nat_ip": "",
-              "subnet_id": "{subnet_id}",
-              "tags": [],
-              "vpc_id": "{vpc_id}"
-            }
-          },
-          "capture": {
-            "loadbalancer_id": "$.loadbalancer.id"
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/loadbalancers/{loadbalancer_id}",
-            "service": "loadbalancer"
-          }
-        },
-        {
-          "name": "dns-privatedns-create",
-          "service": "dns",
-          "group": "dns",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/private-dns",
-          "json": {
-            "connected_vpc_ids": [
-              "{vpc_id}"
-            ],
-            "description": "API zznetession shared-net",
-            "name": "zznetpdns{ualpha}",
-            "tags": []
-          },
-          "capture": {
-            "private_dns_id": "$.private_dns.id"
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/private-dns/{private_dns_id}",
-            "service": "dns"
-          }
-        },
-        {
-          "name": "igw-wait",
-          "service": "vpc",
-          "group": "igw",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/internet-gateways/{internet_gateway_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.internet_gateway.state",
-            "until": [
-              "ACTIVE",
-              "ATTACHED",
-              "CREATED",
-              "RUNNING"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
-        },
-        {
-          "name": "natgw-wait",
-          "service": "vpc",
-          "group": "natgw",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/nat-gateways/{nat_gateway_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.nat_gateway.state",
-            "until": [
-              "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "AVAILABLE"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
-        },
-        {
-          "name": "port-wait",
-          "service": "vpc",
-          "group": "port",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/ports/{port_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.port.state",
-            "until": [
-              "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "DOWN"
-            ],
-            "timeout": 180,
-            "interval": 10
-          }
-        },
-        {
-          "name": "tgw-wait",
-          "service": "vpc",
-          "group": "tgw",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/transit-gateways/{transit_gateway_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.transit_gateway.state",
-            "until": [
-              "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "AVAILABLE"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
-        },
-        {
-          "name": "lb-wait",
-          "service": "loadbalancer",
-          "group": "lb",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/loadbalancers/{loadbalancer_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.loadbalancer.state",
-            "until": [
-              "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "AVAILABLE"
-            ],
-            "timeout": 600,
-            "interval": 20
-          }
-        },
-        {
           "name": "lb-listener-create",
           "service": "loadbalancer",
           "group": "lb",
@@ -5008,6 +4979,35 @@
             201,
             202
           ]
+        },
+        {
+          "name": "dns-privatedns-create",
+          "service": "dns",
+          "group": "dns",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/private-dns",
+          "json": {
+            "connected_vpc_ids": [
+              "{vpc_id}"
+            ],
+            "description": "API zznetession shared-net",
+            "name": "zznetpdns{ualpha}",
+            "tags": []
+          },
+          "capture": {
+            "private_dns_id": "$.private_dns.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/private-dns/{private_dns_id}",
+            "service": "dns"
+          }
         },
         {
           "name": "dns-activate",
