@@ -751,6 +751,15 @@ def build(
     # ------------------------------------------------------------------
     if unified_findings:
         conf = findings_to_conf(unified_findings)
+        # The platform-wide "systemic" findings are NOT per-endpoint, so they are
+        # not in the unified findings store — they live in the conformance.json
+        # the static analysis writes. Merge them back so the dashboard's
+        # "플랫폼 전역 항목" banner is populated.
+        if os.path.exists(conformance):
+            try:
+                conf["systemic"] = json.load(open(conformance)).get("systemic", [])
+            except (ValueError, OSError):
+                pass
     elif os.path.exists(conformance):
         conf = json.load(open(conformance))
     else:
