@@ -281,22 +281,29 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                 pytest.skip(str(exc))
 
             expected = step.get("expect_status", [200])
-            # Account quota limits (e.g. ExceedMaxVpcCountError when the account is
-            # already at its 5-VPC cap with non-regr VPCs) are an environmental
-            # condition, not a regression — tear down anything created so far and
-            # skip, so the dashboard doesn't flag a false NEW regression.
-            if resp.status not in expected and (
-                    "exceed-max-count" in resp.raw_text or "ExceedMax" in resp.raw_text
-                    or "max-count-exceed" in resp.raw_text):
-                # If the quota limit is on an OPTIONAL group's step (e.g. private-dns
+            # Environmental conditions (NOT regressions) -> tear down what was created
+            # and skip, so the dashboard doesn't flag a false NEW regression:
+            #   (a) account quota caps (ExceedMax.../max-count-exceed), e.g. the 5-VPC
+            #       limit when the account is already full of non-regr VPCs;
+            #   (b) gateway/WAF blocks: HTTP 417 "Request Rejected ... Support ID" is
+            #       an infra rejection that never reaches the API, so it is not a body
+            #       bug — treat it like a transient environmental limit, not a fail.
+            _txt = resp.raw_text or ""
+            _is_quota = ("exceed-max-count" in _txt or "ExceedMax" in _txt
+                         or "max-count-exceed" in _txt)
+            _is_gateway_block = (resp.status == 417 and (
+                "Request Rejected" in _txt or "request was blocked" in _txt
+                or "Support ID" in _txt))
+            if resp.status not in expected and (_is_quota or _is_gateway_block):
+                # If the limit is on an OPTIONAL group's step (e.g. private-dns
                 # max-count in the shared-networking lifecycle), skip only that group,
                 # NOT the whole lifecycle — otherwise the later probe-reads that record
                 # coverage for the families that DID provision (vpc/lb/gateways) never
-                # run. Only a quota limit on a non-optional (shared infra) step aborts.
+                # run. Only a limit on a non-optional (shared infra) step aborts.
                 if step.get("optional"):
-                    reason = f"{step['name']} -> {resp.status} (quota): {resp.raw_text[:300]}"
-                    print(f"  optional step '{step['name']}' (group={grp}) hit a quota "
-                          f"limit -> skipping group. {resp.raw_text[:200]}")
+                    reason = f"{step['name']} -> {resp.status} (env): {resp.raw_text[:300]}"
+                    print(f"  optional step '{step['name']}' (group={grp}) hit an "
+                          f"environmental limit -> skipping group. {resp.raw_text[:200]}")
                     if grp:
                         failed_groups.add(grp)
                         group_fail_reason.setdefault(grp, reason)
@@ -304,7 +311,7 @@ def test_crud_lifecycle(lifecycle, client, cfg):
                     continue
                 _teardown()
                 pytest.skip(
-                    f"[{lifecycle['id']}] environmental quota limit at step "
+                    f"[{lifecycle['id']}] environmental limit at step "
                     f"'{step['name']}': {resp.raw_text[:200]}")
             # An "optional" step belongs to a "group" (e.g. one dbaas engine in a
             # multi-engine lifecycle). If it fails (bad status or a capture miss),
