@@ -78,7 +78,7 @@ def main() -> int:
         if _delete(c, "security-group", f"/v1/security-groups/{it['id']}"):
             deleted += 1
     # 2b. ports (regrport) — subnet children; must go before the subnet pass.
-    for it in _list(c, "vpc", "/v1/ports", "regrport"):
+    for it in _list(c, "vpc", "/v1/ports", ("regrport", "zznetport")):
         if it.get("id") and _delete(c, "vpc", f"/v1/ports/{it['id']}"):
             deleted += 1
     # 2c. volume snapshots (regrsnap) then their block volumes (regrvol) —
@@ -103,16 +103,18 @@ def main() -> int:
                 dbaas_deleted.append((svc, cid))
     for svc, cid in dbaas_deleted:
         _wait_gone(c, svc, f"/v1/clusters/{cid}", 900, 20)
-    # 3. subnets — delete all, then wait each is gone
+    # 3. subnets — delete all, then wait each is gone. Also reclaim the isolated
+    # heavy-net run's leftover zznet* subnets/VPCs (that branch used a sweep-immune
+    # prefix; once its PR closed, only this sweep frees the VPC quota they hold).
     subnet_ids = []
-    for it in _list(c, "vpc", "/v1/subnets", "regrsub"):
+    for it in _list(c, "vpc", "/v1/subnets", ("regrsub", "zznetsub")):
         if _delete(c, "vpc", f"/v1/subnets/{it['id']}"):
             deleted += 1; subnet_ids.append(it["id"])
     for sid in subnet_ids:
         _wait_gone(c, "vpc", f"/v1/subnets/{sid}")
     # 3b. internet gateways + public IPs (regr*) — children that would 409-block
     # their VPC; delete them (and wait) before the vpc pass below.
-    for it in _list(c, "vpc", "/v1/internet-gateways", "regr"):
+    for it in _list(c, "vpc", "/v1/internet-gateways", ("regr", "zznet")):
         if it.get("id") and _delete(c, "vpc", f"/v1/internet-gateways/{it['id']}"):
             deleted += 1
             _wait_gone(c, "vpc", f"/v1/internet-gateways/{it['id']}", 300, 15)
@@ -123,21 +125,21 @@ def main() -> int:
     # the important one: a leaked regrpdns holds the scp-network.private-dns
     # max-count quota, which makes the lifecycle's dns group skip every run. The
     # transit-gateway (regrtgw) and load-balancers would also 409-block the vpc.
-    for it in _list(c, "dns", "/v1/private-dns", "regrpdns"):
+    for it in _list(c, "dns", "/v1/private-dns", ("regrpdns", "zznetpdns")):
         if it.get("id") and _delete(c, "dns", f"/v1/private-dns/{it['id']}"):
             deleted += 1
             _wait_gone(c, "dns", f"/v1/private-dns/{it['id']}", 300, 15)
     for it in _list(c, "dns", "/v1/hosted-zones", "regr"):
         if it.get("id") and _delete(c, "dns", f"/v1/hosted-zones/{it['id']}"):
             deleted += 1
-    for it in _list(c, "vpc", "/v1/transit-gateways", "regrtgw"):
+    for it in _list(c, "vpc", "/v1/transit-gateways", ("regrtgw", "zznettgw")):
         if it.get("id") and _delete(c, "vpc", f"/v1/transit-gateways/{it['id']}"):
             deleted += 1
             _wait_gone(c, "vpc", f"/v1/transit-gateways/{it['id']}", 300, 15)
     # load balancers + nat gateways have no regr name; delete any whose vpc_id
     # matches a regr* vpc (the dedicated shared-networking vpc is short-lived, so
     # anything in it is ours). These would otherwise 409-block the vpc delete.
-    regr_vpc_ids = {v["id"] for v in _list(c, "vpc", "/v1/vpcs", "regrvpc") if v.get("id")}
+    regr_vpc_ids = {v["id"] for v in _list(c, "vpc", "/v1/vpcs", ("regrvpc", "zznetvpc")) if v.get("id")}
     if regr_vpc_ids:
         for svc, coll in (("loadbalancer", "/v1/loadbalancers"),
                           ("vpc", "/v1/nat-gateways")):
@@ -153,7 +155,7 @@ def main() -> int:
                         _wait_gone(c, svc, f"{coll}/{it['id']}", 300, 15)
     # 4. vpcs — retry on 409 (lingering child), deleting any stray subnets first
     deleted_vpc_ids = []
-    for it in _list(c, "vpc", "/v1/vpcs", "regrvpc"):
+    for it in _list(c, "vpc", "/v1/vpcs", ("regrvpc", "zznetvpc")):
         vid = it["id"]
         for attempt in range(6):
             st = _delete(c, "vpc", f"/v1/vpcs/{vid}")
@@ -164,7 +166,7 @@ def main() -> int:
                 for sn in _items(c.get("/v1/subnets", service="vpc").body):
                     if (isinstance(sn, dict) and sn.get("id")
                             and str(sn.get("vpc_id")) == vid
-                            and str(sn.get("name", "")).startswith("regrsub")):
+                            and str(sn.get("name", "")).startswith(("regrsub", "zznetsub"))):
                         _delete(c, "vpc", f"/v1/subnets/{sn['id']}")
                         _wait_gone(c, "vpc", f"/v1/subnets/{sn['id']}", 120, 10)
                 time.sleep(10)

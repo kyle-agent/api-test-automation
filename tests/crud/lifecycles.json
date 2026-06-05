@@ -4598,31 +4598,25 @@
           }
         },
         {
-          "name": "port-create",
+          "name": "igw-wait",
           "service": "vpc",
-          "group": "port",
+          "group": "igw",
           "optional": true,
-          "method": "POST",
-          "path": "/v1/ports",
-          "json": {
-            "name": "regrport{unique}",
-            "description": "API regression shared-net",
-            "security_groups": [],
-            "subnet_id": "{subnet_id}",
-            "tags": []
-          },
-          "capture": {
-            "port_id": "$.port.id"
-          },
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
           "expect_status": [
-            200,
-            201,
-            202
+            200
           ],
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/ports/{port_id}",
-            "service": "vpc"
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ATTACHED",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 15
           }
         },
         {
@@ -4653,6 +4647,78 @@
           }
         },
         {
+          "name": "natgw-wait",
+          "service": "vpc",
+          "group": "natgw",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/nat-gateways/{nat_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nat_gateway.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "port-create",
+          "service": "vpc",
+          "group": "port",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/ports",
+          "json": {
+            "name": "regrport{unique}",
+            "description": "API regression shared-net",
+            "security_groups": [],
+            "subnet_id": "{subnet_id}",
+            "tags": []
+          },
+          "capture": {
+            "port_id": "$.port.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/ports/{port_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "port-wait",
+          "service": "vpc",
+          "group": "port",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.port.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "DOWN"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
           "name": "tgw-create",
           "service": "vpc",
           "group": "tgw",
@@ -4679,6 +4745,28 @@
           }
         },
         {
+          "name": "tgw-wait",
+          "service": "vpc",
+          "group": "tgw",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
           "name": "subnetvip-create",
           "service": "vpc",
           "group": "subnetvip",
@@ -4690,7 +4778,7 @@
             "virtual_ip_address": "10.140.1.200"
           },
           "capture": {
-            "vip_id": "$.vip.id"
+            "vip_id": "$.subnet_vip.id"
           },
           "expect_status": [
             200,
@@ -4701,6 +4789,64 @@
             "method": "DELETE",
             "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
             "service": "vpc"
+          }
+        },
+        {
+          "name": "lb-create",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/loadbalancers",
+          "json": {
+            "loadbalancer": {
+              "description": "API regression shared-net",
+              "firewall_enabled": false,
+              "firewall_logging_enabled": false,
+              "layer_type": "L4",
+              "name": "regrlb{ualpha}",
+              "publicip_id": "",
+              "service_ip": "10.140.1.100",
+              "source_nat_ip": "",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture": {
+            "loadbalancer_id": "$.loadbalancer.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/loadbalancers/{loadbalancer_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "lb-wait",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.loadbalancer.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
           }
         },
         {
@@ -4717,11 +4863,8 @@
               "health_check_interval": 5,
               "health_check_port": 80,
               "health_check_timeout": 5,
-              "health_check_url": "/",
-              "http_method": "GET",
               "name": "regrhc{ualpha}",
               "protocol": "TCP",
-              "response_code": "200",
               "subnet_id": "{subnet_id}",
               "tags": [],
               "vpc_id": "{vpc_id}"
@@ -4775,29 +4918,28 @@
           }
         },
         {
-          "name": "lb-create",
+          "name": "lb-listener-create",
           "service": "loadbalancer",
           "group": "lb",
           "optional": true,
           "method": "POST",
-          "path": "/v1/loadbalancers",
+          "path": "/v1/lb-listeners",
           "json": {
-            "loadbalancer": {
+            "listener": {
               "description": "API regression shared-net",
-              "firewall_enabled": false,
-              "firewall_logging_enabled": false,
-              "layer_type": "L4",
-              "name": "regrlb{ualpha}",
-              "publicip_id": "",
-              "service_ip": "10.140.1.100",
-              "source_nat_ip": "",
-              "subnet_id": "{subnet_id}",
+              "loadbalancer_id": "{loadbalancer_id}",
+              "name": "regrls{ualpha}",
+              "protocol": "TCP",
+              "routing_action": "LB_SERVER_GROUP",
+              "server_group_id": "{lb_server_group_id}",
+              "service_port": "80",
+              "support_http2": false,
               "tags": [],
-              "vpc_id": "{vpc_id}"
+              "session_duration_time": 120
             }
           },
           "capture": {
-            "loadbalancer_id": "$.loadbalancer.id"
+            "listener_id": "$.listener.id"
           },
           "expect_status": [
             200,
@@ -4806,7 +4948,7 @@
           ],
           "cleanup": {
             "method": "DELETE",
-            "path": "/v1/loadbalancers/{loadbalancer_id}",
+            "path": "/v1/lb-listeners/{listener_id}",
             "service": "loadbalancer"
           }
         },
@@ -4838,176 +4980,6 @@
             "path": "/v1/private-dns/{private_dns_id}",
             "service": "dns"
           }
-        },
-        {
-          "name": "igw-wait",
-          "service": "vpc",
-          "group": "igw",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/internet-gateways/{internet_gateway_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.internet_gateway.state",
-            "until": [
-              "ACTIVE",
-              "ATTACHED",
-              "CREATED",
-              "RUNNING"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
-        },
-        {
-          "name": "natgw-wait",
-          "service": "vpc",
-          "group": "natgw",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/nat-gateways/{nat_gateway_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.nat_gateway.state",
-            "until": [
-              "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "AVAILABLE"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
-        },
-        {
-          "name": "port-wait",
-          "service": "vpc",
-          "group": "port",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/ports/{port_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.port.state",
-            "until": [
-              "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "DOWN"
-            ],
-            "timeout": 180,
-            "interval": 10
-          }
-        },
-        {
-          "name": "tgw-wait",
-          "service": "vpc",
-          "group": "tgw",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/transit-gateways/{transit_gateway_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.transit_gateway.state",
-            "until": [
-              "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "AVAILABLE"
-            ],
-            "timeout": 300,
-            "interval": 15
-          }
-        },
-        {
-          "name": "lb-wait",
-          "service": "loadbalancer",
-          "group": "lb",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/loadbalancers/{loadbalancer_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.loadbalancer.state",
-            "until": [
-              "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "AVAILABLE"
-            ],
-            "timeout": 600,
-            "interval": 20
-          }
-        },
-        {
-          "name": "lb-listener-create",
-          "service": "loadbalancer",
-          "group": "lb",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/lb-listeners",
-          "json": {
-            "listener": {
-              "description": "API regression shared-net",
-              "loadbalancer_id": "{loadbalancer_id}",
-              "name": "regrls{ualpha}",
-              "protocol": "TCP",
-              "routing_action": "LB_SERVER_GROUP",
-              "server_group_id": "{lb_server_group_id}",
-              "service_port": "80",
-              "support_http2": false,
-              "tags": []
-            }
-          },
-          "capture": {
-            "listener_id": "$.listener.id"
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/lb-listeners/{listener_id}",
-            "service": "loadbalancer"
-          }
-        },
-        {
-          "name": "lb-members-add",
-          "service": "loadbalancer",
-          "group": "lb",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-          "json": {
-            "members": [
-              {
-                "member_ip": "10.140.1.50",
-                "member_port": 80,
-                "member_state": "ENABLE",
-                "member_weight": 100,
-                "name": "regrmbr{ualpha}",
-                "object_id": "{port_id}",
-                "object_type": "VM"
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ]
         },
         {
           "name": "dns-activate",
@@ -5187,43 +5159,6 @@
           "retry_interval": 15
         },
         {
-          "name": "lb-delete",
-          "service": "loadbalancer",
-          "group": "lb",
-          "method": "DELETE",
-          "path": "/v1/loadbalancers/{loadbalancer_id}",
-          "expect_status": [
-            200,
-            202,
-            204,
-            404
-          ],
-          "destructive": true,
-          "retry_on_status": [
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 20
-        },
-        {
-          "name": "lb-wait-gone",
-          "service": "loadbalancer",
-          "group": "lb",
-          "method": "GET",
-          "path": "/v1/loadbalancers/{loadbalancer_id}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 600,
-            "interval": 20
-          }
-        },
-        {
           "name": "lb-servergroup-delete",
           "service": "loadbalancer",
           "group": "lb",
@@ -5260,6 +5195,43 @@
           ],
           "retries": 8,
           "retry_interval": 15
+        },
+        {
+          "name": "lb-delete",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 10,
+          "retry_interval": 20
+        },
+        {
+          "name": "lb-wait-gone",
+          "service": "loadbalancer",
+          "group": "lb",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
         },
         {
           "name": "subnetvip-delete",
