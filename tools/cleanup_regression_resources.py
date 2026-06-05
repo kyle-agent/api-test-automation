@@ -134,6 +134,17 @@ def main() -> int:
         if it.get("id") and _delete(c, "vpc", f"/v1/transit-gateways/{it['id']}"):
             deleted += 1
             _wait_gone(c, "vpc", f"/v1/transit-gateways/{it['id']}", 300, 15)
+    # 3c-bis. isolated heavy-net run uses a zznet* prefix (sweep-immune by design)
+    # but a leaked zznetpdns private-dns holds the private-dns max-count quota and
+    # blocks the dns group on the NEXT run; clean those (and zznet hosted-zones)
+    # here since the sweep runs before CRUD.
+    for it in _list(c, "dns", "/v1/private-dns", "zznetpdns"):
+        if it.get("id") and _delete(c, "dns", f"/v1/private-dns/{it['id']}"):
+            deleted += 1
+            _wait_gone(c, "dns", f"/v1/private-dns/{it['id']}", 300, 15)
+    for it in _list(c, "dns", "/v1/hosted-zones", "zznet"):
+        if it.get("id") and _delete(c, "dns", f"/v1/hosted-zones/{it['id']}"):
+            deleted += 1
     # load balancers + nat gateways have no regr name; delete any whose vpc_id
     # matches a regr* vpc (the dedicated shared-networking vpc is short-lived, so
     # anything in it is ours). These would otherwise 409-block the vpc delete.
