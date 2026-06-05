@@ -39,7 +39,7 @@ class Endpoint:
 def load_catalog() -> list[Endpoint]:
     if not CATALOG_PATH.exists():
         raise FileNotFoundError(
-            f"{CATALOG_PATH} not found. Run: python tools/build_catalog.py")
+            f"{CATALOG_PATH} not found. Run: python -m spec.extract_catalog")
     raw = json.loads(CATALOG_PATH.read_text())
     out = []
     for e in raw:
