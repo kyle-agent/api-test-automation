@@ -2195,6 +2195,46 @@
           }
         },
         {
+          "name": "image-create",
+          "group": "image",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/images",
+          "json": {
+            "image_name": "regrimg{ualpha}"
+          },
+          "capture": {
+            "custom_image_id": "$.image_id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/images/{custom_image_id}"
+          }
+        },
+        {
+          "name": "image-wait",
+          "group": "image",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/images/{custom_image_id}",
+          "poll": {
+            "until_status": [
+              200
+            ],
+            "timeout": 300,
+            "interval": 15
+          },
+          "expect_status": [
+            200,
+            404
+          ]
+        },
+        {
           "name": "start-server",
           "method": "POST",
           "path": "/v1/servers/{server_id}/start",
@@ -2231,6 +2271,23 @@
             "subnet_id": "{subnet_id}",
             "keypair_name": "regrkey{unique}"
           }
+        },
+        {
+          "name": "image-delete",
+          "group": "image",
+          "method": "DELETE",
+          "path": "/v1/images/{custom_image_id}",
+          "destructive": true,
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409
+          ]
         },
         {
           "name": "detach-volume",
