@@ -95,8 +95,8 @@ def main() -> int:
         print("Refusing to run: set SCP_PROBE_VALIDATION=true (RUNTIME probe; needs "
               "SCP creds + SCP_ALLOW_MUTATIONS=true). Run in CI.")
         return 2
-    from framework.config import Settings
-    from framework.client import ApiClient, MutationBlocked
+    from core.config import Settings
+    from core.http_client import ApiClient, MutationBlocked
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--category", default="")

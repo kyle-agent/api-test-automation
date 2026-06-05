@@ -27,7 +27,7 @@ import re
 
 import pytest
 
-from framework.catalog import endpoints
+from core.catalog import endpoints
 
 pytestmark = pytest.mark.smoke
 

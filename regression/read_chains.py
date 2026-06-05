@@ -26,7 +26,7 @@ import re
 
 from core import results
 from core.results import Observation
-from framework.catalog import endpoints
+from core.catalog import endpoints
 
 # None = all services. Pass a list to scope (e.g. ["virtualserver"]).
 SMOKE_TSV = "reports/smoke_status.tsv"

@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-from framework.client import MutationBlocked
+from core.http_client import MutationBlocked
 
 LIFECYCLES = json.loads((Path(__file__).parent / "lifecycles.json").read_text())["lifecycles"]
 _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")

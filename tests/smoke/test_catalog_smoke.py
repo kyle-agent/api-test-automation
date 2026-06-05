@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-from framework.catalog import Endpoint, endpoints
+from core.catalog import Endpoint, endpoints
 
 pytestmark = pytest.mark.smoke
 

@@ -10,10 +10,10 @@ move of ``framework/*`` happens later behind this facade without touching caller
 from __future__ import annotations
 
 # --- stable kernel (re-exported from the existing framework package) ---------
-from framework.config import Settings, settings
-from framework.auth import build_signer
-from framework.client import ApiClient, Response, MutationBlocked
-from framework.catalog import Endpoint, endpoints, load_catalog
+from core.config import Settings, settings
+from core.auth import build_signer
+from core.http_client import ApiClient, Response, MutationBlocked
+from core.catalog import Endpoint, endpoints, load_catalog
 
 # --- new shared contracts ----------------------------------------------------
 from core import budgets, registry, results

@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from framework.catalog import load_catalog
+from core.catalog import load_catalog
 
 
 def main() -> int:

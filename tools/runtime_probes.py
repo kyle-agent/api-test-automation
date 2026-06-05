@@ -200,7 +200,7 @@ def probe_notfound(client, docs, limit, category):
 # ---------------------------------------------------------------- errors/auth (unauth)
 def probe_errors(client, docs, limit, category):
     import requests
-    from framework.config import Settings
+    from core.config import Settings
     cfg = Settings()
     # one representative parameterless GET list endpoint per service
     rep = {}
@@ -263,8 +263,8 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0)
     args = ap.parse_args()
 
-    from framework.config import Settings
-    from framework.client import ApiClient
+    from core.config import Settings
+    from core.http_client import ApiClient
     cfg = Settings()
     cfg.require_credentials()
     client = ApiClient(cfg)

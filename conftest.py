@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from framework.client import ApiClient
-from framework.config import settings
+from core.http_client import ApiClient
+from core.config import settings
 
 
 def pytest_addoption(parser):

@@ -42,8 +42,8 @@ from core import budgets as _budgets
 from core import registry, results
 from core.registry import ResourceRecord, ResourceRegistry
 from core.results import Observation
-from framework.catalog import load_catalog
-from framework.client import MutationBlocked
+from core.catalog import load_catalog
+from core.http_client import MutationBlocked
 
 _HERE = Path(__file__).parent
 SCENARIOS_PATH = _HERE / "scenarios.json"

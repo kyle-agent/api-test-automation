@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import time
 
-from framework.client import ApiClient, MutationBlocked
-from framework.config import settings
+from core.http_client import ApiClient, MutationBlocked
+from core.config import settings
 
 
 def _items(body):

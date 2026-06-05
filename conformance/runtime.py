@@ -238,7 +238,7 @@ def probe_notfound(client, docs, limit, category):
 # ------------------------------------------------ errors/auth (unauth) [GET]
 def probe_errors(client, docs, limit, category):
     import requests
-    from framework.config import Settings
+    from core.config import Settings
     cfg = Settings()
     rep = {}
     for k, e in docs["endpoints"].items():
@@ -341,7 +341,7 @@ def validation_targets(docs, category):
 
 
 def probe_validation(client, docs, limit, category, sleep=0.2):
-    from framework.client import MutationBlocked
+    from core.http_client import MutationBlocked
     tgts = validation_targets(docs, category)
     if limit:
         tgts = tgts[:limit]
@@ -396,8 +396,8 @@ def main() -> int:
     ap.add_argument("--sleep", type=float, default=0.2)
     args = ap.parse_args()
 
-    from framework.config import Settings
-    from framework.client import ApiClient
+    from core.config import Settings
+    from core.http_client import ApiClient
     cfg = Settings()
     cfg.require_credentials()
     client = ApiClient(cfg)

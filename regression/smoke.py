@@ -22,7 +22,7 @@ from pathlib import Path
 
 from core import results
 from core.results import Observation
-from framework.catalog import Endpoint, endpoints
+from core.catalog import Endpoint, endpoints
 
 # --- legacy dual-write targets (kept so nothing downstream breaks yet) -------
 STATUS_FILE = "reports/smoke_status.tsv"
