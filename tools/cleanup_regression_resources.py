@@ -22,7 +22,7 @@ def _items(body):
 
 
 def _name_of(it):
-    for k in ("name", "volume_name", "registry_name"):
+    for k in ("name", "volume_name", "registry_name", "policy_name"):
         if it.get(k):
             return str(it[k])
     return ""
@@ -210,6 +210,45 @@ def main() -> int:
         for it in _list(c, "kms", "/v1/kms/transit", prefix):
             if it.get("id") and _delete(c, "kms", f"/v1/kms/transit/{it['id']}"):
                 deleted += 1
+    # 12. light create->read lifecycle types (scf, apigateway, iam, servicewatch).
+    # These self-delete when their lifecycle passes, but a failed teardown (or the
+    # scf trigger-delete that is tolerated when its body is rejected) would leak
+    # otherwise — and none were swept before, so orphans accumulated run over run.
+    # scf cloud functions (regrscf): delete each function's triggers first (a
+    # function delete may not cascade them), then the function itself.
+    for it in _list(c, "scf", "/v1/cloud-functions", "regrscf"):
+        fid = it.get("id")
+        if not fid:
+            continue
+        try:
+            trs = _items(c.get(f"/v1/triggers?cloud_function_id={fid}",
+                               service="scf").body)
+        except Exception:
+            trs = []
+        for tr in trs:
+            if isinstance(tr, dict) and tr.get("id"):
+                _delete(c, "scf", f"/v1/triggers/{tr['id']}",
+                        json={"cloud_function_id": fid,
+                              "trigger_type": tr.get("trigger_type") or "cronjob"})
+        if _delete(c, "scf", f"/v1/cloud-functions/{fid}"):
+            deleted += 1
+    # apigateway apis (regrapi) — deleting the api removes its child resources.
+    for it in _list(c, "apigateway", "/v1/apis", "regrapi"):
+        if it.get("id") and _delete(c, "apigateway", f"/v1/apis/{it['id']}"):
+            deleted += 1
+    # iam groups (regrgrp) + policies (regrpol)
+    for it in _list(c, "iam", "/v1/groups", "regrgrp"):
+        if it.get("id") and _delete(c, "iam", f"/v1/groups/{it['id']}"):
+            deleted += 1
+    for it in _list(c, "iam", "/v1/policies", "regrpol"):
+        if it.get("id") and _delete(c, "iam", f"/v1/policies/{it['id']}"):
+            deleted += 1
+    # servicewatch log groups (regrlg) — bulk delete by ids.
+    lg_ids = [it["id"] for it in _list(c, "servicewatch", "/v1/log-groups", "regrlg")
+              if it.get("id")]
+    if lg_ids and _delete(c, "servicewatch", "/v1/log-groups", json={"ids": lg_ids}):
+        deleted += len(lg_ids)
+
     print(f"sweep done: {deleted} resource(s) deleted")
     return 0
 
