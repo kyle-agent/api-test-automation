@@ -529,11 +529,14 @@ def main() -> int:
 
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--probe",
-                    choices=["schema", "status", "notfound", "errors", "validation", "all"],
+                    choices=["schema", "status", "notfound", "errors", "validation",
+                             "pagination", "options", "l10n", "schema-live", "all"],
                     default="all")
     ap.add_argument("--category", default="")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--sleep", type=float, default=0.2)
+    ap.add_argument("--filter", default="",
+                    help="schema-live only: substring filter on lifecycle id")
     args = ap.parse_args()
 
     from core.config import Settings
