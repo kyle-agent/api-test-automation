@@ -1,0 +1,1018 @@
+{
+  "summary": {
+    "checked": 144,
+    "client_4xx": 139,
+    "server_5xx_BUG": 2,
+    "other": 3
+  },
+  "results": [
+    {
+      "endpoint": "ai-ml/aimlops-platform/releaseaimlopsplatformv1",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-6aab222a-edfb-4716-8c92-c5edeb5add66\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "ai-ml/cloud-ml/createcloudml",
+      "method": "POST",
+      "status": 404,
+      "klass": "client_4xx",
+      "excerpt": "{\"timestamp\":\"2026-06-05T04:28:50.806+00:00\",\"path\":\"/v1/cloud-ml\",\"status\":404,\"error\":\"Not Found\",\"requestId\":\"fc23b140-59532\"}"
+    },
+    {
+      "endpoint": "application-service/apigateway/createapi",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"api name should be 3~50 characters (English lower case, numbers, and -) start with a lowercase letter and end wi"
+    },
+    {
+      "endpoint": "application-service/apigateway/createprivatelinkendpoint",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"PrivateLink Endpoint name should have 3 to 20 digits long and permitted english case and numbers\",\"Field require"
+    },
+    {
+      "endpoint": "application-service/queueservice/createqueue",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Start with a lowercase letter and enter 3-64 characters using lowercase letters, numbers, and special characters"
+    },
+    {
+      "endpoint": "compute/baremetal/createbaremetals",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "compute/baremetal/startbaremetals",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-6ed28839-c110-48f7-8578-a78a0a25ccbd\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "compute/baremetal/stopbaremetals",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-ecff519b-6878-4cca-9e72-3acb2ac93a3f\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/creategpunodes",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/modifyclusterfabricmembers",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-63811495-c37b-4a94-a27f-4a161322acd7"
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/startgpunodes",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-d9b469d8-d41b-4d5a-8ada-3b8f3dddb080\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/stopgpunodes",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-a7514cb3-0046-4543-b03d-81dd34c2ca39\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "compute/scf/createcloudfunction",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-43e699f2-b8c5-479c-9715-f0273eaebc1e"
+    },
+    {
+      "endpoint": "compute/scf/createcloudfunctionapigatewaytrigger",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-61e096c5-6cc1-4103-bb46-0fcfed4da224"
+    },
+    {
+      "endpoint": "compute/scf/createcloudfunctioncronjobtrigger",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-8ee1ac0b-c71b-4edc-a3b1-a307a3d2ac4b"
+    },
+    {
+      "endpoint": "compute/virtualserver/createautoscalinggroup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 63 characters or shorter, in ^[a-zA-Z0-9-"
+    },
+    {
+      "endpoint": "compute/virtualserver/createimage",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"os_distro\\\" is invalid. Example: \\\"alma\\\"\",\"Field \\\"name\\\" is invalid. The value should be 1 characters "
+    },
+    {
+      "endpoint": "compute/virtualserver/createkeypair",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 255 characters or shorter, in ^[a-zA-Z0-9"
+    },
+    {
+      "endpoint": "compute/virtualserver/createlaunchconfiguration",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 63 characters or shorter, in ^[a-zA-Z0-9-"
+    },
+    {
+      "endpoint": "compute/virtualserver/createservergroup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 255 characters or shorter, in ^[a-zA-Z0-9"
+    },
+    {
+      "endpoint": "compute/virtualserver/createsnapshot",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 255 characters or shorter, in ^[a-zA-Z0-9-_ ]+$ format. Example: "
+    },
+    {
+      "endpoint": "compute/virtualserver/createvirtualserver",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"server_type_id\\\" is invalid. Example: \\\"s1v1m2\\\"\",\"Field \\\"name\\\" is invalid. The value should be 1 char"
+    },
+    {
+      "endpoint": "compute/virtualserver/createvolume",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 255 characters or shorter, in ^[a-zA-Z0-9"
+    },
+    {
+      "endpoint": "compute/virtualserver/createvolumetransfer",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"volume_id\\\" is invalid. Example: \\\"3f500f00-ed80-4566-a057-e31760226f9a\\\"\"],\"global_request_id\":\"req-148"
+    },
+    {
+      "endpoint": "container/scr/createregistry",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-dd"
+    },
+    {
+      "endpoint": "container/scr/createrepository",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-9d20bd50-9d79-44ae-9610-e01aa6230346"
+    },
+    {
+      "endpoint": "container/ske/createcluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"cluster name should be 3~30 characters (lower case, numbers, '-') starting with English lower case and not end w"
+    },
+    {
+      "endpoint": "container/ske/createnodepool",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Nodepool name should be 3~20 characters using lowercase letters, numbers, and '-'. It starts with a lowercase le"
+    },
+    {
+      "endpoint": "data-analytics/data-flow/createdataflow",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "data-analytics/data-flow/createdataflowserviceconsole",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_re"
+    },
+    {
+      "endpoint": "data-analytics/data-ops/createdataops",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "data-analytics/data-ops/createdataopsservice",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "data-analytics/eventstreams/eventstreamscreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],"
+    },
+    {
+      "endpoint": "data-analytics/quick-query/createquickquery",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-93d89a3d-3bae-4202-a78c-c14eb30c9c6d"
+    },
+    {
+      "endpoint": "data-analytics/quick-query/validatequickqueryresources",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-5d29f1b3-ce79-4601-b155-be7d6fb00842\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "data-analytics/searchengine/searchenginecreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_reques"
+    },
+    {
+      "endpoint": "data-analytics/vertica/verticacreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_reques"
+    },
+    {
+      "endpoint": "database/cachestore/cachestorecreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_reques"
+    },
+    {
+      "endpoint": "database/epas/epascreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_reques"
+    },
+    {
+      "endpoint": "database/mariadb/mariadbcreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],"
+    },
+    {
+      "endpoint": "database/mysql/mysqlcreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],"
+    },
+    {
+      "endpoint": "database/postgresql/postgresqlcreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_reques"
+    },
+    {
+      "endpoint": "database/sqlserver/sqlservercreatecluster",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_reques"
+    },
+    {
+      "endpoint": "devops-tools/devopsservice/createdevopsservice",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-597a6759-32ed-4300-b06d-f7477da1def6"
+    },
+    {
+      "endpoint": "financial-management/billingplan/createplannedcomputes",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":\"['Field required', 'Field required', 'Field required', 'Field required']\",\"global_request_id\":\"req-54bbae14-54b4-"
+    },
+    {
+      "endpoint": "financial-management/billingplan/showcancellationfee",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":\"['Field required']\",\"global_request_id\":\"req-0aa25a18-87a8-450b-b70e-c9833117d52d\",\"links\":[],\"related_resources\""
+    },
+    {
+      "endpoint": "financial-management/budget/createaccountbudget",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":\"Amount is required.\",\"global_request_id\":\"req-322cd9c3-a22f-4033-be19-b1e6334962e5\",\"links\":[],\"related_resources"
+    },
+    {
+      "endpoint": "management/cloudcontrol/createaccountfactoryaccount",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-3b5d9613-236d-4857-a287-d368c9b14487"
+    },
+    {
+      "endpoint": "management/cloudcontrol/createlandingzone",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "management/cloudcontrol/enableguardrailbindings",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-638cef7f-5a62-4a2a-a16a-e83ce652ce2c\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/cloudmonitoring/getmetricperfdatalist",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"message\":\"Invalid input data\",\"code\":\"InvalidInputValue\",\"service\":\"Monitoring\",\"path\":\"/monitoring/product/v2/metric-data\",\"requestId\":null,\"timestamp\":\"2026"
+    },
+    {
+      "endpoint": "management/cloudmonitoring/puteventpolicy",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"message\":\"Invalid input data\",\"code\":\"InvalidInputValue\",\"service\":\"Monitoring\",\"path\":\"/monitoring/event/v2/event-policies\",\"requestId\":null,\"timestamp\":\"202"
+    },
+    {
+      "endpoint": "management/iam-identity-center/createaccountassignment",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-2ba8978e-a281-409b-ab3c-7e287bd87578\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/iam-identity-center/creategroup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"value_error\"],\"global_request_id\":\"req-01e479e0-bbd0-4180-b3e9-6fe8848f091d\",\"links\":[],\"relate"
+    },
+    {
+      "endpoint": "management/iam-identity-center/createinstance",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-022fbaa1-c269-4ffc-a6dd-d400a829e86d\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/iam-identity-center/createpermissionset",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"value_error\",\"Field required\"],\"global_request_id\":\"req-f20d1a6c-ab52-439a-9068-0628d10b9230\",\""
+    },
+    {
+      "endpoint": "management/iam-identity-center/createuser",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-3a24cb45-1828-4159-9642-10bd820cd4f7"
+    },
+    {
+      "endpoint": "management/iam/accesskeycreate",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-e0ce4164-77e5-43f1-b4d0-0377f1d1cb91\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/iam/accesskeysendtemporaryotp",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ContactAdminForAssistance\",\"detail\":\"Invalid method\",\"global_request_id\":\"req-8953a65a-8607-4e5b-98bd-ed880c4a60e2\",\"links\":[],\"related_reso"
+    },
+    {
+      "endpoint": "management/iam/creategroup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-4a272962-9bc7-4560-8aeb-92d4b501d48a\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/iam/createpolicy",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-b3f05762-9365-4a6e-a416-d0b84caaf865\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/iam/createrole",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-7dda8cd0-6054-45d4-960f-33386a364223\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/iam/createsamlprovider",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-001385ec-f6f5-43ad-b49e-f72f244a3749\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/iam/querypolicy",
+      "method": "POST",
+      "status": 200,
+      "klass": "other",
+      "excerpt": "{\"count\":27,\"page\":0,\"policies\":[{\"account_id\":\"\",\"created_at\":\"2025-12-16T09:56:55Z\",\"created_by\":\"c23fb561c689455993874fa5d5ed4a2f\",\"creator_email\":\"-\",\"creat"
+    },
+    {
+      "endpoint": "management/loggingaudit/createtrail",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-c8"
+    },
+    {
+      "endpoint": "management/loggingaudit/downloadlogs",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-eaa9d2d9-cff4-4cef-"
+    },
+    {
+      "endpoint": "management/network-logging/createnetworkloggingstorage",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-de5cf1a8-e948-4061-95f0-16b5e8ff1508\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/organization/attachpolicybindings",
+      "method": "POST",
+      "status": 403,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\": [{\"code\": \"Forbidden\", \"detail\": \"You do not have permission to Update. Please contact the administrator.\", \"links\": [], \"global_request_id\": \"req-89"
+    },
+    {
+      "endpoint": "management/organization/cancelinvitations",
+      "method": "PUT",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-33e78734-f6f6-4d4e-81f6-2d03c68a3470\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/organization/createaccount",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-46e6477f-5bc1-4683-"
+    },
+    {
+      "endpoint": "management/organization/createdelegationpolicy",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-a30ec9a6-f6ba-49fd-b539-853a82f2c8f4\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/organization/createinvitation",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-85ca8581-5c2a-4117-b1b9-24760145ab75\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/organization/createorganization",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-574243cd-d5fe-4cdc-86b0-9027ea5af84d\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/organization/createorganizationunit",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-fd83774a-a6bf-4d21-bcd0-b9c17037f0f4\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/organization/createservicecontrolpolicy",
+      "method": "POST",
+      "status": 403,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\": [{\"code\": \"Forbidden\", \"detail\": \"You do not have permission to Create. Please contact the administrator.\", \"links\": [], \"global_request_id\": \"req-74"
+    },
+    {
+      "endpoint": "management/organization/moveaccount",
+      "method": "PUT",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-9864754d-ae51-456d-92d0-df9e697c5225\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/organization/setdelegationpolicy",
+      "method": "PUT",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-22a43e54-e244-4dc6-b312-f418534b8c6f\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/resourcemanager/createresourcegroup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-5b3ea050-516e-43ab-9462-0726e698c350\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/resourcemanager/updatetags",
+      "method": "PUT",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-565e19dc-dc04-482a-87a8-147d1c7fa8cc\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/servicewatch/createalert",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "management/servicewatch/createcustomlogevents",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-c5db6c3e-b33d-4f89-b672-25cc1fab908e\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/servicewatch/createcustomlogstream",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-1a42394d-f7eb-4d1a-9915-39cb906b4956\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/servicewatch/createcustommetricmetas",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-6789639a-2ba2-4583-bf20-c61a81455bdd\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/servicewatch/createcustommetrics",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-3194e673-ca12-4339-be49-c9b627f28737\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/servicewatch/createdashboard",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-697fd695-0b1b-4270-9108-48d5c8a7a930\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "management/servicewatch/createeventrule",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-a6abc6df-2be3-4872-978d-0a768cc1432f\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/servicewatch/createloggroup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-1812e46e-c6cf-4377-bae2-831c3465919f\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "management/servicewatch/downloadmetricdataimage",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-af"
+    },
+    {
+      "endpoint": "management/servicewatch/listmetricdata",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-85"
+    },
+    {
+      "endpoint": "management/servicewatch/listmetricinfos",
+      "method": "POST",
+      "status": 200,
+      "klass": "other",
+      "excerpt": "{\"count\":6,\"namespaces\":[{\"dimensions\":[{\"columns\":[{\"key\":\"name\",\"name_en\":\"Metric Name\",\"name_ko\":\"\\uc9c0\\ud45c\\uba85\"},{\"key\":\"named_dimensions/resource_name"
+    },
+    {
+      "endpoint": "networking/cdn/createcdnservice",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "networking/direct-connect/createdirectconnect",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Direct Connect name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"VPC id "
+    },
+    {
+      "endpoint": "networking/dns/activateprivatedns",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Private DNS name should have 3 to 20 digits long and permitted english cases, numbers and hyphens(-)\"],\"global_r"
+    },
+    {
+      "endpoint": "networking/dns/createhostedzone",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-9b1a7393-23d6-497f-8be1-b907b31d2e4b\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "networking/dns/createprivatedns",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Private DNS name should have 3 to 20 digits long and permitted english cases, numbers and hyphens(-)\"],\"global_r"
+    },
+    {
+      "endpoint": "networking/dns/createpublicdomainname",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Register name should have 30 digits long.\",\"Register name should have 30 digits long.\",\"Field r"
+    },
+    {
+      "endpoint": "networking/firewall/createfirewallrule",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-f51656aa-d148-47b0-8cd4-54175022d079\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "networking/gslb/creategslb",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-f0320f86-eab4-4559-"
+    },
+    {
+      "endpoint": "networking/loadbalancer/createlbhealthcheck",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-f485b9a1-0f16-463b-bc66-a9813412dba9\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "networking/loadbalancer/createlblistener",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-b985233c-55c4-47eb-9b78-3f82cb170a40\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "networking/loadbalancer/createlbservergroup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-5b6fb7d3-0978-4208-876a-c1126357294b\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "networking/loadbalancer/createloadbalancer",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-5079bd92-509a-4b11-8cfc-c9cb0bb9b0bc\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "networking/security-group/createsecuritygroup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Security Group name should have at most 255 characters\"],\"global_request_id\":\"req-36292445-8071-45b9-bf7c-c2f645"
+    },
+    {
+      "endpoint": "networking/security-group/createsecuritygrouprule",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-f9a02e4d-5856-49ba-b1c4-681cee598436\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "networking/vpc/createinternetgateway",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Type should be 'IGW','GGW' or 'SIGW'\"],\"global_request_id\":\"req-ca4ab89e-1387-49cb-ba7b-e6b515f"
+    },
+    {
+      "endpoint": "networking/vpc/createnatgateway",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Subnet ID must be string\",\"Public IP ID must be string\"],\"global_request_id\":\"req-531220b9-6439-4eab-984c-525687"
+    },
+    {
+      "endpoint": "networking/vpc/createport",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Port name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"Field required\"],"
+    },
+    {
+      "endpoint": "networking/vpc/createprivatelinkendpoint",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"PrivateLink Endpoint name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-). Ho"
+    },
+    {
+      "endpoint": "networking/vpc/createprivatelinkservice",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"PrivateLink Service name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-). How"
+    },
+    {
+      "endpoint": "networking/vpc/createprivatenat",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Private NAT name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"Service Re"
+    },
+    {
+      "endpoint": "networking/vpc/createpublicip",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Please input should be a valid Type ['IGW', 'GGW']\"],\"global_request_id\":\"req-1ce842eb-429a-4903-8350-f6c2b079fb"
+    },
+    {
+      "endpoint": "networking/vpc/createsubnet",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Subnet name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"VPC Id should b"
+    },
+    {
+      "endpoint": "networking/vpc/createtransitgateway",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Transit Gateway name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\"],\"globa"
+    },
+    {
+      "endpoint": "networking/vpc/createvpc",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"VPC name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"Field required\"],\""
+    },
+    {
+      "endpoint": "networking/vpc/createvpcendpoint",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"VPC Endpoint name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"VPC ID mu"
+    },
+    {
+      "endpoint": "networking/vpc/createvpcpeering",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"VPC Peering name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"VPC ID mus"
+    },
+    {
+      "endpoint": "networking/vpn/createvpngateway",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-2d"
+    },
+    {
+      "endpoint": "networking/vpn/createvpntunnel",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-8a8e6919-815f-46ae-"
+    },
+    {
+      "endpoint": "platform/sts/assumerole",
+      "method": "POST",
+      "status": 404,
+      "klass": "client_4xx",
+      "excerpt": "<!DOCTYPE html> <html>   <head>     <title>Samsung Cloud Platform</title>     <meta charset=\"UTF-8\" />     <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" "
+    },
+    {
+      "endpoint": "platform/sts/assumerolewithsaml",
+      "method": "POST",
+      "status": 404,
+      "klass": "client_4xx",
+      "excerpt": "<!DOCTYPE html> <html>   <head>     <title>Samsung Cloud Platform</title>     <meta charset=\"UTF-8\" />     <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" "
+    },
+    {
+      "endpoint": "platform/sts/objectstoreauthorization",
+      "method": "POST",
+      "status": 404,
+      "klass": "client_4xx",
+      "excerpt": "<!DOCTYPE html> <html>   <head>     <title>Samsung Cloud Platform</title>     <meta charset=\"UTF-8\" />     <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" "
+    },
+    {
+      "endpoint": "security/certificatemanager/checknameduplication",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-433b498b-35db-4eac-b2f3-bc89753fe894\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "security/certificatemanager/createcertificate",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-ba"
+    },
+    {
+      "endpoint": "security/certificatemanager/selfsigncert",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "security/certificatemanager/validatecertificate",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-c0a9e86d-4c38-47a3-adb9-859908f99062\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "security/configinspection/creatediagnosisobject",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field requ"
+    },
+    {
+      "endpoint": "security/configinspection/diagnosisrequest",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-a2"
+    },
+    {
+      "endpoint": "security/kms/createkey",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-fb"
+    },
+    {
+      "endpoint": "security/secretsmanager/createsecretsmanager",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-896bded4-6502-4732-"
+    },
+    {
+      "endpoint": "security/secretsmanager/createsecretsmanagerkmskey",
+      "method": "POST",
+      "status": 404,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\": [{\"code\": \"NotFound\", \"detail\": \"The requested resource could not be found.\", \"links\": [], \"request_id\": \"req-effb7e42-8e91-4d25-8fa3-176030bddbbd\", "
+    },
+    {
+      "endpoint": "security/secretsmanager/generaterandompassword",
+      "method": "POST",
+      "status": 200,
+      "klass": "other",
+      "excerpt": "{\"random_password\":\"_3VI}8H+l9<L2{ynW#_h#`a{mH}y-MIz\"} "
+    },
+    {
+      "endpoint": "security/secretvault/createsecretvault",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-2f"
+    },
+    {
+      "endpoint": "storage/archivestorage/createarchivingpolicy",
+      "method": "POST",
+      "status": 401,
+      "klass": "client_4xx",
+      "excerpt": "{\"status\":\"UNAUTHORIZED\",\"name\":\"Request was rejected by gateway\",\"message\":\"Service Account catalog has not target's endpoint. target : scp-archivestorage_hmac"
+    },
+    {
+      "endpoint": "storage/archivestorage/createbucket",
+      "method": "POST",
+      "status": 401,
+      "klass": "client_4xx",
+      "excerpt": "{\"status\":\"UNAUTHORIZED\",\"name\":\"Request was rejected by gateway\",\"message\":\"Service Account catalog has not target's endpoint. target : scp-archivestorage_hmac"
+    },
+    {
+      "endpoint": "storage/backup/createbackup",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_re"
+    },
+    {
+      "endpoint": "storage/backup/createbackupagent",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-47d67137-feec-4676-877a-1da257e46805\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/createvolume",
+      "method": "POST",
+      "status": 500,
+      "klass": "server_5xx_BUG",
+      "excerpt": "{\"errors\":[{\"code\":\"ContactAdminForAssistance\",\"detail\":\"There was a problem processing your request.\\nContact us through Support Center > Contact Us.\",\"global_"
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/createvolumegroup",
+      "method": "POST",
+      "status": 500,
+      "klass": "server_5xx_BUG",
+      "excerpt": "{\"errors\":[{\"code\":\"ContactAdminForAssistance\",\"detail\":\"There was a problem processing your request.\\nContact us through Support Center > Contact Us.\",\"global_"
+    },
+    {
+      "endpoint": "storage/filestorage/createsnapshot",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-8e5f62a5-8425-4ea4-8b98-827533b3176f\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "storage/filestorage/createsnapshotschedule",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-09b6310a-92a4-494d-8570-e09d8e8fbf82\",\"links\":[],\"rel"
+    },
+    {
+      "endpoint": "storage/filestorage/createvolume",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-fbc7f42d-6317-4330-a700-ea3e9318c632"
+    },
+    {
+      "endpoint": "storage/filestorage/createvolumereplication",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-66"
+    },
+    {
+      "endpoint": "storage/parallel-filestorage/createsnapshot",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-7f2ecf98-8964-45fd-a147-473e412d1f8f\",\"links\":[],\"related_resources\":["
+    },
+    {
+      "endpoint": "storage/parallel-filestorage/createvolume",
+      "method": "POST",
+      "status": 400,
+      "klass": "client_4xx",
+      "excerpt": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-cde9c966-d933-42d8-8e3b-c4bb9e2aa61a\",\"links\":[],\"rel"
+    }
+  ]
+}

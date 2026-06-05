@@ -1,15 +1,17 @@
-"""Catalog-driven smoke / regression tests.
+"""Catalog-driven smoke / regression tests — THIN pytest entrypoint.
 
-For every endpoint discovered in the API Reference we generate a test case:
+For every endpoint discovered in the API Reference we generate a test case; the
+actual probe + categorize + record logic lives in the :mod:`regression.smoke`
+engine. This module is only the pytest glue: parametrization (one case per
+catalog endpoint, ids = endpoint key), the ``smoke`` marker, the session reset
+of the legacy status logs, and the ok/soft/fail + known-issues-xfail assertions.
 
-  * GET (read-only) endpoints WITHOUT path params -> called for real; we assert
-    the gateway answers with a non-server-error, authenticated status. 2xx is a
-    pass; 401/403 is reported as an auth/permission problem; 5xx is a failure.
-  * Endpoints WITH path params (need a real resource id) -> skipped unless a
-    value is supplied; they are exercised by the CRUD lifecycle suites instead.
-  * Mutating endpoints (POST/PUT/PATCH/DELETE) -> skipped by default. They are
-    only meaningful inside an ordered CRUD lifecycle (see tests/crud/), and the
-    client itself blocks them unless SCP_ALLOW_MUTATIONS is set.
+  * GET (read-only) endpoints WITHOUT path params -> called for real; a 'fail'
+    category fails the test (5xx / HMAC-401), everything else passes.
+  * Endpoints WITH path params / mutating endpoints -> skipped (covered by the
+    read-chain and CRUD lifecycle suites).
+  * A 'fail' on an endpoint baselined in data/baselines/known_issues.json is
+    xfailed (still recorded), so the gate stays green unless a NEW endpoint breaks.
 
 Run a subset, e.g.:  pytest tests/smoke -m smoke --category compute
 """
@@ -17,73 +19,50 @@ from __future__ import annotations
 
 import pytest
 
-from framework.catalog import Endpoint, endpoints
+from core.catalog import Endpoint
+from core import results
+from regression import smoke
 
 pytestmark = pytest.mark.smoke
 
-
-def _selected(config) -> list[Endpoint]:
-    cat = config.getoption("--category")
-    svc = config.getoption("--service")
-    return endpoints(category=cat, service=svc, resolved_only=True)
+# Known-issues baseline loaded once via the engine (same data file/behaviour).
+_KNOWN_ISSUES = smoke.load_known_issues()
 
 
 def pytest_generate_tests(metafunc):
     if "endpoint" in metafunc.fixturenames:
-        eps = _selected(metafunc.config)
+        cat = metafunc.config.getoption("--category")
+        svc = metafunc.config.getoption("--service")
+        eps = smoke.select_endpoints(category=cat, service=svc)
         metafunc.parametrize("endpoint", eps, ids=[e.key for e in eps])
 
 
-_STATUS_FILE = "reports/smoke_status.tsv"
-
-
-def _record(endpoint: Endpoint, status: int, category: str) -> None:
-    """Append status + category so the CI summary can group results."""
-    try:
-        with open(_STATUS_FILE, "a") as fh:
-            fh.write(f"{status}\t{category}\t{endpoint.key}\t{endpoint.method}\t{endpoint.http_path}\n")
-    except OSError:
-        pass
-
-
-def _categorize(status: int, text: str) -> tuple[str, str]:
-    """Classify a read-only response into ok / soft / fail with a reason.
-
-    Hard-fail only on genuine problems:
-      * 401 HmacValidFail   -> our signing is wrong.
-      * 5xx                 -> server error.
-    Everything else is the API responding correctly to a bare list call given
-    this account's params/permissions/entitlements, and is reported, not failed:
-      * 401 "rejected by gateway"/"catalog has not target" -> service not
-        entitled for this account/region (env), not an auth bug.
-      * 403 no permission, 404 not provisioned, 400/409/422 needs params/data.
-    """
-    t = (text or "").lower()
-    if 200 <= status < 300:
-        return "ok", ""
-    if status == 401:
-        if "rejected by gateway" in t or "catalog has not target" in t:
-            return "soft", "service not entitled for this account/region"
-        return "fail", "HmacValidFail — signing/credentials wrong"
-    if status >= 500:
-        return "fail", "server error"
-    if status == 403:
-        return "soft", "no permission for this key"
-    if status == 404:
-        return "soft", "not provisioned / not found"
-    return "soft", "needs required query params / data"  # 400/409/422/etc.
+@pytest.fixture(scope="session", autouse=True)
+def _reset_smoke_status():
+    """Start the smoke session with fresh status logs. Scoped to the smoke
+    suite (not the root conftest) so a later CRUD pytest session does NOT wipe
+    these rows — CRUD's probe-reads append to them for the dashboard's coverage."""
+    smoke.reset_status_files()
+    yield
 
 
 def test_endpoint_reachable(endpoint: Endpoint, client):
-    if endpoint.is_mutating:
-        pytest.skip("mutating endpoint — covered by CRUD lifecycle suites")
-    if endpoint.has_path_params:
-        pytest.skip(f"needs a real resource id: {endpoint.http_path}")
+    res = smoke.smoke_endpoint(endpoint, client, known_issues=_KNOWN_ISSUES)
 
-    resp = client.get(endpoint.http_path, service=endpoint.service)
-    category, reason = _categorize(resp.status, resp.raw_text)
-    _record(endpoint, resp.status, category)
+    if res.get("skipped"):
+        pytest.skip(res.get("reason", "skipped"))
 
-    assert category != "fail", (
-        f"{endpoint.method} {endpoint.http_path} -> {resp.status} ({reason})\n"
-        f"{resp.raw_text[:300]}")
+    # Transient/host failure surfaced as status 0 (already recorded by the engine).
+    if res["status"] == 0 and res["category"] == results.FAIL:
+        pytest.fail(f"{endpoint.method} {endpoint.http_path} -> {res['reason']}")
+
+    # A failure on a baselined endpoint is an already-tracked backend bug, not a
+    # regression in our suite — xfail (it's still recorded as known-red).
+    if res["category"] == results.FAIL and res.get("known_issue"):
+        ki = _KNOWN_ISSUES[endpoint.key]
+        pytest.xfail(
+            f"known issue ({ki.get('type', '?')}, since {ki.get('since', '?')}): "
+            f"{endpoint.http_path} -> {res['status']}; {ki.get('note', '')}")
+
+    assert res["category"] != results.FAIL, (
+        f"{endpoint.method} {endpoint.http_path} -> {res['status']} ({res['reason']})")

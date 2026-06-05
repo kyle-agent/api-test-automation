@@ -1,0 +1,955 @@
+{
+  "summary": {
+    "names_field": 93,
+    "field_less": 32,
+    "other": 10
+  },
+  "count": 135,
+  "results": [
+    {
+      "endpoint": "ai-ml/aimlops-platform/releaseaimlopsplatformv1",
+      "path": "/v1/aimlops-platform",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-44f900e4-17dd-4c87-9e11-d630bfc0de32\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-3ae1ece5-4641-468c-972e-fbb8a3c93d7f\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "ai-ml/cloud-ml/createcloudml",
+      "path": "/v1/cloud-ml",
+      "status": 404,
+      "verdict": "other",
+      "body": "{\"timestamp\":\"2026-06-05T01:05:31.491+00:00\",\"path\":\"/v1/cloud-ml\",\"status\":404,\"error\":\"Not Found\",\"requestId\":\"ddb55d57-40524\"}"
+    },
+    {
+      "endpoint": "application-service/apigateway/createapi",
+      "path": "/v1/apis",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"api name should be 3~50 characters (English lower case, numbers, and -) start with a lowercase letter and end with a letter except -.\"],\"global_request_id\":\"req-147633c9-6d7e-47de-b8db-4547ea36e189\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-77fb0505-05d0-478d-83ac-6907772a5ede\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "application-service/apigateway/createprivatelinkendpoint",
+      "path": "/v1/privatelink-endpoints",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"PrivateLink Endpoint name should have 3 to 20 digits long and permitted english case and numbers\",\"Field required\"],\"global_request_id\":\"req-dcd00dd2-f2a9-4f56-8804-38e7fd6e2a95\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-038e96a9-3749-4123-8ad9-6cde8eb10f2f\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "application-service/queueservice/createqueue",
+      "path": "/v1/queues",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Start with a lowercase letter and enter 3-64 characters using lowercase letters, numbers, and special characters (-).\",\"Please enter a value between 1 and 256.\",\"Please enter the available duration per unit.\",\"Field required\"],\"global_request_id\":\"req-70f80903-c57e-40b7-8987-823cff0f3189\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-ffdddb39-2028-42ee-8a7e-91250c27a277\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/baremetal/createbaremetals",
+      "path": "/v1/baremetals",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-a736ac72-48d0-4540-8c32-546b35c57af0\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-b7bfe1cd-446f-467c-a7fa-7cbe83d0a32b\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/baremetal/startbaremetals",
+      "path": "/v1/baremetals/start",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-60a427ba-4ae4-4f3e-b52c-563f130c8e23\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-01ed7d39-82dc-4b01-bbb9-7a9900c27e89\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/baremetal/stopbaremetals",
+      "path": "/v1/baremetals/stop",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-e086ea7e-3e4d-40dd-b574-090151b6f0b3\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-05ef48e6-2693-4b08-a490-101a479d9189\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/creategpunodes",
+      "path": "/v1/gpu-nodes",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-ba83fc53-635f-4124-8165-8ab86228637d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-003e9e40-f084-4b79-a443-e604ec190808\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/modifyclusterfabricmembers",
+      "path": "/v1/cluster-fabrics/modify-members",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-98eb1135-e218-4982-a7a0-3fed2307f7a3\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-57de377d-9ccf-4378-8441-8a5077fdea13\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/startgpunodes",
+      "path": "/v1/gpu-nodes/start",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-0877df14-26e9-4079-a6e8-49adfb19e605\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-958ef7a9-ef52-4059-8990-147418fa25a5\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/stopgpunodes",
+      "path": "/v1/gpu-nodes/stop",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-25117d50-e904-4b08-a059-26bfcb425eef\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-d1768c41-3878-43fd-bb50-3b6983dc3208\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/scf/createcloudfunction",
+      "path": "/v1/cloud-functions",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-b005f248-6945-4ed6-9f92-a98efe9fbc42\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-32c2266b-7d0c-4976-ae61-c1d411138d96\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/scf/createcloudfunctionapigatewaytrigger",
+      "path": "/v1/triggers/apigateway",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-4da4f125-60d5-4d61-855a-d9864405fa7a\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-287611b8-7945-46c3-8bed-577be3a8e014\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/scf/createcloudfunctioncronjobtrigger",
+      "path": "/v1/triggers/cronjob",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-4662d2d6-9d92-4e95-8bb0-bba214a6919e\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-cc61b133-3609-421a-bbae-b53c59df226b\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/virtualserver/createautoscalinggroup",
+      "path": "/v1/auto-scaling-groups",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 63 characters or shorter, in ^[a-zA-Z0-9-_]*$ format. Example: \\\"auto-scaling-group-name\\\"\",\"Field \\\"desired_server_count\\\" is invalid. Example: \\\"1\\\"\",\"Field \\\"desired_server_count_editable\\\" is invalid. Example: \\\"True\\\"\",\"Field \\\"launch_configuration_id\\\" is invalid. Example: \\\"b5aea5a675fc4f6b9e0fcd1288354c5f\\\"\",\"Field \\\"max_server_count\\\" is invalid. Example: \\\"2\\\"\",\"Field "
+    },
+    {
+      "endpoint": "compute/virtualserver/createimage",
+      "path": "/v1/images",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"os_distro\\\" is invalid. Example: \\\"alma\\\"\",\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 255 characters or shorter, in ^[a-zA-Z0-9-_ ]*$ format. Example: \\\"imagename\\\"\",\"Field \\\"url\\\" is invalid. The value should be 255 characters or shorter. Example: \\\"https://object-store.kr-west1.s.samsungsdscloud.com/8989447062e04a818baf9e073fd04fa7/bucket/object.qcow2\\\"\"],\"global_request_id\":\"req-2aecc29b-f62a-40dc-aab8-e12adc"
+    },
+    {
+      "endpoint": "compute/virtualserver/createkeypair",
+      "path": "/v1/keypairs",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 255 characters or shorter, in ^[a-zA-Z0-9-_ ]*$ format. Example: \\\"keypairname\\\"\"],\"global_request_id\":\"req-99ff8cf9-950c-4028-9376-e522aee19666\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-b5a0acfb-486e-4efb-a867-50d4d6092897\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/virtualserver/createlaunchconfiguration",
+      "path": "/v1/launch-configurations",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 63 characters or shorter, in ^[a-zA-Z0-9-_]*$ format. Example: \\\"launch-configuration-name\\\"\",\"Field \\\"server_type_id\\\" is invalid. Example: \\\"s1v1m2\\\"\",\"Field \\\"image_id\\\" is invalid. Example: \\\"70a599e0-31e7-49b7-b260-868f441e862b\\\"\",\"Field \\\"keypair_name\\\" is invalid. Example: \\\"keypairname\\\"\"],\"global_request_id\":\"req-5060f394-a12a-4b22-aaf9-b9c50811b703\",\"links\":[],\"related"
+    },
+    {
+      "endpoint": "compute/virtualserver/createservergroup",
+      "path": "/v1/server-groups",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 255 characters or shorter, in ^[a-zA-Z0-9-_ ]*$ format. Example: \\\"server-group\\\"\",\"Field \\\"policy\\\" is invalid. The value should be in ^affinity$|^anti-affinity$|^partition$ format. Example: \\\"anti-affinity\\\"\"],\"global_request_id\":\"req-d07f1beb-c47c-4131-9a21-b26cf024ffd8\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-f76c3bf5-055d-46f9-942f-9676d594c8c7\",\"response\":null,"
+    },
+    {
+      "endpoint": "compute/virtualserver/createsnapshot",
+      "path": "/v1/snapshots",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 255 characters or shorter, in ^[a-zA-Z0-9-_ ]+$ format. Example: \\\"snapshot-1\\\"\",\"Field \\\"volume_id\\\" is invalid. Example: \\\"3f500f00-ed80-4566-a057-e31760226f9a\\\"\"],\"global_request_id\":\"req-ad312501-88a8-4e44-a4b7-f015df10457d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-2703d2b5-ad9b-4151-979d-8119b5506aba\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/virtualserver/createvirtualserver",
+      "path": "/v1/servers",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"server_type_id\\\" is invalid. Example: \\\"s1v1m2\\\"\",\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 63 characters or shorter, in ^[a-zA-Z0-9-_ ]*$ format. Example: \\\"servername\\\"\",\"Field \\\"networks\\\" is invalid. Please try another value.\",\"Field required\",\"Field \\\"image_id\\\" is invalid. Example: \\\"70a599e0-31e7-49b7-b260-868f441e862b\\\"\",\"Field \\\"keypair_name\\\" is invalid. Example: \\\"keypairname\\\"\"],\"global_request_id\":"
+    },
+    {
+      "endpoint": "compute/virtualserver/createvolume",
+      "path": "/v1/volumes",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"name\\\" is invalid. The value should be 1 characters or longer, 255 characters or shorter, in ^[a-zA-Z0-9-_ ]*$ format. Example: \\\"volume01\\\"\",\"Field \\\"size\\\" is invalid. The value should be 8 or greater. Example: \\\"104\\\"\"],\"global_request_id\":\"req-7e94285e-f7f7-4d6e-83f6-da37e580fdf5\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-bf1f800f-e6cf-4091-b3aa-05f03667ec8e\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "compute/virtualserver/createvolumetransfer",
+      "path": "/v1/volume-transfer",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field \\\"volume_id\\\" is invalid. Example: \\\"3f500f00-ed80-4566-a057-e31760226f9a\\\"\"],\"global_request_id\":\"req-389e9bed-253f-4f2c-9fdd-565f0b834f2d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-1573a362-cf85-40dc-a173-806e80299fa0\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "container/scr/createregistry",
+      "path": "/v1/container-registries",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-1cb7ac0c-1da2-4811-8065-a449f19a7a6f\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-96f41275-2781-49cf-8753-a3115e045a4b\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "container/scr/createrepository",
+      "path": "/v1/repositories",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-a57b0fbc-629d-4413-a365-118c84da9e31\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-dd4f9677-7858-480f-9ed0-85b268e0697a\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "container/ske/createcluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"cluster name should be 3~30 characters (lower case, numbers, '-') starting with English lower case and not end with '-'.\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-76b62434-5c01-4fe4-9cba-1bff959922a6\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-8d693dfa-c8f4-4940-ac79-ca0488a443ea\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}"
+    },
+    {
+      "endpoint": "container/ske/createnodepool",
+      "path": "/v1/nodepools",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Nodepool name should be 3~20 characters using lowercase letters, numbers, and '-'. It starts with a lowercase letter, and you cannot use '-' at the end.\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-95cbbd7a-0070-4fdd-8339-bda5d0ca9a02\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-873f7e1f-eb0"
+    },
+    {
+      "endpoint": "data-analytics/data-flow/createdataflow",
+      "path": "/v1/data-flows",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-c013c5bc-4996-47ff-ba04-711cd160bdd8\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-0122a564-4c8d-4bea-ba8f-d75bdfb6c112\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "data-analytics/data-flow/createdataflowserviceconsole",
+      "path": "/v1/data-flow-services",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-dc92e733-2d97-4da4-8708-9e4f0b21f7fe\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-a9dd5ef5-1dbe-4881-91ad-b6da081d01b0\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "data-analytics/data-ops/createdataops",
+      "path": "/v1/data-ops",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-8566cb61-6999-45e3-8f9b-3815900603fd\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-ee251059-30cd-4a81-a8a3-78bec0759f6c\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "data-analytics/data-ops/createdataopsservice",
+      "path": "/v1/data-ops-services",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-bdae91d0-6747-40a1-9667-e49497868996\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-6dc55c3c-cf43-492d-acaf-697807a2a10c\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "data-analytics/eventstreams/eventstreamscreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-87781865-4d64-4e06-a78a-30509412f8fd\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-aa72b340-34c4-4d44-89ad-8bd076ef788f\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "data-analytics/quick-query/createquickquery",
+      "path": "/v1/quick-query",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-5423e332-2a21-426c-98e9-e1ecee875bfd\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-adcddaa4-d680-4189-8471-04997a9248b2\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "data-analytics/quick-query/validatequickqueryresources",
+      "path": "/v1/quick-query/validate-resources",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-577f31aa-4a10-41e4-9b97-367521a09478\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-d8719916-8707-490d-9e62-e35c83f00301\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "data-analytics/searchengine/searchenginecreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-dbff5301-5fe5-441a-aa0c-841830816293\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-61257b69-6f60-41f2-8a93-c00402d9c0c6\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "data-analytics/vertica/verticacreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-17693d38-2959-463e-a252-222a061dcc08\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-7be4c733-3330-4697-b1e3-0ad2219f2524\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "database/cachestore/cachestorecreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-eacdb817-ab82-48bc-a046-570be71b6e1b\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-f66b61d0-d1b5-491c-87cb-57752390fca3\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "database/epas/epascreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-5b341f7c-54a9-401c-9ec8-df668bdfbf4b\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-68a96ede-c74a-4a9a-94b3-375b0d7e8785\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "database/mariadb/mariadbcreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-f04404cb-187b-4a60-8bc8-cf8ac4d3e8d9\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-8f672de7-6552-414a-bf19-8162979e349f\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "database/mysql/mysqlcreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-86ec14bf-0aaa-4604-ae4c-625ed64b4b9f\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-c99466fc-a61c-4aa9-a27e-e6aba7f274ed\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "database/postgresql/postgresqlcreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-c730a449-5c40-4f5a-b51d-18595c8aa2bc\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-88d48e2d-8b75-4229-b486-68ec3fe9e344\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "database/sqlserver/sqlservercreatecluster",
+      "path": "/v1/clusters",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\",\"value_error\"],\"global_request_id\":\"req-e001341d-fc08-4266-86d0-3c5725677158\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-e6c979a0-8684-4c5b-bb5a-53550399f4d5\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "devops-tools/devopsservice/createdevopsservice",
+      "path": "/v1/devops-services",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-cbf0ca53-eda5-4942-a746-5e4453570264\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-dc5e4ba9-8bea-4e30-a76a-2f22e7de7f2a\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "financial-management/billingplan/createplannedcomputes",
+      "path": "/v1/planned-computes",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":\"['Field required', 'Field required', 'Field required', 'Field required']\",\"global_request_id\":\"req-e1e8ef40-8102-49c1-9d07-6b5d1afc24af\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-6e2b4c82-724f-49d5-b7d6-f3c6dab96439\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "financial-management/billingplan/showcancellationfee",
+      "path": "/v1/planned-computes/cancellation-fee",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":\"['Field required']\",\"global_request_id\":\"req-e4a53b36-3576-4a03-8da9-c8b4953dadf9\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-20a765c6-a3fa-40f2-b3e8-ae87662f9de7\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "financial-management/budget/createaccountbudget",
+      "path": "/v1/budgets/account",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":\"Amount is required.\",\"global_request_id\":\"req-5dfcbd86-da29-4d90-9504-bed05c0b29a5\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-09d2319e-9805-48a0-9d2d-3508539a8b71\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/cloudcontrol/createaccountfactoryaccount",
+      "path": "/v1/accounts",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-d7df310c-ac79-461d-b520-f719e02526e6\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-e3fda4ff-7888-4d62-95da-336a0ef3cb94\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/cloudcontrol/createlandingzone",
+      "path": "/v1/landing-zones",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-8806fa45-573f-45a1-a603-b65233902c70\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-4f383ece-f318-4e42-afa1-dd331586a27b\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/cloudcontrol/enableguardrailbindings",
+      "path": "/v1/guardrail-bindings",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-0e4f21e0-ad08-41c7-a298-c7dddb86a6cf\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-96980b25-c2f9-4faf-affb-d8b94fb00b31\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/cloudmonitoring/getmetricperfdatalist",
+      "path": "/v1/cloudmonitorings/product/v2/metric-data",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"message\":\"Invalid input data\",\"code\":\"InvalidInputValue\",\"service\":\"Monitoring\",\"path\":\"/monitoring/product/v2/metric-data\",\"requestId\":null,\"timestamp\":\"2026-06-05T01:07:00.138Z\",\"params\":[{\"name\":\"resourceType\",\"value\":\"queryEndDt\"}]}"
+    },
+    {
+      "endpoint": "management/cloudmonitoring/puteventpolicy",
+      "path": "/v1/cloudmonitorings/event/v2/event-policies",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"message\":\"Invalid input data\",\"code\":\"InvalidInputValue\",\"service\":\"Monitoring\",\"path\":\"/monitoring/event/v2/event-policies\",\"requestId\":null,\"timestamp\":\"2026-06-05T01:07:01.371Z\",\"params\":[{\"name\":\"resourceType\",\"value\":\"productResourceId\"}]}"
+    },
+    {
+      "endpoint": "management/iam-identity-center/createaccountassignment",
+      "path": "/v1/account-assignments",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-6cbfa592-23a0-4ce1-868f-615d76159c3d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-4f74f1e4-f757-4d79-93ff-49ebe1d2d4b4\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam-identity-center/creategroup",
+      "path": "/v1/groups",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"value_error\"],\"global_request_id\":\"req-0231b92f-0f48-4eb4-9a36-ce869fb2f05d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-bc7ff643-0e5f-4b16-b252-fb0cff2e07c4\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam-identity-center/createinstance",
+      "path": "/v1/instances",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-3b1418b5-95ad-4ad2-9175-406b95c17bc5\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-5586b693-ba52-45b7-9622-aceeb0c70647\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam-identity-center/createpermissionset",
+      "path": "/v1/permission-sets",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"value_error\",\"Field required\"],\"global_request_id\":\"req-040c0779-335f-41c1-9ff6-6d704698cd7d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-9b93e25d-e5a4-4148-955f-0c60a20f4281\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam-identity-center/createuser",
+      "path": "/v1/users",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-ed2e0c71-7bd3-4bcf-ae0e-1f034a04552d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-e05ffdda-3143-44f8-993c-214a4ff94df0\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam/accesskeycreate",
+      "path": "/v1/access-keys",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-c24298e3-9979-4de0-b6da-0a94c6c00d7e\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-8c8e6ba4-ff8e-4641-991f-a0983c3742c1\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam/creategroup",
+      "path": "/v1/groups",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-0dbc615c-44e8-42a5-a670-c60b3e531c3c\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-c51e569e-b314-4e50-8d6a-f70a2e424736\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam/createpolicy",
+      "path": "/v1/policies",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-b9abe0fc-c27f-4259-ae0a-35362f99315d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-3ef2d9da-ea72-4c15-be76-18e191c16956\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam/createrole",
+      "path": "/v1/roles",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-ed42d904-852b-4395-b99e-df3a9f578aac\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-cffff76d-4500-49ce-998d-df30b1c9702c\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/iam/createsamlprovider",
+      "path": "/v1/saml-providers",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-b6f1bd02-1483-4470-8212-5a8f70c6f3ad\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-27394d67-6d7d-4651-835f-897cff8aefee\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/loggingaudit/createtrail",
+      "path": "/v1/trails",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-4cabbf56-3528-4e43-a626-06f7b82f35b6\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-ee4c8a3c-16cf-4a7c-a531-13bfa06981c9\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/loggingaudit/downloadlogs",
+      "path": "/v1/logs/download",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-abfc7b9f-222e-4162-9b7d-163a32900fdb\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-e7b346b8-e3a0-44e8-a383-ca8d7096ac00\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/network-logging/createnetworkloggingstorage",
+      "path": "/v1/network-logging/storages",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-57ef18e2-ffec-4e38-8c57-87a9888ec17d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-78e125ea-a16d-47d2-abc8-a08ce7bd2ddb\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/organization/attachpolicybindings",
+      "path": "/v1/assignments/policy-bindings",
+      "status": 403,
+      "verdict": "other",
+      "body": "{\"errors\": [{\"code\": \"Forbidden\", \"detail\": \"You do not have permission to Update. Please contact the administrator.\", \"links\": [], \"global_request_id\": \"req-d7c60698-6e08-4fe4-a93d-94c417a58477\", \"request_id\": \"req-181d5bcb-9f9f-491e-8aee-d924d7a87984\", \"status\": 403, \"title\": \"Forbidden\", \"response\": {\"access_level\": \"Update\", \"action_name\": \"organization:AttachPolicyBindings\", \"caused_auths\": [], \"message\": \"You are not authorized to perform this operation. Encoded authorization failure messa"
+    },
+    {
+      "endpoint": "management/organization/createaccount",
+      "path": "/v1/organization-accounts",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-c781da67-bd1c-4fe0-97df-540118229b4e\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-bc674035-a15b-475a-8b9f-933813f606a7\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/organization/createdelegationpolicy",
+      "path": "/v1/delegation-policies",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-86fd7b83-8f26-49b5-9895-d30aafce3a92\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-db63ecdd-142f-4f8c-bad1-02d9bc0bc819\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/organization/createinvitation",
+      "path": "/v1/invitations",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-3a3f2a9b-4920-4d27-ac1e-4232050b98aa\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-32d8c7cd-bdb5-47bb-99d0-1b88d1f486c8\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/organization/createorganization",
+      "path": "/v1/organizations",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-75c631dd-18e3-43e3-9a1c-174eea0d8be4\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-960d54b4-c9b6-4c73-9e87-b7d6f45fcef8\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/organization/createorganizationunit",
+      "path": "/v1/organization-units",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-0623986c-a95f-4d31-aacf-5b6671725935\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-26470a94-13c6-40cf-ab49-12f91b542db5\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/organization/createservicecontrolpolicy",
+      "path": "/v1/service-control-policies",
+      "status": 403,
+      "verdict": "other",
+      "body": "{\"errors\": [{\"code\": \"Forbidden\", \"detail\": \"You do not have permission to Create. Please contact the administrator.\", \"links\": [], \"global_request_id\": \"req-335649d6-dc8f-4a8d-9b1b-c64f33a37e32\", \"request_id\": \"req-ae3da13e-9bb4-40b0-af10-47d7e5d37a24\", \"status\": 403, \"title\": \"Forbidden\", \"response\": {\"access_level\": \"Create\", \"action_name\": \"organization:CreateServiceControlPolicy\", \"caused_auths\": [], \"message\": \"You are not authorized to perform this operation. Encoded authorization failure"
+    },
+    {
+      "endpoint": "management/resourcemanager/createresourcegroup",
+      "path": "/v1/resource-groups",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-ab04e8f3-57b7-4315-9c5d-5344ca5677dd\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-0bc6ce9e-4987-40f5-8e63-7c34c61dd6df\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/createalert",
+      "path": "/v1/alerts",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-5c64a800-4303-45a2-bdc4-af468ba455cf\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-cd534945-e441-4e7d-80ae-9b043d446140\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/createcustomlogevents",
+      "path": "/v1/log-groups/log-streams/log-events",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-caafeafc-7425-4bd4-8d5a-beddc480a928\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-318a66c8-8c4d-403e-bf14-a0362692297f\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/createcustomlogstream",
+      "path": "/v1/log-groups/log-streams/collect/custom",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-1d89ecf5-abca-407e-8423-2e90e3ed4d83\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-b5ab293a-d1ba-423b-a4de-085d188f4ce9\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/createcustommetricmetas",
+      "path": "/v1/metrics/custom/meta",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-847e69eb-9058-4e10-8f8c-38b8e9deb0a4\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-6d3b3a7d-df43-4200-bf72-7864f0807a79\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/createcustommetrics",
+      "path": "/v1/metrics/custom",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-87c582e5-3fe9-4f4f-8908-60ea5033c2cb\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-fc9b4dc9-79da-474f-9d94-0fef25f62f1a\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/createdashboard",
+      "path": "/v1/dashboards",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-f75d9cee-e577-415e-923b-be03475dff6e\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-5823ca5c-9875-44bb-98d6-99c762de9633\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/createeventrule",
+      "path": "/v1/event-rules",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-213796d8-5daa-4cf2-8563-d7e958eb28db\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-c261802f-d7d0-4660-8e2a-60aa26d15bc0\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/createloggroup",
+      "path": "/v1/log-groups",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-fe3848cd-66a8-470b-8d71-18904cba6cc3\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-eea0a36b-5791-40e2-a1a9-6d7a4eac7f22\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/downloadmetricdataimage",
+      "path": "/v1/metrics/data/download/image",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-9280ced4-f0f0-4841-9d0d-ff46d6305a70\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-32a096ed-1132-492a-8202-1ce348acec67\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "management/servicewatch/listmetricdata",
+      "path": "/v1/metrics/data",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-b6914b5e-238f-4a1c-b7bd-933fe83a4753\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-95be5f1e-67b7-4ba1-a6a0-9eeff2fb00a7\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/cdn/createcdnservice",
+      "path": "/v1/cdns",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-0a08228f-0c32-4ab9-8050-f3b9cd805b9f\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-c4367f42-2661-4497-b1fd-9f45d41c7895\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/direct-connect/createdirectconnect",
+      "path": "/v1/direct-connects",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Direct Connect name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"VPC id should be a valid string\",\"Bandwidth should be a valid integer\"],\"global_request_id\":\"req-d08ec871-f5d5-4578-9d5d-dbf85c014a5f\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-c0610524-3652-4e84-8806-58cbea0465b1\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/dns/activateprivatedns",
+      "path": "/v1/private-dns/activate",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Private DNS name should have 3 to 20 digits long and permitted english cases, numbers and hyphens(-)\"],\"global_request_id\":\"req-0b4abfdf-dbaa-48e5-96e9-1fbeac64fecd\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-ac59e24f-0c77-4450-b234-6f11c5dee94b\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/dns/createhostedzone",
+      "path": "/v1/hosted-zones",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-150668d8-ad17-4958-bf51-991c5830b332\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-06d6bd13-7d4b-4ef7-847f-3778e9df96b7\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/dns/createprivatedns",
+      "path": "/v1/private-dns",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Private DNS name should have 3 to 20 digits long and permitted english cases, numbers and hyphens(-)\"],\"global_request_id\":\"req-c9c3dfc7-0ed1-4de7-9361-9295aad931bf\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-bba60133-56a1-4b7d-a46c-14ecd9ba76aa\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/dns/createpublicdomainname",
+      "path": "/v1/public-domain-names",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Register name should have 30 digits long.\",\"Register name should have 30 digits long.\",\"Field required\",\"Field required\",\"Postal code must be \\u2264 6 chars\",\"Field required\",\"Addition address should have 16 digits long.\",\"Field required\",\"Addition address should have 16 digits long.\",\"Overseas address should have 16 digits long.\",\"Overseas address(city) should have 20 digits long.\",\"Overseas address(state&country) should have 20 d"
+    },
+    {
+      "endpoint": "networking/firewall/createfirewallrule",
+      "path": "/v1/firewalls/rules",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-8a5dbf30-00cc-405e-8555-f72d4526e6fe\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-c6cea6d5-7e61-47d9-b180-05c0231fbd9a\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/gslb/creategslb",
+      "path": "/v1/gslbs",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-2b7e480a-d15f-4d1e-8d20-fbbb38dfa334\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-8198ebb5-4cd2-4769-84d8-2b8f331c37d6\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/loadbalancer/createlbhealthcheck",
+      "path": "/v1/lb-health-checks",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-646ef5ed-2fd3-4ae7-9070-5ae1a2c1ae9f\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-440c93ab-593c-4c83-a1c5-fb833f944d72\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/loadbalancer/createlblistener",
+      "path": "/v1/lb-listeners",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-534cbf2f-c51a-40a3-810e-48ef9f54f69c\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-08725097-1a9f-4267-9d8a-680e2d91552f\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/loadbalancer/createlbservergroup",
+      "path": "/v1/lb-server-groups",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-da398ba7-b0e6-483f-a43d-076ca3a67022\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-7966b930-fdd3-42f9-8f64-95a4faf13595\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/loadbalancer/createloadbalancer",
+      "path": "/v1/loadbalancers",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-d1d46dcf-1524-43b5-aa06-2b22397f0086\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-7a05eb82-2e27-44fb-b57e-a195115a66be\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/security-group/createsecuritygroup",
+      "path": "/v1/security-groups",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Security Group name should have at most 255 characters\"],\"global_request_id\":\"req-ba81235f-9197-4ee3-8bd9-7c10af07fa2e\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-d705e450-d5d6-4e62-8764-535d92f216e7\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/security-group/createsecuritygrouprule",
+      "path": "/v1/security-group-rules",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-eee46150-75dd-4b3b-95bf-5133a34128ba\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-095a1aad-1a78-43f6-8d6e-35942c3863e4\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createinternetgateway",
+      "path": "/v1/internet-gateways",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Type should be 'IGW','GGW' or 'SIGW'\"],\"global_request_id\":\"req-322d611b-45bd-40a2-a421-8cad04c7b836\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-891ac07f-1f03-4893-a294-0e091ab1a485\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createnatgateway",
+      "path": "/v1/nat-gateways",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Subnet ID must be string\",\"Public IP ID must be string\"],\"global_request_id\":\"req-6afcd878-f0a7-4d04-a1df-773c38a86a14\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-2979791e-8920-4528-9ff8-1aa6cf984707\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createport",
+      "path": "/v1/ports",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Port name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"Field required\"],\"global_request_id\":\"req-ca49c553-5afa-48c7-81f7-c08bf49c8d49\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-7982e8f9-cd26-425f-b214-eb5f1d3cefdc\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createprivatelinkendpoint",
+      "path": "/v1/privatelink-endpoints",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"PrivateLink Endpoint name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-). However, it cannot start with a hyphen(-).\",\"Subnet ID must be string\",\"PrivateLink Endpoint IP Address must be string\"],\"global_request_id\":\"req-7d23cbc3-9e59-431c-ae43-85ef9197a35b\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-af372d98-5f85-4850-bacd-800d49d176d6\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createprivatelinkservice",
+      "path": "/v1/privatelink-services",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"PrivateLink Service name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-). However, it cannot start with a hyphen(-).\",\"Subnet ID must be string\",\"Please input should be a valid type ['MANUAL', 'AUTO']\",\"PrivateLink Service IP Address must be string\",\"Please input should be a valid type ['LB', 'IP']\"],\"global_request_id\":\"req-16b4c355-4176-4093-85bc-06ab5cc04ede\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-"
+    },
+    {
+      "endpoint": "networking/vpc/createprivatenat",
+      "path": "/v1/private-nats",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Private NAT name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"Service Resource ID must be string type.\",\"Please input should be a valid Service Type ['DIRECT_CONNECT', 'TRANSIT_GATEWAY']\",\"Please input the valid IP range.\"],\"global_request_id\":\"req-bcd2d053-ef7c-445d-818f-234621e97a08\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-e4f5512a-5d8d-4ae3-9ec7-498a8baf1c2e\",\"response\":null,\"status\":400,\"title"
+    },
+    {
+      "endpoint": "networking/vpc/createpublicip",
+      "path": "/v1/publicips",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Please input should be a valid Type ['IGW', 'GGW']\"],\"global_request_id\":\"req-738f779c-9700-4e36-804e-292294a9109d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-0e1f449f-3092-49aa-9bd3-11ebc9ac9433\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createsubnet",
+      "path": "/v1/subnets",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Subnet name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"VPC Id should be a valid string\",\"Type should be 'GENERAL' or 'LOCAL' or 'VPC_ENDPOINT'\",\"Field required\"],\"global_request_id\":\"req-893387c3-3056-4b18-a021-a5e920abe256\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-b26fbd3d-7323-4b0e-9e97-e3ce20742206\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createtransitgateway",
+      "path": "/v1/transit-gateways",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Transit Gateway name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\"],\"global_request_id\":\"req-a86bf7c0-f35a-4dc9-94fc-d07b93a48317\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-11736794-96dc-4426-9202-81bf9a3a6fcd\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createvpc",
+      "path": "/v1/vpcs",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"VPC name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"Field required\"],\"global_request_id\":\"req-e4e6d84f-61a8-4afd-a9ef-dc3e17e8b265\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-858c5fd7-571d-4731-8c6f-90872c9c0979\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpc/createvpcendpoint",
+      "path": "/v1/vpc-endpoints",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"VPC Endpoint name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"VPC ID must be string\",\"Subnet ID must be string\",\"VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)\",\"VPC Endpoint Resource KEY must be string\",\"VPC Endpoint Resource Info should have at most 200 characters\",\"VPC Endpoint IP Address must be string\"],\"global_request_id\":\"req-e873d56e-88f9-47f4-9f12-5eb1207c7d6c\",\"links\":[],\"related_"
+    },
+    {
+      "endpoint": "networking/vpc/createvpcpeering",
+      "path": "/v1/vpc-peerings",
+      "status": 400,
+      "verdict": "field_less",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"VPC Peering name should have 3 to 20 digits long and permitted english case, numbers and hyphens(-)\",\"VPC ID must be string.\",\"VPC ID must be string.\",\"Approver VPC Account ID must be string\"],\"global_request_id\":\"req-27b9837a-644d-418d-bec3-3364c6e0470f\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-9f59e0dd-bee5-42d4-9990-50e507808c82\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpn/createvpngateway",
+      "path": "/v1/vpn-gateways",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-f4fee79c-a317-4b76-b1fb-756e7f874a7f\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-8b85671f-da73-45ff-a937-ce8860b7434f\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "networking/vpn/createvpntunnel",
+      "path": "/v1/vpn-tunnels",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-c97106b8-382a-43f6-b334-1d51dbf07464\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-485331ba-2d08-40b8-8647-3b4ec262e191\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "platform/sts/assumerole",
+      "path": "/v1/assume-role",
+      "status": 404,
+      "verdict": "other",
+      "body": "<!DOCTYPE html>\n<html>\n  <head>\n    <title>Samsung Cloud Platform</title>\n    <meta charset=\"UTF-8\" />\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <style>\n      html,\n      body {\n        height: 100%;\n        font-family: 'Noto Sans KR', sans-serif;\n      }\n      .error-page {\n        margin: 0 auto;\n        width: 1072px;\n        height: 100%;\n        display: flex;\n        align-items: center;\n     "
+    },
+    {
+      "endpoint": "platform/sts/assumerolewithsaml",
+      "path": "/v1/assume-role-with-saml",
+      "status": 404,
+      "verdict": "other",
+      "body": "<!DOCTYPE html>\n<html>\n  <head>\n    <title>Samsung Cloud Platform</title>\n    <meta charset=\"UTF-8\" />\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <style>\n      html,\n      body {\n        height: 100%;\n        font-family: 'Noto Sans KR', sans-serif;\n      }\n      .error-page {\n        margin: 0 auto;\n        width: 1072px;\n        height: 100%;\n        display: flex;\n        align-items: center;\n     "
+    },
+    {
+      "endpoint": "platform/sts/objectstoreauthorization",
+      "path": "/v1/object-store-authorization",
+      "status": 404,
+      "verdict": "other",
+      "body": "<!DOCTYPE html>\n<html>\n  <head>\n    <title>Samsung Cloud Platform</title>\n    <meta charset=\"UTF-8\" />\n    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <style>\n      html,\n      body {\n        height: 100%;\n        font-family: 'Noto Sans KR', sans-serif;\n      }\n      .error-page {\n        margin: 0 auto;\n        width: 1072px;\n        height: 100%;\n        display: flex;\n        align-items: center;\n     "
+    },
+    {
+      "endpoint": "security/certificatemanager/checknameduplication",
+      "path": "/v1/certificatemanager/check-duplication",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-e592abfa-6a43-4610-8f21-e89578816329\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-b9e19dc4-a592-4f04-9307-f768a8858769\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "security/certificatemanager/createcertificate",
+      "path": "/v1/certificatemanager",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-421bffaa-c7e3-4903-a3b6-092bc94fd583\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-f4d95793-9938-44b5-9812-9d0d54337ea4\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "security/certificatemanager/selfsigncert",
+      "path": "/v1/certificatemanager/self-sign",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-b304943c-68b6-470e-ace4-c29ddb13782b\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-ec3f06fc-9c40-40b1-8044-c19cbb344df3\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "security/certificatemanager/validatecertificate",
+      "path": "/v1/certificatemanager/check-validation",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-edce834f-dd48-488a-b90b-3853b17ef048\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-4f96ec2c-8883-4d6a-a705-f277315cff5e\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "security/configinspection/creatediagnosisobject",
+      "path": "/v1/configinspection/diagnosis/save",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-9d7debd4-113e-4151-ac0b-1826b205841e\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-7dc3e17d-0cdd-48e6-a7f7-fe1e671662c8\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "security/configinspection/diagnosisrequest",
+      "path": "/v1/configinspection/diagnosis/request",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-e07deb16-7da3-4563-80f3-15ddc03c6588\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-e02164a7-c339-4b0f-8a35-31903d1cac73\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "security/kms/createkey",
+      "path": "/v1/kms/transit",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-74d98ba4-d967-49a8-a262-d5198864e65a\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-7b33414d-1cd4-445b-a87b-c1f95d76ae19\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "security/secretsmanager/createsecretsmanager",
+      "path": "/v1/secrets",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-e61188e5-36d7-4a8c-af49-f9aded1da217\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-77b72b2f-a8b1-4437-8a0b-7e10d58fde2d\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "security/secretvault/createsecretvault",
+      "path": "/v1/secretvault",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-3cbcfd4f-b757-48b8-a5ee-860c43b8cd1d\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-ec600a5a-ccc2-4b56-8e1d-341900dd5ccc\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "storage/archivestorage/createarchivingpolicy",
+      "path": "/v1/archiving-policies",
+      "status": 401,
+      "verdict": "other",
+      "body": "{\"status\":\"UNAUTHORIZED\",\"name\":\"Request was rejected by gateway\",\"message\":\"Service Account catalog has not target's endpoint. target : scp-archivestorage_hmac\"}"
+    },
+    {
+      "endpoint": "storage/archivestorage/createbucket",
+      "path": "/v1/buckets",
+      "status": 401,
+      "verdict": "other",
+      "body": "{\"status\":\"UNAUTHORIZED\",\"name\":\"Request was rejected by gateway\",\"message\":\"Service Account catalog has not target's endpoint. target : scp-archivestorage_hmac\"}"
+    },
+    {
+      "endpoint": "storage/backup/createbackup",
+      "path": "/v1/backups",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-4ebe5a7e-9f96-44f6-84cd-2ffe293596b8\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-b9d30b23-4adc-437d-9144-b1a41de34ff0\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "storage/backup/createbackupagent",
+      "path": "/v1/backup-agents",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-cb35a8ad-bff6-45bc-814a-23ad8714a2c0\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-24d880f8-be94-4f7c-b989-0fbad534be57\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/createvolume",
+      "path": "/v1/volumes",
+      "status": 500,
+      "verdict": "other",
+      "body": "{\"errors\":[{\"code\":\"ContactAdminForAssistance\",\"detail\":\"There was a problem processing your request.\\nContact us through Support Center > Contact Us.\",\"global_request_id\":\"req-fefc4e10-60fc-4e1e-bb72-8d9acadc3329\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-1d3b81aa-e1f6-4660-858e-db79dc9c6a96\",\"response\":null,\"status\":500,\"title\":\"ContactAdminForAssistance\"}]}\n"
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/createvolumegroup",
+      "path": "/v1/volume-groups",
+      "status": 500,
+      "verdict": "other",
+      "body": "{\"errors\":[{\"code\":\"ContactAdminForAssistance\",\"detail\":\"There was a problem processing your request.\\nContact us through Support Center > Contact Us.\",\"global_request_id\":\"req-2c35ad31-fd4f-475e-8e77-b4ab988f68a6\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-aa136c79-ea4d-4f7f-9e68-9c50f683ed33\",\"response\":null,\"status\":500,\"title\":\"ContactAdminForAssistance\"}]}\n"
+    },
+    {
+      "endpoint": "storage/filestorage/createsnapshot",
+      "path": "/v1/snapshots",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-553ab472-ea6e-4123-b3a1-382f4fec6e25\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-d7b5ee74-4919-4d03-a144-8138ce98b4d3\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "storage/filestorage/createsnapshotschedule",
+      "path": "/v1/snapshot-schedules",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-e9e5e9ce-a95c-4dcf-8b53-3c39724f5757\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-a83d16ed-5ef6-46c5-8f2d-b51311ade493\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "storage/filestorage/createvolume",
+      "path": "/v1/volumes",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-277c9f19-74f8-4a95-9707-625135501d35\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-a56c77b6-a3bc-4b87-ad5c-9e99d72ed4e2\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "storage/filestorage/createvolumereplication",
+      "path": "/v1/replications",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\",\"Field required\",\"Field required\",\"Field required\"],\"global_request_id\":\"req-c56bf27b-32d4-47ef-b05c-63b4e08edcae\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-7e99bfcc-7ad0-4309-98d8-894b0d1701ac\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "storage/parallel-filestorage/createsnapshot",
+      "path": "/v1/snapshots",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\"],\"global_request_id\":\"req-547928ca-e850-4c82-bdb9-69d97b713aec\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-ea2d066a-60a6-4501-9b66-5cce6047f8f7\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    },
+    {
+      "endpoint": "storage/parallel-filestorage/createvolume",
+      "path": "/v1/volumes",
+      "status": 400,
+      "verdict": "names_field",
+      "body": "{\"errors\":[{\"code\":\"ValidationError\",\"detail\":[\"Field required\",\"Field required\"],\"global_request_id\":\"req-2a513940-381e-4e2b-88c0-d3f8d3f82d13\",\"links\":[],\"related_resources\":[],\"request_id\":\"req-e7f088fe-b935-45a7-aeeb-30edac8802a8\",\"response\":null,\"status\":400,\"title\":\"ValidationError\"}]}\n"
+    }
+  ]
+}

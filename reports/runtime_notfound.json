@@ -1,0 +1,1956 @@
+{
+  "summary": {
+    "checked": 278,
+    "ok_404": 190,
+    "non_404": 88,
+    "server_5xx": 0
+  },
+  "results": [
+    {
+      "endpoint": "ai-ml/aimlops-platform/checkaimlopsplatformversionv1",
+      "path": "/v1/aimlops-platform/clusters/{cluster_id}/check-version",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "ai-ml/aimlops-platform/getaimlopsplatformnodelistv1",
+      "path": "/v1/aimlops-platform/internal/clusters/{cluster_id}/nodes",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "ai-ml/aimlops-platform/getaimlopsplatformstorageclasseslistv1",
+      "path": "/v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "ai-ml/aimlops-platform/getaimlopsplatformv1",
+      "path": "/v1/aimlops-platform/{release_id}",
+      "param": "release_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "ai-ml/aimlops-platform/validateclusternamespaceforaimlopsplatformv1",
+      "path": "/v1/aimlops-platform/clusters/{cluster_id}/validate-namespaces",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "ai-ml/aimlops-platform/validateclusterresourcesizeforaimlopsplatformv1",
+      "path": "/v1/aimlops-platform/clusters/{cluster_id}/validate-resources",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "ai-ml/cloud-ml/cloudmlclusterestimate",
+      "path": "/v1/cloud-ml/clusters/{cluster_id}/estimate",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "ai-ml/cloud-ml/clustercheckreleasable",
+      "path": "/v1/cloud-ml/clusters/{cluster_id}/check-releasable",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "ai-ml/cloud-ml/clusterproduct",
+      "path": "/v1/cloud-ml/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "ai-ml/cloud-ml/getcloudml",
+      "path": "/v1/cloud-ml/{cloud_ml_id}",
+      "param": "cloud_ml_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "application-service/apigateway/listaccesscontrols",
+      "path": "/v1/apis/{api_id}/access-controls",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/listapideployments",
+      "path": "/v1/apis/{api_id}/deployments",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/listauths",
+      "path": "/v1/apis/{api_id}/auths",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/listconnectedprivatelinkendpoints",
+      "path": "/v1/apis/{api_id}/connected-endpoints",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/listreports",
+      "path": "/v1/apis/{api_id}/reports",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/listresources",
+      "path": "/v1/apis/{api_id}/resources",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/liststages",
+      "path": "/v1/apis/{api_id}/stages",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/listusageplans",
+      "path": "/v1/apis/{api_id}/usage-plans",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/showapi",
+      "path": "/v1/apis/{api_id}",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/showprivatelinkendpoint",
+      "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}",
+      "param": "privatelink_endpoint_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/apigateway/showresourcepolicy",
+      "path": "/v1/apis/{api_id}/resource-policies",
+      "param": "api_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "application-service/queueservice/getqueueattributes",
+      "path": "/v1/queues/{queue_id}/attributes",
+      "param": "queue_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "application-service/queueservice/showqueue",
+      "path": "/v1/queues/{queue_id}",
+      "param": "queue_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "compute/baremetal/showbaremetal",
+      "path": "/v1/baremetals/{baremetal_id}",
+      "param": "baremetal_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/showclusterfabric",
+      "path": "/v1/cluster-fabrics/{cluster_fabric_id}",
+      "param": "cluster_fabric_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/multinodegpucluster/showgpunode",
+      "path": "/v1/gpu-nodes/{gpu_node_id}",
+      "param": "gpu_node_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/scf/listenvironmentvariables",
+      "path": "/v1/cloud-functions/{cloud_function_id}/configurations/environment-variables",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/listprivatelinkendpoint",
+      "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showcloudfunction",
+      "path": "/v1/cloud-functions/{cloud_function_id}",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showcloudfunctioncode",
+      "path": "/v1/cloud-functions/{cloud_function_id}/codes",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showcloudfunctionconfiguration",
+      "path": "/v1/cloud-functions/{cloud_function_id}/configurations",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showcloudfunctionlogs",
+      "path": "/v1/cloud-functions/{cloud_function_id}/logs",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showcloudfunctionmetrics",
+      "path": "/v1/cloud-functions/{cloud_function_id}/metrics",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showcloudfunctiontrigger",
+      "path": "/v1/triggers/{trigger_id}",
+      "param": "trigger_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "compute/scf/showgeneralconfig",
+      "path": "/v1/cloud-functions/{cloud_function_id}/configurations/config",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showprivatelinkservice",
+      "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showresourcepolicy",
+      "path": "/v1/cloud-functions/{cloud_function_id}/configurations/resource-policies",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/scf/showurlconfig",
+      "path": "/v1/cloud-functions/{cloud_function_id}/configurations/url",
+      "param": "cloud_function_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "compute/virtualserver/listautoscalinggrouplbservergroups",
+      "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/lb-server-groups",
+      "param": "auto_scaling_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/listautoscalinggroupnotifications",
+      "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications",
+      "param": "auto_scaling_group_id",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "compute/virtualserver/listautoscalinggrouppolicies",
+      "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies",
+      "param": "auto_scaling_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/listautoscalinggroupschedules",
+      "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules",
+      "param": "auto_scaling_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/listautoscalinggroupvirtualservers",
+      "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/virtual-servers",
+      "param": "auto_scaling_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/listimagemembers",
+      "path": "/v1/images/{image_id}/members",
+      "param": "image_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/listserverinterfaces",
+      "path": "/v1/servers/{server_id}/interfaces",
+      "param": "server_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/listserverips",
+      "path": "/v1/servers/{server_id}/ips",
+      "param": "server_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/listservervolumes",
+      "path": "/v1/servers/{server_id}/volumes",
+      "param": "server_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/listvirtualserversecuritygroups",
+      "path": "/v1/servers/{server_id}/security-groups",
+      "param": "server_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showautoscalinggroup",
+      "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+      "param": "auto_scaling_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showimage",
+      "path": "/v1/images/{image_id}",
+      "param": "image_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showkeypair",
+      "path": "/v1/keypairs/{keypair_name}",
+      "param": "keypair_name",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showlaunchconfiguration",
+      "path": "/v1/launch-configurations/{launch_configuration_id}",
+      "param": "launch_configuration_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showservergroup",
+      "path": "/v1/server-groups/{server_group_id}",
+      "param": "server_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showservertype",
+      "path": "/v1/server-types/{server_type_id}",
+      "param": "server_type_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showsnapshot",
+      "path": "/v1/snapshots/{snapshot_id}",
+      "param": "snapshot_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showvirtualserver",
+      "path": "/v1/servers/{server_id}",
+      "param": "server_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showvirtualserverconsolelog",
+      "path": "/v1/servers/{server_id}/console-log",
+      "param": "server_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showvolume",
+      "path": "/v1/volumes/{volume_id}",
+      "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showvolumetransfer",
+      "path": "/v1/volume-transfer/{transfer_id}",
+      "param": "transfer_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "compute/virtualserver/showvolumetype",
+      "path": "/v1/volume-types/{volume_type_id}",
+      "param": "volume_type_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/downloadmanifest",
+      "path": "/v1/tagses/{tags_id}/download/manifest",
+      "param": "tags_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/listimages",
+      "path": "/v1/repositories/{repository_id}/images",
+      "param": "repository_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/listrepositories",
+      "path": "/v1/container-registries/{registry_id}/repositories",
+      "param": "registry_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/listtagses",
+      "path": "/v1/images/{image_id}/tagses",
+      "param": "image_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/showimage",
+      "path": "/v1/images/{image_id}",
+      "param": "image_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/showimagelifecyclepolicypreview",
+      "path": "/v1/images/{image_id}/lifecycle-policy/preview",
+      "param": "image_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/showregistry",
+      "path": "/v1/container-registries/{registry_id}",
+      "param": "registry_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/showrepository",
+      "path": "/v1/repositories/{repository_id}",
+      "param": "repository_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/showtags",
+      "path": "/v1/tagses/{tags_id}",
+      "param": "tags_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/showtagspackages",
+      "path": "/v1/tagses/{tags_id}/packages",
+      "param": "tags_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/showtagssecrets",
+      "path": "/v1/tagses/{tags_id}/secrets",
+      "param": "tags_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/scr/showtagsvulnerabilities",
+      "path": "/v1/tagses/{tags_id}/vulnerabilities",
+      "param": "tags_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/ske/createclusterkubeconfig",
+      "path": "/v1/clusters/{cluster_id}/kubeconfig",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "container/ske/listnodepoolnodes",
+      "path": "/v1/nodepools/{nodepool_id}/nodes",
+      "param": "nodepool_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "container/ske/listnodepools",
+      "path": "/v1/clusters/{cluster_id}/nodepools",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "container/ske/showcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "container/ske/showclusteruserkubeconfig",
+      "path": "/v1/clusters/{cluster_id}/user-kubeconfig",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "container/ske/shownodepool",
+      "path": "/v1/nodepools/{nodepool_id}",
+      "param": "nodepool_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/data-flow/getdataflow",
+      "path": "/v1/data-flows/{data_flow_id}",
+      "param": "data_flow_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/data-flow/getdataflowcheckduplication",
+      "path": "/v1/data-flows/{data_flow_name}/check-duplication",
+      "param": "data_flow_name",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "data-analytics/data-flow/getdataflowservicecheckduplication",
+      "path": "/v1/data-flow-services/{data_flow_service_name}/check-duplication",
+      "param": "data_flow_service_name",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "data-analytics/data-flow/getdataflowserviceconsole",
+      "path": "/v1/data-flow-services/{data_flow_service_id}",
+      "param": "data_flow_service_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/data-flow/getdataflowservicesubversions",
+      "path": "/v1/data-flow-services/data-flows/{data_flow_id}/sub-versions",
+      "param": "data_flow_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/data-flow/ingresscluster",
+      "path": "/v1/data-flows/clusters/{cluster_id}/ingress-controllers",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/data-ops/checkduplicationcontroller",
+      "path": "/v1/data-ops-services/{data_ops_service_name}/check-duplication",
+      "param": "data_ops_service_name",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "data-analytics/data-ops/checkduplicationcontrollerv1",
+      "path": "/v1/data-ops/{data_ops_name}/check-duplication",
+      "param": "data_ops_name",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "data-analytics/data-ops/getdataopsdetail",
+      "path": "/v1/data-ops/{data_ops_id}",
+      "param": "data_ops_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/data-ops/getdataopsservice",
+      "path": "/v1/data-ops-services/{data_ops_service_id}",
+      "param": "data_ops_service_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/data-ops/getdataopssubversion",
+      "path": "/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions",
+      "param": "data_ops_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/data-ops/getingresscontrollerlistv1",
+      "path": "/v1/data-ops/clusters/{cluster_id}/ingress-controllers",
+      "param": "cluster_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/eventstreams/eventstreamslistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/eventstreams/eventstreamslistparametervalues",
+      "path": "/v1/clusters/{cluster_id}/parameters",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/eventstreams/eventstreamsshowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/eventstreams/eventstreamsshowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/quick-query/checkduplicationquickquery",
+      "path": "/v1/quick-query/{quick_query_name}/check-duplication",
+      "param": "quick_query_name",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "data-analytics/quick-query/getquickquery",
+      "path": "/v1/quick-query/{quick_query_id}",
+      "param": "quick_query_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/searchengine/searchenginelistbackuphistories",
+      "path": "/v1/clusters/{cluster_id}/backup-histories",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/searchengine/searchenginelistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/searchengine/searchengineshowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/searchengine/searchengineshowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "data-analytics/vertica/verticalistbackuphistories",
+      "path": "/v1/clusters/{cluster_id}/backup-histories",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/vertica/verticalistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/vertica/verticashowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "data-analytics/vertica/verticashowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "database/cachestore/cachestorelistbackuphistories",
+      "path": "/v1/clusters/{cluster_id}/backup-histories",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/cachestore/cachestorelistcommands",
+      "path": "/v1/clusters/{cluster_id}/commands",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/cachestore/cachestorelistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/cachestore/cachestorelistparametervalues",
+      "path": "/v1/clusters/{cluster_id}/parameters",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/cachestore/cachestoreshowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/cachestore/cachestoreshowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "database/epas/epaslistbackuphistories",
+      "path": "/v1/clusters/{cluster_id}/backup-histories",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/epas/epaslistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/epas/epaslistlogexportconfigs",
+      "path": "/v1/clusters/{cluster_id}/log-export-configs",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/epas/epaslistparametervalues",
+      "path": "/v1/clusters/{cluster_id}/parameters",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/epas/epaslistreplicas",
+      "path": "/v1/clusters/{cluster_id}/replicas",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/epas/epasshowarchiveconfig",
+      "path": "/v1/clusters/{cluster_id}/archive",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/epas/epasshowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/epas/epasshowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "database/mariadb/mariadblistbackuphistories",
+      "path": "/v1/clusters/{cluster_id}/backup-histories",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mariadb/mariadblistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mariadb/mariadblistlogexportconfigs",
+      "path": "/v1/clusters/{cluster_id}/log-export-configs",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mariadb/mariadblistparametervalues",
+      "path": "/v1/clusters/{cluster_id}/parameters",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mariadb/mariadblistreplicas",
+      "path": "/v1/clusters/{cluster_id}/replicas",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mariadb/mariadbshowarchiveconfig",
+      "path": "/v1/clusters/{cluster_id}/archive",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mariadb/mariadbshowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mariadb/mariadbshowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "database/mysql/mysqllistbackuphistories",
+      "path": "/v1/clusters/{cluster_id}/backup-histories",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mysql/mysqllistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mysql/mysqllistlogexportconfigs",
+      "path": "/v1/clusters/{cluster_id}/log-export-configs",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mysql/mysqllistparametervalues",
+      "path": "/v1/clusters/{cluster_id}/parameters",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mysql/mysqllistreplicas",
+      "path": "/v1/clusters/{cluster_id}/replicas",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mysql/mysqlshowarchiveconfig",
+      "path": "/v1/clusters/{cluster_id}/archive",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mysql/mysqlshowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/mysql/mysqlshowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "database/postgresql/postgresqllistbackuphistories",
+      "path": "/v1/clusters/{cluster_id}/backup-histories",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/postgresql/postgresqllistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/postgresql/postgresqllistlogexportconfigs",
+      "path": "/v1/clusters/{cluster_id}/log-export-configs",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/postgresql/postgresqllistparametervalues",
+      "path": "/v1/clusters/{cluster_id}/parameters",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/postgresql/postgresqllistreplicas",
+      "path": "/v1/clusters/{cluster_id}/replicas",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/postgresql/postgresqlshowarchiveconfig",
+      "path": "/v1/clusters/{cluster_id}/archive",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/postgresql/postgresqlshowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/postgresql/postgresqlshowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "database/sqlserver/sqlserverlistbackuphistories",
+      "path": "/v1/clusters/{cluster_id}/backup-histories",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/sqlserver/sqlserverlistengineversionproperties",
+      "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+      "param": "dbaas_engine_version_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/sqlserver/sqlserverlistlogexportconfigs",
+      "path": "/v1/clusters/{cluster_id}/log-export-configs",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/sqlserver/sqlserverlistparametervalues",
+      "path": "/v1/clusters/{cluster_id}/parameters",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/sqlserver/sqlservershowcluster",
+      "path": "/v1/clusters/{cluster_id}",
+      "param": "cluster_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "database/sqlserver/sqlservershowrequest",
+      "path": "/v1/requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "devops-tools/devopsservice/checkdeletabledevopsservice",
+      "path": "/v1/devops-services/{devops_service_id}/check-deletable",
+      "param": "devops_service_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "devops-tools/devopsservice/showdevopsservice",
+      "path": "/v1/devops-services/{devops_service_id}",
+      "param": "devops_service_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "financial-management/billingplan/showplannedcompute",
+      "path": "/v1/planned-computes/{planned_compute_id}",
+      "param": "planned_compute_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "financial-management/budget/showaccountbudget",
+      "path": "/v1/budgets/account/{budget_id}",
+      "param": "budget_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/cloudcontrol/showguardrail",
+      "path": "/v1/guardrails/{guardrail_id}",
+      "param": "guardrail_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "management/cloudcontrol/showlandingzone",
+      "path": "/v1/landing-zones/{landing_zone_id}",
+      "param": "landing_zone_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "management/cloudmonitoring/getadressbookmemberlist",
+      "path": "/v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members",
+      "param": "addrbookId",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/cloudmonitoring/geteventdetail",
+      "path": "/v1/cloudmonitorings/event/v2/events/{eventId}",
+      "param": "eventId",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/cloudmonitoring/geteventnotificationstates",
+      "path": "/v1/cloudmonitorings/event/v2/events/{eventId}/notification-states",
+      "param": "eventId",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/cloudmonitoring/geteventpolicydetail",
+      "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+      "param": "eventPolicyId",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/cloudmonitoring/geteventpolicyhistories",
+      "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories",
+      "param": "eventPolicyId",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/cloudmonitoring/geteventpolicynotification",
+      "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications",
+      "param": "eventPolicyId",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/iam-identity-center/listgroupusers",
+      "path": "/v1/groups/{group_id}/users",
+      "param": "group_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/iam-identity-center/listpermissionsetpolicies",
+      "path": "/v1/permission-sets/{permission_set_id}/policies",
+      "param": "permission_set_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/iam-identity-center/showgroup",
+      "path": "/v1/groups/{group_id}",
+      "param": "group_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/iam-identity-center/showinstance",
+      "path": "/v1/instances/{instance_id}",
+      "param": "instance_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam-identity-center/showpermissionset",
+      "path": "/v1/permission-sets/{permission_set_id}",
+      "param": "permission_set_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/iam-identity-center/showuser",
+      "path": "/v1/users/{user_uuid}",
+      "param": "user_uuid",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/iam/accesskeyshow",
+      "path": "/v1/access-keys/{access_key_id}",
+      "param": "access_key_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/listgroupmember",
+      "path": "/v1/groups/{group_id}/members",
+      "param": "group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/listgrouppolicybinding",
+      "path": "/v1/groups/{group_id}/policy-bindings",
+      "param": "group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/listiamuser",
+      "path": "/v1/accounts/{account_id}/users",
+      "param": "account_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "management/iam/listpolicybinding",
+      "path": "/v1/policies/{policy_id}/bindings",
+      "param": "policy_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/listrolepolicybindings",
+      "path": "/v1/roles/{role_id}/policy-bindings",
+      "param": "role_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/listuserpolicybindings",
+      "path": "/v1/users/{user_id}/policy-bindings",
+      "param": "user_id",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "management/iam/showgroup",
+      "path": "/v1/groups/{group_id}",
+      "param": "group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/showpolicy",
+      "path": "/v1/policies/{policy_id}",
+      "param": "policy_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/showresourcepolicy",
+      "path": "/v1/resource-policies/{srn}",
+      "param": "srn",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/iam/showrole",
+      "path": "/v1/roles/{role_id}",
+      "param": "role_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/showsamlprovider",
+      "path": "/v1/saml-providers/{saml_provider_id}",
+      "param": "saml_provider_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/iam/showserviceaccount",
+      "path": "/v1/service-accounts/{service_account_id}",
+      "param": "service_account_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/loggingaudit/showlog",
+      "path": "/v1/logs/{logging_id}",
+      "param": "logging_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/loggingaudit/showtrail",
+      "path": "/v1/trails/{trail_id}",
+      "param": "trail_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/organization/listparents",
+      "path": "/v1/organization-units/{unit_id}/parents",
+      "param": "unit_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "management/organization/showaccount",
+      "path": "/v1/organization-accounts/{account_id}",
+      "param": "account_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "management/organization/showorganization",
+      "path": "/v1/organizations/{organization_id}",
+      "param": "organization_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "management/organization/showorganizationunit",
+      "path": "/v1/organization-units/{unit_id}",
+      "param": "unit_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/organization/showservicecontrolpolicy",
+      "path": "/v1/service-control-policies/{policy_id}",
+      "param": "policy_id",
+      "status_nonexistent_id": 403,
+      "status_malformed_id": 403
+    },
+    {
+      "endpoint": "management/quota/showaccountquota",
+      "path": "/v1/account-quotas/{account_quota_id}",
+      "param": "account_quota_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/quota/showquotarequest",
+      "path": "/v1/quota-requests/{request_id}",
+      "param": "request_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/resourcemanager/listresourcegroupresources",
+      "path": "/v1/resource-groups/{resource_group_id}/resources",
+      "param": "resource_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/resourcemanager/listresourcetags",
+      "path": "/v1/tags/{srn}",
+      "param": "srn",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/resourcemanager/showresource",
+      "path": "/v1/resources/{srn}",
+      "param": "srn",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "management/resourcemanager/showresourcegroup",
+      "path": "/v1/resource-groups/{resource_group_id}",
+      "param": "resource_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/servicewatch/showalert",
+      "path": "/v1/alerts/{id}",
+      "param": "id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/servicewatch/showdashboard",
+      "path": "/v1/dashboards/{dashboard_id}",
+      "param": "dashboard_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/servicewatch/showeventrule",
+      "path": "/v1/event-rules/{event_rule_id}",
+      "param": "event_rule_id",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "management/servicewatch/showloggroup",
+      "path": "/v1/log-groups/{log_group_id}",
+      "param": "log_group_id",
+      "status_nonexistent_id": 200,
+      "status_malformed_id": 200
+    },
+    {
+      "endpoint": "management/support/showinquiry",
+      "path": "/v1/inquiries/{inquiry_id}",
+      "param": "inquiry_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "management/support/showservicerequest",
+      "path": "/v1/service-requests/{service_request_id}",
+      "param": "service_request_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/cdn/detailcdnservice",
+      "path": "/v1/cdns/{id}",
+      "param": "id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/direct-connect/listroutingrules",
+      "path": "/v1/direct-connects/{direct_connect_id}/routing-rules",
+      "param": "direct_connect_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/direct-connect/showdirectconnect",
+      "path": "/v1/direct-connects/{direct_connect_id}",
+      "param": "direct_connect_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/dns/listhostedzonerecords",
+      "path": "/v1/hosted-zones/{hosted_zone_id}/records",
+      "param": "hosted_zone_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "networking/dns/showhostedzone",
+      "path": "/v1/hosted-zones/{hosted_zone_id}",
+      "param": "hosted_zone_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/dns/showprivatedns",
+      "path": "/v1/private-dns/{private_dns_id}",
+      "param": "private_dns_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/dns/showpublicdomainname",
+      "path": "/v1/public-domain-names/{public_domain_id}",
+      "param": "public_domain_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/firewall/showfirewall",
+      "path": "/v1/firewalls/{firewall_id}",
+      "param": "firewall_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/firewall/showfirewallrule",
+      "path": "/v1/firewalls/rules/{firewall_rule_id}",
+      "param": "firewall_rule_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/gslb/listgslbresources",
+      "path": "/v1/gslbs/{gslb_id}/resources",
+      "param": "gslb_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/gslb/showgslb",
+      "path": "/v1/gslbs/{gslb_id}",
+      "param": "gslb_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/loadbalancer/listlbservergroupmembers",
+      "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+      "param": "lb_server_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/loadbalancer/showlbhealthcheck",
+      "path": "/v1/lb-health-checks/{lb_health_check_id}",
+      "param": "lb_health_check_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/loadbalancer/showlblistener",
+      "path": "/v1/lb-listeners/{listener_id}",
+      "param": "listener_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/loadbalancer/showlbservergroup",
+      "path": "/v1/lb-server-groups/{lb_server_group_id}",
+      "param": "lb_server_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/loadbalancer/showloadbalancer",
+      "path": "/v1/loadbalancers/{loadbalancer_id}",
+      "param": "loadbalancer_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/loadbalancer/showloadbalancercertificate",
+      "path": "/v1/loadbalancers/certificates/{lb_certificate_id}",
+      "param": "lb_certificate_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/loadbalancer/showloadbalancerprivatenatip",
+      "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+      "param": "loadbalancer_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/loadbalancer/showloadbalancerpublicnatip",
+      "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+      "param": "loadbalancer_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/security-group/showsecuritygroup",
+      "path": "/v1/security-groups/{security_group_id}",
+      "param": "security_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/security-group/showsecuritygrouprule",
+      "path": "/v1/security-group-rules/{security_group_rule_id}",
+      "param": "security_group_rule_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/listconnectedprivatelinkendpoints",
+      "path": "/v1/privatelink-services/{privatelink_service_id}/connected-endpoints",
+      "param": "privatelink_service_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/listprivatenatips",
+      "path": "/v1/private-nats/{private_nat_id}/private-nat-ips",
+      "param": "private_nat_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/listsapsecondarysubnets",
+      "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
+      "param": "subnet_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/listsubnetvips",
+      "path": "/v1/subnets/{subnet_id}/vips",
+      "param": "subnet_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/listtransitgatewayrules",
+      "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules",
+      "param": "transit_gateway_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/listtransitgatewayvpcconnections",
+      "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+      "param": "transit_gateway_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/listvpcpeeringrules",
+      "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
+      "param": "vpc_peering_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showinternetgateway",
+      "path": "/v1/internet-gateways/{internet_gateway_id}",
+      "param": "internet_gateway_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/shownatgateway",
+      "path": "/v1/nat-gateways/{nat_gateway_id}",
+      "param": "nat_gateway_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showport",
+      "path": "/v1/ports/{port_id}",
+      "param": "port_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showprivatelinkendpoint",
+      "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}",
+      "param": "privatelink_endpoint_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showprivatelinkservice",
+      "path": "/v1/privatelink-services/{privatelink_service_id}",
+      "param": "privatelink_service_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showprivatenat",
+      "path": "/v1/private-nats/{private_nat_id}",
+      "param": "private_nat_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showpublicip",
+      "path": "/v1/publicips/{publicip_id}",
+      "param": "publicip_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showsubnet",
+      "path": "/v1/subnets/{subnet_id}",
+      "param": "subnet_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showtransitgateway",
+      "path": "/v1/transit-gateways/{transit_gateway_id}",
+      "param": "transit_gateway_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showvpc",
+      "path": "/v1/vpcs/{vpc_id}",
+      "param": "vpc_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showvpcendpoint",
+      "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+      "param": "vpc_endpoint_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpc/showvpcpeering",
+      "path": "/v1/vpc-peerings/{vpc_peering_id}",
+      "param": "vpc_peering_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpn/showvpngateway",
+      "path": "/v1/vpn-gateways/{vpn_gateway_id}",
+      "param": "vpn_gateway_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "networking/vpn/showvpntunnel",
+      "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+      "param": "vpn_tunnel_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "platform/product/showproduct",
+      "path": "/v1/products/{product_id}",
+      "param": "product_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "platform/product/showproductcategory",
+      "path": "/v1/product-categories/{category_id}",
+      "param": "category_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "security/certificatemanager/detailcertificate",
+      "path": "/v1/certificatemanager/{certificate_id}",
+      "param": "certificate_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "security/configinspection/getdiagnosisobjectdetail",
+      "path": "/v1/configinspection/diagnosis/detail/{diagnosis_id}",
+      "param": "diagnosis_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "security/kms/listusers",
+      "path": "/v1/kms/transit/{key_id}/users",
+      "param": "key_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "security/kms/showkey",
+      "path": "/v1/kms/transit/{key_id}",
+      "param": "key_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "security/kms/showmanagedkey",
+      "path": "/v1/managed-kms/transit/{key_id}",
+      "param": "key_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "security/secretsmanager/listversion",
+      "path": "/v1/secrets/{secret_id}/versions",
+      "param": "secret_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "security/secretsmanager/showsecretsmanager",
+      "path": "/v1/secrets/{secret_id}",
+      "param": "secret_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "security/secretvault/gettemporarykey",
+      "path": "/v1/temporarykey/{secret_vault_id}",
+      "param": "secret_vault_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "security/secretvault/showsecretvault",
+      "path": "/v1/secretvault/{secret_vault_id}",
+      "param": "secret_vault_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/archivestorage/listbucketobjects",
+      "path": "/v1/buckets/{bucket_id}/objects",
+      "param": "bucket_id",
+      "status_nonexistent_id": 401,
+      "status_malformed_id": 401
+    },
+    {
+      "endpoint": "storage/archivestorage/listbucketobjectversions",
+      "path": "/v1/buckets/{bucket_id}/object-versions",
+      "param": "bucket_id",
+      "status_nonexistent_id": 401,
+      "status_malformed_id": 401
+    },
+    {
+      "endpoint": "storage/archivestorage/showarchivingpolicy",
+      "path": "/v1/archiving-policies/{archiving_policy_id}",
+      "param": "archiving_policy_id",
+      "status_nonexistent_id": 401,
+      "status_malformed_id": 401
+    },
+    {
+      "endpoint": "storage/archivestorage/showbucket",
+      "path": "/v1/buckets/{bucket_id}",
+      "param": "bucket_id",
+      "status_nonexistent_id": 401,
+      "status_malformed_id": 401
+    },
+    {
+      "endpoint": "storage/archivestorage/showbucketencryption",
+      "path": "/v1/buckets/{bucket_id}/encryption",
+      "param": "bucket_id",
+      "status_nonexistent_id": 401,
+      "status_malformed_id": 401
+    },
+    {
+      "endpoint": "storage/archivestorage/showbucketversioning",
+      "path": "/v1/buckets/{bucket_id}/versioning",
+      "param": "bucket_id",
+      "status_nonexistent_id": 401,
+      "status_malformed_id": 401
+    },
+    {
+      "endpoint": "storage/backup/checkconnectionstate",
+      "path": "/v1/backup-agents/{backup_agent_id}/check-connection-state",
+      "param": "backup_agent_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/backup/listagentbackuprestoretargetservers",
+      "path": "/v1/backups/{backup_id}/agent-backup-restore-targets",
+      "param": "backup_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/backup/listbackuphistories",
+      "path": "/v1/backups/{backup_id}/backup-histories",
+      "param": "backup_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/backup/listbackuprestorehistories",
+      "path": "/v1/backups/{backup_id}/restore-histories",
+      "param": "backup_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/backup/listbackuprestoresubnets",
+      "path": "/v1/backups/{backup_id}/restore/restorable-subnets",
+      "param": "backup_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "storage/backup/listbackuprestoretarget",
+      "path": "/v1/backups/{backup_id}/restore-targets",
+      "param": "backup_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/backup/listbackupschedules",
+      "path": "/v1/backups/{backup_id}/schedules",
+      "param": "backup_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/backup/listfilesystempath",
+      "path": "/v1/backups/{backup_id}/filesystem-path",
+      "param": "backup_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "storage/backup/showbackup",
+      "path": "/v1/backups/{backup_id}",
+      "param": "backup_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/backup/showbackupagent",
+      "path": "/v1/backup-agents/{backup_agent_id}",
+      "param": "backup_agent_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/listvolumegroupsnapshots",
+      "path": "/v1/volume-groups/{volume_group_id}/snapshots",
+      "param": "volume_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/listvolumesnapshots",
+      "path": "/v1/volumes/{volume_id}/snapshots",
+      "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/showvolume",
+      "path": "/v1/volumes/{volume_id}",
+      "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/showvolumegroup",
+      "path": "/v1/volume-groups/{volume_group_id}",
+      "param": "volume_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/showvolumegroupreplication",
+      "path": "/v1/volume-groups/{volume_group_id}/replications",
+      "param": "volume_group_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/baremetal-blockstorage/showvolumereplication",
+      "path": "/v1/volumes/{volume_id}/replications",
+      "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/filestorage/listaccessrules",
+      "path": "/v1/volumes/{volume_id}/access-rules",
+      "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/filestorage/showvolume",
+      "path": "/v1/volumes/{volume_id}",
+      "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/filestorage/showvolumereplication",
+      "path": "/v1/replications/{replication_id}",
+      "param": "replication_id",
+      "status_nonexistent_id": 400,
+      "status_malformed_id": 400
+    },
+    {
+      "endpoint": "storage/parallel-filestorage/listaccessrule",
+      "path": "/v1/volumes/{volume_id}/access-rules",
+      "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    },
+    {
+      "endpoint": "storage/parallel-filestorage/showvolume",
+      "path": "/v1/volumes/{volume_id}",
+      "param": "volume_id",
+      "status_nonexistent_id": 404,
+      "status_malformed_id": 404
+    }
+  ]
+}

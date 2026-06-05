@@ -1,0 +1,5 @@
+# Heavy-lifecycle self-trigger. Put ONE pytest -k filter on the first
+# non-comment line to run that heavy lifecycle on the next push (CI turns on
+# SCP_RUN_HEAVY automatically). Comment it out / empty the file to disable.
+# Options: compute-virtualserver-full | database-mysql-cluster | container-ske-cluster-nodepool | heavy-shared-dbaas | heavy-shared-networking
+# heavy-shared-networking

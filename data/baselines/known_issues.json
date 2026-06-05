@@ -1,0 +1,12 @@
+{
+  "_comment": "Baseline of known/expected failures so the dashboard separates NEW regressions from already-tracked backend bugs. A smoke 'fail' whose key matches an entry here is shown as 'known-red' (muted), not a new regression. Type follows the ReportPortal taxonomy: Product Bug | Automation Bug | System Issue.",
+  "issues": [
+    {
+      "key": "financial-management/billingplan/listplannedcomputeservertypes",
+      "status": 500,
+      "type": "Product Bug",
+      "since": "2026-06-01",
+      "note": "SCP backend 500 on /v1/planned-computes/server-types; tracked upstream, not a regression in our suite."
+    }
+  ]
+}
