@@ -408,8 +408,16 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
 
             expected = step.get("expect_status", [200])
             _txt = resp.raw_text or ""
+            _tl = _txt.lower()
+            # Account quota caps are environmental, not regressions. SCP uses
+            # several shapes: networking "max-count-exceed"/"ExceedMax*", and
+            # service quotas like "scp-container-registry.quota.value.exceeded"
+            # ("Exceeded the service quota limit"). Match them broadly.
             _is_quota = ("exceed-max-count" in _txt or "ExceedMax" in _txt
-                         or "max-count-exceed" in _txt)
+                         or "max-count-exceed" in _txt
+                         or "quota.value.exceeded" in _tl
+                         or "exceeded the service quota" in _tl
+                         or (".quota." in _tl and "exceed" in _tl))
             _is_gateway_block = (resp.status == 417 and (
                 "Request Rejected" in _txt or "request was blocked" in _txt
                 or "Support ID" in _txt))

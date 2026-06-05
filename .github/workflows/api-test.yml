@@ -366,7 +366,10 @@ jobs:
       contents: read
       pull-requests: write
     env:
-      # The reconciler refuses to delete unless this is true.
+      # The client blocks DELETE unless BOTH gates are set; the reconciler is
+      # safe because it is tag-scoped (deletes only this run's owned/expired
+      # resources), not because of these gates.
+      SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
     steps:
       - uses: actions/checkout@v4
