@@ -324,6 +324,63 @@ footer{margin-top:18px;font-size:12px}
 """
 
 
+# ---- design/behavior conformance (separate dimension from the HTTP result) ---
+# IMPORTANT: this is NOT the regression pass/fail. The "최근 status" column is
+# whether the API answered the test call; this is a SEPARATE design-defect audit.
+_CONF_WORD = {"red": "결함", "yellow": "개선", "green": "정상"}
+_CONF_STYLE = {
+    "red": "background:#ffebe9;color:#cf222e;border:1px solid #ff818266",
+    "yellow": "background:#fff8c5;color:#9a6700;border:1px solid #d4a72c66",
+    "green": "background:#eaeef2;color:#656d76;border:1px solid #d0d7de",
+}
+
+
+def conf_chip(status, n):
+    word = _CONF_WORD.get(status, "—")
+    txt = word + (f" {n}" if n else "")
+    return (f'<span style="display:inline-block;padding:1px 9px;border-radius:10px;'
+            f'font-size:12px;font-weight:600;white-space:nowrap;{_CONF_STYLE.get(status, "")}">{txt}</span>')
+
+
+def conf_cell(rec):
+    its = rec.get("items", [])
+    chip = conf_chip(rec.get("status", "green"), len(its))
+    if not its:
+        return chip
+    lis = "".join(
+        f'<li><b>{html.escape(i["type"])}</b> '
+        f'<span class="mut">[{i["src"]} · #{i["issue"]}]</span><br>{html.escape(i["detail"])}</li>'
+        for i in its)
+    return (f'<details><summary style="cursor:pointer">{chip}</summary>'
+            f'<ul style="margin:6px 0 0;padding-left:18px;font-size:12px;line-height:1.5">{lis}</ul>'
+            f'</details>')
+
+
+def render_conformance_section(conf):
+    """Top-of-dashboard panel: design-defect summary (kept visually distinct from
+    the regression stats) + the platform-wide systemic findings banner."""
+    s = conf.get("summary", {})
+    if not s:
+        return ""
+    g, y, r, tot = s.get("green", 0), s.get("yellow", 0), s.get("red", 0), s.get("total", 0)
+    cells = (f'{conf_chip("red", r)} &nbsp; {conf_chip("yellow", y)} &nbsp; {conf_chip("green", g)}')
+    sys_rows = "".join(
+        f'<tr><td>{conf_chip("yellow", it.get("count") or "")}</td>'
+        f'<td><b>{html.escape(it["type"])}</b> <span class="mut">#{it["issue"]} · {html.escape(it["scope"])}</span><br>'
+        f'{html.escape(it["detail"])}</td></tr>'
+        for it in conf.get("systemic", []))
+    return (
+        '<section><h2>설계/동작 정합성 <span class="mut" style="text-transform:none">— '
+        '회귀(호출 성공 여부)와 별개로, 정적+런타임 점검에서 찾은 설계·구현 결함</span></h2>'
+        '<div class="panel">'
+        f'<p style="margin:0 0 8px">API별 판정: {cells} '
+        f'<span class="mut">(총 {tot}개 · "결함"=계약 위반 구현버그, "개선"=설계/문서 결함, "정상"=API별 고유 이슈 없음)</span></p>'
+        '<p class="mut" style="margin:0 0 10px">※ "정상"이어도 아래 <b>플랫폼 전역 항목</b>은 공통 적용됩니다. '
+        '서비스 클릭 → API별 <b>설계/동작 결함</b> 열에서 상세 확인.</p>'
+        '<table><thead><tr><th>건수</th><th>플랫폼 전역 점검 항목 (모든 서비스 공통)</th></tr></thead>'
+        f'<tbody>{sys_rows}</tbody></table></div></section>')
+
+
 def render_service_page(s, meta):
     pct = s["covered"] / s["total"] * 100 if s["total"] else 0
     gpct = s["gcov"] / s["gtot"] * 100 if s["gtot"] else 0
@@ -335,16 +392,20 @@ def render_service_page(s, meta):
         col = STATUS_COLORS.get(st // 100, "#656d76")
         return f'<b style="color:{col}">{st}</b>'
 
+    conf = (meta.get("conf") or {}).get("by_endpoint", {})
     rows = []
     for method, path, title, covered, st in s["rows"]:
         chk = ('<span style="color:#2da44e">✓</span>' if covered
                else '<span class="mut">·</span>')
         rcls = "" if covered else ' class="unc"'
+        key = f'{s["category"]}/{s["service"]}/{title}'
+        cc = conf_cell(conf.get(key, {"status": "green", "items": []}))
         rows.append(
             f'<tr{rcls}><td><span class="m m-{method}">{method}</span></td>'
             f'<td><code>{html.escape(path)}</code></td>'
             f'<td class="ti">{html.escape(title or "")}</td>'
-            f'<td style="text-align:center">{chk}</td><td>{statcell(st)}</td></tr>')
+            f'<td style="text-align:center">{chk}</td><td>{statcell(st)}</td>'
+            f'<td>{cc}</td></tr>')
     svc = html.escape(s["service"]); category = html.escape(s["category"])
     return (
         f'<!doctype html><html lang="ko"><head><meta charset="utf-8">'
@@ -357,8 +418,13 @@ def render_service_page(s, meta):
         f'<div class="mut">operation 커버 ({s["covered"]}/{s["total"]})</div>'
         f'<div class="s-sub">읽기 GET {s["gcov"]}/{s["gtot"]} ({gpct:.0f}%) '
         f'&nbsp;·&nbsp; 쓰기 {s["wcov"]}/{s["wtot"]} ({wpct:.0f}%)</div></div>'
+        f'<p class="mut" style="margin:4px 0 10px">컬럼 구분 — <b>최근 status</b>: 회귀 테스트의 '
+        f'실제 호출 응답(테스트 수행 성공 여부) · <b>설계/동작 결함</b>: 호출 성공 여부와 별개로 '
+        f'정적+런타임 점검에서 찾은 개선/결함(클릭 시 상세). 빈칸 status는 미호출(커버 X).</p>'
         f'<table><thead><tr><th>메서드</th><th>경로</th><th>API</th>'
-        f'<th>커버</th><th>최근 status</th></tr></thead><tbody>{"".join(rows)}</tbody></table>'
+        f'<th>커버</th><th>최근 status<br><span class="mut" style="font-weight:400">회귀 호출결과</span></th>'
+        f'<th>설계/동작 결함<br><span class="mut" style="font-weight:400">별도 점검</span></th>'
+        f'</tr></thead><tbody>{"".join(rows)}</tbody></table>'
         f'<footer class="mut">생성 {meta["when"]} · branch <code>{html.escape(meta["branch"])}</code>'
         f' · 커버 기준: GET=실제 호출(smoke 또는 CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행</footer>'
         f'</div></body></html>')
@@ -428,6 +494,7 @@ def render(d, hist, meta, services):
     return TEMPLATE.format(
         branch=meta["branch"], when=meta["when"], run_type=meta["run_type"],
         services_nav=render_services_nav(services),
+        conformance_section=render_conformance_section(meta.get("conf", {})),
         badge=badge, cards=cards, donut=donut(segs, called), legend=legend,
         cov_op=f'{d["cov_op"]:.1f}', tested=d["tested"], total=d["total"],
         cov_get=f'{d["cov_get"]:.1f}', get_total=d["get_total"],
@@ -503,7 +570,8 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax {paramax_cls}">{paramax} parameter</span><span class="ax off">✗ schema</span></div></div>
 </div></section>
 <section><h2>카테고리별 커버리지 (사각지대 탐지)</h2><div class="panel">{covbars}</div></section>
-<section><h2>서비스별 드릴다운 <span class="mut" style="text-transform:none">— 서비스 클릭 시 해당 서비스의 API별 커버 현황</span></h2>{services_nav}</section>
+{conformance_section}
+<section><h2>서비스별 드릴다운 <span class="mut" style="text-transform:none">— 서비스 클릭 시 해당 서비스의 API별 커버 현황 + 설계/동작 결함</span></h2>{services_nav}</section>
 <section><div class="grid2">
 <div class="panel"><h2>실패 분류</h2><table>
 <tr><th>분류</th><th>수</th><th>의미</th></tr>
@@ -532,6 +600,7 @@ def main():
     ap.add_argument("--crud", default="reports/junit-crud.xml")
     ap.add_argument("--lifecycles", default="tests/crud/lifecycles.json")
     ap.add_argument("--known", default="known_issues.json")
+    ap.add_argument("--conformance", default="framework/conformance.json")
     ap.add_argument("--history", default="dashboard/history.jsonl")
     ap.add_argument("--out", default="dashboard/index.html")
     ap.add_argument("--run-type", default="local")
@@ -546,6 +615,8 @@ def main():
     lifecycles = json.load(open(args.lifecycles)).get("lifecycles", []) \
         if os.path.exists(args.lifecycles) else []
     known = json.load(open(args.known)) if os.path.exists(args.known) else {"issues": []}
+    conf = json.load(open(args.conformance)) if os.path.exists(args.conformance) \
+        else {"summary": {}, "systemic": [], "by_endpoint": {}}
 
     d = compute(cat, tsv, crud, lifecycles, known, param_rows)
     hist = append_history(args.history, d, args.run_type, args.sha)
@@ -553,7 +624,7 @@ def main():
 
     meta = {"branch": args.branch,
             "when": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
-            "run_type": args.run_type}
+            "run_type": args.run_type, "conf": conf}
     htm = render(d, hist, meta, services)
     # TEMPLATE references writeax_cls; inject it
     htm = htm.replace("{writeax_cls}", "part" if d["cov_write"] > 0 else "off")

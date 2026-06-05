@@ -276,6 +276,7 @@ jobs:
           git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || \
             git fetch origin dashboard-data --depth=1 >/dev/null 2>&1 && \
             git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || true
+          python tools/build_conformance.py || true   # design/behavior defects -> framework/conformance.json
           python tools/build_dashboard.py \
             --run-type "${{ github.event_name }}" \
             --sha "${{ github.sha }}" \
