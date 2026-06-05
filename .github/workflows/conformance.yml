@@ -65,48 +65,38 @@ jobs:
           python tools/probe_validation.py || true
       - name: Build conformance
         run: python tools/build_conformance.py | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Pull prior dashboard data (coverage tsv + history + baseline)
+      - name: Pull prior baseline
         run: |
-          mkdir -p dashboard reports framework
+          mkdir -p framework
           git fetch origin dashboard-data --depth=1 >/dev/null 2>&1 || true
-          git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || true
-          git show origin/dashboard-data:smoke_status.tsv > reports/smoke_status.tsv 2>/dev/null || true
           git show origin/dashboard-data:conformance_baseline.json > framework/conformance_baseline.json 2>/dev/null || true
-          [ -s reports/smoke_status.tsv ] || rm -f reports/smoke_status.tsv
-          [ -s dashboard/history.jsonl ] || rm -f dashboard/history.jsonl
           [ -s framework/conformance_baseline.json ] || rm -f framework/conformance_baseline.json
       - name: Baseline diff (only NEW defects alarm)
         run: |
           EXTRA=""
           [ "${{ github.event.inputs.update_baseline }}" = "true" ] && EXTRA="--update"
           python tools/conformance_baseline.py --init-if-missing $EXTRA | tee -a "$GITHUB_STEP_SUMMARY"
-      - name: Build dashboard (coverage preserved via pulled tsv)
-        run: |
-          cp dashboard/history.jsonl /tmp/hist_keep 2>/dev/null || true
-          python tools/build_dashboard.py --run-type conformance \
-            --sha "${{ github.sha }}" --branch "${{ github.ref_name }}"
-          cp /tmp/hist_keep dashboard/history.jsonl 2>/dev/null || true   # keep coverage trend owned by api-regression
-      - name: Publish dashboard to data branch
+      - name: Publish conformance data (non-destructive)
         continue-on-error: true
         run: |
-          pub=$(mktemp -d)
-          cp dashboard/index.html "$pub"/ 2>/dev/null || true
-          cp dashboard/history.jsonl "$pub"/ 2>/dev/null || true
-          cp -r dashboard/services "$pub"/services 2>/dev/null || true
-          cp reports/smoke_status.tsv "$pub"/ 2>/dev/null || true
-          cp framework/conformance.json "$pub"/ 2>/dev/null || true
-          cp framework/conformance_baseline.json "$pub"/ 2>/dev/null || true
-          cp reports/conformance_new.json "$pub"/ 2>/dev/null || true
-          touch "$pub/.nojekyll"
-          cd "$pub"
-          git init -q -b dashboard-data
+          url="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          tmp=$(mktemp -d)
+          git clone --depth=1 --branch dashboard-data "$url" "$tmp/dd" 2>/dev/null || { mkdir -p "$tmp/dd"; ( cd "$tmp/dd" && git init -q -b dashboard-data ); }
+          cd "$tmp/dd"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # update ONLY the conformance axis's own data files (HTML stays owned by api-regression)
+          cp "$GITHUB_WORKSPACE/framework/conformance.json" . 2>/dev/null || true
+          cp "$GITHUB_WORKSPACE/framework/conformance_baseline.json" . 2>/dev/null || true
+          cp "$GITHUB_WORKSPACE/reports/conformance_new.json" . 2>/dev/null || true
+          touch .nojekyll
           git add -A
-          git commit -q -m "conformance dashboard @ ${{ github.sha }} (${{ github.event_name }})" || exit 0
-          git push -f \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
-            dashboard-data
+          git commit -q -m "conformance data @ ${{ github.sha }} (${{ github.event_name }})" || { echo "no change"; exit 0; }
+          for i in 1 2 3 4 5; do
+            if git push "$url" HEAD:dashboard-data 2>/dev/null; then echo pushed; break; fi
+            echo "push race, rebasing ($i)"; git fetch "$url" dashboard-data 2>/dev/null && git rebase FETCH_HEAD 2>/dev/null || git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
       - name: Upload artifacts
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

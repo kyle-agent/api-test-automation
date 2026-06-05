@@ -276,8 +276,14 @@ jobs:
           git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || \
             git fetch origin dashboard-data --depth=1 >/dev/null 2>&1 && \
             git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || true
-          # consume the latest conformance.json published by the conformance axis
-          git show origin/dashboard-data:conformance.json > framework/conformance.json 2>/dev/null || true
+          # consume the latest conformance data published by the conformance axis
+          # (keep the committed conformance.json as fallback if the pull is empty/absent)
+          mkdir -p reports framework
+          git show origin/dashboard-data:conformance.json > /tmp/conf.json 2>/dev/null && [ -s /tmp/conf.json ] && cp /tmp/conf.json framework/conformance.json || true
+          git show origin/dashboard-data:conformance_baseline.json > framework/conformance_baseline.json 2>/dev/null || true
+          git show origin/dashboard-data:conformance_new.json > reports/conformance_new.json 2>/dev/null || true
+          [ -s framework/conformance_baseline.json ] || rm -f framework/conformance_baseline.json
+          [ -s reports/conformance_new.json ] || rm -f reports/conformance_new.json
           python tools/build_dashboard.py \
             --run-type "${{ github.event_name }}" \
             --sha "${{ github.sha }}" \
@@ -294,6 +300,8 @@ jobs:
           cp -r dashboard/services "$pub"/services 2>/dev/null || true
           cp reports/smoke_status.tsv "$pub"/ 2>/dev/null || true
           cp framework/conformance.json "$pub"/ 2>/dev/null || true
+          cp framework/conformance_baseline.json "$pub"/ 2>/dev/null || true
+          cp reports/conformance_new.json "$pub"/ 2>/dev/null || true
           # nojekyll so GitHub Pages serves the raw HTML as-is
           touch "$pub/.nojekyll"
           cd "$pub"
