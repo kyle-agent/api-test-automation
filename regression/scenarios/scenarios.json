@@ -585,7 +585,7 @@
       "id": "application-queueservice-queue",
       "service": "application-service/queueservice",
       "enabled": true,
-      "_note": "Light, self-contained: create a Standard queue, read it, list, delete. Synchronous.",
+      "_note": "Light, self-contained: create a Standard queue, read it, then exercise the config/description/deduplication/ACL writes, list, probe-read, delete. Synchronous. COVERAGE EXPANSION (NOT yet validated against the live gateway): updatequeuedescription, updatequeueconfig (encryption omitted \u2014 no KMS key), updatequeuededuplication + updatequeuededuplicationscope (FIFO-oriented \u2014 may 400 on a Standard queue), setacl + deleteacl. Each write is optional+grouped so a rejection isolates to its group and never fails the create->delete spine.",
       "steps": [
         {
           "name": "create",
@@ -621,6 +621,106 @@
           "expect_status": [
             200
           ]
+        },
+        {
+          "name": "update-description",
+          "group": "qdesc",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/queues/{queue_id}/description",
+          "json": {
+            "description": "API regression suite (updated)"
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "update-config",
+          "group": "qconfig",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/queues/{queue_id}/config",
+          "json": {
+            "data_key_reuse_period": 50,
+            "data_key_reuse_period_unit": "minute",
+            "message_retention_period": 50,
+            "message_retention_period_unit": "minute",
+            "message_size": 256
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "update-deduplication",
+          "group": "qdedup",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/queues/{queue_id}/deduplication",
+          "json": {
+            "content_based_deduplication": false
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "update-deduplication-scope",
+          "group": "qdedupscope",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/queues/{queue_id}/deduplication-scope",
+          "json": {
+            "deduplication_scope": "Queue"
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "set-acl",
+          "group": "qacl",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/queues/{queue_id}/acl",
+          "json": {
+            "ip_address": [
+              "10.0.0.0/8"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "delete-acl",
+          "group": "qacl",
+          "optional": true,
+          "method": "DELETE",
+          "path": "/v1/queues/{queue_id}/acl",
+          "json": {
+            "ip_address": [
+              "10.0.0.0/8"
+            ]
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
         },
         {
           "name": "list",
@@ -1824,7 +1924,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. EXPANSION (NOT yet dispatch-validated \u2014 confirm on next HEAVY run): read captures capture-server-port ($.interfaces[0].id) / capture-server-volume ($.volumes[0].id) are SOFT (probe-only; a miss skips the dependent probe, never fails the run) and feed a 13-GET probe; write op rename-server (PUT /v1/servers/{id}) confirmed to require a 'name' matching ^[a-zA-Z0-9-_ ]*$ (tags are NOT updatable via this endpoint); stop/start power-cycle VALIDATED (STOPPED/SHUTOFF/ACTIVE states correct). Extra block-volume re-added: create standalone /v1/volumes (volume_type:'SSD', size:104 int, capture $.id, poll $.state 'available'), attach via POST /v1/servers/{server_id}/volumes (volume_id+device /dev/vdb), then detach + delete on teardown. The field is volume_type NOT type.",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. The field is volume_type NOT type. COVERAGE EXPANSION (NOT yet dispatch-validated \u2014 confirm on next HEAVY run): (a) server-group create->show(probe via server_group_id)->delete; (b) probe-reads now exercises server_group_id so showservergroup joins the ~13 path-param GETs (showvirtualserver/console-log/interfaces/ips/security-groups/volumes + show* by id) driven off the live server; (c) image PUT updateimage (min_disk/min_ram/protected/visibility) added to the image group; (d) block-volume writes on the extra attached volume: updatevolume (name), updateservervolume (attachment), setvolumeqos, extendvolume (104->112); (e) attach/detach a 2nd security group to the running server; (f) SOFT reboot + wait ACTIVE. Every NEW write is optional+grouped so a rejection isolates to its group (tears down just that group) and never fails the expensive VM run; the validated create->...->delete spine is unchanged. lock/unlock intentionally omitted (risk of stranding a billable VM if unlock fails).",
       "steps": [
         {
           "name": "create-vpc",
@@ -1938,6 +2038,33 @@
           }
         },
         {
+          "name": "create-sg2",
+          "service": "security-group",
+          "group": "sg-attach",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg2{unique}",
+            "description": "API regression VS",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg2_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg2_id}",
+            "service": "security-group"
+          }
+        },
+        {
           "name": "create-keypair",
           "method": "POST",
           "path": "/v1/keypairs",
@@ -1955,6 +2082,31 @@
             "path": "/v1/keypairs/regrkey{unique}",
             "service": "virtualserver"
           }
+        },
+        {
+          "name": "create-server-group",
+          "method": "POST",
+          "path": "/v1/server-groups",
+          "json": {
+            "name": "regrsgrp{unique}",
+            "policy": "anti-affinity",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_group_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/server-groups/{server_group_id}",
+            "service": "virtualserver"
+          },
+          "group": "server-group",
+          "optional": true
         },
         {
           "name": "find-image",
@@ -2074,6 +2226,22 @@
           }
         },
         {
+          "name": "attach-security-group",
+          "group": "sg-attach",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/security-groups",
+          "json": {
+            "security_group_id": "{sg2_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            204
+          ]
+        },
+        {
           "name": "create-volume",
           "method": "POST",
           "path": "/v1/volumes",
@@ -2154,6 +2322,65 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "volume-update",
+          "group": "vol-update",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/volumes/{vol_id}",
+          "json": {
+            "name": "regrvol{unique}u"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "server-volume-update",
+          "group": "svol-update",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/servers/{server_id}/volumes/{vol_id}",
+          "json": {
+            "delete_on_termination": false,
+            "volume_id": "{vol_id}"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "volume-set-qos",
+          "group": "vol-qos",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/volumes/{vol_id}/qos",
+          "json": {
+            "max_iops": 11000,
+            "max_throughput": 600
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "volume-extend",
+          "group": "vol-extend",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/volumes/{vol_id}/size",
+          "json": {
+            "size": 112
+          },
+          "expect_status": [
+            200,
+            202
+          ]
         },
         {
           "name": "rename-server",
@@ -2269,8 +2496,59 @@
             "port_id": "{port_id}",
             "volume_id": "{vol_id}",
             "subnet_id": "{subnet_id}",
-            "keypair_name": "regrkey{unique}"
+            "keypair_name": "regrkey{unique}",
+            "server_group_id": "{server_group_id}"
           }
+        },
+        {
+          "name": "reboot-server",
+          "group": "reboot",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/reboot",
+          "json": {
+            "reboot_type": "SOFT"
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ]
+        },
+        {
+          "name": "wait-server-rebooted",
+          "group": "reboot",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "image-update",
+          "group": "image",
+          "optional": true,
+          "method": "PUT",
+          "path": "/v1/images/{custom_image_id}",
+          "json": {
+            "min_disk": 100,
+            "min_ram": 0,
+            "protected": false,
+            "visibility": "private"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
         },
         {
           "name": "image-delete",
@@ -2330,6 +2608,18 @@
           "destructive": true
         },
         {
+          "name": "detach-security-group",
+          "group": "sg-attach",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/security-groups/{sg2_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
           "name": "delete-server",
           "method": "DELETE",
           "path": "/v1/servers/{server_id}",
@@ -2357,6 +2647,19 @@
           }
         },
         {
+          "name": "delete-server-group",
+          "method": "DELETE",
+          "path": "/v1/server-groups/{server_group_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "group": "server-group",
+          "optional": true
+        },
+        {
           "name": "delete-keypair",
           "method": "DELETE",
           "path": "/v1/keypairs/regrkey{unique}",
@@ -2372,6 +2675,19 @@
           "service": "security-group",
           "method": "DELETE",
           "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-sg2",
+          "service": "security-group",
+          "group": "sg-attach",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg2_id}",
           "expect_status": [
             200,
             202,
