@@ -6,6 +6,7 @@
     "container-ske-cluster-nodepool": ["vpc"],
     "compute-virtualserver-full": ["vpc"],
     "database-mysql-cluster": ["vpc"],
+    "database-postgresql-cluster": ["vpc"],
     "heavy-shared-dbaas": ["vpc"],
     "heavy-shared-networking": ["vpc", "private-dns"]
   },
@@ -19,6 +20,7 @@
     "container-ske-cluster-nodepool": ["vpc", "subnet", "security-group", "keypair", "filestorage-volume"],
     "compute-virtualserver-full": ["vpc", "subnet", "security-group", "keypair", "image", "server-type"],
     "database-mysql-cluster": ["vpc", "subnet"],
+    "database-postgresql-cluster": ["vpc", "subnet"],
     "heavy-shared-dbaas": ["vpc", "subnet"],
     "heavy-shared-networking": ["vpc", "private-dns"]
   },

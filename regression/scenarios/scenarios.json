@@ -3602,6 +3602,782 @@
       ]
     },
     {
+      "id": "database-postgresql-cluster",
+      "service": "database/postgresql",
+      "enabled": true,
+      "heavy": true,
+      "_note": "HEAVY: real billable PostgreSQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet; create->RUNNING, then config writes (maintenance/backup/archive/audit/parameters) + lifecycle actions (restart/stop/start) + instance-group/block-storage resizes, each optional+grouped so a bad body isolates; then delete. ~30-50min, SCP_RUN_HEAVY only. PG bodies grounded from api_docs.json request examples (NOTE: PG maintenance/backup/parameter shapes differ from MySQL: database_encoding/database_locale, audit_enabled boolean, flat setter bodies). NOT yet dispatch-validated; validate via crud_filter=database-postgresql-cluster. Replica/restore/log-export/upgrade endpoints deliberately omitted (need a 2nd billable cluster, a completed backup, an external OBS bucket, or an upgrade-eligible target).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression PG",
+            "cidr": "10.126.0.0/20",
+            "tags": []
+          },
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression PG",
+            "cidr": "10.126.1.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE",
+              "RUNNING",
+              "CREATED",
+              "AVAILABLE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "find-engine-version",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "find-server-type",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-cluster",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrpg{unique}",
+            "instance_name_prefix": "regrpg",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C",
+              "database_name": "regrpg",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "10.126.1.10/32",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "postgresql"
+          }
+        },
+        {
+          "name": "wait-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-parameters",
+          "method": "GET",
+          "path": "/v1/parameters",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "param_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "capture-instance-group",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "instance_group_id": "$.instance_groups[0].id",
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+          }
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}",
+            "dbaas_engine_version_id": "{engine_version_id}"
+          }
+        },
+        {
+          "name": "set-maintenance",
+          "optional": true,
+          "group": "pg-maint",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-maint",
+          "optional": true,
+          "group": "pg-maint",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "unset-maintenance",
+          "optional": true,
+          "group": "pg-maint",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "set-backup",
+          "optional": true,
+          "group": "pg-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {
+            "archive_frequency_minute": "30",
+            "retention_period_day": "8",
+            "starting_time_hour": "3"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-backup",
+          "optional": true,
+          "group": "pg-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "list-backup-histories",
+          "optional": true,
+          "group": "pg-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "unset-backup",
+          "optional": true,
+          "group": "pg-backup",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "set-archive",
+          "optional": true,
+          "group": "pg-archive",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-archive",
+          "optional": true,
+          "group": "pg-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "sync-archive",
+          "optional": true,
+          "group": "pg-archive",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ]
+        },
+        {
+          "name": "delete-archivelog",
+          "optional": true,
+          "group": "pg-archive",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "set-audit-log",
+          "optional": true,
+          "group": "pg-audit",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/audit-log",
+          "json": {
+            "use_audit_log": true
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-audit",
+          "optional": true,
+          "group": "pg-audit",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "set-parameters",
+          "optional": true,
+          "group": "pg-param",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "json": {
+            "parameters": [
+              {
+                "id": "{param_id}",
+                "new_value": "200",
+                "old_value": ""
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-param",
+          "optional": true,
+          "group": "pg-param",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          }
+        },
+        {
+          "name": "sync-parameters",
+          "optional": true,
+          "group": "pg-param",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/parameters/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ]
+        },
+        {
+          "name": "restart-cluster",
+          "optional": true,
+          "group": "pg-restart",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-after-restart",
+          "optional": true,
+          "group": "pg-restart",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "resize-server-type",
+          "optional": true,
+          "group": "pg-resize",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/resize",
+          "json": {
+            "server_type_name": "{db_server_type}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400
+          ]
+        },
+        {
+          "name": "wait-after-resize",
+          "optional": true,
+          "group": "pg-resize",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "resize-block-storage",
+          "optional": true,
+          "group": "pg-bsresize",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "json": {
+            "size_gb": 112
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400
+          ]
+        },
+        {
+          "name": "wait-after-bsresize",
+          "optional": true,
+          "group": "pg-bsresize",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "stop-cluster",
+          "optional": true,
+          "group": "pg-stopstart",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-stopped",
+          "optional": true,
+          "group": "pg-stopstart",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "SHUTDOWN"
+            ],
+            "timeout": 900,
+            "interval": 20
+          }
+        },
+        {
+          "name": "start-cluster",
+          "optional": true,
+          "group": "pg-stopstart",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-started",
+          "optional": true,
+          "group": "pg-stopstart",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "delete-cluster",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "wait-cluster-gone",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ]
+    },
+    {
       "id": "heavy-shared-dbaas",
       "service": "networking/vpc",
       "heavy": true,
