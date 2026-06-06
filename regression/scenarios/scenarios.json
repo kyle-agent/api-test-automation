@@ -357,6 +357,187 @@
           }
         },
         {
+          "name": "repo-update-description",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/description",
+          "json": {
+            "description": "API regression suite (updated)"
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "scr-repo-settings"
+        },
+        {
+          "name": "repo-update-lock-policy",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/lock-policy",
+          "json": {
+            "lock_policy": {
+              "locked": false
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "scr-repo-settings"
+        },
+        {
+          "name": "repo-update-pull-policy",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/pull-policy",
+          "json": {
+            "pull_policy": {
+              "critical_limit": 0,
+              "high_limit": 0,
+              "unmodified_excepted": false,
+              "unscanned_image_pull_prevented": false,
+              "vulnerable_image_pull_prevented": false
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "scr-repo-settings"
+        },
+        {
+          "name": "repo-update-scan-policy",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/scan-policy",
+          "json": {
+            "scan_policy": {
+              "auto_scan_enabled": false,
+              "fixed_version_excepted": false,
+              "language_excepted": false,
+              "scan_policy_enabled": false,
+              "secret_excepted": false,
+              "severity_limit": "High"
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "scr-repo-settings"
+        },
+        {
+          "name": "repo-update-lifecycle-policy",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/lifecycle-policy",
+          "json": {
+            "lifecycle_policy": {
+              "lifecycle_policy_enabled": false,
+              "outdated_rule_enabled": false,
+              "outdated_rule_duration": 90,
+              "outdated_rule_tag_expression": "*",
+              "untagged_rule_enabled": false,
+              "untagged_rule_duration": 90
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "scr-repo-settings"
+        },
+        {
+          "name": "registry-update-public-endpoint",
+          "method": "PUT",
+          "path": "/v1/container-registries/{reg_id}/enable-public-endpoint",
+          "json": {
+            "public_endpoint_enabled": false
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "scr-registry-acl"
+        },
+        {
+          "name": "registry-update-private-acl",
+          "method": "PUT",
+          "path": "/v1/container-registries/{reg_id}/private-acl",
+          "json": {
+            "private_acl_enabled": false,
+            "private_acl_resources": []
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "scr-registry-acl"
+        },
+        {
+          "name": "registry-update-public-acl",
+          "method": "PUT",
+          "path": "/v1/container-registries/{reg_id}/public-acl",
+          "json": {
+            "public_acl_enabled": false,
+            "public_acl_resources": []
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "scr-registry-acl"
+        },
+        {
+          "name": "check-registry-name-dup",
+          "method": "GET",
+          "path": "/v1/container-registries/check-duplication/name",
+          "params": {
+            "name": "regrscr{unique}"
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "scr-checks"
+        },
+        {
+          "name": "check-repo-name-dup",
+          "method": "GET",
+          "path": "/v1/repositories/check-duplication/name",
+          "params": {
+            "registry_id": "{reg_id}",
+            "name": "regrrepo{unique}"
+          },
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "scr-checks"
+        },
+        {
+          "name": "list-connectable-resources",
+          "method": "GET",
+          "path": "/v1/container-registries/connectable-resources",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "scr-checks"
+        },
+        {
           "name": "list",
           "method": "GET",
           "path": "/v1/container-registries",
@@ -421,7 +602,7 @@
           }
         }
       ],
-      "_note": "Registry DELETE returns 500 for a few minutes right after creation (provisioning race), then succeeds; the delete step retries 500 up to ~6 min. Enabled."
+      "_note": "Registry DELETE returns 500 for a few minutes right after creation (provisioning race), then succeeds; the delete step retries 500 up to ~6 min. Enabled. COVERAGE EXPANSION (not yet dispatch-validated): repo settings PUTs (description/lock/pull/scan/lifecycle policy), registry ACL PUTs (public-endpoint/private-acl/public-acl \u2014 all no-op/disabled values, never exposes the registry), and the no-param-list/check GETs (check-duplication x2, connectable-resources). Each optional+grouped. image/tags-scoped endpoints stay uncovered (their ids are born by a docker push, not a REST POST)."
     },
     {
       "id": "filestorage-volume",
@@ -1321,7 +1502,7 @@
       "id": "container-ske-cluster-nodepool",
       "service": "container/ske",
       "enabled": true,
-      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed. | EXPANDED (best-guess, validate via heavy dispatch): nodepool scale up/down + label set/clear.",
+      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed. | EXPANDED (best-guess, validate via heavy dispatch): nodepool scale up/down + label set/clear. COVERAGE EXPANSION (not yet dispatch-validated): cluster setters (logging/service-watch-logging/public- & private-access-control/security-groups \u2014 re-assert safe/no-op values), nodepool taints set+clear, best-effort linked-resources, and the two no-param list GETs (clusters/images). Each setter optional+grouped with 409-retry for async reconcile contention. setclusterupgrade/setnodepoolupgrade deliberately omitted (irreversible / node-roll risk on a billable cluster).",
       "steps": [
         {
           "name": "create-vpc",
@@ -1584,6 +1765,126 @@
           }
         },
         {
+          "name": "set-cluster-logging",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/logging",
+          "json": {
+            "cloud_logging_enabled": "true"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-cluster-logging",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
+        },
+        {
+          "name": "set-cluster-service-watch-logging",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/service-watch-logging",
+          "json": {
+            "service_watch_logging_enabled": "true"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-cluster-swlog",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
+        },
+        {
+          "name": "set-cluster-public-access-control",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/public-access-control",
+          "json": {
+            "public_endpoint_access_control_ip": "0.0.0.0/0"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-cluster-pubacl",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
+        },
+        {
+          "name": "set-cluster-private-access-control",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/private-access-control",
+          "json": {
+            "private_endpoint_access_control_resources": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-cluster-privacl",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
+        },
+        {
+          "name": "set-cluster-security-groups",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/security-groups",
+          "json": {
+            "security_group_id_list": [
+              "{sg_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-cluster-sg",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
+        },
+        {
+          "name": "list-clusters",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-images",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/images",
+          "expect_status": [
+            200
+          ]
+        },
+        {
           "name": "create-nodepool",
           "service": "ske",
           "method": "POST",
@@ -1639,6 +1940,78 @@
             "timeout": 1200,
             "interval": 30
           }
+        },
+        {
+          "name": "set-nodepool-taints",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/taints",
+          "json": {
+            "taints": [
+              {
+                "effect": "NoSchedule",
+                "key": "example.com/regr",
+                "value": "bar"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-np-taints",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
+        },
+        {
+          "name": "clear-nodepool-taints",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/taints",
+          "json": {
+            "taints": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-np-taints",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
+        },
+        {
+          "name": "set-nodepool-linked-resources",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/linked-resources",
+          "json": {
+            "linked_resources": [
+              {
+                "id": "{ske_vol_id}",
+                "name": "regrfsk{unique}",
+                "type": "fs"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "ske-np-linked",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 20
         },
         {
           "name": "list-nodepools",
@@ -4661,7 +5034,7 @@
       "id": "compute-scf-cloud-function-cronjob-trigger",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}].",
+      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}]. COVERAGE EXPANSION (not yet dispatch-validated): config/env-vars/url/code PUTs, enable+disable privatelink-service, set+delete resource-policy (Resource:'*' best-effort, 400 tolerated), and update-cronjob-trigger. Each optional+grouped so a rejection isolates. Skipped (need external artifacts/ids): setcloudfunctioncodefile (OBS jar), apigateway trigger, the privatelink-ENDPOINT family.",
       "steps": [
         {
           "name": "create",
@@ -4707,6 +5080,163 @@
           }
         },
         {
+          "name": "update-config",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/config",
+          "json": {
+            "max_scale": "5",
+            "memory": "256",
+            "min_scale": "1",
+            "timeout": "100"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "scf-config"
+        },
+        {
+          "name": "update-variables",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/environment-variables",
+          "json": {
+            "variables": [
+              {
+                "key": "sample",
+                "value": "sample"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "scf-vars"
+        },
+        {
+          "name": "update-url",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/url",
+          "json": {
+            "allow_ips": [],
+            "auth_type": "NONE",
+            "public_ip_acl_enabled": true,
+            "url_enabled": true
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "scf-url"
+        },
+        {
+          "name": "update-code",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/codes",
+          "json": {
+            "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr2' });"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "scf-code",
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "enable-privatelink-service",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
+          "json": {
+            "privatelink_service_enabled": true
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "scf-plsvc"
+        },
+        {
+          "name": "disable-privatelink-service",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
+          "json": {
+            "privatelink_service_enabled": false
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "scf-plsvc"
+        },
+        {
+          "name": "set-resource-policy",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/resource-policies",
+          "json": {
+            "policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "Statement1",
+                  "Effect": "Allow",
+                  "Principal": "*",
+                  "Action": [
+                    "scf:InvokeFunction"
+                  ],
+                  "Resource": [
+                    "*"
+                  ],
+                  "Condition": {
+                    "StringEquals": {
+                      "scf:CloudFunctionAuthType": [
+                        "SCP_IAM"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            400
+          ],
+          "optional": true,
+          "group": "scf-respolicy"
+        },
+        {
+          "name": "delete-resource-policy",
+          "method": "DELETE",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/resource-policies",
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
+          "optional": true,
+          "group": "scf-respolicy",
+          "destructive": true
+        },
+        {
           "name": "list",
           "method": "GET",
           "path": "/v1/cloud-functions",
@@ -4736,6 +5266,22 @@
             "path": "/v1/triggers/{trigger_id}",
             "service": "scf"
           }
+        },
+        {
+          "name": "update-cronjob-trigger",
+          "method": "PUT",
+          "path": "/v1/triggers/cronjob/{trigger_id}",
+          "json": {
+            "cloud_function_id": "{cloud_function_id}",
+            "schedule": "0 0 * * 0",
+            "timezone": "Asia/Tokyo"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "scf-trigger-update"
         },
         {
           "name": "probe-reads",
