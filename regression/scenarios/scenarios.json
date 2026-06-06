@@ -2013,8 +2013,11 @@
           "method": "GET",
           "path": "/v1/images",
           "expect_status": [
-            200
-          ]
+            200,
+            400
+          ],
+          "optional": true,
+          "group": "ske-lists"
         },
         {
           "name": "create-nodepool",
@@ -3047,8 +3050,7 @@
           "json": {
             "min_disk": 100,
             "min_ram": 0,
-            "protected": false,
-            "visibility": "private"
+            "protected": false
           },
           "expect_status": [
             200,
@@ -5988,6 +5990,27 @@
           }
         },
         {
+          "name": "wait-ready-scf-config",
+          "group": "scf-config",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
           "name": "update-config",
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/config",
@@ -6003,6 +6026,27 @@
           ],
           "optional": true,
           "group": "scf-config"
+        },
+        {
+          "name": "wait-ready-scf-vars",
+          "group": "scf-vars",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
         },
         {
           "name": "update-variables",
@@ -6024,6 +6068,27 @@
           "group": "scf-vars"
         },
         {
+          "name": "wait-ready-scf-url",
+          "group": "scf-url",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
           "name": "update-url",
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/url",
@@ -6039,6 +6104,27 @@
           ],
           "optional": true,
           "group": "scf-url"
+        },
+        {
+          "name": "wait-ready-scf-code",
+          "group": "scf-code",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
         },
         {
           "name": "update-code",
@@ -6066,6 +6152,27 @@
           }
         },
         {
+          "name": "wait-ready-scf-plsvc",
+          "group": "scf-plsvc",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
           "name": "enable-privatelink-service",
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
@@ -6080,6 +6187,27 @@
           "group": "scf-plsvc"
         },
         {
+          "name": "wait-ready-scf-plsvc",
+          "group": "scf-plsvc",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
           "name": "disable-privatelink-service",
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
@@ -6092,6 +6220,27 @@
           ],
           "optional": true,
           "group": "scf-plsvc"
+        },
+        {
+          "name": "wait-ready-scf-respolicy",
+          "group": "scf-respolicy",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
         },
         {
           "name": "set-resource-policy",
@@ -6129,6 +6278,27 @@
           ],
           "optional": true,
           "group": "scf-respolicy"
+        },
+        {
+          "name": "wait-ready-scf-respolicy",
+          "group": "scf-respolicy",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 300,
+            "interval": 10
+          }
         },
         {
           "name": "delete-resource-policy",
