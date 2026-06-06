@@ -59,6 +59,30 @@ _SMOKE_TSV = "reports/smoke_status.tsv"
 # the read-only smoke must skip, reusing a resource a lifecycle just created.
 _CATALOG = load_catalog()
 
+
+def _norm_path(p: str) -> str:
+    """Collapse templated id segments to '*' (mirrors dashboard.norm_path) so a
+    lifecycle step's templated path can be matched back to its catalog endpoint."""
+    p = (p or "").split("?")[0].strip("/")
+    return "/".join("*" if "{" in s else s for s in p.split("/"))
+
+
+# (METHOD, normalized-path, service) -> catalog endpoint key. Lets a CRUD WRITE
+# step be recorded under its REAL catalog key (not just "lifecycle:step") so its
+# HTTP status + response time show up in the dashboard's per-endpoint column,
+# exactly like read-only GETs. Service is part of the key because path roots
+# collide across services (e.g. /v1/volumes, /v1/clusters).
+_CAT_KEY_BY_MNS: dict[tuple, str] = {}
+for _e in _CATALOG:
+    _CAT_KEY_BY_MNS.setdefault(
+        ((_e.method or "").upper(), _norm_path(_e.http_path), _e.service), _e.key)
+
+
+def _catalog_key_for(method: str, templated_path: str, service: str | None):
+    """Resolve a step's (method, templated path, service) to a catalog key, or None."""
+    return _CAT_KEY_BY_MNS.get(
+        ((method or "").upper(), _norm_path(templated_path), service or ""))
+
 # Quota kinds whose budget must be reserved before a step's create, keyed by the
 # path it creates. Derived from dependencies.json (path -> kind) so the kernel
 # budget is consulted as DATA, not hardcoded.
@@ -402,9 +426,21 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 raise LifecycleSkip(str(exc))
 
             # record the step call itself for coverage/timing
-            _record_smoke(resp.status, categorize(resp.status, resp.raw_text or ""),
+            _cat = categorize(resp.status, resp.raw_text or "")
+            _ems = getattr(resp, "elapsed_ms", None)
+            _record_smoke(resp.status, _cat,
                           f"{lifecycle['id']}:{step['name']}", step["method"],
-                          step.get("path", path), getattr(resp, "elapsed_ms", None))
+                          step.get("path", path), _ems)
+            # ALSO record WRITE steps under their real catalog endpoint key so the
+            # dashboard surfaces their HTTP status + response time per endpoint, the
+            # same way GETs do (reads already arrive under the catalog key via smoke
+            # / probe_reads). Records the ACTUAL response — incl. a 4xx from an
+            # isolated optional write — which is exactly the signal we want shown.
+            if step["method"].upper() != "GET":
+                _ck = _catalog_key_for(step["method"], step.get("path", ""), step_service)
+                if _ck:
+                    _record_smoke(resp.status, _cat, _ck, step["method"],
+                                  step.get("path", path), _ems)
 
             expected = step.get("expect_status", [200])
             _txt = resp.raw_text or ""
