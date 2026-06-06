@@ -5944,7 +5944,7 @@
       "id": "compute-scf-cloud-function-cronjob-trigger",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}]. COVERAGE EXPANSION (not yet dispatch-validated): config/env-vars/url/code PUTs, enable+disable privatelink-service, set+delete resource-policy (Resource:'*' best-effort, 400 tolerated), and update-cronjob-trigger. Each optional+grouped so a rejection isolates. Skipped (need external artifacts/ids): setcloudfunctioncodefile (OBS jar), apigateway trigger, the privatelink-ENDPOINT family.",
+      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}]. COVERAGE EXPANSION (not yet dispatch-validated): config/env-vars/url/code PUTs, set+delete resource-policy (Resource:'*' best-effort, 400 tolerated), and update-cronjob-trigger. Each optional+grouped so a rejection isolates. Skipped (need external artifacts/ids): setcloudfunctioncodefile (OBS jar), apigateway trigger, the privatelink-ENDPOINT family. enable/disable-privatelink-service REMOVED (run #5): enabling PL leaves the service in 'Creating' so the in-lifecycle disable 400s, then the function delete 400s with CloudFunctionNotDeletableError — i.e. enabling PL blocks clean teardown. Not worth a stateful PL-service wait for 2 niche PUTs.",
       "steps": [
         {
           "name": "create",
@@ -6150,76 +6150,6 @@
             "timeout": 300,
             "interval": 10
           }
-        },
-        {
-          "name": "wait-ready-scf-plsvc",
-          "group": "scf-plsvc",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.cloud_function.state",
-            "until": [
-              "READY",
-              "RUNNING",
-              "ACTIVE",
-              "Running"
-            ],
-            "timeout": 300,
-            "interval": 10
-          }
-        },
-        {
-          "name": "enable-privatelink-service",
-          "method": "PUT",
-          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
-          "json": {
-            "privatelink_service_enabled": true
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "optional": true,
-          "group": "scf-plsvc"
-        },
-        {
-          "name": "wait-ready-scf-plsvc",
-          "group": "scf-plsvc",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.cloud_function.state",
-            "until": [
-              "READY",
-              "RUNNING",
-              "ACTIVE",
-              "Running"
-            ],
-            "timeout": 300,
-            "interval": 10
-          }
-        },
-        {
-          "name": "disable-privatelink-service",
-          "method": "PUT",
-          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
-          "json": {
-            "privatelink_service_enabled": false
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "optional": true,
-          "group": "scf-plsvc"
         },
         {
           "name": "wait-ready-scf-respolicy",
