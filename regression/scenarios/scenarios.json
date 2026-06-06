@@ -43,6 +43,63 @@
           ]
         },
         {
+          "name": "set-rg",
+          "method": "PUT",
+          "path": "/v1/resource-groups/{rg_id}",
+          "json": {
+            "name": "regr-rg-{unique}",
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "rg-set"
+        },
+        {
+          "name": "tag-rg",
+          "method": "PUT",
+          "path": "/v1/tags/{rg_srn}/bulk",
+          "json": {
+            "tags": [
+              {
+                "key": "regr",
+                "value": "{unique}"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "optional": true,
+          "group": "rg-tags"
+        },
+        {
+          "name": "list-rg-tags",
+          "method": "GET",
+          "path": "/v1/tags/{rg_srn}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "rg-tags"
+        },
+        {
+          "name": "del-rg-tag",
+          "method": "DELETE",
+          "path": "/v1/tags/{rg_srn}/regr",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "optional": true,
+          "group": "rg-tags",
+          "destructive": true
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "resource_group_id": "{rg_id}",
@@ -64,6 +121,81 @@
             204
           ],
           "destructive": true
+        }
+      ],
+      "_note": "Create a resource-group, read it, then set it + write/list/delete a tag on its SRN (each optional+grouped), probe path-param GETs, delete. COVERAGE EXPANSION (not dispatch-validated): setresourcegroup, updateresourcetags, listresourcetags, deleteresourcetag. rg_srn is soft-captured; if absent the tag steps isolate to their group."
+    },
+    {
+      "id": "quota-reads",
+      "service": "management/quota",
+      "enabled": true,
+      "_note": "Read-only: list account-quotas + quota-requests, soft-capture an id each, probe the 2 path-param GETs (showaccountquota/showquotarequest). No writes/cleanup. Envelope/id grounded from docs ($.account_quotas[].id, $.quota_requests[].id). Runs in CRUD mode (engine gates all lifecycles on SCP_ALLOW_MUTATIONS); env-dependent (records SOFT if the account has no quota-requests).",
+      "steps": [
+        {
+          "name": "list-account-quotas",
+          "method": "GET",
+          "path": "/v1/account-quotas",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "account_quota_id": "$.account_quotas[0].id"
+          }
+        },
+        {
+          "name": "list-quota-requests",
+          "method": "GET",
+          "path": "/v1/quota-requests",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "request_id": "$.quota_requests[0].id"
+          }
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "account_quota_id": "{account_quota_id}",
+            "request_id": "{request_id}"
+          }
+        }
+      ]
+    },
+    {
+      "id": "support-reads",
+      "service": "management/support",
+      "enabled": true,
+      "_note": "Read-only: list inquiries + service-requests, soft-capture an id each, probe showinquiry/showservicerequest. No writes/cleanup. Env-dependent (records SOFT if the account has no inquiries/tickets \u2014 there is no create-ticket API in the catalog).",
+      "steps": [
+        {
+          "name": "list-inquiries",
+          "method": "GET",
+          "path": "/v1/inquiries",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "inquiry_id": "$.inquiries[0].id"
+          }
+        },
+        {
+          "name": "list-service-requests",
+          "method": "GET",
+          "path": "/v1/service-requests",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "service_request_id": "$.service_requests[0].id"
+          }
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "inquiry_id": "{inquiry_id}",
+            "service_request_id": "{service_request_id}"
+          }
         }
       ]
     },
