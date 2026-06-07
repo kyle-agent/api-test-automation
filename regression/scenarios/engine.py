@@ -236,6 +236,26 @@ def _self_signed_pem() -> dict | None:
     key = next((b for b in blocks if "PRIVATE KEY" in b), None)
     if not cert or not key:
         return None
+    # `openssl req -newkey` emits the key as PKCS#8 (-----BEGIN PRIVATE KEY-----),
+    # but certificatemanager's check-validation/import only accept the traditional
+    # PKCS#1 encoding (-----BEGIN RSA PRIVATE KEY-----) and otherwise reject it as
+    # "not a PEM format". OpenSSL 3.x also defaults `openssl rsa` to PKCS#8, so we
+    # ask for `-traditional`; on OpenSSL 1.x (no such flag) plain `openssl rsa`
+    # already yields PKCS#1, so fall back to it.
+    if "BEGIN RSA PRIVATE KEY" not in key:
+        for args in (["openssl", "rsa", "-traditional"], ["openssl", "rsa"]):
+            try:
+                conv = subprocess.run(args, input=key, capture_output=True,
+                                      text=True, timeout=30, check=True).stdout
+            except (subprocess.SubprocessError, OSError):
+                continue
+            if "BEGIN RSA PRIVATE KEY" in conv:
+                key = conv.strip()
+                break
+        else:
+            print("  cert material: PKCS#1 conversion failed; "
+                  "certificatemanager import/validate lifecycle will skip")
+            return None
     # cert_chain is optional for a self-signed leaf; send empty to avoid the
     # gateway rejecting a self-referential chain.
     _CERT_MATERIAL = {"cert_body": cert + "\n", "private_key": key + "\n",
