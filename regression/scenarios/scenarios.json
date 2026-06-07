@@ -2449,6 +2449,43 @@
           ]
         },
         {
+          "name": "scale-down-nodepool",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "json": {
+            "desired_node_count": "1",
+            "min_node_count": "1",
+            "max_node_count": "2",
+            "is_auto_scale": "false",
+            "is_auto_recovery": "true"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "wait-scale-down",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
           "name": "delete-nodepool",
           "service": "ske",
           "method": "DELETE",
