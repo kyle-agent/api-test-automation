@@ -5840,6 +5840,19 @@
           ]
         },
         {
+          "name": "update-description",
+          "service": "kms",
+          "method": "PUT",
+          "path": "/v1/kms/transit/{key_id}/description",
+          "json": {
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "key_id": "{key_id}"
@@ -5941,6 +5954,19 @@
           ]
         },
         {
+          "name": "set-description",
+          "service": "secretsmanager",
+          "method": "PUT",
+          "path": "/v1/secrets/{secret_id}/description",
+          "json": {
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "secret_id": "{secret_id}"
@@ -6018,6 +6044,19 @@
           "path": "/v1/apis",
           "expect_status": [
             200
+          ]
+        },
+        {
+          "name": "set-api-description",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/description",
+          "json": {
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202
           ]
         },
         {
@@ -7585,6 +7624,20 @@
           "path": "/v1/groups",
           "expect_status": [
             200
+          ]
+        },
+        {
+          "name": "set-group",
+          "service": "iam",
+          "method": "PUT",
+          "path": "/v1/groups/{group_id}",
+          "json": {
+            "name": "regrgrp{ualpha}",
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202
           ]
         },
         {
