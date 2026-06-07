@@ -6700,22 +6700,6 @@
           ]
         },
         {
-          "name": "updateprivatelinkservice",
-          "service": "scf",
-          "method": "PUT",
-          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
-          "group": "xcov-updateprivatelinkservice",
-          "optional": true,
-          "json": {
-            "privatelink_service_enabled": true
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ]
-        },
-        {
           "name": "delete-resource-policy",
           "method": "DELETE",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/resource-policies",
