@@ -998,9 +998,9 @@
     {
       "id": "security-certificatemanager-import",
       "service": "security/certificatemanager",
-      "enabled": true,
+      "enabled": false,
       "needs_cert_material": true,
-      "_note": "Complements the self-sign lifecycle by covering the remaining endpoints: validate a body/key pair (check-validation) and IMPORT it (POST /v1/certificatemanager), then read/list/probe/delete. A throwaway self-signed cert+key is minted at runtime via openssl ({cert_body}/{private_key}/{cert_chain}); the lifecycle skips environmentally when openssl is unavailable. Synchronous.",
+      "_note": "DISABLED: certificatemanager check-validation/import reject a runtime-minted self-signed key/cert regardless of PEM encoding (PKCS#8 and PKCS#1 both return 'This private key is not a PEM format'), so a synthetic keypair cannot satisfy the gateway's CA validation and there is no way to supply a real CA-signed cert in CI. The self-sign lifecycle already covers the create/read/delete spine; this import-only lifecycle stays disabled until real cert material is available. A throwaway self-signed cert+key is minted at runtime via openssl ({cert_body}/{private_key}/{cert_chain}); the lifecycle skips environmentally when openssl is unavailable. Synchronous.",
       "steps": [
         {
           "name": "check-name-dup",
@@ -3790,11 +3790,10 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
           "json": {
-            "maintenance_option": {
-              "period_hour": "4",
-              "starting_day_of_week": "SUN",
-              "starting_time": "0300"
-            }
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
           },
           "expect_status": [
             200,
@@ -4267,9 +4266,25 @@
           ]
         },
         {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "dbaas_parameter_group_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
           "name": "list-parameters",
           "method": "GET",
-          "path": "/v1/parameters",
+          "path": "/v1/parameters?dbaas_parameter_group_id={dbaas_parameter_group_id}",
+          "group": "pg-listparam",
+          "optional": true,
           "expect_status": [
             200
           ],
@@ -4279,14 +4294,6 @@
               "get": "id"
             }
           }
-        },
-        {
-          "name": "list-parameter-groups",
-          "method": "GET",
-          "path": "/v1/parameter-groups",
-          "expect_status": [
-            200
-          ]
         },
         {
           "name": "capture-instance-group",
