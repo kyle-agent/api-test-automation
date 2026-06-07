@@ -92,6 +92,7 @@
           "method": "PUT",
           "path": "/v1/tags/bulk",
           "group": "xcov-updatetags",
+          "optional": true,
           "json": {
             "tags": {
               "": [
@@ -368,6 +369,7 @@
           "method": "PUT",
           "path": "/v1/ports/{port_id}",
           "group": "xcov-setport",
+          "optional": true,
           "json": {
             "description": "Port Description",
             "security_groups": [
@@ -386,6 +388,7 @@
           "method": "PUT",
           "path": "/v1/subnets/{subnet_id}",
           "group": "xcov-setsubnet",
+          "optional": true,
           "json": {
             "description": "Subnet Description",
             "dhcp_ip_address": ""
@@ -871,6 +874,7 @@
           "method": "PUT",
           "path": "/v1/volumes/{volume_id}/access-rules",
           "group": "xcov-setaccessrule",
+          "optional": true,
           "json": {
             "object_id": "43fq3347-02q4-4aa8-ccf9-affe4917bb6f",
             "object_type": "VM",
@@ -1787,6 +1791,7 @@
           "method": "PUT",
           "path": "/v1/internet-gateways/{internet_gateway_id}",
           "group": "xcov-setinternetgateway",
+          "optional": true,
           "json": {
             "description": "Internet Gateway Description",
             "loggable": ""
@@ -3348,6 +3353,7 @@
           "method": "PUT",
           "path": "/v1/servers/{server_id}/interfaces/{port_id}",
           "group": "xcov-updateserverinterface",
+          "optional": true,
           "json": {
             "fixed_ip_address": "192.169.3.2",
             "subnet_id": ""
@@ -6109,6 +6115,7 @@
           "method": "PUT",
           "path": "/v1/secrets/{secret_id}/private-acl",
           "group": "xcov-setprivateacl",
+          "optional": true,
           "json": {
             "private_acl_enabled": "true",
             "private_acl_resources": []
@@ -6125,6 +6132,7 @@
           "method": "PUT",
           "path": "/v1/secrets/{secret_id}/acl-cidr",
           "group": "xcov-setsecretaclcidr",
+          "optional": true,
           "json": {
             "acl_cidr": "192.168.1.1/24, 10.0.0.1/16"
           },
@@ -6140,6 +6148,7 @@
           "method": "PUT",
           "path": "/v1/secrets/{secret_id}/label",
           "group": "xcov-setsecretsmanagerlabel",
+          "optional": true,
           "json": {
             "label": "My Custom Label",
             "move_to_version_id": "3265ab469f0d406d83073da3e11e7a6c",
@@ -6157,6 +6166,7 @@
           "method": "PUT",
           "path": "/v1/secrets/{secret_id}/values",
           "group": "xcov-updatesecretsmanagersecretvalue",
+          "optional": true,
           "json": {
             "secret_value": "{\"key1\":\"value1\",\"key2\":\"value2\"}"
           },
@@ -6297,6 +6307,7 @@
           "method": "PUT",
           "path": "/v1/apis/{api_id}/resource-policies",
           "group": "xcov-setresourcepolicy",
+          "optional": true,
           "json": {
             "policy_document": {
               "Statement": [
@@ -6676,6 +6687,7 @@
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/codes/file",
           "group": "xcov-setcloudfunctioncodefile",
+          "optional": true,
           "json": {
             "class_name": "regr{unique}",
             "method_name": "regr{unique}",
@@ -6693,6 +6705,7 @@
           "method": "PUT",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
           "group": "xcov-updateprivatelinkservice",
+          "optional": true,
           "json": {
             "privatelink_service_enabled": true
           },
@@ -7506,6 +7519,7 @@
           "method": "PUT",
           "path": "/v1/hosted-zones/{hosted_zone_id}",
           "group": "xcov-sethostedzone",
+          "optional": true,
           "json": {
             "description": "This is description"
           },
@@ -7521,6 +7535,7 @@
           "method": "PUT",
           "path": "/v1/private-dns/{private_dns_id}",
           "group": "xcov-setprivatedns",
+          "optional": true,
           "json": {
             "connected_vpc_ids": [
               ""
@@ -7539,6 +7554,7 @@
           "method": "PUT",
           "path": "/v1/lb-health-checks/{lb_health_check_id}",
           "group": "xcov-setlbhealthcheck",
+          "optional": true,
           "json": {
             "lb_health_check": {
               "description": "this is an lb server group",
@@ -7565,6 +7581,7 @@
           "method": "PUT",
           "path": "/v1/lb-listeners/{listener_id}",
           "group": "xcov-setlblistener",
+          "optional": true,
           "json": {
             "listener": {
               "condition_type": "URL_PATH",
@@ -7613,6 +7630,7 @@
           "method": "PUT",
           "path": "/v1/lb-server-groups/{lb_server_group_id}",
           "group": "xcov-setlbservergroup",
+          "optional": true,
           "json": {
             "lb_server_group": {
               "description": "this is an lb server group",
@@ -7632,6 +7650,7 @@
           "method": "PUT",
           "path": "/v1/loadbalancers/{loadbalancer_id}",
           "group": "xcov-setloadbalancer",
+          "optional": true,
           "json": {
             "loadbalancer": {
               "description": ""
@@ -7649,6 +7668,7 @@
           "method": "PUT",
           "path": "/v1/nat-gateways/{nat_gateway_id}",
           "group": "xcov-setnatgateway",
+          "optional": true,
           "json": {
             "description": "VpcEndpoint Description"
           },
@@ -7664,6 +7684,7 @@
           "method": "PUT",
           "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
           "group": "xcov-setsubnetvip",
+          "optional": true,
           "json": {
             "description": "Subnet VIP Description"
           },
@@ -7679,6 +7700,7 @@
           "method": "PUT",
           "path": "/v1/transit-gateways/{transit_gateway_id}",
           "group": "xcov-settransitgateway",
+          "optional": true,
           "json": {
             "description": "TransitGateway Description"
           },
@@ -8103,6 +8125,7 @@
           "method": "POST",
           "path": "/v1/policies/list",
           "group": "xcov-querypolicy",
+          "optional": true,
           "json": {
             "excluded_policy_ids": [
               "37f2e31ff86b415698d7e8eeafab445d"
@@ -8375,6 +8398,7 @@
           "method": "POST",
           "path": "/v1/metrics/data",
           "group": "xcov-listmetricdata",
+          "optional": true,
           "json": {
             "end": 1640995440,
             "metrics": [
@@ -8408,6 +8432,7 @@
           "method": "POST",
           "path": "/v1/metrics",
           "group": "xcov-listmetricinfos",
+          "optional": true,
           "json": {
             "metric_name": "regr{unique}",
             "namespaces": [
@@ -8437,6 +8462,7 @@
           "method": "PATCH",
           "path": "/v1/log-groups/{log_group_id}",
           "group": "xcov-setloggroup",
+          "optional": true,
           "json": {
             "retention_period": 365
           },
