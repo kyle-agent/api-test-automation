@@ -6,6 +6,27 @@
 > triage, and the recommended next steps. Last updated mid-effort while the
 > validation run for `8cd8b27` was still in flight.
 
+## 0. Session-end state (read this first)
+
+- **Branch HEAD** at handoff: this doc's commit (see `git log`); all CODE fixes
+  are already pushed: `e6499eb`, `c49cc27`, `f0fe204`, `8cd8b27` (see §4).
+- **What is DONE & validated:** xcov `optional` isolation, scf privatelink
+  removal, cert-import disable — confirmed by run `27103395462`'s partial
+  artifact (10 PASS / 0 FAIL, §6.5).
+- **What is NOT yet validated:** mysql `set-maintenance` body, postgresql
+  `list-parameters` query fix, scf delete, and the 9 heavy-shared-networking
+  setters — every run so far times out (120 min) or VPC-skips before reaching
+  them.
+- **TOP next action:** resolve the **120-min CRUD timeout** (§7 step 0) — it now
+  blocks all remaining validation.
+- **Runs in flight at handoff:** #22 (`ffa7f4d`) and #23 (`8ce83e0`) were
+  inadvertently started by pushing this Markdown handoff (md pushes are NOT free
+  here — see §2). The agent **cannot cancel** them (Actions token is read-only,
+  403); cancel them in the **GitHub UI** to save billing if desired. A separate
+  `schedule` run (#21) on the base branch is unrelated.
+- **CI is RED** on the PR — but the remaining reds are the timeout plus
+  environmental/permission items (§6 "Environmental"), not the validated fixes.
+
 ## 1. Goal
 
 PR #44 (commit `14f5b4c` "aggressively add 26 grounded write steps") added 26
@@ -28,9 +49,15 @@ billable runs.
   variables.** Therefore **every push to this PR branch (non-`.md`) triggers a
   full CRUD + heavy billable run (~20 min light, up to ~1h45m with heavy).**
   Budget pushes accordingly — batch fixes into ONE push.
-- **`paths-ignore: ["**/*.md"]`** on the `pull_request` trigger → **pushing only
-  Markdown files does NOT trigger a run.** (That is why saving this handoff is
-  free.)
+- **`paths-ignore: ["**/*.md"]` does NOT make Markdown pushes free here.**
+  For a `pull_request` event GitHub evaluates `paths-ignore` against the
+  **entire PR diff (head vs base)**, not just the newly pushed commit. This PR
+  contains non-`.md` changes (scenarios.json, engine.py), so the filter never
+  matches "all changed files" and **every push to this branch — including a
+  Markdown-only push — triggers a full billable CRUD+heavy run.** There is
+  currently **no way to push to this branch without starting a run.** (Earlier
+  in this effort the agent wrongly assumed md-only pushes were exempt and
+  inadvertently triggered runs #22/#23 by pushing this very handoff file.)
 - `concurrency.cancel-in-progress: false` with a per-run-id group → concurrent
   pushes pile up; multiple runs each create VPCs and can saturate the VPC quota.
   Avoid rapid successive pushes.
@@ -84,7 +111,9 @@ non-2xx status:
 | `c49cc27` | add `optional: true` to all 26 `xcov-*` setters so failures isolate | **VALIDATED — works** (run `c49cc27` showed 17 group-isolation warnings instead of hard fails) |
 | `f0fe204` | remove scf `xcov-updateprivatelinkservice` setter | fix pushed, see §6 |
 | `8cd8b27` | mysql/postgresql db-cluster body fixes + disable cert-import lifecycle | **pushed; validation run `27103395462` ran but its CRUD job hit the 120-min timeout (see §6.5) — db/scf/heavy fixes still UNVALIDATED** |
-| `ffa7f4d` | this handoff doc (Markdown-only, no CI run) | n/a |
+| `ffa7f4d` | this handoff doc | **triggered run #22** (md pushes are NOT exempt, see §2) |
+| `8ce83e0` | handoff doc update (run 27103395462 results) | **triggered run #23** |
+| `<this>` | handoff doc finalize (this section + §2 correction) | triggers one more run |
 
 ## 5. Verified-good (do not redo)
 
