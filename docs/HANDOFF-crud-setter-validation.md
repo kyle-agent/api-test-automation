@@ -83,7 +83,8 @@ non-2xx status:
 | `e6499eb` | mint certificatemanager key as PKCS#1 (was PKCS#8) | **INEFFECTIVE** — SCP rejects PKCS#1 too (see §6). Harmless, left in place. |
 | `c49cc27` | add `optional: true` to all 26 `xcov-*` setters so failures isolate | **VALIDATED — works** (run `c49cc27` showed 17 group-isolation warnings instead of hard fails) |
 | `f0fe204` | remove scf `xcov-updateprivatelinkservice` setter | fix pushed, see §6 |
-| `8cd8b27` | mysql/postgresql db-cluster body fixes + disable cert-import lifecycle | **pushed; validation run `27103395462` was IN FLIGHT at handoff time — results not yet confirmed** |
+| `8cd8b27` | mysql/postgresql db-cluster body fixes + disable cert-import lifecycle | **pushed; validation run `27103395462` ran but its CRUD job hit the 120-min timeout (see §6.5) — db/scf/heavy fixes still UNVALIDATED** |
+| `ffa7f4d` | this handoff doc (Markdown-only, no CI run) | n/a |
 
 ## 5. Verified-good (do not redo)
 
@@ -166,12 +167,62 @@ non-2xx status:
   401 HmacValidFail; `registry-update-public-endpoint` 500.
 - archivestorage list/show → 401 (smoke, entitlement).
 
+### 6.5 Validation run `27103395462` (sha `8cd8b27`) — PARTIAL, hit 120-min timeout
+
+- The **CRUD job was CANCELLED at the workflow's `timeout-minutes: 120`**
+  (smoke 20:07–20:20, CRUD 20:20–22:07 = 120 min exactly). The
+  "Comment CRUD result on PR" step was **skipped**, so there is **no CRUD PR
+  comment** for this run. Conformance/dashboard succeeded; sweep ran.
+- Partial results recovered from the **`regression-reports` artifact**
+  (`junit-crud.xml`): **10 PASS / 3 SKIP / 0 FAIL** for the lifecycles that
+  completed before the cut-off.
+  - PASS: resourcemanager-resource-group, networking-vpc-subnet,
+    container-scr-registry, filestorage-volume,
+    security-certificatemanager-selfsign, application-queueservice-queue,
+    networking-security-group, virtualserver-keypair, networking-vpc-publicip,
+    networking-vpc-internet-gateway.
+  - SKIP (VPC quota): container-ske-cluster-nodepool, compute-virtualserver-full,
+    database-mysql-cluster.
+- **What this validates:** the `optional`-isolation fix (`c49cc27`), the scf
+  privatelink removal (`f0fe204`), and the cert-import disable (`8cd8b27`) — the
+  lifecycles that previously hard-failed on xcov setters now **PASS** (setters
+  isolate as warnings), with **zero failures**.
+- **Still UNVALIDATED** (timeout cut the run off before reaching them):
+  database-mysql-cluster `set-maintenance` body fix, database-postgresql-cluster
+  `list-parameters` fix, compute-scf-cloud-function-cronjob-trigger delete,
+  **heavy-shared-networking (the 9 networking setters)**, secretsmanager,
+  apigateway, servicewatch, iam-group, virtualserver-full.
+- **NEW BLOCKER — 120-min CRUD timeout.** Now that fixes let more heavy
+  lifecycles actually run (instead of failing/skipping fast), and because
+  VPC async-deletes linger against the 5-VPC quota, the full CRUD suite no
+  longer finishes within 120 minutes and gets cancelled before the later
+  lifecycles. Recovering per-lifecycle results requires downloading the
+  `regression-reports` artifact's `junit-crud.xml` (the PR comment won't exist
+  on a timed-out run). To download: `mcp__github__actions_get`
+  `download_workflow_run_artifact` → returns a temporary presigned URL → curl +
+  unzip.
+
 ## 7. Outstanding / recommended next steps
 
-1. **Confirm run `27103395462` (sha `8cd8b27`)** results (read its CRUD comment
-   or job log). Expect: cert-import gone, mysql set-maintenance pass, postgresql
-   list-parameters pass/isolate, scf delete OK, xcov isolating. Remaining reds
-   would be the environmental ones in §6 (scf 403 trigger, ske/vs flaky 404).
+0. **FIRST — solve the 120-min CRUD timeout (§6.5), it now blocks all further
+   validation.** The suite no longer finishes in 120 min, so the db/scf/heavy
+   fixes can't be reached. Options (pick one or combine):
+   - Raise `timeout-minutes` for the regression job in
+     `.github/workflows/api-test.yml` (e.g. 120 → 300). Simple; the run is long
+     and billable but completes. (This is a `.yml` change → it WILL trigger a
+     run.)
+   - Reorder lifecycles in `scenarios.json` so the high-value unvalidated ones
+     (postgresql-cluster, scf, heavy-shared-networking, secretsmanager) run
+     EARLY, before the time/VPC budget is exhausted.
+   - Scope a single targeted run via `crud_filter` (needs human dispatch or repo
+     var) — but note `-k $FILTER` in the workflow is unquoted, so multi-term
+     `"a or b"` filters break; use a single token. Consider quoting it
+     (`-k "$FILTER"`, workflow line ~311) to allow precise multi-lifecycle runs.
+1. The fixes in `8cd8b27` (mysql set-maintenance body, postgresql
+   list-parameters) and `f0fe204` (scf delete) and the 9 heavy-shared-networking
+   setters are **still unvalidated** — confirm them once a run can reach them.
+   Read results from the `regression-reports` artifact `junit-crud.xml` if the
+   run times out (no PR comment on a cancelled run).
 2. **heavy-shared-networking is still unvalidated** (VPC starvation). Options
    discussed with the user:
    - (a) Rework the lifecycle to **adopt an existing VPC** instead of
