@@ -1917,6 +1917,27 @@
           "retry_interval": 20
         },
         {
+          "name": "wait-cluster-running-swlog",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-cluster-swlog",
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
           "name": "set-cluster-service-watch-logging",
           "service": "ske",
           "method": "PUT",
@@ -1935,6 +1956,27 @@
           ],
           "retries": 4,
           "retry_interval": 20
+        },
+        {
+          "name": "wait-cluster-running-pubacl",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-cluster-pubacl",
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
         },
         {
           "name": "set-cluster-public-access-control",
@@ -1957,6 +1999,27 @@
           "retry_interval": 20
         },
         {
+          "name": "wait-cluster-running-privacl",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-cluster-privacl",
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
           "name": "set-cluster-private-access-control",
           "service": "ske",
           "method": "PUT",
@@ -1975,6 +2038,27 @@
           ],
           "retries": 4,
           "retry_interval": 20
+        },
+        {
+          "name": "wait-cluster-running-sg",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "optional": true,
+          "group": "ske-cluster-sg",
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
         },
         {
           "name": "set-cluster-security-groups",
@@ -2018,6 +2102,25 @@
           ],
           "optional": true,
           "group": "ske-lists"
+        },
+        {
+          "name": "wait-cluster-running-pre-nodepool",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
         },
         {
           "name": "create-nodepool",
