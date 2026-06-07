@@ -253,6 +253,19 @@
           ]
         },
         {
+          "name": "set-vpc",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/vpcs/{vpc_id}",
+          "json": {
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
           "name": "create-subnet",
           "method": "POST",
           "path": "/v1/subnets",
@@ -1539,6 +1552,19 @@
           "path": "/v1/publicips",
           "expect_status": [
             200
+          ]
+        },
+        {
+          "name": "set-publicip",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/publicips/{publicip_id}",
+          "json": {
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202
           ]
         },
         {
