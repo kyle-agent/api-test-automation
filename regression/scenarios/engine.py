@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
 import time
 from pathlib import Path
 
@@ -198,6 +200,47 @@ def _capture(body, expr):
 
 def _fill(template: str, ctx: dict) -> str:
     return _PLACEHOLDER.sub(lambda m: str(ctx.get(m.group(1), m.group(0))), template)
+
+
+_PEM_BLOCK = re.compile(r"-----BEGIN [^-]+-----.*?-----END [^-]+-----", re.DOTALL)
+_CERT_MATERIAL: dict | None = None  # per-process cache; {} = generation attempted+failed
+
+
+def _self_signed_pem() -> dict | None:
+    """Generate a throwaway self-signed RSA cert + key (PEM) via the ``openssl``
+    CLI, cached per process. Returns ``{cert_body, private_key, cert_chain}`` for
+    {placeholder} substitution, or ``None`` when openssl is unavailable / fails.
+
+    Nothing is written to disk and nothing is committed — a fresh keypair is
+    minted each run purely to exercise the certificatemanager import + validate
+    endpoints (which need a body/key pair that actually matches). The cert is
+    self-signed with a 10-year validity, so there is no expiry flakiness."""
+    global _CERT_MATERIAL
+    if _CERT_MATERIAL is not None:
+        return _CERT_MATERIAL or None
+    _CERT_MATERIAL = {}  # mark attempted so we don't re-shell on every lifecycle
+    if shutil.which("openssl") is None:
+        return None
+    try:
+        out = subprocess.run(
+            ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+             "-keyout", "/dev/stdout", "-out", "/dev/stdout", "-days", "3650",
+             "-subj", "/CN=regr-test.example.com", "-batch"],
+            capture_output=True, text=True, timeout=30, check=True).stdout
+    except (subprocess.SubprocessError, OSError) as exc:
+        print(f"  cert material: openssl generation failed ({exc}); "
+              f"certificatemanager import/validate lifecycle will skip")
+        return None
+    blocks = _PEM_BLOCK.findall(out)
+    cert = next((b for b in blocks if "CERTIFICATE" in b), None)
+    key = next((b for b in blocks if "PRIVATE KEY" in b), None)
+    if not cert or not key:
+        return None
+    # cert_chain is optional for a self-signed leaf; send empty to avoid the
+    # gateway rejecting a self-referential chain.
+    _CERT_MATERIAL = {"cert_body": cert + "\n", "private_key": key + "\n",
+                      "cert_chain": ""}
+    return _CERT_MATERIAL
 
 
 def _fill_obj(obj, ctx: dict):
@@ -365,6 +408,17 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         cleanups[:] = list(reversed(keep))
 
     try:
+        # Lifecycles that import/validate a real certificate need a matching
+        # body/key pair. Mint one (per process) and expose it as placeholders;
+        # if the toolchain can't, skip environmentally rather than 4xx-ing.
+        if lifecycle.get("needs_cert_material"):
+            pem = _self_signed_pem()
+            if not pem:
+                raise LifecycleSkip(
+                    "no certificate material (openssl unavailable) — skipping "
+                    "certificatemanager import/validate lifecycle")
+            ctx.update(pem)
+
         for step in lifecycle["steps"]:
             grp = step.get("group")
             if grp and grp in failed_groups:
