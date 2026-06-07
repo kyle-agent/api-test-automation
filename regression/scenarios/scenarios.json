@@ -87,6 +87,28 @@
           "group": "rg-tags"
         },
         {
+          "name": "updatetags",
+          "service": "resourcemanager",
+          "method": "PUT",
+          "path": "/v1/tags/bulk",
+          "group": "xcov-updatetags",
+          "json": {
+            "tags": {
+              "": [
+                {
+                  "key": "tag-key",
+                  "value": "tag-value"
+                }
+              ]
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
           "name": "del-rg-tag",
           "method": "DELETE",
           "path": "/v1/tags/{rg_srn}/regr",
@@ -339,6 +361,40 @@
             "subnet_id": "{subnet_id}",
             "port_id": "{port_id}"
           }
+        },
+        {
+          "name": "setport",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/ports/{port_id}",
+          "group": "xcov-setport",
+          "json": {
+            "description": "Port Description",
+            "security_groups": [
+              ""
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setsubnet",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/subnets/{subnet_id}",
+          "group": "xcov-setsubnet",
+          "json": {
+            "description": "Subnet Description",
+            "dhcp_ip_address": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
         },
         {
           "name": "delete-port",
@@ -808,6 +864,23 @@
           "probe_reads": {
             "volume_id": "{volume_id}"
           }
+        },
+        {
+          "name": "setaccessrule",
+          "service": "filestorage",
+          "method": "PUT",
+          "path": "/v1/volumes/{volume_id}/access-rules",
+          "group": "xcov-setaccessrule",
+          "json": {
+            "object_id": "43fq3347-02q4-4aa8-ccf9-affe4917bb6f",
+            "object_type": "VM",
+            "action": "add"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
         },
         {
           "name": "delete",
@@ -1707,6 +1780,22 @@
             "vpc_id": "{vpc_id}",
             "internet_gateway_id": "{internet_gateway_id}"
           }
+        },
+        {
+          "name": "setinternetgateway",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "group": "xcov-setinternetgateway",
+          "json": {
+            "description": "Internet Gateway Description",
+            "loggable": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
         },
         {
           "name": "delete-igw",
@@ -3250,6 +3339,22 @@
           },
           "expect_status": [
             200,
+            202
+          ]
+        },
+        {
+          "name": "updateserverinterface",
+          "service": "virtualserver",
+          "method": "PUT",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}",
+          "group": "xcov-updateserverinterface",
+          "json": {
+            "fixed_ip_address": "192.169.3.2",
+            "subnet_id": ""
+          },
+          "expect_status": [
+            200,
+            201,
             202
           ]
         },
@@ -5999,6 +6104,69 @@
           }
         },
         {
+          "name": "setprivateacl",
+          "service": "secretsmanager",
+          "method": "PUT",
+          "path": "/v1/secrets/{secret_id}/private-acl",
+          "group": "xcov-setprivateacl",
+          "json": {
+            "private_acl_enabled": "true",
+            "private_acl_resources": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setsecretaclcidr",
+          "service": "secretsmanager",
+          "method": "PUT",
+          "path": "/v1/secrets/{secret_id}/acl-cidr",
+          "group": "xcov-setsecretaclcidr",
+          "json": {
+            "acl_cidr": "192.168.1.1/24, 10.0.0.1/16"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setsecretsmanagerlabel",
+          "service": "secretsmanager",
+          "method": "PUT",
+          "path": "/v1/secrets/{secret_id}/label",
+          "group": "xcov-setsecretsmanagerlabel",
+          "json": {
+            "label": "My Custom Label",
+            "move_to_version_id": "3265ab469f0d406d83073da3e11e7a6c",
+            "remove_from_version_id": "3265ab469f0d406d83073da3e11e7a6c"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "updatesecretsmanagersecretvalue",
+          "service": "secretsmanager",
+          "method": "PUT",
+          "path": "/v1/secrets/{secret_id}/values",
+          "group": "xcov-updatesecretsmanagersecretvalue",
+          "json": {
+            "secret_value": "{\"key1\":\"value1\",\"key2\":\"value2\"}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
           "name": "delete",
           "method": "DELETE",
           "path": "/v1/secrets/{secret_id}",
@@ -6124,6 +6292,43 @@
           }
         },
         {
+          "name": "setresourcepolicy",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/resource-policies",
+          "group": "xcov-setresourcepolicy",
+          "json": {
+            "policy_document": {
+              "Statement": [
+                {
+                  "Action": [
+                    "apigateway:InvokeApigatewayRegion"
+                  ],
+                  "Condition": {
+                    "SrnLike": {
+                      "scp:RequestAttribute/body['method-srn']": [
+                        "srn:dev2::27bb070b564349f8a31cc60734cc36a5:kr-west1::apigateway:method/a4b19a70b596467fb010d3c3/*/GET/n-f"
+                      ]
+                    }
+                  },
+                  "Effect": "Allow",
+                  "Principal": "*",
+                  "Resource": [
+                    "srn:dev2::27bb070b564349f8a31cc60734cc36a5:kr-west1::apigateway:api/a4b19a70b596467fb010d3c3"
+                  ],
+                  "Sid": "Statement1"
+                }
+              ],
+              "Version": "2024-07-01"
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
           "name": "delete-resource",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/resources/{resource_id}",
@@ -6179,7 +6384,7 @@
       "id": "compute-scf-cloud-function-cronjob-trigger",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}]. COVERAGE EXPANSION (not yet dispatch-validated): config/env-vars/url/code PUTs, set+delete resource-policy (Resource:'*' best-effort, 400 tolerated), and update-cronjob-trigger. Each optional+grouped so a rejection isolates. Skipped (need external artifacts/ids): setcloudfunctioncodefile (OBS jar), apigateway trigger, the privatelink-ENDPOINT family. enable/disable-privatelink-service REMOVED (run #5): enabling PL leaves the service in 'Creating' so the in-lifecycle disable 400s, then the function delete 400s with CloudFunctionNotDeletableError — i.e. enabling PL blocks clean teardown. Not worth a stateful PL-service wait for 2 niche PUTs.",
+      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}]. COVERAGE EXPANSION (not yet dispatch-validated): config/env-vars/url/code PUTs, set+delete resource-policy (Resource:'*' best-effort, 400 tolerated), and update-cronjob-trigger. Each optional+grouped so a rejection isolates. Skipped (need external artifacts/ids): setcloudfunctioncodefile (OBS jar), apigateway trigger, the privatelink-ENDPOINT family. enable/disable-privatelink-service REMOVED (run #5): enabling PL leaves the service in 'Creating' so the in-lifecycle disable 400s, then the function delete 400s with CloudFunctionNotDeletableError \u2014 i.e. enabling PL blocks clean teardown. Not worth a stateful PL-service wait for 2 niche PUTs.",
       "steps": [
         {
           "name": "create",
@@ -6464,6 +6669,38 @@
             "timeout": 300,
             "interval": 10
           }
+        },
+        {
+          "name": "setcloudfunctioncodefile",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/codes/file",
+          "group": "xcov-setcloudfunctioncodefile",
+          "json": {
+            "class_name": "regr{unique}",
+            "method_name": "regr{unique}",
+            "obs_url": "https://obs.kr-east1.scp-in.com:8443/sample/java-sample-1.0-SNAPSHOT.jar"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "updateprivatelinkservice",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
+          "group": "xcov-updateprivatelinkservice",
+          "json": {
+            "privatelink_service_enabled": true
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
         },
         {
           "name": "delete-resource-policy",
@@ -7264,6 +7501,194 @@
           }
         },
         {
+          "name": "sethostedzone",
+          "service": "dns",
+          "method": "PUT",
+          "path": "/v1/hosted-zones/{hosted_zone_id}",
+          "group": "xcov-sethostedzone",
+          "json": {
+            "description": "This is description"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setprivatedns",
+          "service": "dns",
+          "method": "PUT",
+          "path": "/v1/private-dns/{private_dns_id}",
+          "group": "xcov-setprivatedns",
+          "json": {
+            "connected_vpc_ids": [
+              ""
+            ],
+            "description": "This is description"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setlbhealthcheck",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "group": "xcov-setlbhealthcheck",
+          "json": {
+            "lb_health_check": {
+              "description": "this is an lb server group",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "health_check_url": "/test",
+              "http_method": "GET",
+              "protocol": "TCP",
+              "request_data": "username=admin&password=1234",
+              "response_code": "200"
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setlblistener",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-listeners/{listener_id}",
+          "group": "xcov-setlblistener",
+          "json": {
+            "listener": {
+              "condition_type": "URL_PATH",
+              "description": "",
+              "hsts_max_age": "",
+              "https_redirection": {
+                "port": "",
+                "protocol": "",
+                "response_code": ""
+              },
+              "idle_timeout": "",
+              "insert_client_ip": "",
+              "persistence": "",
+              "response_timeout": "",
+              "server_group_id": "",
+              "session_duration_time": "",
+              "sni_certificate": [
+                {
+                  "domain_name": "regr{unique}",
+                  "not_after_dt": "",
+                  "sni_cert_id": ""
+                }
+              ],
+              "ssl_certificate": {
+                "client_cert_id": "",
+                "client_cert_level": "",
+                "server_cert_level": ""
+              },
+              "support_http2": "",
+              "url_handler": "",
+              "url_redirection": "",
+              "x_forwarded_for": "",
+              "x_forwarded_port": "",
+              "x_forwarded_proto": ""
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setlbservergroup",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "group": "xcov-setlbservergroup",
+          "json": {
+            "lb_server_group": {
+              "description": "this is an lb server group",
+              "lb_health_check_id": "46c681018e33453085ca7c8db54e0076",
+              "lb_method": "ROUND_ROBIN"
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setloadbalancer",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "group": "xcov-setloadbalancer",
+          "json": {
+            "loadbalancer": {
+              "description": ""
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setnatgateway",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/nat-gateways/{nat_gateway_id}",
+          "group": "xcov-setnatgateway",
+          "json": {
+            "description": "VpcEndpoint Description"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setsubnetvip",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+          "group": "xcov-setsubnetvip",
+          "json": {
+            "description": "Subnet VIP Description"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "settransitgateway",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "xcov-settransitgateway",
+          "json": {
+            "description": "TransitGateway Description"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
           "name": "dns-zone-delete",
           "service": "dns",
           "group": "dns",
@@ -7673,6 +8098,23 @@
           }
         },
         {
+          "name": "querypolicy",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/policies/list",
+          "group": "xcov-querypolicy",
+          "json": {
+            "excluded_policy_ids": [
+              "37f2e31ff86b415698d7e8eeafab445d"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
           "name": "delete",
           "method": "DELETE",
           "path": "/v1/groups/{group_id}",
@@ -7926,6 +8368,83 @@
             "log_group_id": "{log_group_id}",
             "log_stream_id": "{log_stream_id}"
           }
+        },
+        {
+          "name": "listmetricdata",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics/data",
+          "group": "xcov-listmetricdata",
+          "json": {
+            "end": 1640995440,
+            "metrics": [
+              {
+                "dimensions": [
+                  {
+                    "key": "VolumeID",
+                    "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+                  }
+                ],
+                "display_name": "regr{unique}",
+                "name": "regr{unique}",
+                "namespace_name": "regr{unique}",
+                "period": 300,
+                "statistic_type": "AVG"
+              }
+            ],
+            "period": 300,
+            "start": 1640995200,
+            "statistic_type": "AVG"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "listmetricinfos",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics",
+          "group": "xcov-listmetricinfos",
+          "json": {
+            "metric_name": "regr{unique}",
+            "namespaces": [
+              {
+                "dimensions": "[[\"resource_id\"]]",
+                "name": "regr{unique}"
+              }
+            ],
+            "resource_id": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502",
+            "resource_name": "regr{unique}",
+            "tags": [
+              {
+                "key": "key01",
+                "value": "value01"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "setloggroup",
+          "service": "servicewatch",
+          "method": "PATCH",
+          "path": "/v1/log-groups/{log_group_id}",
+          "group": "xcov-setloggroup",
+          "json": {
+            "retention_period": 365
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
         },
         {
           "name": "delete-stream",
