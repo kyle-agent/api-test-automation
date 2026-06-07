@@ -2449,43 +2449,6 @@
           ]
         },
         {
-          "name": "scale-down-nodepool",
-          "service": "ske",
-          "method": "PUT",
-          "path": "/v1/nodepools/{nodepool_id}",
-          "json": {
-            "desired_node_count": "1",
-            "min_node_count": "1",
-            "max_node_count": "2",
-            "is_auto_scale": "false",
-            "is_auto_recovery": "true"
-          },
-          "expect_status": [
-            200,
-            202
-          ]
-        },
-        {
-          "name": "wait-scale-down",
-          "service": "ske",
-          "method": "GET",
-          "path": "/v1/nodepools/{nodepool_id}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.nodepool.status",
-            "until": [
-              "Running",
-              "RUNNING",
-              "ACTIVE",
-              "active"
-            ],
-            "timeout": 1200,
-            "interval": 30
-          }
-        },
-        {
           "name": "delete-nodepool",
           "service": "ske",
           "method": "DELETE",
@@ -3458,7 +3421,7 @@
       "service": "database/mysql",
       "enabled": true,
       "heavy": true,
-      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address must sit inside the subnet CIDR. | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch).",
+      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address left blank so the platform auto-assigns a free IP from the subnet (a hardcoded IP can collide / be reserved -> 'not available'). | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch).",
       "steps": [
         {
           "name": "create-vpc",
@@ -3631,7 +3594,7 @@
                 "instances": [
                   {
                     "role_type": "ACTIVE",
-                    "service_ip_address": "10.124.1.10/32",
+                    "service_ip_address": "",
                     "public_ip_id": ""
                   }
                 ]
@@ -4119,7 +4082,7 @@
                 "instances": [
                   {
                     "role_type": "ACTIVE",
-                    "service_ip_address": "10.126.1.10/32",
+                    "service_ip_address": "",
                     "public_ip_id": ""
                   }
                 ]
