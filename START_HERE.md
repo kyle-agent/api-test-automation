@@ -37,6 +37,11 @@ implementation blueprint (this file does not duplicate them).
 4. Consult [`knowledge/`](knowledge/) before inventing API call orders or request
    bodies — most of it is already captured (and hard-won). Add what you learn back.
 
+> **Kicking off a fresh session?** The minimum prompt is literally:
+> *"Read `START_HERE.md` and continue per its instructions."* Ready-to-paste
+> kickoff prompts for specific goals (advance coverage, run conformance, curate
+> domain knowledge) live in [`agents/PROMPTS.md`](agents/PROMPTS.md#starting-a-new-session-copy-paste-kickoffs).
+
 ## Golden rules (do not break these)
 
 - **Safety gates are sacred.** A run never changes cloud state unless explicitly
