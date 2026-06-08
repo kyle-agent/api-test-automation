@@ -40,7 +40,7 @@ import sys
 import time
 from pathlib import Path
 
-from core.results import Finding, record_finding
+from core.results import Finding, Observation, record, record_finding
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "data" / "api_docs.json"
@@ -60,6 +60,28 @@ def _emit(endpoint_key: str, rule_id: str, severity: str, detail: str) -> None:
     """Record a runtime finding to the unified results store (best-effort)."""
     record_finding(Finding(endpoint_key=endpoint_key, rule_id=rule_id,
                            severity=severity, detail=detail, source="runtime"))
+
+
+def _observe(endpoint_key: str, method: str, path: str, status,
+             elapsed_ms=None, text: str = "") -> None:
+    """Record an Observation for an endpoint a probe actually called, so the
+    dashboard's per-endpoint "최근 status (HTTP code + response time)" column is
+    populated by conformance-exercised endpoints too (incl. POST/PUT).
+
+    Mirrors :func:`regression.smoke._record`. The ok/soft/fail category reuses the
+    smoke classifier (imported, not duplicated). Best-effort: a recording failure
+    (bad status, import hiccup) must never break a probe.
+    """
+    try:
+        from regression.smoke import categorize
+        st = status if isinstance(status, int) else 0
+        category, _reason = categorize(st, text or "")
+        record(Observation(
+            endpoint_key=endpoint_key, method=(method or "").upper(),
+            path=path or "", status=st, category=category,
+            elapsed_ms=elapsed_ms, source="runtime_probe", note=text or ""))
+    except Exception:
+        pass
 
 
 def _write(mode, summary, rows, fieldnames):
@@ -101,6 +123,8 @@ def probe_schema(client, docs, limit, category):
             rows.append({"endpoint": k, "status": "ERR", "note": str(exc)[:120]})
             continue
         summ["checked"] += 1
+        _observe(k, "GET", e["path"], resp.status,
+                 getattr(resp, "elapsed_ms", None), resp.raw_text or "")
         if resp.status != 200 or not isinstance(resp.body, dict):
             summ["non_200"] += 1
             rows.append({"endpoint": k, "status": resp.status, "model": ref,
@@ -171,6 +195,8 @@ def probe_status(client, docs, limit, category):
                          "excerpt": str(exc)[:160]})
             summ["other"] += 1
             continue
+        _observe(k, e["method"], e["path"], st,
+                 getattr(resp, "elapsed_ms", None), resp.raw_text or "")
         klass = ("client_4xx" if 400 <= st < 500 else
                  "server_5xx_BUG" if 500 <= st < 600 else "other")
         summ["checked"] += 1
@@ -201,14 +227,19 @@ def probe_notfound(client, docs, limit, category):
         if category and category not in e["category"]:
             continue
 
-        def call(idval):
+        def call(idval, observe=False):
             p = path.replace("{" + params[0] + "}", idval)
             try:
-                return client.request("GET", p, service=e["service"]).status
+                resp = client.request("GET", p, service=e["service"])
+                if observe:
+                    # record under the ORIGINAL templated path, not the substituted one
+                    _observe(k, "GET", path, resp.status,
+                             getattr(resp, "elapsed_ms", None), resp.raw_text or "")
+                return resp.status
             except Exception as exc:
                 return f"ERR:{str(exc)[:40]}"
 
-        s_missing = call(NONEXISTENT_ID)
+        s_missing = call(NONEXISTENT_ID, observe=True)
         s_malformed = call(MALFORMED_ID)
         summ["checked"] += 1
         if s_missing == 404:
@@ -321,6 +352,8 @@ def probe_pagination(client, docs, limit, category):
             rows.append({"endpoint": k, "status": "ERR", "note": str(exc)[:100]})
             continue
         summ["checked"] += 1
+        _observe(k, "GET", e["path"], resp.status,
+                 getattr(resp, "elapsed_ms", None), resp.raw_text or "")
         if resp.status != 200 or not isinstance(resp.body, dict):
             summ["non_200"] += 1
             rows.append({"endpoint": k, "status": resp.status})
@@ -407,15 +440,18 @@ def probe_l10n(client, docs, limit, category):
         if category and category not in e["category"]:
             continue
 
-        def msg(lang):
+        def msg(lang, observe=False):
             try:
                 r = client.request("POST", e["path"], json={}, service=e["service"],
                                    headers={"Accept-Language": lang})
+                if observe:
+                    _observe(k, "POST", e["path"], r.status,
+                             getattr(r, "elapsed_ms", None), r.raw_text or "")
                 return r.status, r.raw_text or ""
             except Exception as exc:
                 return "ERR", str(exc)
 
-        sk, bk = msg("ko-KR")
+        sk, bk = msg("ko-KR", observe=True)
         se, be = msg("en-US")
         if sk != 400 and se != 400:
             time.sleep(0.1)
@@ -498,6 +534,8 @@ def probe_validation(client, docs, limit, category, sleep=0.2):
     for k, e in tgts:
         try:
             resp = client.request("POST", e["path"], json={}, service=e["service"])
+            _observe(k, "POST", e["path"], resp.status,
+                     getattr(resp, "elapsed_ms", None), resp.raw_text or "")
             verdict = classify(resp.status, resp.raw_text)
             results.append({"endpoint": k, "path": e["path"], "status": resp.status,
                             "verdict": verdict, "body": (resp.raw_text or "")[:500]})

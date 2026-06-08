@@ -204,6 +204,12 @@ def per_service(cat, tsv_rows, write_hit):
     called = {}
     for status, _category, key, _method, _path, *_rest in tsv_rows:
         called[key] = (status, _rest[0] if _rest else None)
+    # A key is "exercised" only if we actually observed a call to it (the unified
+    # store records every smoke GET, read-chain, CRUD probe AND every CRUD write
+    # step under its real catalog key). Coverage for *all* methods is grounded in
+    # this — never in the static scenario declaration — so the ✓ always matches a
+    # real status + response time. `write_hit` is the *declared* (planned) write
+    # surface: shown as a distinct "선언됨(미실행)" marker, never as covered.
     tested_keys = set(called) or smoke_tested_keys(cat)
 
     groups = defaultdict(list)
@@ -213,24 +219,28 @@ def per_service(cat, tsv_rows, write_hit):
     services = []
     for (category, service), ents in groups.items():
         rows, covn = [], 0
-        gtot = gcov = wtot = wcov = 0
+        gtot = gcov = wtot = wcov = wdecl = 0
         for e in sorted(ents, key=lambda x: (x["method"], x["_norm"])):
+            exercised = e["key"] in tested_keys
             if e["method"] == "GET":
                 gtot += 1
-                covered = e["key"] in tested_keys
-                gcov += covered
+                gcov += exercised
+                state = "exec" if exercised else "none"
             else:
                 wtot += 1
-                covered = (e["method"], e["_norm"]) in write_hit
-                wcov += covered
-            covn += covered
+                wcov += exercised
+                declared = (e["method"], e["_norm"]) in write_hit
+                wdecl += declared and not exercised
+                state = "exec" if exercised else ("declared" if declared else "none")
+            covn += exercised
             st_el = called.get(e["key"]) or (None, None)
             rows.append((e["method"], e["http_path"], e.get("name", ""),
-                         bool(covered), st_el[0], st_el[1]))
+                         state, st_el[0], st_el[1]))
         services.append({
             "category": category, "service": service, "slug": slug(category, service),
             "total": len(ents), "covered": covn,
-            "gtot": gtot, "gcov": gcov, "wtot": wtot, "wcov": wcov, "rows": rows})
+            "gtot": gtot, "gcov": gcov, "wtot": wtot, "wcov": wcov, "wdecl": wdecl,
+            "rows": rows})
     services.sort(key=lambda s: (s["category"], s["covered"] / (s["total"] or 1), s["service"]))
     return services
 
@@ -248,7 +258,14 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
 
     tested_keys = {r[2] for r in tsv_rows} or smoke_tested_keys(cat)
     key_cat = {e["key"]: e["category"] for e in cat}
-    cat_tested = Counter(key_cat.get(k, "?") for k in tested_keys)
+    # Intersect with real catalog keys so synthetic "lifecycle:step" observation
+    # keys never inflate coverage, and split GET vs write by what was *exercised*.
+    all_keys = {e["key"] for e in cat}
+    get_keys = {e["key"] for e in cat if e["method"] == "GET"}
+    tested_catalog = tested_keys & all_keys
+    tested_get = tested_keys & get_keys
+    tested_write = tested_catalog - get_keys
+    cat_tested = Counter(key_cat.get(k, "?") for k in tested_get)
 
     dist = Counter(r[0] for r in tsv_rows)
     cats = Counter(r[1] for r in tsv_rows)
@@ -261,10 +278,13 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
             (known_red if key in known_keys else new_regressions).append(
                 (key, status, path))
 
-    write_hit = crud_write_ops(lifecycles, cat)
-    cov_op = len(tested_keys) / total * 100 if total else 0
-    cov_get = len(tested_keys) / get_total * 100 if get_total else 0
-    cov_write = len(write_hit) / nonget_total * 100 if nonget_total else 0
+    write_hit = crud_write_ops(lifecycles, cat)   # declared/planned write surface
+    cov_op = len(tested_catalog) / total * 100 if total else 0
+    cov_get = len(tested_get) / get_total * 100 if get_total else 0
+    # Write coverage = writes actually exercised (observed), consistent with GET —
+    # NOT the static scenario declaration. len(write_hit) is reported separately
+    # as the planned surface so the gap (declared but not yet run) stays visible.
+    cov_write = len(tested_write) / nonget_total * 100 if nonget_total else 0
 
     param_attempted = len(param_rows)
     param_accepted = sum(1 for r in param_rows if 200 <= r[0] < 300)
@@ -279,10 +299,10 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
         crud_rows.append((lc["id"], kind, st, len(lc.get("steps", []))))
 
     return {
-        "total": total, "tested": len(tested_keys),
+        "total": total, "tested": len(tested_catalog), "tested_get": len(tested_get),
         "cov_op": cov_op, "cov_get": cov_get, "cov_write": cov_write,
         "get_total": get_total, "nonget_total": nonget_total,
-        "write_hit": len(write_hit),
+        "write_hit": len(tested_write), "write_declared": len(write_hit),
         "ok": ok, "soft": soft,
         "cov_param": cov_param, "param_attempted": param_attempted,
         "param_accepted": param_accepted,
@@ -490,19 +510,27 @@ def render_service_page(s, meta):
         col = STATUS_COLORS.get(st // 100, "#656d76")
         return f'<b style="color:{col}">{st}</b>{fmt_ms(el)}'
 
+    def covmark(state):
+        """✓ exercised (has a real call) · ◷ declared in a CRUD scenario but not
+        run this run · · not covered."""
+        if state == "exec":
+            return '<span style="color:#2da44e" title="실제 호출됨">✓</span>'
+        if state == "declared":
+            return ('<span style="color:#8250df" title="CRUD 시나리오에 선언됨 — 이번 '
+                    '실행에서는 미실행(gated/skip/timeout)">◷</span>')
+        return '<span class="mut">·</span>'
+
     conf = (meta.get("conf") or {}).get("by_endpoint", {})
     rows = []
-    for method, path, title, covered, st, el in s["rows"]:
-        chk = ('<span style="color:#2da44e">✓</span>' if covered
-               else '<span class="mut">·</span>')
-        rcls = "" if covered else ' class="unc"'
+    for method, path, title, state, st, el in s["rows"]:
+        rcls = "" if state == "exec" else ' class="unc"'
         key = f'{s["category"]}/{s["service"]}/{title}'
         cc = conf_cell(conf.get(key, {"status": "green", "items": []}))
         rows.append(
             f'<tr{rcls}><td><span class="m m-{method}">{method}</span></td>'
             f'<td><code>{html.escape(path)}</code></td>'
             f'<td class="ti">{html.escape(title or "")}</td>'
-            f'<td style="text-align:center">{chk}</td><td>{statcell(st, el)}</td>'
+            f'<td style="text-align:center">{covmark(state)}</td><td>{statcell(st, el)}</td>'
             f'<td>{cc}</td></tr>')
     svc = html.escape(s["service"]); category = html.escape(s["category"])
     return (
@@ -513,12 +541,17 @@ def render_service_page(s, meta):
         f'<div class="bc"><a href="../index.html">← 대시보드</a> &nbsp;/&nbsp; {category} &nbsp;/&nbsp; <b>{svc}</b></div>'
         f'<h1>{svc} <span class="mut">{category}</span></h1>'
         f'<div class="sum"><div class="s-big">{pct:.0f}%</div>'
-        f'<div class="mut">operation 커버 ({s["covered"]}/{s["total"]})</div>'
+        f'<div class="mut">operation 커버 ({s["covered"]}/{s["total"]}) — 실제 호출 기준</div>'
         f'<div class="s-sub">읽기 GET {s["gcov"]}/{s["gtot"]} ({gpct:.0f}%) '
-        f'&nbsp;·&nbsp; 쓰기 {s["wcov"]}/{s["wtot"]} ({wpct:.0f}%)</div></div>'
-        f'<p class="mut" style="margin:4px 0 10px">컬럼 구분 — <b>최근 status</b>: 회귀 테스트의 '
-        f'실제 호출 응답(테스트 수행 성공 여부) · <b>설계/동작 결함</b>: 호출 성공 여부와 별개로 '
-        f'정적+런타임 점검에서 찾은 개선/결함(클릭 시 상세). 빈칸 status는 미호출(커버 X).</p>'
+        f'&nbsp;·&nbsp; 쓰기 POST/PUT/DELETE {s["wcov"]}/{s["wtot"]} ({wpct:.0f}%)'
+        + (f' &nbsp;·&nbsp; <span style="color:#8250df">◷ 선언됨(미실행) {s["wdecl"]}</span>'
+           if s.get("wdecl") else "")
+        + '</div></div>'
+        f'<p class="mut" style="margin:4px 0 10px">커버 — <b style="color:#2da44e">✓</b> 실제 호출됨'
+        f'(응답코드·응답시간 표시) · <b style="color:#8250df">◷</b> CRUD 시나리오에 선언됐으나 이번 '
+        f'실행에서 미실행(heavy gated/skip/timeout) · <b class="mut">·</b> 미커버. '
+        f'<b>최근 status</b>: 회귀 호출의 실제 HTTP 응답코드 + 응답시간(POST/PUT/DELETE 포함) · '
+        f'<b>설계/동작 결함</b>: 정적+런타임 점검 결과(클릭 시 상세).</p>'
         f'<table><thead><tr><th>메서드</th><th>경로</th><th>API</th>'
         f'<th>커버</th><th>최근 status<br><span class="mut" style="font-weight:400">회귀 호출결과 · 응답시간</span></th>'
         f'<th>설계/동작 결함<br><span class="mut" style="font-weight:400">별도 점검</span></th>'
@@ -597,8 +630,9 @@ def render(d, hist, meta, services):
         conformance_section=render_conformance_section(meta.get("conf", {})),
         badge=badge, cards=cards, donut=donut(segs, called), legend=legend,
         cov_op=f'{d["cov_op"]:.1f}', tested=d["tested"], total=d["total"],
-        cov_get=f'{d["cov_get"]:.1f}', get_total=d["get_total"],
+        cov_get=f'{d["cov_get"]:.1f}', get_total=d["get_total"], tested_get=d["tested_get"],
         cov_write=f'{d["cov_write"]:.1f}', write_hit=d["write_hit"],
+        write_declared=d["write_declared"],
         nonget_total=d["nonget_total"], writeax=writeax,
         paramax=paramax, paramax_cls=paramax_cls, param_stat=param_stat,
         covbars=covbars, ok=d["ok"], soft=d["soft"],
@@ -663,8 +697,8 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <div class="panel"><h2>커버리지</h2>
 <div style="display:flex;gap:28px;align-items:baseline">
 <div><div class="bignum" style="color:#0969da">{cov_op}%</div><div class="mut">operation ({tested}/{total})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">읽기 GET ({tested}/{get_total})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">쓰기 CRUD ({write_hit}/{nonget_total})</div></div>{param_stat}</div>
+<div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">읽기 GET ({tested_get}/{get_total})</div></div>
+<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">쓰기 실행 ({write_hit}/{nonget_total}) · 선언 {write_declared}</div></div>{param_stat}</div>
 <div class="mut" style="margin-top:12px">측정 축 (swagger-coverage/ReadyAPI 기준)</div>
 <div class="axes"><span class="ax on">✓ operation</span><span class="ax part">◑ status-code</span>
 <span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax {paramax_cls}">{paramax} parameter</span><span class="ax off">✗ schema</span></div></div>

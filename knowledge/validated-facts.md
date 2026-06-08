@@ -25,6 +25,11 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
 | scr registry / repository | `$.id` | flat |
 | queue | `$.id` | flat |
 | **server (VM)** | `$.servers[0].id` | **array**, not `$.server.id` |
+| product (read) | `$.products[0].product_id` | global svc, list envelope `$.products[]`; show id-bound on `{product_id}` |
+| product-category (read) | `$.product_categories[0].category_id` | global svc; show id-bound on `{category_id}` |
+| billingplan planned-compute (read) | `$.planned_computes[0].id` | global svc; list envelope `$.planned_computes[]`; show id-bound `/v1/planned-computes/{planned_compute_id}` returns `$.planned_compute.id` (from docs) |
+| costexplorer bill / usage (read) | `$.bills[0].id` / `$.usages[0].id` | global svc; ids EXIST in list envelopes but there is **no** `/v1/bills/{id}` or `/v1/usages/{id}` id-bound GET — nothing to bind, so no probe (from docs) |
+| pricing report (read) | (none) | global svc; `$.billing_item_ids` is a scalar string, `$.offerings` is a list of strings, `$.prices` is a scalar inside a page envelope — **no nested object id** to capture; all 3 GETs are direct, no id-bound GET (from docs) |
 | ske cluster | `$.resource_id` | not `$.cluster.id` |
 | ske nodepool | `$.nodepool.id` | nested |
 | custom image (from server) | `$.image_id` | flat |
@@ -100,6 +105,19 @@ VPC needed** (confirmed via the VM/ske lifecycles). Rule create uses
 
 **public-ip / internet-gateway (from docs, best-effort):** public-ip `type: IGW`;
 igw needs `vpc_id`, `firewall_enabled`, `type: IGW`.
+
+**financial-management reads (`pricing-reads` / `costexplorer-reads` /
+`billingplan-reads`, from docs):** all three are global/account-scoped (no region).
+Only **billingplan** has an id-bound GET (`showplannedcompute`,
+`/v1/planned-computes/{planned_compute_id}`), so only it carries a `probe_reads`
+step (key = catalog path-param name `planned_compute_id`, captured from
+`$.planned_computes[0].id`). pricing has 3 direct report GETs with no nested id and
+no id-bound GET; costexplorer has 3 direct GETs whose list envelopes do carry ids
+(`$.bills[].id`, `$.usages[].id`) but with no matching id-bound GET to bind them to
+— so pricing/costexplorer have **no probe_reads** and add no coverage over the smoke
+floor (added anyway as explicit, attributable read coverage and as the documented
+`*-reads` pattern). All env-dependent: record SOFT if the account has no
+planned-computes / bills / usages / payments.
 
 ## Placeholders the engine seeds automatically
 
