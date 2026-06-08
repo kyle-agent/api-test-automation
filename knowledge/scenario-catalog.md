@@ -30,6 +30,13 @@ safety gates. Re-derive flags with the snippet at the bottom.
 | `iam-policy` | management/iam | IAM policy |
 | `servicewatch-loggroup-logstream` | management/servicewatch | log group + stream |
 
+> **Shared VPC (heavy):** the heavy lifecycles below no longer each create a VPC
+> — they **adopt one session-shared VPC** (`conftest.py shared_vpc` →
+> `engine.provision_shared_vpc`; `create-vpc`/`delete-vpc` steps carry
+> `{"adopt":"vpc"}`). Each still makes its own subnet under it (re-homed to
+> `10.124.1-6.0/24`). 6 VPC creates → 1; no-op fallback to self-create. See
+> `knowledge/vpc-scheduling-strategy.md`. Pending live validation.
+
 ## Heavy scenarios (billable; only with `SCP_RUN_HEAVY=true`)
 
 | Lifecycle id | Service | Notes |

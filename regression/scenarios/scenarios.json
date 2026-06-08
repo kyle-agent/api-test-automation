@@ -1883,7 +1883,8 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          }
+          },
+          "adopt": "vpc"
         },
         {
           "name": "wait-vpc",
@@ -1910,7 +1911,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression SKE",
-            "cidr": "10.125.1.0/24",
+            "cidr": "10.124.1.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -2713,7 +2714,8 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "adopt": "vpc"
         }
       ],
       "heavy": true
@@ -2747,7 +2749,8 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          }
+          },
+          "adopt": "vpc"
         },
         {
           "name": "wait-vpc",
@@ -2774,7 +2777,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression VS",
-            "cidr": "10.124.1.0/24",
+            "cidr": "10.124.2.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -3548,7 +3551,8 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "adopt": "vpc"
         }
       ],
       "heavy": true
@@ -3583,7 +3587,8 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          }
+          },
+          "adopt": "vpc"
         },
         {
           "name": "wait-vpc",
@@ -3613,7 +3618,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression DBaaS",
-            "cidr": "10.124.1.0/24",
+            "cidr": "10.124.3.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -4037,7 +4042,8 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "adopt": "vpc"
         }
       ]
     },
@@ -4071,7 +4077,8 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          }
+          },
+          "adopt": "vpc"
         },
         {
           "name": "wait-vpc",
@@ -4101,7 +4108,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression PG",
-            "cidr": "10.126.1.0/24",
+            "cidr": "10.124.4.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -4821,7 +4828,8 @@
             409
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "adopt": "vpc"
         }
       ]
     },
@@ -4855,7 +4863,8 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          }
+          },
+          "adopt": "vpc"
         },
         {
           "name": "wait-vpc",
@@ -4884,7 +4893,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression shared",
-            "cidr": "10.130.1.0/24",
+            "cidr": "10.124.5.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -5810,7 +5819,8 @@
             409
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "adopt": "vpc"
         }
       ]
     },
@@ -6862,7 +6872,8 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          }
+          },
+          "adopt": "vpc"
         },
         {
           "name": "wait-vpc",
@@ -6891,7 +6902,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression shared-net",
-            "cidr": "10.140.1.0/24",
+            "cidr": "10.124.6.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -7178,7 +7189,7 @@
           "path": "/v1/subnets/{subnet_id}/vips",
           "json": {
             "description": "API regression shared-net",
-            "virtual_ip_address": "10.140.1.200"
+            "virtual_ip_address": "10.124.6.200"
           },
           "capture": {
             "vip_id": "$.subnet_vip.id"
@@ -7209,7 +7220,7 @@
               "layer_type": "L4",
               "name": "regrlb{ualpha}",
               "publicip_id": "",
-              "service_ip": "10.140.1.100",
+              "service_ip": "10.124.6.100",
               "source_nat_ip": "",
               "subnet_id": "{subnet_id}",
               "tags": [],
@@ -8039,7 +8050,8 @@
             409
           ],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "adopt": "vpc"
         }
       ]
     },

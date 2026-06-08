@@ -90,6 +90,16 @@ def _catalog_key_for(method: str, templated_path: str, service: str | None):
 # budget is consulted as DATA, not hardcoded.
 _VPC_CREATE_PATH = "/v1/vpcs"
 
+# Shared-resource adoption (knowledge/vpc-scheduling-strategy.md). A step marked
+# {"adopt": "<kind>"} reuses a session-shared resource instead of creating its
+# own, so the heavy lifecycles don't each consume a slot against the 5-VPC cap.
+# Maps adopt kind -> the ctx var holding the shared resource id (seeded from the
+# shared_ctx the pytest fixture builds via provision_shared_vpc). When the shared
+# id is absent (no fixture / mutations off) an adopt step is a NO-OP and the
+# lifecycle falls back to its own create/delete (so this can never regress CRUD).
+_ADOPT_SHARED = {"vpc": "shared_vpc_id", "subnet": "shared_subnet_id"}
+_SHARED_VPC_CIDR = "10.124.0.0/20"
+
 
 # --------------------------------------------------------------------------- #
 # categorize + recording (dual-write)
@@ -362,7 +372,8 @@ class LifecycleSkip(Exception):
 
 def run_lifecycle(lifecycle: dict, client, cfg, *,
                   budget: _budgets.Budget | None = None,
-                  resource_registry: ResourceRegistry | None = None) -> dict:
+                  resource_registry: ResourceRegistry | None = None,
+                  shared_ctx: dict | None = None) -> dict:
     """Run one lifecycle's steps in order. Returns a result dict
     ``{id, status: 'passed'|'skipped'|'failed', reason?, failed_groups, created}``.
 
@@ -393,6 +404,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
     }
+    # Seed shared resources (e.g. a session-shared VPC) so {"adopt": ...} steps
+    # reuse them instead of creating their own.
+    if shared_ctx:
+        ctx.update({k: str(v) for k, v in shared_ctx.items() if v})
 
     # Teardown stack of (label, method, path, service, json, group, budget_kind).
     cleanups: list[tuple] = []
@@ -443,6 +458,27 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             grp = step.get("group")
             if grp and grp in failed_groups:
                 continue  # an earlier step in this group failed — skip the rest
+
+            # Shared-resource adoption: reuse a session-shared resource instead of
+            # creating/deleting our own (so heavy lifecycles share one VPC rather
+            # than each consuming a slot against the 5-VPC cap). NO-OP when the
+            # shared id is absent — the lifecycle then self-creates as before.
+            _adopt = step.get("adopt")
+            if _adopt:
+                _shared_val = ctx.get(_ADOPT_SHARED.get(_adopt, ""))
+                if _shared_val:
+                    _m = step.get("method", "").upper()
+                    if _m == "POST":  # adopt: skip the create, seed its capture vars
+                        for _v in step.get("capture", {}):
+                            ctx[_v] = _shared_val
+                        print(f"  [{lifecycle['id']}] adopting shared {_adopt}="
+                              f"{_shared_val} (skip create '{step['name']}')")
+                        continue
+                    if _m == "DELETE":  # retain shared resource — fixture tears it down
+                        print(f"  [{lifecycle['id']}] retaining shared {_adopt} "
+                              f"(skip delete '{step['name']}')")
+                        continue
+
             step_service = step.get("service") or service
             if step.get("wait"):
                 time.sleep(float(step["wait"]))
@@ -649,3 +685,58 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
     for lc in active_lifecycles():
         out.append(run_lifecycle(lc, client, cfg, budget=budget, resource_registry=reg))
     return out
+
+
+def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None):
+    """Create ONE VPC (active) for heavy lifecycles to ADOPT, so they don't each
+    create their own against the 5-VPC cap (knowledge/vpc-scheduling-strategy.md).
+
+    Returns ``(shared_ctx, teardown)`` where ``shared_ctx`` is ``{"shared_vpc_id":
+    <id>}`` (or ``{}`` if it could not be provisioned — callers then fall back to
+    per-lifecycle self-create) and ``teardown()`` deletes the VPC at session end.
+    The VPC is owner/run/ttl-tagged so the reconciler sweep reclaims it even if
+    teardown is skipped. No-op unless mutations are allowed.
+    """
+    noop = ({}, lambda: None)
+    if not cfg.allow_mutations:
+        return noop
+    reg = resource_registry if resource_registry is not None else ResourceRegistry()
+    uniq = format(int(time.time()), "x")
+    body = _inject_owner_tags({
+        # 'regrvpc' prefix (not 'regrshared') so the reconciler's VPC sweep AND
+        # its LB/NAT-by-vpc_id sweep (name_prefixes=('regrvpc','zznetvpc')) reclaim
+        # this shared VPC + its children even if a VPC list response omits tags.
+        "name": f"regrvpcshared{uniq}", "description": "API regression shared VPC",
+        "cidr": _SHARED_VPC_CIDR, "tags": [],
+    }, axis="regression")
+    create = {"name": "create-shared-vpc", "method": "POST", "service": "vpc"}
+    resp = _run_step(client, create, _VPC_CREATE_PATH, body, "vpc", {})
+    if resp.status not in (200, 201, 202) or not resp.body:
+        print(f"  shared-VPC provision failed ({resp.status}); heavy lifecycles "
+              f"will self-create. {(resp.raw_text or '')[:200]}")
+        return noop
+    vpc_id = _capture(resp.body, "$.vpc.id")
+    if not vpc_id:
+        return noop
+    vpc_id = str(vpc_id)
+    # poll to ACTIVE so adopters can build under it immediately
+    wait = {"name": "wait-shared-vpc", "method": "GET", "service": "vpc",
+            "poll": {"field": "$.vpc.state",
+                     "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
+                     "timeout": 300, "interval": 10}}
+    _run_step(client, wait, f"{_VPC_CREATE_PATH}/{vpc_id}", None, "vpc", {})
+    reg.track(ResourceRecord(service="vpc",
+                             delete_path=f"{_VPC_CREATE_PATH}/{vpc_id}",
+                             resource_id=vpc_id, kind="vpc", parent="shared"))
+    print(f"  shared VPC provisioned: {vpc_id} ({_SHARED_VPC_CIDR})")
+
+    def teardown():
+        if not cfg.allow_destructive:
+            return
+        try:
+            client.request("DELETE", f"{_VPC_CREATE_PATH}/{vpc_id}", service="vpc")
+            print(f"  shared VPC {vpc_id} deleted")
+        except Exception as exc:  # best-effort; the tag-scoped sweep is the backstop
+            print(f"  shared VPC {vpc_id} delete failed ({exc}); sweep will reclaim")
+
+    return {"shared_vpc_id": vpc_id}, teardown

@@ -105,11 +105,41 @@ Pick one (in order of robustness):
 3. **Per-run VPC lane budget**: cap each run to ≤2 of the 5 VPCs and only allow two
    such runs at once. Needs the live-sync engine work below to be enforceable.
 
-## The durable fix (implement to make a single full run safe — recommended next code change)
+## IMPLEMENTED: shared-VPC adoption for heavy lifecycles
+
+> Status: built (offline-tested), **pending live validation on the next heavy
+> run**. See `tests/crud/test_shared_vpc_adopt.py`.
+
+The six **heavy** VPC lifecycles no longer each create their own VPC. A
+session-scoped pytest fixture (`shared_vpc` in `conftest.py`) provisions **one**
+VPC (`10.124.0.0/20`, owner/run/ttl-tagged) via `engine.provision_shared_vpc`,
+and each heavy lifecycle's `create-vpc`/`delete-vpc` steps carry
+`{"adopt": "vpc"}`: the engine seeds `vpc_id` from the shared VPC and **skips
+both the create and the delete** (the fixture tears the VPC down once at session
+end; the tag-scoped sweep is the backstop). Net: **6 heavy VPC creates → 1.**
+
+- **Scope decision:** heavy-only. The two *light* networking lifecycles
+  (`networking-vpc-subnet`, `networking-vpc-internet-gateway`) keep self-creating
+  so the VPC create/delete endpoints stay exercised for coverage.
+- **Share VPC only (not the subnet):** each heavy lifecycle still creates its
+  *own* subnet **under** the shared VPC, re-homed into the shared `/20`
+  (`10.124.1.0/24` … `10.124.6.0/24`), preserving each service's known-good
+  subnet config. (`heavy-shared-networking`'s in-subnet host IPs were moved to
+  `10.124.6.100/200` to match.) This avoids the risk of one shared subnet not
+  satisfying every service.
+- **Safety / no-regression:** adoption is a **no-op when no shared VPC exists**
+  (mutations off, or provisioning failed) — the lifecycle then self-creates
+  exactly as before. So the fixture failing can't redden heavy CRUD.
+- **Effect on the cap:** heavy runs now hold **1** shared VPC + at most the light
+  lifecycles' own, instead of up to 6 — `heavy-shared-networking` no longer gets
+  starved. The lane sharding below is still useful for *cross-run* isolation but
+  is no longer required to fit the heavy suite intra-run.
+
+## Other durable fixes (still recommended)
 
 The lane sharding above is executable **today** with zero code change. To make a
-single, un-sharded `run_heavy=true` run safe (no manual sharding), close the
-accounting gap:
+single, un-sharded `run_heavy=true` run safe (no manual sharding), also close the
+remaining accounting gap:
 
 1. **Share one `Budget` for the whole pytest session and seed it from reality.**
    In a `tests/crud` fixture (module/session scope), build one `Budget`, call
