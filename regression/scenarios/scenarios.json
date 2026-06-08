@@ -223,6 +223,43 @@
       ]
     },
     {
+      "id": "platform-product-reads",
+      "service": "platform/product",
+      "enabled": true,
+      "_note": "Read-only: list products + product-categories (global/account-scoped service, no region), soft-capture product_id + category_id, then probe the 2 path-param GETs showproduct/showproductcategory. Covers all 4 product GETs (2 direct + 2 id-bound) with zero writes/cleanup and zero cost. Envelope grounded from docs response_example: $.products[].product_id and $.product_categories[].category_id. probe_reads keys are the catalog path-param names (product_id, category_id) so _probe_reads matches showproduct (/v1/products/{product_id}) + showproductcategory (/v1/product-categories/{category_id}). Env-independent: the product catalog is populated for every account, but records SOFT if a list returns empty.",
+      "steps": [
+        {
+          "name": "list-products",
+          "method": "GET",
+          "path": "/v1/products",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "product_id": "$.products[0].product_id"
+          }
+        },
+        {
+          "name": "list-product-categories",
+          "method": "GET",
+          "path": "/v1/product-categories",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "category_id": "$.product_categories[0].category_id"
+          }
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "product_id": "{product_id}",
+            "category_id": "{category_id}"
+          }
+        }
+      ]
+    },
+    {
       "id": "networking-vpc-subnet",
       "service": "networking/vpc",
       "enabled": true,

@@ -13,6 +13,7 @@ safety gates. Re-derive flags with the snippet at the bottom.
 | `networking-vpc-subnet` | networking/vpc | vpc + subnet + port |
 | `quota-reads` | management/quota | read-only quota endpoints |
 | `support-reads` | management/support | read-only support endpoints |
+| `platform-product-reads` | platform/product | read-only product + product-category endpoints |
 | `container-scr-registry` | container/scr | registry + repository |
 | `filestorage-volume` | storage/filestorage | NFS volume |
 | `security-certificatemanager-selfsign` | security/certificatemanager | self-signed cert |
@@ -49,8 +50,8 @@ safety gates. Re-derive flags with the snippet at the bottom.
 | `iam-role` | not yet validated |
 | `security-certificatemanager-import` | cert import flow currently unsatisfiable (see HANDOFF doc) |
 
-> **29 lifecycles total** (24 enabled, 3 disabled here + the heavy ones gated by
-> `SCP_RUN_HEAVY`). The setter-coverage expansion (26 write steps, in-place
+> **30 lifecycles total** (27 enabled = 21 light + 6 heavy gated by
+> `SCP_RUN_HEAVY`; 3 disabled here). The setter-coverage expansion (26 write steps, in-place
 > updates) added in the trusting-curie merge lives inside several existing
 > lifecycles as extra steps — see `docs/HANDOFF-crud-setter-validation.md`.
 
@@ -61,10 +62,72 @@ directly-testable GETs (smoke floor), 302 id-bound GETs (need read-chain/CRUD),
 845 mutating endpoints (need CRUD scenarios). The biggest uncovered surfaces by
 endpoint count are **database (255)**, **management (244)**, **networking (205)**,
 **compute (181)**, **storage (129)**, **data-analytics (119)** — prioritize CRUD
-scenarios there. Record specific missing endpoints here as you triage them.
+scenarios there.
 
-> **TODO (next sessions):** triage uncovered endpoints per category into concrete
-> scenario ideas and list them here so the Regression agent can pick them up.
+### Triage: services with NO lifecycle yet (by endpoint count)
+
+Derived statically from `data/api_catalog.json` minus the `service` of every
+lifecycle in `scenarios.json` (re-derive with the snippet at the bottom of this
+section). `directGET` = directly-testable GETs (no path param = smoke floor).
+**Cost class** gates how soon we can write it: *read* = pure GET surface, can be
+a zero-cost read-only lifecycle today (model on `quota-reads` / `support-reads` /
+`platform-product-reads`); *light* = creatable without billable cluster/VM;
+*heavy* = billable cluster/DB/VM, gate behind `SCP_RUN_HEAVY`.
+
+| Endpoints | directGET | Category | Service | Cost | Smallest concrete scenario idea |
+|----------:|----------:|----------|---------|------|---------------------------------|
+| 47 | 5 | database | `epas` | heavy | epas create→show→delete cluster (mirror mysql/postgresql heavy) |
+| 46 | 5 | database | `mariadb` | heavy | mariadb create→show→delete cluster (mirror mysql) |
+| 41 | 2 | storage | `baremetal-blockstorage` | light | volume-group + volume create→show→delete (note: red in conformance — 5xx-on-bad-input) |
+| 38 | 5 | database | `sqlserver` | heavy | sqlserver create→show→delete cluster |
+| 37 | 9 | management | `organization` | read | read-only: list orgs/accounts/OUs + probe id-bound GETs (mutations risky — defer) |
+| 34 | 5 | networking | `loadbalancer` | light | LB needs a vpc+subnet: create LB → listener → show → delete |
+| 32 | 5 | management | `iam-identity-center` | light | create group/permission-set → show → delete (red in conformance) |
+| 32 | 5 | database | `cachestore` | heavy | cachestore create→show→delete cluster |
+| 31 | 9 | storage | `backup` | read→light | read-only first: list backup policies/vaults + probe; later create policy |
+| 26 | 3 | data-analytics | `searchengine` | heavy | searchengine create→show→delete cluster |
+| 25 | 6 | storage | `archivestorage` | light | bucket/vault create→show→delete |
+| 24 | 5 | data-analytics | `eventstreams` | heavy | eventstreams create→show→delete cluster |
+| 23 | 3 | data-analytics | `vertica` | heavy | vertica create→show→delete cluster |
+| 18 | 8 | management | `cloudmonitoring` | read | read-only: list metrics/event-policies + probe id-bound GETs |
+| 17 | 3 | data-analytics | `data-ops` | light | read-only first (list image-versions etc.) |
+| 17 | 3 | data-analytics | `data-flow` | light | read-only first (list flows) |
+| 16 | 5 | compute | `multinodegpucluster` | heavy | GPU cluster — billable, defer |
+| 16 | 3 | compute | `baremetal` | heavy | bare-metal server — billable, defer |
+| 15 | 4 | management | `cloudcontrol` | light | resource-control create→show→delete |
+| 12 | 3 | ai-ml | `aimlops-platform` | heavy | platform create→show→delete (cluster-backed) |
+| 12 | 2 | data-analytics | `quick-query` | light | query create→run→show→delete |
+| 11 | 2 | storage | `parallel-filestorage` | light | parallel volume create→show→delete (mirror filestorage) |
+| 10 | 6 | financial-management | `billingplan` | read | read-only: list planned-computes/server-types/... + probe showplannedcompute |
+| 10 | 2 | networking | `vpn` | light | vpn-gateway/tunnel (needs vpc) |
+| 10 | 2 | management | `loggingaudit` | read→light | read-only: list audit logs/trails |
+| 10 | 2 | networking | `gslb` | light | gslb create→show→delete |
+| 9 | 2 | ai-ml | `cloud-ml` | heavy | cloud-ml cluster — billable, defer |
+| 9 | 1 | networking | `cdn` | light | cdn distribution create→show→delete |
+| 8 | 2 | networking | `firewall` | light | firewall rule (needs vpc) |
+| 8 | 1 | networking | `direct-connect` | light | direct-connect connection create→show→delete |
+| 7 | 3 | security | `configinspection` | read→light | read-only: list inspection results + probe |
+| 6 | 2 | devops-tools | `devopsservice` | light | devops project create→show→delete |
+| 5 | 1 | security | `secretvault` | light | vault create→show→delete (mirror secretsmanager) |
+| 5 | 1 | financial-management | `budget` | read→light | read-only: list account budgets + probe showaccountbudget |
+| 4 | 2 | platform | `product` | ✅ done | covered by `platform-product-reads` |
+| 4 | 2 | management | `network-logging` | read→light | read-only: list logs |
+| 3 | 3 | financial-management | `pricing` | read | read-only: list offerings/prices/billing-item-ids (all direct GET) |
+| 3 | 3 | financial-management | `costexplorer` | read | read-only: list bills/usages + show monthly payment |
+| 3 | 0 | platform | `sts` | light | token mint (POST-only; no GET to read back) |
+
+**Recommended next wins (cheapest coverage, no billing, low mutation risk):** the
+*read* class — `pricing`, `costexplorer`, `billingplan`, `cloudmonitoring`,
+`organization` (read-only slice) — each adds a `*-reads` lifecycle exactly like
+`platform-product-reads` and unlocks both direct + id-bound GETs at zero cost.
+Then the small *light* CRUD services (`secretvault`, `archivestorage`,
+`cloudcontrol`, `gslb`, `cdn`, `direct-connect`). Defer all *heavy* DB/cluster
+services until a heavy session.
+
+> Re-derive this table any time:
+> ```bash
+> python3 -c "import json,collections;cat=json.load(open('data/api_catalog.json'));sc=json.load(open('regression/scenarios/scenarios.json'))['lifecycles'];cov={l['service'].split('/',1)[1] for l in sc if '/' in l.get('service','')};bs=collections.defaultdict(collections.Counter);cc={};dg=collections.Counter();[ (bs[e['service']].update([e['method']]), cc.__setitem__(e['service'],e['category']), dg.update([e['service']] if e['method']=='GET' and '{' not in e['http_path'] else [])) for e in cat];rows=sorted(((sum(c.values()),dg[s],cc[s],s) for s,c in bs.items() if s not in cov),reverse=True);[print(f'{t:4d} dG={d:3d} {cat:18s} {s}') for t,d,cat,s in rows]"
+> ```
 
 ## How to inspect / extend
 

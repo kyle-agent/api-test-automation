@@ -88,9 +88,9 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 ## Current state (keep this updated as work progresses)
 
 - Catalog: extracted, 1,372 endpoints, 0 unresolved.
-- **29 CRUD lifecycles** today (full list + flags in
+- **30 CRUD lifecycles** today (full list + flags in
   `knowledge/scenario-catalog.md`). Light: resourcemanager resource-group, quota/
-  support reads, vpc+subnet+port, scr registry+repo, filestorage volume,
+  support/product reads, vpc+subnet+port, scr registry+repo, filestorage volume,
   certificatemanager self-sign, queueservice queue, security-group(+rule),
   virtualserver keypair, virtualserver volume+snapshot, vpc public-ip, vpc
   internet-gateway, kms key, secretsmanager secret, apigateway api+resource, scf
@@ -102,7 +102,10 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   `docs/HANDOFF-crud-setter-validation.md`.
 - Auth/host resolution: implemented & configurable; confirm against a live `200`.
 - **What to advance next:** widen GET coverage toward 100% and add CRUD scenarios
-  for the long tail. Record gaps in `knowledge/scenario-catalog.md`.
+  for the long tail. Uncovered services are now triaged by cost class in
+  `knowledge/scenario-catalog.md` — cheapest next wins are the *read*-class
+  services (pricing, costexplorer, billingplan, cloudmonitoring) as `*-reads`
+  lifecycles, modeled on `platform-product-reads`.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.

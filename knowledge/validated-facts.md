@@ -25,6 +25,8 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
 | scr registry / repository | `$.id` | flat |
 | queue | `$.id` | flat |
 | **server (VM)** | `$.servers[0].id` | **array**, not `$.server.id` |
+| product (read) | `$.products[0].product_id` | global svc, list envelope `$.products[]`; show id-bound on `{product_id}` |
+| product-category (read) | `$.product_categories[0].category_id` | global svc; show id-bound on `{category_id}` |
 | ske cluster | `$.resource_id` | not `$.cluster.id` |
 | ske nodepool | `$.nodepool.id` | nested |
 | custom image (from server) | `$.image_id` | flat |
