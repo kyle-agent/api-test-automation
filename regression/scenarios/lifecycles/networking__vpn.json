@@ -1,0 +1,200 @@
+{
+  "lifecycles": [
+    {
+      "id": "networking-vpn-gateway-tunnel",
+      "service": "networking/vpn",
+      "enabled": true,
+      "heavy": true,
+      "_note": "VPN gateway + tunnel CRUD (Wave 2, NOT runtime-proven, HEAVY/billable). A VPN gateway needs a base VPC + a public IP. The VPC is the session-shared VPC (adopt:vpc, per knowledge/vpc-scheduling-strategy.md — does NOT self-create a VPC); a publicip is created on the vpc service for the gateway's ip_id. Then: create-gateway -> get/set-gateway, create-tunnel -> get/set-tunnel, delete-tunnel, delete-gateway. gateway+tunnel writes are one optional 'vpn' group so a bad body / missing publicip skips only this family (cleaned up children-first). Bodies from data/api_docs.json request_example. create-gateway returns $.vpn_gateway.id, create-tunnel returns $.vpn_tunnel.id (both soft-captured; dependent steps reference {vpn_gateway_id}/{vpn_tunnel_id} -> real chain on success, literal-but-norm-matching on 4xx so coverage still records). gateway needs vpc_id + ip_id(public ip) + ip_type:PUBLIC + ip_address; tunnel needs vpn_gateway_id + phase1/phase2 crypto blocks (enum lists from docs, UNVALIDATED). The phase1/phase2 encryption + diffie_hellman group values are docs-example guesses and may be rejected -> optional/4xx-tolerant. Covers all 6 VPN WRITE ops: POST /v1/vpn-gateways, PUT /v1/vpn-gateways/{vpn_gateway_id}, DELETE /v1/vpn-gateways/{vpn_gateway_id}, POST /v1/vpn-tunnels, PUT /v1/vpn-tunnels/{vpn_tunnel_id}, DELETE /v1/vpn-tunnels/{vpn_tunnel_id}.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression vpn",
+            "cidr": "10.124.0.0/20",
+            "tags": []
+          },
+          "capture": {"vpc_id": "$.vpc.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE", "CREATED", "RUNNING"], "timeout": 300, "interval": 10}
+        },
+        {
+          "name": "create-publicip",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "json": {"description": "API regression vpn", "type": "IGW", "tags": []},
+          "capture": {"publicip_id": "$.publicip.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/publicips/{publicip_id}", "service": "vpc"}
+        },
+        {
+          "name": "create-vpn-gateway",
+          "method": "POST",
+          "path": "/v1/vpn-gateways",
+          "group": "vpn",
+          "optional": true,
+          "json": {
+            "description": "API regression suite",
+            "ip_id": "{publicip_id}",
+            "ip_type": "PUBLIC",
+            "name": "regrvpngw{ualpha}",
+            "tags": [],
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"vpn_gateway_id": "$.vpn_gateway.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpn-gateways/{vpn_gateway_id}", "service": "vpn"}
+        },
+        {
+          "name": "get-vpn-gateway",
+          "method": "GET",
+          "path": "/v1/vpn-gateways/{vpn_gateway_id}",
+          "group": "vpn",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404]
+        },
+        {
+          "name": "set-vpn-gateway",
+          "method": "PUT",
+          "path": "/v1/vpn-gateways/{vpn_gateway_id}",
+          "group": "vpn",
+          "optional": true,
+          "json": {"description": "API regression suite (updated)"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-vpn-tunnel",
+          "method": "POST",
+          "path": "/v1/vpn-tunnels",
+          "group": "vpn",
+          "optional": true,
+          "json": {
+            "description": "API regression suite",
+            "name": "regrvpntun{ualpha}",
+            "phase1": {
+              "dpd_retry_interval": 60,
+              "ike_version": 2,
+              "peer_gateway_ip": "203.0.113.2",
+              "phase1_diffie_hellman_groups": [14],
+              "phase1_encryptions": ["aes256-sha256"],
+              "phase1_life_time": 86400,
+              "pre_shared_key": "regrPreSharedKey1"
+            },
+            "phase2": {
+              "perfect_forward_secrecy": "ENABLE",
+              "phase2_diffie_hellman_groups": [14],
+              "phase2_encryptions": ["aes256-sha256"],
+              "phase2_life_time": 43200,
+              "remote_subnets": ["10.1.1.0/24"]
+            },
+            "tags": [],
+            "vpn_gateway_id": "{vpn_gateway_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"vpn_tunnel_id": "$.vpn_tunnel.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpn-tunnels/{vpn_tunnel_id}", "service": "vpn"}
+        },
+        {
+          "name": "get-vpn-tunnel",
+          "method": "GET",
+          "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+          "group": "vpn",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404]
+        },
+        {
+          "name": "set-vpn-tunnel",
+          "method": "PUT",
+          "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+          "group": "vpn",
+          "optional": true,
+          "json": {
+            "description": "API regression suite (updated)",
+            "phase1": {
+              "dpd_retry_interval": 60,
+              "ike_version": 2,
+              "peer_gateway_ip": "203.0.113.2",
+              "phase1_diffie_hellman_groups": [14],
+              "phase1_encryptions": ["aes256-sha256"],
+              "phase1_life_time": 86400,
+              "pre_shared_key": "regrPreSharedKey1"
+            },
+            "phase2": {
+              "perfect_forward_secrecy": "ENABLE",
+              "phase2_diffie_hellman_groups": [14],
+              "phase2_encryptions": ["aes256-sha256"],
+              "phase2_life_time": 43200,
+              "remote_subnets": ["10.1.1.0/24"]
+            }
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-vpn-reads",
+          "probe_reads": {"vpn_gateway_id": "{vpn_gateway_id}", "vpn_tunnel_id": "{vpn_tunnel_id}"}
+        },
+        {
+          "name": "delete-vpn-tunnel",
+          "method": "DELETE",
+          "path": "/v1/vpn-tunnels/{vpn_tunnel_id}",
+          "group": "vpn",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-vpn-gateway",
+          "method": "DELETE",
+          "path": "/v1/vpn-gateways/{vpn_gateway_id}",
+          "group": "vpn",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [409],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-publicip",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 20,
+          "retry_interval": 20
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
+    }
+  ]
+}

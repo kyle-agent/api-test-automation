@@ -1,0 +1,136 @@
+{
+  "lifecycles": [
+    {
+      "id": "networking-direct-connect-routing",
+      "service": "networking/direct-connect",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Direct Connect + routing-rule CRUD (Wave 2, NOT runtime-proven, HEAVY/billable). A direct-connect attaches to a base VPC: the session-shared VPC (adopt:vpc, per knowledge/vpc-scheduling-strategy.md — does NOT self-create a VPC). Then: create-dc -> get/set-dc, create-routing-rule -> delete-routing-rule, delete-dc. All dc/routing-rule writes are one optional 'dc' group so a bad body skips only this family (cleaned up children-first). Bodies from data/api_docs.json request_example. create-dc returns $.direct_connect.id; create-routing-rule returns $.routing_rule.id (both soft-captured; dependent steps reference {direct_connect_id}/{routing_rule_id} -> real chain on success, literal-but-norm-matching on 4xx so coverage still records). NOTE: the docs createdirectconnect example sends tags as a STRINGIFIED list (\"[{'key':...}]\") which is almost certainly a doc bug; we send a proper JSON list [] (the engine merges owner tags). bandwidth=1 (Gbps?) is a docs guess; routing-rule destination_type=ON_PREMISE with destination_cidr; destination_resource_id omitted (we have no on-premise resource) which may 4xx -> optional/tolerant. Covers all 5 direct-connect WRITE ops: POST /v1/direct-connects, PUT /v1/direct-connects/{direct_connect_id}, DELETE /v1/direct-connects/{direct_connect_id}, POST /v1/direct-connects/{direct_connect_id}/routing-rules, DELETE /v1/direct-connects/{direct_connect_id}/routing-rules/{routing_rule_id}.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression dc",
+            "cidr": "10.124.0.0/20",
+            "tags": []
+          },
+          "capture": {"vpc_id": "$.vpc.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE", "CREATED", "RUNNING"], "timeout": 300, "interval": 10}
+        },
+        {
+          "name": "create-direct-connect",
+          "method": "POST",
+          "path": "/v1/direct-connects",
+          "group": "dc",
+          "optional": true,
+          "json": {
+            "bandwidth": 1,
+            "description": "API regression suite",
+            "firewall_enabled": true,
+            "firewall_loggable": true,
+            "name": "regrdc{ualpha}",
+            "tags": [],
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"direct_connect_id": "$.direct_connect.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/direct-connects/{direct_connect_id}", "service": "direct-connect"}
+        },
+        {
+          "name": "get-direct-connect",
+          "method": "GET",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "group": "dc",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404]
+        },
+        {
+          "name": "set-direct-connect",
+          "method": "PUT",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "group": "dc",
+          "optional": true,
+          "json": {"description": "API regression suite (updated)"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-routing-rule",
+          "method": "POST",
+          "path": "/v1/direct-connects/{direct_connect_id}/routing-rules",
+          "group": "dc",
+          "optional": true,
+          "json": {
+            "description": "API regression suite",
+            "destination_cidr": "11.11.11.0/24",
+            "destination_type": "ON_PREMISE"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"routing_rule_id": "$.routing_rule.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/direct-connects/{direct_connect_id}/routing-rules/{routing_rule_id}", "service": "direct-connect"}
+        },
+        {
+          "name": "list-routing-rules",
+          "method": "GET",
+          "path": "/v1/direct-connects/{direct_connect_id}/routing-rules",
+          "group": "dc",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404]
+        },
+        {
+          "name": "probe-dc-reads",
+          "probe_reads": {"direct_connect_id": "{direct_connect_id}"}
+        },
+        {
+          "name": "delete-routing-rule",
+          "method": "DELETE",
+          "path": "/v1/direct-connects/{direct_connect_id}/routing-rules/{routing_rule_id}",
+          "group": "dc",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-direct-connect",
+          "method": "DELETE",
+          "path": "/v1/direct-connects/{direct_connect_id}",
+          "group": "dc",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [409],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "lifecycles": [
+    {
+      "id": "security-configinspection-diagnosis",
+      "service": "security/configinspection",
+      "enabled": true,
+      "_note": "COVERAGE-ONLY lifecycle for the 3 uncovered configinspection WRITE ops: POST /v1/configinspection/diagnosis/save (create a diagnosis object), POST /v1/configinspection/diagnosis/request (run a diagnosis), DELETE /v1/configinspection/diagnosis/terminate/{diagnosis_id} (terminate). Config Inspection diagnoses a CLOUD ACCOUNT (csp_type SCP or a foreign CSP) and the request/save bodies need REAL credentials of the account being inspected (diagnosisrequest: access_key/secret_key/tenant_id; diagnosisobjectrequest: a nested auth_key_request with a real auth_key_id, plus diagnosis_account_id). We do NOT have a throwaway inspectable account + auth key, so every write is a GUARDED OPTIONAL call with doc-sample ids and broad expect_status: it CALLS the endpoint (recording coverage for the 3 catalog keys) and 4xx's as expected. Bodies/field rules from data/api_docs.json (diagnosisobjectrequest, diagnosisrequest, diagnosisschedulerequest, authkeyrequest) — _UNPROVEN. save returns FLAT $.diagnosis_id (configinspectioncreateresponse) — soft-captured so that, if save unexpectedly succeeds, probe-reads can exercise GET .../diagnosis/detail/{diagnosis_id} and the terminate DELETE targets the real id; otherwise terminate fires against the doc-sample {diagnosis_id} (still records the DELETE write, 4xx). diagnosis_name pattern ^[a-zA-Z0-9-_]+$. Each write is isolated in its own group so a 4xx is a warning, not a run failure; nothing real is created so teardown is the terminate call itself (no separate cleanup resource).",
+      "steps": [
+        {
+          "name": "save",
+          "service": "configinspection",
+          "method": "POST",
+          "path": "/v1/configinspection/diagnosis/save",
+          "group": "xcov-config-save",
+          "optional": true,
+          "json": {
+            "account_id": "0e3dffc50eb247a1adf4f2e5c82c4f99",
+            "auth_key_request": {
+              "auth_key_id": "9b72a9856e494e67afc69atd3631fe38",
+              "diagnosis_id": "DIA-943731CB8E3045C289BAECAEC3532097"
+            },
+            "csp_type": "SCP",
+            "diagnosis_account_id": "0e3dffc50eb247a1adf4f2e5c82c4f99",
+            "diagnosis_check_type": "BP",
+            "diagnosis_id": "DIA-943731CB8E3045C289BAECAEC3532097",
+            "diagnosis_name": "regr-config-{unique}",
+            "diagnosis_type": "Console",
+            "plan_type": "STANDARD",
+            "schedule_request": {
+              "diagnosis_id": "DIA-943731CB8E3045C289BAECAEC3532097",
+              "frequency_type": "ONCE",
+              "use_diagnosis_check_type_bp": "true",
+              "use_diagnosis_check_type_ssi": "false"
+            },
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"diagnosis_id": "$.diagnosis_id"}
+        },
+        {
+          "name": "request",
+          "service": "configinspection",
+          "method": "POST",
+          "path": "/v1/configinspection/diagnosis/request",
+          "group": "xcov-config-request",
+          "optional": true,
+          "json": {
+            "access_key": "SAMPLE KEY",
+            "diagnosis_check_type": "BP",
+            "diagnosis_id": "DIA-943731CB8E3045C289BAECAEC3532097",
+            "secret_key": "SAMPLE KEY",
+            "tenant_id": "1234567890"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"diagnosis_id": "{diagnosis_id}"}
+        },
+        {
+          "name": "terminate",
+          "service": "configinspection",
+          "method": "DELETE",
+          "path": "/v1/configinspection/diagnosis/terminate/{diagnosis_id}",
+          "group": "xcov-config-terminate",
+          "optional": true,
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

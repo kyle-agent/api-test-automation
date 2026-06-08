@@ -1,14 +1,58 @@
 {
   "_comment": "Scheduling metadata for the CRUD scenarios in scenarios.json. Keeps service prerequisites and account quota kinds as DATA so a scheduler can serialize/parallelize lifecycles safely against core.budgets (vpc=5, private-dns=3, ...). 'quota_kinds' maps a lifecycle id -> the capped resource kinds it CREATES (and must reserve in core.budgets before running); a scheduler should serialize lifecycles that share a kind once the live usage + reserved slots reach the limit. 'prerequisites' lists the in-flow resource families each lifecycle stands up before its headline resource (informational: these are created inline by the lifecycle's own steps, not external preconditions). 'budget_paths' maps the create PATH that consumes a kind -> the kind, mirroring engine._budget_kind_for_path so the mapping has one source of truth.",
   "quota_kinds": {
-    "networking-vpc-subnet": ["vpc"],
-    "networking-vpc-internet-gateway": ["vpc"],
-    "container-ske-cluster-nodepool": ["vpc"],
-    "compute-virtualserver-full": ["vpc"],
-    "database-mysql-cluster": ["vpc"],
-    "database-postgresql-cluster": ["vpc"],
-    "heavy-shared-dbaas": ["vpc"],
-    "heavy-shared-networking": ["vpc", "private-dns"]
+    "networking-vpc-subnet": [
+      "vpc"
+    ],
+    "networking-vpc-internet-gateway": [
+      "vpc"
+    ],
+    "container-ske-cluster-nodepool": [
+      "vpc"
+    ],
+    "compute-virtualserver-full": [
+      "vpc"
+    ],
+    "database-mysql-cluster": [
+      "vpc"
+    ],
+    "database-postgresql-cluster": [
+      "vpc"
+    ],
+    "heavy-shared-dbaas": [
+      "vpc"
+    ],
+    "heavy-shared-networking": [
+      "vpc",
+      "private-dns"
+    ],
+    "vpc-cidr-secondary": [
+      "vpc"
+    ],
+    "vpc-privatelink-service": [
+      "vpc"
+    ],
+    "vpc-endpoint": [
+      "vpc"
+    ],
+    "vpc-peering": [
+      "vpc"
+    ],
+    "vpc-transit-gateway-children": [
+      "vpc"
+    ],
+    "vpc-subnet-vip-nat": [
+      "vpc"
+    ],
+    "networking-loadbalancer-members-nat": [
+      "vpc"
+    ],
+    "networking-vpn-gateway-tunnel": [
+      "vpc"
+    ],
+    "networking-direct-connect-routing": [
+      "vpc"
+    ]
   },
   "budget_paths": {
     "/v1/vpcs": "vpc",
@@ -20,24 +64,89 @@
     "private_dns_limit": 3,
     "per_run_vpc_cap": 3,
     "lanes": [
-      { "id": "L0-light", "run_heavy": false, "crud_filter": "", "vpc_lifecycles": ["networking-vpc-subnet", "networking-vpc-internet-gateway"], "peak_vpcs": 2 },
-      { "id": "L1-compute", "run_heavy": true, "crud_filter": "container-ske-cluster-nodepool or compute-virtualserver-full", "vpc_lifecycles": ["container-ske-cluster-nodepool", "compute-virtualserver-full"], "peak_vpcs": 2 },
-      { "id": "L2-database", "run_heavy": true, "crud_filter": "database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas", "vpc_lifecycles": ["database-mysql-cluster", "database-postgresql-cluster", "heavy-shared-dbaas"], "peak_vpcs": 2 },
-      { "id": "L3-networking", "run_heavy": true, "crud_filter": "heavy-shared-networking", "vpc_lifecycles": ["heavy-shared-networking"], "peak_vpcs": 1 }
+      {
+        "id": "L0-light",
+        "run_heavy": false,
+        "crud_filter": "",
+        "vpc_lifecycles": [
+          "networking-vpc-subnet",
+          "networking-vpc-internet-gateway"
+        ],
+        "peak_vpcs": 2
+      },
+      {
+        "id": "L1-compute",
+        "run_heavy": true,
+        "crud_filter": "container-ske-cluster-nodepool or compute-virtualserver-full",
+        "vpc_lifecycles": [
+          "container-ske-cluster-nodepool",
+          "compute-virtualserver-full"
+        ],
+        "peak_vpcs": 2
+      },
+      {
+        "id": "L2-database",
+        "run_heavy": true,
+        "crud_filter": "database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas",
+        "vpc_lifecycles": [
+          "database-mysql-cluster",
+          "database-postgresql-cluster",
+          "heavy-shared-dbaas"
+        ],
+        "peak_vpcs": 2
+      },
+      {
+        "id": "L3-networking",
+        "run_heavy": true,
+        "crud_filter": "heavy-shared-networking",
+        "vpc_lifecycles": [
+          "heavy-shared-networking"
+        ],
+        "peak_vpcs": 1
+      }
     ],
     "cross_run_policy": "Never let two VPC-mutating runs overlap. Preferred: a single shared concurrency group for mutating runs (cancel-in-progress:false) so they queue. Interim: trigger one lane at a time and wait for the prior run's regression job to complete (the reliable 'VPCs no longer being created' signal) before the next.",
     "shared_vpc_adopt": "IMPLEMENTED (heavy-only, pending live validation): the 6 heavy VPC lifecycles carry {'adopt':'vpc'} on create-vpc/delete-vpc and reuse ONE session-shared VPC (10.124.0.0/20, conftest.py shared_vpc fixture -> engine.provision_shared_vpc); each still makes its own subnet under it (re-homed to 10.124.1-6.0/24). 6 heavy VPC creates -> 1. No-op fallback to self-create when no shared VPC exists. The 2 light networking lifecycles still self-create for coverage. See tests/crud/test_shared_vpc_adopt.py + knowledge/vpc-scheduling-strategy.md.",
     "durable_fix": "Remaining (to make a single un-sharded run fully self-regulating): (1) share ONE core.budgets.Budget across the pytest session and Budget.sync('vpc'/'private-dns', live_count) from a real list call before creates (the pytest driver currently builds a fresh Budget per lifecycle and never syncs, so the reserve gate sees a phantom 5 free); (2) drain-wait on GET /v1/vpcs after a VPC teardown before the next VPC create; (3) reorder so heavy-shared-networking is not last, or rely on (1)+(2)."
   },
   "prerequisites": {
-    "networking-vpc-subnet": ["vpc"],
-    "networking-vpc-internet-gateway": ["vpc"],
-    "container-ske-cluster-nodepool": ["vpc", "subnet", "security-group", "keypair", "filestorage-volume"],
-    "compute-virtualserver-full": ["vpc", "subnet", "security-group", "keypair", "image", "server-type"],
-    "database-mysql-cluster": ["vpc", "subnet"],
-    "database-postgresql-cluster": ["vpc", "subnet"],
-    "heavy-shared-dbaas": ["vpc", "subnet"],
-    "heavy-shared-networking": ["vpc", "private-dns"]
+    "networking-vpc-subnet": [
+      "vpc"
+    ],
+    "networking-vpc-internet-gateway": [
+      "vpc"
+    ],
+    "container-ske-cluster-nodepool": [
+      "vpc",
+      "subnet",
+      "security-group",
+      "keypair",
+      "filestorage-volume"
+    ],
+    "compute-virtualserver-full": [
+      "vpc",
+      "subnet",
+      "security-group",
+      "keypair",
+      "image",
+      "server-type"
+    ],
+    "database-mysql-cluster": [
+      "vpc",
+      "subnet"
+    ],
+    "database-postgresql-cluster": [
+      "vpc",
+      "subnet"
+    ],
+    "heavy-shared-dbaas": [
+      "vpc",
+      "subnet"
+    ],
+    "heavy-shared-networking": [
+      "vpc",
+      "private-dns"
+    ]
   },
   "notes": "Quota kinds come from core.budgets.DEFAULT_LIMITS (vpc=5, private-dns=3). networking-dns-hosted-zone is currently disabled (needs a private-dns activate sub-flow) and so carries no quota row yet; when re-enabled it should declare private-dns. The four heavy lifecycles each stand up their own VPC inline, so under the 5-VPC cap a scheduler must serialize them (and the two light VPC lifecycles) rather than run them concurrently. The engine reserves a slot in core.budgets before each /v1/vpcs (and /v1/private-dns) create and releases it on teardown; a multi-process scheduler should first Budget.sync() each kind from a live list call, then gate concurrency on Budget.available(kind)."
 }

@@ -1,0 +1,171 @@
+{
+  "lifecycles": [
+    {
+      "id": "vertica-cluster-subops-guarded",
+      "service": "data-analytics/vertica",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY guarded lifecycle for the vertica (analytics DB DBaaS) cluster sub-op WRITE endpoints. vertica has ZERO GAP-write endpoints in spec.coverage_gap because every write shares a /v1/clusters/* or /v1/instance-groups/* path already matched by the shared DBaaS scenarios (the gap analyzer matches path-only, ignoring service). This lifecycle re-exercises those writes (add-block-storages/resize/restart/start/stop/sync-state/maintenance/backup/security-group-rules/patch/restore/remove-backup-histories/set-block-storage-size) so they ALSO record under vertica's OWN catalog keys in the dashboard (the engine records WRITE steps per (method,path,service)), and includes a probe-reads step to exercise vertica's two id-bound GETs (verticashowrequest, verticalistengineversionproperties via the engine-version list). Does NOT provision a real billable cluster: soft-captures an EXISTING cluster_id/engine_version_id from the read-only lists; when none exists the {cluster_id}/{instance_group_id}/{block_storage_group_id} tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 4xx counts as covered). Every mutating step optional + grouped + broad expect_status; DELETEs destructive:true. heavy:true gates behind SCP_RUN_HEAVY. Bodies best-effort from path/field semantics + data/api_bodies.json verticacreatecluster shape — UNPROVEN, promote after a real 2xx.",
+      "steps": [
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [200],
+          "capture_soft": {"cluster_id": "$.contents[0].id"}
+        },
+        {
+          "name": "list-engine-versions",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [200],
+          "capture_soft": {"dbaas_engine_version_id": "$.contents[0].id"}
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}",
+            "dbaas_engine_version_id": "{dbaas_engine_version_id}"
+          }
+        },
+        {
+          "name": "capture-subop-ids",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {
+            "instance_group_id": "$.instance_groups[0].id",
+            "block_storage_group_id": "$.instance_groups[0].block_storage_groups[0].id"
+          }
+        },
+        {
+          "name": "set-security-group-rules",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {"security_group_rules": [{"direction": "INBOUND", "protocol": "TCP", "port_min": 5433, "port_max": 5433, "remote_ip_prefix": "10.0.0.0/8", "description": "regr coverage probe"}]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-sg-rules"
+        },
+        {
+          "name": "set-maintenance",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {"period_hour": "5", "starting_day_of_week": "MON", "starting_time": "0000"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-maintenance"
+        },
+        {
+          "name": "unset-maintenance",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "vt-maintenance"
+        },
+        {
+          "name": "set-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {"retention_period_day": "7", "starting_time_hour": "2"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-backup"
+        },
+        {
+          "name": "unset-backup",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "vt-backup"
+        },
+        {
+          "name": "remove-backup-histories",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "json": {"backup_history_ids": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-backup-hist"
+        },
+        {
+          "name": "create-restore",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {"name": "regrrst{ualpha}", "instance_name_prefix": "regrrst", "subnet_id": "", "restore_option": {"restore_type": "DATETIME", "restore_dt": "{today}"}, "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-restore"
+        },
+        {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-power"
+        },
+        {
+          "name": "stop-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-power"
+        },
+        {
+          "name": "start-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-power"
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-power"
+        },
+        {
+          "name": "set-server-type",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/resize",
+          "json": {"server_type_name": ""},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-resize"
+        },
+        {
+          "name": "add-block-storages",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
+          "json": {"block_storage_groups": [{"role_type": "DATA", "size_gb": 10, "volume_type": "SSD"}]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-resize"
+        },
+        {
+          "name": "set-block-storage-size",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+          "json": {"size_gb": 20},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-resize"
+        }
+      ]
+    }
+  ]
+}

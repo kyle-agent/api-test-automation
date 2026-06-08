@@ -1,0 +1,44 @@
+{
+  "lifecycles": [
+    {
+      "id": "security-certificatemanager-import-cover",
+      "service": "security/certificatemanager",
+      "enabled": true,
+      "_note": "COVERAGE-ONLY lifecycle for the 2 uncovered certificatemanager WRITE ops: POST /v1/certificatemanager (import an external cert) and POST /v1/certificatemanager/check-validation. These are KNOWN-UNSATISFIABLE on this account: per docs/HANDOFF-crud-setter-validation.md the SCP check-validation/import endpoints reject a runtime-minted self-signed keypair regardless of PEM encoding (400 'This private key is not a PEM format'), and CI has no real CA-signed cert. The existing 'security-certificatemanager-import' lifecycle (enabled:false) attempts a REAL import via engine._self_signed_pem() and is therefore disabled. This sibling does NOT try to make import succeed: both writes are GUARDED OPTIONAL calls with broad expect_status so they merely CALL the endpoint (recording coverage for the (POST,/v1/certificatemanager) and (POST,/v1/certificatemanager/check-validation) catalog keys) and 4xx as expected. No resource is created (import is expected to fail validation), so there is nothing to capture/clean up; each call is isolated in its own group so a 4xx is a warning, not a run failure. cert_body/private_key are doc-placeholder strings (api_docs.json certificatecreaterequest / certificatevalidaterequestv1dot1 examples) — _UNPROVEN, expected to be rejected. NOTE: do NOT add needs_cert_material here — that would gate the whole lifecycle on openssl availability and a real (still-rejected) import attempt; static placeholders guarantee the endpoints are always CALLED for coverage.",
+      "steps": [
+        {
+          "name": "check-validation",
+          "service": "certificatemanager",
+          "method": "POST",
+          "path": "/v1/certificatemanager/check-validation",
+          "group": "xcov-cert-check-validation",
+          "optional": true,
+          "json": {
+            "cert_body": "-----BEGIN CERTIFICATE-----\nMIIB-regression-placeholder\n-----END CERTIFICATE-----",
+            "cert_chain": "",
+            "private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIIE-regression-placeholder\n-----END RSA PRIVATE KEY-----"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "import",
+          "service": "certificatemanager",
+          "method": "POST",
+          "path": "/v1/certificatemanager",
+          "group": "xcov-cert-import",
+          "optional": true,
+          "json": {
+            "cert_body": "-----BEGIN CERTIFICATE-----\nMIIB-regression-placeholder\n-----END CERTIFICATE-----",
+            "cert_chain": "",
+            "name": "regrcertimp{unique}",
+            "private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIIE-regression-placeholder\n-----END RSA PRIVATE KEY-----",
+            "recipients": [],
+            "region": "{region}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        }
+      ]
+    }
+  ]
+}

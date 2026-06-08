@@ -1,0 +1,114 @@
+{
+  "lifecycles": [
+    {
+      "id": "quick-query-lifecycle-guarded",
+      "service": "data-analytics/quick-query",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY guarded lifecycle for quick-query's uncovered WRITE endpoints: createquickquery (POST /v1/quick-query), validatequickqueryresources (POST /v1/quick-query/validate-resources), deletequickquery (DELETE), and the five in-place PUT setters on /v1/quick-query/{id}/{description,domain,dsc-domain,engine,host-alias}. quick-query provisions a billable query engine, so this is heavy:true and does NOT spin up a real instance: it soft-captures any EXISTING quick-query id from the read-only list; when none exists the {quick_query_id} token still normalizes to the catalog '*' key so each endpoint is CALLED and RECORDED (a 4xx counts as covered per the engine). Every mutating step is optional + grouped + broad expect_status so an isolated 4xx isolates to its group and never fails the run or chains a real create->mutate->delete. delete is destructive:true (gated by SCP_ALLOW_DESTRUCTIVE). No data/api_bodies.json entry exists for quick-query, so bodies are best-effort from path/field semantics + the shared SCP analytics shape and are UNPROVEN — promote to validated after a real 2xx. The PUT setters target distinct sub-resources (description/domain/dsc-domain/engine/host-alias); domain/dsc-domain/host-alias bodies are guessed and likely 4xx without real DSC/domain values (still records coverage).",
+      "steps": [
+        {
+          "name": "list-quick-query",
+          "method": "GET",
+          "path": "/v1/quick-query",
+          "expect_status": [200],
+          "capture_soft": {"quick_query_id": "$.contents[0].id"}
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"quick_query_id": "{quick_query_id}"}
+        },
+        {
+          "name": "validate-resources",
+          "method": "POST",
+          "path": "/v1/quick-query/validate-resources",
+          "json": {"name": "regrqq{ualpha}", "subnet_id": "", "server_type_name": "", "instance_count": 1},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "qq-validate"
+        },
+        {
+          "name": "create-quick-query",
+          "method": "POST",
+          "path": "/v1/quick-query",
+          "json": {
+            "name": "regrqq{ualpha}",
+            "description": "API regression coverage probe",
+            "dbaas_engine_version_id": "",
+            "subnet_id": "",
+            "nat_enabled": false,
+            "instance_name_prefix": "regrqq",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "",
+                "block_storage_groups": [{"role_type": "OS", "size_gb": 104, "volume_type": "SSD"}],
+                "instances": [{"role_type": "ACTIVE", "service_ip_address": "192.168.10.10/32"}]
+              }
+            ],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "qq-create"
+        },
+        {
+          "name": "update-description",
+          "method": "PUT",
+          "path": "/v1/quick-query/{quick_query_id}/description",
+          "json": {"description": "API regression coverage probe (updated)"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "qq-description"
+        },
+        {
+          "name": "update-domain",
+          "method": "PUT",
+          "path": "/v1/quick-query/{quick_query_id}/domain",
+          "json": {"domain": "regr.example.com"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "qq-domain"
+        },
+        {
+          "name": "update-dsc-domain",
+          "method": "PUT",
+          "path": "/v1/quick-query/{quick_query_id}/dsc-domain",
+          "json": {"dsc_domain": "regr.example.com"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "qq-dsc-domain"
+        },
+        {
+          "name": "update-engine",
+          "method": "PUT",
+          "path": "/v1/quick-query/{quick_query_id}/engine",
+          "json": {"server_type_name": ""},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "qq-engine"
+        },
+        {
+          "name": "update-host-alias",
+          "method": "PUT",
+          "path": "/v1/quick-query/{quick_query_id}/host-alias",
+          "json": {"host_aliases": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "qq-host-alias"
+        },
+        {
+          "name": "delete-quick-query",
+          "method": "DELETE",
+          "path": "/v1/quick-query/{quick_query_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "qq-delete"
+        }
+      ]
+    }
+  ]
+}

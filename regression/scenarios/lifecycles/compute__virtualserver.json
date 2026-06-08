@@ -1,0 +1,660 @@
+{
+  "lifecycles": [
+    {
+      "id": "vs-autoscaling-coverage",
+      "service": "compute/virtualserver",
+      "enabled": true,
+      "_note": "Light, VPC-FREE, COVERAGE-ONLY. Exercises the auto-scaling + launch-configuration WRITE surface the base virtualserver lifecycles never touch. No real ASG/VM is provisioned. Path-bound ids ({auto_scaling_group_id}/{launch_configuration_id}/{notification_id}/{policy_id}/{schedule_id}) are SOFT-seeded from list GETs at the top (so the validator is satisfied and a real id is reused when one exists); when the account has none, the soft-capture finds nothing, the placeholder stays literal, and the engine still RECORDS the endpoint (catalog normalizes {..} to '*'). Every write is optional+grouped with broad expect_status [200,201,202,400,403,404,409,422] so a 4xx from a non-existent id never fails the run. Bodies are docs/best-effort (NO api_bodies.json entry exists for asg/launch-config) — fields UNPROVEN, see per-step _note.",
+      "steps": [
+        {
+          "name": "seed-placeholders",
+          "_note": "COST/SAFETY: declares {auto_scaling_group_id}/{launch_configuration_id}/{policy_id}/{schedule_id}/{notification_id} via NO-OP soft-capture selectors that find nothing, so they stay LITERAL at runtime. An ASG manages REAL billable VMs — seeding an existing ASG and PUTting server-count would scale production. Literal '{auto_scaling_group_id}' yields a guaranteed 404 so the PUT/POST/DELETE nested calls NEVER touch a real ASG, while {..} still normalizes to catalog '*' so every endpoint is RECORDED. The real create-* steps below capture their own ids on success (then their DELETEs clean up); they overwrite these literal seeds only within their own group.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {
+            "limit": 1
+          },
+          "capture_soft": {
+            "auto_scaling_group_id": "$.auto_scaling_groups[0].nonexistent_asg_seed",
+            "launch_configuration_id": "$.auto_scaling_groups[0].nonexistent_lc_seed",
+            "policy_id": "$.auto_scaling_groups[0].nonexistent_policy_seed",
+            "schedule_id": "$.auto_scaling_groups[0].nonexistent_schedule_seed",
+            "notification_id": "$.auto_scaling_groups[0].nonexistent_notification_seed"
+          }
+        },
+        {
+          "name": "create-launch-configuration",
+          "_note": "UNPROVEN body. Mirrors create-server fields (image_id/server_type_id/keypair) but for a launch template; ids are literal synthetic strings (no real lookup needed). 4xx expected — still records POST /v1/launch-configurations.",
+          "method": "POST",
+          "path": "/v1/launch-configurations",
+          "json": {
+            "name": "regrlc{unique}",
+            "image_id": "00000000-0000-0000-0000-000000000000",
+            "server_type_id": "s1v1m2",
+            "keypair_name": "regrkey{unique}",
+            "volumes": [
+              {
+                "boot_index": 0,
+                "size": 100,
+                "type": "SSD",
+                "delete_on_termination": true
+              }
+            ],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "lc",
+          "capture": {
+            "launch_configuration_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/launch-configurations/{launch_configuration_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "delete-launch-configuration",
+          "method": "DELETE",
+          "path": "/v1/launch-configurations/{launch_configuration_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "lc",
+          "destructive": true
+        },
+        {
+          "name": "create-auto-scaling-group",
+          "_note": "UNPROVEN body. References launch_configuration_id (soft-seeded or synthetic) + literal synthetic subnet/sg ids. 4xx expected — still records POST /v1/auto-scaling-groups.",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups",
+          "json": {
+            "name": "regrasg{unique}",
+            "launch_configuration_id": "{launch_configuration_id}",
+            "desired_server_count": 1,
+            "min_server_count": 1,
+            "max_server_count": 2,
+            "subnet_id": "00000000-0000-0000-0000-000000000000",
+            "security_groups": ["00000000-0000-0000-0000-000000000000"],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg",
+          "capture": {
+            "auto_scaling_group_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "update-auto-scaling-group",
+          "_note": "UNPROVEN. PUT base resource (rename / count bounds).",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+          "json": {
+            "name": "regrasg{unique}u",
+            "min_server_count": 1,
+            "max_server_count": 3
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-update"
+        },
+        {
+          "name": "update-asg-server-count",
+          "_note": "UNPROVEN. Manual scale set.",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/server-count",
+          "json": {
+            "desired_server_count": 2
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-count"
+        },
+        {
+          "name": "update-asg-lb-server-groups",
+          "_note": "UNPROVEN. Attach LB server groups by id list (empty).",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/lb-server-groups",
+          "json": {
+            "lb_server_group_ids": []
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-lb"
+        },
+        {
+          "name": "create-asg-policy",
+          "_note": "UNPROVEN. Scaling policy (scale-out on capacity change).",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies",
+          "json": {
+            "name": "regrpol{unique}",
+            "policy_type": "SCALE_OUT",
+            "adjustment_type": "CHANGE_IN_CAPACITY",
+            "adjustment_value": 1,
+            "cooldown": 300
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-policy",
+          "capture": {
+            "policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "update-asg-policy",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+          "json": {
+            "name": "regrpol{unique}u",
+            "adjustment_value": 2,
+            "cooldown": 600
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-policy"
+        },
+        {
+          "name": "delete-asg-policy",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-policy",
+          "destructive": true
+        },
+        {
+          "name": "create-asg-schedule",
+          "_note": "UNPROVEN. Scheduled scaling action (one-shot start_time, far future).",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules",
+          "json": {
+            "name": "regrsch{unique}",
+            "desired_server_count": 2,
+            "min_server_count": 1,
+            "max_server_count": 3,
+            "start_time": "{today_plus_5y}T00:00:00Z"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-schedule",
+          "capture": {
+            "schedule_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "update-asg-schedule",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+          "json": {
+            "name": "regrsch{unique}u",
+            "desired_server_count": 1
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-schedule"
+        },
+        {
+          "name": "delete-asg-schedule",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-schedule",
+          "destructive": true
+        },
+        {
+          "name": "create-asg-notification",
+          "_note": "UNPROVEN. Notification config (EMAIL recipient).",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications",
+          "json": {
+            "name": "regrntf{unique}",
+            "notification_type": "EMAIL",
+            "recipients": ["regression-coverage@example.com"]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-notify",
+          "capture": {
+            "notification_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "update-asg-notification",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
+          "json": {
+            "name": "regrntf{unique}u",
+            "recipients": ["regression-coverage@example.com"]
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-notify"
+        },
+        {
+          "name": "delete-asg-notification",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg-notify",
+          "destructive": true
+        },
+        {
+          "name": "delete-auto-scaling-group",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "asg",
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "vs-image-write-coverage",
+      "service": "compute/virtualserver",
+      "enabled": true,
+      "_note": "Light, VPC-FREE, COVERAGE-ONLY. Exercises image create/import/share/members (the base full-VM lifecycle only does server->image create + image PUT/DELETE). {image_id} is SOFT-seeded from list-images so the nested member/share/import calls run against a real public image id when present; member_id is a project id we DON'T own (literal synthetic) so share/member calls 4xx. POST /v1/images attempts a real image registration with a guessed body. All optional+grouped, broad expect_status. Bodies docs/best-effort, UNPROVEN.",
+      "steps": [
+        {
+          "name": "seed-placeholders",
+          "_note": "COST/SAFETY: declares {image_id}/{member_id} via NO-OP soft-capture selectors that find nothing, so they stay LITERAL at runtime -> a non-existent '{image_id}' yields a guaranteed 404, so import/share/members NEVER mutate a real image, while {..} still normalizes to catalog '*' so every endpoint is RECORDED. image_id/member_id are also captured by create-image / create-image-member when those POSTs succeed (then their DELETEs clean up).",
+          "method": "GET",
+          "path": "/v1/images",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {
+            "limit": 1
+          },
+          "capture_soft": {
+            "image_id": "$.images[0].nonexistent_image_seed",
+            "member_id": "$.images[0].nonexistent_member_seed"
+          }
+        },
+        {
+          "name": "create-image",
+          "_note": "UNPROVEN. POST /v1/images registers an image from external source (os_type/disk_format/min_disk). Distinct from POST /v1/servers/{id}/images (snapshot a running VM, already covered). 4xx likely without a real source — still records.",
+          "method": "POST",
+          "path": "/v1/images",
+          "json": {
+            "name": "regrimg{ualpha}",
+            "os_type": "linux",
+            "disk_format": "qcow2",
+            "min_disk": 100,
+            "min_ram": 0,
+            "visibility": "private",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "img-create",
+          "capture": {
+            "image_id": "$.image_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/images/{image_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "import-image",
+          "_note": "UNPROVEN. POST /v1/images/{image_id}/import kicks an async import job for the image.",
+          "method": "POST",
+          "path": "/v1/images/{image_id}/import",
+          "json": {
+            "source": "regression-coverage-probe"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "img-import"
+        },
+        {
+          "name": "share-image",
+          "_note": "UNPROVEN. POST /v1/images/{image_id}/share shares to other projects/accounts (synthetic member id).",
+          "method": "POST",
+          "path": "/v1/images/{image_id}/share",
+          "json": {
+            "members": ["00000000000000000000000000000000"]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "img-share"
+        },
+        {
+          "name": "create-image-member",
+          "_note": "UNPROVEN. POST /v1/images/{image_id}/members adds one project as an image member (synthetic member id).",
+          "method": "POST",
+          "path": "/v1/images/{image_id}/members",
+          "json": {
+            "member_id": "00000000000000000000000000000000"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "img-member",
+          "capture": {
+            "member_id": "$.member_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/images/{image_id}/members/{member_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "update-image-member",
+          "_note": "UNPROVEN. PUT accepts/rejects a member share (status=accepted). member_id soft-seeded or literal when not captured.",
+          "method": "PUT",
+          "path": "/v1/images/{image_id}/members/{member_id}",
+          "json": {
+            "status": "accepted"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "img-member-update"
+        },
+        {
+          "name": "delete-image-member",
+          "method": "DELETE",
+          "path": "/v1/images/{image_id}/members/{member_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "img-member",
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "vs-volume-transfer-coverage",
+      "service": "compute/virtualserver",
+      "enabled": true,
+      "_note": "Light, VPC-FREE, COVERAGE-ONLY. Covers volume-transfer (cross-project handover), volume revert-to-snapshot, attach/detach a volume to a server via the /volumes/{id}/servers route, and snapshot PUT update. {volume_id}/{snapshot_id} SOFT-seeded from list GETs (reuses a real id when one exists; otherwise stays literal and still records). {server_id}/{transfer_id} are literal synthetic. createvolumetransfer body grounded in api_bodies.json (compute/virtualserver/createvolumetransfer: name+volume_id). Other bodies docs/best-effort, UNPROVEN.",
+      "steps": [
+        {
+          "name": "seed-placeholders",
+          "_note": "COST/SAFETY: declares {volume_id}/{snapshot_id}/{server_id}/{transfer_id} via NO-OP soft-capture selectors that find nothing, so they stay LITERAL at runtime. A literal '{volume_id}' in the URL yields a guaranteed 404 -> revert/transfer/attach NEVER act on a real volume/server (revert is destructive, transfer hands off ownership — both must stay coverage-only), while {..} still normalizes to catalog '*' so every endpoint is RECORDED. transfer_id is also captured by create-volume-transfer when that POST happens to succeed, in which case the matching DELETE cleans it up.",
+          "method": "GET",
+          "path": "/v1/volumes",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {
+            "limit": 1
+          },
+          "capture_soft": {
+            "volume_id": "$.volumes[0].nonexistent_volume_seed",
+            "snapshot_id": "$.volumes[0].nonexistent_snapshot_seed",
+            "server_id": "$.volumes[0].nonexistent_server_seed",
+            "transfer_id": "$.volumes[0].nonexistent_transfer_seed"
+          }
+        },
+        {
+          "name": "create-volume-transfer",
+          "_note": "Body from data/api_bodies.json createvolumetransfer (name+volume_id). volume_id soft-seeded or literal — records POST /v1/volume-transfer.",
+          "method": "POST",
+          "path": "/v1/volume-transfer",
+          "json": {
+            "name": "regrvt{unique}",
+            "volume_id": "{volume_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt",
+          "capture": {
+            "transfer_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volume-transfer/{transfer_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "accept-volume-transfer",
+          "_note": "UNPROVEN. POST .../accept needs the transfer auth_key issued at create; synthetic transfer_id+key so 4xx expected.",
+          "method": "POST",
+          "path": "/v1/volume-transfer/{transfer_id}/accept",
+          "json": {
+            "auth_key": "regression-coverage-probe"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt-accept"
+        },
+        {
+          "name": "delete-volume-transfer",
+          "method": "DELETE",
+          "path": "/v1/volume-transfer/{transfer_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vt",
+          "destructive": true
+        },
+        {
+          "name": "revert-volume-to-snapshot",
+          "_note": "UNPROVEN. POST /v1/volumes/{volume_id}/revert rolls a volume back to a snapshot.",
+          "method": "POST",
+          "path": "/v1/volumes/{volume_id}/revert",
+          "json": {
+            "snapshot_id": "{snapshot_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vol-revert"
+        },
+        {
+          "name": "attach-volume-via-volumes-route",
+          "_note": "UNPROVEN. POST /v1/volumes/{volume_id}/servers attaches a volume to a server (mirror of POST /v1/servers/{id}/volumes). server_id soft-seeded or literal.",
+          "method": "POST",
+          "path": "/v1/volumes/{volume_id}/servers",
+          "json": {
+            "server_id": "{server_id}",
+            "device": "/dev/vdc"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vol-server"
+        },
+        {
+          "name": "detach-volume-via-volumes-route",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}/servers/{server_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "vol-server-detach",
+          "destructive": true
+        },
+        {
+          "name": "update-snapshot",
+          "_note": "UNPROVEN. PUT /v1/snapshots/{snapshot_id} renames a snapshot.",
+          "method": "PUT",
+          "path": "/v1/snapshots/{snapshot_id}",
+          "json": {
+            "name": "regrsnap{unique}u",
+            "description": "API regression coverage probe (update)"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "snap-update"
+        }
+      ]
+    },
+    {
+      "id": "vs-server-action-coverage",
+      "service": "compute/virtualserver",
+      "enabled": true,
+      "_note": "Light, COVERAGE-ONLY, NO REAL VM (cost control). Exercises the per-server WRITE actions the heavy full-VM lifecycle deliberately omits (lock/unlock — risk of stranding a billable VM — plus password/rebuild/server-type/dump and the NIC interface + static-NAT routes). Path ids are {placeholder} tokens (NOT literal UUIDs — a literal id segment normalizes to itself and records ZERO coverage; see knowledge/validated-facts Wave-1 gotcha). {server_id}/{port_id}/{nat_id} are declared via a NO-OP soft-capture (seed-server-placeholders) so they stay LITERAL at runtime: the URL carries a non-existent '{server_id}' -> guaranteed 404 (never touches a real production VM, the cost-safe choice) while {..} still normalizes to catalog '*' so each endpoint is RECORDED. All optional+grouped, broad expect_status — a 4xx never fails the run. lock/unlock send an empty body (api_bodies lock/unlock _raw is just the server_id path arg); password body from api_bodies showvirtualserverpassword (private_key). Other bodies docs/best-effort, UNPROVEN.",
+      "steps": [
+        {
+          "name": "seed-server-placeholders",
+          "_note": "COST/SAFETY: declares {server_id}/{port_id}/{nat_id} via NO-OP soft-capture selectors that deliberately find nothing, so at runtime these placeholders stay LITERAL ('{server_id}' etc.). The URL then carries a non-existent literal id -> guaranteed 404 (never touches a real VM), while the catalog still normalizes {..} to '*' so every endpoint is RECORDED. This is the cost-controlled alternative to seeding a real server_id (which would risk lock/dump/rebuild/resize hitting a production VM).",
+          "method": "GET",
+          "path": "/v1/servers",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {
+            "limit": 1
+          },
+          "capture_soft": {
+            "server_id": "$.servers[0].nonexistent_server_seed",
+            "port_id": "$.servers[0].nonexistent_port_seed",
+            "nat_id": "$.servers[0].nonexistent_nat_seed"
+          }
+        },
+        {
+          "name": "get-server-password",
+          "_note": "POST /v1/servers/{server_id}/password decrypts the Windows admin password with the keypair private key. Body from api_bodies showvirtualserverpassword (private_key). Placeholder key -> 4xx; still records. Read-only effect (never mutates the VM).",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/password",
+          "json": {
+            "private_key": "-----BEGIN RSA PRIVATE KEY-----\nregression-coverage-probe\n-----END RSA PRIVATE KEY-----"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-password"
+        },
+        {
+          "name": "lock-server",
+          "_note": "api_bodies lockvirtualserver is _raw={server_id} (path arg only) -> empty body. Paired with unlock-server in the same group so a seeded real VM is left unlocked.",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/lock",
+          "json": {},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-lock"
+        },
+        {
+          "name": "unlock-server",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/unlock",
+          "json": {},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-lock"
+        },
+        {
+          "name": "create-server-interface",
+          "_note": "UNPROVEN. POST /v1/servers/{server_id}/interfaces attaches a new NIC on a subnet (synthetic subnet id -> 4xx unless a real subnet matches the seeded server).",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/interfaces",
+          "json": {
+            "subnet_id": "00000000-0000-0000-0000-000000000000"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-iface"
+        },
+        {
+          "name": "create-interface-static-nat",
+          "_note": "UNPROVEN. POST .../interfaces/{port_id}/static-nats maps a public-ip to the NIC (synthetic public-ip).",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats",
+          "json": {
+            "public_ip_id": "00000000-0000-0000-0000-000000000000"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-nat"
+        },
+        {
+          "name": "delete-interface-static-nat",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats/{nat_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-nat-delete",
+          "destructive": true
+        },
+        {
+          "name": "create-interface-private-static-nat",
+          "_note": "UNPROVEN. POST .../interfaces/{port_id}/private-static-nats maps a private NAT ip.",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}/private-static-nats",
+          "json": {
+            "private_ip_address": "10.124.2.50"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-pnat"
+        },
+        {
+          "name": "delete-interface-private-static-nat",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}/private-static-nats/{nat_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-pnat-delete",
+          "destructive": true
+        },
+        {
+          "name": "delete-server-interface",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-iface-delete",
+          "destructive": true
+        },
+        {
+          "name": "resize-server-type",
+          "_note": "UNPROVEN. POST /v1/servers/{server_id}/server-type resizes the VM to a new server_type_id. Mutates a seeded VM if accepted — kept optional and last among non-destructive so it does not disturb the lock/nat probes.",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/server-type",
+          "json": {
+            "server_type_id": "s1v1m2"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-resize"
+        },
+        {
+          "name": "rebuild-server",
+          "_note": "UNPROVEN. POST /v1/servers/{server_id}/rebuild reinstalls the OS from a synthetic image_id -> 4xx (a real image_id would wipe the seeded VM; synthetic id is deliberate to keep this coverage-only).",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/rebuild",
+          "json": {
+            "image_id": "00000000-0000-0000-0000-000000000000",
+            "keypair_name": "regrkey{unique}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-rebuild"
+        },
+        {
+          "name": "dump-server",
+          "_note": "UNPROVEN. POST /v1/servers/{server_id}/dump triggers a kernel crash dump / NMI on a seeded VM if accepted. Last + optional so it cannot disturb earlier probes.",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/dump",
+          "json": {},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "srv-dump"
+        }
+      ]
+    }
+  ]
+}

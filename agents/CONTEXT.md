@@ -120,14 +120,19 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   write ops / 53 services** from `python -m spec.coverage_gap` (id-bound GETs are
   auto-covered by read-chains). **Wave 1 done** (6 fragments, 13 new lifecycles):
   iam, organization, iam-identity-center, servicewatch, baremetal-blockstorage,
-  apigateway → 151 writes closed, static ceiling **43.0% → 55.4%** (54 lifecycles,
-  validator clean). Remaining ~390 writes / 47 services. All Wave-1 bodies are
-  docs-derived, **pending live validation**.
-- **What to advance next:** Wave 2 service-agents for the next-biggest gaps
-  (compute/virtualserver 41, networking/vpc 38, database epas/mariadb/mysql/
-  postgresql, storage/archivestorage, security/kms, …). Then a live CI run (needs
-  lane scheduling to fit the 300-min cap) to convert the static ceiling into
-  measured `cov_op`.
+  apigateway → 151 writes closed. **Wave 2 done** (7 cluster-agents, 30 fragments,
+  49 lifecycles): networking/{vpc,loadbalancer,dns,cdn,gslb,vpn,firewall,direct-
+  connect}, compute/virtualserver, the 6 database engines, storage/{archive,backup,
+  file,parallel-file}, security/{kms,secrets,vault,configinspection,certmgr},
+  data-analytics ×6 → +302 writes. **Static ceiling 43.0% → 78.6%** (95 lifecycles,
+  validator 0 errors, offline tests pass). **36 services at write-gap 0.** All
+  bodies docs-derived, **pending live validation**.
+- **What to advance next:** Wave 3 mops up the last **88 writes / ~14 services**:
+  compute/{baremetal 12, multinodegpucluster 9, scf 7}, container/{scr 10, ske 2},
+  management/{cloudcontrol 9, resourcemanager 9, loggingaudit 6, cloudmonitoring 4,
+  network-logging 2}, ai-ml ×2, financial-management ×2, platform/sts 3,
+  devops-tools 2. Then a live CI run (needs lane scheduling to fit the 300-min cap)
+  to convert the static ceiling into measured `cov_op`.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.

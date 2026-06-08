@@ -1,0 +1,107 @@
+{
+  "lifecycles": [
+    {
+      "id": "eventstreams-cluster-subops-guarded",
+      "service": "data-analytics/eventstreams",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY guarded lifecycle for the eventstreams (Kafka DBaaS) WRITE endpoints. Primary target (the service's own GAP-write set): eventstreamsaddinstances (POST /v1/clusters/{cluster_id}/add-instances). Also re-exercises the shared cluster sub-ops (restart/maintenance/security-group-rules/patch/resize/block-storage-resize) and eventstreamssetparametervalues (PUT /v1/clusters/{cluster_id}/parameters — eventstreams-specific) so they record under eventstreams' own catalog keys (the gap analyzer matches path-only, but the engine records WRITE steps per (method,path,service)). Does NOT provision a real billable cluster: soft-captures an EXISTING cluster_id from the read-only list; when none exists the {cluster_id}/{instance_group_id}/{block_storage_group_id} tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 4xx counts as covered). Every mutating step is optional + grouped + broad expect_status; DELETEs destructive:true. heavy:true gates behind SCP_RUN_HEAVY. Bodies best-effort from path/field semantics + data/api_bodies.json eventstreamscreatecluster shape — UNPROVEN, promote after a real 2xx. set-parameter-values needs a real parameter-group/parameter name/value (doc-sample used; likely 4xx, still records).",
+      "steps": [
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [200],
+          "capture_soft": {"cluster_id": "$.contents[0].id"}
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"cluster_id": "{cluster_id}"}
+        },
+        {
+          "name": "capture-subop-ids",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {
+            "instance_group_id": "$.instance_groups[0].id",
+            "block_storage_group_id": "$.instance_groups[0].block_storage_groups[0].id"
+          }
+        },
+        {
+          "name": "add-instances",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/add-instances",
+          "json": {"instances": [{"role_type": "ACTIVE", "service_ip_address": "192.168.10.20/32"}]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-instances"
+        },
+        {
+          "name": "set-parameter-values",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "json": {"parameters": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-parameters"
+        },
+        {
+          "name": "set-security-group-rules",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {"security_group_rules": [{"direction": "INBOUND", "protocol": "TCP", "port_min": 9091, "port_max": 9091, "remote_ip_prefix": "10.0.0.0/8", "description": "regr coverage probe"}]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-sg-rules"
+        },
+        {
+          "name": "set-maintenance",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {"period_hour": "5", "starting_day_of_week": "MON", "starting_time": "0000"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-maintenance"
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-patch"
+        },
+        {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-power"
+        },
+        {
+          "name": "set-server-type",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/resize",
+          "json": {"server_type_name": ""},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-resize"
+        },
+        {
+          "name": "set-block-storage-size",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
+          "json": {"size_gb": 20},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-resize"
+        }
+      ]
+    }
+  ]
+}

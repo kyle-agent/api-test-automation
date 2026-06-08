@@ -1,0 +1,162 @@
+{
+  "lifecycles": [
+    {
+      "id": "security-kms-transit-crypto",
+      "service": "security/kms",
+      "enabled": true,
+      "_note": "KMS transit-key CRYPTO lifecycle (Wave 2 coverage). The existing 'security-kms-key' lifecycle covers create/get/list/update-description/delete; this sibling covers the 9 remaining transit WRITE ops + the 1 managed-kms WRITE. Spine: create transit key (key_type 'advanced', purpose 'rsa-2048' from data/api_bodies.json security/kms/createkey) -> capture $.key.id (confirmed envelope) -> exercise crypto + rotation writes -> delete (schedule deletion). All crypto/rotation steps are optional+grouped so an unexpected 4xx (e.g. a purpose/key_type that does not support a given op, or asymmetric-vs-symmetric mismatch) isolates as a warning and still RECORDS coverage for that endpoint. Bodies from data/api_bodies.json (datakey/encryptdata/hmac/signdata/verifydata/rotatekey/changerotateinfo/changestatekey) + data/api_docs.json schemas; _UNPROVEN provenance (no live 2xx yet). NOTE on purpose: an rsa-2048 (asymmetric) key supports sign/verify/encrypt/decrypt but NOT hmac/datakey (which need a symmetric key); each such op is isolated optional so it records its endpoint then warns. encrypt returns a 'vault:v..' ciphertext used (best-effort soft-capture) to feed decrypt/rewrap; when the soft-capture is absent the doc-sample ciphertext from api_bodies is sent (still records the endpoint, expects 4xx). sign returns a signature fed to verify likewise. managed-kms keys are SYSTEM-managed and cannot be created by the OpenAPI -> update-managed-key-description targets a {unique} id (a seeded placeholder, never a real managed key) so it records the PUT /v1/managed-kms/transit/* write endpoint and 4xx's, isolated optional. (Earlier this used {managed_key_id}, an uncaptured placeholder that the validator now rejects as undefined; {unique} normalizes to '*' for catalog matching identically while resolving cleanly.)",
+      "steps": [
+        {
+          "name": "create",
+          "method": "POST",
+          "path": "/v1/kms/transit",
+          "json": {
+            "auto_rotate": "Y",
+            "description": "API regression suite (crypto)",
+            "key_type": "advanced",
+            "name": "regrkmsc{unique}",
+            "purpose": "rsa-2048",
+            "rotate_cycle": 7,
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"key_id": "$.key.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/kms/transit/{key_id}",
+            "service": "kms"
+          }
+        },
+        {
+          "name": "get",
+          "method": "GET",
+          "path": "/v1/kms/transit/{key_id}",
+          "expect_status": [200]
+        },
+        {
+          "name": "encrypt",
+          "service": "kms",
+          "method": "POST",
+          "path": "/v1/kms/openapi/encrypt/{key_id}",
+          "group": "xcov-kms-encrypt",
+          "optional": true,
+          "json": {"plaintext": "dGhlIHF1aWNrIGJyb3duIGZveAo="},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"ciphertext": "$.ciphertext"}
+        },
+        {
+          "name": "decrypt",
+          "service": "kms",
+          "method": "POST",
+          "path": "/v1/kms/openapi/decrypt/{key_id}",
+          "group": "xcov-kms-decrypt",
+          "optional": true,
+          "json": {"ciphertext": "{ciphertext}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "rewrap",
+          "service": "kms",
+          "method": "POST",
+          "path": "/v1/kms/openapi/rewrap/{key_id}",
+          "group": "xcov-kms-rewrap",
+          "optional": true,
+          "json": {"ciphertext": "{ciphertext}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "datakey",
+          "service": "kms",
+          "method": "POST",
+          "path": "/v1/kms/openapi/datakey/{key_id}",
+          "group": "xcov-kms-datakey",
+          "optional": true,
+          "json": {"key_type": "plaintext"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "hmac",
+          "service": "kms",
+          "method": "POST",
+          "path": "/v1/kms/openapi/hmac/{key_id}",
+          "group": "xcov-kms-hmac",
+          "optional": true,
+          "json": {"input": "dGVzdCBpbnB1dA=="},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "sign",
+          "service": "kms",
+          "method": "POST",
+          "path": "/v1/kms/openapi/sign/{key_id}",
+          "group": "xcov-kms-sign",
+          "optional": true,
+          "json": {"input": "dGVzdCBpbnB1dA=="},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"signature": "$.signature"}
+        },
+        {
+          "name": "verify",
+          "service": "kms",
+          "method": "POST",
+          "path": "/v1/kms/openapi/verify/{key_id}",
+          "group": "xcov-kms-verify",
+          "optional": true,
+          "json": {"input": "dGVzdCBpbnB1dA==", "signature": "{signature}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "rotate",
+          "service": "kms",
+          "method": "POST",
+          "path": "/v1/kms/transit/{key_id}/rotate",
+          "group": "xcov-kms-rotate",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-rotate-info",
+          "service": "kms",
+          "method": "PUT",
+          "path": "/v1/kms/transit/{key_id}/rotate-info",
+          "group": "xcov-kms-rotate-info",
+          "optional": true,
+          "json": {"auto_rotate": "Y", "rotate_cycle": 7},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-state",
+          "service": "kms",
+          "method": "PUT",
+          "path": "/v1/kms/transit/{key_id}/state",
+          "group": "xcov-kms-state",
+          "optional": true,
+          "json": {"state": "Active"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-managed-key-description",
+          "service": "kms",
+          "method": "PUT",
+          "path": "/v1/managed-kms/transit/{unique}/description",
+          "group": "xcov-kms-managed-desc",
+          "optional": true,
+          "json": {"description": "API regression suite"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"key_id": "{key_id}"}
+        },
+        {
+          "name": "delete",
+          "method": "DELETE",
+          "path": "/v1/kms/transit/{key_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

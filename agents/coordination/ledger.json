@@ -1,9 +1,9 @@
 {
   "_comment": "Campaign blackboard for the multi-agent coverage drive. Coordinator (lead session) and service-agents read/write this. Status: todo|claimed|authored|integrated|live-validated. fragment = regression/scenarios/lifecycles/<file>. See agents/CAMPAIGN.md.",
   "generated": "2026-06-08T20:57:46Z",
-  "static_ceiling_pct": 55.4,
+  "static_ceiling_pct": 78.6,
   "total_endpoints": 1372,
-  "write_gap_total": 396,
+  "write_gap_total": 88,
   "shared_contracts": {
     "vpc": {
       "owner": "networking/vpc",
@@ -16,22 +16,35 @@
       "category": "compute",
       "service": "virtualserver",
       "fragment": "compute__virtualserver.json",
-      "write_gap": 41,
+      "write_gap": 0,
       "getid_gap": 22,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "vs-autoscaling-coverage",
+        "vs-image-write-coverage",
+        "vs-volume-transfer-coverage",
+        "vs-server-action-coverage"
+      ],
       "notes": ""
     },
     {
       "category": "networking",
       "service": "vpc",
       "fragment": "networking__vpc.json",
-      "write_gap": 38,
+      "write_gap": 0,
       "getid_gap": 13,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "vpc-cidr-secondary",
+        "vpc-private-nat",
+        "vpc-privatelink-service",
+        "vpc-endpoint",
+        "vpc-peering",
+        "vpc-transit-gateway-children",
+        "vpc-subnet-vip-nat"
+      ],
       "notes": ""
     },
     {
@@ -119,44 +132,52 @@
       "category": "database",
       "service": "epas",
       "fragment": "database__epas.json",
-      "write_gap": 17,
+      "write_gap": 0,
       "getid_gap": 4,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "epas-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "database",
       "service": "mariadb",
       "fragment": "database__mariadb.json",
-      "write_gap": 17,
+      "write_gap": 0,
       "getid_gap": 4,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "mariadb-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "database",
       "service": "mysql",
       "fragment": "database__mysql.json",
-      "write_gap": 17,
+      "write_gap": 0,
       "getid_gap": 4,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "mysql-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "database",
       "service": "postgresql",
       "fragment": "database__postgresql.json",
-      "write_gap": 17,
+      "write_gap": 0,
       "getid_gap": 4,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "postgresql-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
@@ -179,22 +200,27 @@
       "category": "database",
       "service": "sqlserver",
       "fragment": "database__sqlserver.json",
-      "write_gap": 13,
+      "write_gap": 0,
       "getid_gap": 3,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "sqlserver-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "storage",
       "service": "archivestorage",
       "fragment": "storage__archivestorage.json",
-      "write_gap": 13,
+      "write_gap": 0,
       "getid_gap": 6,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "archivestorage-bucket",
+        "archivestorage-archiving-policy"
+      ],
       "notes": ""
     },
     {
@@ -212,22 +238,27 @@
       "category": "storage",
       "service": "backup",
       "fragment": "storage__backup.json",
-      "write_gap": 12,
+      "write_gap": 0,
       "getid_gap": 10,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "backup-agent",
+        "backup-job"
+      ],
       "notes": ""
     },
     {
       "category": "security",
       "service": "kms",
       "fragment": "security__kms.json",
-      "write_gap": 11,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-kms-writes"
+      ],
       "notes": ""
     },
     {
@@ -278,66 +309,78 @@
       "category": "data-analytics",
       "service": "data-flow",
       "fragment": "data-analytics__data-flow.json",
-      "write_gap": 8,
+      "write_gap": 0,
       "getid_gap": 6,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "data-flow-service-and-flow-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "data-analytics",
       "service": "data-ops",
       "fragment": "data-analytics__data-ops.json",
-      "write_gap": 8,
+      "write_gap": 0,
       "getid_gap": 6,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "data-ops-service-and-ops-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "data-analytics",
       "service": "quick-query",
       "fragment": "data-analytics__quick-query.json",
-      "write_gap": 8,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "quick-query-lifecycle-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "data-analytics",
       "service": "searchengine",
       "fragment": "data-analytics__searchengine.json",
-      "write_gap": 8,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "searchengine-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "database",
       "service": "cachestore",
       "fragment": "database__cachestore.json",
-      "write_gap": 8,
+      "write_gap": 0,
       "getid_gap": 3,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "cachestore-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "networking",
       "service": "loadbalancer",
       "fragment": "networking__loadbalancer.json",
-      "write_gap": 8,
+      "write_gap": 0,
       "getid_gap": 8,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-loadbalancer-members-nat"
+      ],
       "notes": ""
     },
     {
@@ -355,22 +398,26 @@
       "category": "networking",
       "service": "cdn",
       "fragment": "networking__cdn.json",
-      "write_gap": 7,
+      "write_gap": 0,
       "getid_gap": 1,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-cdn-service"
+      ],
       "notes": ""
     },
     {
       "category": "storage",
       "service": "filestorage",
       "fragment": "storage__filestorage.json",
-      "write_gap": 7,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "filestorage-replication-schedule"
+      ],
       "notes": ""
     },
     {
@@ -388,77 +435,91 @@
       "category": "networking",
       "service": "dns",
       "fragment": "networking__dns.json",
-      "write_gap": 6,
+      "write_gap": 0,
       "getid_gap": 4,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-dns-public-domain"
+      ],
       "notes": ""
     },
     {
       "category": "networking",
       "service": "gslb",
       "fragment": "networking__gslb.json",
-      "write_gap": 6,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-gslb-service"
+      ],
       "notes": ""
     },
     {
       "category": "networking",
       "service": "vpn",
       "fragment": "networking__vpn.json",
-      "write_gap": 6,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-vpn-gateway-tunnel"
+      ],
       "notes": ""
     },
     {
       "category": "data-analytics",
       "service": "vertica",
       "fragment": "data-analytics__vertica.json",
-      "write_gap": 5,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "vertica-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "networking",
       "service": "direct-connect",
       "fragment": "networking__direct-connect.json",
-      "write_gap": 5,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-direct-connect-routing"
+      ],
       "notes": ""
     },
     {
       "category": "security",
       "service": "secretsmanager",
       "fragment": "security__secretsmanager.json",
-      "write_gap": 5,
+      "write_gap": 0,
       "getid_gap": 1,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-secretsmanager-writes"
+      ],
       "notes": ""
     },
     {
       "category": "data-analytics",
       "service": "eventstreams",
       "fragment": "data-analytics__eventstreams.json",
-      "write_gap": 4,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "eventstreams-cluster-subops-guarded"
+      ],
       "notes": ""
     },
     {
@@ -476,11 +537,13 @@
       "category": "networking",
       "service": "firewall",
       "fragment": "networking__firewall.json",
-      "write_gap": 4,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-firewall-rule"
+      ],
       "notes": ""
     },
     {
@@ -542,11 +605,13 @@
       "category": "security",
       "service": "configinspection",
       "fragment": "security__configinspection.json",
-      "write_gap": 3,
+      "write_gap": 0,
       "getid_gap": 1,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-configinspection-diagnosis"
+      ],
       "notes": ""
     },
     {
@@ -586,33 +651,39 @@
       "category": "security",
       "service": "certificatemanager",
       "fragment": "security__certificatemanager.json",
-      "write_gap": 2,
+      "write_gap": 0,
       "getid_gap": 0,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-certificatemanager-import-cover"
+      ],
       "notes": ""
     },
     {
       "category": "security",
       "service": "secretvault",
       "fragment": "security__secretvault.json",
-      "write_gap": 2,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-secretvault-vault"
+      ],
       "notes": ""
     },
     {
       "category": "storage",
       "service": "parallel-filestorage",
       "fragment": "storage__parallel-filestorage.json",
-      "write_gap": 2,
+      "write_gap": 0,
       "getid_gap": 1,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "parallel-filestorage-capacity-restore"
+      ],
       "notes": ""
     },
     {

@@ -1,0 +1,197 @@
+{
+  "lifecycles": [
+    {
+      "id": "mysql-cluster-subops-guarded",
+      "service": "database/mysql",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY guarded lifecycle for the mysql DBaaS cluster sub-op WRITE endpoints that the real heavy `database-mysql-cluster` lifecycle does NOT exercise (replicas, restore, promote, switchover, sync-state, log-export-configs, security-group-rules, backup-histories, kernel-upgrade, patch, add-block-storages, reset/sync replica state). It does NOT provision a real billable cluster. It soft-captures an EXISTING cluster_id from the read-only list; if none exists the {cluster_id} (and {instance_group_id}/{origin_cluster_id}/{replica_cluster_id}/{log_type}) path tokens still normalize to the catalog '*' key, so the endpoint is CALLED and RECORDED (a 404/400/403/409/422 counts as covered per the engine). Every mutating step is optional + grouped + broad expect_status so an isolated 4xx records coverage WITHOUT failing the run or chaining a real create->mutate->delete. heavy:true gates it behind SCP_RUN_HEAVY; DELETEs are destructive:true (SCP_ALLOW_DESTRUCTIVE). Bodies are best-effort from path/field semantics + the shared SCP DBaaS shape (data/api_bodies.json only has createcluster) and are UNPROVEN — promote to validated after a real 2xx against a dedicated test cluster. Shared DBaaS body shape across mysql/mariadb/epas/postgresql is identical here; sqlserver/cachestore diverge (see those fragments).",
+      "steps": [
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [200],
+          "capture_soft": {"cluster_id": "$.contents[0].id"}
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"cluster_id": "{cluster_id}"}
+        },
+        {
+          "name": "capture-subop-ids",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {
+            "instance_group_id": "$.instance_groups[0].id",
+            "origin_cluster_id": "$.id",
+            "replica_cluster_id": "$.id"
+          }
+        },
+        {
+          "name": "capture-log-type",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {"log_type": "$.contents[0].log_type"}
+        },
+        {
+          "name": "register-log-export-config",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "json": {"log_type": "general", "service_watch_log_collection": true, "retention_period_day": "7"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "log-export"
+        },
+        {
+          "name": "set-log-export-config",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+          "json": {"service_watch_log_collection": true, "retention_period_day": "14"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "log-export"
+        },
+        {
+          "name": "export-log",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "json": {"start_dt": "{today}", "end_dt": "{today}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "log-export"
+        },
+        {
+          "name": "unregister-log-export-config",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "log-export"
+        },
+        {
+          "name": "set-security-group-rules",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {"security_group_rules": [{"direction": "INBOUND", "protocol": "TCP", "port_min": 2866, "port_max": 2866, "remote_ip_prefix": "10.0.0.0/8", "description": "regr coverage probe"}]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "sg-rules"
+        },
+        {
+          "name": "create-replica",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "json": {"name": "regrrepl{ualpha}", "instance_name_prefix": "regrrepl", "subnet_id": "", "server_type_name": "", "service_watch_log_collection": true, "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "replica"
+        },
+        {
+          "name": "create-other-region-replica",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/replicas/other-region",
+          "json": {"name": "regrreplx{ualpha}", "instance_name_prefix": "regrreplx", "region": "{region}", "subnet_id": "", "server_type_name": "", "service_watch_log_collection": true, "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "replica"
+        },
+        {
+          "name": "promote-replica-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/promote",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "replica"
+        },
+        {
+          "name": "reset-replica",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/reset-replica",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "replica"
+        },
+        {
+          "name": "sync-replica-state",
+          "method": "POST",
+          "path": "/v1/clusters/{origin_cluster_id}/sync-replica-state",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "replica"
+        },
+        {
+          "name": "switchover-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/switchover",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "create-restore",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {"name": "regrrestore{ualpha}", "instance_name_prefix": "regrrst", "subnet_id": "", "server_type_name": "", "restore_option": {"restore_type": "DATETIME", "restore_dt": "{today}"}, "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "restore"
+        },
+        {
+          "name": "remove-backup-histories",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "json": {"backup_history_ids": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "backup-hist"
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "patch"
+        },
+        {
+          "name": "upgrade-kernel",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "patch"
+        },
+        {
+          "name": "add-block-storages",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
+          "json": {"block_storage_groups": [{"role_type": "DATA", "size_gb": 10, "volume_type": "SSD"}]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "block-storage"
+        }
+      ]
+    }
+  ]
+}

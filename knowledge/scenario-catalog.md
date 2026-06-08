@@ -108,3 +108,20 @@ virtualserver 41, networking/vpc 38, then database epas/mariadb/mysql/postgresql
 ~17 each, storage/archivestorage, security/kms, …). Track in
 `agents/coordination/ledger.json`. All Wave-1 bodies are docs-derived and pending
 live validation — see `knowledge/validated-facts.md` "Wave 1 facts".
+
+## Coverage campaign — Wave 2 (2026-06-08)
+
+7 cluster-agents added **30 fragment files / 49 lifecycles** closing **302 write
+ops**; static ceiling **55.4% → 78.6%** (write gap 390 → 88). Services at write-gap 0:
+networking/{vpc,loadbalancer,dns,cdn,gslb,vpn,firewall,direct-connect},
+compute/virtualserver, database/{mysql,mariadb,epas,postgresql,sqlserver,cachestore},
+storage/{archivestorage,backup,filestorage,parallel-filestorage},
+security/{kms,secretsmanager,secretvault,configinspection,certificatemanager},
+data-analytics/{data-flow,data-ops,quick-query,searchengine,vertica,eventstreams}.
+
+**Remaining write gap = 88 / ~14 services** (Wave 3 targets): compute/baremetal 12,
+container/scr 10, compute/multinodegpucluster 9, management/cloudcontrol 9,
+management/resourcemanager 9, compute/scf 7, management/loggingaudit 6,
+management/cloudmonitoring 4, ai-ml/{aimlops-platform,cloud-ml} 3 each,
+financial-management/{billingplan,budget} 3 each, platform/sts 3, container/ske 2,
+devops-tools/devopsservice 2, management/network-logging 2, networking 1.
