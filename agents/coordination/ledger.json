@@ -1,9 +1,9 @@
 {
   "_comment": "Campaign blackboard for the multi-agent coverage drive. Coordinator (lead session) and service-agents read/write this. Status: todo|claimed|authored|integrated|live-validated. fragment = regression/scenarios/lifecycles/<file>. See agents/CAMPAIGN.md.",
   "generated": "2026-06-08T20:57:46Z",
-  "static_ceiling_pct": 43.0,
+  "static_ceiling_pct": 55.4,
   "total_endpoints": 1372,
-  "write_gap_total": 547,
+  "write_gap_total": 396,
   "shared_contracts": {
     "vpc": {
       "owner": "networking/vpc",
@@ -38,56 +38,82 @@
       "category": "management",
       "service": "iam",
       "fragment": "management__iam.json",
-      "write_gap": 35,
+      "write_gap": 0,
       "getid_gap": 12,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
-      "notes": ""
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "iam-role-full",
+        "iam-policy-extra-writes",
+        "iam-group-bindings",
+        "iam-user-policy-bindings",
+        "iam-resource-policy",
+        "iam-credentials-heavy"
+      ],
+      "notes": "heavy=credentials/saml/account-users; api_bodies.json createsamlprovider is corrupt (needs real SAML metadata)."
     },
     {
       "category": "storage",
       "service": "baremetal-blockstorage",
       "fragment": "storage__baremetal-blockstorage.json",
-      "write_gap": 30,
+      "write_gap": 0,
       "getid_gap": 5,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
-      "notes": ""
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "blockstorage-volume",
+        "blockstorage-volume-group"
+      ],
+      "notes": "heavy (billable volumes); volume create wants attachments[] (sent []); no DELETE for volume-group (teardown via member volume)."
     },
     {
       "category": "application-service",
       "service": "apigateway",
       "fragment": "application-service__apigateway.json",
-      "write_gap": 28,
+      "write_gap": 0,
       "getid_gap": 17,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
-      "notes": ""
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "apigateway-api-write-coverage",
+        "apigateway-privatelink-endpoint"
+      ],
+      "notes": "light, VPC-free; auth_id via listauths; privatelink needs real privatelink_service_id (synthetic->4xx, optional)."
     },
     {
       "category": "management",
       "service": "organization",
       "fragment": "management__organization.json",
-      "write_gap": 23,
+      "write_gap": 0,
       "getid_gap": 5,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
-      "notes": ""
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "org-organizations-guarded",
+        "org-units-guarded",
+        "org-accounts-guarded",
+        "org-service-control-policies-guarded",
+        "org-policy-bindings-and-delegation-guarded",
+        "org-invitations-guarded"
+      ],
+      "notes": "COVERAGE-ONLY guarded: heavy+optional, no real org/SCP mutation; bodies unproven (no api_bodies entry)."
     },
     {
       "category": "management",
       "service": "iam-identity-center",
       "fragment": "management__iam-identity-center.json",
-      "write_gap": 19,
+      "write_gap": 0,
       "getid_gap": 5,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
-      "notes": ""
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "idc-instance",
+        "idc-user",
+        "idc-group",
+        "idc-permission-set",
+        "idc-account-assignment"
+      ],
+      "notes": "heavy; SSO instance_id is hard dep; uses PATCH; account-assignments fired with all-zero ids (no real grant)."
     },
     {
       "category": "database",
@@ -137,12 +163,17 @@
       "category": "management",
       "service": "servicewatch",
       "fragment": "management__servicewatch.json",
-      "write_gap": 16,
+      "write_gap": 0,
       "getid_gap": 4,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
-      "notes": ""
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "servicewatch-alert",
+        "servicewatch-dashboard",
+        "servicewatch-event-rule",
+        "servicewatch-custom-ingest"
+      ],
+      "notes": "light observability; bulk-delete body shape {ids:[]} unproven; create envelopes $.alert.id/$.dashboard.id/$.event_rule.id unproven."
     },
     {
       "category": "database",

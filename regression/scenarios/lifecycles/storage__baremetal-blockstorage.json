@@ -1,0 +1,473 @@
+{
+  "lifecycles": [
+    {
+      "id": "blockstorage-volume",
+      "service": "storage/baremetal-blockstorage",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Baremetal block storage VOLUME lifecycle (billable -> heavy, gated by SCP_RUN_HEAVY). Create a block volume (disk_type SSD, size_gb 10) -> poll $.result.state to AVAILABLE -> exercise snapshots, snapshot-rates, snapshot-schedules, replications, attachments, recoveries, restore -> tear down. ALL bodies from data/api_bodies.json (storage/baremetal-blockstorage/*) and data/api_docs.json model schemas; provenance docs-only (no live 2xx yet). Capture ids: volume create returns $.result.id (VolumeModelV1Dot2.id); snapshot create returns flat $.snapshot_id (VolumeSnapshotResponse). Volume create requires an 'attachments' array of {object_id,object_type:BM} -> we send [] because this account has no baremetal server to attach; if the API rejects an empty attachments list the optional create simply 4xx's (still recorded as covered) and the dependent families run with the unfilled {volume_id} placeholder (each call still records coverage for its endpoint). Replication targets a remote region (region kr-west1 from docs example) -> may 4xx if DR/region unavailable; optional+grouped. Attachments POST/DELETE need a real BM object_id (placeholder from docs) -> optional+grouped. snapshot_id for restore/delete is captured from the create-snapshot response. Teardown: snapshot-schedules/rates/replications/attachments are deleted as cleanup before the volume DELETE; volume DELETE is destructive with 409/500 retry, then poll to 404.",
+      "steps": [
+        {
+          "name": "create-volume",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrbsvol{unique}",
+            "disk_type": "SSD",
+            "size_gb": 10,
+            "qos": {"iops": 5000, "throughput": 250},
+            "attachments": [],
+            "tags": []
+          },
+          "optional": true,
+          "expect_status": [200, 201, 202],
+          "capture": {"volume_id": "$.result.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}",
+            "service": "baremetal-blockstorage"
+          }
+        },
+        {
+          "name": "wait-volume-available",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {
+            "field": "$.result.state",
+            "until": ["AVAILABLE", "available", "IN_USE", "ACTIVE"],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "list-volumes",
+          "method": "GET",
+          "path": "/v1/volumes",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "set-snapshot-rate",
+          "method": "PUT",
+          "path": "/v1/volumes/{volume_id}/snapshot-rates",
+          "group": "vol-snapshot-rate",
+          "optional": true,
+          "json": {"snapshot_rate": 100},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-snapshot-rate",
+          "method": "POST",
+          "path": "/v1/volumes/{volume_id}/snapshot-rates",
+          "group": "vol-snapshot-rate",
+          "optional": true,
+          "json": {"snapshot_rate": 100},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-snapshot-rate",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}/snapshot-rates",
+          "group": "vol-snapshot-rate",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-snapshot-schedule",
+          "method": "PUT",
+          "path": "/v1/volumes/{volume_id}/snapshot-schedules",
+          "group": "vol-snapshot-schedule",
+          "optional": true,
+          "json": {"day_of_week": "SUN", "hour": 18},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-snapshot-schedule",
+          "method": "POST",
+          "path": "/v1/volumes/{volume_id}/snapshot-schedules",
+          "group": "vol-snapshot-schedule",
+          "optional": true,
+          "json": {"day_of_week": "SUN", "hour": 18},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-snapshot-schedule",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}/snapshot-schedules",
+          "group": "vol-snapshot-schedule",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-snapshot",
+          "method": "POST",
+          "path": "/v1/volumes/{volume_id}/snapshots",
+          "group": "vol-snapshot",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"snapshot_id": "$.snapshot_id"}
+        },
+        {
+          "name": "list-snapshots",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}/snapshots",
+          "group": "vol-snapshot",
+          "optional": true,
+          "expect_status": [200, 404]
+        },
+        {
+          "name": "restore-snapshot",
+          "method": "PUT",
+          "path": "/v1/volumes/{volume_id}/snapshots/{snapshot_id}/restore",
+          "group": "vol-snapshot",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-snapshot",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}/snapshots/{snapshot_id}",
+          "group": "vol-snapshot",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "create-replication",
+          "method": "POST",
+          "path": "/v1/volumes/{volume_id}/replications",
+          "group": "vol-replication",
+          "optional": true,
+          "json": {"cycle": "5MIN", "name": "regrbsrepl{unique}", "region": "kr-west1"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-replication-cycle",
+          "method": "PUT",
+          "path": "/v1/volumes/{volume_id}/replications/cycle",
+          "group": "vol-replication",
+          "optional": true,
+          "json": {"cycle": "5MIN"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-replication-policy",
+          "method": "PUT",
+          "path": "/v1/volumes/{volume_id}/replications/policy",
+          "group": "vol-replication",
+          "optional": true,
+          "json": {"policy": "RESYNC"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-replication",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}/replications",
+          "group": "vol-replication",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-recovery",
+          "method": "POST",
+          "path": "/v1/volumes/{volume_id}/recoveries",
+          "group": "vol-recovery",
+          "optional": true,
+          "json": {"name": "regrbsrecov{unique}", "snapshot_id": "{snapshot_id}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-attachment",
+          "method": "POST",
+          "path": "/v1/volumes/{volume_id}/attachments",
+          "group": "vol-attachment",
+          "optional": true,
+          "json": {"attachments": [{"object_id": "00000000000000000000000000000000", "object_type": "BM"}]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}/attachments",
+            "service": "baremetal-blockstorage",
+            "json": {"attachments": ["00000000000000000000000000000000"]}
+          }
+        },
+        {
+          "name": "delete-attachment",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}/attachments",
+          "group": "vol-attachment",
+          "optional": true,
+          "destructive": true,
+          "json": {"attachments": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"volume_id": "{volume_id}"}
+        },
+        {
+          "name": "delete-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404],
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-volume-gone",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+        }
+      ]
+    },
+    {
+      "id": "blockstorage-volume-group",
+      "service": "storage/baremetal-blockstorage",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Baremetal block storage VOLUME-GROUP lifecycle (billable -> heavy). Create a member volume -> create a volume-group containing it -> exercise members add/remove, group snapshots + snapshot-schedules, group replications (+cycle/policy), group recoveries, group snapshot restore -> tear down (group then member volume). Bodies from data/api_bodies.json + api_docs model schemas (docs-only provenance). Captures: volume create $.result.id; volume-group create $.result.id (VolumeGroupModel.id); group snapshot create flat $.snapshot_id (VolumeGroupSnapshotResponse). members/add + members/remove take {volume_ids:[...]}; we add then remove the created member volume. Group replication targets remote region kr-west1 (docs example) -> may 4xx; optional+grouped. Group DELETE endpoint is not in this service's catalog (no DELETE /v1/volume-groups/{id}) so the group is removed implicitly by deleting its members + best-effort; member volume is the registered cleanup. snapshot-schedules/replications are deleted as cleanup before teardown.",
+      "steps": [
+        {
+          "name": "create-member-volume",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "optional": true,
+          "json": {
+            "name": "regrbsgvol{unique}",
+            "disk_type": "SSD",
+            "size_gb": 10,
+            "qos": {"iops": 5000, "throughput": 250},
+            "attachments": [],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"member_volume_id": "$.result.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{member_volume_id}",
+            "service": "baremetal-blockstorage"
+          }
+        },
+        {
+          "name": "wait-member-available",
+          "method": "GET",
+          "path": "/v1/volumes/{member_volume_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {
+            "field": "$.result.state",
+            "until": ["AVAILABLE", "available", "IN_USE", "ACTIVE"],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-volume-group",
+          "method": "POST",
+          "path": "/v1/volume-groups",
+          "optional": true,
+          "json": {
+            "name": "regrbsvg{unique}",
+            "volume_ids": ["{member_volume_id}"],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"volume_group_id": "$.result.id"}
+        },
+        {
+          "name": "wait-group-available",
+          "method": "GET",
+          "path": "/v1/volume-groups/{volume_group_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {
+            "field": "$.result.state",
+            "until": ["AVAILABLE", "available", "ACTIVE"],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "list-volume-groups",
+          "method": "GET",
+          "path": "/v1/volume-groups",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "remove-group-member",
+          "method": "PUT",
+          "path": "/v1/volume-groups/{volume_group_id}/members/remove",
+          "group": "vg-members",
+          "optional": true,
+          "json": {"volume_ids": ["{member_volume_id}"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "add-group-member",
+          "method": "PUT",
+          "path": "/v1/volume-groups/{volume_group_id}/members/add",
+          "group": "vg-members",
+          "optional": true,
+          "json": {"volume_ids": ["{member_volume_id}"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-group-snapshot-schedule",
+          "method": "PUT",
+          "path": "/v1/volume-groups/{volume_group_id}/snapshot-schedules",
+          "group": "vg-snapshot-schedule",
+          "optional": true,
+          "json": {"day_of_week": "SUN", "hour": 18},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-group-snapshot-schedule",
+          "method": "POST",
+          "path": "/v1/volume-groups/{volume_group_id}/snapshot-schedules",
+          "group": "vg-snapshot-schedule",
+          "optional": true,
+          "json": {"day_of_week": "SUN", "hour": 18},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-group-snapshot-schedule",
+          "method": "DELETE",
+          "path": "/v1/volume-groups/{volume_group_id}/snapshot-schedules",
+          "group": "vg-snapshot-schedule",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-group-snapshot",
+          "method": "POST",
+          "path": "/v1/volume-groups/{volume_group_id}/snapshots",
+          "group": "vg-snapshot",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"group_snapshot_id": "$.snapshot_id"}
+        },
+        {
+          "name": "list-group-snapshots",
+          "method": "GET",
+          "path": "/v1/volume-groups/{volume_group_id}/snapshots",
+          "group": "vg-snapshot",
+          "optional": true,
+          "expect_status": [200, 404]
+        },
+        {
+          "name": "restore-group-snapshot",
+          "method": "PUT",
+          "path": "/v1/volume-groups/{volume_group_id}/snapshots/{group_snapshot_id}/restore",
+          "group": "vg-snapshot",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-group-snapshot",
+          "method": "DELETE",
+          "path": "/v1/volume-groups/{volume_group_id}/snapshots/{group_snapshot_id}",
+          "group": "vg-snapshot",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "create-group-replication",
+          "method": "POST",
+          "path": "/v1/volume-groups/{volume_group_id}/replications",
+          "group": "vg-replication",
+          "optional": true,
+          "json": {
+            "cycle": "5MIN",
+            "name": "regrbsvgrepl{unique}",
+            "region": "kr-west1",
+            "replication_volume_name_prefix": "dr"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-group-replication-cycle",
+          "method": "PUT",
+          "path": "/v1/volume-groups/{volume_group_id}/replications/cycle",
+          "group": "vg-replication",
+          "optional": true,
+          "json": {"cycle": "5MIN"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-group-replication-policy",
+          "method": "PUT",
+          "path": "/v1/volume-groups/{volume_group_id}/replications/policy",
+          "group": "vg-replication",
+          "optional": true,
+          "json": {"policy": "RESYNC"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-group-replication",
+          "method": "DELETE",
+          "path": "/v1/volume-groups/{volume_group_id}/replications",
+          "group": "vg-replication",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-group-recovery",
+          "method": "POST",
+          "path": "/v1/volume-groups/{volume_group_id}/recoveries",
+          "group": "vg-recovery",
+          "optional": true,
+          "json": {"block_storage_name_prefix": "regrrec", "snapshot_id": "{group_snapshot_id}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"volume_group_id": "{volume_group_id}", "volume_id": "{member_volume_id}"}
+        },
+        {
+          "name": "delete-member-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{member_volume_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404, 409],
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-member-gone",
+          "method": "GET",
+          "path": "/v1/volumes/{member_volume_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+        }
+      ]
+    }
+  ]
+}

@@ -83,3 +83,28 @@ python3 -c "import json;[print(f\"{l['id']:45} enabled={l.get('enabled')} heavy=
 Add a scenario = add an entry to `scenarios.json` (no new Python; the engine
 drives it) + declare any quota kinds in `dependencies.json` + record validated
 facts in `validated-facts.md`. See `agents/domain-knowledge-agent.md`.
+
+---
+
+## Coverage campaign — fragment lifecycles (Wave 1, 2026-06-08)
+
+Per-service CRUD lifecycles now also live in
+`regression/scenarios/lifecycles/<category>__<service>.json` fragments (merged by
+`regression/scenarios/loader.py`; one file per service-agent → no collisions).
+See `agents/CAMPAIGN.md`. Wave 1 closed **151 write ops across 6 services**,
+raising the static coverage ceiling **43.0% → 55.4%** (write gap 547 → ~390).
+
+| Fragment | Lifecycles | Writes | Flags |
+|----------|-----------|--------|-------|
+| `management__iam.json` | iam-role-full, -policy-extra-writes, -group-bindings, -user-policy-bindings, -resource-policy, -credentials-heavy | 35 | 5 light + 1 heavy |
+| `management__organization.json` | org-{organizations,units,accounts,service-control-policies,policy-bindings-and-delegation,invitations}-guarded | 23 | all heavy+optional (blast radius) |
+| `management__iam-identity-center.json` | idc-{instance,user,group,permission-set,account-assignment} | 19 | all heavy+optional (SSO) |
+| `management__servicewatch.json` | servicewatch-{alert,dashboard,event-rule,custom-ingest} | 16 | light |
+| `storage__baremetal-blockstorage.json` | blockstorage-{volume,volume-group} | 30 | heavy (billable) |
+| `application-service__apigateway.json` | apigateway-{api-write-coverage,privatelink-endpoint} | 28 | light |
+
+Remaining write-op gap after Wave 1: **~390 across 47 services** (top: compute/
+virtualserver 41, networking/vpc 38, then database epas/mariadb/mysql/postgresql
+~17 each, storage/archivestorage, security/kms, …). Track in
+`agents/coordination/ledger.json`. All Wave-1 bodies are docs-derived and pending
+live validation — see `knowledge/validated-facts.md` "Wave 1 facts".

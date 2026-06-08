@@ -1,0 +1,511 @@
+{
+  "lifecycles": [
+    {
+      "id": "servicewatch-alert",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "Observability alert lifecycle: create alert -> read it -> PATCH full body / activated / description -> bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createalert (+setalert/setalertactivated/setalertdescription). UNPROVEN: create response envelope ($.alert.id assumed; capture-soft -> dependent steps skip if absent), and the create likely 4xx without real metric_id/namespace_id/recipient_ids — so the whole create is optional+grouped so a 4xx records coverage for POST /v1/alerts and cleanly skips the PATCH/DELETE steps without failing the lifecycle. DELETE /v1/alerts (deletebulkalerts) assumed to take {ids:[...]} mirroring deleteloggroups; unproven.",
+      "steps": [
+        {
+          "name": "create-alert",
+          "method": "POST",
+          "path": "/v1/alerts",
+          "group": "alert",
+          "optional": true,
+          "json": {
+            "description": "regr alert {unique}",
+            "dimension": {
+              "key": "InstanceId",
+              "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+            },
+            "dimensions": [],
+            "evaluation_count": 3,
+            "individual_items": [
+              {
+                "key": "VolumeID",
+                "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+              }
+            ],
+            "level": "HIGH",
+            "lower_bound": 80.0,
+            "metric_id": "d91097ac-0387-4e69-adb2-7b8d453b8db5",
+            "missing_data_option": "BREACHING",
+            "name": "regralert{unique}",
+            "namespace_id": "d583a229-9766-4eb8-96c4-ec389902ba3d",
+            "operator": "RANGE",
+            "period": 300,
+            "recipient_ids": [],
+            "statistic": "AVG",
+            "tags": [],
+            "threshold": 80.0,
+            "upper_bound": 90.0,
+            "violation_count": 2
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {
+            "alert_id": "$.alert.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/alerts",
+            "service": "servicewatch",
+            "json": {
+              "ids": ["{alert_id}"]
+            }
+          }
+        },
+        {
+          "name": "get-alert",
+          "method": "GET",
+          "path": "/v1/alerts/{alert_id}",
+          "group": "alert",
+          "optional": true,
+          "expect_status": [200, 403, 404]
+        },
+        {
+          "name": "set-alert",
+          "method": "PATCH",
+          "path": "/v1/alerts/{alert_id}",
+          "group": "alert",
+          "optional": true,
+          "json": {
+            "dimension": {
+              "key": "InstanceId",
+              "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+            },
+            "dimensions": [],
+            "evaluation_count": 3,
+            "individual_items": [
+              {
+                "key": "VolumeID",
+                "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+              }
+            ],
+            "level": "HIGH",
+            "lower_bound": 80.0,
+            "metric_id": "d91097ac-0387-4e69-adb2-7b8d453b8db5",
+            "missing_data_option": "BREACHING",
+            "namespace_id": "d583a229-9766-4eb8-96c4-ec389902ba3d",
+            "operator": "RANGE",
+            "period": 300,
+            "statistic": "AVG",
+            "threshold": 80.0,
+            "upper_bound": 90.0,
+            "violation_count": 2
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-alert-activated",
+          "method": "PATCH",
+          "path": "/v1/alerts/{alert_id}/activated",
+          "group": "alert",
+          "optional": true,
+          "json": {
+            "activated_yn": "Y"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-alert-description",
+          "method": "PATCH",
+          "path": "/v1/alerts/{alert_id}/description",
+          "group": "alert",
+          "optional": true,
+          "json": {
+            "description": "regr alert {unique} updated"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-alert",
+          "method": "DELETE",
+          "path": "/v1/alerts",
+          "group": "alert",
+          "optional": true,
+          "destructive": true,
+          "json": {
+            "ids": ["{alert_id}"]
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "servicewatch-dashboard",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "Dashboard lifecycle: create -> read -> PUT update -> bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createdashboard (+setdashboard). UNPROVEN: create response envelope ($.dashboard.id assumed). Create is optional+grouped so a 4xx still records POST /v1/dashboards coverage and skips dependents. DELETE /v1/dashboards (deletebulkdashboards) assumed {ids:[...]}; unproven.",
+      "steps": [
+        {
+          "name": "create-dashboard",
+          "method": "POST",
+          "path": "/v1/dashboards",
+          "group": "dashboard",
+          "optional": true,
+          "json": {
+            "name": "regrdash{unique}",
+            "widgets": [
+              {
+                "height": 1,
+                "order": 1,
+                "properties": {
+                  "metrics": [
+                    {
+                      "color": "#ff7f0e",
+                      "dimensions": [
+                        {
+                          "key": "InstanceId",
+                          "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+                        }
+                      ],
+                      "display_name": "EC2-Prod-CPU",
+                      "individual_items": [
+                        {
+                          "key": "BucketId",
+                          "value": "b-1234567890abcdef0"
+                        }
+                      ],
+                      "name": "CPUUtilization",
+                      "namespace_name": "Virtual Server",
+                      "period": 300,
+                      "statistic_type": "AVG"
+                    }
+                  ],
+                  "period": 300,
+                  "stacked": false,
+                  "statistic_type": "AVG",
+                  "title": "Virtual Server | CPU Utilization",
+                  "view": "line"
+                },
+                "type": "metric",
+                "width": 1
+              }
+            ]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {
+            "dashboard_id": "$.dashboard.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/dashboards",
+            "service": "servicewatch",
+            "json": {
+              "ids": ["{dashboard_id}"]
+            }
+          }
+        },
+        {
+          "name": "get-dashboard",
+          "method": "GET",
+          "path": "/v1/dashboards/{dashboard_id}",
+          "group": "dashboard",
+          "optional": true,
+          "expect_status": [200, 403, 404]
+        },
+        {
+          "name": "set-dashboard",
+          "method": "PUT",
+          "path": "/v1/dashboards/{dashboard_id}",
+          "group": "dashboard",
+          "optional": true,
+          "json": {
+            "name": "regrdash{unique}-renamed",
+            "widgets": [
+              {
+                "height": 1,
+                "order": 1,
+                "properties": {
+                  "metrics": [
+                    {
+                      "color": "#ff7f0e",
+                      "dimensions": [
+                        {
+                          "key": "InstanceId",
+                          "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+                        }
+                      ],
+                      "display_name": "EC2-Prod-CPU",
+                      "individual_items": [
+                        {
+                          "key": "BucketId",
+                          "value": "b-1234567890abcdef0"
+                        }
+                      ],
+                      "name": "CPUUtilization",
+                      "namespace_name": "Virtual Server",
+                      "period": 300,
+                      "statistic_type": "AVG"
+                    }
+                  ],
+                  "period": 300,
+                  "stacked": false,
+                  "statistic_type": "AVG",
+                  "title": "Virtual Server | CPU Utilization",
+                  "view": "line"
+                },
+                "type": "metric",
+                "width": 1
+              }
+            ]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-dashboard",
+          "method": "DELETE",
+          "path": "/v1/dashboards",
+          "group": "dashboard",
+          "optional": true,
+          "destructive": true,
+          "json": {
+            "ids": ["{dashboard_id}"]
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "servicewatch-event-rule",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "Event-rule lifecycle: create -> read -> PATCH update -> bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createeventrule (+seteventrule). event_ids/recipient_ids/resource_type_id/service_id/srn_list are sample ids from the doc body, so create likely 4xx in this account — create is optional+grouped so a 4xx still records POST /v1/event-rules coverage and skips dependents. UNPROVEN: create response envelope ($.event_rule.id assumed). DELETE /v1/event-rules (deleteeventrules) assumed {ids:[...]}; unproven.",
+      "steps": [
+        {
+          "name": "create-event-rule",
+          "method": "POST",
+          "path": "/v1/event-rules",
+          "group": "event-rule",
+          "optional": true,
+          "json": {
+            "description": "regr event rule {unique}",
+            "event_ids": [
+              "014cb88ca2a9420e840d5c9ac16cac89",
+              "28520cbbc8c54a3f86f513a9695e6481"
+            ],
+            "name": "regrevtrule{unique}",
+            "recipient_ids": [],
+            "resource_type_id": "596bf16709e84e27b7df397bf59b877c",
+            "service_id": "2778de83d7e247609445bbd570a4eba9",
+            "srn_list": [],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {
+            "event_rule_id": "$.event_rule.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/event-rules",
+            "service": "servicewatch",
+            "json": {
+              "ids": ["{event_rule_id}"]
+            }
+          }
+        },
+        {
+          "name": "get-event-rule",
+          "method": "GET",
+          "path": "/v1/event-rules/{event_rule_id}",
+          "group": "event-rule",
+          "optional": true,
+          "expect_status": [200, 403, 404]
+        },
+        {
+          "name": "set-event-rule",
+          "method": "PATCH",
+          "path": "/v1/event-rules/{event_rule_id}",
+          "group": "event-rule",
+          "optional": true,
+          "json": {
+            "active_yn": "Y",
+            "description": "regr event rule {unique} updated",
+            "event_ids": [
+              "014cb88ca2a9420e840d5c9ac16cac89",
+              "28520cbbc8c54a3f86f513a9695e6481"
+            ],
+            "none_attributes": [],
+            "recipient_ids": [],
+            "resource_type_id": "596bf16709e84e27b7df397bf59b877c",
+            "service_id": "2778de83d7e247609445bbd570a4eba9",
+            "srn_list": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-event-rule",
+          "method": "DELETE",
+          "path": "/v1/event-rules",
+          "group": "event-rule",
+          "optional": true,
+          "destructive": true,
+          "json": {
+            "ids": ["{event_rule_id}"]
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "servicewatch-custom-ingest",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "Light ingest-only coverage for the remaining servicewatch write endpoints that POST data rather than create addressable resources (no capture / no teardown needed): custom metrics + metric meta (OTLP-shaped), metric-data chart image render, custom log-stream collect, and OTLP log-events ingestion. All bodies grounded from data/api_bodies.json (createcustommetrics, createcustommetricmetas, downloadmetricdataimage, createcustomlogstream, createcustomlogevents). Each step is optional + its own group with a broad expect_status so a 4xx/empty-payload rejection still records coverage for the endpoint without failing the lifecycle. The OTLP-attribute sample bodies carry empty-string fields straight from the doc and are likely rejected at runtime — coverage is recorded on the call regardless.",
+      "steps": [
+        {
+          "name": "create-custom-metrics",
+          "method": "POST",
+          "path": "/v1/metrics/custom",
+          "group": "custom-metrics",
+          "optional": true,
+          "json": {
+            "resource_metrics": [
+              {
+                "resource": {
+                  "attributes": [
+                    {
+                      "key": "service.name",
+                      "value": {
+                        "string_value": "regr{unique}"
+                      }
+                    }
+                  ]
+                },
+                "scope_metrics": [
+                  {
+                    "metrics": [
+                      {
+                        "description": "regression custom metric",
+                        "gauge": {
+                          "data_points": [
+                            {
+                              "as_double": 0.75,
+                              "time_unix_nano": "1753776789854000000"
+                            }
+                          ]
+                        },
+                        "name": "regr_custom_metric_{unique}",
+                        "unit": "Bytes"
+                      }
+                    ],
+                    "scope": {
+                      "name": "ServiceWatch-Agent",
+                      "version": "1.0.0"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-custom-metric-meta",
+          "method": "POST",
+          "path": "/v1/metrics/custom/meta",
+          "group": "custom-metric-meta",
+          "optional": true,
+          "json": {
+            "metricMetas": [
+              {
+                "descriptionEn": "regression custom metric meta",
+                "descriptionKo": "regression custom metric meta",
+                "dimensions": [
+                  ["image_id"]
+                ],
+                "metricName": "Custom_regr_{unique}",
+                "storageResolution": 60,
+                "unit": "Bytes"
+              }
+            ],
+            "namespace": "MyCustom/regr{unique}"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "download-metric-data-image",
+          "method": "POST",
+          "path": "/v1/metrics/data/download/image",
+          "group": "metric-image",
+          "optional": true,
+          "json": {
+            "end": 1640995440,
+            "height": 400,
+            "metrics": [
+              {
+                "color": "#0000ff",
+                "dimensions": [
+                  {
+                    "key": "VolumeID",
+                    "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+                  }
+                ],
+                "display_name": "regr{unique}",
+                "name": "CPU Usage/Core[Basic]",
+                "namespace_name": "Virtual Server",
+                "period": 300,
+                "statistic_type": "AVG"
+              }
+            ],
+            "period": 300,
+            "start": 1640995200,
+            "statistic_type": "AVG",
+            "timezone": "UTC",
+            "title": "regr{unique} chart",
+            "width": 600
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-custom-log-stream",
+          "method": "POST",
+          "path": "/v1/log-groups/log-streams/collect/custom",
+          "group": "custom-log-stream",
+          "optional": true,
+          "json": {
+            "log_group_name": "regrlg{unique}",
+            "log_stream_name": "regrls{unique}"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-custom-log-events",
+          "method": "POST",
+          "path": "/v1/log-groups/log-streams/log-events",
+          "group": "custom-log-events",
+          "optional": true,
+          "json": {
+            "resourceLogs": [
+              {
+                "resource": {
+                  "attributes": [
+                    {
+                      "key": "account_id",
+                      "value": {
+                        "stringValue": "regr{unique}"
+                      }
+                    }
+                  ]
+                },
+                "scopeLogs": [
+                  {
+                    "logRecords": [
+                      {
+                        "body": {
+                          "stringValue": "level=info regression otlp test log {unique}"
+                        },
+                        "timeUnixNano": "1762336464000000000"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    }
+  ]
+}

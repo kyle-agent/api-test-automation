@@ -112,8 +112,22 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   **write-setter / in-place-update** steps (coverage expansion) — see
   `docs/HANDOFF-crud-setter-validation.md`.
 - Auth/host resolution: implemented & configurable; confirm against a live `200`.
-- **What to advance next:** widen GET coverage toward 100% and add CRUD scenarios
-  for the long tail. Record gaps in `knowledge/scenario-catalog.md`.
+- **Coverage campaign (multi-agent) — RUNNING.** `agents/CAMPAIGN.md` is the
+  operating model; `agents/coordination/ledger.json` is the blackboard. Per-service
+  CRUD fragments now live in `regression/scenarios/lifecycles/*.json` (merged by
+  `regression/scenarios/loader.py`; validate with
+  `python -m regression.scenarios.validate`). Real target = the **547 uncovered
+  write ops / 53 services** from `python -m spec.coverage_gap` (id-bound GETs are
+  auto-covered by read-chains). **Wave 1 done** (6 fragments, 13 new lifecycles):
+  iam, organization, iam-identity-center, servicewatch, baremetal-blockstorage,
+  apigateway → 151 writes closed, static ceiling **43.0% → 55.4%** (54 lifecycles,
+  validator clean). Remaining ~390 writes / 47 services. All Wave-1 bodies are
+  docs-derived, **pending live validation**.
+- **What to advance next:** Wave 2 service-agents for the next-biggest gaps
+  (compute/virtualserver 41, networking/vpc 38, database epas/mariadb/mysql/
+  postgresql, storage/archivestorage, security/kms, …). Then a live CI run (needs
+  lane scheduling to fit the 300-min cap) to convert the static ceiling into
+  measured `cov_op`.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.
