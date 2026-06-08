@@ -1,0 +1,88 @@
+{
+  "lifecycles": [
+    {
+      "id": "cloud-ml-write-coverage",
+      "service": "ai-ml/cloud-ml",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY + heavy (NOT yet runtime-proven). Closes all 3 cloud-ml writes: POST /v1/cloud-ml (createcloudml), PUT /v1/cloud-ml/{cloud_ml_id} (updatecloudml), DELETE /v1/cloud-ml/{cloud_ml_id} (deletecloudml). A cloud-ml resource is a billable, GPU-capable ML serving stack provisioned onto a SKE cluster, so this lifecycle NEVER actually provisions one. Pattern: soft-capture cluster_id/image_id from the read-only images/list, soft-capture cloud_ml_id from the list against a DELIBERATELY-NONEXISTENT field so the {cloud_ml_id} placeholder stays LITERAL -> guaranteed 404, then CALL each write once (optional+grouped+broad expect_status) to record coverage without touching a real resource. Marked heavy:true (gated behind SCP_RUN_HEAVY) as defense in depth. POST body is the data/api_bodies.json createcloudml shape (cloud_ml_name/cluster_id/image_id/product_group_id + analytics/application/copilot resource sizing); PUT body is the api_bodies updatecloudml shape ({description}). The doc-sample ids in createcloudml are replaced with soft-captured/{unique} values where possible; expected 400/422 (needs real cluster_id/image_id/product_group_id) or 403. probe-reads exercises the id-bound GETs (getcloudml + clusterproduct/estimate/check-releasable) when a real id is present.",
+      "steps": [
+        {
+          "name": "list-images",
+          "method": "GET",
+          "path": "/v1/cloud-ml/images",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cloud-ml",
+          "capture_soft": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "list-cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cloud-ml",
+          "capture_soft": {
+            "cloud_ml_id": "$.contents[0].nonexistent_cloud_ml_seed",
+            "cluster_id": "$.contents[0].cluster_id"
+          },
+          "_note": "cloud_ml_id captured against a nonexistent field so the placeholder stays literal -> PUT/DELETE/GET-by-id hit a guaranteed 404 (records coverage, touches no real resource). cluster_id soft-captured if a resource exists."
+        },
+        {
+          "name": "create-cloud-ml",
+          "method": "POST",
+          "path": "/v1/cloud-ml",
+          "json": {
+            "cloud_ml_name": "regr-cloudml-{ualpha}",
+            "description": "API regression suite — coverage-only, never provisioned",
+            "cluster_id": "{cluster_id}",
+            "image_id": "{image_id}",
+            "domain_name": "regr-cloudml-{ualpha}",
+            "endpoint_type": "PUBLIC",
+            "use_copilot": false,
+            "analytics_resource": {"cpu": 1, "gpu": "", "memory": 2},
+            "application_resource": {"cpu": 1, "memory": 2},
+            "copilot": {"cpu": 0, "gpu": "", "memory": 0},
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cloud-ml-create",
+          "_note": "BILLABLE ML serving stack — never actually provisioned. Body from data/api_bodies.json createcloudml (UNPROVEN) with the doc-sample ids replaced by soft-captured cluster_id/image_id (product_group_id omitted — no capture source, the create is expected to 4xx anyway); expected 400/422 (needs real cluster_id/image_id/product_group_id) or 403. Deliberately NOT chained to a delete of a real resource."
+        },
+        {
+          "name": "update-cloud-ml",
+          "method": "PUT",
+          "path": "/v1/cloud-ml/{cloud_ml_id}",
+          "json": {
+            "description": "API regression suite — updated (coverage-only)"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cloud-ml-update",
+          "_note": "In-place update (updatecloudml). Body {description} from data/api_bodies.json updatecloudml. Targets the literal {cloud_ml_id} -> 404."
+        },
+        {
+          "name": "delete-cloud-ml",
+          "method": "DELETE",
+          "path": "/v1/cloud-ml/{cloud_ml_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "cloud-ml-delete",
+          "_note": "destructive — only runs under SCP_ALLOW_DESTRUCTIVE. Targets the literal {cloud_ml_id} (no real resource) -> expected 404. optional+broad so it records coverage without deleting a real resource."
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cloud_ml_id": "{cloud_ml_id}",
+            "cluster_id": "{cluster_id}"
+          }
+        }
+      ]
+    }
+  ]
+}

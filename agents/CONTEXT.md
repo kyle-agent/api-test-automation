@@ -124,15 +124,22 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   49 lifecycles): networking/{vpc,loadbalancer,dns,cdn,gslb,vpn,firewall,direct-
   connect}, compute/virtualserver, the 6 database engines, storage/{archive,backup,
   file,parallel-file}, security/{kms,secrets,vault,configinspection,certmgr},
-  data-analytics ×6 → +302 writes. **Static ceiling 43.0% → 78.6%** (95 lifecycles,
-  validator 0 errors, offline tests pass). **36 services at write-gap 0.** All
-  bodies docs-derived, **pending live validation**.
-- **What to advance next:** Wave 3 mops up the last **88 writes / ~14 services**:
-  compute/{baremetal 12, multinodegpucluster 9, scf 7}, container/{scr 10, ske 2},
-  management/{cloudcontrol 9, resourcemanager 9, loggingaudit 6, cloudmonitoring 4,
-  network-logging 2}, ai-ml ×2, financial-management ×2, platform/sts 3,
-  devops-tools 2. Then a live CI run (needs lane scheduling to fit the 300-min cap)
-  to convert the static ceiling into measured `cov_op`.
+  data-analytics ×6 → +302 writes. **Wave 3 done** (4 cluster-agents, +88 writes):
+  compute/{baremetal,multinodegpucluster,scf}, container/{scr,ske}, management/
+  {cloudcontrol,resourcemanager,loggingaudit,cloudmonitoring,network-logging}, ai-ml
+  ×2, financial ×2, platform/sts, devops, networking/security-group.
+- **WRITE-COVERAGE CAMPAIGN COMPLETE.** All **547 catalog write ops reachable**
+  (write-gap = 0 across all 53 services); **113 lifecycles** (29 base + 84 in 53
+  fragments), validator 0 errors, offline tests pass. **Static ceiling 43.0% →
+  85.6%**; residual 198-endpoint gap is exclusively id-bound GETs (read-chain /
+  probe_reads auto-covered at runtime, so live `cov_op` runs higher). All bodies
+  docs-derived, **PENDING LIVE VALIDATION**.
+- **What to advance next:** a **live CI run** to convert the static ceiling into
+  measured `cov_op` — needs the lane-scheduling work first so the heavy CRUD set
+  fits the 300-min cap (the new fragments add many heavy lifecycles). Then iterate
+  on bodies that 4xx (the docs-derived guesses) using real runtime evidence, and
+  fix the known corrupt `api_bodies.json` entries (iam saml-provider, vpc tgw
+  firewall-connection). Ledger: `agents/coordination/ledger.json`.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.

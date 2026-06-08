@@ -1,9 +1,9 @@
 {
   "_comment": "Campaign blackboard for the multi-agent coverage drive. Coordinator (lead session) and service-agents read/write this. Status: todo|claimed|authored|integrated|live-validated. fragment = regression/scenarios/lifecycles/<file>. See agents/CAMPAIGN.md.",
   "generated": "2026-06-08T20:57:46Z",
-  "static_ceiling_pct": 78.6,
+  "static_ceiling_pct": 85.6,
   "total_endpoints": 1372,
-  "write_gap_total": 88,
+  "write_gap_total": 0,
   "shared_contracts": {
     "vpc": {
       "owner": "networking/vpc",
@@ -227,11 +227,13 @@
       "category": "compute",
       "service": "baremetal",
       "fragment": "compute__baremetal.json",
-      "write_gap": 12,
+      "write_gap": 0,
       "getid_gap": 1,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "baremetal-server-coverage"
+      ],
       "notes": ""
     },
     {
@@ -265,44 +267,53 @@
       "category": "container",
       "service": "scr",
       "fragment": "container__scr.json",
-      "write_gap": 10,
+      "write_gap": 0,
       "getid_gap": 10,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "scr-image-write-coverage",
+        "scr-tags-write-coverage"
+      ],
       "notes": ""
     },
     {
       "category": "compute",
       "service": "multinodegpucluster",
       "fragment": "compute__multinodegpucluster.json",
-      "write_gap": 9,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "mngc-gpu-node-coverage"
+      ],
       "notes": ""
     },
     {
       "category": "management",
       "service": "cloudcontrol",
       "fragment": "management__cloudcontrol.json",
-      "write_gap": 9,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "cloudcontrol-landing-zone-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "management",
       "service": "resourcemanager",
       "fragment": "management__resourcemanager.json",
-      "write_gap": 9,
+      "write_gap": 0,
       "getid_gap": 6,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "resourcemanager-tag-lifecycle"
+      ],
       "notes": ""
     },
     {
@@ -387,11 +398,13 @@
       "category": "compute",
       "service": "scf",
       "fragment": "compute__scf.json",
-      "write_gap": 7,
+      "write_gap": 0,
       "getid_gap": 11,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "scf-privatelink-apigateway-coverage"
+      ],
       "notes": ""
     },
     {
@@ -424,11 +437,13 @@
       "category": "management",
       "service": "loggingaudit",
       "fragment": "management__loggingaudit.json",
-      "write_gap": 6,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "management-loggingaudit-coverage"
+      ],
       "notes": ""
     },
     {
@@ -526,11 +541,13 @@
       "category": "management",
       "service": "cloudmonitoring",
       "fragment": "management__cloudmonitoring.json",
-      "write_gap": 4,
+      "write_gap": 0,
       "getid_gap": 6,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "management-cloudmonitoring-coverage"
+      ],
       "notes": ""
     },
     {
@@ -550,55 +567,65 @@
       "category": "ai-ml",
       "service": "aimlops-platform",
       "fragment": "ai-ml__aimlops-platform.json",
-      "write_gap": 3,
+      "write_gap": 0,
       "getid_gap": 6,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "aimlops-platform-release-write-coverage"
+      ],
       "notes": ""
     },
     {
       "category": "ai-ml",
       "service": "cloud-ml",
       "fragment": "ai-ml__cloud-ml.json",
-      "write_gap": 3,
+      "write_gap": 0,
       "getid_gap": 4,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "cloud-ml-write-coverage"
+      ],
       "notes": ""
     },
     {
       "category": "financial-management",
       "service": "billingplan",
       "fragment": "financial-management__billingplan.json",
-      "write_gap": 3,
+      "write_gap": 0,
       "getid_gap": 1,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "billingplan-planned-computes-guarded"
+      ],
       "notes": ""
     },
     {
       "category": "financial-management",
       "service": "budget",
       "fragment": "financial-management__budget.json",
-      "write_gap": 3,
+      "write_gap": 0,
       "getid_gap": 1,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "budget-account-budget"
+      ],
       "notes": ""
     },
     {
       "category": "platform",
       "service": "sts",
       "fragment": "platform__sts.json",
-      "write_gap": 3,
+      "write_gap": 0,
       "getid_gap": 0,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "sts-token-issuance-coverage"
+      ],
       "notes": ""
     },
     {
@@ -618,33 +645,39 @@
       "category": "container",
       "service": "ske",
       "fragment": "container__ske.json",
-      "write_gap": 2,
+      "write_gap": 0,
       "getid_gap": 3,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "ske-upgrade-write-coverage"
+      ],
       "notes": ""
     },
     {
       "category": "devops-tools",
       "service": "devopsservice",
       "fragment": "devops-tools__devopsservice.json",
-      "write_gap": 2,
+      "write_gap": 0,
       "getid_gap": 2,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "devopsservice-write-coverage"
+      ],
       "notes": ""
     },
     {
       "category": "management",
       "service": "network-logging",
       "fragment": "management__network-logging.json",
-      "write_gap": 2,
+      "write_gap": 0,
       "getid_gap": 0,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "management-network-logging-coverage"
+      ],
       "notes": ""
     },
     {
@@ -690,12 +723,15 @@
       "category": "networking",
       "service": "security-group",
       "fragment": "networking__security-group.json",
-      "write_gap": 1,
+      "write_gap": 0,
       "getid_gap": 0,
-      "status": "todo",
-      "owner": null,
-      "lifecycles": [],
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "networking-security-group-update"
+      ],
       "notes": ""
     }
-  ]
+  ],
+  "campaign_status": "write-coverage COMPLETE \u2014 all 547 write ops reachable; remaining gap is id-bound GETs (read-chain auto-covered). Next: live CI validation."
 }

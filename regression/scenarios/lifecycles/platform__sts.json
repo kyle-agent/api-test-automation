@@ -1,0 +1,54 @@
+{
+  "lifecycles": [
+    {
+      "id": "sts-token-issuance-coverage",
+      "service": "platform/sts",
+      "enabled": true,
+      "_note": "COVERAGE-ONLY, light (NOT yet runtime-proven). STS (Security Token Service) issues SHORT-LIVED CREDENTIALS. Closes all 3 sts writes: POST /v1/assume-role (assumerole), POST /v1/assume-role-with-saml (assumerolewithsaml), POST /v1/object-store-authorization (objectstoreauthorization). Each is a stateless token-MINT (no resource created/deleted, nothing to clean up), so there is no create->delete chain. SAFETY: this lifecycle deliberately does NOT capture or persist any returned token/credential (no capture/capture_soft on the responses) — it only records the HTTP status for coverage and NEVER exfiltrates real creds. Each write is optional+grouped+broad expect_status so the expected 400/403/422 (synthetic/unauthorized role_arn or SAML assertion, missing object-store scope) records the endpoint as covered without minting a usable credential. No data/api_bodies.json entries exist for sts; bodies are best-effort from STS field semantics (role_arn, role_session_name, duration_seconds, saml_assertion, object/bucket scope) and are UNPROVEN.",
+      "steps": [
+        {
+          "name": "assume-role",
+          "method": "POST",
+          "path": "/v1/assume-role",
+          "json": {
+            "role_arn": "srn:scp:iam::regr:role/nonexistent-regr-role-{unique}",
+            "role_session_name": "regr-sts-{ualpha}",
+            "duration_seconds": 900
+          },
+          "expect_status": [200, 201, 400, 401, 403, 404, 409, 422],
+          "optional": true,
+          "group": "sts-assume-role",
+          "_note": "Mints temporary creds for a role. role_arn deliberately points at a NONEXISTENT role so no usable credential is issued; expected 400/403/404. Body (role_arn/role_session_name/duration_seconds) UNPROVEN. No token captured (safety)."
+        },
+        {
+          "name": "assume-role-with-saml",
+          "method": "POST",
+          "path": "/v1/assume-role-with-saml",
+          "json": {
+            "role_arn": "srn:scp:iam::regr:role/nonexistent-regr-role-{unique}",
+            "principal_arn": "srn:scp:iam::regr:saml-provider/nonexistent-regr-{unique}",
+            "saml_assertion": "regr-placeholder-not-a-real-assertion",
+            "duration_seconds": 900
+          },
+          "expect_status": [200, 201, 400, 401, 403, 404, 409, 422],
+          "optional": true,
+          "group": "sts-assume-role-saml",
+          "_note": "Federated SAML token mint. saml_assertion is an obvious placeholder (NOT a real base64 SAML doc) so no usable credential is issued; expected 400/422. Body (role_arn/principal_arn/saml_assertion/duration_seconds) UNPROVEN. No token captured (safety)."
+        },
+        {
+          "name": "object-store-authorization",
+          "method": "POST",
+          "path": "/v1/object-store-authorization",
+          "json": {
+            "bucket_name": "regr-nonexistent-bucket-{unique}",
+            "duration_seconds": 900
+          },
+          "expect_status": [200, 201, 400, 401, 403, 404, 409, 422],
+          "optional": true,
+          "group": "sts-object-store-auth",
+          "_note": "Mints an object-store access token scoped to a bucket. bucket_name points at a NONEXISTENT bucket so no usable scoped credential is issued; expected 400/403/404. Body (bucket_name/duration_seconds) UNPROVEN. No token captured (safety)."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "lifecycles": [
+    {
+      "id": "cloudmonitoring-event-policy",
+      "service": "management/cloudmonitoring",
+      "enabled": true,
+      "_note": "Light monitoring lifecycle. Covers all 4 uncovered writes: puteventpolicy(POST /v1/cloudmonitorings/event/v2/event-policies), modifyeventpolicy(PUT .../{eventPolicyId}), deleteeventpolicy(DELETE .../{eventPolicyId}), getmetricperfdatalist(POST /v1/cloudmonitorings/product/v2/metric-data). NOTE the API name 'puteventpolicy'/'getmetricperfdatalist' are misleading: puteventpolicy is the CREATE (POST), getmetricperfdatalist is a read-shaped POST query. No data/api_bodies.json entry and docs are JS-rendered, so the event-policy body (product type, event conditions, notification addressbook) and the metric-data query body are BEST-GUESS and UNPROVEN — promote after a real 2xx. event-policy create likely requires a real productResourceId + addrbook member, so a 400/422 is expected; every mutating step is optional+grouped with a broad expect_status so it RECORDS coverage without failing. Capture path $.eventPolicyId is a guess (camelCase to mirror the path param); if absent the id-bound steps still normalize to the catalog '*' key. DELETE is destructive (gated).",
+      "steps": [
+        {
+          "name": "list-event-policies",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "cm-read",
+          "capture_soft": {
+            "eventPolicyId": "$.contents[0].eventPolicyId"
+          }
+        },
+        {
+          "name": "create-event-policy",
+          "method": "POST",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies",
+          "json": {
+            "eventPolicyName": "regrcmep{unique}",
+            "productTypeCode": "Server",
+            "eventLevel": "WARNING",
+            "enabled": true,
+            "description": "API regression coverage probe"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cm-policy",
+          "capture": {
+            "eventPolicyId": "$.eventPolicyId"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+            "service": "cloudmonitoring"
+          },
+          "_note": "Body UNPROVEN — likely needs a real product type + event condition + notification target. On the expected 4xx the optional flag isolates the group; the POST is still recorded as covered."
+        },
+        {
+          "name": "show-event-policy",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cm-policy"
+        },
+        {
+          "name": "modify-event-policy",
+          "method": "PUT",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+          "json": {
+            "eventPolicyName": "regrcmep{unique}",
+            "eventLevel": "CRITICAL",
+            "enabled": false,
+            "description": "API regression coverage probe (update)"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cm-policy"
+        },
+        {
+          "name": "delete-event-policy",
+          "method": "DELETE",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "optional": true,
+          "group": "cm-policy",
+          "destructive": true,
+          "_note": "If create captured no id (and the soft list capture also found none), {eventPolicyId} stays literal and the DELETE normalizes to the catalog '*' key (records coverage) and 404s harmlessly."
+        },
+        {
+          "name": "get-metric-perf-data",
+          "method": "POST",
+          "path": "/v1/cloudmonitorings/product/v2/metric-data",
+          "json": {
+            "productTypeCode": "Server",
+            "metricName": "cpu_usage",
+            "statisticType": "AVG",
+            "period": 300,
+            "startDt": "{today}",
+            "endDt": "{today}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cm-metric",
+          "_note": "Coverage-only read-shaped POST (a metric query). Body UNPROVEN. Isolated group so a 4xx never affects the event-policy group."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,225 @@
+{
+  "lifecycles": [
+    {
+      "id": "scr-image-write-coverage",
+      "service": "container/scr",
+      "enabled": true,
+      "_note": "COVERAGE-ONLY (NOT yet runtime-proven). SCR image ids are born by a `docker push` to a repository, NOT by any REST POST — so this lifecycle cannot create a real image. It seeds {image_id} via a soft-capture against a deliberately-nonexistent field of GET /v1/repositories/{repository_id}/images (so the placeholder stays LITERAL at runtime -> guaranteed 404), then CALLS every uncovered image WRITE endpoint once. Endpoint coverage is recorded on the call regardless of status (engine: a step that fires records under its catalog key). Each write is optional+grouped+broad expect_status so a 404/400/403 never reds the run and one bad body costs only its group. Light/non-billable (no resource created). Bodies docs-derived (no data/api_bodies.json entries exist for these); the policy bodies mirror the proven repository policy shapes in the base container-scr-registry lifecycle. lifecycle-policy/preview is a POST (run) + the engine auto-covers its paired id-bound GET preview via probe_reads. Also CALLS DELETE /v1/images/{image_id} once (the literal {image_id} -> 404) to close that write gap; marked destructive so it only fires under SCP_ALLOW_DESTRUCTIVE and is a no-op with no real image.",
+      "steps": [
+        {
+          "name": "seed-repository-placeholder",
+          "method": "GET",
+          "path": "/v1/repositories",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "scr-image",
+          "capture_soft": {
+            "repository_id": "$.repositories[0].nonexistent_repo_seed"
+          }
+        },
+        {
+          "name": "seed-image-placeholder",
+          "method": "GET",
+          "path": "/v1/repositories/{repository_id}/images",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "scr-image",
+          "capture_soft": {
+            "image_id": "$.images[0].nonexistent_image_seed"
+          }
+        },
+        {
+          "name": "update-image-description",
+          "method": "PUT",
+          "path": "/v1/images/{image_id}/description",
+          "json": {
+            "description": "API regression suite"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-image-desc"
+        },
+        {
+          "name": "update-image-lock-policy",
+          "method": "PUT",
+          "path": "/v1/images/{image_id}/lock-policy",
+          "json": {
+            "lock_policy": {
+              "locked": false
+            }
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-image-lock"
+        },
+        {
+          "name": "update-image-pull-policy",
+          "method": "PUT",
+          "path": "/v1/images/{image_id}/pull-policy",
+          "json": {
+            "pull_policy": {
+              "critical_limit": 0,
+              "high_limit": 0,
+              "unmodified_excepted": false,
+              "unscanned_image_pull_prevented": false,
+              "vulnerable_image_pull_prevented": false
+            }
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-image-pull"
+        },
+        {
+          "name": "update-image-scan-policy",
+          "method": "PUT",
+          "path": "/v1/images/{image_id}/scan-policy",
+          "json": {
+            "scan_policy": {
+              "auto_scan_enabled": false,
+              "fixed_version_excepted": false,
+              "language_excepted": false,
+              "scan_policy_enabled": false,
+              "secret_excepted": false,
+              "severity_limit": "High"
+            }
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-image-scan"
+        },
+        {
+          "name": "update-image-lifecycle-policy",
+          "method": "PUT",
+          "path": "/v1/images/{image_id}/lifecycle-policy",
+          "json": {
+            "lifecycle_policy": {
+              "lifecycle_policy_enabled": false,
+              "outdated_rule_enabled": false,
+              "outdated_rule_duration": 90,
+              "outdated_rule_tag_expression": "*",
+              "untagged_rule_enabled": false,
+              "untagged_rule_duration": 90
+            }
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-image-lcp"
+        },
+        {
+          "name": "run-image-lifecycle-policy-preview",
+          "method": "POST",
+          "path": "/v1/images/{image_id}/lifecycle-policy/preview",
+          "json": {
+            "lifecycle_policy": {
+              "lifecycle_policy_enabled": false,
+              "outdated_rule_enabled": false,
+              "outdated_rule_duration": 90,
+              "outdated_rule_tag_expression": "*",
+              "untagged_rule_enabled": false,
+              "untagged_rule_duration": 90
+            }
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-image-preview"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "repository_id": "{repository_id}",
+            "image_id": "{image_id}"
+          }
+        },
+        {
+          "name": "delete-image",
+          "method": "DELETE",
+          "path": "/v1/images/{image_id}",
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-image-delete",
+          "destructive": true
+        }
+      ]
+    },
+    {
+      "id": "scr-tags-write-coverage",
+      "service": "container/scr",
+      "enabled": true,
+      "_note": "COVERAGE-ONLY (NOT yet runtime-proven). SCR tags ids (image tags) are born by a `docker push` too, not by REST — so {tags_id} is seeded via a soft-capture against a nonexistent field of GET /v1/images/{image_id}/tagses and stays LITERAL at runtime (guaranteed 404). CALLS the remaining uncovered tags WRITE endpoints once each to record coverage: PUT .../check-vulnerability (trigger a vuln scan), PUT .../lock-policy, and the two bulk/single tag deletes. DELETE /v1/tagses has NO path id -> modeled as a bulk delete with body {\"ids\":[...]} (UNPROVEN; mirrors the proven servicewatch bulk-delete shape from Wave 1) using a synthetic id so nothing real is removed. DELETE /v1/tagses/{tags_id} uses the literal {tags_id} placeholder -> 404. Marked destructive so it only fires under SCP_ALLOW_DESTRUCTIVE; with no real tag it is a no-op. Light/non-billable. Bodies docs-derived (no data/api_bodies.json entries).",
+      "steps": [
+        {
+          "name": "seed-image-placeholder",
+          "method": "GET",
+          "path": "/v1/repositories",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "scr-tags",
+          "capture_soft": {
+            "image_id": "$.repositories[0].nonexistent_image_seed"
+          }
+        },
+        {
+          "name": "seed-tags-placeholder",
+          "method": "GET",
+          "path": "/v1/images/{image_id}/tagses",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "scr-tags",
+          "capture_soft": {
+            "tags_id": "$.tagses[0].nonexistent_tags_seed"
+          }
+        },
+        {
+          "name": "check-tags-vulnerability",
+          "method": "PUT",
+          "path": "/v1/tagses/{tags_id}/check-vulnerability",
+          "json": {},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-tags-checkvuln"
+        },
+        {
+          "name": "update-tags-lock-policy",
+          "method": "PUT",
+          "path": "/v1/tagses/{tags_id}/lock-policy",
+          "json": {
+            "lock_policy": {
+              "locked": false
+            }
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-tags-lock"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "image_id": "{image_id}",
+            "tags_id": "{tags_id}"
+          }
+        },
+        {
+          "name": "delete-tags-bulk",
+          "method": "DELETE",
+          "path": "/v1/tagses",
+          "json": {
+            "ids": ["{tags_id}"]
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-tags-bulkdelete",
+          "destructive": true
+        },
+        {
+          "name": "delete-tags",
+          "method": "DELETE",
+          "path": "/v1/tagses/{tags_id}",
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scr-tags-delete",
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

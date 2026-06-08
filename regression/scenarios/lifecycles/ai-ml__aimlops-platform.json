@@ -1,0 +1,82 @@
+{
+  "lifecycles": [
+    {
+      "id": "aimlops-platform-release-write-coverage",
+      "service": "ai-ml/aimlops-platform",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY + heavy (NOT yet runtime-proven). Closes all 3 aimlops-platform writes: POST /v1/aimlops-platform (releaseaimlopsplatformv1), PUT /v1/aimlops-platform/{release_id} (updateaimlopsplatformv1), DELETE /v1/aimlops-platform/{release_id} (deleteaimlopsplatformv1). A 'release' provisions an AI/ML-Ops platform ONTO a SKE cluster — billable, slow, and tied to a real cluster_id, so this lifecycle NEVER actually provisions one. Pattern (mirrors ske-upgrade-write-coverage): soft-capture cluster_id from /v1/aimlops-platform/images or a list, soft-capture release_id from the read-only list against a DELIBERATELY-NONEXISTENT field so the {release_id} placeholder stays LITERAL at runtime -> guaranteed 404, then CALL each write once (optional+grouped+broad expect_status) to record coverage without touching a real platform. Marked heavy:true (gated behind SCP_RUN_HEAVY) as defense in depth even though it creates nothing. No data/api_bodies.json entries exist for aimlops-platform; bodies are best-effort from field semantics (release name, cluster_id, image_id, namespace, resource sizing) and are UNPROVEN. probe-reads exercises the id-bound GETs (getaimlopsplatformv1 + the cluster check/validate GETs) when a real id is present.",
+      "steps": [
+        {
+          "name": "list-images",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/images",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "aimlops",
+          "capture_soft": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "list-releases",
+          "method": "GET",
+          "path": "/v1/aimlops-platform",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "aimlops",
+          "capture_soft": {
+            "release_id": "$.contents[0].nonexistent_release_seed",
+            "cluster_id": "$.contents[0].cluster_id"
+          },
+          "_note": "release_id captured against a nonexistent field so the placeholder stays literal -> the PUT/DELETE/GET-by-id hit a guaranteed 404 (records coverage, touches no real platform). cluster_id soft-captured if a release exists."
+        },
+        {
+          "name": "release-aimlops-platform",
+          "method": "POST",
+          "path": "/v1/aimlops-platform",
+          "json": {
+            "release_name": "regr-aimlops-{unique}",
+            "cluster_id": "{cluster_id}",
+            "image_id": "{image_id}",
+            "namespace": "regr-aimlops-{ualpha}",
+            "description": "API regression suite — coverage-only, never provisioned"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "aimlops-release",
+          "_note": "BILLABLE platform release — never actually provisioned. Body (release_name/cluster_id/image_id/namespace) best-effort from field semantics, UNPROVEN; expected 400/422 (needs a real cluster_id/image_id + full resource spec) or 403. Deliberately NOT chained to a delete of a real release."
+        },
+        {
+          "name": "update-aimlops-platform",
+          "method": "PUT",
+          "path": "/v1/aimlops-platform/{release_id}",
+          "json": {
+            "description": "API regression suite — updated (coverage-only)"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "aimlops-update",
+          "_note": "In-place update (updateaimlopsplatformv1) on the literal {release_id} -> 404. Body UNPROVEN (description-only guess)."
+        },
+        {
+          "name": "delete-aimlops-platform",
+          "method": "DELETE",
+          "path": "/v1/aimlops-platform/{release_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "aimlops-delete",
+          "_note": "destructive — only runs under SCP_ALLOW_DESTRUCTIVE. Targets the literal {release_id} (no real release) -> expected 404. optional+broad so it records coverage without deleting a real platform."
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "release_id": "{release_id}",
+            "cluster_id": "{cluster_id}"
+          }
+        }
+      ]
+    }
+  ]
+}

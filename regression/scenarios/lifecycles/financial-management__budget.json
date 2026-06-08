@@ -1,0 +1,87 @@
+{
+  "lifecycles": [
+    {
+      "id": "budget-account-budget",
+      "service": "financial-management/budget",
+      "enabled": true,
+      "_note": "budget is a GLOBAL (account-scoped, no region) financial-management service (see CONTEXT.md global-services list). Closes all 3 budget writes: POST /v1/budgets/account (createaccountbudget), PUT /v1/budgets/account/{budget_id} (setaccountbudget), DELETE /v1/budgets/account/{budget_id} (deleteaccountbudget). An account budget is a non-billable spend-alert config (no infra), but a shared account may already have one and the body is UNPROVEN (no data/api_bodies.json entry; docs JS-rendered), so this is COVERAGE-ONLY guarded: every write is optional + broad expect_status so a 4xx/409 (e.g. a budget already exists, or missing required field) still records coverage without failing the run. budget_id is captured from a 2xx create when possible, else soft-captured from the read-only list so the PUT/DELETE/GET-by-id still target a real id. Bodies (amount/threshold/notification fields) are best-effort from field semantics. Covers GAP-get-id showaccountbudget via probe_reads/show step too.",
+      "steps": [
+        {
+          "name": "list-account-budgets",
+          "method": "GET",
+          "path": "/v1/budgets/account",
+          "expect_status": [200, 403, 404],
+          "capture_soft": {
+            "budget_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "budget"
+        },
+        {
+          "name": "create-account-budget",
+          "method": "POST",
+          "path": "/v1/budgets/account",
+          "json": {
+            "name": "regr-budget-{unique}",
+            "budget_amount": 1000000,
+            "currency": "KRW",
+            "period_type": "MONTHLY",
+            "notifications": [
+              {
+                "threshold_percent": 80,
+                "notification_emails": ["kchoic.ai+budget{unique}@gmail.com"]
+              }
+            ]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {
+            "budget_id": "$.budget.id"
+          },
+          "optional": true,
+          "group": "budget-create",
+          "_note": "Creates an account spend-alert budget. Body (budget_amount/currency/period_type/notifications) is best-effort, UNPROVEN. Capture path $.budget.id is a guess; soft so a different envelope still records coverage (the list-captured id covers PUT/DELETE). Expected 409 if a budget already exists on the shared account."
+        },
+        {
+          "name": "show-account-budget",
+          "method": "GET",
+          "path": "/v1/budgets/account/{budget_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "budget",
+          "_note": "Read-only id-bound GET on the captured/soft-captured budget id (closes GAP-get-id showaccountbudget)."
+        },
+        {
+          "name": "set-account-budget",
+          "method": "PUT",
+          "path": "/v1/budgets/account/{budget_id}",
+          "json": {
+            "name": "regr-budget-{unique}",
+            "budget_amount": 1500000,
+            "currency": "KRW",
+            "period_type": "MONTHLY",
+            "notifications": [
+              {
+                "threshold_percent": 90,
+                "notification_emails": ["kchoic.ai+budget{unique}@gmail.com"]
+              }
+            ]
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "budget-set",
+          "_note": "In-place update (setaccountbudget). Targets the captured/soft-captured id. Body UNPROVEN. optional so a 4xx records coverage."
+        },
+        {
+          "name": "delete-account-budget",
+          "method": "DELETE",
+          "path": "/v1/budgets/account/{budget_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "budget-delete",
+          "_note": "destructive — only runs under SCP_ALLOW_DESTRUCTIVE. Deletes the account budget. Guarded; on a shared account this may target a soft-captured pre-existing budget so it is optional and never required to succeed (expected 403/404)."
+        }
+      ]
+    }
+  ]
+}

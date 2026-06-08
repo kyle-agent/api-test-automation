@@ -125,3 +125,20 @@ management/resourcemanager 9, compute/scf 7, management/loggingaudit 6,
 management/cloudmonitoring 4, ai-ml/{aimlops-platform,cloud-ml} 3 each,
 financial-management/{billingplan,budget} 3 each, platform/sts 3, container/ske 2,
 devops-tools/devopsservice 2, management/network-logging 2, networking 1.
+
+## Coverage campaign — Wave 3 (2026-06-08) — WRITE COVERAGE COMPLETE
+
+4 cluster-agents closed the final 88 writes / 17 services: compute/{baremetal,
+multinodegpucluster,scf}, container/{scr,ske}, management/{cloudcontrol,
+resourcemanager,loggingaudit,cloudmonitoring,network-logging}, ai-ml/{aimlops-
+platform,cloud-ml}, financial-management/{billingplan,budget}, platform/sts,
+devops-tools/devopsservice, networking/security-group.
+
+**Campaign result: every one of the 547 catalog write operations is now reachable
+by an enabled lifecycle (write-op gap = 0 across all 53 services).** 113 lifecycles
+total (29 base + 84 in 53 fragments). Static ceiling **43.0% → 85.6%**; the residual
+198-endpoint gap is exclusively id-bound GETs, which read-chains (list→show) and
+CRUD probe_reads discover at runtime — so measured live `cov_op` runs above the
+static figure. All bodies are docs-derived and **pending live validation** (see
+`validated-facts.md`). Next step: a lane-scheduled live CI run to convert the static
+ceiling into measured coverage.

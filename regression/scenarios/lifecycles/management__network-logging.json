@@ -1,0 +1,61 @@
+{
+  "lifecycles": [
+    {
+      "id": "network-logging-storage",
+      "service": "management/network-logging",
+      "enabled": true,
+      "_note": "Light control-plane lifecycle for network-logging storages: create a storage -> read it via the configurations/storages lists + probe -> delete. Covers createnetworkloggingstorage (POST /v1/network-logging/storages) and deletenetworkloggingstorage (DELETE /v1/network-logging/storages/{network_logging_storage_id}). There is NO data/api_bodies.json entry for network-logging and the docs are JS-rendered, so the create body fields (object_storage / bucket / log_type) are BEST-GUESS from the path semantics and UNPROVEN — promote after a real 2xx. The create step is optional+grouped with a broad expect_status so a 400/403/422 on a shared account (e.g. a missing real object-storage bucket reference) still RECORDS the POST as covered without failing the run. Capture path $.network_logging_storage.id is a guess; if absent the delete still normalizes to the catalog '*' key and records coverage. delete is destructive (gated by SCP_ALLOW_DESTRUCTIVE).",
+      "steps": [
+        {
+          "name": "list-configurations",
+          "method": "GET",
+          "path": "/v1/network-logging/configurations",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "nl-read"
+        },
+        {
+          "name": "create-storage",
+          "method": "POST",
+          "path": "/v1/network-logging/storages",
+          "json": {
+            "name": "regrnl{unique}",
+            "log_type": "VPC_FLOW_LOG",
+            "object_storage_bucket_name": "regrnl{unique}",
+            "description": "API regression coverage probe"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "nl-storage",
+          "capture": {
+            "network_logging_storage_id": "$.network_logging_storage.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/network-logging/storages/{network_logging_storage_id}",
+            "service": "network-logging"
+          },
+          "_note": "Body UNPROVEN. If this ever 2xx-creates a real storage the cleanup tears it down in reverse order. On the expected 4xx the optional flag isolates the group and the POST is still recorded as covered."
+        },
+        {
+          "name": "list-storages",
+          "method": "GET",
+          "path": "/v1/network-logging/storages",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "nl-storage"
+        },
+        {
+          "name": "delete-storage",
+          "method": "DELETE",
+          "path": "/v1/network-logging/storages/{network_logging_storage_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "optional": true,
+          "group": "nl-storage",
+          "destructive": true,
+          "_note": "If create did not capture an id, {network_logging_storage_id} stays literal and the DELETE normalizes to the catalog '*' key (still records coverage) and 404s harmlessly."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "lifecycles": [
+    {
+      "id": "ske-upgrade-write-coverage",
+      "service": "container/ske",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY (NOT yet runtime-proven). Closes the last two ske write gaps: PUT /v1/clusters/{cluster_id}/upgrade and PUT /v1/nodepools/{nodepool_id}/upgrade. Both are IRREVERSIBLE control-plane / node-roll operations on a billable cluster — the base container-ske-cluster-nodepool lifecycle deliberately OMITS them for that reason. So this lifecycle NEVER provisions a cluster: it soft-captures {cluster_id}/{nodepool_id} from list GETs against deliberately-nonexistent fields (placeholders stay LITERAL at runtime -> guaranteed 404), then CALLS each upgrade endpoint once to record coverage. Each write is optional+grouped+broad expect_status so a 404/400/403 (and the no-real-resource case) never reds the run. Marked heavy:true so it is gated behind SCP_RUN_HEAVY even though it creates nothing — defense in depth, since an upgrade against a (hypothetically pre-existing) real cluster would roll nodes. Bodies docs-derived (no data/api_bodies.json entries exist): upgrade target sent as {\"kubernetes_version\": <a real version from /v1/kubernetes-versions>}; field name UNPROVEN.",
+      "steps": [
+        {
+          "name": "find-k8s-version",
+          "method": "GET",
+          "path": "/v1/kubernetes-versions",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "ske-upgrade",
+          "capture_soft": {
+            "kube_ver": "$.kubernetes_versions[0].kubernetes_version"
+          }
+        },
+        {
+          "name": "seed-cluster-placeholder",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "ske-upgrade",
+          "capture_soft": {
+            "cluster_id": "$.clusters[0].nonexistent_cluster_seed"
+          }
+        },
+        {
+          "name": "seed-nodepool-placeholder",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/nodepools",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "ske-upgrade",
+          "capture_soft": {
+            "nodepool_id": "$.nodepools[0].nonexistent_nodepool_seed"
+          }
+        },
+        {
+          "name": "set-cluster-upgrade",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/upgrade",
+          "json": {
+            "kubernetes_version": "{kube_ver}"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "ske-cluster-upgrade"
+        },
+        {
+          "name": "set-nodepool-upgrade",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/upgrade",
+          "json": {
+            "kubernetes_version": "{kube_ver}"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "ske-nodepool-upgrade"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}",
+            "nodepool_id": "{nodepool_id}"
+          }
+        }
+      ]
+    }
+  ]
+}

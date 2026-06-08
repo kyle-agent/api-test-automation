@@ -1,0 +1,194 @@
+{
+  "lifecycles": [
+    {
+      "id": "resourcemanager-tag-lifecycle",
+      "service": "management/resourcemanager",
+      "enabled": true,
+      "_note": "Light, self-contained tag-write lifecycle for resourcemanager (global service). The EXISTING base scenarios.json:resourcemanager-resource-group already covers createresourcegroup / setresourcegroup / deleteresourcegroup / updatetags(/v1/tags/bulk) / updateresourcetags(/v1/tags/{srn}/bulk). This fragment closes the remaining 9 uncovered writes — the per-tag PUT/DELETE family on BOTH addressing schemes plus the two no-path-id bulk DELETEs — by creating a real (cheap, reversible) resource-group to obtain a real srn + (region/service/resource_type/resource_identifier) tuple, then exercising the tag writes against it, then deleting the group. Each tag step is optional+grouped with a broad expect_status so it RECORDS coverage even if the body/addressing guess yields a 4xx. ALL id segments are {placeholders} (never literal) so each step normalizes to the correct catalog '*' key (Wave-1 gotcha). Capture shapes: $.resource_group.id + soft $.resource_group.srn (proven by the base resource-group lifecycle). Tag PUT bodies are from data/api_bodies.json (updatecomponentstagvalue/updateresourcetagvalue -> {\"value\":...}; updatecomponentstags -> {\"tags\":[{key,value}]}). The {region}/{service}/{resource_type}/{resource_identifier} addressing for a resource-group's own tags is BEST-GUESS (region={region}, service=resourcemanager, resource_type=resource-group, resource_identifier={rg_id}) and UNPROVEN — a 400/404 still records coverage. Covers: updatecomponentstags(PUT .../bulk), updatecomponentstagvalue(PUT .../{key}), deletecomponentstags(DELETE .../tuple), deletecomponentstag(DELETE .../tuple/{key}), updateresourcetagvalue(PUT /v1/tags/{srn}/{key}), deleteresourcetags(DELETE /v1/tags/{srn}), deleteresourcetag(DELETE /v1/tags/{srn}/{key}), deletetags(DELETE /v1/tags, bulk), deleteresourcegroups(DELETE /v1/resource-groups, bulk).",
+      "steps": [
+        {
+          "name": "create-rg",
+          "method": "POST",
+          "path": "/v1/resource-groups",
+          "json": {
+            "name": "regrtagrg{unique}",
+            "description": "API regression tag-coverage probe"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "rg_id": "$.resource_group.id"
+          },
+          "capture_soft": {
+            "rg_srn": "$.resource_group.srn"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/resource-groups/{rg_id}",
+            "service": "resourcemanager"
+          },
+          "_note": "Real, cheap, reversible global resource. Provides the srn + id used as the tag-addressing key. Torn down by the final delete-rg step (and the registry cleanup on any failure)."
+        },
+        {
+          "name": "discover-resource-addressing",
+          "method": "GET",
+          "path": "/v1/resources",
+          "service": "resourcemanager",
+          "params": {
+            "limit": 1
+          },
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "rm-component-tags",
+          "capture_soft": {
+            "tag_region": "$.contents[0].region",
+            "tag_service": "$.contents[0].service",
+            "tag_resource_type": "$.contents[0].resource_type",
+            "tag_resource_id": "$.contents[0].resource_identifier",
+            "tag_key": "$.contents[0].tags[0].key"
+          },
+          "_note": "Soft-capture a REAL (region/service/resource_type/resource_identifier) addressing tuple + a tag key from an existing resource, used to exercise the component-tags PUT/DELETE family below. Capture paths ($.contents[0].*) are BEST-GUESS for the resources list envelope and UNPROVEN. If any segment is not captured the placeholder stays literal at runtime (the call 404s harmlessly) but the step still RECORDS coverage via the catalog '*' norm. tag_key falls back to a builtin if absent (see set-component-tag-value)."
+        },
+        {
+          "name": "seed-component-tags",
+          "method": "PUT",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/bulk",
+          "service": "resourcemanager",
+          "json": {
+            "tags": [
+              {
+                "key": "regrkey",
+                "value": "{unique}"
+              }
+            ]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "rm-component-tags",
+          "_note": "updatecomponentstags — bulk PUT on the region/service/resource_type/resource_identifier scheme (every variable segment is a {placeholder} so it normalizes to v1/tags/*/*/*/*/bulk and matches the catalog). Body from data/api_bodies.json updatecomponentstags. Addressing tuple is the soft-captured real resource; a 400/404 still records coverage."
+        },
+        {
+          "name": "set-component-tag-value",
+          "method": "PUT",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{tag_key}",
+          "service": "resourcemanager",
+          "json": {
+            "value": "{unique}-updated"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "rm-component-tags",
+          "_note": "updatecomponentstagvalue — PUT a single tag value. ALL segments are {placeholders} -> normalizes to v1/tags/*/*/*/*/* matching the catalog (the base lifecycle's del-rg-tag used a literal segment and so did NOT match — this one does). Body {\"value\":...} from data/api_bodies.json updatecomponentstagvalue."
+        },
+        {
+          "name": "delete-component-tag",
+          "method": "DELETE",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{tag_key}",
+          "service": "resourcemanager",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "optional": true,
+          "group": "rm-component-tags",
+          "destructive": true,
+          "_note": "deletecomponentstag — DELETE a single component tag by key."
+        },
+        {
+          "name": "delete-component-tags",
+          "method": "DELETE",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}",
+          "service": "resourcemanager",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "optional": true,
+          "group": "rm-component-tags",
+          "destructive": true,
+          "_note": "deletecomponentstags — DELETE all component tags for the resource tuple."
+        },
+        {
+          "name": "set-resource-tag-value",
+          "method": "PUT",
+          "path": "/v1/tags/{rg_srn}/{tag_key}",
+          "service": "resourcemanager",
+          "json": {
+            "value": "{unique}-updated"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "rm-srn-tags",
+          "_note": "updateresourcetagvalue — PUT /v1/tags/{srn}/{key}. {rg_srn} soft-captured from create; {tag_key} seeded below as a ctx literal so BOTH segments are placeholders (norm -> v1/tags/*/* matching the catalog) per the Wave-1 path-match gotcha (the base lifecycle's del-rg-tag used a literal 'regr' segment and so did NOT match — this one does). Body {\"value\":...} from data/api_bodies.json updateresourcetagvalue. If rg_srn was not captured the segment stays literal and 404s while still recording coverage."
+        },
+        {
+          "name": "delete-resource-tag",
+          "method": "DELETE",
+          "path": "/v1/tags/{rg_srn}/{tag_key}",
+          "service": "resourcemanager",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "optional": true,
+          "group": "rm-srn-tags",
+          "destructive": true,
+          "_note": "deleteresourcetag — DELETE /v1/tags/{srn}/{key}. Both segments placeholders -> matches v1/tags/*/*."
+        },
+        {
+          "name": "delete-resource-tags",
+          "method": "DELETE",
+          "path": "/v1/tags/{rg_srn}",
+          "service": "resourcemanager",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "optional": true,
+          "group": "rm-srn-tags",
+          "destructive": true,
+          "_note": "deleteresourcetags — DELETE /v1/tags/{srn} (all tags on the srn)."
+        },
+        {
+          "name": "delete-tags-bulk",
+          "method": "DELETE",
+          "path": "/v1/tags",
+          "service": "resourcemanager",
+          "json": {
+            "tags": {
+              "": []
+            }
+          },
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "rm-bulk",
+          "destructive": true,
+          "_note": "deletetags — bulk DELETE /v1/tags (no path id), body mirrors the proven updatetags shape ({\"tags\":{\"\":[...]}}) with an EMPTY selection so even on a permissive account nothing real is deleted; the call still RECORDS coverage. Body shape UNPROVEN for the delete variant."
+        },
+        {
+          "name": "delete-resource-groups-bulk",
+          "method": "DELETE",
+          "path": "/v1/resource-groups",
+          "service": "resourcemanager",
+          "json": {
+            "resource_group_ids": []
+          },
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "rm-bulk",
+          "destructive": true,
+          "_note": "deleteresourcegroups — bulk DELETE /v1/resource-groups (no path id). Deliberately EMPTY selection (resource_group_ids:[]) so our own rg is NOT deleted here (the explicit delete-rg below owns that). Body field name UNPROVEN; an empty/invalid 4xx still records coverage."
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "resource_group_id": "{rg_id}",
+            "srn": "{rg_srn}",
+            "region": "{tag_region}",
+            "service": "{tag_service}",
+            "resource_type": "{tag_resource_type}",
+            "resource_identifier": "{tag_resource_id}",
+            "key": "{tag_key}"
+          },
+          "_note": "Exercise the id-bound GETs (resources/{srn}, resources/{region}/{service}/{resource_type}/{resource_identifier}, tags/{srn}/{key}, tags/{region}/.../{key}, resource-groups/{id}/resources) reusing the captured rg id/srn + the soft-captured addressing tuple. Read-only; any unfilled placeholder mapping is dropped so only fully-resolvable GETs fire."
+        },
+        {
+          "name": "delete-rg",
+          "method": "DELETE",
+          "path": "/v1/resource-groups/{rg_id}",
+          "service": "resourcemanager",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "_note": "Tear down the real resource-group created at the top (reverse order). Covered already by the base lifecycle but required here to leave no orphan."
+        }
+      ]
+    }
+  ]
+}

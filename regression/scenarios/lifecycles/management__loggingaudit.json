@@ -1,0 +1,104 @@
+{
+  "lifecycles": [
+    {
+      "id": "loggingaudit-trail",
+      "service": "management/loggingaudit",
+      "enabled": true,
+      "_note": "Light governance lifecycle for loggingaudit (audit trails / CloudTrail-equivalent). Covers all 6 uncovered writes: createtrail(POST /v1/trails), settrail(PUT /v1/trails/{trail_id}), starttrail(POST /v1/trails/{trail_id}/start), stoptrail(POST /v1/trails/{trail_id}/stop), deletetrail(DELETE /v1/trails/{trail_id}), downloadlogs(POST /v1/logs/download). No data/api_bodies.json entry for loggingaudit and docs are JS-rendered, so create/set bodies (target object-storage bucket + log selectors) are BEST-GUESS and UNPROVEN — promote after a real 2xx. createtrail typically requires a real object-storage bucket to receive logs, so a 400/403/422 is expected on a shared account; every mutating step is optional with a broad expect_status so it RECORDS coverage without failing. trail_id capture path $.trail.id is a guess; if absent the id-bound steps still normalize to the catalog '*' key. start/stop are POSTs without a body. downloadlogs is a coverage-only POST (it may stream a file on success; we only assert it is reachable). DELETE is destructive (gated).",
+      "steps": [
+        {
+          "name": "list-trails",
+          "method": "GET",
+          "path": "/v1/trails",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "la-read"
+        },
+        {
+          "name": "create-trail",
+          "method": "POST",
+          "path": "/v1/trails",
+          "json": {
+            "name": "regrtrail{unique}",
+            "description": "API regression coverage probe",
+            "object_storage_bucket_name": "regrtrail{unique}",
+            "is_multi_region": false,
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "la-trail",
+          "capture": {
+            "trail_id": "$.trail.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/trails/{trail_id}",
+            "service": "loggingaudit"
+          },
+          "_note": "Body UNPROVEN — createtrail likely needs a pre-existing object-storage bucket. On the expected 4xx the optional flag isolates the group; the POST is still recorded as covered. tags[] receives owner tags via the engine."
+        },
+        {
+          "name": "show-trail",
+          "method": "GET",
+          "path": "/v1/trails/{trail_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "la-trail"
+        },
+        {
+          "name": "set-trail",
+          "method": "PUT",
+          "path": "/v1/trails/{trail_id}",
+          "json": {
+            "description": "API regression coverage probe (update)",
+            "is_multi_region": false
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "la-trail"
+        },
+        {
+          "name": "start-trail",
+          "method": "POST",
+          "path": "/v1/trails/{trail_id}/start",
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "la-trail"
+        },
+        {
+          "name": "stop-trail",
+          "method": "POST",
+          "path": "/v1/trails/{trail_id}/stop",
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "la-trail"
+        },
+        {
+          "name": "delete-trail",
+          "method": "DELETE",
+          "path": "/v1/trails/{trail_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "optional": true,
+          "group": "la-trail",
+          "destructive": true,
+          "_note": "If create captured no id, {trail_id} stays literal and the DELETE normalizes to the catalog '*' key (records coverage) and 404s harmlessly."
+        },
+        {
+          "name": "download-logs",
+          "method": "POST",
+          "path": "/v1/logs/download",
+          "json": {
+            "trail_id": "{trail_id}",
+            "start_dt": "{today}",
+            "end_dt": "{today}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "la-download",
+          "_note": "Coverage-only POST. Body UNPROVEN (downloadlogs likely takes a trail/time-window selector). On success it may return a download URL or stream; we only assert reachability. Isolated group so a 4xx never affects the trail group."
+        }
+      ]
+    }
+  ]
+}

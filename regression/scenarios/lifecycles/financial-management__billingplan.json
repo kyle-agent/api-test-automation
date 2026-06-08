@@ -1,0 +1,74 @@
+{
+  "lifecycles": [
+    {
+      "id": "billingplan-planned-computes-guarded",
+      "service": "financial-management/billingplan",
+      "enabled": true,
+      "heavy": true,
+      "_note": "billingplan is a GLOBAL (account-scoped) service (CONTEXT.md global-services list). 'planned-computes' are RESERVED/COMMITTED compute purchases — a real financial commitment that bills the account for a term and is NOT freely reversible. This lifecycle is COVERAGE-ONLY + heavy (gated behind SCP_RUN_HEAVY): it NEVER actually purchases a plan. Every write is optional + broad expect_status so the expected 400/403/422 (missing/real product-offering ids, or no purchase permission) RECORDS the endpoint as covered WITHOUT buying a commitment. Closes all 3 writes: POST /v1/planned-computes (createplannedcomputes), POST /v1/planned-computes/cancellation-fee (showcancellationfee — returns a fee QUOTE, read-like but modeled POST), PUT /v1/planned-computes/{planned_compute_id} (updateplannedcompute). planned_compute_id soft-captured from the read-only list so the PUT and GAP-get-id show target a real id when one exists. No api_bodies.json entries; bodies best-effort from field semantics, UNPROVEN. NOT chained create->use; create is deliberately expected to 4xx.",
+      "steps": [
+        {
+          "name": "list-planned-computes",
+          "method": "GET",
+          "path": "/v1/planned-computes",
+          "expect_status": [200, 403, 404],
+          "capture_soft": {
+            "planned_compute_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "pc"
+        },
+        {
+          "name": "show-cancellation-fee",
+          "method": "POST",
+          "path": "/v1/planned-computes/cancellation-fee",
+          "json": {
+            "planned_compute_id": "{planned_compute_id}"
+          },
+          "expect_status": [200, 201, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pc-fee",
+          "_note": "Returns the cancellation FEE quote for a planned compute (read-like, no state change). Body shape {planned_compute_id} UNPROVEN; expected 400/404 when no real plan exists. Isolated group so a missing id doesn't block the create probe."
+        },
+        {
+          "name": "create-planned-computes",
+          "method": "POST",
+          "path": "/v1/planned-computes",
+          "json": {
+            "name": "regr-plannedcompute-{unique}",
+            "product_offering": "virtual_server",
+            "product_category": "compute",
+            "term_months": 12,
+            "quantity": 1,
+            "payment_type": "ALL_UPFRONT"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pc-create",
+          "_note": "BILLABLE financial commitment — never actually purchased. Body (product_offering/product_category/term_months/quantity/payment_type) best-effort, UNPROVEN; expected 400/422 (needs a real product-offering id / spec) or 403 (no purchase permission). Deliberately NOT chained to a use/cancel step."
+        },
+        {
+          "name": "show-planned-compute",
+          "method": "GET",
+          "path": "/v1/planned-computes/{planned_compute_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "pc",
+          "_note": "Read-only id-bound GET on the soft-captured planned-compute id (closes GAP-get-id showplannedcompute)."
+        },
+        {
+          "name": "update-planned-compute",
+          "method": "PUT",
+          "path": "/v1/planned-computes/{planned_compute_id}",
+          "json": {
+            "name": "regr-plannedcompute-{unique}-upd"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pc-update",
+          "_note": "In-place update (updateplannedcompute) on the soft-captured id. Body UNPROVEN (name-only guess). optional+broad expect_status so a 4xx records coverage without altering a real commitment."
+        }
+      ]
+    }
+  ]
+}
