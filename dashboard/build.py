@@ -200,6 +200,41 @@ def slug(category, service):
     return f"{category}__{service}".replace("/", "-").replace(" ", "-")
 
 
+def reachable_ceiling(cat, lifecycles):
+    """Static coverage CEILING from the committed scenarios (no live calls).
+
+    Mirrors spec.coverage_gap so the dashboard shows a STABLE number that reflects
+    scenario-authoring work the instant it is committed — independent of whether a
+    live run happened or what state the account was in. An endpoint is reachable if:
+      * GET with no path params  (read-only smoke floor), OR
+      * (method, normalized-path) matches an ENABLED lifecycle step
+        (GET steps cover id-bound GETs via probe/read-chains; non-GET cover writes).
+    Returns reachable count/%, plus the remaining gap split into write vs id-GET —
+    i.e. exactly "what to improve next".
+    """
+    hit = set()
+    for lc in lifecycles:
+        if not lc.get("enabled"):
+            continue
+        for s in lc.get("steps", []):
+            if s.get("method") and s.get("path"):
+                hit.add((s["method"].upper(), norm_path(s["path"])))
+    reach = gap_write = gap_getid = 0
+    for e in cat:
+        m, np = e["method"], e.get("_norm") or norm_path(e["http_path"])
+        if (m == "GET" and "{" not in e["http_path"]) or (m, np) in hit:
+            reach += 1
+        elif m == "GET":
+            gap_getid += 1
+        else:
+            gap_write += 1
+    total = len(cat)
+    return {"reachable": reach,
+            "reachable_pct": reach / total * 100 if total else 0,
+            "gap_write": gap_write, "gap_getid": gap_getid}
+
+
+
 def per_service(cat, tsv_rows, write_hit):
     called = {}
     for status, _category, key, _method, _path, *_rest in tsv_rows:
@@ -308,6 +343,11 @@ def append_history(path, d, run_type, sha):
         "fail_new": d["fail_new"], "fail_known": d["fail_known"],
         "cov_op": round(d["cov_op"], 2), "cov_get": round(d["cov_get"], 2),
         "tested": d["tested"], "total": d["total"],
+        # (2) stable ceiling + (1) run-scope so the trend reflects authoring
+        # progress (monotonic), not live measurement noise.
+        "reachable_pct": round(d.get("reachable_pct", 0), 2),
+        "gap_write": d.get("gap_write", 0), "gap_getid": d.get("gap_getid", 0),
+        "crud_ran": d.get("crud_ran", False),
     }
     hist = []
     if path and os.path.exists(path):
@@ -544,11 +584,12 @@ def render(d, hist, meta, services):
     def card(label, value, sub, color):
         return (f'<div class="card"><div class="card-val" style="color:{color}">{value}</div>'
                 f'<div class="card-lbl">{label}</div><div class="card-sub">{sub}</div></div>')
+    run_scope = "full CRUD" if d.get("crud_ran") else "read-only"
     cards = (card("New regressions", str(d["fail_new"]),
                   "vs known baseline", "#2da44e" if healthy else "#cf222e")
              + card("Pass rate", f"{pass_rate:.1f}%", f'{d["ok"]} ok / {called} calls', "#1f2328")
-             + card("Operation coverage", f'{d["cov_op"]:.1f}%',
-                    f'{d["tested"]} / {d["total"]} ops', "#0969da")
+             + card("Reachable ceiling", f'{d.get("reachable_pct", 0):.1f}%',
+                    f'{d.get("reachable", 0)} / {d["total"]} · scenarios', "#2da44e")
              + card("Known-red", str(d["fail_known"]),
                     "tracked backend bugs", "#cf222e" if d["fail_known"] else "#2da44e"))
 
@@ -580,7 +621,10 @@ def render(d, hist, meta, services):
 
     pr_series = [h["ok"] / max(1, h["ok"] + h["soft"] + h["fail_new"] + h["fail_known"]) * 100
                  for h in hist[-12:]]
-    cov_series = [h["cov_op"] for h in hist[-12:]]
+    # Trend uses the STABLE reachable ceiling (monotonic with authoring work),
+    # not the per-run live measurement (which bounces with run scope / account
+    # state). Old history rows without reachable_pct fall back to cov_op.
+    cov_series = [h.get("reachable_pct", h.get("cov_op", 0)) for h in hist[-12:]]
 
     writeax = "◑" if d["cov_write"] > 0 else "✗"
     measured = d.get("param_attempted", 0) > 0
@@ -597,6 +641,9 @@ def render(d, hist, meta, services):
         conformance_section=render_conformance_section(meta.get("conf", {})),
         badge=badge, cards=cards, donut=donut(segs, called), legend=legend,
         cov_op=f'{d["cov_op"]:.1f}', tested=d["tested"], total=d["total"],
+        reach_pct=f'{d.get("reachable_pct", 0):.1f}', reachable=d.get("reachable", 0),
+        gap_write=d.get("gap_write", 0), gap_getid=d.get("gap_getid", 0),
+        run_scope=run_scope,
         cov_get=f'{d["cov_get"]:.1f}', get_total=d["get_total"],
         cov_write=f'{d["cov_write"]:.1f}', write_hit=d["write_hit"],
         nonget_total=d["nonget_total"], writeax=writeax,
@@ -661,10 +708,12 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <section><div class="grid2">
 <div class="panel"><h2>응답 코드 분포</h2><div class="donutwrap">{donut}<div>{legend}</div></div></div>
 <div class="panel"><h2>커버리지</h2>
-<div style="display:flex;gap:28px;align-items:baseline">
-<div><div class="bignum" style="color:#0969da">{cov_op}%</div><div class="mut">operation ({tested}/{total})</div></div>
+<div style="display:flex;gap:28px;align-items:baseline;flex-wrap:wrap">
+<div><div class="bignum" style="color:#2da44e">{reach_pct}%</div><div class="mut">도달가능 ceiling ({reachable}/{total} · 시나리오 기준, 안정)</div></div>
+<div><div class="bignum" style="color:#0969da">{cov_op}%</div><div class="mut">측정·이번 run ({tested}/{total} · {run_scope})</div></div>
 <div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">읽기 GET ({tested}/{get_total})</div></div>
 <div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">쓰기 CRUD ({write_hit}/{nonget_total})</div></div>{param_stat}</div>
+<div class="mut" style="margin-top:8px">남은 gap → write <b>{gap_write}</b> · id-bound GET <b>{gap_getid}</b> &nbsp;(다음 개선 대상; write=시나리오 추가, id-GET=read-chain/probe로 런타임 자동 도달)</div>
 <div class="mut" style="margin-top:12px">측정 축 (swagger-coverage/ReadyAPI 기준)</div>
 <div class="axes"><span class="ax on">✓ operation</span><span class="ax part">◑ status-code</span>
 <span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax {paramax_cls}">{paramax} parameter</span><span class="ax off">✗ schema</span></div></div>
@@ -684,7 +733,7 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <section><h2>추세 <span class="mut" style="text-transform:none">— {runs} runs 누적 (dashboard-data 브랜치)</span></h2>
 <div class="panel trendgrid">
 <div><div class="mut">성공률</div>{spark_pr}</div>
-<div><div class="mut">operation 커버리지 %</div>{spark_cov}</div></div></section>
+<div><div class="mut">도달가능 ceiling % (시나리오 기준, 단조)</div>{spark_cov}</div></div></section>
 <section><h2>알려진 이슈 (data/baselines/known_issues.json)</h2><div class="panel"><table>
 <tr><th>endpoint</th><th>status</th><th>유형</th></tr>{knrows}</table></div></section>
 <footer>생성: <code>dashboard/build.py</code> ← unified results store (reports/results/*.jsonl) + legacy fallback (smoke_status.tsv, junit-crud.xml, api_catalog.json)
@@ -777,6 +826,15 @@ def build(
     # 5. Compute, history, render
     # ------------------------------------------------------------------
     d = compute(cat, tsv_rows, crud_results, lc_data, known_data, param_rows)
+    # (2) stable static ceiling from committed scenarios (reflects authoring work
+    # immediately, no live run needed) + remaining gap = what to improve next.
+    d.update(reachable_ceiling(cat, lc_data))
+    # (1) run scope: did this run actually exercise CRUD (write ops), or was it
+    # read-only (smoke + read-chains)? Read-only/partial runs measure FEWER
+    # endpoints, so their live cov_op must not be read as a regression of the
+    # full-run number — label it and keep the ceiling as the stable headline.
+    d["crud_ran"] = (any(o.get("source") == "crud_probe" for o in unified_obs)
+                     or any(v == "pass" for v in crud_results.values()))
     hist = append_history(history, d, run_type, sha)
     services = per_service(cat, tsv_rows, crud_write_ops(lc_data, cat))
 
@@ -805,7 +863,9 @@ def build(
     print(
         f"dashboard -> {out}  "
         f"(source: {source_label}; "
-        f"coverage {d['cov_op']:.1f}% op, {d['cov_get']:.1f}% GET, {d['cov_write']:.1f}% write; "
+        f"reachable {d.get('reachable_pct', 0):.1f}% ceiling (gap write {d.get('gap_write', 0)} / id-GET {d.get('gap_getid', 0)}); "
+        f"measured {d['cov_op']:.1f}% op ({'full CRUD' if d.get('crud_ran') else 'read-only'}), "
+        f"{d['cov_get']:.1f}% GET, {d['cov_write']:.1f}% write; "
         f"ok {d['ok']} soft {d['soft']} new {d['fail_new']} known {d['fail_known']}; "
         f"{len(hist)} history rows; {len(services)} service pages)"
     )
