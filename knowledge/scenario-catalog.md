@@ -11,6 +11,8 @@ safety gates. Re-derive flags with the snippet at the bottom.
 |--------------|---------|----------------------|
 | `resourcemanager-resource-group` | management/resourcemanager | resource group |
 | `networking-vpc-subnet` | networking/vpc | vpc + subnet + port |
+| `quota-reads` | management/quota | read-only quota endpoints |
+| `support-reads` | management/support | read-only support endpoints |
 | `container-scr-registry` | container/scr | registry + repository |
 | `filestorage-volume` | storage/filestorage | NFS volume |
 | `security-certificatemanager-selfsign` | security/certificatemanager | self-signed cert |
@@ -35,6 +37,7 @@ safety gates. Re-derive flags with the snippet at the bottom.
 | `container-ske-cluster-nodepool` | container/ske | real K8s, ~27 min, consumes 1 vpc |
 | `compute-virtualserver-full` | virtualserver | real VM, ~17 min, consumes 1 vpc |
 | `database-mysql-cluster` | database/mysql | DB cluster, consumes 1 vpc |
+| `database-postgresql-cluster` | database/postgresql | DB cluster, consumes 1 vpc |
 | `heavy-shared-dbaas` | networking/vpc | shared DBaaS flow, consumes 1 vpc |
 | `heavy-shared-networking` | networking/vpc | consumes vpc + private-dns |
 
@@ -44,6 +47,12 @@ safety gates. Re-derive flags with the snippet at the bottom.
 |--------------|--------------|
 | `networking-dns-hosted-zone` | needs a private-dns activate sub-flow; must declare `private-dns` quota when re-enabled |
 | `iam-role` | not yet validated |
+| `security-certificatemanager-import` | cert import flow currently unsatisfiable (see HANDOFF doc) |
+
+> **29 lifecycles total** (24 enabled, 3 disabled here + the heavy ones gated by
+> `SCP_RUN_HEAVY`). The setter-coverage expansion (26 write steps, in-place
+> updates) added in the trusting-curie merge lives inside several existing
+> lifecycles as extra steps — see `docs/HANDOFF-crud-setter-validation.md`.
 
 ## Coverage gap (drive AXIS 1 to 100%)
 

@@ -88,12 +88,18 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 ## Current state (keep this updated as work progresses)
 
 - Catalog: extracted, 1,372 endpoints, 0 unresolved.
-- CRUD scenarios enabled today (see `knowledge/scenario-catalog.md` for the live
-  list): resourcemanager resource-group, vpc+subnet+port, scr registry+repo,
-  filestorage volume, certificatemanager self-sign, queueservice queue,
-  security-group(+rule), virtualserver keypair, virtualserver volume+snapshot,
-  vpc public-ip, vpc internet-gateway, **heavy**: ske cluster+nodepool,
-  virtualserver full VM, mysql cluster, shared dbaas, shared networking.
+- **29 CRUD lifecycles** today (full list + flags in
+  `knowledge/scenario-catalog.md`). Light: resourcemanager resource-group, quota/
+  support reads, vpc+subnet+port, scr registry+repo, filestorage volume,
+  certificatemanager self-sign, queueservice queue, security-group(+rule),
+  virtualserver keypair, virtualserver volume+snapshot, vpc public-ip, vpc
+  internet-gateway, kms key, secretsmanager secret, apigateway api+resource, scf
+  function+trigger, iam group, iam policy, servicewatch loggroup+stream.
+  **Heavy** (`SCP_RUN_HEAVY`): ske cluster+nodepool, virtualserver full VM, mysql
+  cluster, postgresql cluster, shared dbaas, shared networking. Disabled:
+  dns-hosted-zone, iam-role, certificatemanager-import. Many lifecycles also carry
+  **write-setter / in-place-update** steps (coverage expansion) — see
+  `docs/HANDOFF-crud-setter-validation.md`.
 - Auth/host resolution: implemented & configurable; confirm against a live `200`.
 - **What to advance next:** widen GET coverage toward 100% and add CRUD scenarios
   for the long tail. Record gaps in `knowledge/scenario-catalog.md`.
