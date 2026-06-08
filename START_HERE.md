@@ -1,4 +1,4 @@
-# CLAUDE.md — Session bootstrap (read me first)
+# START_HERE.md — Session bootstrap (read me first)
 
 > **이 파일은 어떤 Claude Code 세션에서 시작하더라도 동일한 지점에서 이어서
 > 작업할 수 있도록 하는 진입점입니다.** 새 세션이 열리면 이 파일 →

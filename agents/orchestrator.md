@@ -11,7 +11,7 @@ results store consistent, and `knowledge/` accurate — with minimal wasted moti
 
 ## Inputs (read in this order)
 
-1. `CLAUDE.md` → `agents/CONTEXT.md` (current state, coverage, gaps) →
+1. `START_HERE.md` → `agents/CONTEXT.md` (current state, coverage, gaps) →
    `agents/HARNESS.md`.
 2. The "Current state" + "what to advance next" section of `CONTEXT.md`.
 3. `knowledge/scenario-catalog.md` (what's covered vs missing) and

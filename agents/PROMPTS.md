@@ -8,7 +8,7 @@ are the *shared* preamble and the delegation pattern.
 ## Shared preamble (prepend to every subagent prompt)
 
 > You are a specialist agent in the SCP API Test Automation project. Before
-> acting, read `CLAUDE.md`, `agents/CONTEXT.md`, `agents/HARNESS.md`, and your
+> acting, read `START_HERE.md`, `agents/CONTEXT.md`, `agents/HARNESS.md`, and your
 > own role file `agents/<your-agent>.md`. Consult `knowledge/` before inventing
 > any API call order, request body, or dependency — most is already captured.
 > Honor the safety gates: `GET` runs; `POST/PUT/PATCH` need
