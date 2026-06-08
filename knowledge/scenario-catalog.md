@@ -14,6 +14,9 @@ safety gates. Re-derive flags with the snippet at the bottom.
 | `quota-reads` | management/quota | read-only quota endpoints |
 | `support-reads` | management/support | read-only support endpoints |
 | `platform-product-reads` | platform/product | read-only product + product-category endpoints |
+| `pricing-reads` | financial-management/pricing | read-only pricing report endpoints (3 direct GETs; no id-bound, no probe) |
+| `costexplorer-reads` | financial-management/costexplorer | read-only bills/usages/monthly-payment (3 direct GETs; no id-bound, no probe) |
+| `billingplan-reads` | financial-management/billingplan | read-only planned-computes (+ 5 enum GETs) + probe id-bound showplannedcompute |
 | `container-scr-registry` | container/scr | registry + repository |
 | `filestorage-volume` | storage/filestorage | NFS volume |
 | `security-certificatemanager-selfsign` | security/certificatemanager | self-signed cert |
@@ -50,7 +53,7 @@ safety gates. Re-derive flags with the snippet at the bottom.
 | `iam-role` | not yet validated |
 | `security-certificatemanager-import` | cert import flow currently unsatisfiable (see HANDOFF doc) |
 
-> **30 lifecycles total** (27 enabled = 21 light + 6 heavy gated by
+> **33 lifecycles total** (30 enabled = 24 light + 6 heavy gated by
 > `SCP_RUN_HEAVY`; 3 disabled here). The setter-coverage expansion (26 write steps, in-place
 > updates) added in the trusting-curie merge lives inside several existing
 > lifecycles as extra steps — see `docs/HANDOFF-crud-setter-validation.md`.
@@ -98,7 +101,7 @@ a zero-cost read-only lifecycle today (model on `quota-reads` / `support-reads` 
 | 12 | 3 | ai-ml | `aimlops-platform` | heavy | platform create→show→delete (cluster-backed) |
 | 12 | 2 | data-analytics | `quick-query` | light | query create→run→show→delete |
 | 11 | 2 | storage | `parallel-filestorage` | light | parallel volume create→show→delete (mirror filestorage) |
-| 10 | 6 | financial-management | `billingplan` | read | read-only: list planned-computes/server-types/... + probe showplannedcompute |
+| 10 | 6 | financial-management | `billingplan` | ✅ done | covered by `billingplan-reads` (6 direct GETs + probe showplannedcompute) |
 | 10 | 2 | networking | `vpn` | light | vpn-gateway/tunnel (needs vpc) |
 | 10 | 2 | management | `loggingaudit` | read→light | read-only: list audit logs/trails |
 | 10 | 2 | networking | `gslb` | light | gslb create→show→delete |
@@ -112,14 +115,16 @@ a zero-cost read-only lifecycle today (model on `quota-reads` / `support-reads` 
 | 5 | 1 | financial-management | `budget` | read→light | read-only: list account budgets + probe showaccountbudget |
 | 4 | 2 | platform | `product` | ✅ done | covered by `platform-product-reads` |
 | 4 | 2 | management | `network-logging` | read→light | read-only: list logs |
-| 3 | 3 | financial-management | `pricing` | read | read-only: list offerings/prices/billing-item-ids (all direct GET) |
-| 3 | 3 | financial-management | `costexplorer` | read | read-only: list bills/usages + show monthly payment |
+| 3 | 3 | financial-management | `pricing` | ✅ done | covered by `pricing-reads` (3 direct GETs; no id-bound, adds no coverage over smoke) |
+| 3 | 3 | financial-management | `costexplorer` | ✅ done | covered by `costexplorer-reads` (3 direct GETs; no id-bound, adds no coverage over smoke) |
 | 3 | 0 | platform | `sts` | light | token mint (POST-only; no GET to read back) |
 
 **Recommended next wins (cheapest coverage, no billing, low mutation risk):** the
-*read* class — `pricing`, `costexplorer`, `billingplan`, `cloudmonitoring`,
-`organization` (read-only slice) — each adds a `*-reads` lifecycle exactly like
-`platform-product-reads` and unlocks both direct + id-bound GETs at zero cost.
+*read* class. `pricing`, `costexplorer`, `billingplan` are now ✅ done
+(`pricing-reads` / `costexplorer-reads` / `billingplan-reads`). Remaining read-class
+picks — `cloudmonitoring`, `organization` (read-only slice) — each adds a `*-reads`
+lifecycle exactly like `platform-product-reads` and unlocks both direct + id-bound
+GETs at zero cost.
 Then the small *light* CRUD services (`secretvault`, `archivestorage`,
 `cloudcontrol`, `gslb`, `cdn`, `direct-connect`). Defer all *heavy* DB/cluster
 services until a heavy session.

@@ -260,6 +260,135 @@
       ]
     },
     {
+      "id": "pricing-reads",
+      "service": "financial-management/pricing",
+      "enabled": true,
+      "_note": "Read-only: list the 3 direct pricing report GETs (billing-item-ids, offerings, prices). Global/account-scoped service (no region). pricing has NO id-bound GET in the catalog (all 3 endpoints are direct, no path params) and the response_examples carry no nested object id to capture ($.billing_item_ids is a scalar, $.offerings is a list of strings, $.prices is a scalar/page envelope), so there is NO probe_reads step — nothing to bind. These 3 GETs are already in the smoke floor; this lifecycle adds explicit, attributable CRUD-mode read coverage for the pricing service as the documented *-reads pattern, but adds no coverage over smoke. Envelopes grounded from docs response_example: listbillingitemids {\"billing_item_ids\": ...}, listoffering {\"offerings\": [...]}, listreportprice {\"count\",\"page\",\"prices\",...}. Runs in CRUD mode (engine gates all lifecycles on SCP_ALLOW_MUTATIONS).",
+      "steps": [
+        {
+          "name": "list-billing-item-ids",
+          "method": "GET",
+          "path": "/v1/reports/billing-item-ids",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-offerings",
+          "method": "GET",
+          "path": "/v1/reports/offerings",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-prices",
+          "method": "GET",
+          "path": "/v1/reports/prices",
+          "expect_status": [
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "costexplorer-reads",
+      "service": "financial-management/costexplorer",
+      "enabled": true,
+      "_note": "Read-only: list bills + usages and show monthly payments — the 3 direct costexplorer GETs. Global/account-scoped service (no region). costexplorer has NO id-bound GET in the catalog (all 3 endpoints are direct, no path params), so there is NO probe_reads step even though the list envelopes do carry ids ($.bills[].id, $.usages[].id) — there is no /v1/bills/{id} or /v1/usages/{id} to bind them to. These 3 GETs are already in the smoke floor; this lifecycle adds explicit, attributable read coverage as the documented *-reads pattern but adds no coverage over smoke. Envelopes grounded from docs response_example: listbills {\"bills\": [{\"id\", ...}]}, listusages {\"usages\": [{\"id\", ...}]}, showpaymentmonthly {\"payments\": [...]}. Env-dependent: records SOFT if the account has no bills/usages/payments for the period. Runs in CRUD mode (engine gates all lifecycles on SCP_ALLOW_MUTATIONS).",
+      "steps": [
+        {
+          "name": "list-bills",
+          "method": "GET",
+          "path": "/v1/bills",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-usages",
+          "method": "GET",
+          "path": "/v1/usages",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "show-payment-monthly",
+          "method": "GET",
+          "path": "/v1/payments/monthly",
+          "expect_status": [
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "billingplan-reads",
+      "service": "financial-management/billingplan",
+      "enabled": true,
+      "_note": "Read-only: list planned-computes + its 5 enumeration GETs (contract-types, os-types, instances, server-types, service-types), soft-capture a planned_compute id, then probe the ONE id-bound GET showplannedcompute (/v1/planned-computes/{planned_compute_id}). Global/account-scoped service (no region). Unlike pricing/costexplorer this *-reads lifecycle adds REAL id-bound coverage via probe_reads. Envelopes grounded from docs response_example: listplannedcomputes {\"planned_computes\": [{\"id\": \"...\"}], ...} so the list id is $.planned_computes[0].id; showplannedcompute returns {\"planned_compute\": {\"id\": ...}}. probe_reads key is the CATALOG path-param name planned_compute_id so _probe_reads matches showplannedcompute. The 5 enumeration GETs are direct (no path params) and already in smoke; including them keeps the read lifecycle complete. Env-dependent: records SOFT (no probe) if the account has no planned-computes. Runs in CRUD mode (engine gates all lifecycles on SCP_ALLOW_MUTATIONS).",
+      "steps": [
+        {
+          "name": "list-planned-computes",
+          "method": "GET",
+          "path": "/v1/planned-computes",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "planned_compute_id": "$.planned_computes[0].id"
+          }
+        },
+        {
+          "name": "list-contract-types",
+          "method": "GET",
+          "path": "/v1/planned-computes/contract-types",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-os-types",
+          "method": "GET",
+          "path": "/v1/planned-computes/os-types",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-planned-compute-instances",
+          "method": "GET",
+          "path": "/v1/planned-computes/instances",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-planned-compute-server-types",
+          "method": "GET",
+          "path": "/v1/planned-computes/server-types",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "list-planned-compute-service-types",
+          "method": "GET",
+          "path": "/v1/planned-computes/service-types",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "planned_compute_id": "{planned_compute_id}"
+          }
+        }
+      ]
+    },
+    {
       "id": "networking-vpc-subnet",
       "service": "networking/vpc",
       "enabled": true,
