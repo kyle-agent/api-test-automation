@@ -123,23 +123,11 @@ def _missing_param_description(ep: dict) -> Optional[Finding]:
 
 
 # --- B11: 4xx/5xx responses never document a schema ------------------------
-def _no_error_response_schema(ep: dict) -> Optional[Finding]:
-    errs = [r for r in ep.get("responses", [])
-            if re.match(r"[45]", str(r.get("code", "")))]
-    if not errs:
-        return None
-    if all(not r.get("schema_ref")
-           and (str(r.get("schema", "")).lower() in ("", "none"))
-           for r in errs):
-        return Finding(
-            endpoint_key=_key(ep),
-            rule_id="no-error-response-schema",
-            severity=YELLOW,
-            detail="4xx/5xx responses document no body schema",
-            source="static",
-            issue="15",
-        )
-    return None
+# Intentionally NOT a per-endpoint rule. Undocumented error-response schemas
+# affect essentially every endpoint, so the check is reported once as a
+# `systemic` issue (issue 15, scope "all endpoints") in conformance.static.build()
+# rather than as a yellow finding repeated on every individual API. The aggregate
+# count still comes from analyze_docs()'s `no-error-response-schema` group.
 
 
 # --- B12: 2xx response documents no schema (skip DELETE) -------------------
@@ -200,7 +188,7 @@ _DOCS_RULES = [
     FunctionRule("param-naming", YELLOW, SCOPE_ENDPOINT, _inconsistent_param_naming),
     FunctionRule("missing-endpoint-description", YELLOW, SCOPE_ENDPOINT, _missing_endpoint_description),
     FunctionRule("missing-param-description", YELLOW, SCOPE_ENDPOINT, _missing_param_description),
-    FunctionRule("no-error-response-schema", YELLOW, SCOPE_ENDPOINT, _no_error_response_schema),
+    # no-error-response-schema is reported systemically (see build()), not per-endpoint.
     FunctionRule("no-success-schema", YELLOW, SCOPE_ENDPOINT, _no_success_response_schema),
     FunctionRule("required-body-no-model", YELLOW, SCOPE_ENDPOINT, _required_body_no_model),
     FunctionRule("deprecated", YELLOW, SCOPE_ENDPOINT, _deprecated_endpoint),

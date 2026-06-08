@@ -208,8 +208,10 @@ def analyze_docs(*, emit_findings: bool = True) -> dict:
             if errs and all(not r.get("schema_ref")
                             and (str(r.get("schema", "")).lower() in ("", "none")) for r in errs):
                 no_err_schema.append(k)
-                _emit(k, "no-error-response-schema", rules_mod.YELLOW,
-                      "4xx/5xx responses document no body schema", 15)
+                # NB: intentionally NOT emitted per-endpoint. Undocumented error
+                # response schemas affect essentially every endpoint, so this is
+                # reported once as a `systemic` issue in build() (issue 15,
+                # scope "all endpoints") instead of as per-API finding noise.
             if any(r.get("schema_ref") for r in errs):
                 any_err_schema += 1
         findings["no-error-response-schema"] = {
