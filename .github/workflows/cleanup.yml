@@ -1,0 +1,90 @@
+name: SCP Cleanup (tag-scoped reconciler)
+
+# On-demand teardown of leftover regression resources, run with the repo's
+# Actions credentials (this is the only place the SCP secrets live).
+#
+# The reconciler is tag-scoped and SAFE by design: it deletes only resources
+# carrying our owner tag (owner=apitest) whose TTL has passed, plus legacy
+# orphans matched by name prefix (regr*/zznet*). Live resources from a
+# concurrent run (owner tag, TTL not yet passed — default 6h) are SKIPPED, so
+# this never nukes another run's in-flight resources.
+#
+# Triggers:
+#   * workflow_dispatch — manual "Run workflow" button (preferred going forward).
+#   * push on this file  — committing/updating this workflow fires one run, so a
+#     session that can push (but cannot dispatch) can still kick a cleanup.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id_note:
+        description: "Optional note (e.g. the run whose leftovers you're clearing)."
+        required: false
+        default: ""
+  push:
+    paths:
+      - ".github/workflows/cleanup.yml"
+
+concurrency:
+  group: scp-cleanup-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # --- endpoint / region (per-service hosts) ---
+  SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
+  SCP_ENV: ${{ vars.SCP_ENV || 'e' }}
+  SCP_HOST_TEMPLATE: ${{ vars.SCP_HOST_TEMPLATE }}
+  SCP_SERVICE_HOSTS: ${{ vars.SCP_SERVICE_HOSTS }}
+  SCP_BASE_URL: ${{ secrets.SCP_BASE_URL }}
+  # --- credentials (repository secrets) ---
+  SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
+  SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
+  SCP_PROJECT_ID: ${{ secrets.SCP_PROJECT_ID }}
+  SCP_AUTH_SCHEME: ${{ vars.SCP_AUTH_SCHEME || 'hmac' }}
+  # --- run behaviour ---
+  SCP_TIMEOUT: ${{ vars.SCP_TIMEOUT || '20' }}
+  SCP_MAX_RETRIES: ${{ vars.SCP_MAX_RETRIES || '2' }}
+  PYTHONPATH: ${{ github.workspace }}
+  APITEST_RUN_ID: ${{ github.run_id }}
+  # The reconciler's own gate — deletes nothing unless this is set.
+  SCP_ALLOW_MUTATIONS: "true"
+  SCP_ALLOW_DESTRUCTIVE: "true"
+
+jobs:
+  sweep:
+    name: Reconcile leftover resources (tag-scoped)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Verify configuration
+        run: |
+          if [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
+            echo "::error::Missing credentials. Set SCP_ACCESS_KEY and SCP_SECRET_KEY in repo Settings > Secrets."
+            exit 1
+          fi
+      - name: Reconcile (tag-scoped sweep)
+        run: |
+          mkdir -p reports
+          python -m cleanup.reconciler 2>&1 | tee reports/sweep.log
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          echo "## SCP cleanup (tag-scoped reconciler)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 50 reports/sweep.log >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload sweep log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanup-sweep-log
+          path: reports/sweep.log
+          if-no-files-found: ignore
