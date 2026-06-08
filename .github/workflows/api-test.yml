@@ -19,11 +19,8 @@ on:
     # SCP_PR_CATEGORY / SCP_PR_SERVICE repo variables.
     paths-ignore:
       - "**/*.md"
-  schedule:
-    # 18:00 UTC daily (03:00 KST): read-only smoke regression (axis 1).
-    - cron: "0 18 * * *"
-    # 21:00 UTC daily: conformance refresh (axis 2), distinct slot.
-    - cron: "0 21 * * *"
+  # NOTE: scheduled (cron) triggers removed on request — runs are now manual
+  # (workflow_dispatch) or push to the run-* branches only. No daily automation.
   push:
     # claude/run-conformance: full conformance refresh (read-only probes).
     # claude/run-schema-live: also enables the data-based, BILLABLE schema-live
