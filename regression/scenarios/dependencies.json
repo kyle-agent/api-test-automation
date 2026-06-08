@@ -14,6 +14,20 @@
     "/v1/vpcs": "vpc",
     "/v1/private-dns": "private-dns"
   },
+  "vpc_schedule": {
+    "_comment": "Strategy to keep runs from colliding on the account VPC cap (=5). See knowledge/vpc-scheduling-strategy.md for the full rationale + next-run playbook. 'per_run_vpc_cap' is the max concurrent live VPCs a single run should hold (5 minus headroom for async-delete linger). 'lanes' partition the eight VPC-consuming lifecycles into non-overlapping shards; run each lane as a SEPARATE, non-overlapping workflow_dispatch (allow_mutations+allow_destructive; heavy lanes also run_heavy) via crud_filter, waiting for each run's regression job to finish before starting the next. 'cross_run_policy' = how to stop concurrent runs from competing for VPCs. 'durable_fix' = the code change that makes a single un-sharded full run safe (then lanes are optional).",
+    "vpc_limit": 5,
+    "private_dns_limit": 3,
+    "per_run_vpc_cap": 3,
+    "lanes": [
+      { "id": "L0-light", "run_heavy": false, "crud_filter": "", "vpc_lifecycles": ["networking-vpc-subnet", "networking-vpc-internet-gateway"], "peak_vpcs": 2 },
+      { "id": "L1-compute", "run_heavy": true, "crud_filter": "container-ske-cluster-nodepool or compute-virtualserver-full", "vpc_lifecycles": ["container-ske-cluster-nodepool", "compute-virtualserver-full"], "peak_vpcs": 2 },
+      { "id": "L2-database", "run_heavy": true, "crud_filter": "database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas", "vpc_lifecycles": ["database-mysql-cluster", "database-postgresql-cluster", "heavy-shared-dbaas"], "peak_vpcs": 2 },
+      { "id": "L3-networking", "run_heavy": true, "crud_filter": "heavy-shared-networking", "vpc_lifecycles": ["heavy-shared-networking"], "peak_vpcs": 1 }
+    ],
+    "cross_run_policy": "Never let two VPC-mutating runs overlap. Preferred: a single shared concurrency group for mutating runs (cancel-in-progress:false) so they queue. Interim: trigger one lane at a time and wait for the prior run's regression job to complete (the reliable 'VPCs no longer being created' signal) before the next.",
+    "durable_fix": "To make a single un-sharded run_heavy run safe: (1) share ONE core.budgets.Budget across the pytest session and Budget.sync('vpc'/'private-dns', live_count) from a real list call before creates (the pytest driver currently builds a fresh Budget per lifecycle and never syncs, so the reserve gate sees a phantom 5 free); (2) drain-wait on GET /v1/vpcs after a VPC teardown before the next VPC create; (3) reorder so heavy-shared-networking is not last, or rely on (1)+(2); (4) best: heavy lifecycles adopt one shared VPC instead of each calling create-vpc."
+  },
   "prerequisites": {
     "networking-vpc-subnet": ["vpc"],
     "networking-vpc-internet-gateway": ["vpc"],

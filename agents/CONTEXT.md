@@ -72,6 +72,14 @@ ordered CRUD scenarios. Never relax these as a shortcut.
 - Account quotas (vpc=5, private-dns=3, …) are modelled in `core.budgets` +
   `regression/scenarios/dependencies.json`; the engine **reserves** a slot before
   a quota-bound create and **skips** (not fails) when exhausted.
+- **VPC scheduling:** 8 lifecycles each create a VPC against the 5-cap. To keep
+  runs from colliding (and to stop starving `heavy-shared-networking`), follow
+  the lane-sharding playbook + durable fix in
+  [`knowledge/vpc-scheduling-strategy.md`](../knowledge/vpc-scheduling-strategy.md)
+  (machine-readable schedule: `dependencies.json:vpc_schedule`). NB the pytest
+  CRUD driver currently builds a fresh `Budget` per lifecycle and never `sync()`s
+  it to the live VPC count, so today's reserve gate gives no real cross-lifecycle
+  protection — sharding is the interim guard.
 
 ## Where results live (the contract)
 

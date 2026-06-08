@@ -310,11 +310,14 @@ jobs:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
         run: |
           echo "Running CRUD lifecycles (creates/deletes REAL resources)" | tee reports/crud.log
-          ARGS="tests/crud -m crud --junitxml=reports/junit-crud.xml"
+          # Build argv as an array so a multi-token -k filter survives as ONE
+          # argument, e.g. crud_filter="a or b or c" (VPC-scheduling lanes — see
+          # knowledge/vpc-scheduling-strategy.md). A blank filter is unaffected.
+          ARGS=(tests/crud -m crud --junitxml=reports/junit-crud.xml)
           FILTER="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
-          [ -n "$FILTER" ] && ARGS="$ARGS -k $FILTER"
+          [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
           set -o pipefail
-          python -m pytest $ARGS 2>&1 | tee -a reports/crud.log
+          python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log
 
       - name: Comment CRUD result on PR
         if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
