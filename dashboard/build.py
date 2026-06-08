@@ -769,8 +769,15 @@ def build(
     # 4. Load CRUD / lifecycle data (legacy only, no unified equivalent yet)
     # ------------------------------------------------------------------
     crud_results = parse_crud_junit(crud)
-    lc_data = (json.load(open(lifecycles)).get("lifecycles", [])
-               if os.path.exists(lifecycles) else [])
+    # Merge base scenarios.json + per-service fragments (lifecycles/*.json) via
+    # the shared loader so coverage counts every agent's fragment. Fall back to
+    # the raw file if the loader isn't importable (keeps the dashboard standalone).
+    try:
+        from regression.scenarios.loader import load_lifecycles
+        lc_data = load_lifecycles()
+    except Exception:
+        lc_data = (json.load(open(lifecycles)).get("lifecycles", [])
+                   if os.path.exists(lifecycles) else [])
     known_data = json.load(open(known)) if os.path.exists(known) else {"issues": []}
 
     # ------------------------------------------------------------------

@@ -51,7 +51,12 @@ _HERE = Path(__file__).parent
 SCENARIOS_PATH = _HERE / "scenarios.json"
 DEPENDENCIES_PATH = _HERE / "dependencies.json"
 
-LIFECYCLES = json.loads(SCENARIOS_PATH.read_text())["lifecycles"]
+# Base scenarios.json + every per-service fragment under lifecycles/ (see
+# regression.scenarios.loader). One merged list so the engine, dashboard, and
+# gap analyzer all agree on the lifecycle set.
+from regression.scenarios.loader import load_lifecycles  # noqa: E402
+
+LIFECYCLES = load_lifecycles()
 DEPENDENCIES = json.loads(DEPENDENCIES_PATH.read_text())
 _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 
