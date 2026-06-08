@@ -402,11 +402,21 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
     created_count = 0
 
     def _run_cleanup(entry):
-        label, method, path, svc, cu_json, _grp, bkind = entry
+        label, method, path, svc, cu_json, _grp, bkind, tmpl_path = entry
         try:
             if cfg.allow_destructive:
-                client.request(method, path, json=cu_json, service=svc)
+                resp = client.request(method, path, json=cu_json, service=svc)
                 print(f"  cleanup: {method} {path}")
+                # Surface teardown DELETEs on the dashboard too: record the call
+                # under its real catalog key (resolved from the TEMPLATED path,
+                # since `path` carries concrete ids) with status + response time,
+                # exactly like an in-loop write step.
+                _ck = _catalog_key_for(method, tmpl_path, svc)
+                if _ck:
+                    _record_smoke(resp.status,
+                                  categorize(resp.status, resp.raw_text or ""),
+                                  _ck, method, tmpl_path,
+                                  getattr(resp, "elapsed_ms", None))
         except Exception as exc:  # best-effort; report and continue
             print(f"  cleanup FAILED for {label} ({path}): {exc}")
         finally:
@@ -602,7 +612,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 cu_path = _fill(cu["path"], ctx)
                 cu_svc = cu.get("service") or step_service
                 cleanups.append((step["name"], cu["method"], cu_path, cu_svc,
-                                 _fill_obj(cu.get("json"), ctx), grp, bkind))
+                                 _fill_obj(cu.get("json"), ctx), grp, bkind,
+                                 cu["path"]))
                 # crash-safe manifest entry for the reconciler
                 rid = ""
                 for v in step.get("capture", {}):

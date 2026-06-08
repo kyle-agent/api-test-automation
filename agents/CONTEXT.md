@@ -79,6 +79,11 @@ One unified store under `reports/results/` (gitignored):
 
 - `observations.jsonl` — AXIS 1 calls (`endpoint_key, method, path, status,
   category∈{ok,soft,fail}, elapsed_ms, source∈{smoke,read_chain,crud_probe}`).
+  CRUD **write** steps (POST/PUT/PATCH) and **teardown DELETEs** are recorded
+  under their real catalog key (with status + `elapsed_ms`), so the dashboard
+  surfaces write results exactly like GETs. Dashboard coverage (✓) = a catalog
+  key actually appears here; a scenario-*declared* but un-run write is a distinct
+  "◷" marker, never a ✓. (Fix + guard: `tests/dashboard/test_coverage_semantics.py`.)
 - `findings.jsonl` — AXIS 2 defects (`endpoint_key, rule_id, severity∈{red,
   yellow,green}, detail, source∈{static,runtime}`).
 
