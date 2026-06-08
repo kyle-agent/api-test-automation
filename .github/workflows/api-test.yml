@@ -184,7 +184,11 @@ jobs:
     name: AXIS1 regression (smoke + read-chains, opt-in CRUD)
     needs: spec
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # 300 (not 120): a full CRUD + HEAVY baseline (real VM/K8s/DB + shared
+    # networking, with VPC async-delete linger against the 5-VPC quota) does not
+    # finish in 120 min and was being cancelled before the tail heavy lifecycles
+    # ran. See docs/HANDOFF-crud-setter-validation.md §6.5.
+    timeout-minutes: 300
     permissions:
       contents: read
       pull-requests: write
