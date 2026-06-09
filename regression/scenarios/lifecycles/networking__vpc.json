@@ -152,7 +152,8 @@
           },
           "expect_status": [200, 201, 202],
           "capture": {"vpc_id": "$.vpc.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"}
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
         },
         {
           "name": "wait-vpc",
@@ -177,7 +178,8 @@
           },
           "expect_status": [200, 201, 202],
           "capture": {"subnet_id": "$.subnet.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"}
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"},
+          "adopt": "subnet"
         },
         {
           "name": "wait-subnet",
@@ -197,12 +199,12 @@
           "json": {
             "approval_type": "AUTO",
             "connected_resource_id": "{unique}",
-            "connected_resource_ip_address": "10.128.7.10",
+            "connected_resource_ip_address": "10.124.0.6",
             "connected_resource_type": "LB",
             "description": "API regression privatelink service",
             "high_speed_transfer": false,
             "name": "regrpls{unique}",
-            "service_ip_address": "10.128.7.5",
+            "service_ip_address": "10.124.0.5",
             "subnet_id": "{subnet_id}",
             "tags": []
           },
@@ -247,7 +249,8 @@
           "path": "/v1/subnets/{subnet_id}",
           "expect_status": [200, 202, 204],
           "destructive": true,
-          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15,
+          "adopt": "subnet"
         },
         {
           "name": "wait-subnet-gone",
@@ -255,7 +258,8 @@
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
           "expect_status": [200, 404],
-          "poll": {"until_status": [404], "timeout": 180, "interval": 10}
+          "poll": {"until_status": [404], "timeout": 180, "interval": 10},
+          "adopt": "subnet"
         },
         {
           "name": "delete-vpc",
@@ -263,7 +267,8 @@
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
           "expect_status": [200, 202, 204],
-          "destructive": true
+          "destructive": true,
+          "adopt": "vpc"
         }
       ]
     },
@@ -287,7 +292,8 @@
           },
           "expect_status": [200, 201, 202],
           "capture": {"vpc_id": "$.vpc.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"}
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
         },
         {
           "name": "wait-vpc",
@@ -312,7 +318,8 @@
           },
           "expect_status": [200, 201, 202],
           "capture": {"subnet_id": "$.subnet.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"}
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"},
+          "adopt": "subnet"
         },
         {
           "name": "wait-subnet",
@@ -331,7 +338,7 @@
           "optional": true,
           "json": {
             "description": "API regression vpc endpoint",
-            "endpoint_ip_address": "10.129.8.5",
+            "endpoint_ip_address": "10.124.0.20",
             "name": "regrvpce{unique}",
             "resource_info": "x.samsungsdscloud.com(Registry)",
             "resource_key": "{unique}",
@@ -381,7 +388,8 @@
           "path": "/v1/subnets/{subnet_id}",
           "expect_status": [200, 202, 204],
           "destructive": true,
-          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15,
+          "adopt": "subnet"
         },
         {
           "name": "wait-subnet-gone",
@@ -389,7 +397,8 @@
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
           "expect_status": [200, 404],
-          "poll": {"until_status": [404], "timeout": 180, "interval": 10}
+          "poll": {"until_status": [404], "timeout": 180, "interval": 10},
+          "adopt": "subnet"
         },
         {
           "name": "delete-vpc",
@@ -397,7 +406,8 @@
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
           "expect_status": [200, 202, 204],
-          "destructive": true
+          "destructive": true,
+          "adopt": "vpc"
         }
       ]
     },

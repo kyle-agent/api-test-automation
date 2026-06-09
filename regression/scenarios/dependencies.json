@@ -63,6 +63,35 @@
     "vpc_limit": 5,
     "private_dns_limit": 3,
     "per_run_vpc_cap": 3,
+    "_classification_comment": "Shared-infra parallel design (knowledge/vpc-scheduling-strategy.md). 'adopt_lifecycles' reuse the ONE session-shared VPC+subnet (provisioned once by regression.scenarios.shared_infra --provision; ids passed via SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env) and create only their own child resource -> safe to run in PARALLEL with pytest-xdist. 'vpc_crud_lifecycles' MUST self-create (their purpose is vpc/subnet/peering creation, they MUTATE the shared vpc, or they need >1 vpc) -> run SERIALLY (xdist -n0) so they stay within per_run_vpc_cap (1 shared + <=1 self-created at a time). shared_infra.py --print-filters derives PARALLEL_K = 'not (<vpc_crud ids OR'd>)' and VPC_CRUD_K = '<vpc_crud ids OR'd>' so the two -k selections partition all enabled CRUD lifecycles with no overlap.",
+    "adopt_lifecycles": [
+      "container-ske-cluster-nodepool",
+      "compute-virtualserver-full",
+      "database-mysql-cluster",
+      "database-postgresql-cluster",
+      "heavy-shared-dbaas",
+      "vpc-privatelink-service",
+      "vpc-endpoint",
+      "networking-loadbalancer-members-nat",
+      "networking-vpn-gateway-tunnel",
+      "networking-direct-connect-routing"
+    ],
+    "vpc_crud_lifecycles": [
+      "networking-vpc-subnet",
+      "networking-vpc-internet-gateway",
+      "vpc-peering",
+      "vpc-transit-gateway-children",
+      "heavy-shared-networking",
+      "vpc-cidr-secondary",
+      "vpc-subnet-vip-nat"
+    ],
+    "shared_subnet_cidr": "10.124.0.0/24",
+    "fixed_ip_map": {
+      "_comment": "ADOPT-class lifecycles re-home their fixed host IPs into the shared subnet (10.124.0.0/24) at DISTINCT, non-overlapping host addresses so two parallel adopters never claim the same IP in the ONE shared subnet. Reserve .1 (gateway). All these steps are optional+broad expect_status so a reject still records coverage.",
+      "vpc-privatelink-service": {"service_ip_address": "10.124.0.5", "connected_resource_ip_address": "10.124.0.6"},
+      "vpc-endpoint": {"endpoint_ip_address": "10.124.0.20"},
+      "networking-loadbalancer-members-nat": {"service_ip": "10.124.0.30", "member_ip": "10.124.0.31"}
+    },
     "lanes": [
       {
         "id": "L0-light",
@@ -106,7 +135,7 @@
       }
     ],
     "cross_run_policy": "Never let two VPC-mutating runs overlap. Preferred: a single shared concurrency group for mutating runs (cancel-in-progress:false) so they queue. Interim: trigger one lane at a time and wait for the prior run's regression job to complete (the reliable 'VPCs no longer being created' signal) before the next.",
-    "shared_vpc_adopt": "IMPLEMENTED (heavy-only, pending live validation): the 6 heavy VPC lifecycles carry {'adopt':'vpc'} on create-vpc/delete-vpc and reuse ONE session-shared VPC (10.124.0.0/20, conftest.py shared_vpc fixture -> engine.provision_shared_vpc); each still makes its own subnet under it (re-homed to 10.124.1-6.0/24). 6 heavy VPC creates -> 1. No-op fallback to self-create when no shared VPC exists. The 2 light networking lifecycles still self-create for coverage. See tests/crud/test_shared_vpc_adopt.py + knowledge/vpc-scheduling-strategy.md.",
+    "shared_vpc_adopt": "IMPLEMENTED (shared VPC + shared SUBNET, parallel-adopt): the 10 adopt_lifecycles carry {'adopt':'vpc'} on create-vpc/delete-vpc AND {'adopt':'subnet'} on create-subnet/delete-subnet, reusing ONE session-shared VPC (10.124.0.0/20) + ONE shared subnet (10.124.0.0/24) provisioned by engine.provision_shared_vpc. Ids flow via SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env so every pytest-xdist worker adopts the SAME live infra. ADOPT-class fixed host IPs were re-homed into the shared subnet at distinct addresses (see fixed_ip_map) to avoid collision under parallel runs. Self-create stays as fallback when no shared id is present. The 7 vpc_crud_lifecycles self-create (run serially). See tests/crud/test_shared_vpc_adopt.py + knowledge/vpc-scheduling-strategy.md.",
     "durable_fix": "Remaining (to make a single un-sharded run fully self-regulating): (1) share ONE core.budgets.Budget across the pytest session and Budget.sync('vpc'/'private-dns', live_count) from a real list call before creates (the pytest driver currently builds a fresh Budget per lifecycle and never syncs, so the reserve gate sees a phantom 5 free); (2) drain-wait on GET /v1/vpcs after a VPC teardown before the next VPC create; (3) reorder so heavy-shared-networking is not last, or rely on (1)+(2)."
   },
   "prerequisites": {

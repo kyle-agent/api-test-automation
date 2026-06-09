@@ -34,7 +34,8 @@
           "json": {"name": "regrsub{unique}", "description": "API regression lb", "cidr": "10.124.5.0/24", "type": "GENERAL", "vpc_id": "{vpc_id}", "tags": []},
           "capture": {"subnet_id": "$.subnet.id"},
           "expect_status": [200, 201, 202],
-          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"}
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"},
+          "adopt": "subnet"
         },
         {
           "name": "wait-subnet",
@@ -58,7 +59,7 @@
               "layer_type": "L4",
               "name": "regrlb{ualpha}",
               "publicip_id": "",
-              "service_ip": "10.124.5.100",
+              "service_ip": "10.124.0.30",
               "source_nat_ip": "",
               "subnet_id": "{subnet_id}",
               "tags": [],
@@ -133,7 +134,7 @@
           "json": {
             "members": [
               {
-                "member_ip": "10.124.5.50",
+                "member_ip": "10.124.0.31",
                 "member_port": 80,
                 "member_state": "ENABLE",
                 "member_weight": 100,
@@ -283,7 +284,8 @@
           "destructive": true,
           "retry_on_status": [409],
           "retries": 40,
-          "retry_interval": 30
+          "retry_interval": 30,
+          "adopt": "subnet"
         },
         {
           "name": "wait-subnet-gone",
@@ -291,7 +293,8 @@
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
           "expect_status": [200, 404],
-          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15},
+          "adopt": "subnet"
         },
         {
           "name": "delete-vpc",

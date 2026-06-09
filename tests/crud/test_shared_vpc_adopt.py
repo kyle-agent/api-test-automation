@@ -119,3 +119,53 @@ def test_provision_shared_vpc_noop_without_mutations():
     assert shared == {}
     teardown()  # must be safe
     assert client.calls == []
+
+
+# --------------------------------------------------------------------------- #
+# shared SUBNET adoption + env-aware provisioning (parallel-adopt design)
+# --------------------------------------------------------------------------- #
+def _heavy_lc_subnet_adopt():
+    """Heavy lifecycle that adopts BOTH the shared vpc AND the shared subnet."""
+    lc = _heavy_lc()
+    for s in lc["steps"]:
+        if s["name"] in ("create-subnet", "delete-subnet"):
+            s["adopt"] = "subnet"
+    return lc
+
+
+def test_provision_shared_vpc_creates_subnet_and_tears_down_child_first():
+    client = FakeClient({
+        ("POST", "/v1/vpcs"): _r(201, {"vpc": {"id": "shared-1", "state": "ACTIVE"}}),
+        ("GET", "/v1/vpcs/"): _r(200, {"vpc": {"id": "shared-1", "state": "ACTIVE"}}),
+        ("POST", "/v1/subnets"): _r(201, {"subnet": {"id": "sub-1", "state": "ACTIVE"}}),
+        ("GET", "/v1/subnets/"): _r(200, {"subnet": {"id": "sub-1", "state": "ACTIVE"}}),
+    })
+    shared, teardown = engine.provision_shared_vpc(client, _cfg())
+    assert shared == {"shared_vpc_id": "shared-1", "shared_subnet_id": "sub-1"}, shared
+    assert ("POST", "/v1/subnets") in client.calls
+    teardown()
+    # teardown deletes the SUBNET before the VPC (child before parent)
+    dels = [c for c in client.calls if c[0] == "DELETE"]
+    assert dels.index(("DELETE", "/v1/subnets/sub-1")) < \
+        dels.index(("DELETE", "/v1/vpcs/shared-1")), client.calls
+
+
+def test_adopt_shared_subnet_skips_subnet_create_and_delete():
+    # No POST/DELETE on /v1/subnets at all — both are adopted (retained).
+    client = FakeClient({})
+    res = engine.run_lifecycle(
+        _heavy_lc_subnet_adopt(), client, _cfg(),
+        shared_ctx={"shared_vpc_id": "shared-9", "shared_subnet_id": "sub-9"})
+    assert res["status"] == "passed", res
+    assert client.methods_on("/v1/vpcs") == [], client.calls
+    assert client.methods_on("/v1/subnets") == [], client.calls
+
+
+def test_env_ids_adopt_without_creating_and_teardown_is_noop(monkeypatch):
+    monkeypatch.setenv("SCP_SHARED_VPC_ID", "env-vpc-7")
+    monkeypatch.setenv("SCP_SHARED_SUBNET_ID", "env-sub-7")
+    client = FakeClient({})
+    shared, teardown = engine.provision_shared_vpc(client, _cfg())
+    assert shared == {"shared_vpc_id": "env-vpc-7", "shared_subnet_id": "env-sub-7"}
+    teardown()  # must be a no-op (the provisioner owns teardown)
+    assert client.calls == [], client.calls

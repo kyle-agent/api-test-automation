@@ -107,7 +107,13 @@ class ResourceRegistry:
 
     def __init__(self, path: str | os.PathLike | None = None):
         self.records: list[ResourceRecord] = []
-        self.path = Path(path or f"reports/registry/{run_id()}.jsonl")
+        # Under pytest-xdist, key the manifest by worker (…-gw0.jsonl) so parallel
+        # workers don't interleave appends into ONE run-id file (corrupting lines /
+        # confusing the reconciler). The reconciler globs reports/registry/*.jsonl,
+        # so per-worker shards are picked up without a merge.
+        worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+        suffix = f"-{worker}" if worker else ""
+        self.path = Path(path or f"reports/registry/{run_id()}{suffix}.jsonl")
 
     def track(self, rec: ResourceRecord) -> ResourceRecord:
         self.records.append(rec)

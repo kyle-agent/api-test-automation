@@ -28,12 +28,38 @@ def client(cfg):
 
 @pytest.fixture(scope="session")
 def shared_vpc(client, cfg):
-    """One VPC shared by the heavy CRUD lifecycles that {"adopt": "vpc"} it, so
-    they don't each consume a slot against the 5-VPC cap (see
-    knowledge/vpc-scheduling-strategy.md). Only provisioned for heavy mutating
-    runs; otherwise yields {} and lifecycles self-create as before. Torn down
-    once at session end (the tag-scoped sweep is the backstop)."""
+    """One VPC + one subnet shared by the ADOPT-class CRUD lifecycles (they carry
+    {"adopt":"vpc"}/{"adopt":"subnet"}) so they don't each consume a slot against
+    the 5-VPC cap (knowledge/vpc-scheduling-strategy.md).
+
+    xdist-safe — three modes:
+      * env ids set (SCP_SHARED_VPC_ID[/SUBNET_ID]) -> adopt the already-live
+        infra, NO creation, NO teardown (the provisioner that set the env owns
+        teardown). This is the CI path: shared_infra --provision creates once,
+        all xdist workers adopt the same ids.
+      * else, running UNDER an xdist worker (PYTEST_XDIST_WORKER set) but no env
+        ids -> yield {} (never provision per-worker; that would race + multiply
+        VPCs). Workers in this state self-create per lifecycle as before.
+      * else (single-process, no env ids) -> provision once + tear down at
+        session end, exactly as before. Only for heavy mutating runs; otherwise
+        yield {} and lifecycles self-create.
+    """
+    import os
     from regression.scenarios import engine
+
+    # 1) adopt pre-provisioned live infra by env (provision_shared_vpc is itself
+    #    env-aware: it returns the env ids + a no-op teardown).
+    if os.environ.get("SCP_SHARED_VPC_ID", "").strip():
+        shared_ctx, _ = engine.provision_shared_vpc(client, cfg)
+        yield shared_ctx
+        return
+
+    # 2) under an xdist worker without env ids: never provision per-worker.
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        yield {}
+        return
+
+    # 3) single-process: provision once (heavy mutating runs only) + teardown.
     if not (getattr(cfg, "allow_mutations", False) and getattr(cfg, "run_heavy", False)):
         yield {}
         return
