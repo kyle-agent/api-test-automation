@@ -95,7 +95,15 @@ def provision():
         _eprint("[shared_infra] SCP_ALLOW_MUTATIONS not set — nothing to provision "
                 "(adopters self-create); printing no env ids.")
         return 0
-    shared_ctx, _teardown = engine.provision_shared_vpc(client, cfg)
+    # engine.provision_shared_vpc emits human diagnostics via plain print() ->
+    # STDOUT. This entrypoint's STDOUT is redirected to $GITHUB_ENV by the
+    # workflow, where ONLY well-formed `KEY=VALUE` lines are legal — a stray
+    # "  shared VPC provisioned: ..." line makes the runner fail the step with
+    # "Invalid format". So capture the engine's stdout onto STDERR and let ONLY
+    # our explicit SCP_SHARED_*= lines below reach STDOUT.
+    import contextlib
+    with contextlib.redirect_stdout(sys.stderr):
+        shared_ctx, _teardown = engine.provision_shared_vpc(client, cfg)
     if not shared_ctx:
         _eprint("[shared_infra] could not provision shared VPC; adopters will "
                 "self-create.")
