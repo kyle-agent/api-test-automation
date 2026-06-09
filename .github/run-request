@@ -1,0 +1,11 @@
+# Touch this file (change anything) and push to trigger a LIVE api-test run on
+# this branch. KEY=VALUE options below are parsed by the spec job and gate the
+# run (mutations/destructive/heavy/conformance/category/service/crud_filter).
+#
+# request: sweep orphaned servicewatch log groups (stream-first delete fix);
+#          scoped smoke + servicewatch CRUD to validate the lifecycle teardown.
+mutations=true
+destructive=true
+category=management
+service=servicewatch
+crud_filter=servicewatch
