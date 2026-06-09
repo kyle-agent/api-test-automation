@@ -235,11 +235,34 @@ def reachable_ceiling(cat, lifecycles):
 
 
 
-def per_service(cat, tsv_rows, write_hit):
+def endpoint_verdicts(cat, tsv_rows):
+    """Map each OBSERVED catalog endpoint key -> runtime verdict.
+
+    Restricted to catalog keys on purpose: the CRUD engine also records each
+    write step under a synthetic ``"<lifecycle>:<step>"`` key (engine.py), which
+    is NOT a catalog endpoint. Counting those in the coverage numerator is what
+    pushed the headline past 100% (e.g. 131.5%) — they are excluded here.
+
+      * verified — saw a 2xx at least once (the operation actually worked)
+      * failed   — saw a 5xx / hard auth-fail (and never a 2xx)
+      * reached  — only ever 4xx (400/403/404/409/422): the endpoint was CALLED
+                   but NOT verified. A POST/DELETE that 404s created/deleted
+                   nothing, so it is "도달(reached)", never "covered".
+    """
+    cat_keys = {e["key"] for e in cat}
+    obs = defaultdict(set)
+    for _status, category, key, *_rest in tsv_rows:
+        if key in cat_keys:
+            obs[key].add(category)
+    return {k: ("verified" if "ok" in cs else "failed" if "fail" in cs else "reached")
+            for k, cs in obs.items()}
+
+
+def per_service(cat, tsv_rows):
     called = {}
     for status, _category, key, _method, _path, *_rest in tsv_rows:
         called[key] = (status, _rest[0] if _rest else None)
-    tested_keys = set(called) or smoke_tested_keys(cat)
+    verdict = endpoint_verdicts(cat, tsv_rows)
 
     groups = defaultdict(list)
     for e in cat:
@@ -247,24 +270,25 @@ def per_service(cat, tsv_rows, write_hit):
 
     services = []
     for (category, service), ents in groups.items():
-        rows, covn = [], 0
+        rows, covn, reachn = [], 0, 0
         gtot = gcov = wtot = wcov = 0
         for e in sorted(ents, key=lambda x: (x["method"], x["_norm"])):
+            v = verdict.get(e["key"])          # None | verified | reached | failed
+            covered = (v == "verified")        # "covered" == 검증(2xx)됨
             if e["method"] == "GET":
                 gtot += 1
-                covered = e["key"] in tested_keys
                 gcov += covered
             else:
                 wtot += 1
-                covered = (e["method"], e["_norm"]) in write_hit
                 wcov += covered
             covn += covered
+            reachn += (v == "reached")
             st_el = called.get(e["key"]) or (None, None)
             rows.append((e["method"], e["http_path"], e.get("name", ""),
-                         bool(covered), st_el[0], st_el[1]))
+                         bool(covered), st_el[0], st_el[1], v or ""))
         services.append({
             "category": category, "service": service, "slug": slug(category, service),
-            "total": len(ents), "covered": covn,
+            "total": len(ents), "covered": covn, "reached": reachn,
             "gtot": gtot, "gcov": gcov, "wtot": wtot, "wcov": wcov, "rows": rows})
     services.sort(key=lambda s: (s["category"], s["covered"] / (s["total"] or 1), s["service"]))
     return services
@@ -281,9 +305,21 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
     get_total = sum(cat_get.values())
     nonget_total = total - get_total
 
-    tested_keys = {r[2] for r in tsv_rows} or smoke_tested_keys(cat)
     key_cat = {e["key"]: e["category"] for e in cat}
-    cat_tested = Counter(key_cat.get(k, "?") for k in tested_keys)
+    get_keys = {e["key"] for e in cat if e["method"] == "GET"}
+
+    # Per-endpoint runtime verdict (catalog keys only). "covered" == verified
+    # (2xx); "reached" == called but only 4xx (도달했으나 미검증) — a 404'd
+    # POST/DELETE lands here, NOT in covered.
+    verdict = endpoint_verdicts(cat, tsv_rows)
+    verified = {k for k, v in verdict.items() if v == "verified"}
+    reached = {k for k, v in verdict.items() if v == "reached"}
+    touched = set(verdict)                       # any catalog endpoint observed
+    get_verified = verified & get_keys
+    write_verified = verified - get_keys
+    write_reached = reached - get_keys           # 미검증 write 엔드포인트
+
+    cat_tested = Counter(key_cat[k] for k in get_verified)  # 카테고리 막대 = 검증된 GET
 
     dist = Counter(r[0] for r in tsv_rows)
     cats = Counter(r[1] for r in tsv_rows)
@@ -296,10 +332,12 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
             (known_red if key in known_keys else new_regressions).append(
                 (key, status, path))
 
-    write_hit = crud_write_ops(lifecycles, cat)
-    cov_op = len(tested_keys) / total * 100 if total else 0
-    cov_get = len(tested_keys) / get_total * 100 if get_total else 0
-    cov_write = len(write_hit) / nonget_total * 100 if nonget_total else 0
+    # Headline coverage = VERIFIED (real 2xx). Reachability (verified+reached)
+    # is reported SEPARATELY so a 404'd write is never counted as covered.
+    cov_op = len(verified) / total * 100 if total else 0
+    reach_measured_pct = len(touched) / total * 100 if total else 0
+    cov_get = len(get_verified) / get_total * 100 if get_total else 0
+    cov_write = len(write_verified) / nonget_total * 100 if nonget_total else 0
 
     param_attempted = len(param_rows)
     param_accepted = sum(1 for r in param_rows if 200 <= r[0] < 300)
@@ -314,10 +352,14 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
         crud_rows.append((lc["id"], kind, st, len(lc.get("steps", []))))
 
     return {
-        "total": total, "tested": len(tested_keys),
+        "total": total, "tested": len(touched),
+        "verified": len(verified), "reached": len(reached),
+        "reach_measured_pct": reach_measured_pct,
+        "get_verified": len(get_verified),
+        "write_verified": len(write_verified), "write_reached": len(write_reached),
         "cov_op": cov_op, "cov_get": cov_get, "cov_write": cov_write,
         "get_total": get_total, "nonget_total": nonget_total,
-        "write_hit": len(write_hit),
+        "write_hit": len(write_verified),
         "ok": ok, "soft": soft,
         "cov_param": cov_param, "param_attempted": param_attempted,
         "param_accepted": param_accepted,
@@ -532,9 +574,15 @@ def render_service_page(s, meta):
 
     conf = (meta.get("conf") or {}).get("by_endpoint", {})
     rows = []
-    for method, path, title, covered, st, el in s["rows"]:
-        chk = ('<span style="color:#2da44e">✓</span>' if covered
-               else '<span class="mut">·</span>')
+    for method, path, title, covered, st, el, verd in s["rows"]:
+        if covered:
+            chk = '<span style="color:#2da44e">✓</span>'
+        elif verd == "reached":
+            chk = '<span style="color:#8250df" title="호출됨·4xx 미검증">◑</span>'
+        elif verd == "failed":
+            chk = '<span style="color:#cf222e" title="5xx/auth fail">⛔</span>'
+        else:
+            chk = '<span class="mut">·</span>'
         rcls = "" if covered else ' class="unc"'
         key = f'{s["category"]}/{s["service"]}/{title}'
         cc = conf_cell(conf.get(key, {"status": "green", "items": []}))
@@ -553,9 +601,10 @@ def render_service_page(s, meta):
         f'<div class="bc"><a href="../index.html">← 대시보드</a> &nbsp;/&nbsp; {category} &nbsp;/&nbsp; <b>{svc}</b></div>'
         f'<h1>{svc} <span class="mut">{category}</span></h1>'
         f'<div class="sum"><div class="s-big">{pct:.0f}%</div>'
-        f'<div class="mut">operation 커버 ({s["covered"]}/{s["total"]})</div>'
+        f'<div class="mut">검증(2xx) 커버 ({s["covered"]}/{s["total"]}) '
+        f'&nbsp;·&nbsp; <span style="color:#8250df">◑ 도달·미검증 {s["reached"]}</span></div>'
         f'<div class="s-sub">읽기 GET {s["gcov"]}/{s["gtot"]} ({gpct:.0f}%) '
-        f'&nbsp;·&nbsp; 쓰기 {s["wcov"]}/{s["wtot"]} ({wpct:.0f}%)</div></div>'
+        f'&nbsp;·&nbsp; 쓰기 {s["wcov"]}/{s["wtot"]} ({wpct:.0f}%) &nbsp;— 모두 2xx 기준</div></div>'
         f'<p class="mut" style="margin:4px 0 10px">컬럼 구분 — <b>최근 status</b>: 회귀 테스트의 '
         f'실제 호출 응답(테스트 수행 성공 여부) · <b>설계/동작 결함</b>: 호출 성공 여부와 별개로 '
         f'정적+런타임 점검에서 찾은 개선/결함(클릭 시 상세). 빈칸 status는 미호출(커버 X).</p>'
@@ -641,6 +690,8 @@ def render(d, hist, meta, services):
         conformance_section=render_conformance_section(meta.get("conf", {})),
         badge=badge, cards=cards, donut=donut(segs, called), legend=legend,
         cov_op=f'{d["cov_op"]:.1f}', tested=d["tested"], total=d["total"],
+        verified=d["verified"], reach_measured=f'{d["reach_measured_pct"]:.1f}',
+        get_verified=d["get_verified"], write_reached=d["write_reached"],
         reach_pct=f'{d.get("reachable_pct", 0):.1f}', reachable=d.get("reachable", 0),
         gap_write=d.get("gap_write", 0), gap_getid=d.get("gap_getid", 0),
         run_scope=run_scope,
@@ -710,10 +761,12 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <div class="panel"><h2>커버리지</h2>
 <div style="display:flex;gap:28px;align-items:baseline;flex-wrap:wrap">
 <div><div class="bignum" style="color:#2da44e">{reach_pct}%</div><div class="mut">도달가능 ceiling ({reachable}/{total} · 시나리오 기준, 안정)</div></div>
-<div><div class="bignum" style="color:#0969da">{cov_op}%</div><div class="mut">측정·이번 run ({tested}/{total} · {run_scope})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">읽기 GET ({tested}/{get_total})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">쓰기 CRUD ({write_hit}/{nonget_total})</div></div>{param_stat}</div>
-<div class="mut" style="margin-top:8px">남은 gap → write <b>{gap_write}</b> · id-bound GET <b>{gap_getid}</b> &nbsp;(다음 개선 대상; write=시나리오 추가, id-GET=read-chain/probe로 런타임 자동 도달)</div>
+<div><div class="bignum" style="color:#0969da">{cov_op}%</div><div class="mut">측정·검증 2xx ({verified}/{total} · {run_scope})</div></div>
+<div><div style="font-size:22px;font-weight:700;color:#8250df">{reach_measured}%</div><div class="mut">측정·도달 called ({tested}/{total})</div></div>
+<div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">읽기 GET 검증 ({get_verified}/{get_total})</div></div>
+<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">쓰기 검증 ({write_hit}/{nonget_total}) · 미검증 {write_reached}</div></div>{param_stat}</div>
+<div class="mut" style="margin-top:8px"><b>검증(2xx)</b>=실제로 동작 확인됨 = "covered" · <b>도달</b>=호출됐으나 4xx(404 포함, 미검증). 404 POST/DELETE는 아무것도 생성/삭제 안 했으므로 도달일 뿐 covered 아님.</div>
+<div class="mut" style="margin-top:6px">남은 gap → write <b>{gap_write}</b> · id-bound GET <b>{gap_getid}</b> &nbsp;(다음 개선 대상; write=시나리오 추가, id-GET=read-chain/probe로 런타임 자동 도달)</div>
 <div class="mut" style="margin-top:12px">측정 축 (swagger-coverage/ReadyAPI 기준)</div>
 <div class="axes"><span class="ax on">✓ operation</span><span class="ax part">◑ status-code</span>
 <span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax {paramax_cls}">{paramax} parameter</span><span class="ax off">✗ schema</span></div></div>
@@ -724,8 +777,9 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <section><div class="grid2">
 <div class="panel"><h2>실패 분류</h2><table>
 <tr><th>분류</th><th>수</th><th>의미</th></tr>
-<tr><td>✅ ok (2xx)</td><td>{ok}</td><td>정상</td></tr>
-<tr><td>🟡 soft (4xx)</td><td>{soft}</td><td>파라미터/권한/엔타이틀먼트 한계</td></tr>
+<tr><td>✅ 검증(2xx) 엔드포인트</td><td>{verified}</td><td>실제 동작 확인 = covered</td></tr>
+<tr><td>◑ 미검증(도달) write</td><td>{write_reached}</td><td>호출됐으나 4xx(404 포함) — 생성/삭제 미발생, covered 아님</td></tr>
+<tr><td>🟡 soft 호출 (4xx)</td><td>{soft}</td><td>파라미터/권한/엔타이틀먼트 한계 (call 단위)</td></tr>
 <tr><td>⛔ new regression</td><td><b class="badge {new_cls}" style="border:0;background:0;padding:0">{fail_new}</b></td><td>새로 깨진 5xx/auth — 알림 대상</td></tr>
 <tr><td>🔴 known-red</td><td>{fail_known}</td><td>등록된 백엔드 버그(known_issues)</td></tr></table></div>
 <div class="panel"><h2>CRUD 라이프사이클</h2><div class="crudgrid">{crudgrid}</div></div>
@@ -843,7 +897,7 @@ def build(
     d["crud_ran"] = (any(o.get("source") == "crud_probe" for o in unified_obs)
                      or any(v == "pass" for v in crud_results.values()))
     hist = append_history(history, d, run_type, sha)
-    services = per_service(cat, tsv_rows, crud_write_ops(lc_data, cat))
+    services = per_service(cat, tsv_rows)
 
     meta = {
         "branch": branch,
@@ -871,8 +925,9 @@ def build(
         f"dashboard -> {out}  "
         f"(source: {source_label}; "
         f"reachable {d.get('reachable_pct', 0):.1f}% ceiling (gap write {d.get('gap_write', 0)} / id-GET {d.get('gap_getid', 0)}); "
-        f"measured {d['cov_op']:.1f}% op ({'full CRUD' if d.get('crud_ran') else 'read-only'}), "
-        f"{d['cov_get']:.1f}% GET, {d['cov_write']:.1f}% write; "
+        f"measured-verified {d['cov_op']:.1f}% op ({d['verified']}/{d['total']}, {'full CRUD' if d.get('crud_ran') else 'read-only'}), "
+        f"measured-reached {d['reach_measured_pct']:.1f}% ({d['tested']}/{d['total']}); "
+        f"{d['cov_get']:.1f}% GET-verified, {d['cov_write']:.1f}% write-verified (write reached-but-unverified {d['write_reached']}); "
         f"ok {d['ok']} soft {d['soft']} new {d['fail_new']} known {d['fail_known']}; "
         f"{len(hist)} history rows; {len(services)} service pages)"
     )
