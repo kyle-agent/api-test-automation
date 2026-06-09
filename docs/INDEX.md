@@ -12,6 +12,12 @@ work-in-progress notes.
 - When the effort lands, mark the doc `done` here (don't delete — it's history).
 - Add every new handoff to the table below.
 
+## Proposals / standards (draft until approved)
+
+| Doc | Topic | Status |
+|-----|-------|--------|
+| [`COVERAGE-CRITERIA.md`](COVERAGE-CRITERIA.md) | The C0–C4 coverage ladder + waiver mechanism — what "100%" means | **draft, awaiting review** |
+
 ## Handoffs
 
 | Doc | Topic | Status |
