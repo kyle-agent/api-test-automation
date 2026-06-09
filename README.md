@@ -196,9 +196,12 @@ to `data/baselines/known_issues.json` so only genuinely new breakage alarms.
 
 **Triggers are on-demand only** (live runs are expensive — no cron, no per-push
 runs): touch **`.github/run-request`** and push (runs on that branch; this is
-how a chat session starts a run), or use **workflow_dispatch** for explicit
-inputs (mutations/heavy/filters). Ordinary pushes/PRs run only the cheap
-offline gate `validate.yml` (scenario + knowledge validation, no credentials).
+how a chat session starts a run), or use **workflow_dispatch**. File-triggered
+runs read `KEY=VALUE` options from the run-request file itself —
+`mutations/destructive/heavy/conformance/category/service/crud_filter` — so
+every dispatch capability is chat-controllable. Ordinary pushes/PRs run only
+the cheap offline gate `validate.yml` (scenario + knowledge validation, no
+credentials).
 **Conformance** is further gated: it runs only when the spec actually changed
 (catalog refresh diff), on `claude/run-conformance`/`run-schema-live` pushes,
 with dispatch `run_conformance=true`, or repo var `SCP_RUN_CONFORMANCE=true` —

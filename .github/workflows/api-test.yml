@@ -21,9 +21,10 @@ on:
   #   * workflow_dispatch                   -> runs with explicit inputs
   # Ordinary pushes/PRs do NOT trigger this workflow — the cheap offline
   # validation lives in validate.yml and runs on every PR instead.
-  # To run conformance: push a run-request touch to claude/run-conformance
-  # (or claude/run-schema-live for the BILLABLE schema-live probe), or
-  # dispatch with run_conformance=true.
+  # File-triggered runs read KEY=VALUE options from the run-request file
+  # itself (mutations/destructive/heavy/conformance/category/service/
+  # crud_filter) — parsed by the spec job, honored by every gate. So a chat
+  # session can start ANY kind of run by writing the file and pushing.
   push:
     # The file does not need to pre-exist: creating or editing it in a push is
     # the trigger. Keep it OUT of unrelated commits so merges stay silent.
@@ -140,8 +141,36 @@ jobs:
       # 'true' only when a catalog refresh actually changed the spec — used to
       # gate the conformance job (no point re-judging an unchanged spec).
       spec_changed: ${{ steps.specdiff.outputs.spec_changed || 'false' }}
+      # Options parsed from .github/run-request (file-triggered runs only —
+      # the chat-controllable equivalent of workflow_dispatch inputs).
+      req_mutations: ${{ steps.req.outputs.mutations }}
+      req_destructive: ${{ steps.req.outputs.destructive }}
+      req_heavy: ${{ steps.req.outputs.heavy }}
+      req_conformance: ${{ steps.req.outputs.conformance }}
+      req_category: ${{ steps.req.outputs.category }}
+      req_service: ${{ steps.req.outputs.service }}
+      req_crud_filter: ${{ steps.req.outputs.crud_filter }}
     steps:
       - uses: actions/checkout@v4
+      - name: Parse .github/run-request (file-triggered run options)
+        id: req
+        # KEY=VALUE lines (last one wins; # comments ignored). Only honored for
+        # push (file-touch) events so dispatch inputs stay authoritative there.
+        run: |
+          f=.github/run-request
+          get() { grep -E "^$1=" "$f" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]'; }
+          if [ "${{ github.event_name }}" = "push" ] && [ -f "$f" ]; then
+            {
+              echo "mutations=$(get mutations)"
+              echo "destructive=$(get destructive)"
+              echo "heavy=$(get heavy)"
+              echo "conformance=$(get conformance)"
+              echo "category=$(get category)"
+              echo "service=$(get service)"
+              echo "crud_filter=$(get crud_filter)"
+            } >> "$GITHUB_OUTPUT"
+            echo "run-request options:"; grep -E '^[a-z_]+=' "$f" || echo "(none — read-only smoke run)"
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -226,10 +255,10 @@ jobs:
     env:
       # --- safety gates (default OFF) -------------------------------------
       # Enabled by manual dispatch OR repo var SCP_RUN_CRUD=true (opt a PR in).
-      SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
-      SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+      SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+      SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       # Heavy lifecycles run ONLY via dispatch run_heavy=true (or repo var).
-      SCP_RUN_HEAVY: ${{ (github.event.inputs.run_heavy == 'true' || vars.SCP_RUN_HEAVY == 'true') }}
+      SCP_RUN_HEAVY: ${{ (github.event.inputs.run_heavy == 'true' || needs.spec.outputs.req_heavy == 'true' || vars.SCP_RUN_HEAVY == 'true') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -250,8 +279,8 @@ jobs:
         env:
           PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY }}
           PR_SERVICE: ${{ vars.SCP_PR_SERVICE }}
-          DISPATCH_CATEGORY: ${{ github.event.inputs.category }}
-          DISPATCH_SERVICE: ${{ github.event.inputs.service }}
+          DISPATCH_CATEGORY: ${{ github.event.inputs.category || needs.spec.outputs.req_category }}
+          DISPATCH_SERVICE: ${{ github.event.inputs.service || needs.spec.outputs.req_service }}
         run: |
           mkdir -p reports
           ARGS="tests/smoke -m smoke"
@@ -338,7 +367,7 @@ jobs:
         # the workflow never hardcodes the classification. PARALLEL_K is the exact
         # complement of VPC_CRUD_K -> the two CRUD passes partition all enabled
         # CRUD lifecycles. Written to $GITHUB_ENV for the run steps below.
-        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         run: |
           python -m regression.scenarios.shared_infra --print-filters >> "$GITHUB_ENV"
           echo "derived ADOPT_K / VPC_CRUD_K / PARALLEL_K -> \$GITHUB_ENV"
@@ -349,7 +378,7 @@ jobs:
         # subsequent pytest (and each xdist worker) ADOPTS the same live infra
         # instead of provisioning per-worker. No-op (prints nothing) if mutations
         # are off. Diagnostics go to stderr; only the SCP_SHARED_* lines hit env.
-        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         run: |
           # Capture stdout to a file, then append ONLY well-formed SCP_SHARED_*=
           # lines to $GITHUB_ENV. This is the robust guard: even if anything
@@ -367,9 +396,9 @@ jobs:
         # env ids, so they only create their own child resource -> safe to run in
         # parallel with pytest-xdist -n 6. A manual crud_filter (dispatch) or the
         # heavy.txt self-trigger filter is ANDed in to NARROW within the pass.
-        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
-          CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
+          CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}
         run: |
           echo "Running ADOPT-class CRUD in parallel (-n 6)" | tee reports/crud.log
           MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
@@ -387,7 +416,7 @@ jobs:
         # do NOT use the shared VPC, so tearing it down here is safe. Idempotent
         # (the final always() teardown below is a no-op backstop). No-op without
         # SCP_ALLOW_DESTRUCTIVE.
-        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         run: |
           python -m regression.scenarios.shared_infra --teardown || true
 
@@ -399,9 +428,9 @@ jobs:
         # lifecycle uses a UNIQUE, non-overlapping CIDR and subnets carved within
         # it (knowledge/domain-constraints.md). Runs even if the parallel pass had
         # failures (separate -k).
-        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
-          CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
+          CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}
         run: |
           echo "Running VPC-CRUD class serially (-n 0)" | tee -a reports/crud.log
           MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
@@ -420,7 +449,7 @@ jobs:
         # smoke TSV shards into reports/smoke_status.tsv; and merge the two CRUD
         # junit files into one reports/junit-crud.xml. Registry shards are left
         # as-is (the reconciler globs reports/registry/*.jsonl).
-        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -453,12 +482,12 @@ jobs:
         # Always tear down (subnet then vpc) so a failed CRUD pass doesn't strand
         # the shared infra; the tag-scoped reconciler sweep is the backstop. No-op
         # without SCP_ALLOW_DESTRUCTIVE.
-        if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         run: |
           python -m regression.scenarios.shared_infra --teardown || true
 
       - name: Comment CRUD result on PR
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
@@ -506,8 +535,8 @@ jobs:
   # ---------------------------------------------------------------------------
   sweep:
     name: Sweep (cleanup.reconciler, tag-scoped)
-    needs: regression
-    if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+    needs: [spec, regression]
+    if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_mutations == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -517,8 +546,8 @@ jobs:
       # The client blocks DELETE unless BOTH gates are set; the reconciler is
       # safe because it is tag-scoped (deletes only this run's owned/expired
       # resources), not because of these gates.
-      SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
-      SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+      SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_mutations == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+      SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -580,6 +609,7 @@ jobs:
     if: ${{ !cancelled() && (
           (github.event_name == 'push' && (github.ref_name == 'claude/run-conformance' || github.ref_name == 'claude/run-schema-live')) ||
           github.event.inputs.run_conformance == 'true' ||
+          needs.spec.outputs.req_conformance == 'true' ||
           vars.SCP_RUN_CONFORMANCE == 'true' ||
           needs.spec.outputs.spec_changed == 'true') }}
     runs-on: ubuntu-latest
