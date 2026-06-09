@@ -3900,7 +3900,12 @@
             200,
             202,
             204
-          ]
+          ],
+          "retry_on_status": [
+            401
+          ],
+          "retries": 4,
+          "retry_interval": 20
         },
         {
           "name": "wait-after-unset-backup",
@@ -4425,6 +4430,11 @@
             202,
             204
           ],
+          "retry_on_status": [
+            401
+          ],
+          "retries": 4,
+          "retry_interval": 20,
           "destructive": true
         },
         {
