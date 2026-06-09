@@ -1,0 +1,314 @@
+{
+  "lifecycles": [
+    {
+      "id": "networking-loadbalancer-members-nat",
+      "service": "networking/loadbalancer",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Loadbalancer server-group MEMBERS + static-NAT write coverage (Wave 2, NOT runtime-proven, HEAVY/billable). The 8 uncovered LB writes all hang off a real loadbalancer / lb-server-group, so this lifecycle stands up a minimal LB stack under the session-shared VPC (adopt:vpc — does NOT self-create a VPC) and creates its OWN subnet under it (the heavy lifecycles share the VPC but each make their own subnet, per vpc-scheduling-strategy.md): subnet -> lb -> lb-health-check -> lb-server-group (bodies mirror the proven heavy-shared-networking LB chain). Then it exercises members (add -> set -> remove-single -> remove-bulk) and static-nats (public static-nat create/delete on the loadbalancer, private static-nat create/delete). MEMBERS family: addlbservergroupmembers POST returns $.members[0].id (soft-captured into member_id from response_example); set/remove-single reference {member_id}; remove-bulk uses {member_id_list:[{member_id}]}. member_ip is an arbitrary in-subnet IP — no backend VM required to register a member. STATIC-NAT family: createloadbalancerpublicnatip needs a real publicip_id and createloadbalancerprivatenatip needs private_nat_id+private_nat_ip_id — we have none, so those POSTs send empty-string ids, are OPTIONAL and 4xx-tolerant; the static_nat create returns $.static_nat.id (soft-captured) so the matching DELETE reuses it, else sends {static_nat_id} literal which still norm-matches the catalog '*' and records coverage. All families are isolated optional groups so one bad body skips only its family (cleaned up children-first). layer_type:L4 + LB enum guesses inherit the heavy-shared-networking UNVALIDATED caveat. Covers all 8 LB WRITE ops: POST/DELETE /v1/lb-server-groups/{id}/members, PUT/DELETE /v1/lb-server-groups/{id}/members/{member_id}, POST/DELETE /v1/loadbalancers/{id}/static-nats, POST/DELETE /v1/loadbalancers/{id}/private-static-nats.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {"name": "regrvpc{unique}", "description": "API regression lb", "cidr": "10.124.0.0/20", "tags": []},
+          "capture": {"vpc_id": "$.vpc.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE", "CREATED", "RUNNING"], "timeout": 300, "interval": 10}
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {"name": "regrsub{unique}", "description": "API regression lb", "cidr": "10.124.5.0/24", "type": "GENERAL", "vpc_id": "{vpc_id}", "tags": []},
+          "capture": {"subnet_id": "$.subnet.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"},
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 300, "interval": 10}
+        },
+        {
+          "name": "lb-create",
+          "method": "POST",
+          "path": "/v1/loadbalancers",
+          "group": "lb",
+          "optional": true,
+          "json": {
+            "loadbalancer": {
+              "description": "API regression suite",
+              "firewall_enabled": false,
+              "firewall_logging_enabled": false,
+              "layer_type": "L4",
+              "name": "regrlb{ualpha}",
+              "publicip_id": "",
+              "service_ip": "10.124.0.30",
+              "source_nat_ip": "",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture_soft": {"loadbalancer_id": "$.loadbalancer.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/loadbalancers/{loadbalancer_id}", "service": "loadbalancer"}
+        },
+        {
+          "name": "lb-wait",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "group": "lb",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {"field": "$.loadbalancer.state", "until": ["ACTIVE", "CREATED", "RUNNING", "AVAILABLE"], "timeout": 600, "interval": 20}
+        },
+        {
+          "name": "lb-healthcheck-create",
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "group": "lb",
+          "optional": true,
+          "json": {
+            "lb_health_check": {
+              "description": "API regression suite",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "name": "regrhc{ualpha}",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture_soft": {"lb_health_check_id": "$.lb_health_check.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/lb-health-checks/{lb_health_check_id}", "service": "loadbalancer"}
+        },
+        {
+          "name": "lb-servergroup-create",
+          "method": "POST",
+          "path": "/v1/lb-server-groups",
+          "group": "lb",
+          "optional": true,
+          "json": {
+            "lb_server_group": {
+              "description": "API regression suite",
+              "lb_health_check_id": "{lb_health_check_id}",
+              "lb_method": "ROUND_ROBIN",
+              "name": "regrsg{ualpha}",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture_soft": {"lb_server_group_id": "$.lb_server_group.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/lb-server-groups/{lb_server_group_id}", "service": "loadbalancer"}
+        },
+        {
+          "name": "members-add",
+          "method": "POST",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "group": "members",
+          "optional": true,
+          "json": {
+            "members": [
+              {
+                "member_ip": "10.124.0.31",
+                "member_port": 80,
+                "member_state": "ENABLE",
+                "member_weight": 100,
+                "name": "regrmember1",
+                "object_id": "",
+                "object_type": "VM"
+              }
+            ]
+          },
+          "capture_soft": {"member_id": "$.members[0].id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "members-set",
+          "method": "PUT",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+          "group": "members",
+          "optional": true,
+          "json": {
+            "member": {
+              "member_port": 80,
+              "member_state": "ENABLE",
+              "member_weight": 100
+            }
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "members-remove-single",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+          "group": "members",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409]
+        },
+        {
+          "name": "members-remove-bulk",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "group": "members",
+          "optional": true,
+          "destructive": true,
+          "json": {"member_id_list": ["{member_id}"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409]
+        },
+        {
+          "name": "static-nat-create",
+          "method": "POST",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+          "group": "staticnat",
+          "optional": true,
+          "json": {"static_nat": {"publicip_id": ""}},
+          "capture_soft": {"static_nat_id": "$.static_nat.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "static-nat-delete",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+          "group": "staticnat",
+          "optional": true,
+          "destructive": true,
+          "json": {"static_nat_id_list": ["{static_nat_id}"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409]
+        },
+        {
+          "name": "private-static-nat-create",
+          "method": "POST",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+          "group": "privstaticnat",
+          "optional": true,
+          "json": {"static_nat": {"private_nat_id": "", "private_nat_ip_id": ""}},
+          "capture_soft": {"private_static_nat_id": "$.static_nat.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "private-static-nat-delete",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+          "group": "privstaticnat",
+          "optional": true,
+          "destructive": true,
+          "json": {"static_nat_id_list": ["{private_static_nat_id}"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409]
+        },
+        {
+          "name": "probe-lb-reads",
+          "probe_reads": {
+            "loadbalancer_id": "{loadbalancer_id}",
+            "lb_server_group_id": "{lb_server_group_id}",
+            "lb_health_check_id": "{lb_health_check_id}",
+            "member_id": "{member_id}"
+          }
+        },
+        {
+          "name": "lb-servergroup-delete",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "group": "lb",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [409],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "lb-healthcheck-delete",
+          "method": "DELETE",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "group": "lb",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [409],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "lb-delete",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "group": "lb",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [409],
+          "retries": 10,
+          "retry_interval": 20
+        },
+        {
+          "name": "lb-wait-gone",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "group": "lb",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 600, "interval": 20}
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15},
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
+    }
+  ]
+}

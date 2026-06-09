@@ -30,6 +30,13 @@ safety gates. Re-derive flags with the snippet at the bottom.
 | `iam-policy` | management/iam | IAM policy |
 | `servicewatch-loggroup-logstream` | management/servicewatch | log group + stream |
 
+> **Shared VPC (heavy):** the heavy lifecycles below no longer each create a VPC
+> — they **adopt one session-shared VPC** (`conftest.py shared_vpc` →
+> `engine.provision_shared_vpc`; `create-vpc`/`delete-vpc` steps carry
+> `{"adopt":"vpc"}`). Each still makes its own subnet under it (re-homed to
+> `10.124.1-6.0/24`). 6 VPC creates → 1; no-op fallback to self-create. See
+> `knowledge/vpc-scheduling-strategy.md`. Pending live validation.
+
 ## Heavy scenarios (billable; only with `SCP_RUN_HEAVY=true`)
 
 | Lifecycle id | Service | Notes |
@@ -76,3 +83,62 @@ python3 -c "import json;[print(f\"{l['id']:45} enabled={l.get('enabled')} heavy=
 Add a scenario = add an entry to `scenarios.json` (no new Python; the engine
 drives it) + declare any quota kinds in `dependencies.json` + record validated
 facts in `validated-facts.md`. See `agents/domain-knowledge-agent.md`.
+
+---
+
+## Coverage campaign — fragment lifecycles (Wave 1, 2026-06-08)
+
+Per-service CRUD lifecycles now also live in
+`regression/scenarios/lifecycles/<category>__<service>.json` fragments (merged by
+`regression/scenarios/loader.py`; one file per service-agent → no collisions).
+See `agents/CAMPAIGN.md`. Wave 1 closed **151 write ops across 6 services**,
+raising the static coverage ceiling **43.0% → 55.4%** (write gap 547 → ~390).
+
+| Fragment | Lifecycles | Writes | Flags |
+|----------|-----------|--------|-------|
+| `management__iam.json` | iam-role-full, -policy-extra-writes, -group-bindings, -user-policy-bindings, -resource-policy, -credentials-heavy | 35 | 5 light + 1 heavy |
+| `management__organization.json` | org-{organizations,units,accounts,service-control-policies,policy-bindings-and-delegation,invitations}-guarded | 23 | all heavy+optional (blast radius) |
+| `management__iam-identity-center.json` | idc-{instance,user,group,permission-set,account-assignment} | 19 | all heavy+optional (SSO) |
+| `management__servicewatch.json` | servicewatch-{alert,dashboard,event-rule,custom-ingest} | 16 | light |
+| `storage__baremetal-blockstorage.json` | blockstorage-{volume,volume-group} | 30 | heavy (billable) |
+| `application-service__apigateway.json` | apigateway-{api-write-coverage,privatelink-endpoint} | 28 | light |
+
+Remaining write-op gap after Wave 1: **~390 across 47 services** (top: compute/
+virtualserver 41, networking/vpc 38, then database epas/mariadb/mysql/postgresql
+~17 each, storage/archivestorage, security/kms, …). Track in
+`agents/coordination/ledger.json`. All Wave-1 bodies are docs-derived and pending
+live validation — see `knowledge/validated-facts.md` "Wave 1 facts".
+
+## Coverage campaign — Wave 2 (2026-06-08)
+
+7 cluster-agents added **30 fragment files / 49 lifecycles** closing **302 write
+ops**; static ceiling **55.4% → 78.6%** (write gap 390 → 88). Services at write-gap 0:
+networking/{vpc,loadbalancer,dns,cdn,gslb,vpn,firewall,direct-connect},
+compute/virtualserver, database/{mysql,mariadb,epas,postgresql,sqlserver,cachestore},
+storage/{archivestorage,backup,filestorage,parallel-filestorage},
+security/{kms,secretsmanager,secretvault,configinspection,certificatemanager},
+data-analytics/{data-flow,data-ops,quick-query,searchengine,vertica,eventstreams}.
+
+**Remaining write gap = 88 / ~14 services** (Wave 3 targets): compute/baremetal 12,
+container/scr 10, compute/multinodegpucluster 9, management/cloudcontrol 9,
+management/resourcemanager 9, compute/scf 7, management/loggingaudit 6,
+management/cloudmonitoring 4, ai-ml/{aimlops-platform,cloud-ml} 3 each,
+financial-management/{billingplan,budget} 3 each, platform/sts 3, container/ske 2,
+devops-tools/devopsservice 2, management/network-logging 2, networking 1.
+
+## Coverage campaign — Wave 3 (2026-06-08) — WRITE COVERAGE COMPLETE
+
+4 cluster-agents closed the final 88 writes / 17 services: compute/{baremetal,
+multinodegpucluster,scf}, container/{scr,ske}, management/{cloudcontrol,
+resourcemanager,loggingaudit,cloudmonitoring,network-logging}, ai-ml/{aimlops-
+platform,cloud-ml}, financial-management/{billingplan,budget}, platform/sts,
+devops-tools/devopsservice, networking/security-group.
+
+**Campaign result: every one of the 547 catalog write operations is now reachable
+by an enabled lifecycle (write-op gap = 0 across all 53 services).** 113 lifecycles
+total (29 base + 84 in 53 fragments). Static ceiling **43.0% → 85.6%**; the residual
+198-endpoint gap is exclusively id-bound GETs, which read-chains (list→show) and
+CRUD probe_reads discover at runtime — so measured live `cov_op` runs above the
+static figure. All bodies are docs-derived and **pending live validation** (see
+`validated-facts.md`). Next step: a lane-scheduled live CI run to convert the static
+ceiling into measured coverage.

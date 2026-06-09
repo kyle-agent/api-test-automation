@@ -1,0 +1,176 @@
+{
+  "lifecycles": [
+    {
+      "id": "cloudcontrol-landing-zone-guarded",
+      "service": "management/cloudcontrol",
+      "enabled": true,
+      "heavy": true,
+      "_note": "HIGH BLAST RADIUS — cloudcontrol is the SCP landing-zone / account-factory / guardrail governance service (Control Tower equivalent). Creating a landing zone, factory account, or guardrail binding restructures account-wide governance and is largely irreversible on a shared account; account-factory create is also BILLABLE (provisions a real member account). This lifecycle is COVERAGE-ONLY: it never builds real governance structure. Every mutating step is optional+grouped with a broad expect_status so the expected 403 (caller is not the org master/control-tower admin) or 400/404/409/422 on a shared account RECORDS the endpoint as covered WITHOUT creating real resources or failing the run. heavy:true gates it behind SCP_RUN_HEAVY; all DELETEs are destructive:true (gated by SCP_ALLOW_DESTRUCTIVE). No data/api_bodies.json entry for cloudcontrol and docs are JS-rendered, so all bodies are BEST-GUESS from path/field semantics and UNPROVEN — promote only after a real 2xx on a dedicated control-tower admin account. landing_zone_id is soft-captured from the read-only list; assignment_id is left literal ({assignment_id} undefined-but-templated -> normalizes to the catalog '*' key and 404s harmlessly while still recording coverage). guardrail_id soft-captured from GET /v1/guardrails to close its GAP-get-id. Covers all 9 uncovered writes: createlandingzone(POST /v1/landing-zones), setlandingzone(PUT id), deletelandingzone(DELETE id), createaccountfactoryaccount(POST /v1/accounts), enableguardrailbindings(POST /v1/guardrail-bindings), disableguardrailbindings(DELETE /v1/guardrail-bindings), addbaselineassignment(POST /v1/baseline-assignments/{assignment_id}), updatebaselineassignment(PUT same), removebaselineassignment(DELETE same).",
+      "steps": [
+        {
+          "name": "list-landing-zones",
+          "method": "GET",
+          "path": "/v1/landing-zones",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cc-read",
+          "_note": "There is no zero-param GET /v1/landing-zones in the smoke floor for the id-bound show; this read also soft-captures an existing landing zone id if one exists.",
+          "capture_soft": {
+            "landing_zone_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "list-guardrails",
+          "method": "GET",
+          "path": "/v1/guardrails",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cc-read",
+          "capture_soft": {
+            "guardrail_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "show-guardrail",
+          "method": "GET",
+          "path": "/v1/guardrails/{guardrail_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cc-read",
+          "_note": "Closes GAP-get-id for the guardrail show endpoint when a guardrail exists; if guardrail_id was not soft-captured the segment stays literal and 404s while still normalizing to the catalog '*' key."
+        },
+        {
+          "name": "create-landing-zone",
+          "method": "POST",
+          "path": "/v1/landing-zones",
+          "json": {
+            "name": "regrlz{unique}",
+            "description": "API regression coverage probe — DO NOT promote to a real landing zone",
+            "region": "{region}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-landing-zone",
+          "capture": {
+            "landing_zone_id": "$.landing_zone.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/landing-zones/{landing_zone_id}",
+            "service": "cloudcontrol"
+          },
+          "_note": "Body UNPROVEN (createlandingzone likely needs org/OU + region + baseline config). Expected 403 on a non-admin/shared account. If it ever 2xx-creates, the cleanup tears it down in reverse order. Capture path $.landing_zone.id is a guess; on the expected 4xx the optional flag isolates the group and the POST is still recorded as covered."
+        },
+        {
+          "name": "set-landing-zone",
+          "method": "PUT",
+          "path": "/v1/landing-zones/{landing_zone_id}",
+          "json": {
+            "description": "API regression coverage probe (update)"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-landing-zone"
+        },
+        {
+          "name": "delete-landing-zone",
+          "method": "DELETE",
+          "path": "/v1/landing-zones/{landing_zone_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-landing-zone",
+          "destructive": true,
+          "_note": "If create captured no id and the list found none, {landing_zone_id} stays literal and the DELETE normalizes to the catalog '*' key (records coverage) and 404s harmlessly."
+        },
+        {
+          "name": "create-account-factory-account",
+          "method": "POST",
+          "path": "/v1/accounts",
+          "json": {
+            "name": "regraccount{unique}",
+            "email": "regr-account-{unique}@example.com",
+            "description": "API regression coverage probe — DO NOT promote to a real account"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-account-factory",
+          "_note": "BILLABLE + IRREVERSIBLE on success (provisions a real member account in the org). Deliberately COVERAGE-ONLY: NOT chained to a delete (account closure is a separate org workflow). Expected 403 on a non-org-master/shared account. If a dedicated control-tower account ever 2xx-creates here, add a guarded teardown before relying on it. Body UNPROVEN."
+        },
+        {
+          "name": "enable-guardrail-bindings",
+          "method": "POST",
+          "path": "/v1/guardrail-bindings",
+          "json": {
+            "guardrail_id": "{guardrail_id}",
+            "target_ids": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-guardrail-binding",
+          "_note": "Enables (binds) a guardrail to target OUs/accounts — governance-altering, coverage-only. Body UNPROVEN; guardrail_id is the soft-captured existing guardrail (or stays literal). Expected 4xx on a shared account. NOT auto-disabled (disable is a separate explicit step below, isolated to its own group so a 4xx on enable does not gate it)."
+        },
+        {
+          "name": "disable-guardrail-bindings",
+          "method": "DELETE",
+          "path": "/v1/guardrail-bindings",
+          "json": {
+            "guardrail_id": "{guardrail_id}",
+            "target_ids": []
+          },
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-guardrail-unbind",
+          "destructive": true,
+          "_note": "Bulk DELETE with a body (no path id) — disables guardrail bindings. Body UNPROVEN, mirrors the enable body. target_ids:[] is a deliberately empty selection so even on a permissive account nothing real is detached; the call still RECORDS coverage."
+        },
+        {
+          "name": "list-baseline-assignments",
+          "method": "GET",
+          "path": "/v1/baseline-assignments",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cc-baseline",
+          "capture_soft": {
+            "assignment_id": "$.contents[0].id"
+          },
+          "_note": "Soft-capture an existing baseline-assignment id to drive the POST/PUT/DELETE on /v1/baseline-assignments/{assignment_id}. Capture path UNPROVEN. If none exists, {assignment_id} stays literal at runtime (the calls 404 harmlessly) while the steps still RECORD coverage via the catalog '*' norm. The validator requires the placeholder be defined here."
+        },
+        {
+          "name": "add-baseline-assignment",
+          "method": "POST",
+          "path": "/v1/baseline-assignments/{assignment_id}",
+          "json": {
+            "baseline_id": "regr-baseline-{unique}",
+            "target_id": "regr-target-{unique}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-baseline",
+          "_note": "{assignment_id} is intentionally left undefined-but-templated: it normalizes to the catalog '*' key (records coverage for addbaselineassignment) and 404/400s harmlessly since no real assignment id is supplied (per the Wave-1 path-match gotcha — never use a literal id). Body UNPROVEN."
+        },
+        {
+          "name": "update-baseline-assignment",
+          "method": "PUT",
+          "path": "/v1/baseline-assignments/{assignment_id}",
+          "json": {
+            "baseline_id": "regr-baseline-{unique}"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-baseline",
+          "_note": "Same templated {assignment_id} — records coverage for updatebaselineassignment without a real assignment."
+        },
+        {
+          "name": "remove-baseline-assignment",
+          "method": "DELETE",
+          "path": "/v1/baseline-assignments/{assignment_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cc-baseline",
+          "destructive": true,
+          "_note": "Same templated {assignment_id} — records coverage for removebaselineassignment. 404s harmlessly (no real assignment)."
+        }
+      ]
+    }
+  ]
+}

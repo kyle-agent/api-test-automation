@@ -1,0 +1,229 @@
+{
+  "lifecycles": [
+    {
+      "id": "backup-agent",
+      "service": "storage/backup",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Backup AGENT lifecycle (billable backup service -> heavy, gated by SCP_RUN_HEAVY). Closes the backup-agent write gap: create-backup-agent (BackupAgentCreateRequest1Dot2: server_uuid + subnet_id + tags) -> capture $.resource.id (SyncResponse.resource.id) -> read -> delete-backup-agent. Body seeded from data/api_bodies.json storage/backup/createbackupagent; provenance DOCS-ONLY (no live 2xx). server_uuid and subnet_id are docs-example UUIDs and reference resources that do NOT exist on this account, so create likely 4xx (still records coverage) -> optional. If create returns an id, delete runs as cleanup; otherwise the delete step still fires with the unfilled {backup_agent_id} placeholder and records coverage for DELETE /v1/backup-agents/{backup_agent_id}.",
+      "steps": [
+        {
+          "name": "create-backup-agent",
+          "method": "POST",
+          "path": "/v1/backup-agents",
+          "group": "bk-agent",
+          "optional": true,
+          "json": {
+            "server_uuid": "89f5ef44-1021-4a5c-8e06-fbb289eac366",
+            "subnet_id": "023c57b14f11483689338d085e061492",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"backup_agent_id": "$.resource.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/backup-agents/{backup_agent_id}",
+            "service": "backup"
+          }
+        },
+        {
+          "name": "show-backup-agent",
+          "method": "GET",
+          "path": "/v1/backup-agents/{backup_agent_id}",
+          "group": "bk-agent",
+          "optional": true,
+          "expect_status": [200, 404]
+        },
+        {
+          "name": "list-backup-agents",
+          "method": "GET",
+          "path": "/v1/backup-agents",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "probe-reads-agent",
+          "probe_reads": {"backup_agent_id": "{backup_agent_id}"}
+        },
+        {
+          "name": "delete-backup-agent",
+          "method": "DELETE",
+          "path": "/v1/backup-agents/{backup_agent_id}",
+          "group": "bk-agent",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404, 409, 400, 403, 422],
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 15
+        }
+      ]
+    },
+    {
+      "id": "backup-job",
+      "service": "storage/backup",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Backup JOB lifecycle (billable -> heavy, gated by SCP_RUN_HEAVY). Closes the backup-job write gap: create-backup (BackupCreateRequest1Dot2) -> capture $.resource.id (SyncResponse.resource.id) -> schedules / filesystem-path / replication / retention-period setters -> manual-backup -> restore + restore-agent-backup -> delete restore-targets -> delete-backup. ALL bodies seeded from data/api_bodies.json storage/backup/* (createbackup, setbackupschedules, setfilesystempath, updatereplicationuse, updateretentionperiod, restorebackup, restoreagentbackup); provenance DOCS-ONLY (no live 2xx). createbackup references a server (server_guid/server_uuid docs UUIDs) and a DR region that do NOT exist on this account -> create likely 4xx (still records coverage) -> optional. server_category in the docs body is the literal 'VIRTUAL_SERVER | GPU_SERVER | BAREMETAL_SERVER' enum-string; we send a single value 'VIRTUAL_SERVER'. restore / restore-agent-backup / delete-restore-targets reference restore_target_id (docs UUID) and a server_type_id 's1v1m2' -> 4xx expected, optional+grouped. manual-backup (POST, empty body) and the setters run with the unfilled {backup_id} placeholder when create did not yield an id, still recording coverage for each endpoint.",
+      "steps": [
+        {
+          "name": "create-backup",
+          "method": "POST",
+          "path": "/v1/backups",
+          "optional": true,
+          "json": {
+            "name": "regrbk{unique}",
+            "policy_category": "AGENTLESS",
+            "policy_type": "VM_IMAGE",
+            "server_category": "VIRTUAL_SERVER",
+            "server_guid": "9ab33c66-3dbd-46cd-b0af-abccd3eb3170",
+            "server_uuid": "89f5ef44-1021-4a5c-8e06-fbb289eac366",
+            "region": "{region}",
+            "retention_period": "WEEK_2",
+            "dr_enabled": false,
+            "encrypt_enabled": true,
+            "is_all_filesystem": false,
+            "filesystem_paths": ["/aaa", "/bbb"],
+            "schedules": [
+              {"frequency": "DAILY", "start_day": "MON", "start_time": "09:00:00", "start_week": "WEEK_2", "type": "FULL"}
+            ],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"backup_id": "$.resource.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/backups/{backup_id}",
+            "service": "backup"
+          }
+        },
+        {
+          "name": "show-backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "optional": true,
+          "expect_status": [200, 404]
+        },
+        {
+          "name": "list-backups",
+          "method": "GET",
+          "path": "/v1/backups",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "set-backup-schedules",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/schedules",
+          "group": "bk-schedules",
+          "optional": true,
+          "json": {
+            "schedules": [
+              {"frequency": "DAILY", "start_day": "MON", "start_time": "09:00:00", "start_week": "WEEK_2", "type": "FULL"}
+            ]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-backup-filesystem-path",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/filesystem-path",
+          "group": "bk-fspath",
+          "optional": true,
+          "json": {"backup_filesystem_paths": ["/aaa", "/bbb"], "is_all_filesystem": false},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-backup-replication",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/replication",
+          "group": "bk-replication",
+          "optional": true,
+          "json": {"dr_enabled": false},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-backup-retention-period",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/retention-period",
+          "group": "bk-retention",
+          "optional": true,
+          "json": {"retention_period": "WEEK_2"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "manual-backup",
+          "method": "POST",
+          "path": "/v1/backups/{backup_id}/manual-backup",
+          "group": "bk-manual",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "restore-backup",
+          "method": "POST",
+          "path": "/v1/backups/{backup_id}/restore",
+          "group": "bk-restore",
+          "optional": true,
+          "json": {
+            "restore_region": "{region}",
+            "restore_server_name": "regrrst{unique}",
+            "restore_target_id": "ca1a8e76-af49-40ea-93f8-a5989ffe138b",
+            "server_type_id": "s1v1m2",
+            "networks": [{"subnet_id": "023c57b14f11483689338d085e061492"}],
+            "security_groups": ["023c57b14f11483689338d085e061492"]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "restore-agent-backup",
+          "method": "POST",
+          "path": "/v1/backups/{backup_id}/restore-agent-backup",
+          "group": "bk-restore-agent",
+          "optional": true,
+          "json": {
+            "restore_target_id": "ca1a8e76-af49-40ea-93f8-a5989ffe138b",
+            "restore_server_uuid": "89f5ef44-1021-4a5c-8e06-fbb289eac366",
+            "overwrite": true,
+            "filesystem_paths": [{"source": "/", "destination": "/"}]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-backup-restore-targets",
+          "method": "DELETE",
+          "path": "/v1/backups/{backup_id}/restore-targets",
+          "group": "bk-restore-targets",
+          "optional": true,
+          "destructive": true,
+          "json": {"restore_target_ids": ["ca1a8e76-af49-40ea-93f8-a5989ffe138b"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-reads-backup",
+          "probe_reads": {"backup_id": "{backup_id}"}
+        },
+        {
+          "name": "delete-backup",
+          "method": "DELETE",
+          "path": "/v1/backups/{backup_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404, 409, 400, 403, 422],
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "wait-backup-gone",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+        }
+      ]
+    }
+  ]
+}

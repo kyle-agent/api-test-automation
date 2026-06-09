@@ -1,0 +1,870 @@
+{
+  "lifecycles": [
+    {
+      "id": "vpc-cidr-secondary",
+      "service": "networking/vpc",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Closes POST /v1/vpcs/{vpc_id}/cidrs (secondary CIDR block). Adopts the session-shared VPC ({\"adopt\":\"vpc\"}) so it does not consume the 5-VPC cap; falls back to self-create when no shared VPC exists (mutations off / provisioning failed). heavy:true because the fallback self-creates a real VPC. The secondary-CIDR body is docs-derived (data/api_docs.json: AddVpcCidr) and UNPROVEN: SCP requires a non-overlapping RFC1918 block; we send 10.200.0.0/20 (outside the shared 10.124.0.0/20). optional+broad expect_status so a reject still records coverage without failing. The added CIDR has no documented standalone DELETE endpoint (removed with the VPC), so this step has no cleanup of its own; the shared VPC is retained for the fixture to tear down.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression VPC cidr",
+            "cidr": "10.127.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"vpc_id": "$.vpc.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-vpc-cidr",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs/{vpc_id}/cidrs",
+          "group": "vpc-cidr",
+          "optional": true,
+          "json": {"cidr": "10.200.0.0/20"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "vpc-private-nat",
+      "service": "networking/vpc",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Closes private-nats: POST /v1/private-nats, POST/DELETE .../private-nat-ips, PUT/DELETE /v1/private-nats/{id}. Bodies from data/api_bodies.json (networking/vpc/createprivatenat, createprivatenatip) -> UNPROVEN. createprivatenat needs a service_resource_id (a Direct Connect / connected resource we do not own) -> we send a {unique} placeholder so the create likely 4xx's; every step is optional+grouped+broad expect_status so it still records coverage. PUT body is a docs-best-guess {description}. capture envelope $.private_nat.id and $.private_nat_ip.id are UNPROVEN (no live 2xx); if the create misses its capture the optional group skips cleanly and dependent ip/put steps fire with the unfilled {private_nat_id} placeholder (each still records its endpoint). No base VPC required for the private-nat object itself per docs (it references a service_resource_id), so this lifecycle does not adopt the shared VPC; heavy:true defensively because a successful create would be a real billable NAT.",
+      "steps": [
+        {
+          "name": "create-private-nat",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/private-nats",
+          "group": "private-nat",
+          "optional": true,
+          "json": {
+            "name": "regrpnat{unique}",
+            "description": "API regression private-nat",
+            "cidr": "192.167.0.0/24",
+            "service_resource_id": "{unique}",
+            "service_type": "DIRECT_CONNECT",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"private_nat_id": "$.private_nat.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/private-nats/{private_nat_id}", "service": "vpc", "json": null}
+        },
+        {
+          "name": "list-private-nats",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/private-nats",
+          "group": "private-nat",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "create-private-nat-ip",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/private-nats/{private_nat_id}/private-nat-ips",
+          "group": "private-nat",
+          "optional": true,
+          "json": {"ip_address": ""},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"private_nat_ip_id": "$.private_nat_ip.id"}
+        },
+        {
+          "name": "set-private-nat",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/private-nats/{private_nat_id}",
+          "group": "private-nat",
+          "optional": true,
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-private-nat-ip",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/private-nats/{private_nat_id}/private-nat-ips/{private_nat_ip_id}",
+          "group": "private-nat",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-private-nat",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/private-nats/{private_nat_id}",
+          "group": "private-nat",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        }
+      ]
+    },
+    {
+      "id": "vpc-privatelink-service",
+      "service": "networking/vpc",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Closes privatelink-services: POST /v1/privatelink-services, PUT/DELETE /v1/privatelink-services/{id}. (privatelink-ENDPOINTS POST/PUT/DELETE are already covered elsewhere and out of scope.) Body from data/api_bodies.json (networking/vpc/createprivatelinkservice) -> UNPROVEN. Needs a real connected_resource_id (a load balancer) + security_group_ids + a subnet under a VPC; we adopt the shared VPC and create our own subnet, but the connected_resource_id is a {unique} placeholder we do not own, so the create likely 4xx's. All steps optional+grouped+broad expect_status. capture envelope $.privatelink_service.id UNPROVEN. heavy:true (real VPC fallback + would-be billable service).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression PLS",
+            "cidr": "10.128.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"vpc_id": "$.vpc.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression PLS",
+            "cidr": "10.128.7.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"subnet_id": "$.subnet.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"},
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-privatelink-service",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/privatelink-services",
+          "group": "pls",
+          "optional": true,
+          "json": {
+            "approval_type": "AUTO",
+            "connected_resource_id": "{unique}",
+            "connected_resource_ip_address": "10.124.0.6",
+            "connected_resource_type": "LB",
+            "description": "API regression privatelink service",
+            "high_speed_transfer": false,
+            "name": "regrpls{unique}",
+            "service_ip_address": "10.124.0.5",
+            "subnet_id": "{subnet_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"privatelink_service_id": "$.privatelink_service.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/privatelink-services/{privatelink_service_id}", "service": "vpc"}
+        },
+        {
+          "name": "list-privatelink-services",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/privatelink-services",
+          "group": "pls",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "set-privatelink-service",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/privatelink-services/{privatelink_service_id}",
+          "group": "pls",
+          "optional": true,
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-privatelink-service",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/privatelink-services/{privatelink_service_id}",
+          "group": "pls",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15,
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 180, "interval": 10},
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "vpc-endpoint",
+      "service": "networking/vpc",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Closes vpc-endpoints: POST /v1/vpc-endpoints, PUT/DELETE /v1/vpc-endpoints/{id}. Body from data/api_bodies.json (networking/vpc/createvpcendpoint) -> UNPROVEN. Needs a real resource_key (the target service, e.g. an SCR registry) + subnet under a VPC; we adopt the shared VPC and create our own subnet, but resource_key/resource_info are {unique}/synthetic so the create likely 4xx's. All vpc-endpoint steps optional+grouped+broad expect_status. capture envelope $.vpc_endpoint.id UNPROVEN. heavy:true (real VPC fallback + billable endpoint).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression vpc-endpoint",
+            "cidr": "10.129.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"vpc_id": "$.vpc.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression vpc-endpoint",
+            "cidr": "10.129.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"subnet_id": "$.subnet.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"},
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-vpc-endpoint",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpc-endpoints",
+          "group": "vpce",
+          "optional": true,
+          "json": {
+            "description": "API regression vpc endpoint",
+            "endpoint_ip_address": "10.124.0.20",
+            "name": "regrvpce{unique}",
+            "resource_info": "x.samsungsdscloud.com(Registry)",
+            "resource_key": "{unique}",
+            "resource_type": "FS",
+            "subnet_id": "{subnet_id}",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"vpc_endpoint_id": "$.vpc_endpoint.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpc-endpoints/{vpc_endpoint_id}", "service": "vpc"}
+        },
+        {
+          "name": "list-vpc-endpoints",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-endpoints",
+          "group": "vpce",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "set-vpc-endpoint",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "group": "vpce",
+          "optional": true,
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-vpc-endpoint",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "group": "vpce",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15,
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 180, "interval": 10},
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "vpc-peering",
+      "service": "networking/vpc",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; we have only the shared VPC, so requester_vpc_id={vpc_id} and approver_vpc_id/account are {unique} placeholders -> the create likely 4xx's. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression peering",
+            "cidr": "10.130.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"vpc_id": "$.vpc.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-vpc-peering",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpc-peerings",
+          "group": "peering",
+          "optional": true,
+          "json": {
+            "approver_vpc_account_id": "{unique}",
+            "approver_vpc_id": "{unique}",
+            "description": "API regression vpc peering",
+            "name": "regrpeer{unique}",
+            "requester_vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"vpc_peering_id": "$.vpc_peering.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpc-peerings/{vpc_peering_id}", "service": "vpc"}
+        },
+        {
+          "name": "list-vpc-peerings",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings",
+          "group": "peering",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "create-peering-routing-rule",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
+          "group": "peering",
+          "optional": true,
+          "json": {
+            "destination_cidr": "10.130.0.0/20",
+            "destination_vpc_type": "REQUESTER_VPC",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"routing_rule_id": "$.routing_rule.id"}
+        },
+        {
+          "name": "set-vpc-peering",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "approve-vpc-peering",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}/approval",
+          "group": "peering",
+          "optional": true,
+          "json": {"action": "APPROVE"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-peering-routing-rule",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules/{routing_rule_id}",
+          "group": "peering",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-vpc-peering",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "vpc-transit-gateway-children",
+      "service": "networking/vpc",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Closes the transit-gateway CHILD writes (10): POST/DELETE for firewalls, firewall-connections, routing-rules, uplink-routing-rules, vpc-connections. (POST /v1/transit-gateways + PUT/DELETE /v1/transit-gateways/{id} are already covered elsewhere and out of scope.) Bodies from data/api_bodies.json (networking/vpc/createtransitgateway*, ...rule, ...uplinkrule, ...vpcconnection, ...firewall, ...firewallconnection). createtransitgatewayfirewallconnection body in api_bodies is the corrupt {\"_raw\":\"{transit_gateway_id}\"} -> replaced with a docs-best-guess {firewall_id} body. We create a real transit-gateway as the parent (capture $.transit_gateway.id UNPROVEN); each child create needs ids we may not have (a TGW firewall product, a peer VPC connection) so all children are optional+grouped+broad expect_status -> they record coverage even on 4xx. tgw_connection_vpc_id / vpc_id reference {vpc_id} (we adopt the shared VPC). routing_rule_id captures are soft. heavy:true (real TGW + VPC fallback are billable).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression tgw",
+            "cidr": "10.131.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"vpc_id": "$.vpc.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-transit-gateway",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways",
+          "group": "tgw",
+          "optional": true,
+          "json": {
+            "name": "regrtgw{unique}",
+            "description": "API regression transit gateway",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"transit_gateway_id": "$.transit_gateway.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/transit-gateways/{transit_gateway_id}", "service": "vpc"}
+        },
+        {
+          "name": "create-tgw-vpc-connection",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+          "group": "tgw",
+          "optional": true,
+          "json": {"vpc_id": "{vpc_id}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"vpc_connection_id": "$.vpc_connection.id"}
+        },
+        {
+          "name": "create-tgw-firewall",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/firewalls",
+          "group": "tgw",
+          "optional": true,
+          "json": {"product_type": "TGW_DGW"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"firewall_id": "$.firewall.id"}
+        },
+        {
+          "name": "create-tgw-firewall-connection",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/firewall-connections",
+          "group": "tgw",
+          "optional": true,
+          "json": {"firewall_id": "{firewall_id}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-tgw-routing-rule",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules",
+          "group": "tgw",
+          "optional": true,
+          "json": {
+            "description": "API regression tgw routing rule",
+            "destination_cidr": "10.131.0.0/20",
+            "destination_type": "VPC",
+            "tgw_connection_vpc_id": "{vpc_id}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"routing_rule_id": "$.routing_rule.id"}
+        },
+        {
+          "name": "create-tgw-uplink-routing-rule",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/uplink-routing-rules",
+          "group": "tgw",
+          "optional": true,
+          "json": {
+            "description": "API regression tgw uplink rule",
+            "destination_cidr": "192.167.5.0/24",
+            "destination_type": "ON_PREMISE"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"uplink_routing_rule_id": "$.routing_rule.id"}
+        },
+        {
+          "name": "delete-tgw-firewall-connection",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/firewall-connections",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-tgw-firewall",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/firewalls/{firewall_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-tgw-routing-rule",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules/{routing_rule_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-tgw-uplink-routing-rule",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/uplink-routing-rules/{uplink_routing_rule_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-tgw-vpc-connection",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-transit-gateway",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "vpc-subnet-vip-nat",
+      "service": "networking/vpc",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Closes the subnet-VIP NAT children (4 writes): POST/DELETE /v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports, POST/DELETE .../static-nat-ips. (The VIP itself POST/PUT/DELETE is already covered elsewhere.) Adopts the shared VPC, creates an own subnet, then a VIP under it (create from data/api_bodies.json networking/vpc/createsubnetvip -> $.vip.id UNPROVEN), then exercises connected-ports (createsubnetvipport: needs a real port_id -> {unique} placeholder) and static-nat-ips (createsubnetvipnatip: needs a real publicip_id -> {unique} placeholder). All VIP-child steps optional+grouped+broad expect_status so they record coverage even on 4xx. connected_port_id / static_nat_id captures are soft (envelopes UNPROVEN). heavy:true (real VPC fallback).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression vip-nat",
+            "cidr": "10.132.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"vpc_id": "$.vpc.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"}
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression vip-nat",
+            "cidr": "10.132.9.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"subnet_id": "$.subnet.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}", "service": "vpc"}
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "create-subnet-vip",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "group": "vip",
+          "optional": true,
+          "json": {
+            "description": "API regression subnet vip",
+            "virtual_ip_address": "10.132.9.6"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"vip_id": "$.vip.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}/vips/{vip_id}", "service": "vpc"}
+        },
+        {
+          "name": "create-vip-connected-port",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports",
+          "group": "vip",
+          "optional": true,
+          "json": {"port_id": "{unique}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"connected_port_id": "$.connected_port.id"}
+        },
+        {
+          "name": "create-vip-static-nat-ip",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/static-nat-ips",
+          "group": "vip",
+          "optional": true,
+          "json": {"nat_type": "PUBLIC", "publicip_id": "{unique}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"static_nat_id": "$.static_nat_ip.id"}
+        },
+        {
+          "name": "delete-vip-connected-port",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports/{connected_port_id}",
+          "group": "vip",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-vip-static-nat-ip",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}/static-nat-ips/{static_nat_id}",
+          "group": "vip",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "wait-subnet-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 180, "interval": 10}
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

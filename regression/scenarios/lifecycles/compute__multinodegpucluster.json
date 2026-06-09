@@ -1,0 +1,141 @@
+{
+  "lifecycles": [
+    {
+      "id": "mngc-gpu-node-coverage",
+      "service": "compute/multinodegpucluster",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY, heavy (multi-node GPU cluster nodes are billable + slow). Closes ALL 9 uncovered compute/multinodegpucluster WRITE endpoints WITHOUT provisioning a real GPU node/cluster-fabric. No catalog GPU lifecycle exists; bodies are docs-derived (data/api_docs.json models gpunodecreaterequest / gpunodedetailsrequest / clusterfabricdetailsrequest / gpunodeoperationrequest / gpunodeterminaterequest / gpunodeassignpublicnatiprequest / clusterfabricmembermodifyrequestbody) — there are NO data/api_bodies.json entries for this service. UNPROVEN. Cost/safety pattern (proven by compute-virtualserver vs-server-action-coverage): {gpu_node_id} is declared via a NO-OP soft-capture selector that deliberately finds nothing, so at runtime it stays LITERAL ('{gpu_node_id}') -> per-id URLs carry a non-existent literal id and 404 (never touch a real node), while the catalog normalizes {..} to '*' so every endpoint is RECORDED (covered). create POST /v1/gpu-nodes + bulk DELETE /v1/gpu-nodes + start/stop + modify-members use SYNTHETIC vpc/subnet/image/server-type/cluster-fabric/node-pool ids we do not own -> guaranteed 4xx, so NO real billable GPU node is ever created or deleted (hence no capture/cleanup). Every write is optional + grouped + broad expect_status [200,201,202,204,400,403,404,409,422] so a 4xx/404 never fails the run. ENABLED+heavy: runs only under SCP_RUN_HEAVY=true AND SCP_ALLOW_MUTATIONS=true; the destructive deletes additionally need SCP_ALLOW_DESTRUCTIVE=true.",
+      "steps": [
+        {
+          "name": "seed-gpu-node-placeholders",
+          "_note": "COST/SAFETY: declares {gpu_node_id} via a NO-OP soft-capture selector that finds nothing, so it stays LITERAL at runtime -> per-id writes 404 (never mutate a real GPU node). The catalog still normalizes {..} to '*' so the endpoints are RECORDED. List array key is gpu_nodes (docs gpunodelistresponse).",
+          "method": "GET",
+          "path": "/v1/gpu-nodes",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {"limit": 1},
+          "capture_soft": {
+            "gpu_node_id": "$.gpu_nodes[0].nonexistent_gpu_seed"
+          }
+        },
+        {
+          "name": "create-gpu-nodes",
+          "_note": "UNPROVEN body (docs gpunodecreaterequest + gpunodedetailsrequest + clusterfabricdetailsrequest). POST /v1/gpu-nodes provisions GPU nodes into a cluster-fabric/node-pool. Uses SYNTHETIC vpc/subnet/image/server-type/cluster-fabric/node-pool ids we do not own -> guaranteed 4xx, so NO real billable node is created (no capture/cleanup). Required: cluster_fabric_details{cluster_fabric_name,node_pool_id}, image_id, os_user_id, os_user_password, region_id, server_details[]{gpu_node_name,nat_enabled,server_type_id}, subnet_id, tags, vpc_id.",
+          "method": "POST",
+          "path": "/v1/gpu-nodes",
+          "json": {
+            "vpc_id": "00000000000000000000000000000000",
+            "subnet_id": "00000000000000000000000000000000",
+            "image_id": "IMAGE-regrCoverageProbe000000",
+            "region_id": "{region}",
+            "os_user_id": "regruser",
+            "os_user_password": "RegrCoverageProbe!1",
+            "lock_enabled": false,
+            "cluster_fabric_details": {
+              "cluster_fabric_id": "00000000000000000000000000000000",
+              "cluster_fabric_name": "regrcf{unique}",
+              "node_pool_id": "POOL-regrCoverageProbe00"
+            },
+            "server_details": [
+              {
+                "gpu_node_name": "regrgpu{unique}",
+                "server_type_id": "00000000000000000000000000000000",
+                "nat_enabled": false
+              }
+            ],
+            "tags": [{"key": "regr_coverage", "value": "probe"}]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-create"
+        },
+        {
+          "name": "start-gpu-nodes",
+          "_note": "UNPROVEN body (docs gpunodeoperationrequest -> gpu_node_ids). POST /v1/gpu-nodes/start powers on a list of GPU nodes. Synthetic id -> 4xx; still records.",
+          "method": "POST",
+          "path": "/v1/gpu-nodes/start",
+          "json": {"gpu_node_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-start"
+        },
+        {
+          "name": "stop-gpu-nodes",
+          "_note": "UNPROVEN body (docs gpunodeoperationrequest, same shape as start). POST /v1/gpu-nodes/stop powers off a list of GPU nodes. Synthetic id -> 4xx; still records.",
+          "method": "POST",
+          "path": "/v1/gpu-nodes/stop",
+          "json": {"gpu_node_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-stop"
+        },
+        {
+          "name": "modify-cluster-fabric-members",
+          "_note": "UNPROVEN body (docs clusterfabricmembermodifyrequestbody). POST /v1/cluster-fabrics/modify-members moves GPU nodes from before_cluster_fabric_id to after_cluster_fabric_id. Synthetic fabric + node ids -> 4xx; still records.",
+          "method": "POST",
+          "path": "/v1/cluster-fabrics/modify-members",
+          "json": {
+            "before_cluster_fabric_id": "00000000000000000000000000000000",
+            "after_cluster_fabric_id": "00000000000000000000000000000000",
+            "gpu_node_id_list": ["00000000000000000000000000000000"]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-modify-members"
+        },
+        {
+          "name": "lock-gpu-node",
+          "_note": "PUT /v1/gpu-nodes/{gpu_node_id}/lock enables delete-protection. Docs declare NO request body -> empty body. Literal {gpu_node_id} -> 404; still records. Paired with unlock.",
+          "method": "PUT",
+          "path": "/v1/gpu-nodes/{gpu_node_id}/lock",
+          "json": {},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-lock"
+        },
+        {
+          "name": "unlock-gpu-node",
+          "_note": "PUT /v1/gpu-nodes/{gpu_node_id}/unlock disables delete-protection. Docs declare NO request body. Literal {gpu_node_id} -> 404; still records.",
+          "method": "PUT",
+          "path": "/v1/gpu-nodes/{gpu_node_id}/unlock",
+          "json": {},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-unlock"
+        },
+        {
+          "name": "assign-gpu-node-public-nat-ip",
+          "_note": "UNPROVEN body (docs gpunodeassignpublicnatiprequest). POST /v1/gpu-nodes/{gpu_node_id}/public-nat-ip assigns a public NAT IP. Synthetic public_ip_address_id + literal {gpu_node_id} -> 4xx/404; still records.",
+          "method": "POST",
+          "path": "/v1/gpu-nodes/{gpu_node_id}/public-nat-ip",
+          "json": {"public_ip_address_id": "00000000000000000000000000000000"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-public-nat"
+        },
+        {
+          "name": "release-gpu-node-public-nat-ip",
+          "_note": "DELETE /v1/gpu-nodes/{gpu_node_id}/public-nat-ip releases the public NAT IP (singular path, unlike baremetal's plural). Docs declare NO request body. Literal {gpu_node_id} -> 404; still records. Marked destructive but releases nothing on a non-existent id.",
+          "method": "DELETE",
+          "path": "/v1/gpu-nodes/{gpu_node_id}/public-nat-ip",
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-public-nat-release",
+          "destructive": true
+        },
+        {
+          "name": "delete-gpu-nodes",
+          "_note": "UNPROVEN body (docs gpunodeterminaterequest -> gpu_node_ids). DELETE /v1/gpu-nodes (bulk terminate, no path id) takes a list of ids in the body. SYNTHETIC id -> guaranteed 4xx, so NO real node is terminated. Marked destructive (needs SCP_ALLOW_DESTRUCTIVE). Recorded regardless of status.",
+          "method": "DELETE",
+          "path": "/v1/gpu-nodes",
+          "json": {"gpu_node_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "gpu-delete",
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

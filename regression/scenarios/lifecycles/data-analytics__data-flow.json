@@ -1,0 +1,222 @@
+{
+  "lifecycles": [
+    {
+      "id": "data-flow-service-and-flow-guarded",
+      "service": "data-analytics/data-flow",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY guarded lifecycle for data-flow's uncovered WRITE endpoints: createdataflowserviceconsole (POST /v1/data-flow-services), updatedataflowserviceconsole (PUT), deletedataflowserviceconsole (DELETE), the two validate-resources POSTs (create- and update-scope), and createdataflow/updatedataflow/deletedataflow on /v1/data-flows. data-flow provisions a billable analytics cluster + service, so this is heavy:true and does NOT spin up a real cluster: it soft-captures any EXISTING service/flow id from the read-only lists; when none exist the {data_flow_service_id}/{data_flow_id}/{cluster_id} tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 4xx counts as covered per the engine). Every mutating step is optional + grouped + broad expect_status so an isolated 4xx isolates to its group and never fails the run or chains a real create->mutate->delete. DELETEs are destructive:true (gated by SCP_ALLOW_DESTRUCTIVE). No data/api_bodies.json entries exist for data-flow (only createcluster exists for searchengine/vertica/eventstreams), so bodies are best-effort from path/field semantics + the shared SCP analytics-console shape and are UNPROVEN — promote to validated after a real 2xx. create-service body mirrors the dbaas instance_groups/block_storage shape used by searchengine; validate-resources is a dry-run preflight that the console calls before create/update.",
+      "steps": [
+        {
+          "name": "list-data-flow-services",
+          "method": "GET",
+          "path": "/v1/data-flow-services",
+          "expect_status": [200],
+          "capture_soft": {"data_flow_service_id": "$.contents[0].id"}
+        },
+        {
+          "name": "list-data-flows",
+          "method": "GET",
+          "path": "/v1/data-flows",
+          "expect_status": [200],
+          "capture_soft": {"data_flow_id": "$.contents[0].id"}
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "data_flow_service_id": "{data_flow_service_id}",
+            "data_flow_id": "{data_flow_id}"
+          }
+        },
+        {
+          "name": "capture-cluster-id",
+          "method": "GET",
+          "path": "/v1/data-flow-services/{data_flow_service_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {"cluster_id": "$.cluster_id"}
+        },
+        {
+          "name": "validate-resources-create",
+          "method": "POST",
+          "path": "/v1/data-flow-services/clusters/{cluster_id}/validate-resources",
+          "json": {"name": "regrdfsvc{ualpha}", "subnet_id": "", "server_type_name": "", "instance_count": 1},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "df-validate"
+        },
+        {
+          "name": "validate-resources-update",
+          "method": "POST",
+          "path": "/v1/data-flow-services/{data_flow_service_id}/validate-resources",
+          "json": {"server_type_name": "", "instance_count": 1},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "df-validate"
+        },
+        {
+          "name": "create-data-flow-service",
+          "method": "POST",
+          "path": "/v1/data-flow-services",
+          "json": {
+            "name": "regrdfsvc{ualpha}",
+            "description": "API regression coverage probe",
+            "dbaas_engine_version_id": "",
+            "subnet_id": "",
+            "nat_enabled": false,
+            "instance_name_prefix": "regrdf",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "",
+                "block_storage_groups": [{"role_type": "OS", "size_gb": 104, "volume_type": "SSD"}],
+                "instances": [{"role_type": "ACTIVE", "service_ip_address": "192.168.10.10/32"}]
+              }
+            ],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "df-service"
+        },
+        {
+          "name": "update-data-flow-service",
+          "method": "PUT",
+          "path": "/v1/data-flow-services/{data_flow_service_id}",
+          "json": {"description": "API regression coverage probe (updated)"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "df-service"
+        },
+        {
+          "name": "delete-data-flow-service",
+          "method": "DELETE",
+          "path": "/v1/data-flow-services/{data_flow_service_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "df-service"
+        },
+        {
+          "name": "create-data-flow",
+          "method": "POST",
+          "path": "/v1/data-flows",
+          "json": {
+            "name": "regrdf{ualpha}",
+            "description": "API regression coverage probe",
+            "data_flow_service_id": "{data_flow_service_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "df-flow"
+        },
+        {
+          "name": "update-data-flow",
+          "method": "PUT",
+          "path": "/v1/data-flows/{data_flow_id}",
+          "json": {"description": "API regression coverage probe (updated)"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "df-flow"
+        },
+        {
+          "name": "delete-data-flow",
+          "method": "DELETE",
+          "path": "/v1/data-flows/{data_flow_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "df-flow"
+        }
+      ]
+    },
+    {
+      "id": "data-flow-read-coverage",
+      "service": "data-analytics/data-flow",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY read lifecycle for data-flow's id-bound GETs (READ-ONLY, never mutates). Lists the data-flows and data-flow-services collections, soft-captures ids under the EXACT catalog path-param names (data_flow_id, cluster_id) so the final probe-reads step exercises every catalog GET whose params are satisfied: getdataflow (/v1/data-flows/{data_flow_id}), getdataflowservicesubversions (/v1/data-flow-services/data-flows/{data_flow_id}/sub-versions) and ingresscluster (/v1/data-flows/clusters/{cluster_id}/ingress-controllers). The two check-duplication GETs take a free-form NAME path-param (not an id), so they are called directly with a literal probe name (duplication-check accepts any name -> 200/400, still RECORDED). When a collection is empty the {var} normalizes to the catalog '*' key so each endpoint is still CALLED and a 4xx counts as covered. Every step optional + grouped + broad expect_status so an isolated failure never fails the run. cluster_id is harvested from the service detail (best-effort); when absent the ingress probe still records against the '*' key.",
+      "steps": [
+        {
+          "name": "list-data-flows",
+          "method": "GET",
+          "path": "/v1/data-flows",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read",
+          "capture_soft": {"data_flow_id": "$.contents[0].id"}
+        },
+        {
+          "name": "list-data-flow-services",
+          "method": "GET",
+          "path": "/v1/data-flow-services",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read",
+          "capture_soft": {"data_flow_service_id": "$.contents[0].id"}
+        },
+        {
+          "name": "get-data-flow",
+          "method": "GET",
+          "path": "/v1/data-flows/{data_flow_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "get-data-flow-sub-versions",
+          "method": "GET",
+          "path": "/v1/data-flow-services/data-flows/{data_flow_id}/sub-versions",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "check-data-flow-duplication",
+          "method": "GET",
+          "path": "/v1/data-flows/regrprobe/check-duplication",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "check-data-flow-service-duplication",
+          "method": "GET",
+          "path": "/v1/data-flow-services/regrprobe/check-duplication",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "capture-cluster-id",
+          "method": "GET",
+          "path": "/v1/data-flow-services/{data_flow_service_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "df-read",
+          "capture_soft": {"cluster_id": "$.cluster_id"}
+        },
+        {
+          "name": "get-ingress-controllers",
+          "method": "GET",
+          "path": "/v1/data-flows/clusters/{cluster_id}/ingress-controllers",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "data_flow_id": "{data_flow_id}",
+            "cluster_id": "{cluster_id}"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,514 @@
+{
+  "lifecycles": [
+    {
+      "id": "org-organizations-guarded",
+      "service": "management/organization",
+      "enabled": true,
+      "heavy": true,
+      "_note": "HIGHEST BLAST RADIUS. organization is the account-hierarchy root: creating/updating/deleting an organization, leaving membership, or moving accounts can restructure or sever the ENTIRE shared account tree and is largely IRREVERSIBLE. This lifecycle is COVERAGE-ONLY: it never builds a real org. Every mutating step is optional with a broad expect_status so the expected 403 (Forbidden — caller is not the org master/payer) or 400/404 on a shared, non-master account RECORDS the endpoint as covered WITHOUT creating real structure or failing the run. heavy:true gates it behind SCP_RUN_HEAVY. organization_id is soft-captured from the read-only list; if absent (or zero orgs) the {organization_id} steps still normalize to the catalog '*' key and record coverage. Bodies are best-effort from path/field semantics (no data/api_bodies.json entry, docs are JS-rendered) and UNPROVEN — promote after a real 2xx on a dedicated org-master test account. Covers: createorganization(POST), setorganization(PUT id), deleteorganization(DELETE id), leaveorganization(DELETE id/membership). No DELETE here ever runs without SCP_ALLOW_DESTRUCTIVE.",
+      "steps": [
+        {
+          "name": "list-organizations",
+          "method": "GET",
+          "path": "/v1/organizations",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "organization_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "org-root"
+        },
+        {
+          "name": "create-organization",
+          "method": "POST",
+          "path": "/v1/organizations",
+          "json": {
+            "name": "regr-org-{unique}",
+            "description": "API regression coverage probe — DO NOT promote to real org"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "org-create",
+          "_note": "Expected 403 on a non-master/shared account. NOT chained to a delete on purpose — we do not want a real org to exist. If this ever 2xx-creates on a dedicated test account, add a capture+destructive cleanup before enabling."
+        },
+        {
+          "name": "show-organization",
+          "method": "GET",
+          "path": "/v1/organizations/{organization_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "org-root",
+          "_note": "Read-only id-bound GET on the soft-captured org id (closes the GAP-get-id for showorganization)."
+        },
+        {
+          "name": "set-organization",
+          "method": "PUT",
+          "path": "/v1/organizations/{organization_id}",
+          "json": {
+            "name": "regr-org-{unique}",
+            "description": "API regression coverage probe (update)"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "org-root"
+        },
+        {
+          "name": "delete-organization",
+          "method": "DELETE",
+          "path": "/v1/organizations/{organization_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "org-delete",
+          "_note": "destructive — only runs under SCP_ALLOW_DESTRUCTIVE. Targets a soft-captured EXISTING org id; on a shared account this returns 403, recording coverage without deleting anything."
+        },
+        {
+          "name": "leave-organization-membership",
+          "method": "DELETE",
+          "path": "/v1/organizations/{organization_id}/membership",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "org-membership",
+          "_note": "destructive — leaving an org detaches this account from the hierarchy. Guarded; expected 403 on a member-without-permission or master account."
+        }
+      ]
+    },
+    {
+      "id": "org-units-guarded",
+      "service": "management/organization",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Organization units (OUs) carve up the account hierarchy; creating/deleting/moving them on a shared account reshapes real structure. COVERAGE-ONLY guarded calls: every mutating step optional + broad expect_status so 403/400 records coverage without building real OUs. unit_id soft-captured from the read-only list. Bodies UNPROVEN (no api_bodies entry; docs JS-rendered). Covers: createorganizationunit(POST), setorganizationunit(PUT id), deleteorganizationunits(DELETE collection w/ id list body), moveaccount(PUT /v1/organization-accounts/parent).",
+      "steps": [
+        {
+          "name": "list-organization-units",
+          "method": "GET",
+          "path": "/v1/organization-units",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "unit_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "ou"
+        },
+        {
+          "name": "create-organization-unit",
+          "method": "POST",
+          "path": "/v1/organization-units",
+          "json": {
+            "name": "regr-ou-{unique}",
+            "description": "API regression coverage probe"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "ou-create"
+        },
+        {
+          "name": "show-organization-unit",
+          "method": "GET",
+          "path": "/v1/organization-units/{unit_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "ou",
+          "_note": "Read-only id-bound GET on the soft-captured OU id (closes GAP-get-id for showorganizationunit)."
+        },
+        {
+          "name": "list-organization-unit-parents",
+          "method": "GET",
+          "path": "/v1/organization-units/{unit_id}/parents",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "ou",
+          "_note": "Read-only id-bound GET (closes GAP-get-id for listparents)."
+        },
+        {
+          "name": "set-organization-unit",
+          "method": "PUT",
+          "path": "/v1/organization-units/{unit_id}",
+          "json": {
+            "name": "regr-ou-{unique}",
+            "description": "API regression coverage probe (update)"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "ou"
+        },
+        {
+          "name": "delete-organization-units",
+          "method": "DELETE",
+          "path": "/v1/organization-units",
+          "json": {
+            "ids": ["{unit_id}"]
+          },
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "ou-delete",
+          "_note": "Collection DELETE takes an id list in the body. Guarded — expected 403/400 on a shared account; never deletes real OUs without SCP_ALLOW_DESTRUCTIVE. Body shape 'ids' UNPROVEN."
+        },
+        {
+          "name": "list-accounts-for-move",
+          "method": "GET",
+          "path": "/v1/organization-accounts",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "account_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "ou-move",
+          "_note": "Read-only id source for move-account-parent; placed in the same group so the move isolates if no account exists."
+        },
+        {
+          "name": "move-account-parent",
+          "method": "PUT",
+          "path": "/v1/organization-accounts/parent",
+          "json": {
+            "account_id": "{account_id}",
+            "parent_id": "{unit_id}"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "ou-move",
+          "_note": "Reparents an org account under an OU — restructures the hierarchy. account_id soft-captured above. Guarded coverage call; body UNPROVEN."
+        }
+      ]
+    },
+    {
+      "id": "org-accounts-guarded",
+      "service": "management/organization",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Organization-accounts are member cloud accounts in the hierarchy. Creating one provisions a NEW billable account; removing/deleting one detaches or closes a real account — IRREVERSIBLE and high blast radius. COVERAGE-ONLY guarded calls (optional + broad expect_status) so 403/400 records coverage without provisioning/closing accounts. account_id soft-captured read-only. Bodies UNPROVEN. Covers: createaccount(POST), deleteaccount(DELETE id), removeaccounts(DELETE collection w/ id list body).",
+      "steps": [
+        {
+          "name": "list-organization-accounts",
+          "method": "GET",
+          "path": "/v1/organization-accounts",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "account_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "acct"
+        },
+        {
+          "name": "show-organization-account",
+          "method": "GET",
+          "path": "/v1/organization-accounts/{account_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "acct",
+          "_note": "Read-only id-bound GET on the soft-captured account id (closes GAP-get-id for showaccount)."
+        },
+        {
+          "name": "create-organization-account",
+          "method": "POST",
+          "path": "/v1/organization-accounts",
+          "json": {
+            "name": "regr-acct-{unique}",
+            "email": "kchoic.ai+regr{unique}@gmail.com"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "acct-create",
+          "_note": "Creating a member account is billable and provisions real infrastructure. NOT chained to a delete on purpose. Expected 403 on a non-master account. Body (name/email) UNPROVEN."
+        },
+        {
+          "name": "delete-organization-account",
+          "method": "DELETE",
+          "path": "/v1/organization-accounts/{account_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "acct-delete",
+          "_note": "destructive — closes/detaches a real member account. Guarded; expected 403 on a shared account."
+        },
+        {
+          "name": "remove-organization-accounts",
+          "method": "DELETE",
+          "path": "/v1/organization-accounts",
+          "json": {
+            "ids": ["{account_id}"]
+          },
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "acct-remove",
+          "_note": "Bulk remove member accounts (id list body). Guarded; body shape 'ids' UNPROVEN."
+        }
+      ]
+    },
+    {
+      "id": "org-service-control-policies-guarded",
+      "service": "management/organization",
+      "enabled": true,
+      "heavy": true,
+      "_note": "SERVICE CONTROL POLICIES (SCPs) are the single most dangerous resource in the platform: an SCP attached at the org/OU root can DENY actions account-wide and lock every member (including admins) out of services — restricting or damaging the whole hierarchy, and the effect is immediate. COVERAGE-ONLY guarded calls: every mutating step is optional with a broad expect_status so the expected 403 on a non-master account records coverage WITHOUT creating a live deny policy. We deliberately DO NOT chain create->attach; an SCP is never attached to a target by this lifecycle. policy_id soft-captured read-only. policy_document mirrors the IAM USER_DEFINED policy shape (Version 2024-07-01) as a best-effort, UNPROVEN guess. Covers: createservicecontrolpolicy(POST), setservicecontrolpolicy(PUT id), deleteservicecontrolpolicies(DELETE collection w/ id list body).",
+      "steps": [
+        {
+          "name": "list-service-control-policies",
+          "method": "GET",
+          "path": "/v1/service-control-policies",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "scp_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "scp"
+        },
+        {
+          "name": "create-service-control-policy",
+          "method": "POST",
+          "path": "/v1/service-control-policies",
+          "json": {
+            "name": "regr-scp-{unique}",
+            "description": "API regression coverage probe — DENY-only, never attached",
+            "policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "RegrProbeNoOp",
+                  "Effect": "Deny",
+                  "Action": ["organization:DeleteOrganization"],
+                  "Resource": ["*"]
+                }
+              ]
+            }
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scp-create",
+          "_note": "Even on a master account this only CREATES an unattached policy (no enforcement until attached, which we never do). Expected 403 on a shared/non-master account. policy_document shape UNPROVEN."
+        },
+        {
+          "name": "show-service-control-policy",
+          "method": "GET",
+          "path": "/v1/service-control-policies/{scp_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scp",
+          "_note": "Read-only id-bound GET on the soft-captured SCP id (closes GAP-get-id for showservicecontrolpolicy)."
+        },
+        {
+          "name": "set-service-control-policy",
+          "method": "PUT",
+          "path": "/v1/service-control-policies/{scp_id}",
+          "json": {
+            "name": "regr-scp-{unique}",
+            "description": "API regression coverage probe (update)"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scp"
+        },
+        {
+          "name": "delete-service-control-policies",
+          "method": "DELETE",
+          "path": "/v1/service-control-policies",
+          "json": {
+            "ids": ["{scp_id}"]
+          },
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "scp-delete",
+          "_note": "Collection DELETE (id list body). Guarded; body shape 'ids' UNPROVEN."
+        }
+      ]
+    },
+    {
+      "id": "org-policy-bindings-and-delegation-guarded",
+      "service": "management/organization",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Policy bindings ATTACH an SCP to a target (org/OU/account) — this is the step that ACTIVATES a deny policy and can lock the hierarchy. Delegation policies grant a member account delegated admin over org resources. Both are high blast radius. COVERAGE-ONLY guarded calls: optional + broad expect_status, expected 403 on a non-master account, so no real binding/delegation is created. policy_id/target ids soft-captured read-only. Bodies UNPROVEN. Covers: attachpolicybindings(POST assignments/policy-bindings), removepolicybindings(DELETE assignments/policy-bindings), createdelegationpolicy(POST), setdelegationpolicy(PUT), deletedelegationpolicy(DELETE).",
+      "steps": [
+        {
+          "name": "list-scps-for-binding",
+          "method": "GET",
+          "path": "/v1/service-control-policies",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "scp_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "binding"
+        },
+        {
+          "name": "list-targets-for-binding",
+          "method": "GET",
+          "path": "/v1/organization-units",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "target_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "binding"
+        },
+        {
+          "name": "attach-policy-bindings",
+          "method": "POST",
+          "path": "/v1/assignments/policy-bindings",
+          "json": {
+            "policy_id": "{scp_id}",
+            "target_ids": ["{target_id}"]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "binding",
+          "_note": "ATTACHING a deny SCP is what activates enforcement. Guarded — expected 403; body UNPROVEN. Placed after its soft-captured inputs so it isolates if either is missing."
+        },
+        {
+          "name": "remove-policy-bindings",
+          "method": "DELETE",
+          "path": "/v1/assignments/policy-bindings",
+          "json": {
+            "policy_id": "{scp_id}",
+            "target_ids": ["{target_id}"]
+          },
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "binding-remove",
+          "_note": "Detach binding (id body). Guarded; body UNPROVEN."
+        },
+        {
+          "name": "show-delegation-policy",
+          "method": "GET",
+          "path": "/v1/delegation-policies",
+          "expect_status": [200, 403, 404],
+          "optional": true,
+          "group": "delegation"
+        },
+        {
+          "name": "create-delegation-policy",
+          "method": "POST",
+          "path": "/v1/delegation-policies",
+          "json": {
+            "policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "RegrProbe",
+                  "Effect": "Allow",
+                  "Action": ["organization:ListAccounts"],
+                  "Resource": ["*"]
+                }
+              ]
+            }
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "delegation-create",
+          "_note": "Delegates org admin to a member account. Guarded; body UNPROVEN."
+        },
+        {
+          "name": "set-delegation-policy",
+          "method": "PUT",
+          "path": "/v1/delegation-policies",
+          "json": {
+            "policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "RegrProbe",
+                  "Effect": "Allow",
+                  "Action": ["organization:ListAccounts"],
+                  "Resource": ["*"]
+                }
+              ]
+            }
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "delegation-set"
+        },
+        {
+          "name": "delete-delegation-policy",
+          "method": "DELETE",
+          "path": "/v1/delegation-policies",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "delegation-delete"
+        }
+      ]
+    },
+    {
+      "id": "org-invitations-guarded",
+      "service": "management/organization",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Invitations bring an external account into THIS organization (or invite this account into another). Accepting/declining changes real membership. COVERAGE-ONLY guarded calls: optional + broad expect_status, expected 403/400/404 on a shared account, so no real invitation is sent or membership changed. invitation_id soft-captured from the read-only account-invitations/organization-invitations lists. Bodies UNPROVEN. Covers: createinvitation(POST), cancelinvitations(PUT cancel), acceptinvitation(PUT id/accept), declineinvitation(PUT id/decline).",
+      "steps": [
+        {
+          "name": "list-organization-invitations",
+          "method": "GET",
+          "path": "/v1/organization-invitations",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "invitation_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "invite"
+        },
+        {
+          "name": "list-account-invitations",
+          "method": "GET",
+          "path": "/v1/account-invitations",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "invitation_id": "$.contents[0].id"
+          },
+          "optional": true,
+          "group": "invite",
+          "_note": "Second read-only id source (this account's inbound invitations); overrides invitation_id when present."
+        },
+        {
+          "name": "create-invitation",
+          "method": "POST",
+          "path": "/v1/invitations",
+          "json": {
+            "email": "kchoic.ai+orginvite{unique}@gmail.com",
+            "message": "API regression coverage probe"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "invite-create",
+          "_note": "Sends an org invitation. Guarded — expected 403 on a non-master account; body UNPROVEN. NOT chained to accept (we never alter real membership)."
+        },
+        {
+          "name": "cancel-invitations",
+          "method": "PUT",
+          "path": "/v1/invitations/cancel",
+          "json": {
+            "ids": ["{invitation_id}"]
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "invite-cancel",
+          "_note": "Cancel pending invitations (id list body). Guarded; body UNPROVEN."
+        },
+        {
+          "name": "accept-invitation",
+          "method": "PUT",
+          "path": "/v1/invitations/{invitation_id}/accept",
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "invite-accept",
+          "_note": "Accepting joins THIS account to another org — changes real membership. Guarded; expected 404/400 (no pending invitation) or 403."
+        },
+        {
+          "name": "decline-invitation",
+          "method": "PUT",
+          "path": "/v1/invitations/{invitation_id}/decline",
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "invite-decline",
+          "_note": "Decline a pending invitation. Guarded; expected 404/400 when none pending."
+        }
+      ]
+    }
+  ]
+}

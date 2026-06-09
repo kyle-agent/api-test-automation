@@ -1,0 +1,59 @@
+{
+  "lifecycles": [
+    {
+      "id": "networking-security-group-update",
+      "service": "networking/security-group",
+      "enabled": true,
+      "_note": "Closes the 1 remaining SG write gap: PUT /v1/security-groups/{security_group_id} (setsecuritygroup), an in-place update sub-op NOT covered by the existing 'networking-security-group' lifecycle (which only covers create SG + rule). Light, self-contained, REAL reversible create: SGs are account/region-scoped (no VPC needed, per validated VM/ske lifecycles, knowledge/validated-facts.md). Create SG -> capture $.security_group.id -> GET -> PUT (rename/redescribe) -> DELETE. PUT body (name/description/loggable) mirrors the proven createsecuritygroup body shape; the 'name' field reuses the proven SG name pattern. UNPROVEN: that setsecuritygroup accepts exactly these fields (no api_bodies.json entry for setsecuritygroup) — promote after a live 2xx. Distinct id from the existing 'networking-security-group' lifecycle (no collision).",
+      "steps": [
+        {
+          "name": "create-sg",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsgupd{unique}",
+            "description": "API regression suite — set/update probe",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "get-sg",
+          "method": "GET",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [200]
+        },
+        {
+          "name": "set-sg",
+          "method": "PUT",
+          "path": "/v1/security-groups/{sg_id}",
+          "json": {
+            "name": "regrsgupd{unique}",
+            "description": "API regression suite — updated description",
+            "loggable": false
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "sg-update",
+          "_note": "In-place update (setsecuritygroup). Body fields name/description/loggable mirror createsecuritygroup; UNPROVEN that PUT accepts these. optional+broad expect_status so a 4xx still records coverage without failing the run."
+        },
+        {
+          "name": "delete-sg",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

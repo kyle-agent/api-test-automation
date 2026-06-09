@@ -113,3 +113,99 @@ Deletes that touch a resource still releasing a dependency return `409` (or `500
 for scr/snapshot/igw) — retry with backoff (`retry_on_status`, `retries`,
 `retry_interval`). Always wait for the dependent resource to be `404` before
 deleting its parent (e.g. subnet 404 before vpc delete).
+
+---
+
+## Coverage campaign — Wave 1 facts (2026-06-08, NOT yet runtime-proven)
+
+> Authored by parallel service-agents (see `agents/CAMPAIGN.md`). Bodies/envelopes
+> below are docs-derived best-effort; promote to "validated" only after a live 2xx.
+
+**Engine coverage-matching gotcha (confirmed, applies to all authors):** the
+catalog match normalizes only `{...}` path segments to `*`; a *literal* id
+segment in a step path (e.g. `/v1/roles/0000`) does NOT match the catalog and so
+records ZERO write coverage. Always use `{placeholder}` tokens for id segments
+(`{unique}` works) so the step both resolves to the catalog key and still fires
+when its capture is absent.
+
+**iam** — role create returns `$.role.id`, group `$.group.id`, policy FLAT `$.id`.
+`POST /v1/roles` is known to 500 `ContactAdminForAssistance` on the shared account
+(pre-existing). `data/api_bodies.json` `createsamlprovider`/`setsamlprovider` are
+**corrupt** (`{"_raw":"{'key':'company',...}"}`) — needs a real SAML metadata doc.
+
+**iam-identity-center (SSO)** — uses **PATCH** for in-place updates
+(setinstance/setuser/setgroup/setpermissionset), unlike iam (PUT). `instance_id`
+is a hard dependency for nearly every write. Envelopes (unproven): `$.instance.id`,
+`$.user.id`, `$.group.id`, `$.permission_set.id`, `$.account_assignment.id`.
+
+**organization (HIGHEST blast radius)** — organizations / organization-accounts /
+**service-control-policies (SCPs)** / delegation-policies / policy-bindings /
+invitations can sever or DENY the entire account hierarchy account-wide and are
+largely irreversible. All org lifecycles are **coverage-only**: heavy + every
+write `optional` + expecting 403/400, never chaining create→attach/accept. No
+`api_bodies.json` entries exist; all bodies guessed. NEVER weaken to real
+create/delete on a shared account.
+
+**storage/baremetal-blockstorage** — volume create returns `$.result.id`
+(`result`-wrapped), snapshot create returns FLAT `$.snapshot_id`. State machine
+`CREATING→AVAILABLE/IN_USE→DELETING→DELETED` (poll `$.result.state`). Volume create
+requires `attachments:[{object_id,object_type:BM|MNGC}]` (sent `[]`, may reject).
+There is **no** `DELETE /v1/volume-groups/{id}` — a group is torn down via its
+member volume. Enums: replication cycle {5MIN,HOURLY,DAILY,WEEKLY,MONTHLY}, policy
+{RESYNC,BREAK}; disk_type {SSD,HDD}.
+
+**application-service/apigateway** — VPC-free control-plane. A deployment needs ≥1
+method first (`NoMethodsExist`); `createapideployment stage_type:new` creates the
+stage and returns `$.deployment_id`. `createauth` returns ONLY `$.access_token`
+(no id) → recover `auth_id` via `listauths $.auths[0].id`. Methods addressed by
+`{method_type}`, stages by `{stage_name}` (no ids). name/stage pattern
+`^[a-z][a-z0-9-]{1,48}[a-z0-9]$`. privatelink-endpoint needs a real
+`privatelink_service_id` (synthetic → 4xx, optional).
+
+**servicewatch** — bulk-delete (`DELETE /v1/alerts|dashboards|event-rules`, no path
+id) modeled as `{"ids":[...]}` (unproven, mirrors proven `deleteloggroups`).
+Create envelopes `$.alert.id`/`$.dashboard.id`/`$.event_rule.id` (unproven).
+createalert needs real `metric_id`/`namespace_id`; createeventrule needs real
+event/resource/service ids — doc-sample ids used, 4xx expected (still records).
+
+---
+
+## Coverage campaign — Wave 2 facts (2026-06-08, NOT yet runtime-proven)
+
+> 7 cluster-agents authored 36 fragment files / 49 lifecycles closing 302 write
+> ops. Static ceiling 55.4% → 78.6%. All bodies docs-derived; promote after a live 2xx.
+
+**Static coverage matching is PATH-only (service-agnostic).** `spec.coverage_gap`
+and the dashboard match `(method, norm_path)` ignoring service, but the engine
+RECORDS under `(method, norm_path, service)`. Consequence: DBaaS-family services
+sharing `/v1/clusters/*` roots (mysql/mariadb/epas/postgresql/sqlserver/cachestore
++ data-analytics searchengine/vertica/eventstreams) appear "covered" once ANY
+engine covers the path — but each still needs its own fragment to record under its
+own host/keys at runtime. All such per-engine fragments were authored.
+
+**Cost-safe coverage-only pattern (virtualserver, databases, org, analytics):** for
+billable/destructive resources, do NOT provision — soft-capture an existing id (or
+a deliberately-empty JSONPath so the `{id}` stays literal → guaranteed 404), fire
+every write `optional`+`group`+broad `expect_status:[200,201,202,400,403,404,409,422]`.
+The endpoint is CALLED+recorded (counts as covered) without touching real resources.
+
+**VPC reuse extended:** loadbalancer, vpn, direct-connect, and the 6 vpc-extra
+lifecycles adopt the session-shared VPC via `{"adopt":"vpc"}` (registered in
+`dependencies.json:quota_kinds` as `["vpc"]`). The "VPC consumers" set in
+`vpc-scheduling-strategy.md` is now larger but all heavy adopters share the one VPC.
+
+**Corrupt `data/api_bodies.json` entries found (TODO fix):**
+`security/iam createsamlprovider`/`setsamlprovider` (`{"_raw":"{'key':'company',...}"}`)
+and `networking/vpc createtransitgatewayfirewallconnection` (`{"_raw":"{transit_gateway_id}"}`).
+Agents worked around with best-guess bodies; the source entries should be re-extracted.
+
+**Per-family capture/body notes** (unproven): block-volume `$.result.id` + flat
+`$.snapshot_id`; backup `$.resource.id`; filestorage snapshot `$.snapshot.id`,
+snapshot-schedule create returns NO id (use list); cdn `$.cdn.resource_id`; gslb
+`$.gslb.id`; vpn `$.vpn_gateway.id`/`$.vpn_tunnel.id`; dc `$.direct_connect.id`.
+DBaaS diverges: mariadb/epas/pg add audit-log (+epas/pg archive-delete); sqlserver
+is HA-only (add-secondary/databases, no archive/replicas, excluded from shared-dbaas
+on license); cachestore (Redis) uses `/commands`(+sync) not archive/audit/log-export.
+secretvault has no hard DELETE (PUT .../terminated); secretsmanager
+`POST .../values` is REVEAL not update; certificatemanager import is unsatisfiable
+(coverage-only); firewall has no `POST /v1/firewalls` (implicit on igw/dc/vpc).

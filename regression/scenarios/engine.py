@@ -51,7 +51,12 @@ _HERE = Path(__file__).parent
 SCENARIOS_PATH = _HERE / "scenarios.json"
 DEPENDENCIES_PATH = _HERE / "dependencies.json"
 
-LIFECYCLES = json.loads(SCENARIOS_PATH.read_text())["lifecycles"]
+# Base scenarios.json + every per-service fragment under lifecycles/ (see
+# regression.scenarios.loader). One merged list so the engine, dashboard, and
+# gap analyzer all agree on the lifecycle set.
+from regression.scenarios.loader import load_lifecycles  # noqa: E402
+
+LIFECYCLES = load_lifecycles()
 DEPENDENCIES = json.loads(DEPENDENCIES_PATH.read_text())
 _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 
@@ -90,6 +95,26 @@ def _catalog_key_for(method: str, templated_path: str, service: str | None):
 # budget is consulted as DATA, not hardcoded.
 _VPC_CREATE_PATH = "/v1/vpcs"
 
+# Shared-resource adoption (knowledge/vpc-scheduling-strategy.md). A step marked
+# {"adopt": "<kind>"} reuses a session-shared resource instead of creating its
+# own, so the heavy lifecycles don't each consume a slot against the 5-VPC cap.
+# Maps adopt kind -> the ctx var holding the shared resource id (seeded from the
+# shared_ctx the pytest fixture builds via provision_shared_vpc). When the shared
+# id is absent (no fixture / mutations off) an adopt step is a NO-OP and the
+# lifecycle falls back to its own create/delete (so this can never regress CRUD).
+_ADOPT_SHARED = {"vpc": "shared_vpc_id", "subnet": "shared_subnet_id"}
+_SHARED_VPC_CIDR = "10.124.0.0/20"
+# Shared subnet carved from the first /24 of the shared VPC's /20. ADOPT-class
+# lifecycles re-home their fixed host IPs into this range (10.124.0.x) so that
+# parallel adopters do not collide on the SAME host IP in the ONE shared subnet
+# (see knowledge/vpc-scheduling-strategy.md fixed-IP map).
+_SHARED_SUBNET_CIDR = "10.124.0.0/24"
+_SUBNET_CREATE_PATH = "/v1/subnets"
+# Env keys for cross-process (xdist) adoption of an already-live shared VPC/subnet
+# provisioned once by regression.scenarios.shared_infra --provision.
+_ENV_SHARED_VPC = "SCP_SHARED_VPC_ID"
+_ENV_SHARED_SUBNET = "SCP_SHARED_SUBNET_ID"
+
 
 # --------------------------------------------------------------------------- #
 # categorize + recording (dual-write)
@@ -115,9 +140,15 @@ def _record_smoke(status, category, key, method, path, elapsed_ms=None):
         category=category, elapsed_ms=elapsed_ms, source="crud_probe"))
     import os
     ems = "" if elapsed_ms is None else f"{elapsed_ms:.0f}"
+    # Under pytest-xdist each worker writes its OWN smoke shard (smoke_status-gw0.tsv)
+    # so parallel workers don't interleave lines on one file; the workflow's
+    # "Merge per-worker results" step concatenates the shards back into
+    # reports/smoke_status.tsv (loaders glob canonical + shards).
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "")
+    tsv = _SMOKE_TSV if not worker else _SMOKE_TSV.replace(".tsv", f"-{worker}.tsv")
     try:
         os.makedirs("reports", exist_ok=True)
-        with open(_SMOKE_TSV, "a") as fh:
+        with open(tsv, "a") as fh:
             fh.write(f"{status}\t{category}\t{key}\t{method}\t{path}\t{ems}\n")
     except OSError:
         pass
@@ -362,7 +393,8 @@ class LifecycleSkip(Exception):
 
 def run_lifecycle(lifecycle: dict, client, cfg, *,
                   budget: _budgets.Budget | None = None,
-                  resource_registry: ResourceRegistry | None = None) -> dict:
+                  resource_registry: ResourceRegistry | None = None,
+                  shared_ctx: dict | None = None) -> dict:
     """Run one lifecycle's steps in order. Returns a result dict
     ``{id, status: 'passed'|'skipped'|'failed', reason?, failed_groups, created}``.
 
@@ -393,6 +425,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
     }
+    # Seed shared resources (e.g. a session-shared VPC) so {"adopt": ...} steps
+    # reuse them instead of creating their own.
+    if shared_ctx:
+        ctx.update({k: str(v) for k, v in shared_ctx.items() if v})
 
     # Teardown stack of (label, method, path, service, json, group, budget_kind).
     cleanups: list[tuple] = []
@@ -443,6 +479,32 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             grp = step.get("group")
             if grp and grp in failed_groups:
                 continue  # an earlier step in this group failed — skip the rest
+
+            # Shared-resource adoption: reuse a session-shared resource instead of
+            # creating/deleting our own (so heavy lifecycles share one VPC rather
+            # than each consuming a slot against the 5-VPC cap). NO-OP when the
+            # shared id is absent — the lifecycle then self-creates as before.
+            _adopt = step.get("adopt")
+            if _adopt:
+                _shared_val = ctx.get(_ADOPT_SHARED.get(_adopt, ""))
+                if _shared_val:
+                    _m = step.get("method", "").upper()
+                    if _m == "POST":  # adopt: skip the create, seed its capture vars
+                        for _v in step.get("capture", {}):
+                            ctx[_v] = _shared_val
+                        print(f"  [{lifecycle['id']}] adopting shared {_adopt}="
+                              f"{_shared_val} (skip create '{step['name']}')")
+                        continue
+                    if _m == "DELETE":  # retain shared resource — fixture tears it down
+                        print(f"  [{lifecycle['id']}] retaining shared {_adopt} "
+                              f"(skip delete '{step['name']}')")
+                        continue
+                    if _m == "GET":  # e.g. wait-<x>-gone — pointless on a retained
+                        # shared resource (it never 404s); skip to avoid a long poll.
+                        print(f"  [{lifecycle['id']}] skipping '{step['name']}' "
+                              f"(shared {_adopt} retained, not deleted)")
+                        continue
+
             step_service = step.get("service") or service
             if step.get("wait"):
                 time.sleep(float(step["wait"]))
@@ -649,3 +711,123 @@ def run_all(client, cfg, *, budget: _budgets.Budget | None = None,
     for lc in active_lifecycles():
         out.append(run_lifecycle(lc, client, cfg, budget=budget, resource_registry=reg))
     return out
+
+
+def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | None = None):
+    """Create ONE VPC + ONE subnet (both ACTIVE) for the heavy/ADOPT-class
+    lifecycles to ADOPT, so they don't each create their own against the 5-VPC
+    cap (knowledge/vpc-scheduling-strategy.md).
+
+    Returns ``(shared_ctx, teardown)`` where ``shared_ctx`` is
+    ``{"shared_vpc_id": <id>, "shared_subnet_id": <id>}`` (subnet key omitted if
+    the subnet could not be created — adopters then self-create their own subnet
+    under the shared VPC), or ``{}`` if nothing could be provisioned (callers
+    then fall back to per-lifecycle self-create). ``teardown()`` deletes the
+    subnet THEN the VPC at session end. Both are owner/run/ttl-tagged so the
+    reconciler sweep reclaims them even if teardown is skipped.
+
+    ENV-AWARE: if ``SCP_SHARED_VPC_ID`` (and optionally ``SCP_SHARED_SUBNET_ID``)
+    are set, ADOPT those already-live ids — no create, teardown is a no-op (the
+    provisioner process owns teardown). This lets pytest-xdist workers all adopt
+    the SAME live infra provisioned once out-of-band (shared_infra --provision).
+
+    No-op ``({}, noop)`` unless mutations are allowed.
+    """
+    import os
+    noop = ({}, lambda: None)
+
+    # 1) ENV adoption — ids already provisioned out-of-band (xdist / CI). Adopt
+    #    them; never create/teardown here (the provisioner owns the lifecycle).
+    env_vpc = os.environ.get(_ENV_SHARED_VPC, "").strip()
+    if env_vpc:
+        ctx = {"shared_vpc_id": env_vpc}
+        env_sub = os.environ.get(_ENV_SHARED_SUBNET, "").strip()
+        if env_sub:
+            ctx["shared_subnet_id"] = env_sub
+        print(f"  adopting pre-provisioned shared VPC={env_vpc}"
+              f"{' subnet=' + env_sub if env_sub else ''} (env)")
+        return ctx, (lambda: None)
+
+    if not cfg.allow_mutations:
+        return noop
+    reg = resource_registry if resource_registry is not None else ResourceRegistry()
+    uniq = format(int(time.time()), "x")
+    body = _inject_owner_tags({
+        # 'regrvpc' prefix (not 'regrshared') so the reconciler's VPC sweep AND
+        # its LB/NAT-by-vpc_id sweep (name_prefixes=('regrvpc','zznetvpc')) reclaim
+        # this shared VPC + its children even if a VPC list response omits tags.
+        "name": f"regrvpcshared{uniq}", "description": "API regression shared VPC",
+        "cidr": _SHARED_VPC_CIDR, "tags": [],
+    }, axis="regression")
+    create = {"name": "create-shared-vpc", "method": "POST", "service": "vpc"}
+    resp = _run_step(client, create, _VPC_CREATE_PATH, body, "vpc", {})
+    if resp.status not in (200, 201, 202) or not resp.body:
+        print(f"  shared-VPC provision failed ({resp.status}); heavy lifecycles "
+              f"will self-create. {(resp.raw_text or '')[:200]}")
+        return noop
+    vpc_id = _capture(resp.body, "$.vpc.id")
+    if not vpc_id:
+        return noop
+    vpc_id = str(vpc_id)
+    # poll to ACTIVE so adopters can build under it immediately
+    wait = {"name": "wait-shared-vpc", "method": "GET", "service": "vpc",
+            "poll": {"field": "$.vpc.state",
+                     "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
+                     "timeout": 300, "interval": 10}}
+    _run_step(client, wait, f"{_VPC_CREATE_PATH}/{vpc_id}", None, "vpc", {})
+    reg.track(ResourceRecord(service="vpc",
+                             delete_path=f"{_VPC_CREATE_PATH}/{vpc_id}",
+                             resource_id=vpc_id, kind="vpc", parent="shared"))
+    print(f"  shared VPC provisioned: {vpc_id} ({_SHARED_VPC_CIDR})")
+
+    # 2) shared SUBNET under the shared VPC (mirrors a create-subnet step body in
+    #    scenarios.json: name/description/cidr/type=GENERAL/vpc_id/tags). Carved
+    #    from the first /24 of the VPC's /20.
+    subnet_id = None
+    sub_body = _inject_owner_tags({
+        "name": f"regrsubshared{uniq}", "description": "API regression shared subnet",
+        "cidr": _SHARED_SUBNET_CIDR, "type": "GENERAL", "vpc_id": vpc_id, "tags": [],
+    }, axis="regression")
+    sub_create = {"name": "create-shared-subnet", "method": "POST", "service": "vpc"}
+    sresp = _run_step(client, sub_create, _SUBNET_CREATE_PATH, sub_body, "vpc", {})
+    if sresp.status in (200, 201, 202) and sresp.body:
+        subnet_id = _capture(sresp.body, "$.subnet.id")
+        if subnet_id:
+            subnet_id = str(subnet_id)
+            swait = {"name": "wait-shared-subnet", "method": "GET", "service": "vpc",
+                     "poll": {"field": "$.subnet.state",
+                              "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
+                              "timeout": 300, "interval": 10}}
+            _run_step(client, swait, f"{_SUBNET_CREATE_PATH}/{subnet_id}",
+                      None, "vpc", {})
+            reg.track(ResourceRecord(service="vpc",
+                                     delete_path=f"{_SUBNET_CREATE_PATH}/{subnet_id}",
+                                     resource_id=subnet_id, kind="subnet",
+                                     parent=vpc_id))
+            print(f"  shared subnet provisioned: {subnet_id} ({_SHARED_SUBNET_CIDR})")
+    if not subnet_id:
+        print(f"  shared-subnet provision failed ({sresp.status}); adopters will "
+              f"self-create a subnet under the shared VPC.")
+
+    def teardown():
+        if not cfg.allow_destructive:
+            return
+        # subnet THEN vpc (children before parent)
+        if subnet_id:
+            try:
+                client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{subnet_id}",
+                               service="vpc")
+                print(f"  shared subnet {subnet_id} deleted")
+            except Exception as exc:
+                print(f"  shared subnet {subnet_id} delete failed ({exc}); "
+                      f"sweep will reclaim")
+        try:
+            client.request("DELETE", f"{_VPC_CREATE_PATH}/{vpc_id}", service="vpc")
+            print(f"  shared VPC {vpc_id} deleted")
+        except Exception as exc:  # best-effort; the tag-scoped sweep is the backstop
+            print(f"  shared VPC {vpc_id} delete failed ({exc}); sweep will reclaim")
+
+    ctx = {"shared_vpc_id": vpc_id}
+    if subnet_id:
+        ctx["shared_subnet_id"] = subnet_id
+    return ctx, teardown

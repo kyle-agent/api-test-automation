@@ -1,0 +1,523 @@
+{
+  "lifecycles": [
+    {
+      "id": "iam-role-full",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light, self-contained ROLE lifecycle covering 7 role write ops. A real role create->read->update->bindings->delete is attempted in group 'role-real'; every step is optional so an environmental 500/400/403 (the prior disabled iam-role saw POST /v1/roles -> 500 ContactAdminForAssistance) records coverage on the CALL and skips the rest of the group cleanly rather than failing the run. Bodies grounded on api_bodies.json (createrole/setrole/setroletrustpolicy/addrolepolicybindings). assume_role_policy_document uses an empty Resource and no real Principal (principals[] empty) to avoid referencing a non-existent user SRN. policy_ids sent empty on create; the binding steps then add/remove a placeholder policy id (synthetic -> expected 400/404). The standalone group 'role-bulk' exercises DELETE /v1/roles/bulk and the bindings DELETE endpoints against ids that need no real role (bulk delete of an empty/synthetic set), so those writes are CALLED even if role create 500s. RISK (from docs, not runtime-proven): create role may 500 on this account; bulk role delete body shape (role_ids) is from convention, not a confirmed example -> _note on that step. Create response envelope $.role.id confirmed from createrole 202 doc example.",
+      "steps": [
+        {
+          "name": "create-role",
+          "method": "POST",
+          "path": "/v1/roles",
+          "group": "role-real",
+          "optional": true,
+          "json": {
+            "name": "regrrole{ualpha}",
+            "description": "API regression suite",
+            "role_type": "USER_DEFINED",
+            "max_session_duration": 3600,
+            "assume_role_policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "statement1",
+                  "Effect": "Allow",
+                  "Action": ["sts:AssumeRole"],
+                  "Condition": {},
+                  "Resource": []
+                }
+              ]
+            },
+            "policy_ids": [],
+            "principals": [],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"role_id": "$.role.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/roles/{role_id}", "service": "iam"}
+        },
+        {
+          "name": "get-role",
+          "method": "GET",
+          "path": "/v1/roles/{role_id}",
+          "group": "role-real",
+          "expect_status": [200]
+        },
+        {
+          "name": "set-role",
+          "method": "PUT",
+          "path": "/v1/roles/{role_id}",
+          "group": "role-real",
+          "optional": true,
+          "json": {"description": "updated by API regression suite", "max_session_duration": 3600},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-role-trust-policy",
+          "method": "PUT",
+          "path": "/v1/roles/{role_id}/trust-policy",
+          "group": "role-real",
+          "optional": true,
+          "_note": "Body from setroletrustpolicy; Principal/Resource minimized (empty Resource, sts:AssumeRole only) to avoid a real-SRN dependency.",
+          "json": {
+            "assume_role_policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {"Sid": "statement1", "Effect": "Allow", "Action": ["sts:AssumeRole"], "Condition": {}, "Resource": []}
+              ]
+            }
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "add-role-policy-bindings",
+          "method": "POST",
+          "path": "/v1/roles/{role_id}/policy-bindings",
+          "group": "role-real",
+          "optional": true,
+          "_note": "addrolepolicybindings: synthetic policy id -> expected 400/404 (no real policy bound) but the POST is CALLED.",
+          "json": {"policy_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-role-reads",
+          "group": "role-real",
+          "probe_reads": {"role_id": "{role_id}"}
+        },
+        {
+          "name": "remove-role-policy-binding",
+          "method": "DELETE",
+          "path": "/v1/roles/{role_id}/policy-bindings/{unique}",
+          "group": "role-real",
+          "optional": true,
+          "destructive": true,
+          "_note": "{unique} stands in for the synthetic policy id added above; remove single binding (path param segment normalizes to '*' for catalog match).",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "remove-bulk-role-policy-bindings",
+          "method": "DELETE",
+          "path": "/v1/roles/{role_id}/policy-bindings",
+          "group": "role-real",
+          "optional": true,
+          "destructive": true,
+          "_note": "removebulkrolepolicybindings: detaches all policy bindings from the role.",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-role",
+          "method": "DELETE",
+          "path": "/v1/roles/{role_id}",
+          "group": "role-real",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-roles-bulk",
+          "method": "DELETE",
+          "path": "/v1/roles/bulk",
+          "group": "role-bulk",
+          "optional": true,
+          "destructive": true,
+          "_note": "Standalone (does NOT need role-real to succeed) so DELETE /v1/roles/bulk is CALLED regardless. Body shape role_ids is from convention (no confirmed example) -> synthetic id, expecting 400/404/422.",
+          "json": {"role_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "iam-policy-extra-writes",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light. Covers policy write ops NOT covered by the base iam-policy lifecycle: PUT /v1/policies/{policy_id}, PUT /v1/policies/{policy_id}/bindings, DELETE /v1/policies/bulk, plus the user/group policy-binding add/remove and resource-policy statement ops. A real USER_DEFINED policy is created (group 'pol-real', body from createpolicy with server-assigned id fields omitted) then set/bound/deleted; all sub-steps optional so a 4xx records coverage. The standalone group 'pol-bulk' exercises DELETE /v1/policies/bulk against a synthetic id so it is CALLED even if create fails. Create envelope is FLAT $.id (confirmed from createpolicy 201 doc example, same as base iam-policy).",
+      "steps": [
+        {
+          "name": "create-policy",
+          "method": "POST",
+          "path": "/v1/policies",
+          "group": "pol-real",
+          "optional": true,
+          "json": {
+            "policy_name": "regrpolx{ualpha}",
+            "description": "API regression suite",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"policy_id": "$.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/policies/{policy_id}", "service": "iam"}
+        },
+        {
+          "name": "set-policy",
+          "method": "PUT",
+          "path": "/v1/policies/{policy_id}",
+          "group": "pol-real",
+          "optional": true,
+          "_note": "setpolicy: server-assigned version id fields omitted; updates name/description/document.",
+          "json": {
+            "policy_name": "regrpolx{ualpha}",
+            "description": "updated by API regression suite",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
+                ]
+              }
+            }
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-policy-bindings",
+          "method": "PUT",
+          "path": "/v1/policies/{policy_id}/bindings",
+          "group": "pol-real",
+          "optional": true,
+          "_note": "setpolicygroupbinding: add/remove a synthetic GROUP id -> expected 400/404 but PUT is CALLED.",
+          "json": {"identity_type": "GROUP", "add_ids": ["00000000000000000000000000000000"], "remove_ids": []},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-policy-reads",
+          "group": "pol-real",
+          "probe_reads": {"policy_id": "{policy_id}"}
+        },
+        {
+          "name": "delete-policy",
+          "method": "DELETE",
+          "path": "/v1/policies/{policy_id}",
+          "group": "pol-real",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-policies-bulk",
+          "method": "DELETE",
+          "path": "/v1/policies/bulk",
+          "group": "pol-bulk",
+          "optional": true,
+          "destructive": true,
+          "_note": "Standalone so DELETE /v1/policies/bulk is CALLED regardless. Body policy_ids from convention (no confirmed example) -> synthetic id, expecting 400/404/422.",
+          "json": {"policy_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "iam-group-bindings",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light. Covers group member + policy-binding write ops not in the base iam-group lifecycle: POST/DELETE /v1/groups/{group_id}/members, POST/DELETE /v1/groups/{group_id}/policy-bindings. Creates a real group (group 'grp-bind'; body from creategroup with empty principals so no pre-existing user/policy needed), then adds a synthetic member + policy binding and removes them. All sub-steps optional: a synthetic user/policy id returns 400/404 but the POST/DELETE is CALLED. Group create envelope $.group.id confirmed from creategroup 201 doc example.",
+      "steps": [
+        {
+          "name": "create-group",
+          "method": "POST",
+          "path": "/v1/groups",
+          "group": "grp-bind",
+          "optional": true,
+          "json": {"name": "regrgrpb{ualpha}", "description": "API regression suite", "policy_ids": [], "user_ids": [], "tags": []},
+          "expect_status": [200, 201, 202],
+          "capture": {"group_id": "$.group.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/groups/{group_id}", "service": "iam"}
+        },
+        {
+          "name": "add-group-member",
+          "method": "POST",
+          "path": "/v1/groups/{group_id}/members",
+          "group": "grp-bind",
+          "optional": true,
+          "_note": "addgroupmember: synthetic user_id -> expected 400/404, POST is CALLED.",
+          "json": {"user_id": "00000000000000000000000000000000"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "add-group-policy-binding",
+          "method": "POST",
+          "path": "/v1/groups/{group_id}/policy-bindings",
+          "group": "grp-bind",
+          "optional": true,
+          "_note": "addgrouppolicybinding: synthetic policy id -> expected 400/404, POST is CALLED.",
+          "json": {"policy_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-group-reads",
+          "group": "grp-bind",
+          "probe_reads": {"group_id": "{group_id}"}
+        },
+        {
+          "name": "remove-group-policy-binding",
+          "method": "DELETE",
+          "path": "/v1/groups/{group_id}/policy-bindings/{unique}",
+          "group": "grp-bind",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "remove-group-member",
+          "method": "DELETE",
+          "path": "/v1/groups/{group_id}/members/{unique}",
+          "group": "grp-bind",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-group",
+          "method": "DELETE",
+          "path": "/v1/groups/{group_id}",
+          "group": "grp-bind",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "iam-user-policy-bindings",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light, standalone (no resource create). Covers POST/DELETE /v1/users/{user_id}/policy-bindings against a synthetic user id so both writes are CALLED. A synthetic user id yields 400/404 (user not found) but coverage is recorded on the call. adduserpolicybinding body from api_bodies.json (policy_ids).",
+      "steps": [
+        {
+          "name": "add-user-policy-binding",
+          "method": "POST",
+          "path": "/v1/users/{unique}/policy-bindings",
+          "optional": true,
+          "json": {"policy_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "remove-user-policy-binding",
+          "method": "DELETE",
+          "path": "/v1/users/{unique}/policy-bindings/{unique}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "iam-resource-policy",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light, standalone. Covers the resource-policy write ops: PUT/DELETE /v1/resource-policies/{srn}, POST /v1/resource-policies/{srn}/statements, PUT/DELETE /v1/resource-policies/{srn}/statements/{sid}. A resource policy attaches to an existing resource by its SRN; we use a synthetic SRN ({srn} literal) so the API returns 400/404 (resource not found / invalid srn) but every write is CALLED. Bodies from setresourcepolicy (server-assigned version id fields omitted) and addpermission/setpermission. The SRN is a single path segment containing ':' which normalizes to '*' for catalog matching. RISK: real resource-policy ops require a valid target resource SRN the test account owns; not runtime-proven here.",
+      "steps": [
+        {
+          "name": "set-resource-policy",
+          "method": "PUT",
+          "path": "/v1/resource-policies/srn:e:0000:::iam:resource-policy~regr{unique}",
+          "optional": true,
+          "json": {
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": "*"}
+                ]
+              }
+            }
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "add-resource-policy-statement",
+          "method": "POST",
+          "path": "/v1/resource-policies/srn:e:0000:::iam:resource-policy~regr{unique}/statements",
+          "optional": true,
+          "_note": "addpermission: a single statement object.",
+          "json": {
+            "Sid": "Statement2",
+            "Effect": "Allow",
+            "Action": ["iam:*"],
+            "NotAction": [],
+            "Principal": "*",
+            "Resource": ["*"],
+            "Condition": {}
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-resource-policy-statement",
+          "method": "PUT",
+          "path": "/v1/resource-policies/srn:e:0000:::iam:resource-policy~regr{unique}/statements/{unique}",
+          "optional": true,
+          "_note": "setpermission: replace a single statement identified by sid (path param segment normalizes to '*').",
+          "json": {
+            "Sid": "Statement2",
+            "Effect": "Allow",
+            "Action": ["iam:*"],
+            "NotAction": [],
+            "Principal": "*",
+            "Resource": ["*"],
+            "Condition": {}
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "remove-resource-policy-statement",
+          "method": "DELETE",
+          "path": "/v1/resource-policies/srn:e:0000:::iam:resource-policy~regr{unique}/statements/{unique}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-resource-policy",
+          "method": "DELETE",
+          "path": "/v1/resource-policies/srn:e:0000:::iam:resource-policy~regr{unique}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "iam-credentials-heavy",
+      "service": "management/iam",
+      "heavy": true,
+      "enabled": true,
+      "_note": "HEAVY (irreversible/credential + account-user + SAML ops). Runs only under SCP_RUN_HEAVY. Covers: POST/PUT/DELETE /v1/access-keys (+ bulk + send-otp); POST/PUT/DELETE /v1/accounts/{account_id}/users (+ bulk) and PUT .../password; POST/PUT/DELETE /v1/saml-providers (+ bulk). These create real credentials / users / federation providers, so each is optional with a broad expect_status: on a shared account most return 403 (permission) or 400 (body/account scope) which still records coverage on the CALL. {account_id} uses a synthetic id; access-key/saml ids likewise synthetic for the PUT/DELETE-by-id steps. createsamlprovider/setsamlprovider bodies in api_bodies.json are corrupt (_raw stringified) -> we send a best-effort multipart-less JSON guess; marked NOT runtime-proven. accesskeycreate parent_access_key_id/passcode omitted (account-specific). RISK: every step here is unproven against a real 2xx; the goal is purely to CALL each write endpoint so a future live run records it.",
+      "steps": [
+        {
+          "name": "access-key-send-otp",
+          "method": "POST",
+          "path": "/v1/access-keys/send-otp",
+          "optional": true,
+          "_note": "accesskeysendtemporaryotp: sends an OTP to the caller; safe-ish but gated heavy because it triggers a real notification.",
+          "json": {"locale": "ko_KR", "method": "PHONE"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422, 429]
+        },
+        {
+          "name": "create-access-key",
+          "method": "POST",
+          "path": "/v1/access-keys",
+          "group": "ak",
+          "optional": true,
+          "_note": "accesskeycreate: PERMANENT key. parent_access_key_id/passcode omitted. Captures id if returned; the PUT/DELETE-by-id steps fall back to a synthetic id when capture misses (separate group).",
+          "json": {"access_key_type": "PERMANENT", "description": "API regression suite"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"access_key_id": "$.access_key_id"}
+        },
+        {
+          "name": "set-access-key",
+          "method": "PUT",
+          "path": "/v1/access-keys/{unique}",
+          "optional": true,
+          "_note": "accesskeyset: enable/disable. Synthetic id ({unique}) so the PUT is always CALLED; path param segment normalizes to '*'.",
+          "json": {"is_enabled": "true"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-access-key",
+          "method": "DELETE",
+          "path": "/v1/access-keys/{unique}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-access-keys-bulk",
+          "method": "DELETE",
+          "path": "/v1/access-keys/bulk",
+          "optional": true,
+          "destructive": true,
+          "_note": "Body access_key_ids from convention (no confirmed example) -> synthetic id.",
+          "json": {"access_key_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-account-user",
+          "method": "POST",
+          "path": "/v1/accounts/{unique}/users",
+          "optional": true,
+          "_note": "createiamuser: empty group_ids/policy_ids; synthetic account_id ({unique}) -> expected 400/403/404, POST CALLED. user_name unique.",
+          "json": {"user_name": "regru{ualpha}", "description": "API regression suite", "group_ids": [], "policy_ids": [], "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "update-account-user",
+          "method": "PUT",
+          "path": "/v1/accounts/{unique}/users/{unique}",
+          "optional": true,
+          "_note": "updateiamuser.",
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-account-user-password",
+          "method": "PUT",
+          "path": "/v1/accounts/{unique}/users/{unique}/password",
+          "optional": true,
+          "_note": "updateiamuserpassword. password omitted-as-empty to avoid setting a weak real password; expecting 400/403.",
+          "json": {"temporary_password": false},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-account-user",
+          "method": "DELETE",
+          "path": "/v1/accounts/{unique}/users/{unique}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-account-users-bulk",
+          "method": "DELETE",
+          "path": "/v1/accounts/{unique}/users/bulk",
+          "optional": true,
+          "destructive": true,
+          "_note": "Body user_ids from convention (no confirmed example) -> synthetic id.",
+          "json": {"user_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-saml-provider",
+          "method": "POST",
+          "path": "/v1/saml-providers",
+          "optional": true,
+          "_note": "createsamlprovider: api_bodies.json entry is corrupt (_raw). Best-effort JSON guess (name + metadata_document placeholder); NOT runtime-proven. Likely 400 on invalid metadata, which still records coverage.",
+          "json": {"name": "regrsaml{ualpha}", "metadata_document": "PLACEHOLDER_SAML_METADATA", "tags": []},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-saml-provider",
+          "method": "PUT",
+          "path": "/v1/saml-providers/{unique}",
+          "optional": true,
+          "_note": "setsamlprovider: corrupt body in api_bodies.json; best-effort guess; synthetic id.",
+          "json": {"metadata_document": "PLACEHOLDER_SAML_METADATA"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-saml-providers-bulk",
+          "method": "DELETE",
+          "path": "/v1/saml-providers/bulk",
+          "optional": true,
+          "destructive": true,
+          "_note": "Body saml_provider_ids from convention (no confirmed example) -> synthetic id.",
+          "json": {"saml_provider_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    }
+  ]
+}

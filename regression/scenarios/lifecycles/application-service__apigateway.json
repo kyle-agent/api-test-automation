@@ -1,0 +1,446 @@
+{
+  "lifecycles": [
+    {
+      "id": "apigateway-api-write-coverage",
+      "service": "application-service/apigateway",
+      "enabled": true,
+      "_note": "Light, VPC-FREE, self-contained. Creates its OWN api (does NOT touch application-apigateway-api-resource) and exercises the apigateway WRITE surface that the base lifecycle leaves uncovered: resource methods, deployments, stages (+config +active-deployment), auths, access-controls, resource-policies, usage-plans (+description +quota) and api-keys (+description). Each family lives in its own optional group keyed `xcov-*` so an environmental 4xx on one create records the CALL for coverage and tears down just that group, never failing the lifecycle. Bodies grounded from docs models (createstage/createmethod/createauth/createaccesscontrols/createusageplan/createapikey/createapideployment/set*) — example values from each model's Example string. PROVENANCE: from docs (best-effort), NOT runtime-proven. Key facts encoded from docs: createapideployment with stage_type=new creates a stage in one call and returns $.deployment_id (api_bodies.json createapideployment); a deployment requires >=1 method to exist first (existing base-lifecycle note: NoMethodsExist) so create-method runs before create-deployment; createstage body needs a real deployment_id (-> uses captured deployment_id); createmethod returns $.methods[] (no id) and methods are addressed by method_type in the path (GET); createauth returns only $.access_token (NO id) so auth_id is recovered via listauths $.auths[0].id; createaccesscontrols returns $.id directly; createusageplan -> $.usage_plan.id; createapikey -> $.api_key.id. Names match pattern ^[a-z][a-z0-9-]{1,48}[a-z0-9]$ (regr{ualpha} is lowercase-alpha, safe). resource-policy body mirrors the base lifecycle's proven shape (placeholder srn -> may 4xx but CALLs setresourcepolicy + deleteresourcepolicy).",
+      "steps": [
+        {
+          "name": "create-api",
+          "method": "POST",
+          "path": "/v1/apis",
+          "json": {
+            "name": "regrapiw{ualpha}",
+            "description": "API regression write-coverage",
+            "endpoint_type": "REGION",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"api_id": "$.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}", "service": "apigateway"}
+        },
+        {
+          "name": "find-root-resource",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/resources",
+          "expect_status": [200],
+          "capture": {"parent_id": "$.resources[0].id"}
+        },
+        {
+          "name": "create-resource",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/resources/{parent_id}",
+          "json": {"path_part": "regr{unique}"},
+          "expect_status": [200, 201, 202],
+          "capture": {"resource_id": "$.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}/resources/{resource_id}", "service": "apigateway"}
+        },
+
+        {
+          "name": "create-method",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods",
+          "optional": true,
+          "_note": "createmethod (MethodCreateRequestV1Dot3): HTTP integration with a reachable endpoint_url; method_type GET addresses set/delete in the path. Returns $.methods[] -> capture method_type for the set/delete paths (methods are addressed by method_type, not an id). Standalone optional (no group) so a 4xx here does not skip set/delete-method, which then run against the unfilled {method_type} placeholder for coverage.",
+          "json": {
+            "method_type": "GET",
+            "integration_type": "HTTP",
+            "endpoint_url": "https://example.com",
+            "api_key_required": false,
+            "iam_enabled": false,
+            "query_strings": {},
+            "request_headers": {}
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"method_type": "$.methods[0].method_type"},
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}", "service": "apigateway"}
+        },
+        {
+          "name": "set-method",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}",
+          "optional": true,
+          "_note": "setmethod (MethodSetRequestV1Dot3): query_strings/request_headers required (object[boolean]). Standalone optional: if create-method captured method_type=GET it targets the real method; if create-method failed the unfilled {method_type} placeholder yields a 404 but still CALLs setmethod for coverage.",
+          "json": {
+            "integration_type": "HTTP",
+            "endpoint_url": "https://example.org",
+            "api_key_required": false,
+            "iam_enabled": false,
+            "query_strings": {},
+            "request_headers": {}
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+
+        {
+          "name": "create-deployment",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/deployments",
+          "group": "xcov-deploy-stage",
+          "optional": true,
+          "_note": "createapideployment (api_bodies.json): stage_type=new creates a brand-new stage `dev` in the same call and returns $.deployment_id. Requires >=1 method (created above). deployment_id feeds createstage + setstageactivedeployment.",
+          "json": {"description": "regression deployment", "stage_name": "dev", "stage_type": "new"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"deployment_id": "$.deployment_id"}
+        },
+        {
+          "name": "create-stage",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/stages",
+          "group": "xcov-deploy-stage",
+          "optional": true,
+          "_note": "createstage (StageCreateRequest): stage_name pattern ^[a-z][a-z0-9-]{1,48}[a-z0-9]$ (>=3 chars), deployment_id from the deployment just created. Stage is addressed by stage_name in the path for config/active-deployment/delete.",
+          "json": {"stage_name": "stg{unique}", "description": "regression stage", "deployment_id": "{deployment_id}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}/stages/stg{unique}", "service": "apigateway"}
+        },
+        {
+          "name": "set-stage-config",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/stages/stg{unique}/config",
+          "group": "xcov-deploy-stage",
+          "optional": true,
+          "_note": "setstageconfiguration (StageSetConfigRequestV1Dot1): cors_enabled + jwt_enabled required booleans.",
+          "json": {"cors_enabled": false, "jwt_enabled": false, "description": "regression stage config"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-stage-active-deployment",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/stages/stg{unique}/deployment",
+          "group": "xcov-deploy-stage",
+          "optional": true,
+          "_note": "setstageactivedeployment (StageSetActiveDeploymentRequest): deployment_id required.",
+          "json": {"deployment_id": "{deployment_id}"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+
+        {
+          "name": "create-auth",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/auths",
+          "group": "xcov-auth",
+          "optional": true,
+          "_note": "createauth (AuthCreateRequest): returns only $.access_token (NO id) -> auth_id recovered via listauths below. connected_stages references the `dev` stage created by the deployment; expiration_period in days.",
+          "json": {"name": "regrauth{ualpha}", "connected_stages": ["dev"], "expiration_period": 90},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "find-auth-id",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/auths",
+          "group": "xcov-auth",
+          "optional": true,
+          "_note": "listauths $.auths[0].id -> auth_id for set/delete (createauth has no id in its response).",
+          "expect_status": [200],
+          "capture": {"auth_id": "$.auths[0].id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}/auths/{auth_id}", "service": "apigateway"}
+        },
+        {
+          "name": "set-auth",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/auths/{auth_id}",
+          "group": "xcov-auth",
+          "optional": true,
+          "_note": "setauth (AuthSetRequest): connected_stages required.",
+          "json": {"connected_stages": ["dev"]},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+
+        {
+          "name": "create-access-control",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/access-controls",
+          "group": "xcov-acl",
+          "optional": true,
+          "_note": "createaccesscontrols (AccessControlCreateRequest): returns $.id directly. allowed_ip_addr CIDR list; connected_stages references the `dev` stage.",
+          "json": {
+            "name": "regracl{ualpha}",
+            "allowed_ip_addr": ["10.0.0.0/24"],
+            "connected_stages": ["dev"],
+            "description": "regression access control"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"access_control_id": "$.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}/access-controls/{access_control_id}", "service": "apigateway"}
+        },
+        {
+          "name": "set-access-control",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/access-controls/{access_control_id}",
+          "group": "xcov-acl",
+          "optional": true,
+          "_note": "setaccesscontrol (AccessControlSetRequest): allowed_ip_addr + connected_stages required.",
+          "json": {"allowed_ip_addr": ["10.0.1.0/24"], "connected_stages": ["dev"], "description": "updated access control"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+
+        {
+          "name": "set-resource-policy",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/resource-policies",
+          "group": "xcov-resource-policy",
+          "optional": true,
+          "_note": "setresourcepolicy (ResourcePolicySetRequest): policy_document shape mirrors the base lifecycle's proven shape. The example srn references a non-existent api/method so this may 4xx, but it CALLs setresourcepolicy for coverage.",
+          "json": {
+            "policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "Statement1",
+                  "Effect": "Allow",
+                  "Principal": "*",
+                  "Action": ["apigateway:InvokeApigatewayRegion"],
+                  "Resource": ["srn:scp::apigateway:api/{api_id}"]
+                }
+              ]
+            }
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}/resource-policies", "service": "apigateway"}
+        },
+
+        {
+          "name": "create-usage-plan",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/usage-plans",
+          "group": "xcov-usage-plan",
+          "optional": true,
+          "_note": "createusageplan (UsagePlanCreateRequest): returns $.usage_plan.id. rate enum hour|day|month; limit 1..2000000000.",
+          "json": {"name": "regrup{ualpha}", "limit": 100, "rate": "day", "description": "regression usage plan"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"usage_plan_id": "$.usage_plan.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}", "service": "apigateway"}
+        },
+        {
+          "name": "set-usage-plan-description",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/description",
+          "group": "xcov-usage-plan",
+          "optional": true,
+          "json": {"description": "updated usage plan"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-usage-plan-quota",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/quota",
+          "group": "xcov-usage-plan",
+          "optional": true,
+          "_note": "setusageplanquota (UsagePlanSetQuotaRequest): limit + rate required.",
+          "json": {"limit": 200, "rate": "day"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-api-key",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys",
+          "group": "xcov-usage-plan",
+          "optional": true,
+          "_note": "createapikey (ApiKeyCreateRequest): returns $.api_key.id.",
+          "json": {"name": "regrkey{ualpha}", "description": "regression api key"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"api_key_id": "$.api_key.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys/{api_key_id}", "service": "apigateway"}
+        },
+        {
+          "name": "set-api-key-description",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys/{api_key_id}/description",
+          "group": "xcov-usage-plan",
+          "optional": true,
+          "json": {"description": "updated api key"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+
+        {
+          "name": "probe-reads",
+          "probe_reads": {"api_id": "{api_id}"}
+        },
+
+        {
+          "name": "delete-api-key",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys/{api_key_id}",
+          "group": "xcov-usage-plan",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 10
+        },
+        {
+          "name": "delete-usage-plan",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}",
+          "group": "xcov-usage-plan",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 10
+        },
+        {
+          "name": "delete-resource-policy",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resource-policies",
+          "group": "xcov-resource-policy",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true
+        },
+        {
+          "name": "delete-access-control",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/access-controls/{access_control_id}",
+          "group": "xcov-acl",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 10
+        },
+        {
+          "name": "delete-auth",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/auths/{auth_id}",
+          "group": "xcov-auth",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 10
+        },
+        {
+          "name": "delete-stage",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/stages/stg{unique}",
+          "group": "xcov-deploy-stage",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 10
+        },
+        {
+          "name": "delete-method",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 10
+        },
+        {
+          "name": "delete-resource",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 5,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-api",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-gone",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}",
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+        }
+      ]
+    },
+    {
+      "id": "apigateway-privatelink-endpoint",
+      "service": "application-service/apigateway",
+      "enabled": true,
+      "_note": "Light, self-contained PRIVATELINK-ENDPOINT lifecycle covering all 7 privatelink-endpoint write ops (POST create, PUT set, PUT request, PUT connection, PUT approval, DELETE) + the {id} GET via probe-reads. createprivatelinkendpoint needs a real privatelink_service_id which this account may not have, so the whole flow is one optional group `xcov-pl`: a 4xx on create records the CALL for createprivatelinkendpoint and skips the rest cleanly. The set/request/connection/approval PUTs and DELETE are independent standalone groups that run against a synthetic endpoint id (00000000000000000000000000000000) so they are CALLED for coverage even when create 4xxs (expected 400/403/404). Bodies from docs models: privatelinkendpointcreaterequest {name,privatelink_service_id,description}, privatelinkendpointsetrequest {description}, privatelinkendpointrequestrequest {type: CANCEL|RE_REQUEST}. connect/approval request models were not in the docs models dump -> sent as {} (best-effort) with a broad expect_status; PROVENANCE from docs, NOT runtime-proven. NOT heavy: a privatelink endpoint is a control-plane object (no per-hour VM/DB billing) and create is expected to 4xx without a service id, so it stays enabled+light.",
+      "steps": [
+        {
+          "name": "create-privatelink-endpoint",
+          "method": "POST",
+          "path": "/v1/privatelink-endpoints",
+          "group": "xcov-pl-create",
+          "optional": true,
+          "_note": "createprivatelinkendpoint: privatelink_service_id is a synthetic id (no real PrivateLink service on this account) -> expected 400/404 but CALLs the POST. Returns $.privatelink_endpoint.id on success.",
+          "json": {
+            "name": "regrple{ualpha}",
+            "privatelink_service_id": "00000000000000000000000000000000",
+            "description": "regression privatelink endpoint"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"privatelink_endpoint_id": "$.privatelink_endpoint.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}", "service": "apigateway"}
+        },
+        {
+          "name": "set-privatelink-endpoint",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}",
+          "group": "xcov-pl-set",
+          "optional": true,
+          "_note": "setprivatelinkendpoint against the captured (or, if create 4xxd, the unfilled placeholder) endpoint id -> expected 404, CALLs the PUT for coverage.",
+          "json": {"description": "updated privatelink endpoint"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "request-privatelink-endpoint",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/request",
+          "group": "xcov-pl-request",
+          "optional": true,
+          "_note": "requestprivatelinkendpoint (PrivateLinkEndpointRequestRequest): type CANCEL|RE_REQUEST. Targets the captured endpoint id, or the unfilled {privatelink_endpoint_id} placeholder when create 4xxd -> expected 404.",
+          "json": {"type": "CANCEL"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "connect-privatelink-endpoint",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/connection",
+          "group": "xcov-pl-connect",
+          "optional": true,
+          "_note": "connectprivatelinkendpoint: request model not in docs dump -> empty body (best-effort). Targets the captured endpoint id, or the unfilled {privatelink_endpoint_id} placeholder when create 4xxd -> expected 404.",
+          "json": {},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "approve-privatelink-endpoint",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/approval",
+          "group": "xcov-pl-approve",
+          "optional": true,
+          "_note": "approveprivatelinkendpoint: request model not in docs dump -> empty body (best-effort). Targets the captured endpoint id, or the unfilled {privatelink_endpoint_id} placeholder when create 4xxd -> expected 404.",
+          "json": {},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-privatelink-endpoint-synthetic",
+          "method": "DELETE",
+          "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}",
+          "group": "xcov-pl-delete",
+          "optional": true,
+          "_note": "deleteprivatelinkendpoint against the captured (or, if create 4xxd, the unfilled placeholder) endpoint id -> expected 404, CALLs the DELETE for coverage regardless of whether create succeeded (uses the captured id or the unfilled placeholder).",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

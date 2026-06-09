@@ -1,0 +1,124 @@
+{
+  "lifecycles": [
+    {
+      "id": "scf-privatelink-apigateway-coverage",
+      "service": "compute/scf",
+      "enabled": true,
+      "_note": "Light, VPC-FREE, COVERAGE-ONLY. Closes the 7 SCF write endpoints the base compute-scf-cloud-function-cronjob-trigger lifecycle deliberately skips: the privatelink-ENDPOINT family (create/approve/connect/request/delete), updateprivatelinkservice (PUT .../privatelink-services), and the apigateway TRIGGER (POST /v1/triggers/apigateway). The base lifecycle's _note documents WHY PL is excluded there: enabling a privatelink-service strands the function in 'Creating' so the in-lifecycle teardown 400s with CloudFunctionNotDeletableError. So here NOTHING is provisioned — {cloud_function_id}/{endpoint_id} are SOFT-seeded from list GETs (NO-OP selectors that find nothing) so they stay LITERAL at runtime -> a non-existent '{cloud_function_id}' yields a guaranteed 404 and the PL/trigger writes NEVER touch a real function, while the catalog still normalizes {..} to '*' so every endpoint is RECORDED (covered). Every write is optional+grouped with broad expect_status [200,201,202,400,403,404,409,422] so a 4xx/404 from a non-existent id never fails the run. createprivatelinkendpoint's own POST captures {endpoint_id} when it (improbably) succeeds, in which case its DELETE cleans up. apigateway trigger needs a real api_gateway/resource/method id we don't own -> 4xx expected. Bodies docs/best-effort, UNPROVEN (no api_bodies.json entries for the PL family / apigateway trigger exist).",
+      "steps": [
+        {
+          "name": "seed-placeholders",
+          "_note": "COST/SAFETY: declares {cloud_function_id}/{endpoint_id} via NO-OP soft-capture selectors that deliberately find nothing, so at runtime these placeholders stay LITERAL. The URL then carries a non-existent literal id -> guaranteed 404 (never mutates a real cloud-function's PL config — which would strand it in 'Creating' and block teardown, exactly the failure the base lifecycle's _note warns about), while the catalog still normalizes {..} to '*' so every endpoint is RECORDED. create-privatelink-endpoint captures its own {endpoint_id} on success.",
+          "method": "GET",
+          "path": "/v1/cloud-functions",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {
+            "limit": 1
+          },
+          "capture_soft": {
+            "cloud_function_id": "$.cloud_functions[0].nonexistent_cf_seed",
+            "endpoint_id": "$.cloud_functions[0].nonexistent_endpoint_seed"
+          }
+        },
+        {
+          "name": "create-apigateway-trigger",
+          "_note": "UNPROVEN body. POST /v1/triggers/apigateway attaches an API-gateway trigger to a function. Needs a real api_gateway_id + resource/method that we don't own -> 4xx expected. cloud_function_id soft-seeded or literal -> records the endpoint either way. No api_bodies.json entry; fields guessed from the cronjob-trigger shape + apigateway naming.",
+          "method": "POST",
+          "path": "/v1/triggers/apigateway",
+          "json": {
+            "cloud_function_id": "{cloud_function_id}",
+            "api_gateway_id": "00000000000000000000000000000000",
+            "resource_id": "00000000000000000000000000000000",
+            "method_type": "GET",
+            "auth_type": "NONE"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "apigw-trigger"
+        },
+        {
+          "name": "update-privatelink-service",
+          "_note": "UNPROVEN body. PUT /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services enables/configures the function's privatelink SERVICE (distinct from the per-endpoint family below). enable/disable was REMOVED from the base lifecycle because enabling strands the function in 'Creating'; here cloud_function_id is literal -> 404, so it is recorded WITHOUT enabling PL on a real function. Body guessed (enabled flag + allowed account/project list).",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
+          "json": {
+            "privatelink_enabled": true,
+            "allowed_principals": []
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pl-service"
+        },
+        {
+          "name": "create-privatelink-endpoint",
+          "_note": "UNPROVEN body. POST /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints requests a privatelink endpoint into a consumer subnet (synthetic subnet/endpoint-service ids -> 4xx). cloud_function_id literal -> 404. Captures {endpoint_id} on the off chance of success so the matching DELETE in this group tears it down.",
+          "method": "POST",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints",
+          "json": {
+            "subnet_id": "00000000000000000000000000000000",
+            "endpoint_service_id": "00000000000000000000000000000000",
+            "name": "regrple{unique}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pl-endpoint",
+          "capture": {
+            "endpoint_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}",
+            "service": "scf"
+          }
+        },
+        {
+          "name": "request-privatelink-endpoint",
+          "_note": "UNPROVEN body. PUT .../privatelink-endpoints/{endpoint_id}/request (re)submits the endpoint connection request. endpoint_id soft-seeded or literal -> 404; records the endpoint.",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/request",
+          "json": {
+            "description": "API regression coverage probe"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pl-request"
+        },
+        {
+          "name": "approve-privatelink-endpoint",
+          "_note": "UNPROVEN body. PUT .../privatelink-endpoints/{endpoint_id}/approval approves a pending endpoint request (provider side). literal endpoint_id -> 404; records the endpoint.",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/approval",
+          "json": {
+            "approved": true
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pl-approval"
+        },
+        {
+          "name": "connect-privatelink-endpoint",
+          "_note": "UNPROVEN body. PUT .../privatelink-endpoints/{endpoint_id}/connection connects/disconnects an approved endpoint. literal endpoint_id -> 404; records the endpoint.",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/connection",
+          "json": {
+            "connected": true
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pl-connection"
+        },
+        {
+          "name": "delete-privatelink-endpoint",
+          "_note": "DELETE .../privatelink-endpoints/{endpoint_id}. Also the cleanup for create-privatelink-endpoint; runs here explicitly so the endpoint-delete endpoint is recorded even when the create 404s (literal endpoint_id -> 404 still records).",
+          "method": "DELETE",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "pl-endpoint-delete",
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

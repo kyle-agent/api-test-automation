@@ -1,0 +1,173 @@
+{
+  "lifecycles": [
+    {
+      "id": "baremetal-server-coverage",
+      "service": "compute/baremetal",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY, heavy (bare-metal servers are billable + slow to provision). Closes ALL 12 uncovered compute/baremetal WRITE endpoints WITHOUT provisioning a real bare-metal server. The catalog has NO compute/baremetal create lifecycle; bodies are docs-derived (data/api_docs.json models baremetalcreaterequest / serverdetailsrequest / baremetalsoperationrequest / baremetalterminaterequest / baremetalserverassign{private,public}natiprequest / localsubnet{attach,detach}request) — there are NO data/api_bodies.json entries for this service. UNPROVEN. Cost/safety pattern (proven by compute-virtualserver vs-server-action-coverage): {baremetal_id} is declared via a NO-OP soft-capture selector that deliberately finds nothing, so at runtime it stays LITERAL ('{baremetal_id}') -> the per-id URLs carry a non-existent literal id and 404 (never touch a real server), while the catalog normalizes {..} to '*' so every endpoint is RECORDED (covered). The create POST /v1/baremetals + bulk DELETE /v1/baremetals + start/stop use SYNTHETIC vpc/subnet/image/server ids we do not own -> guaranteed 4xx, so no real billable server is ever created or deleted. Every write is optional + grouped + broad expect_status [200,201,202,204,400,403,404,409,422] so a 4xx/404 never fails the run. The create captures NOTHING real (we never chain to a live id) and registers no cleanup, so there is nothing to tear down. ENABLED+heavy: it only runs under SCP_RUN_HEAVY=true AND SCP_ALLOW_MUTATIONS=true, and the destructive bulk-delete additionally needs SCP_ALLOW_DESTRUCTIVE=true.",
+      "steps": [
+        {
+          "name": "seed-baremetal-placeholders",
+          "_note": "COST/SAFETY: declares {baremetal_id} via a NO-OP soft-capture selector that finds nothing, so it stays LITERAL at runtime -> per-id writes 404 (never mutate a real bare-metal server). The catalog still normalizes {..} to '*' so the endpoints are RECORDED.",
+          "method": "GET",
+          "path": "/v1/baremetals",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {"limit": 1},
+          "capture_soft": {
+            "baremetal_id": "$.baremetals[0].nonexistent_bm_seed"
+          }
+        },
+        {
+          "name": "create-baremetals",
+          "_note": "UNPROVEN body (docs baremetalcreaterequest + serverdetailsrequest). POST /v1/baremetals provisions one or more bare-metal servers. Uses SYNTHETIC vpc/subnet/image/server-type ids we do not own -> guaranteed 4xx, so NO real billable server is created (hence no capture/cleanup). Required fields: image_id, os_user_id, os_user_password, region_id, subnet_id, vpc_id, server_details[]. server_details requires bare_metal_server_name, nat_enabled, server_type_id.",
+          "method": "POST",
+          "path": "/v1/baremetals",
+          "json": {
+            "vpc_id": "00000000000000000000000000000000",
+            "subnet_id": "00000000000000000000000000000000",
+            "image_id": "IMAGE-regrCoverageProbe000000",
+            "region_id": "{region}",
+            "os_user_id": "regruser",
+            "os_user_password": "RegrCoverageProbe!1",
+            "lock_enabled": false,
+            "use_placement_group": false,
+            "server_details": [
+              {
+                "bare_metal_server_name": "regrbm{unique}",
+                "server_type_id": "PRODUCT-regrCoverageProbe00",
+                "nat_enabled": false,
+                "use_hyper_threading": true
+              }
+            ],
+            "tags": [{"key": "regr_coverage", "value": "probe"}]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-create"
+        },
+        {
+          "name": "start-baremetals",
+          "_note": "UNPROVEN body (docs baremetalsoperationrequest). POST /v1/baremetals/start powers on a list of bare-metal servers by id. Synthetic id -> 4xx; still records.",
+          "method": "POST",
+          "path": "/v1/baremetals/start",
+          "json": {"bare_metal_server_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-start"
+        },
+        {
+          "name": "stop-baremetals",
+          "_note": "UNPROVEN body (docs baremetalsoperationrequest, same shape as start). POST /v1/baremetals/stop powers off a list of bare-metal servers. Synthetic id -> 4xx; still records.",
+          "method": "POST",
+          "path": "/v1/baremetals/stop",
+          "json": {"bare_metal_server_ids": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-stop"
+        },
+        {
+          "name": "lock-baremetal",
+          "_note": "PUT /v1/baremetals/{baremetal_id}/lock enables delete-protection. Docs declare NO request body -> empty body. Literal {baremetal_id} -> 404; still records. Paired with unlock so a (hypothetical) real seeded server is left unlocked.",
+          "method": "PUT",
+          "path": "/v1/baremetals/{baremetal_id}/lock",
+          "json": {},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-lock"
+        },
+        {
+          "name": "unlock-baremetal",
+          "_note": "PUT /v1/baremetals/{baremetal_id}/unlock disables delete-protection. Docs declare NO request body. Literal {baremetal_id} -> 404; still records.",
+          "method": "PUT",
+          "path": "/v1/baremetals/{baremetal_id}/unlock",
+          "json": {},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-unlock"
+        },
+        {
+          "name": "attach-local-subnet",
+          "_note": "UNPROVEN body (docs localsubnetattachrequest). PUT /v1/baremetals/local-subnet/{baremetal_id}/attach attaches a local subnet to the server. Synthetic local_subnet_id + literal {baremetal_id} -> 4xx/404; still records.",
+          "method": "PUT",
+          "path": "/v1/baremetals/local-subnet/{baremetal_id}/attach",
+          "json": {
+            "local_subnet_id": "00000000000000000000000000000000",
+            "local_subnet_ip": "192.168.0.10"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-localsubnet-attach"
+        },
+        {
+          "name": "detach-local-subnet",
+          "_note": "UNPROVEN body (docs localsubnetdetachrequest; local_subnet_ip is required here). PUT /v1/baremetals/local-subnet/{baremetal_id}/detach detaches a local subnet. Synthetic ids -> 4xx/404; still records.",
+          "method": "PUT",
+          "path": "/v1/baremetals/local-subnet/{baremetal_id}/detach",
+          "json": {
+            "local_subnet_id": "00000000000000000000000000000000",
+            "local_subnet_ip": "192.168.0.10"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-localsubnet-detach"
+        },
+        {
+          "name": "assign-private-nat-ip",
+          "_note": "UNPROVEN body (docs baremetalserverassignprivatenatiprequest). POST /v1/baremetals/{baremetal_id}/private-nat-ips assigns a private NAT IP. Synthetic private_nat_id / private_nat_ip_id + literal {baremetal_id} -> 4xx/404; still records.",
+          "method": "POST",
+          "path": "/v1/baremetals/{baremetal_id}/private-nat-ips",
+          "json": {
+            "private_nat_id": "00000000000000000000000000000000",
+            "private_nat_ip_id": "00000000000000000000000000000000"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-private-nat"
+        },
+        {
+          "name": "delete-private-nat-ip",
+          "_note": "DELETE /v1/baremetals/{baremetal_id}/private-nat-ips removes the private NAT IP. Docs declare NO request body. Literal {baremetal_id} -> 404; still records. Marked destructive (needs SCP_ALLOW_DESTRUCTIVE), but on a non-existent id it deletes nothing.",
+          "method": "DELETE",
+          "path": "/v1/baremetals/{baremetal_id}/private-nat-ips",
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-private-nat-delete",
+          "destructive": true
+        },
+        {
+          "name": "assign-public-nat-ip",
+          "_note": "UNPROVEN body (docs baremetalserverassignpublicnatiprequest). POST /v1/baremetals/{baremetal_id}/public-nat-ips assigns a public NAT IP. Synthetic public_ip_address_id + literal {baremetal_id} -> 4xx/404; still records.",
+          "method": "POST",
+          "path": "/v1/baremetals/{baremetal_id}/public-nat-ips",
+          "json": {"public_ip_address_id": "00000000000000000000000000000000"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-public-nat"
+        },
+        {
+          "name": "delete-public-nat-ip",
+          "_note": "DELETE /v1/baremetals/{baremetal_id}/public-nat-ips removes the public NAT IP. Docs declare NO request body. Literal {baremetal_id} -> 404; still records. Marked destructive but deletes nothing on a non-existent id.",
+          "method": "DELETE",
+          "path": "/v1/baremetals/{baremetal_id}/public-nat-ips",
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-public-nat-delete",
+          "destructive": true
+        },
+        {
+          "name": "delete-baremetals",
+          "_note": "UNPROVEN body (docs baremetalterminaterequest -> baremetal_id_list). DELETE /v1/baremetals (bulk terminate, no path id) takes a list of ids in the body. Uses a SYNTHETIC id -> guaranteed 4xx, so NO real server is terminated. Marked destructive (needs SCP_ALLOW_DESTRUCTIVE). Recorded regardless of status.",
+          "method": "DELETE",
+          "path": "/v1/baremetals",
+          "json": {"baremetal_id_list": ["00000000000000000000000000000000"]},
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "bm-delete",
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

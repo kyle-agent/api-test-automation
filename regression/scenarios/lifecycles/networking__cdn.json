@@ -1,0 +1,130 @@
+{
+  "lifecycles": [
+    {
+      "id": "networking-cdn-service",
+      "service": "networking/cdn",
+      "enabled": true,
+      "heavy": false,
+      "_note": "CDN service CRUD (Wave 2, NOT runtime-proven). CDN is a VPC-free control-plane resource, so no shared-VPC adoption. Create -> read -> update -> update-description -> start -> stop -> purge -> delete, all in one optional 'cdn' group so a bad body skips only this family (cleaned up). Bodies from data/api_docs.json request_example. create returns $.cdn.resource_id (NOT $.id and NOT $.cdn.id — confirmed from createcdnservice response_example {cdn:{account_id,resource_id,workflow_id}}); captured SOFT into cdn_id. Dependent steps reference {cdn_id}: when create succeeds this is a real reversible chain; when create 4xx's, cdn_id stays unset and {cdn_id} is sent literally — it still norm-matches catalog /v1/cdns/* and records the call (coverage) with an expected 4xx. Enum guesses (UNVALIDATED): cache_key_hostname=REQUEST_HOST_HEADER, forward_host_header=REQUEST_HOST_HEADER, origin_hostname_type=DOMAIN, cdn_origin_hostname=test.example.com; cdn_service_domain_prefix must be globally unique -> regr{ualpha}. start/stop/purge sent with empty bodies (no request body in docs). Covers all 7 CDN WRITE ops: POST /v1/cdns, PUT /v1/cdns/{id}, PUT /v1/cdns/{id}/description, POST /v1/cdns/{id}/start, POST /v1/cdns/{id}/stop, POST /v1/cdns/{id}/purge, DELETE /v1/cdns/{id}.",
+      "steps": [
+        {
+          "name": "create-cdn",
+          "method": "POST",
+          "path": "/v1/cdns",
+          "group": "cdn",
+          "optional": true,
+          "json": {
+            "cache_expiry_time": "",
+            "cache_key_hostname": "REQUEST_HOST_HEADER",
+            "caching_option": "",
+            "cdn_origin_hostname": "test.example.com",
+            "cdn_origin_port": "",
+            "cdn_origin_protocol": "",
+            "cdn_service_domain_prefix": "regr{ualpha}",
+            "cdn_service_origin_path": "/test/global/",
+            "content_policy": "",
+            "custom_forward_host_header": "",
+            "description": "API regression suite",
+            "forward_host_header": "REQUEST_HOST_HEADER",
+            "name": "regr{ualpha}",
+            "origin_hostname_type": "DOMAIN",
+            "query_string_ignored": "",
+            "range_request_allowed": "",
+            "request_custom_headers": "",
+            "response_custom_headers": "",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"cdn_id": "$.cdn.resource_id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cdns/{cdn_id}",
+            "service": "cdn"
+          }
+        },
+        {
+          "name": "get-cdn",
+          "method": "GET",
+          "path": "/v1/cdns/{cdn_id}",
+          "group": "cdn",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404]
+        },
+        {
+          "name": "update-cdn",
+          "method": "PUT",
+          "path": "/v1/cdns/{cdn_id}",
+          "group": "cdn",
+          "optional": true,
+          "json": {
+            "cache_expiry_time": "",
+            "cache_key_hostname": "REQUEST_HOST_HEADER",
+            "caching_option": "",
+            "cdn_origin_hostname": "test.example.com",
+            "cdn_origin_port": "",
+            "cdn_origin_protocol": "",
+            "cdn_service_origin_path": "/test/global/",
+            "content_policy": "",
+            "custom_forward_host_header": "",
+            "forward_host_header": "REQUEST_HOST_HEADER",
+            "origin_hostname_type": "DOMAIN",
+            "query_string_ignored": "",
+            "range_request_allowed": "",
+            "request_custom_headers": "",
+            "response_custom_headers": ""
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "update-cdn-description",
+          "method": "PUT",
+          "path": "/v1/cdns/{cdn_id}/description",
+          "group": "cdn",
+          "optional": true,
+          "json": {"description": "API regression suite (updated)"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "start-cdn",
+          "method": "POST",
+          "path": "/v1/cdns/{cdn_id}/start",
+          "group": "cdn",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "stop-cdn",
+          "method": "POST",
+          "path": "/v1/cdns/{cdn_id}/stop",
+          "group": "cdn",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "purge-cdn",
+          "method": "POST",
+          "path": "/v1/cdns/{cdn_id}/purge",
+          "group": "cdn",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-cdn-reads",
+          "probe_reads": {"cdn_id": "{cdn_id}"}
+        },
+        {
+          "name": "delete-cdn",
+          "method": "DELETE",
+          "path": "/v1/cdns/{cdn_id}",
+          "group": "cdn",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409]
+        }
+      ]
+    }
+  ]
+}

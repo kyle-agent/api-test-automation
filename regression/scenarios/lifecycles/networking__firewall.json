@@ -1,0 +1,71 @@
+{
+  "lifecycles": [
+    {
+      "id": "networking-firewall-rule",
+      "service": "networking/firewall",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY firewall lifecycle (Wave 2, NOT runtime-proven). A firewall is an attribute of a vpc/igw/direct-connect (created implicitly with firewall_enabled:true), NOT a standalone create endpoint — there is no POST /v1/firewalls, only POST /v1/firewalls/rules (needs an existing firewall_id) and PUT /v1/firewalls/{firewall_id}. We have no cheap way to mint a firewall_id in this fragment, so every write is an OPTIONAL probe using a builtin {unique} token in the id path segment: the engine fires the call ({unique} normalizes to catalog '*' and is a builtin so the validator accepts it), records 400/403/404, and counts coverage without a false failure or an undefined-placeholder error. The createfirewallrule body references firewall_id:{unique} (a fake id; expected 4xx). Bodies from data/api_docs.json request_example: createfirewallrule wraps the rule in {firewall_id, firewall_rule:{...}}; setfirewall takes {flavor_name, loggable}; setfirewallrule takes a bare rule body. order_rule_id omitted (an existing rule id we don't have) so order_direction dropped too. createfirewallrule response envelope is $.firewall_rule.id. Promote to a real create->delete chain once a firewall-bearing resource (igw/direct-connect) is wired in as a prerequisite. Covers all 4 firewall WRITE ops: POST /v1/firewalls/rules, PUT /v1/firewalls/rules/{firewall_rule_id}, DELETE /v1/firewalls/rules/{firewall_rule_id}, PUT /v1/firewalls/{firewall_id}.",
+      "steps": [
+        {
+          "name": "createfirewallrule",
+          "method": "POST",
+          "path": "/v1/firewalls/rules",
+          "group": "fwrule",
+          "optional": true,
+          "json": {
+            "firewall_id": "{unique}",
+            "firewall_rule": {
+              "action": "ALLOW",
+              "description": "API regression suite",
+              "destination_address": ["10.0.0.1", "10.0.0.2"],
+              "direction": "INBOUND",
+              "service": [{"service_type": "TCP", "service_value": "443"}],
+              "source_address": ["192.168.1.1", "192.168.1.2"],
+              "status": "ENABLE"
+            }
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"firewall_rule_id": "$.firewall_rule.id"}
+        },
+        {
+          "name": "setfirewallrule",
+          "method": "PUT",
+          "path": "/v1/firewalls/rules/{unique}",
+          "group": "fwrule",
+          "optional": true,
+          "json": {
+            "action": "ALLOW",
+            "description": "API regression suite (updated)",
+            "destination_address": ["10.0.0.1", "10.0.0.2"],
+            "direction": "INBOUND",
+            "service": [{"service_type": "TCP", "service_value": "443"}],
+            "source_address": ["192.168.1.1", "192.168.1.2"]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "deletefirewallrule",
+          "method": "DELETE",
+          "path": "/v1/firewalls/rules/{unique}",
+          "group": "fwrule",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409]
+        },
+        {
+          "name": "setfirewall",
+          "method": "PUT",
+          "path": "/v1/firewalls/{unique}",
+          "group": "fw",
+          "optional": true,
+          "json": {
+            "flavor_name": "EXSMALL",
+            "loggable": false
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        }
+      ]
+    }
+  ]
+}

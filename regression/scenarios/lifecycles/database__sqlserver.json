@@ -1,0 +1,709 @@
+{
+  "lifecycles": [
+    {
+      "id": "sqlserver-cluster-subops-guarded",
+      "service": "database/sqlserver",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY guarded lifecycle for the sqlserver DBaaS cluster sub-op WRITE endpoints (incl. the sqlserver-only create/delete cluster which the shared heavy-shared-dbaas lifecycle EXCLUDES because SQL Server needs a real license). Soft-captures an existing cluster_id (+ instance_group_id/bsg_id/log_type) from read-only calls; absent that, tokens normalize to the catalog '*' key so every endpoint is CALLED+RECORDED (4xx counts). All mutating steps optional+grouped+broad-expect_status; heavy:true (SCP_RUN_HEAVY); DELETEs destructive:true. Bodies from api_docs request_example, UNPROVEN. sqlserver DIVERGES from the relational template: it has add-secondary (HA standby, needs a license) and databases (add/del DB list) and has NO archive/replicas/promote/other-region/reset-replica/sync-replica-state endpoints.",
+      "steps": [
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "cluster_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}"
+          }
+        },
+        {
+          "name": "capture-subop-ids",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "instance_group_id": "$.instance_groups[0].id",
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+          }
+        },
+        {
+          "name": "capture-log-type",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "log_type": "$.contents[0].log_type"
+          }
+        },
+        {
+          "name": "create-cluster-guarded",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "allowable_ip_addresses": [],
+            "dbaas_engine_version_id": "",
+            "ha_enabled": false,
+            "init_config_option": {
+              "audit_enabled": false,
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              },
+              "database_name": "regrss",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy"
+            },
+            "instance_groups": [
+              {
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "public_ip_id": "",
+                    "role_type": "ACTIVE",
+                    "service_ip_address": ""
+                  }
+                ],
+                "role_type": "ACTIVE",
+                "server_type_name": ""
+              }
+            ],
+            "instance_name_prefix": "regrss",
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "name": "regrss{ualpha}",
+            "nat_enabled": false,
+            "origin_cluster_id": "",
+            "service_watch_log_collection": true,
+            "subnet_id": "",
+            "tags": [],
+            "timezone": "Asia/Seoul",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "create-delete"
+        },
+        {
+          "name": "set-maintenance",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "maint"
+        },
+        {
+          "name": "unset-maintenance",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "maint"
+        },
+        {
+          "name": "create-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {
+            "archive_frequency_minute": "30",
+            "retention_period_day": "8",
+            "starting_time_hour": "3"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "backup"
+        },
+        {
+          "name": "remove-backup-histories",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "json": {
+            "backup_history_number": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "backup"
+        },
+        {
+          "name": "delete-backup",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "backup"
+        },
+        {
+          "name": "set-parameters",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "json": {
+            "parameters": [
+              {
+                "id": "",
+                "new_value": "256",
+                "old_value": ""
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "sync-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/parameters/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "set-audit-log",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/audit-log",
+          "json": {
+            "use_audit_log": true
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "audit"
+        },
+        {
+          "name": "register-log-export-config",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "json": {
+            "access_key": "",
+            "bucket_name": "regrcoveragebucket",
+            "delete_on_export": true,
+            "log_type": "alert",
+            "schedule_day_of_month": "28",
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "DAY",
+            "schedule_hour": "12",
+            "secret_key": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "log-export"
+        },
+        {
+          "name": "set-log-export-config",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+          "json": {
+            "access_key": "",
+            "delete_on_export": true,
+            "schedule_day_of_month": "28",
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "DAY",
+            "schedule_hour": "12",
+            "secret_key": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "log-export"
+        },
+        {
+          "name": "export-log",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "log-export"
+        },
+        {
+          "name": "delete-log-export-config",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "log-export"
+        },
+        {
+          "name": "set-security-group-rules",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "sg-rules"
+        },
+        {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "stop-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "start-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "switchover-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/switchover",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {
+            "backup_before_upgrade": false,
+            "software_version": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "patch"
+        },
+        {
+          "name": "resize-instance-group",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/resize",
+          "json": {
+            "server_type_name": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "resize"
+        },
+        {
+          "name": "add-block-storages",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
+          "json": {
+            "role_type": "DATA",
+            "size_gb": 104,
+            "volume_type": "SSD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "resize"
+        },
+        {
+          "name": "resize-block-storage",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "json": {
+            "size_gb": 112
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "resize"
+        },
+        {
+          "name": "add-secondary",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/add-secondary",
+          "json": {
+            "license": "",
+            "name": "regrsec{ualpha}",
+            "service_ip_address": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "secondary"
+        },
+        {
+          "name": "set-databases",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/databases",
+          "json": {
+            "add_databases": [],
+            "del_databases": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "databases"
+        },
+        {
+          "name": "create-restore",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {
+            "allowable_ip_addresses": [],
+            "backup_history_number": "202501010000",
+            "backup_recovery_time": "",
+            "block_storage_groups": [],
+            "instance_name_prefix": "regrrst",
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "name": "regrrestore{ualpha}",
+            "server_type_name": "",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "restore"
+        },
+        {
+          "name": "delete-cluster-guarded",
+          "method": "DELETE",
+          "path": "/v1/clusters/regrnonexistent{unique}",
+          "_note": "Targets a SYNTHETIC non-existent cluster id (never the soft-captured {cluster_id}) so this can only 404 and NEVER deletes a real adopted sqlserver cluster \u2014 it exists solely to CALL+record the DELETE /v1/clusters/{cluster_id} endpoint under the sqlserver host.",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "create-delete"
+        }
+      ]
+    },
+    {
+      "id": "sqlserver-read-coverage",
+      "service": "database/sqlserver",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY sqlserver catalog GET whose path params are satisfied (engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). sqlserver has NO clusters/{cluster_id}/replicas endpoint. 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected).",
+      "steps": [
+        {
+          "name": "list-engine-versions",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov",
+          "capture_soft": {
+            "dbaas_engine_version_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "get-engine-version-properties",
+          "method": "GET",
+          "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "dbaas_engine_version_id": "{dbaas_engine_version_id}",
+            "request_id": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ]
+    }
+  ]
+}

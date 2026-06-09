@@ -1,0 +1,737 @@
+{
+  "_comment": "Campaign blackboard for the multi-agent coverage drive. Coordinator (lead session) and service-agents read/write this. Status: todo|claimed|authored|integrated|live-validated. fragment = regression/scenarios/lifecycles/<file>. See agents/CAMPAIGN.md.",
+  "generated": "2026-06-08T20:57:46Z",
+  "static_ceiling_pct": 85.6,
+  "total_endpoints": 1372,
+  "write_gap_total": 0,
+  "shared_contracts": {
+    "vpc": {
+      "owner": "networking/vpc",
+      "cidr": "10.124.0.0/20",
+      "note": "heavy lifecycles adopt via {\"adopt\":\"vpc\"}; see vpc-scheduling-strategy.md"
+    }
+  },
+  "services": [
+    {
+      "category": "compute",
+      "service": "virtualserver",
+      "fragment": "compute__virtualserver.json",
+      "write_gap": 0,
+      "getid_gap": 22,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "vs-autoscaling-coverage",
+        "vs-image-write-coverage",
+        "vs-volume-transfer-coverage",
+        "vs-server-action-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "vpc",
+      "fragment": "networking__vpc.json",
+      "write_gap": 0,
+      "getid_gap": 13,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "vpc-cidr-secondary",
+        "vpc-private-nat",
+        "vpc-privatelink-service",
+        "vpc-endpoint",
+        "vpc-peering",
+        "vpc-transit-gateway-children",
+        "vpc-subnet-vip-nat"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "management",
+      "service": "iam",
+      "fragment": "management__iam.json",
+      "write_gap": 0,
+      "getid_gap": 12,
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "iam-role-full",
+        "iam-policy-extra-writes",
+        "iam-group-bindings",
+        "iam-user-policy-bindings",
+        "iam-resource-policy",
+        "iam-credentials-heavy"
+      ],
+      "notes": "heavy=credentials/saml/account-users; api_bodies.json createsamlprovider is corrupt (needs real SAML metadata)."
+    },
+    {
+      "category": "storage",
+      "service": "baremetal-blockstorage",
+      "fragment": "storage__baremetal-blockstorage.json",
+      "write_gap": 0,
+      "getid_gap": 5,
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "blockstorage-volume",
+        "blockstorage-volume-group"
+      ],
+      "notes": "heavy (billable volumes); volume create wants attachments[] (sent []); no DELETE for volume-group (teardown via member volume)."
+    },
+    {
+      "category": "application-service",
+      "service": "apigateway",
+      "fragment": "application-service__apigateway.json",
+      "write_gap": 0,
+      "getid_gap": 17,
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "apigateway-api-write-coverage",
+        "apigateway-privatelink-endpoint"
+      ],
+      "notes": "light, VPC-free; auth_id via listauths; privatelink needs real privatelink_service_id (synthetic->4xx, optional)."
+    },
+    {
+      "category": "management",
+      "service": "organization",
+      "fragment": "management__organization.json",
+      "write_gap": 0,
+      "getid_gap": 5,
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "org-organizations-guarded",
+        "org-units-guarded",
+        "org-accounts-guarded",
+        "org-service-control-policies-guarded",
+        "org-policy-bindings-and-delegation-guarded",
+        "org-invitations-guarded"
+      ],
+      "notes": "COVERAGE-ONLY guarded: heavy+optional, no real org/SCP mutation; bodies unproven (no api_bodies entry)."
+    },
+    {
+      "category": "management",
+      "service": "iam-identity-center",
+      "fragment": "management__iam-identity-center.json",
+      "write_gap": 0,
+      "getid_gap": 5,
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "idc-instance",
+        "idc-user",
+        "idc-group",
+        "idc-permission-set",
+        "idc-account-assignment"
+      ],
+      "notes": "heavy; SSO instance_id is hard dep; uses PATCH; account-assignments fired with all-zero ids (no real grant)."
+    },
+    {
+      "category": "database",
+      "service": "epas",
+      "fragment": "database__epas.json",
+      "write_gap": 0,
+      "getid_gap": 4,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "epas-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "database",
+      "service": "mariadb",
+      "fragment": "database__mariadb.json",
+      "write_gap": 0,
+      "getid_gap": 4,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "mariadb-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "database",
+      "service": "mysql",
+      "fragment": "database__mysql.json",
+      "write_gap": 0,
+      "getid_gap": 4,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "mysql-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "database",
+      "service": "postgresql",
+      "fragment": "database__postgresql.json",
+      "write_gap": 0,
+      "getid_gap": 4,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "postgresql-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "management",
+      "service": "servicewatch",
+      "fragment": "management__servicewatch.json",
+      "write_gap": 0,
+      "getid_gap": 4,
+      "status": "authored",
+      "owner": "wave1-service-agent",
+      "lifecycles": [
+        "servicewatch-alert",
+        "servicewatch-dashboard",
+        "servicewatch-event-rule",
+        "servicewatch-custom-ingest"
+      ],
+      "notes": "light observability; bulk-delete body shape {ids:[]} unproven; create envelopes $.alert.id/$.dashboard.id/$.event_rule.id unproven."
+    },
+    {
+      "category": "database",
+      "service": "sqlserver",
+      "fragment": "database__sqlserver.json",
+      "write_gap": 0,
+      "getid_gap": 3,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "sqlserver-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "storage",
+      "service": "archivestorage",
+      "fragment": "storage__archivestorage.json",
+      "write_gap": 0,
+      "getid_gap": 6,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "archivestorage-bucket",
+        "archivestorage-archiving-policy"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "compute",
+      "service": "baremetal",
+      "fragment": "compute__baremetal.json",
+      "write_gap": 0,
+      "getid_gap": 1,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "baremetal-server-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "storage",
+      "service": "backup",
+      "fragment": "storage__backup.json",
+      "write_gap": 0,
+      "getid_gap": 10,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "backup-agent",
+        "backup-job"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "security",
+      "service": "kms",
+      "fragment": "security__kms.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-kms-writes"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "container",
+      "service": "scr",
+      "fragment": "container__scr.json",
+      "write_gap": 0,
+      "getid_gap": 10,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "scr-image-write-coverage",
+        "scr-tags-write-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "compute",
+      "service": "multinodegpucluster",
+      "fragment": "compute__multinodegpucluster.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "mngc-gpu-node-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "management",
+      "service": "cloudcontrol",
+      "fragment": "management__cloudcontrol.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "cloudcontrol-landing-zone-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "management",
+      "service": "resourcemanager",
+      "fragment": "management__resourcemanager.json",
+      "write_gap": 0,
+      "getid_gap": 6,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "resourcemanager-tag-lifecycle"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "data-analytics",
+      "service": "data-flow",
+      "fragment": "data-analytics__data-flow.json",
+      "write_gap": 0,
+      "getid_gap": 6,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "data-flow-service-and-flow-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "data-analytics",
+      "service": "data-ops",
+      "fragment": "data-analytics__data-ops.json",
+      "write_gap": 0,
+      "getid_gap": 6,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "data-ops-service-and-ops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "data-analytics",
+      "service": "quick-query",
+      "fragment": "data-analytics__quick-query.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "quick-query-lifecycle-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "data-analytics",
+      "service": "searchengine",
+      "fragment": "data-analytics__searchengine.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "searchengine-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "database",
+      "service": "cachestore",
+      "fragment": "database__cachestore.json",
+      "write_gap": 0,
+      "getid_gap": 3,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "cachestore-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "loadbalancer",
+      "fragment": "networking__loadbalancer.json",
+      "write_gap": 0,
+      "getid_gap": 8,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-loadbalancer-members-nat"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "compute",
+      "service": "scf",
+      "fragment": "compute__scf.json",
+      "write_gap": 0,
+      "getid_gap": 11,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "scf-privatelink-apigateway-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "cdn",
+      "fragment": "networking__cdn.json",
+      "write_gap": 0,
+      "getid_gap": 1,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-cdn-service"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "storage",
+      "service": "filestorage",
+      "fragment": "storage__filestorage.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "filestorage-replication-schedule"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "management",
+      "service": "loggingaudit",
+      "fragment": "management__loggingaudit.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "management-loggingaudit-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "dns",
+      "fragment": "networking__dns.json",
+      "write_gap": 0,
+      "getid_gap": 4,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-dns-public-domain"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "gslb",
+      "fragment": "networking__gslb.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-gslb-service"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "vpn",
+      "fragment": "networking__vpn.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-vpn-gateway-tunnel"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "data-analytics",
+      "service": "vertica",
+      "fragment": "data-analytics__vertica.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "vertica-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "direct-connect",
+      "fragment": "networking__direct-connect.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-direct-connect-routing"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "security",
+      "service": "secretsmanager",
+      "fragment": "security__secretsmanager.json",
+      "write_gap": 0,
+      "getid_gap": 1,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-secretsmanager-writes"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "data-analytics",
+      "service": "eventstreams",
+      "fragment": "data-analytics__eventstreams.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "eventstreams-cluster-subops-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "management",
+      "service": "cloudmonitoring",
+      "fragment": "management__cloudmonitoring.json",
+      "write_gap": 0,
+      "getid_gap": 6,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "management-cloudmonitoring-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "firewall",
+      "fragment": "networking__firewall.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "networking-firewall-rule"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "ai-ml",
+      "service": "aimlops-platform",
+      "fragment": "ai-ml__aimlops-platform.json",
+      "write_gap": 0,
+      "getid_gap": 6,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "aimlops-platform-release-write-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "ai-ml",
+      "service": "cloud-ml",
+      "fragment": "ai-ml__cloud-ml.json",
+      "write_gap": 0,
+      "getid_gap": 4,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "cloud-ml-write-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "financial-management",
+      "service": "billingplan",
+      "fragment": "financial-management__billingplan.json",
+      "write_gap": 0,
+      "getid_gap": 1,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "billingplan-planned-computes-guarded"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "financial-management",
+      "service": "budget",
+      "fragment": "financial-management__budget.json",
+      "write_gap": 0,
+      "getid_gap": 1,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "budget-account-budget"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "platform",
+      "service": "sts",
+      "fragment": "platform__sts.json",
+      "write_gap": 0,
+      "getid_gap": 0,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "sts-token-issuance-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "security",
+      "service": "configinspection",
+      "fragment": "security__configinspection.json",
+      "write_gap": 0,
+      "getid_gap": 1,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-configinspection-diagnosis"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "container",
+      "service": "ske",
+      "fragment": "container__ske.json",
+      "write_gap": 0,
+      "getid_gap": 3,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "ske-upgrade-write-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "devops-tools",
+      "service": "devopsservice",
+      "fragment": "devops-tools__devopsservice.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "devopsservice-write-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "management",
+      "service": "network-logging",
+      "fragment": "management__network-logging.json",
+      "write_gap": 0,
+      "getid_gap": 0,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "management-network-logging-coverage"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "security",
+      "service": "certificatemanager",
+      "fragment": "security__certificatemanager.json",
+      "write_gap": 0,
+      "getid_gap": 0,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-certificatemanager-import-cover"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "security",
+      "service": "secretvault",
+      "fragment": "security__secretvault.json",
+      "write_gap": 0,
+      "getid_gap": 2,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "security-secretvault-vault"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "storage",
+      "service": "parallel-filestorage",
+      "fragment": "storage__parallel-filestorage.json",
+      "write_gap": 0,
+      "getid_gap": 1,
+      "status": "authored",
+      "owner": "wave2-service-agent",
+      "lifecycles": [
+        "parallel-filestorage-capacity-restore"
+      ],
+      "notes": ""
+    },
+    {
+      "category": "networking",
+      "service": "security-group",
+      "fragment": "networking__security-group.json",
+      "write_gap": 0,
+      "getid_gap": 0,
+      "status": "authored",
+      "owner": "wave3-service-agent",
+      "lifecycles": [
+        "networking-security-group-update"
+      ],
+      "notes": ""
+    }
+  ],
+  "campaign_status": "write-coverage COMPLETE \u2014 all 547 write ops reachable; remaining gap is id-bound GETs (read-chain auto-covered). Next: live CI validation."
+}

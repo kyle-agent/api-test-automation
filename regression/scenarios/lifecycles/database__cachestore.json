@@ -1,0 +1,497 @@
+{
+  "lifecycles": [
+    {
+      "id": "cachestore-cluster-subops-guarded",
+      "service": "database/cachestore",
+      "enabled": true,
+      "heavy": true,
+      "_note": "COVERAGE-ONLY guarded lifecycle for the cachestore (Redis) DBaaS cluster sub-op WRITE endpoints. Soft-captures an existing cluster_id (+ instance_group_id/bsg_id) from read-only calls; absent that, tokens normalize to the catalog '*' key so every endpoint is CALLED+RECORDED (4xx counts). All mutating steps optional+grouped+broad-expect_status; heavy:true (SCP_RUN_HEAVY); DELETEs destructive:true. Bodies from api_docs request_example, UNPROVEN. cachestore DIVERGES MOST from the relational template: it uses commands (PUT /commands with {id,name,new_value}) + commands/sync INSTEAD of the full archive/audit/log-export surface, has NO archive/audit-log/log-export/replicas/promote/databases/add-secondary, no add-block-storages, patch body uses dbaas_engine+software_version, backup body omits archive_frequency_minute, and restore wants explicit OS+DATA block_storage_groups.",
+      "steps": [
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "cluster_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}"
+          }
+        },
+        {
+          "name": "capture-subop-ids",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "instance_group_id": "$.instance_groups[0].id",
+            "bsg_id": "$.instance_groups[0].block_storage_groups[0].id"
+          }
+        },
+        {
+          "name": "set-maintenance",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "maint"
+        },
+        {
+          "name": "unset-maintenance",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "maint"
+        },
+        {
+          "name": "create-backup",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {
+            "retention_period_day": "8",
+            "starting_time_hour": "3"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "backup"
+        },
+        {
+          "name": "remove-backup-histories",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "json": {
+            "backup_history_number": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "backup"
+        },
+        {
+          "name": "delete-backup",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "destructive": true,
+          "group": "backup"
+        },
+        {
+          "name": "set-parameters",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "json": {
+            "parameters": [
+              {
+                "id": "",
+                "new_value": "256",
+                "old_value": ""
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "sync-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/parameters/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "set-commands",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/commands",
+          "json": {
+            "commands": [
+              {
+                "id": "",
+                "name": "maxmemory-policy",
+                "new_value": "allkeys-lru"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "commands"
+        },
+        {
+          "name": "sync-commands",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/commands/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "commands"
+        },
+        {
+          "name": "set-security-group-rules",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "sg-rules"
+        },
+        {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "stop-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/stop",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "start-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/start",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "switchover-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/switchover",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "patch-minor-version",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/patch",
+          "json": {
+            "dbaas_engine": "",
+            "software_version": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "patch"
+        },
+        {
+          "name": "resize-instance-group",
+          "method": "POST",
+          "path": "/v1/instance-groups/{instance_group_id}/resize",
+          "json": {
+            "server_type_name": ""
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "resize"
+        },
+        {
+          "name": "resize-block-storage",
+          "method": "POST",
+          "path": "/v1/block-storage-groups/{bsg_id}/resize",
+          "json": {
+            "size_gb": 112
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "resize"
+        },
+        {
+          "name": "create-restore",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {
+            "allowable_ip_addresses": [],
+            "backup_history_number": "202501010000",
+            "backup_recovery_time": "",
+            "block_storage_groups": [
+              {
+                "role_type": "OS",
+                "size_gb": 104,
+                "volume_type": "SSD"
+              },
+              {
+                "role_type": "DATA",
+                "size_gb": 56,
+                "volume_type": "SSD"
+              }
+            ],
+            "instance_name_prefix": "regrrst",
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "name": "regrrestore{ualpha}",
+            "server_type_name": "",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "restore"
+        }
+      ]
+    },
+    {
+      "id": "cachestore-read-coverage",
+      "service": "database/cachestore",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY read lifecycle for cachestore id-bound GETs. Soft-captures an existing cluster_id (from /v1/clusters) and dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY cachestore catalog GET whose path params are satisfied (commands via cluster_id, engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected).",
+      "steps": [
+        {
+          "name": "list-clusters",
+          "method": "GET",
+          "path": "/v1/clusters",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "read-cov",
+          "capture_soft": {
+            "cluster_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "list-engine-versions",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "read-cov",
+          "capture_soft": {
+            "dbaas_engine_version_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "get-cluster-commands",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/commands",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "read-cov"
+        },
+        {
+          "name": "get-engine-version-properties",
+          "method": "GET",
+          "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "read-cov"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "cluster_id": "{cluster_id}",
+            "dbaas_engine_version_id": "{dbaas_engine_version_id}",
+            "request_id": "00000000-0000-0000-0000-000000000000"
+          }
+        }
+      ]
+    }
+  ]
+}

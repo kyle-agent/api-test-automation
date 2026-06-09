@@ -1,0 +1,178 @@
+{
+  "lifecycles": [
+    {
+      "id": "filestorage-replication-schedule",
+      "service": "storage/filestorage",
+      "enabled": true,
+      "heavy": true,
+      "_note": "FileStorage REPLICATION + SNAPSHOT-SCHEDULE + SNAPSHOT-RESTORE lifecycle (billable NFS volume -> heavy, gated by SCP_RUN_HEAVY). Complements the existing 'filestorage-volume' lifecycle (do NOT edit it) by closing its 7 remaining write gaps: POST/PUT/DELETE /v1/replications(/{id}), POST/PUT/DELETE /v1/snapshot-schedules(/{id}), PUT /v1/snapshots/{snapshot_id}/restore. Flow: create a real NFS volume (protocol NFS, type_name HDD -- the only proven filestorage create body, from knowledge/validated-facts.md) -> poll $.state to available -> capture $.volume_id (flat, filestorage-specific) -> create a snapshot of it (capture $.snapshot.id from SnapshotShowResponse) -> restore that snapshot -> create snapshot-schedule (SnapshotScheduleCreateRequest: volume_id + snapshot_schedule{frequency,day_of_week,hour} + snapshot_retention_count) -> set + delete it -> create replication (ReplicationCreateRequest) -> set + delete it -> tear down snapshot + volume. Bodies for replication/schedule/restore from data/api_docs.json model schemas (createvolumereplication also present in data/api_bodies.json); provenance for the new endpoints DOCS-ONLY (no live 2xx). snapshot-schedule CREATE response (SnapshotScheduleCreateResponse) carries NO id, so set/delete-schedule run with an unfilled {snapshot_schedule_id} placeholder (still records coverage for the {snapshot_schedule_id} endpoints). Replication targets a remote region (kr-west1 docs example) -> may 4xx if DR/region unavailable; replication create captures $.replication_id (ReplicationCreateResponse). All replication/schedule/restore steps are optional+grouped so a failing family costs only that group; the volume + snapshot create are the only required-ish (optional) anchors.",
+      "steps": [
+        {
+          "name": "create-volume",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "optional": true,
+          "json": {
+            "name": "regrfsr{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"volume_id": "$.volume_id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-volume-available",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {
+            "field": "$.state",
+            "until": ["available", "AVAILABLE", "ACTIVE"],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-snapshot",
+          "method": "POST",
+          "path": "/v1/snapshots",
+          "group": "fs-snapshot",
+          "optional": true,
+          "json": {"volume_id": "{volume_id}"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"snapshot_id": "$.snapshot.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/snapshots/{snapshot_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "restore-snapshot",
+          "method": "PUT",
+          "path": "/v1/snapshots/{snapshot_id}/restore",
+          "group": "fs-snapshot",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-snapshot-schedule",
+          "method": "POST",
+          "path": "/v1/snapshot-schedules",
+          "group": "fs-schedule",
+          "optional": true,
+          "json": {
+            "volume_id": "{volume_id}",
+            "snapshot_retention_count": 10,
+            "snapshot_schedule": {"frequency": "WEEKLY", "day_of_week": "MON", "hour": "23"}
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"snapshot_schedule_id": "$.snapshot_schedule.id"}
+        },
+        {
+          "name": "set-snapshot-schedule",
+          "method": "PUT",
+          "path": "/v1/snapshot-schedules/{snapshot_schedule_id}",
+          "group": "fs-schedule",
+          "optional": true,
+          "json": {
+            "snapshot_retention_count": 5,
+            "snapshot_schedule": {"frequency": "DAILY", "hour": "12"}
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-snapshot-schedule",
+          "method": "DELETE",
+          "path": "/v1/snapshot-schedules/{snapshot_schedule_id}",
+          "group": "fs-schedule",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-replication",
+          "method": "POST",
+          "path": "/v1/replications",
+          "group": "fs-replication",
+          "optional": true,
+          "json": {
+            "name": "regrfsrepl{unique}",
+            "volume_id": "{volume_id}",
+            "region": "kr-west1",
+            "replication_frequency": "5min",
+            "replication_type": "replication",
+            "backup_retention_count": 2
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"replication_id": "$.replication_id"}
+        },
+        {
+          "name": "set-replication",
+          "method": "PUT",
+          "path": "/v1/replications/{replication_id}",
+          "group": "fs-replication",
+          "optional": true,
+          "json": {
+            "replication_update_type": "policy",
+            "replication_policy": "use",
+            "replication_frequency": "5min",
+            "backup_retention_count": 2
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-replication",
+          "method": "DELETE",
+          "path": "/v1/replications/{replication_id}",
+          "group": "fs-replication",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"volume_id": "{volume_id}"}
+        },
+        {
+          "name": "delete-snapshot",
+          "method": "DELETE",
+          "path": "/v1/snapshots/{snapshot_id}",
+          "group": "fs-snapshot",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404, 409, 400, 403, 422],
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-volume",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404, 409],
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-volume-gone",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+        }
+      ]
+    }
+  ]
+}

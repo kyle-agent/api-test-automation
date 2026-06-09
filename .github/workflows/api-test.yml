@@ -181,7 +181,25 @@ jobs:
     name: AXIS1 regression (smoke + read-chains, opt-in CRUD)
     needs: spec
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # SHARED-INFRA PARALLEL design (replaces the old serial 4-lane matrix). ONE
+    # job: smoke + read-chains run once (read-only), then the opt-in CRUD phase
+    # provisions ONE shared VPC + ONE shared subnet ONCE and runs the lifecycles
+    # in TWO -k-partitioned passes within a single 300-min budget:
+    #   * ADOPT-class (PARALLEL_K) — most lifecycles adopt the shared VPC+subnet
+    #     (SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env so every xdist worker adopts
+    #     the SAME live infra) and create only their own child -> safe to run in
+    #     PARALLEL with pytest-xdist `-n 6`.
+    #   * VPC-CRUD class (VPC_CRUD_K) — the few lifecycles that MUST self-create a
+    #     VPC/subnet (or mutate/peer the shared VPC, or need >1 VPC) run SERIALLY
+    #     (`-n 0`) so live VPCs stay within per_run_vpc_cap (1 shared + <=1
+    #     self-created at a time).
+    # PARALLEL_K and VPC_CRUD_K are exact complements (derived from
+    # dependencies.json via shared_infra --print-filters) so the two passes
+    # partition ALL enabled CRUD lifecycles with no overlap/orphan. See
+    # knowledge/vpc-scheduling-strategy.md + regression/scenarios/dependencies.json
+    # (vpc_schedule.adopt_lifecycles / vpc_crud_lifecycles).
+    # 300 min is now ample (parallelism replaces the 4 serial job budgets).
+    timeout-minutes: 300
     permissions:
       contents: read
       pull-requests: write
@@ -208,6 +226,7 @@ jobs:
           fi
 
       - name: Run read-only smoke + read-chains regression
+        # Read-only — runs once for every event (PR/smoke-only and CRUD runs).
         env:
           PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY }}
           PR_SERVICE: ${{ vars.SCP_PR_SERVICE }}
@@ -294,20 +313,110 @@ jobs:
             fi
           fi
 
-      - name: Run CRUD lifecycles (opt-in only)
+      - name: Derive lane filters (adopt vs vpc-crud partition)
+        # ADOPT_K / VPC_CRUD_K / PARALLEL_K are derived from dependencies.json so
+        # the workflow never hardcodes the classification. PARALLEL_K is the exact
+        # complement of VPC_CRUD_K -> the two CRUD passes partition all enabled
+        # CRUD lifecycles. Written to $GITHUB_ENV for the run steps below.
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        run: |
+          python -m regression.scenarios.shared_infra --print-filters >> "$GITHUB_ENV"
+          echo "derived ADOPT_K / VPC_CRUD_K / PARALLEL_K -> \$GITHUB_ENV"
+
+      - name: Provision shared VPC + subnet (once, for all xdist workers)
+        # Creates ONE shared VPC + ONE shared subnet and appends
+        # SCP_SHARED_VPC_ID / SCP_SHARED_SUBNET_ID to $GITHUB_ENV so every
+        # subsequent pytest (and each xdist worker) ADOPTS the same live infra
+        # instead of provisioning per-worker. No-op (prints nothing) if mutations
+        # are off. Diagnostics go to stderr; only the SCP_SHARED_* lines hit env.
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        run: |
+          python -m regression.scenarios.shared_infra --provision >> "$GITHUB_ENV"
+          echo "provisioned shared VPC/subnet (ids appended to \$GITHUB_ENV)"
+
+      - name: Run ADOPT-class CRUD (parallel)
         id: crud
-        # Runs independently of the smoke outcome, when opted in. Skipped on a
-        # cancelled run so a truncated push doesn't kick off a half CRUD pass.
+        # PARALLEL_K selects every CRUD lifecycle that is NOT a vpc-crud one (the
+        # adopt-class + all non-VPC CRUD). They adopt the shared VPC+subnet via
+        # env ids, so they only create their own child resource -> safe to run in
+        # parallel with pytest-xdist -n 6. A manual crud_filter (dispatch) or the
+        # heavy.txt self-trigger filter is ANDed in to NARROW within the pass.
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
         run: |
-          echo "Running CRUD lifecycles (creates/deletes REAL resources)" | tee reports/crud.log
-          ARGS="tests/crud -m crud --junitxml=reports/junit-crud.xml"
-          FILTER="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
-          [ -n "$FILTER" ] && ARGS="$ARGS -k $FILTER"
+          echo "Running ADOPT-class CRUD in parallel (-n 6)" | tee reports/crud.log
+          MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
+          if [ -n "$MANUAL" ]; then FILTER="($PARALLEL_K) and ($MANUAL)"; else FILTER="$PARALLEL_K"; fi
+          echo "adopt-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
+          ARGS=(tests/crud -m crud -n 6 --junitxml=reports/junit-crud-parallel.xml)
+          [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
           set -o pipefail
-          python -m pytest $ARGS 2>&1 | tee -a reports/crud.log
+          python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log
+
+      - name: Run VPC-CRUD class (serial)
+        # VPC_CRUD_K lifecycles MUST self-create their own VPC/subnet (their
+        # purpose is vpc/subnet/peering creation, they mutate the shared VPC, or
+        # they need >1 VPC), so they run SERIALLY (-n 0). With the 1 shared VPC
+        # still live, at most 1 self-created VPC exists at a time => <= per-run
+        # vpc cap (3). Runs even if the parallel pass had failures (separate -k).
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        env:
+          CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
+        run: |
+          echo "Running VPC-CRUD class serially (-n 0)" | tee -a reports/crud.log
+          MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
+          if [ -n "$MANUAL" ]; then FILTER="($VPC_CRUD_K) and ($MANUAL)"; else FILTER="$VPC_CRUD_K"; fi
+          echo "vpc-crud-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
+          ARGS=(tests/crud -m crud -n 0 --junitxml=reports/junit-crud-serial.xml)
+          [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
+          set -o pipefail
+          python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log
+
+      - name: Merge per-worker results
+        # Under xdist each worker wrote its own shards (observations-gw*.jsonl,
+        # smoke_status-gw*.tsv, registry/<run>-gw*.jsonl). Fold the observation
+        # shards into the canonical reports/results/observations.jsonl (and remove
+        # them) so the dashboard reads one file and never double-counts; concat the
+        # smoke TSV shards into reports/smoke_status.tsv; and merge the two CRUD
+        # junit files into one reports/junit-crud.xml. Registry shards are left
+        # as-is (the reconciler globs reports/registry/*.jsonl).
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from core import results
+          n = results.merge_worker_shards()
+          print(f"merged {n} results shard(s) into canonical observations/findings")
+          # smoke TSV shards -> canonical
+          tsv = Path("reports/smoke_status.tsv")
+          shards = sorted(Path("reports").glob("smoke_status-*.tsv"))
+          if shards:
+              with open(tsv, "a") as out:
+                  for s in shards:
+                      out.write(s.read_text()); s.unlink()
+              print(f"merged {len(shards)} smoke TSV shard(s)")
+          # two CRUD junit files -> one (parallel + serial passes ran disjoint -k)
+          import glob, xml.etree.ElementTree as ET
+          cases = []
+          for f in sorted(glob.glob("reports/junit-crud-*.xml")):
+              try: cases.extend(ET.parse(f).getroot().iter("testcase"))
+              except (ET.ParseError, OSError): pass
+          if cases:
+              suites = ET.Element("testsuites")
+              suite = ET.SubElement(suites, "testsuite", {"name": "crud", "tests": str(len(cases))})
+              for tc in cases: suite.append(tc)
+              ET.ElementTree(suites).write("reports/junit-crud.xml", encoding="utf-8", xml_declaration=True)
+              print(f"merged {len(cases)} crud testcase(s) into reports/junit-crud.xml")
+          PY
+
+      - name: Teardown shared VPC + subnet
+        # Always tear down (subnet then vpc) so a failed CRUD pass doesn't strand
+        # the shared infra; the tag-scoped reconciler sweep is the backstop. No-op
+        # without SCP_ALLOW_DESTRUCTIVE.
+        if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        run: |
+          python -m regression.scenarios.shared_infra --teardown || true
 
       - name: Comment CRUD result on PR
         if: ${{ !cancelled() && github.event_name == 'pull_request' && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
@@ -336,6 +445,9 @@ jobs:
           PY
 
       - name: Upload regression reports + results store
+        # ONE artifact (single job again, no lanes). The "Merge per-worker results"
+        # step already folded the xdist shards into the canonical files, so the
+        # sweep + dashboard jobs download this one `regression-reports` artifact.
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
@@ -376,10 +488,14 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Download this run's registry manifest
+      - name: Download regression registry manifest
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
+          # Single artifact again (no lanes). The reconciler sweeps the ACCOUNT by
+          # owner tag (is_owned + is_expired) and globs reports/registry/*.jsonl
+          # (incl. per-xdist-worker shards <run>-gw*.jsonl), so it does not depend
+          # on a merge — this download is for completeness / debugging.
           name: regression-reports
           path: reports
       - name: Reconcile leftover resources (tag-scoped)
@@ -564,6 +680,10 @@ jobs:
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
+          # Single artifact again (no lanes). The regression job already folded
+          # its xdist per-worker shards into the canonical files (observations.jsonl,
+          # smoke_status.tsv, junit-crud.xml) via "Merge per-worker results", so the
+          # dashboard reads them directly.
           name: regression-reports
           path: reports
       - name: Download conformance results

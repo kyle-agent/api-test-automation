@@ -72,6 +72,17 @@ ordered CRUD scenarios. Never relax these as a shortcut.
 - Account quotas (vpc=5, private-dns=3, …) are modelled in `core.budgets` +
   `regression/scenarios/dependencies.json`; the engine **reserves** a slot before
   a quota-bound create and **skips** (not fails) when exhausted.
+- **VPC scheduling / reuse:** 8 lifecycles touch the 5-VPC cap. The **6 heavy**
+  ones now **adopt one session-shared VPC** (`conftest.py shared_vpc` →
+  `engine.provision_shared_vpc`; steps marked `{"adopt":"vpc"}`), so heavy runs
+  hold 1 shared VPC instead of up to 6 and `heavy-shared-networking` is no longer
+  starved (6 creates → 1; no-op fallback to self-create; pending live validation —
+  `tests/crud/test_shared_vpc_adopt.py`). The 2 light networking lifecycles still
+  self-create for coverage. Cross-run isolation + remaining gaps (the pytest CRUD
+  driver still builds a fresh `Budget` per lifecycle and never `sync()`s it live):
+  see the lane playbook in
+  [`knowledge/vpc-scheduling-strategy.md`](../knowledge/vpc-scheduling-strategy.md)
+  (machine-readable: `dependencies.json:vpc_schedule`).
 
 ## Where results live (the contract)
 
@@ -101,8 +112,34 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   **write-setter / in-place-update** steps (coverage expansion) — see
   `docs/HANDOFF-crud-setter-validation.md`.
 - Auth/host resolution: implemented & configurable; confirm against a live `200`.
-- **What to advance next:** widen GET coverage toward 100% and add CRUD scenarios
-  for the long tail. Record gaps in `knowledge/scenario-catalog.md`.
+- **Coverage campaign (multi-agent) — RUNNING.** `agents/CAMPAIGN.md` is the
+  operating model; `agents/coordination/ledger.json` is the blackboard. Per-service
+  CRUD fragments now live in `regression/scenarios/lifecycles/*.json` (merged by
+  `regression/scenarios/loader.py`; validate with
+  `python -m regression.scenarios.validate`). Real target = the **547 uncovered
+  write ops / 53 services** from `python -m spec.coverage_gap` (id-bound GETs are
+  auto-covered by read-chains). **Wave 1 done** (6 fragments, 13 new lifecycles):
+  iam, organization, iam-identity-center, servicewatch, baremetal-blockstorage,
+  apigateway → 151 writes closed. **Wave 2 done** (7 cluster-agents, 30 fragments,
+  49 lifecycles): networking/{vpc,loadbalancer,dns,cdn,gslb,vpn,firewall,direct-
+  connect}, compute/virtualserver, the 6 database engines, storage/{archive,backup,
+  file,parallel-file}, security/{kms,secrets,vault,configinspection,certmgr},
+  data-analytics ×6 → +302 writes. **Wave 3 done** (4 cluster-agents, +88 writes):
+  compute/{baremetal,multinodegpucluster,scf}, container/{scr,ske}, management/
+  {cloudcontrol,resourcemanager,loggingaudit,cloudmonitoring,network-logging}, ai-ml
+  ×2, financial ×2, platform/sts, devops, networking/security-group.
+- **WRITE-COVERAGE CAMPAIGN COMPLETE.** All **547 catalog write ops reachable**
+  (write-gap = 0 across all 53 services); **113 lifecycles** (29 base + 84 in 53
+  fragments), validator 0 errors, offline tests pass. **Static ceiling 43.0% →
+  85.6%**; residual 198-endpoint gap is exclusively id-bound GETs (read-chain /
+  probe_reads auto-covered at runtime, so live `cov_op` runs higher). All bodies
+  docs-derived, **PENDING LIVE VALIDATION**.
+- **What to advance next:** a **live CI run** to convert the static ceiling into
+  measured `cov_op` — needs the lane-scheduling work first so the heavy CRUD set
+  fits the 300-min cap (the new fragments add many heavy lifecycles). Then iterate
+  on bodies that 4xx (the docs-derived guesses) using real runtime evidence, and
+  fix the known corrupt `api_bodies.json` entries (iam saml-provider, vpc tgw
+  firewall-connection). Ledger: `agents/coordination/ledger.json`.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.

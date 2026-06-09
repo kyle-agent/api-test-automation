@@ -1,0 +1,199 @@
+{
+  "lifecycles": [
+    {
+      "id": "archivestorage-bucket",
+      "service": "storage/archivestorage",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Archive Storage BUCKET lifecycle (billable object storage -> heavy, gated by SCP_RUN_HEAVY). Closes the bucket-side write gap: create bucket (BucketCreateRequest: name + tags) -> capture $.id (BucketCreateResponse.id) -> versioning/encryption setters -> object + object-version deletes + recovers -> delete bucket. Bodies derived from data/api_docs.json model schemas (no data/api_bodies.json entries for archivestorage); provenance DOCS-ONLY (no live 2xx yet). Bucket name pattern not documented beyond Example 'astest' -> we use 'regras{unique}'. recover-objects/recover-object-versions and delete-objects/delete-object-versions target objects that do NOT exist in a freshly-created empty bucket, so they will 4xx (still records coverage); all are optional+grouped so one failing family costs only that group. Object paths/versions are docs-example placeholders. cancel-archiving / cancel-recovery (PUT, no path id, empty body) belong to the archiving-policy family and are exercised in the archivestorage-archiving-policy lifecycle below.",
+      "steps": [
+        {
+          "name": "create-bucket",
+          "method": "POST",
+          "path": "/v1/buckets",
+          "json": {
+            "name": "regras{unique}",
+            "tags": []
+          },
+          "optional": true,
+          "expect_status": [200, 201, 202],
+          "capture": {"bucket_id": "$.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/buckets/{bucket_id}",
+            "service": "archivestorage"
+          }
+        },
+        {
+          "name": "show-bucket",
+          "method": "GET",
+          "path": "/v1/buckets/{bucket_id}",
+          "optional": true,
+          "expect_status": [200, 404]
+        },
+        {
+          "name": "list-buckets",
+          "method": "GET",
+          "path": "/v1/buckets",
+          "optional": true,
+          "expect_status": [200]
+        },
+        {
+          "name": "set-bucket-versioning",
+          "method": "PUT",
+          "path": "/v1/buckets/{bucket_id}/versioning",
+          "group": "as-versioning",
+          "optional": true,
+          "json": {"enabled": true},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-bucket-encryption",
+          "method": "PUT",
+          "path": "/v1/buckets/{bucket_id}/encryption",
+          "group": "as-encryption",
+          "optional": true,
+          "json": {"enabled": true},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "recover-objects",
+          "method": "PUT",
+          "path": "/v1/buckets/{bucket_id}/recover-objects",
+          "group": "as-recover-objects",
+          "optional": true,
+          "json": {
+            "recovery_target_bucket_name": "regras{unique}",
+            "recovery_infos": [{"source_object_path": "/", "object_type": "FILE"}],
+            "overwrite": true
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "recover-object-versions",
+          "method": "PUT",
+          "path": "/v1/buckets/{bucket_id}/recover-object-versions",
+          "group": "as-recover-object-versions",
+          "optional": true,
+          "json": {
+            "recovery_target_bucket_name": "regras{unique}",
+            "source_object_path": "/",
+            "source_object_version": "Oc9nEYWV.6VjzsIMXFZWM1zL8HcYvKl",
+            "overwrite": true
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-bucket-objects",
+          "method": "DELETE",
+          "path": "/v1/buckets/{bucket_id}/objects",
+          "group": "as-delete-objects",
+          "optional": true,
+          "destructive": true,
+          "json": {"paths": ["test/"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-bucket-object-versions",
+          "method": "DELETE",
+          "path": "/v1/buckets/{bucket_id}/object-versions",
+          "group": "as-delete-object-versions",
+          "optional": true,
+          "destructive": true,
+          "json": {"path": "hello/my_file.txt", "versions": ["Oc9nEYWV.6VjzsIMXFZWM1zL8HcYvKl"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"bucket_id": "{bucket_id}"}
+        },
+        {
+          "name": "delete-bucket",
+          "method": "DELETE",
+          "path": "/v1/buckets/{bucket_id}",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404, 409],
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "wait-bucket-gone",
+          "method": "GET",
+          "path": "/v1/buckets/{bucket_id}",
+          "optional": true,
+          "expect_status": [200, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+        }
+      ]
+    },
+    {
+      "id": "archivestorage-archiving-policy",
+      "service": "storage/archivestorage",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Archive Storage ARCHIVING-POLICY lifecycle (heavy). Closes the archiving-policy write gap: create-archiving-policy (ArchivingPolicyCreateRequest: archiving_source_bucket_name, object_lifecycle, object_path='/') -> capture $.id (ArchivingPolicyCreateResponse.id) -> set policy (object_lifecycle) -> set policy state (ACTIVE|INACTIVE) -> cancel-archiving / cancel-recovery (PUT, no path id, empty body). DOCS-ONLY provenance. archiving_source_bucket_name must reference an existing OBS source bucket; on this account none is wired in, so create-policy will likely 4xx (still records coverage) -> optional. cancel-archiving and cancel-recovery have NO documented request body (body=[] in api_docs) -> sent with empty json {}; they cancel an in-flight archiving/recovery history and 4xx when none is running (records coverage). object_lifecycle is documented as a STRING ('Example : 1').",
+      "steps": [
+        {
+          "name": "create-archiving-policy",
+          "method": "POST",
+          "path": "/v1/archiving-policies",
+          "group": "as-policy",
+          "optional": true,
+          "json": {
+            "archiving_source_bucket_name": "obs-bucket-name",
+            "object_lifecycle": "1",
+            "object_path": "/"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture": {"archiving_policy_id": "$.id"}
+        },
+        {
+          "name": "show-archiving-policy",
+          "method": "GET",
+          "path": "/v1/archiving-policies/{archiving_policy_id}",
+          "group": "as-policy",
+          "optional": true,
+          "expect_status": [200, 404]
+        },
+        {
+          "name": "set-archiving-policy",
+          "method": "PUT",
+          "path": "/v1/archiving-policies/{archiving_policy_id}",
+          "group": "as-policy",
+          "optional": true,
+          "json": {"object_lifecycle": "2"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-archiving-policy-state",
+          "method": "PUT",
+          "path": "/v1/archiving-policies/{archiving_policy_id}/state",
+          "group": "as-policy",
+          "optional": true,
+          "json": {"state": "INACTIVE"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "cancel-archiving",
+          "method": "PUT",
+          "path": "/v1/archiving-histories/cancel-archiving",
+          "group": "as-cancel-archiving",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "cancel-recovery",
+          "method": "PUT",
+          "path": "/v1/recovery-histories/cancel-recovery",
+          "group": "as-cancel-recovery",
+          "optional": true,
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        }
+      ]
+    }
+  ]
+}

@@ -27,11 +27,12 @@ _active = engine.active_lifecycles()
 @pytest.mark.parametrize("lifecycle", _active or [pytest.param(None, marks=pytest.mark.skip(
     reason="no enabled lifecycles in scenarios.json"))],
     ids=[lc["id"] for lc in _active] or ["none"])
-def test_crud_lifecycle(lifecycle, client, cfg):
+def test_crud_lifecycle(lifecycle, client, cfg, shared_vpc):
     # The engine runs the lifecycle and NEVER raises on an environmental skip:
     # it returns status='skipped'. A genuine failure (wrong status / capture
     # miss) is re-raised after best-effort teardown, failing this test.
-    result = engine.run_lifecycle(lifecycle, client, cfg)
+    # shared_vpc (session fixture) seeds a shared VPC the heavy lifecycles adopt.
+    result = engine.run_lifecycle(lifecycle, client, cfg, shared_ctx=shared_vpc)
 
     if result["status"] == "skipped":
         reason = result.get("reason") or "skipped"
