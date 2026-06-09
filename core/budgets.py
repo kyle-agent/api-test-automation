@@ -1,6 +1,6 @@
 """Account budgets — make resource quotas explicit so scenarios schedule safely.
 
-The 5-VPC cap repeatedly skipped networking scenarios and, combined with leaks,
+The 3-VPC cap repeatedly skipped networking scenarios and, combined with leaks,
 caused flaky coverage. Modelling limits as data lets the scenario scheduler:
 
   * reserve a slot before a create and release it after teardown,
@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 # Conservative defaults; override from data/baselines or env as they are learned.
 DEFAULT_LIMITS = {
-    "vpc": 5,            # scp-network.vpc.exceed-max-count (the recurring one)
+    "vpc": 3,            # scp-network.vpc.exceed-max-count — HARD account cap is 3
     "private-dns": 3,    # scp-network.private-dns.max-count-exceed
 }
 
