@@ -58,6 +58,17 @@ entrypoints + env vars; GitHub Actions is just one orchestrator shell.
 - **Done when:** one documented command provisions a fresh server to run the
   nightly schedule and publish the dashboard.
 
+## End state (the destination all phases serve)
+
+Read the **entire userguide**, and from it build: ① per-service test
+scenarios, ② multi-service combination scenarios, ③ option/parameter
+variations (C4 coverage in `docs/COVERAGE-CRITERIA.md`). For now only the
+docs needed for coverage 100% are prioritized — the full backlog with
+priorities and per-service status lives in
+[`knowledge/formal/INGESTION.md`](knowledge/formal/INGESTION.md)
+(짬짬이 ingest: any session picks P1 rows and converts them into
+`knowledge/formal/services/` files).
+
 ## Cross-cutting — Domain knowledge, formalized
 
 Domain knowledge (API call order, service dependencies, quotas, combination

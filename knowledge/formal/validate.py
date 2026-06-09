@@ -254,6 +254,41 @@ def check_combos(ids: set[str], services: set[str]) -> int:
     return len(combos)
 
 
+WAIVER_CLASSES = {"blast-radius", "entitlement", "unsatisfiable-flow", "billing-prohibitive"}
+
+
+def check_waivers() -> int:
+    """data/baselines/coverage_waivers.json — C3 waivers (docs/COVERAGE-CRITERIA.md)."""
+    path = ROOT / "data" / "baselines" / "coverage_waivers.json"
+    if not path.exists():
+        return 0
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        err(f"coverage_waivers.json: parse error: {exc}")
+        return 0
+    cat = json.loads((ROOT / "data" / "api_catalog.json").read_text(encoding="utf-8"))
+    eps = cat["endpoints"] if isinstance(cat, dict) and "endpoints" in cat else cat
+    cat_keys = {e["key"] for e in eps}
+    seen: set[str] = set()
+    waivers = data.get("waivers") or []
+    for w in waivers:
+        key = w.get("key")
+        if not key:
+            err("coverage_waivers.json: waiver missing 'key'")
+            continue
+        if key in seen:
+            err(f"coverage_waivers.json: duplicate waiver '{key}'")
+        seen.add(key)
+        if key not in cat_keys:
+            err(f"coverage_waivers.json: '{key}' is not a catalog endpoint key")
+        if w.get("class") not in WAIVER_CLASSES:
+            err(f"coverage_waivers.json: '{key}' class must be one of {sorted(WAIVER_CLASSES)}")
+        if not w.get("reason"):
+            err(f"coverage_waivers.json: '{key}' missing 'reason'")
+    return len(waivers)
+
+
 def main() -> int:
     ids = lifecycle_ids()
     services = catalog_services()
@@ -262,6 +297,7 @@ def main() -> int:
     resources, n_cross = check_cross_service(services)
     n_rules, n_orders = check_flows(resources, ids)
     n_combos = check_combos(ids, services)
+    n_waivers = check_waivers()
 
     for w in warnings:
         print(f"WARN  {w}")
@@ -271,7 +307,7 @@ def main() -> int:
         f"L1 {n_services} service file(s) · "
         f"L2 {len(resources)} resource(s) + {n_cross} cross-constraint(s) · "
         f"L3 {n_rules} flow-rule(s) + {n_orders} call-order(s) · "
-        f"{n_combos} combo(s) checked · "
+        f"{n_combos} combo(s) · {n_waivers} waiver(s) checked · "
         f"{len(errors)} error(s) · {len(warnings)} warning(s)"
     )
     return 1 if errors else 0

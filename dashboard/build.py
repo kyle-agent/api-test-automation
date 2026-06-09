@@ -298,7 +298,7 @@ def per_service(cat, tsv_rows):
 # Computation (verbatim from legacy, extended with axis-2 findings count)
 # ---------------------------------------------------------------------------
 
-def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
+def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None):
     total = len(cat)
     cat_total = Counter(e["category"] for e in cat)
     cat_get = Counter(e["category"] for e in cat if e["method"] == "GET")
@@ -339,6 +339,19 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
     cov_get = len(get_verified) / get_total * 100 if get_total else 0
     cov_write = len(write_verified) / nonget_total * 100 if nonget_total else 0
 
+    # C0-C4 ladder (docs/COVERAGE-CRITERIA.md): the 100% goal is C3 (verified)
+    # for every endpoint EXCEPT the explicit, human-approved waiver list, which
+    # must still be C2 (called). Waived endpoints leave both numerator and
+    # denominator of the headline; a verified waived endpoint means the waiver
+    # is obsolete (surfaced separately).
+    cat_keys_all = {e["key"] for e in cat}
+    waived = {w["key"] for w in (waivers or {}).get("waivers", [])} & cat_keys_all
+    c3_denom = total - len(waived)
+    c3_verified = verified - waived
+    cov_c3 = len(c3_verified) / c3_denom * 100 if c3_denom else 0
+    waived_called = len(waived & touched)
+    waived_verified = len(waived & verified)   # waiver candidates for removal
+
     param_attempted = len(param_rows)
     param_accepted = sum(1 for r in param_rows if 200 <= r[0] < 300)
     cov_param = param_accepted / param_attempted * 100 if param_attempted else 0
@@ -358,6 +371,9 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=()):
         "get_verified": len(get_verified),
         "write_verified": len(write_verified), "write_reached": len(write_reached),
         "cov_op": cov_op, "cov_get": cov_get, "cov_write": cov_write,
+        "cov_c3": cov_c3, "c3_denom": c3_denom, "c3_verified": len(c3_verified),
+        "waived_total": len(waived), "waived_called": waived_called,
+        "waived_verified": waived_verified,
         "get_total": get_total, "nonget_total": nonget_total,
         "write_hit": len(write_verified),
         "ok": ok, "soft": soft,
@@ -384,6 +400,8 @@ def append_history(path, d, run_type, sha):
         "ok": d["ok"], "soft": d["soft"],
         "fail_new": d["fail_new"], "fail_known": d["fail_known"],
         "cov_op": round(d["cov_op"], 2), "cov_get": round(d["cov_get"], 2),
+        "cov_c3": round(d.get("cov_c3", d["cov_op"]), 2),
+        "waived": d.get("waived_total", 0),
         "tested": d["tested"], "total": d["total"],
         # (2) stable ceiling + (1) run-scope so the trend reflects authoring
         # progress (monotonic), not live measurement noise.
@@ -446,6 +464,27 @@ def spark(series, w=520, h=120, color="#0969da"):
             f'<polygon points="{area}" fill="{color}1a"/>'
             f'<polyline points="{poly}" fill="none" stroke="{color}" stroke-width="2"/>'
             f'{dots}</svg>')
+
+
+def spark_multi(series_list, w=520, h=120):
+    """Overlay several (series, color) lines on ONE shared scale, so the gap
+    between C1 (plannable) and C3 (verified) is visible at a glance."""
+    series_list = [(s, c) for s, c in series_list if len(s) >= 2]
+    if not series_list:
+        return ('<div style="color:#656d76;font-size:13px;padding:30px 0;text-align:center">'
+                'collecting… (need ≥2 runs)</div>')
+    allv = [v for s, _ in series_list for v in s]
+    mx = max(allv) or 1; mn = min(allv); rng = (mx - mn) or 1; pad = 10
+    out = [f'<svg viewBox="0 0 {w} {h}" width="100%" height="{h}">']
+    for series, color in series_list:
+        n = len(series)
+        pts = [(pad + i * (w - 2 * pad) / (n - 1),
+                h - pad - (v - mn) / rng * (h - 2 * pad)) for i, v in enumerate(series)]
+        poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+        out.append(f'<polyline points="{poly}" fill="none" stroke="{color}" stroke-width="2"/>')
+        out.append("".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.5" fill="{color}"/>' for x, y in pts))
+    out.append("</svg>")
+    return "".join(out)
 
 
 STATUS_COLORS = {2: "#2da44e", 4: "#bf8700", 5: "#cf222e"}
@@ -637,8 +676,8 @@ def render(d, hist, meta, services):
     cards = (card("New regressions", str(d["fail_new"]),
                   "vs known baseline", "#2da44e" if healthy else "#cf222e")
              + card("Pass rate", f"{pass_rate:.1f}%", f'{d["ok"]} ok / {called} calls', "#1f2328")
-             + card("Reachable ceiling", f'{d.get("reachable_pct", 0):.1f}%',
-                    f'{d.get("reachable", 0)} / {d["total"]} · scenarios', "#2da44e")
+             + card("C3 검증 커버리지", f'{d.get("cov_c3", 0):.1f}%',
+                    f'{d.get("c3_verified", 0)} / {d.get("c3_denom", d["total"])} · 목표 100%', "#0969da")
              + card("Known-red", str(d["fail_known"]),
                     "tracked backend bugs", "#cf222e" if d["fail_known"] else "#2da44e"))
 
@@ -670,10 +709,11 @@ def render(d, hist, meta, services):
 
     pr_series = [h["ok"] / max(1, h["ok"] + h["soft"] + h["fail_new"] + h["fail_known"]) * 100
                  for h in hist[-12:]]
-    # Trend uses the STABLE reachable ceiling (monotonic with authoring work),
-    # not the per-run live measurement (which bounces with run scope / account
-    # state). Old history rows without reachable_pct fall back to cov_op.
-    cov_series = [h.get("reachable_pct", h.get("cov_op", 0)) for h in hist[-12:]]
+    # Trend: C1 (stable, monotonic with authoring) AND C3 (the goal metric) on
+    # one shared scale. Old history rows without cov_c3 fall back to cov_op
+    # (same semantics before waivers existed).
+    c1_series = [h.get("reachable_pct", h.get("cov_op", 0)) for h in hist[-12:]]
+    c3_series = [h.get("cov_c3", h.get("cov_op", 0)) for h in hist[-12:]]
 
     writeax = "◑" if d["cov_write"] > 0 else "✗"
     measured = d.get("param_attempted", 0) > 0
@@ -690,6 +730,11 @@ def render(d, hist, meta, services):
         conformance_section=render_conformance_section(meta.get("conf", {})),
         badge=badge, cards=cards, donut=donut(segs, called), legend=legend,
         cov_op=f'{d["cov_op"]:.1f}', tested=d["tested"], total=d["total"],
+        cov_c3=f'{d.get("cov_c3", d["cov_op"]):.1f}',
+        c3_verified=d.get("c3_verified", d["verified"]),
+        c3_denom=d.get("c3_denom", d["total"]),
+        waived_total=d.get("waived_total", 0), waived_called=d.get("waived_called", 0),
+        waived_verified=d.get("waived_verified", 0),
         verified=d["verified"], reach_measured=f'{d["reach_measured_pct"]:.1f}',
         get_verified=d["get_verified"], write_reached=d["write_reached"],
         reach_pct=f'{d.get("reachable_pct", 0):.1f}', reachable=d.get("reachable", 0),
@@ -705,7 +750,7 @@ def render(d, hist, meta, services):
         crudgrid=crudgrid, knrows=knrows,
         writeax_cls=writeax_cls,
         spark_pr=spark(pr_series, color="#2da44e"),
-        spark_cov=spark(cov_series, color="#0969da"),
+        spark_cov=spark_multi([(c1_series, "#2da44e"), (c3_series, "#0969da")]),
         runs=len(hist))
 
 
@@ -758,16 +803,17 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <section><h2>건강도</h2><div class="cards">{cards}</div></section>
 <section><div class="grid2">
 <div class="panel"><h2>응답 코드 분포</h2><div class="donutwrap">{donut}<div>{legend}</div></div></div>
-<div class="panel"><h2>커버리지</h2>
+<div class="panel"><h2>커버리지 — C1→C2→C3 사다리 <span class="mut" style="text-transform:none">(docs/COVERAGE-CRITERIA.md)</span></h2>
 <div style="display:flex;gap:28px;align-items:baseline;flex-wrap:wrap">
-<div><div class="bignum" style="color:#2da44e">{reach_pct}%</div><div class="mut">도달가능 ceiling ({reachable}/{total} · 시나리오 기준, 안정)</div></div>
-<div><div class="bignum" style="color:#0969da">{cov_op}%</div><div class="mut">측정·검증 2xx ({verified}/{total} · {run_scope})</div></div>
-<div><div style="font-size:22px;font-weight:700;color:#8250df">{reach_measured}%</div><div class="mut">측정·도달 called ({tested}/{total})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">읽기 GET 검증 ({get_verified}/{get_total})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">쓰기 검증 ({write_hit}/{nonget_total}) · 미검증 {write_reached}</div></div>{param_stat}</div>
-<div class="mut" style="margin-top:8px"><b>검증(2xx)</b>=실제로 동작 확인됨 = "covered" · <b>도달</b>=호출됐으나 4xx(404 포함, 미검증). 404 POST/DELETE는 아무것도 생성/삭제 안 했으므로 도달일 뿐 covered 아님.</div>
-<div class="mut" style="margin-top:6px">남은 gap → write <b>{gap_write}</b> · id-bound GET <b>{gap_getid}</b> &nbsp;(다음 개선 대상; write=시나리오 추가, id-GET=read-chain/probe로 런타임 자동 도달)</div>
-<div class="mut" style="margin-top:12px">측정 축 (swagger-coverage/ReadyAPI 기준)</div>
+<div><div class="bignum" style="color:#0969da">{cov_c3}%</div><div class="mut"><b>C3 검증됨</b> — 2xx 동작 확인 ({c3_verified}/{c3_denom} · {run_scope}) · <b>목표 100%</b></div></div>
+<div><div style="font-size:22px;font-weight:700;color:#8250df">{reach_measured}%</div><div class="mut"><b>C2 호출됨</b> — 4xx 포함 응답 수신 ({tested}/{total})</div></div>
+<div><div style="font-size:22px;font-weight:700;color:#2da44e">{reach_pct}%</div><div class="mut"><b>C1 도달가능</b> — 시나리오 정적 ({reachable}/{total})</div></div>
+<div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">C3-읽기 GET 2xx ({get_verified}/{get_total})</div></div>
+<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">C3-쓰기 2xx ({write_hit}/{nonget_total}) · C2뿐 {write_reached}</div></div>{param_stat}</div>
+<div class="mut" style="margin-top:8px"><b>C2 호출됨</b>="이 API는 호출은 된다"(4xx 포함 — 404 POST/DELETE는 아무것도 생성/삭제 안 함) · <b>C3 검증됨</b>="이 API는 동작한다"(GET 200, 쓰기 2xx) · <b>100% = waiver 제외 전부 C3 + waived는 C2 필수</b></div>
+<div class="mut" style="margin-top:6px">waiver {waived_total}개 (C2 충족 {waived_called} · 2xx 확인되어 waiver 해제 후보 {waived_verified}) — data/baselines/coverage_waivers.json</div>
+<div class="mut" style="margin-top:6px">남은 gap → write <b>{gap_write}</b> · id-bound GET <b>{gap_getid}</b> &nbsp;(write=시나리오 추가, id-GET=read-chain/probe로 런타임 자동 도달)</div>
+<div class="mut" style="margin-top:12px">C4 심화 축 (100% 이후 — swagger-coverage/ReadyAPI 기준)</div>
 <div class="axes"><span class="ax on">✓ operation</span><span class="ax part">◑ status-code</span>
 <span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax {paramax_cls}">{paramax} parameter</span><span class="ax off">✗ schema</span></div></div>
 </div></section>
@@ -787,7 +833,7 @@ footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var
 <section><h2>추세 <span class="mut" style="text-transform:none">— {runs} runs 누적 (dashboard-data 브랜치)</span></h2>
 <div class="panel trendgrid">
 <div><div class="mut">성공률</div>{spark_pr}</div>
-<div><div class="mut">도달가능 ceiling % (시나리오 기준, 단조)</div>{spark_cov}</div></div></section>
+<div><div class="mut">커버리지 — <span style="color:#2da44e">C1 도달가능</span> · <span style="color:#0969da">C3 검증(목표)</span></div>{spark_cov}</div></div></section>
 <section><h2>알려진 이슈 (data/baselines/known_issues.json)</h2><div class="panel"><table>
 <tr><th>endpoint</th><th>status</th><th>유형</th></tr>{knrows}</table></div></section>
 <footer>생성: <code>dashboard/build.py</code> ← unified results store (reports/results/*.jsonl) + legacy fallback (smoke_status.tsv, junit-crud.xml, api_catalog.json)
@@ -811,6 +857,7 @@ def build(
     crud: str = "reports/junit-crud.xml",
     lifecycles: str = "regression/scenarios/scenarios.json",
     known: str = "data/baselines/known_issues.json",
+    waivers: str = "data/baselines/coverage_waivers.json",
     conformance: str = "data/conformance.json",
     # Output
     out: str = "reports/dashboard/index.html",
@@ -882,11 +929,13 @@ def build(
         lc_data = (json.load(open(lifecycles)).get("lifecycles", [])
                    if os.path.exists(lifecycles) else [])
     known_data = json.load(open(known)) if os.path.exists(known) else {"issues": []}
+    waiver_data = json.load(open(waivers)) if os.path.exists(waivers) else {"waivers": []}
 
     # ------------------------------------------------------------------
     # 5. Compute, history, render
     # ------------------------------------------------------------------
-    d = compute(cat, tsv_rows, crud_results, lc_data, known_data, param_rows)
+    d = compute(cat, tsv_rows, crud_results, lc_data, known_data, param_rows,
+                waivers=waiver_data)
     # (2) stable static ceiling from committed scenarios (reflects authoring work
     # immediately, no live run needed) + remaining gap = what to improve next.
     d.update(reachable_ceiling(cat, lc_data))
@@ -925,8 +974,9 @@ def build(
         f"dashboard -> {out}  "
         f"(source: {source_label}; "
         f"reachable {d.get('reachable_pct', 0):.1f}% ceiling (gap write {d.get('gap_write', 0)} / id-GET {d.get('gap_getid', 0)}); "
-        f"measured-verified {d['cov_op']:.1f}% op ({d['verified']}/{d['total']}, {'full CRUD' if d.get('crud_ran') else 'read-only'}), "
-        f"measured-reached {d['reach_measured_pct']:.1f}% ({d['tested']}/{d['total']}); "
+        f"C3-verified {d.get('cov_c3', 0):.1f}% ({d.get('c3_verified', 0)}/{d.get('c3_denom', 0)}, "
+        f"waived {d.get('waived_total', 0)}, {'full CRUD' if d.get('crud_ran') else 'read-only'}), "
+        f"C2-called {d['reach_measured_pct']:.1f}% ({d['tested']}/{d['total']}); "
         f"{d['cov_get']:.1f}% GET-verified, {d['cov_write']:.1f}% write-verified (write reached-but-unverified {d['write_reached']}); "
         f"ok {d['ok']} soft {d['soft']} new {d['fail_new']} known {d['fail_known']}; "
         f"{len(hist)} history rows; {len(services)} service pages)"
@@ -952,6 +1002,8 @@ def main():
     ap.add_argument("--crud", default="reports/junit-crud.xml")
     ap.add_argument("--lifecycles", default="regression/scenarios/scenarios.json")
     ap.add_argument("--known", default="data/baselines/known_issues.json")
+    ap.add_argument("--waivers", default="data/baselines/coverage_waivers.json",
+                    help="C3 waiver list (docs/COVERAGE-CRITERIA.md)")
     ap.add_argument("--conformance", default="data/conformance.json",
                     help="Legacy fallback: conformance.json")
     ap.add_argument("--history", default="dashboard/history.jsonl")
@@ -970,6 +1022,7 @@ def main():
         crud=args.crud,
         lifecycles=args.lifecycles,
         known=args.known,
+        waivers=args.waivers,
         conformance=args.conformance,
         history=args.history,
         out=args.out,

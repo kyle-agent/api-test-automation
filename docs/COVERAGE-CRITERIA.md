@@ -1,7 +1,8 @@
-# Coverage criteria — what does "100%" mean? (DRAFT — 사람 검토용 초안)
+# Coverage criteria — what does "100%" mean?
 
-> Status: **draft, awaiting review.** 이 문서가 승인되면 대시보드 카드 라벨과
-> waiver 메커니즘을 이 기준대로 구현합니다.
+> Status: **ADOPTED** (승인 2026-06-09). 대시보드가 이 기준대로 구현되어 있음:
+> C1/C2/C3 카드 + waiver 메커니즘(`data/baselines/coverage_waivers.json`) +
+> C1·C3 동시 추세. waiver 추가는 사람이 승인한다.
 
 ## The problem
 
@@ -83,16 +84,19 @@ secondary = C2 / total                          # 호출 커버리지
 planning  = C1 / total                          # 시나리오 도달가능 (저작 진척)
 ```
 
-## Dashboard changes once this is approved
+## Implementation (done)
 
-1. Relabel the five cards to the ladder: `C1 도달가능` / `C2 호출됨` /
-   `C3 검증됨 (목표)` headline / C3-read / C3-write. One-line legend:
+1. ✅ Coverage panel relabeled to the ladder: `C3 검증됨` headline (+ 건강도
+   카드), `C2 호출됨`, `C1 도달가능`, C3-read / C3-write breakdown, legend
    "C2=호출은 된다(4xx 포함) · C3=실제로 동작했다(2xx)".
-2. Add the waiver mechanism (`coverage_waivers.json` + dashboard surfacing +
-   validator check that waived keys exist in the catalog and are C2-reachable).
-3. Trend chart: track C3 (goal progress) alongside C1 (authoring progress) —
-   today it trends C1 only.
-4. C4 axes stay visible as the post-100% roadmap (ROADMAP Phase 2 "widen
+2. ✅ Waiver mechanism: `data/baselines/coverage_waivers.json` (initially
+   empty; 사람이 승인해 추가) — dashboard surfaces waived/called counts and
+   flags waived endpoints that DO 2xx as removal candidates;
+   `knowledge/formal/validate.py` checks keys exist in the catalog, class
+   enum, reason present.
+3. ✅ Trend chart overlays C1 (authoring progress) and C3 (goal progress) on
+   one scale; history rows record `cov_c3` + `waived`.
+4. ✅ C4 axes stay visible as the post-100% roadmap (ROADMAP Phase 2 "widen
    parameter combinations").
 
 ## Sources
