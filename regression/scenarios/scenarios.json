@@ -189,7 +189,7 @@
       "id": "support-reads",
       "service": "management/support",
       "enabled": true,
-      "_note": "Read-only: list inquiries + service-requests, soft-capture an id each, probe showinquiry/showservicerequest. No writes/cleanup. Env-dependent (records SOFT if the account has no inquiries/tickets \u2014 there is no create-ticket API in the catalog).",
+      "_note": "Read-only: list inquiries + service-requests, soft-capture an id each, probe showinquiry/showservicerequest. No writes/cleanup. Env-dependent (records SOFT if the account has no inquiries/tickets — there is no create-ticket API in the catalog).",
       "steps": [
         {
           "name": "list-inquiries",
@@ -806,7 +806,7 @@
           }
         }
       ],
-      "_note": "Registry DELETE returns 500 for a few minutes right after creation (provisioning race), then succeeds; the delete step retries 500 up to ~6 min. Enabled. COVERAGE EXPANSION (not yet dispatch-validated): repo settings PUTs (description/lock/pull/scan/lifecycle policy), registry ACL PUTs (public-endpoint/private-acl/public-acl \u2014 all no-op/disabled values, never exposes the registry), and the no-param-list/check GETs (check-duplication x2, connectable-resources). Each optional+grouped. image/tags-scoped endpoints stay uncovered (their ids are born by a docker push, not a REST POST)."
+      "_note": "Registry DELETE returns 500 for a few minutes right after creation (provisioning race), then succeeds; the delete step retries 500 up to ~6 min. Enabled. COVERAGE EXPANSION (not yet dispatch-validated): repo settings PUTs (description/lock/pull/scan/lifecycle policy), registry ACL PUTs (public-endpoint/private-acl/public-acl — all no-op/disabled values, never exposes the registry), and the no-param-list/check GETs (check-duplication x2, connectable-resources). Each optional+grouped. image/tags-scoped endpoints stay uncovered (their ids are born by a docker push, not a REST POST)."
     },
     {
       "id": "filestorage-volume",
@@ -1092,7 +1092,7 @@
       "id": "application-queueservice-queue",
       "service": "application-service/queueservice",
       "enabled": true,
-      "_note": "Light, self-contained: create a Standard queue, read it, then exercise the config/description/deduplication/ACL writes, list, probe-read, delete. Synchronous. COVERAGE EXPANSION (NOT yet validated against the live gateway): updatequeuedescription, updatequeueconfig (encryption omitted \u2014 no KMS key), updatequeuededuplication + updatequeuededuplicationscope (FIFO-oriented \u2014 may 400 on a Standard queue), setacl + deleteacl. Each write is optional+grouped so a rejection isolates to its group and never fails the create->delete spine.",
+      "_note": "Light, self-contained: create a Standard queue, read it, then exercise the config/description/deduplication/ACL writes, list, probe-read, delete. Synchronous. COVERAGE EXPANSION (NOT yet validated against the live gateway): updatequeuedescription, updatequeueconfig (encryption omitted — no KMS key), updatequeuededuplication + updatequeuededuplicationscope (FIFO-oriented — may 400 on a Standard queue), setacl + deleteacl. Each write is optional+grouped so a rejection isolates to its group and never fails the create->delete spine.",
       "steps": [
         {
           "name": "create",
@@ -1432,7 +1432,7 @@
       "id": "compute-virtualserver-volume-snapshot",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "Light, no-VPC: create a block volume, snapshot it, probe-read both (showvolume + showsnapshot), then tear down. Volume create body mirrors the VM lifecycle's create-volume (VALIDATED). Snapshot create body grounded from docs (createsnapshot). Captures use $.id (volume id convention confirmed from the VM lifecycle); snapshot id inferred as $.id \u2014 regrsnap* swept as insurance.",
+      "_note": "Light, no-VPC: create a block volume, snapshot it, probe-read both (showvolume + showsnapshot), then tear down. Volume create body mirrors the VM lifecycle's create-volume (VALIDATED). Snapshot create body grounded from docs (createsnapshot). Captures use $.id (volume id convention confirmed from the VM lifecycle); snapshot id inferred as $.id — regrsnap* swept as insurance.",
       "steps": [
         {
           "name": "create-volume",
@@ -1858,7 +1858,7 @@
       "id": "container-ske-cluster-nodepool",
       "service": "container/ske",
       "enabled": true,
-      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed. | EXPANDED (best-guess, validate via heavy dispatch): nodepool scale up/down + label set/clear. COVERAGE EXPANSION (not yet dispatch-validated): cluster setters (logging/service-watch-logging/public- & private-access-control/security-groups \u2014 re-assert safe/no-op values), nodepool taints set+clear, best-effort linked-resources, and the two no-param list GETs (clusters/images). Each setter optional+grouped with 409-retry for async reconcile contention. setclusterupgrade/setnodepoolupgrade deliberately omitted (irreversible / node-roll risk on a billable cluster).",
+      "_note": "VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with SSD_Provisioned needs volume_max_iops/throughput. SLOW + costly; disable for routine runs if needed. | EXPANDED (best-guess, validate via heavy dispatch): nodepool scale up/down + label set/clear. COVERAGE EXPANSION (not yet dispatch-validated): cluster setters (logging/service-watch-logging/public- & private-access-control/security-groups — re-assert safe/no-op values), nodepool taints set+clear, best-effort linked-resources, and the two no-param list GETs (clusters/images). Each setter optional+grouped with 409-retry for async reconcile contention. setclusterupgrade/setnodepoolupgrade deliberately omitted (irreversible / node-roll risk on a billable cluster).",
       "steps": [
         {
           "name": "create-vpc",
@@ -1883,8 +1883,7 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          },
-          "adopt": "vpc"
+          }
         },
         {
           "name": "wait-vpc",
@@ -1911,7 +1910,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression SKE",
-            "cidr": "10.124.1.0/24",
+            "cidr": "10.125.1.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -2714,8 +2713,7 @@
             202,
             204
           ],
-          "destructive": true,
-          "adopt": "vpc"
+          "destructive": true
         }
       ],
       "heavy": true
@@ -2724,7 +2722,7 @@
       "id": "compute-virtualserver-full",
       "service": "virtualserver",
       "enabled": true,
-      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. The field is volume_type NOT type. COVERAGE EXPANSION (NOT yet dispatch-validated \u2014 confirm on next HEAVY run): (a) server-group create->show(probe via server_group_id)->delete; (b) probe-reads now exercises server_group_id so showservergroup joins the ~13 path-param GETs (showvirtualserver/console-log/interfaces/ips/security-groups/volumes + show* by id) driven off the live server; (c) image PUT updateimage (min_disk/min_ram/protected/visibility) added to the image group; (d) block-volume writes on the extra attached volume: updatevolume (name), updateservervolume (attachment), setvolumeqos, extendvolume (104->112); (e) attach/detach a 2nd security group to the running server; (f) SOFT reboot + wait ACTIVE. Every NEW write is optional+grouped so a rejection isolates to its group (tears down just that group) and never fails the expensive VM run; the validated create->...->delete spine is unchanged. lock/unlock intentionally omitted (risk of stranding a billable VM if unlock fails).",
+      "_note": "Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid recurring VM cost on routine runs. The field is volume_type NOT type. COVERAGE EXPANSION (NOT yet dispatch-validated — confirm on next HEAVY run): (a) server-group create->show(probe via server_group_id)->delete; (b) probe-reads now exercises server_group_id so showservergroup joins the ~13 path-param GETs (showvirtualserver/console-log/interfaces/ips/security-groups/volumes + show* by id) driven off the live server; (c) image PUT updateimage (min_disk/min_ram/protected/visibility) added to the image group; (d) block-volume writes on the extra attached volume: updatevolume (name), updateservervolume (attachment), setvolumeqos, extendvolume (104->112); (e) attach/detach a 2nd security group to the running server; (f) SOFT reboot + wait ACTIVE. Every NEW write is optional+grouped so a rejection isolates to its group (tears down just that group) and never fails the expensive VM run; the validated create->...->delete spine is unchanged. lock/unlock intentionally omitted (risk of stranding a billable VM if unlock fails).",
       "steps": [
         {
           "name": "create-vpc",
@@ -4075,8 +4073,7 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          },
-          "adopt": "vpc"
+          }
         },
         {
           "name": "wait-vpc",
@@ -4106,7 +4103,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression PG",
-            "cidr": "10.124.4.0/24",
+            "cidr": "10.126.4.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -4826,8 +4823,7 @@
             409
           ],
           "retries": 40,
-          "retry_interval": 30,
-          "adopt": "vpc"
+          "retry_interval": 30
         }
       ]
     },
@@ -4861,8 +4857,7 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          },
-          "adopt": "vpc"
+          }
         },
         {
           "name": "wait-vpc",
@@ -4891,7 +4886,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression shared",
-            "cidr": "10.124.5.0/24",
+            "cidr": "10.130.5.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -5817,8 +5812,7 @@
             409
           ],
           "retries": 40,
-          "retry_interval": 30,
-          "adopt": "vpc"
+          "retry_interval": 30
         }
       ]
     },
@@ -6027,7 +6021,7 @@
       "id": "security-secretsmanager-secret",
       "service": "security/secretsmanager",
       "enabled": true,
-      "_note": "Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down last. secret_value must be a JSON STRING; private_acl_enabled is a string 'false'. Captures $.secret.id / $.key.id confirmed from doc response examples. Secret DELETE requires a body {waiting_time_ndays} (recovery window) \u2014 sent on both the delete step and the cleanup.",
+      "_note": "Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down last. secret_value must be a JSON STRING; private_acl_enabled is a string 'false'. Captures $.secret.id / $.key.id confirmed from doc response examples. Secret DELETE requires a body {waiting_time_ndays} (recovery window) — sent on both the delete step and the cleanup.",
       "steps": [
         {
           "name": "create-kms",
@@ -6410,7 +6404,7 @@
       "id": "compute-scf-cloud-function-cronjob-trigger",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}]. COVERAGE EXPANSION (not yet dispatch-validated): config/env-vars/url/code PUTs, set+delete resource-policy (Resource:'*' best-effort, 400 tolerated), and update-cronjob-trigger. Each optional+grouped so a rejection isolates. Skipped (need external artifacts/ids): setcloudfunctioncodefile (OBS jar), apigateway trigger, the privatelink-ENDPOINT family. enable/disable-privatelink-service REMOVED (run #5): enabling PL leaves the service in 'Creating' so the in-lifecycle disable 400s, then the function delete 400s with CloudFunctionNotDeletableError \u2014 i.e. enabling PL blocks clean teardown. Not worth a stateful PL-service wait for 2 niche PUTs.",
+      "_note": "Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apigateway/VPC dependency), probe-reads every {cloud_function_id} + {trigger_id} GET, and tears down. Create body grounded from docs createcloudfunction 1.4 ({content,name,runtime,tags}; 202 -> $.id, $.state READY). showcloudfunction wraps in $.cloud_function.state. Cronjob trigger grounded from createcloudfunctioncronjobtrigger 1.4 (200 -> $.triggers[0].trigger_id; schedule is 5-field cron, timezone tz name). Trigger delete is DELETE /v1/triggers/{trigger_id}. regrscf{unique} name is lowercase-alnum (safe). tags shape is [{key,value}]. COVERAGE EXPANSION (not yet dispatch-validated): config/env-vars/url/code PUTs, set+delete resource-policy (Resource:'*' best-effort, 400 tolerated), and update-cronjob-trigger. Each optional+grouped so a rejection isolates. Skipped (need external artifacts/ids): setcloudfunctioncodefile (OBS jar), apigateway trigger, the privatelink-ENDPOINT family. enable/disable-privatelink-service REMOVED (run #5): enabling PL leaves the service in 'Creating' so the in-lifecycle disable 400s, then the function delete 400s with CloudFunctionNotDeletableError — i.e. enabling PL blocks clean teardown. Not worth a stateful PL-service wait for 2 niche PUTs.",
       "steps": [
         {
           "name": "create",
@@ -6870,8 +6864,7 @@
             "method": "DELETE",
             "path": "/v1/vpcs/{vpc_id}",
             "service": "vpc"
-          },
-          "adopt": "vpc"
+          }
         },
         {
           "name": "wait-vpc",
@@ -6900,7 +6893,7 @@
           "json": {
             "name": "regrsub{unique}",
             "description": "API regression shared-net",
-            "cidr": "10.124.6.0/24",
+            "cidr": "10.140.6.0/24",
             "type": "GENERAL",
             "vpc_id": "{vpc_id}",
             "tags": []
@@ -7187,7 +7180,7 @@
           "path": "/v1/subnets/{subnet_id}/vips",
           "json": {
             "description": "API regression shared-net",
-            "virtual_ip_address": "10.124.6.200"
+            "virtual_ip_address": "10.140.6.200"
           },
           "capture": {
             "vip_id": "$.subnet_vip.id"
@@ -7218,7 +7211,7 @@
               "layer_type": "L4",
               "name": "regrlb{ualpha}",
               "publicip_id": "",
-              "service_ip": "10.124.6.100",
+              "service_ip": "10.140.6.100",
               "source_nat_ip": "",
               "subnet_id": "{subnet_id}",
               "tags": [],
@@ -8048,8 +8041,7 @@
             409
           ],
           "retries": 40,
-          "retry_interval": 30,
-          "adopt": "vpc"
+          "retry_interval": 30
         }
       ]
     },
@@ -8155,7 +8147,7 @@
       "id": "iam-policy",
       "service": "management/iam",
       "enabled": true,
-      "_note": "Light, self-contained: create a USER_DEFINED identity policy (no path-param POST /v1/policies), read it, probe the 2 policy-id path-param GETs, delete. Body grounded on management/iam/createpolicy example; server-assigned id fields (default_version_id, policy_version.policy_id/policy_version_id) are OMITTED \u2014 they are returned by the API, not supplied on create. policy_document mirrors the example verbatim (Version 2024-07-01). Create response envelope is FLAT: $.id (confirmed from the doc 201 example).",
+      "_note": "Light, self-contained: create a USER_DEFINED identity policy (no path-param POST /v1/policies), read it, probe the 2 policy-id path-param GETs, delete. Body grounded on management/iam/createpolicy example; server-assigned id fields (default_version_id, policy_version.policy_id/policy_version_id) are OMITTED — they are returned by the API, not supplied on create. policy_document mirrors the example verbatim (Version 2024-07-01). Create response envelope is FLAT: $.id (confirmed from the doc 201 example).",
       "steps": [
         {
           "name": "create",
@@ -8241,7 +8233,7 @@
       "id": "iam-role",
       "service": "management/iam",
       "enabled": false,
-      "_note": "Light, self-contained: create a USER_DEFINED role (no path-param POST /v1/roles), read it, probe the 2 role-id path-param GETs, delete. Body grounded on management/iam/createrole example; assume_role_policy_document copied verbatim (sts:AssumeRole). policy_ids/principals sent empty to avoid referencing non-existent users. Create response envelope $.role.id confirmed from the doc 202 example. RISK: the trust-policy / principals validation is account-specific \u2014 if the gateway requires a real principal SRN, create returns 400 and this lifecycle should be disabled; everything else is grounded.",
+      "_note": "Light, self-contained: create a USER_DEFINED role (no path-param POST /v1/roles), read it, probe the 2 role-id path-param GETs, delete. Body grounded on management/iam/createrole example; assume_role_policy_document copied verbatim (sts:AssumeRole). policy_ids/principals sent empty to avoid referencing non-existent users. Create response envelope $.role.id confirmed from the doc 202 example. RISK: the trust-policy / principals validation is account-specific — if the gateway requires a real principal SRN, create returns 400 and this lifecycle should be disabled; everything else is grounded.",
       "steps": [
         {
           "name": "create",
