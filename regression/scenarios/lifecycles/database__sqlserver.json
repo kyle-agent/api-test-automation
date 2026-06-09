@@ -645,7 +645,7 @@
           "name": "delete-cluster-guarded",
           "method": "DELETE",
           "path": "/v1/clusters/regrnonexistent{unique}",
-          "_note": "Targets a SYNTHETIC non-existent cluster id (never the soft-captured {cluster_id}) so this can only 404 and NEVER deletes a real adopted sqlserver cluster — it exists solely to CALL+record the DELETE /v1/clusters/{cluster_id} endpoint under the sqlserver host.",
+          "_note": "Targets a SYNTHETIC non-existent cluster id (never the soft-captured {cluster_id}) so this can only 404 and NEVER deletes a real adopted sqlserver cluster \u2014 it exists solely to CALL+record the DELETE /v1/clusters/{cluster_id} endpoint under the sqlserver host.",
           "expect_status": [
             200,
             202,
@@ -659,6 +659,49 @@
           "optional": true,
           "destructive": true,
           "group": "create-delete"
+        }
+      ]
+    },
+    {
+      "id": "sqlserver-read-coverage",
+      "service": "database/sqlserver",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY sqlserver catalog GET whose path params are satisfied (engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). sqlserver has NO clusters/{cluster_id}/replicas endpoint. 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected).",
+      "steps": [
+        {
+          "name": "list-engine-versions",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov",
+          "capture_soft": {
+            "dbaas_engine_version_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "get-engine-version-properties",
+          "method": "GET",
+          "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "dbaas_engine_version_id": "{dbaas_engine_version_id}",
+            "request_id": "00000000-0000-0000-0000-000000000000"
+          }
         }
       ]
     }

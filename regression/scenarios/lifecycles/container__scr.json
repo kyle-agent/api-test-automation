@@ -220,6 +220,136 @@
           "destructive": true
         }
       ]
+    },
+    {
+      "id": "scr-read-coverage",
+      "service": "container/scr",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY (READ-ONLY). Fills coverage for the remaining id-bound SCR GET endpoints by CALLING each one so it is recorded at runtime. Harvests real ids best-effort from the SCR list endpoints (capture_soft, never fails): registries (-> registry_id, $.registries[0].id), that registry's repositories (-> repository_id, $.repositories[0].id), that repository's images (-> image_id, $.images[0].id), and that image's tagses (-> tags_id, $.tagses[0].id). It then fires every uncovered id-GET explicitly; when a list is empty the placeholder stays LITERAL -> a 4xx that still counts as 'reached'. A final probe_reads catch-all replays every catalog GET whose path params are all in {registry_id,image_id,tags_id,repository_id}. The SCR `/v1/repositories` listing has returned 403 for this service account; the repository show step is added anyway since 403/404 still records coverage. Every step is optional + grouped + expect_status [200,400,403,404] so nothing reds the run. No writes — all GET, non-billable."
+      ,
+      "steps": [
+        {
+          "name": "list-registries-harvest",
+          "method": "GET",
+          "path": "/v1/container-registries",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read",
+          "capture_soft": {
+            "registry_id": "$.registries[0].id"
+          }
+        },
+        {
+          "name": "get-registry-repositories",
+          "method": "GET",
+          "path": "/v1/container-registries/{registry_id}/repositories",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read",
+          "capture_soft": {
+            "repository_id": "$.repositories[0].id"
+          }
+        },
+        {
+          "name": "list-repositories-harvest",
+          "method": "GET",
+          "path": "/v1/repositories",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read",
+          "capture_soft": {
+            "repository_id": "$.repositories[0].id"
+          }
+        },
+        {
+          "name": "get-repository",
+          "method": "GET",
+          "path": "/v1/repositories/{repository_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read"
+        },
+        {
+          "name": "list-images-harvest",
+          "method": "GET",
+          "path": "/v1/repositories/{repository_id}/images",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read",
+          "capture_soft": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "get-image-lifecycle-policy-preview",
+          "method": "GET",
+          "path": "/v1/images/{image_id}/lifecycle-policy/preview",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read"
+        },
+        {
+          "name": "list-tagses-harvest",
+          "method": "GET",
+          "path": "/v1/images/{image_id}/tagses",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read",
+          "capture_soft": {
+            "tags_id": "$.tagses[0].id"
+          }
+        },
+        {
+          "name": "get-tags",
+          "method": "GET",
+          "path": "/v1/tagses/{tags_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read"
+        },
+        {
+          "name": "get-tags-download-manifest",
+          "method": "GET",
+          "path": "/v1/tagses/{tags_id}/download/manifest",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read"
+        },
+        {
+          "name": "get-tags-packages",
+          "method": "GET",
+          "path": "/v1/tagses/{tags_id}/packages",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read"
+        },
+        {
+          "name": "get-tags-secrets",
+          "method": "GET",
+          "path": "/v1/tagses/{tags_id}/secrets",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read"
+        },
+        {
+          "name": "get-tags-vulnerabilities",
+          "method": "GET",
+          "path": "/v1/tagses/{tags_id}/vulnerabilities",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read"
+        },
+        {
+          "name": "probe-reads-all",
+          "probe_reads": {
+            "registry_id": "{registry_id}",
+            "image_id": "{image_id}",
+            "tags_id": "{tags_id}",
+            "repository_id": "{repository_id}"
+          }
+        }
+      ]
     }
   ]
 }

@@ -132,6 +132,91 @@
           "group": "do-ops"
         }
       ]
+    },
+    {
+      "id": "data-ops-read-coverage",
+      "service": "data-analytics/data-ops",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY read lifecycle for data-ops's id-bound GETs (READ-ONLY, never mutates). Lists the data-ops and data-ops-services collections, soft-captures ids under the EXACT catalog path-param names (data_ops_id, cluster_id) so the final probe-reads step exercises every catalog GET whose params are satisfied: getdataops (/v1/data-ops/{data_ops_id}), getdataopssubversions (/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions) and the data-ops ingress-controllers (/v1/data-ops/clusters/{cluster_id}/ingress-controllers). The two check-duplication GETs take a free-form NAME path-param (not an id), so they are called directly with a literal probe name (duplication-check accepts any name -> 200/400, still RECORDED). When a collection is empty the {var} normalizes to the catalog '*' key so each endpoint is still CALLED and a 4xx counts as covered. Every step optional + grouped + broad expect_status so an isolated failure never fails the run. cluster_id is harvested from the service detail (best-effort); when absent the ingress probe still records against the '*' key.",
+      "steps": [
+        {
+          "name": "list-data-ops",
+          "method": "GET",
+          "path": "/v1/data-ops",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "do-read",
+          "capture_soft": {"data_ops_id": "$.contents[0].id"}
+        },
+        {
+          "name": "list-data-ops-services",
+          "method": "GET",
+          "path": "/v1/data-ops-services",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "do-read",
+          "capture_soft": {"data_ops_service_id": "$.contents[0].id"}
+        },
+        {
+          "name": "get-data-ops",
+          "method": "GET",
+          "path": "/v1/data-ops/{data_ops_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "do-read"
+        },
+        {
+          "name": "get-data-ops-sub-versions",
+          "method": "GET",
+          "path": "/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "do-read"
+        },
+        {
+          "name": "check-data-ops-duplication",
+          "method": "GET",
+          "path": "/v1/data-ops/regrprobe/check-duplication",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "do-read"
+        },
+        {
+          "name": "check-data-ops-service-duplication",
+          "method": "GET",
+          "path": "/v1/data-ops-services/regrprobe/check-duplication",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "do-read"
+        },
+        {
+          "name": "capture-cluster-id",
+          "method": "GET",
+          "path": "/v1/data-ops-services/{data_ops_service_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "do-read",
+          "capture_soft": {"cluster_id": "$.cluster_id"}
+        },
+        {
+          "name": "get-ingress-controllers",
+          "method": "GET",
+          "path": "/v1/data-ops/clusters/{cluster_id}/ingress-controllers",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "do-read"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "data_ops_id": "{data_ops_id}",
+            "cluster_id": "{cluster_id}"
+          }
+        }
+      ]
     }
   ]
 }

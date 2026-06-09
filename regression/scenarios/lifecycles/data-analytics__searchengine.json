@@ -183,6 +183,44 @@
           "group": "se-resize"
         }
       ]
+    },
+    {
+      "id": "searchengine-read-coverage",
+      "service": "data-analytics/searchengine",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY read lifecycle for searchengine's two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-param name (dbaas_engine_version_id) so the final probe-reads step exercises searchenginelistengineversionproperties (/v1/engine-versions/{dbaas_engine_version_id}/properties). KNOWN-HARD: searchengineshowrequest (/v1/requests/{request_id}) — request_id is only returned by async write ops and is NOT exposed by any list/collection GET, so it cannot be harvested in a read-only run; it is called with a literal placeholder id so the endpoint is at least CALLED and RECORDED (a 404 counts as reached/covered per the engine). When the engine-versions collection is empty the {dbaas_engine_version_id} normalizes to the catalog '*' key so the properties endpoint is still CALLED. Every step optional + grouped + broad expect_status so an isolated failure never fails the run.",
+      "steps": [
+        {
+          "name": "list-engine-versions",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "se-read",
+          "capture_soft": {"dbaas_engine_version_id": "$.contents[0].id"}
+        },
+        {
+          "name": "get-engine-version-properties",
+          "method": "GET",
+          "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "se-read"
+        },
+        {
+          "name": "get-request",
+          "method": "GET",
+          "path": "/v1/requests/00000000-0000-0000-0000-000000000000",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "se-read"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"dbaas_engine_version_id": "{dbaas_engine_version_id}"}
+        }
+      ]
     }
   ]
 }

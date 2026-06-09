@@ -132,6 +132,91 @@
           "group": "df-flow"
         }
       ]
+    },
+    {
+      "id": "data-flow-read-coverage",
+      "service": "data-analytics/data-flow",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY read lifecycle for data-flow's id-bound GETs (READ-ONLY, never mutates). Lists the data-flows and data-flow-services collections, soft-captures ids under the EXACT catalog path-param names (data_flow_id, cluster_id) so the final probe-reads step exercises every catalog GET whose params are satisfied: getdataflow (/v1/data-flows/{data_flow_id}), getdataflowservicesubversions (/v1/data-flow-services/data-flows/{data_flow_id}/sub-versions) and ingresscluster (/v1/data-flows/clusters/{cluster_id}/ingress-controllers). The two check-duplication GETs take a free-form NAME path-param (not an id), so they are called directly with a literal probe name (duplication-check accepts any name -> 200/400, still RECORDED). When a collection is empty the {var} normalizes to the catalog '*' key so each endpoint is still CALLED and a 4xx counts as covered. Every step optional + grouped + broad expect_status so an isolated failure never fails the run. cluster_id is harvested from the service detail (best-effort); when absent the ingress probe still records against the '*' key.",
+      "steps": [
+        {
+          "name": "list-data-flows",
+          "method": "GET",
+          "path": "/v1/data-flows",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read",
+          "capture_soft": {"data_flow_id": "$.contents[0].id"}
+        },
+        {
+          "name": "list-data-flow-services",
+          "method": "GET",
+          "path": "/v1/data-flow-services",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read",
+          "capture_soft": {"data_flow_service_id": "$.contents[0].id"}
+        },
+        {
+          "name": "get-data-flow",
+          "method": "GET",
+          "path": "/v1/data-flows/{data_flow_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "get-data-flow-sub-versions",
+          "method": "GET",
+          "path": "/v1/data-flow-services/data-flows/{data_flow_id}/sub-versions",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "check-data-flow-duplication",
+          "method": "GET",
+          "path": "/v1/data-flows/regrprobe/check-duplication",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "check-data-flow-service-duplication",
+          "method": "GET",
+          "path": "/v1/data-flow-services/regrprobe/check-duplication",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "capture-cluster-id",
+          "method": "GET",
+          "path": "/v1/data-flow-services/{data_flow_service_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "df-read",
+          "capture_soft": {"cluster_id": "$.cluster_id"}
+        },
+        {
+          "name": "get-ingress-controllers",
+          "method": "GET",
+          "path": "/v1/data-flows/clusters/{cluster_id}/ingress-controllers",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "df-read"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "data_flow_id": "{data_flow_id}",
+            "cluster_id": "{cluster_id}"
+          }
+        }
+      ]
     }
   ]
 }

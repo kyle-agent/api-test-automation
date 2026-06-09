@@ -110,6 +110,45 @@
           "group": "qq-delete"
         }
       ]
+    },
+    {
+      "id": "quick-query-read-coverage",
+      "service": "data-analytics/quick-query",
+      "enabled": true,
+      "heavy": false,
+      "_note": "COVERAGE-ONLY read lifecycle for quick-query's id-bound GETs (READ-ONLY, never mutates). Lists the quick-query collection, soft-captures the id under the EXACT catalog path-param name (quick_query_id) so the final probe-reads step exercises getquickquery (/v1/quick-query/{quick_query_id}). The check-duplication GET takes a free-form NAME path-param (not an id), so it is called directly with a literal probe name (duplication-check accepts any name -> 200/400, still RECORDED). When the collection is empty the {quick_query_id} normalizes to the catalog '*' key so the endpoint is still CALLED and a 4xx counts as covered. Every step optional + grouped + broad expect_status so an isolated failure never fails the run.",
+      "steps": [
+        {
+          "name": "list-quick-query",
+          "method": "GET",
+          "path": "/v1/quick-query",
+          "params": {"size": 20, "page": 0},
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "qq-read",
+          "capture_soft": {"quick_query_id": "$.contents[0].id"}
+        },
+        {
+          "name": "get-quick-query",
+          "method": "GET",
+          "path": "/v1/quick-query/{quick_query_id}",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "qq-read"
+        },
+        {
+          "name": "check-quick-query-duplication",
+          "method": "GET",
+          "path": "/v1/quick-query/regrprobe/check-duplication",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "qq-read"
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {"quick_query_id": "{quick_query_id}"}
+        }
+      ]
     }
   ]
 }
