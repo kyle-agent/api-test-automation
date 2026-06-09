@@ -2,10 +2,9 @@
 # this branch. KEY=VALUE options below are parsed by the spec job and gate the
 # run (mutations/destructive/heavy/conformance/category/service/crud_filter).
 #
-# request: sweep orphaned servicewatch log groups (stream-first delete fix);
-#          scoped smoke + servicewatch CRUD to validate the lifecycle teardown.
-mutations=true
+# request: cleanup-only re-run with the hardened reconciler — fixed-point
+#          rounds (pagination), per-collection counts, servicewatch
+#          dashboards/alerts/event-rules, alternate name-key fallback.
 destructive=true
 category=management
 service=servicewatch
-crud_filter=servicewatch
