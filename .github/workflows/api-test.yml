@@ -178,13 +178,33 @@ jobs:
   # opt-in CRUD. Followed by the registry-driven cleanup sweep (support C).
   # ---------------------------------------------------------------------------
   regression:
-    name: AXIS1 regression (smoke + read-chains, opt-in CRUD)
+    name: AXIS1 regression (smoke + read-chains, opt-in CRUD) [lane ${{ matrix.lane }}]
     needs: spec
     runs-on: ubuntu-latest
-    # 300 (not 120): a full CRUD + HEAVY baseline (real VM/K8s/DB + shared
-    # networking, with VPC async-delete linger against the 5-VPC quota) does not
-    # finish in 120 min and was being cancelled before the tail heavy lifecycles
-    # ran. See docs/HANDOFF-crud-setter-validation.md §6.5.
+    # SERIAL matrix lanes: the heavy CRUD suite exceeds one 300-min job budget
+    # (run #36 was cancelled at 5h), so the CRUD phase is split into lanes, each
+    # of which gets its OWN fresh 300-min job. Lanes MUST run one-at-a-time
+    # (max-parallel: 1) — never in parallel — because each lane provisions its
+    # own session-scoped shared VPC (conftest.py `shared_vpc`) and the account
+    # caps VPCs at 5; concurrent lanes would trip the cap and silently skip
+    # VPC lifecycles. See knowledge/vpc-scheduling-strategy.md +
+    # regression/scenarios/dependencies.json (vpc_schedule). The lane `-k`
+    # filters partition ALL enabled CRUD lifecycles:
+    #   compute    : the 2 heavy compute VPC lifecycles
+    #   database   : the 3 heavy database VPC lifecycles
+    #   networking : the 1 heavy + 2 light networking VPC lifecycles
+    #   rest       : everything else (all *-read-coverage + write-coverage etc.)
+    # Smoke + read-chains is read-only and runs ONCE (on the `rest` lane only,
+    # see the step `if:` below) so it is not repeated 4x. PR / smoke-only runs
+    # still execute every lane, but the CRUD step is skipped (opt-in gate), so
+    # for a PR each lane is just a no-op past smoke — and only the `rest` lane
+    # produces the smoke artifact the dashboard needs.
+    strategy:
+      matrix:
+        lane: [compute, database, networking, rest]
+      max-parallel: 1
+      fail-fast: false
+    # 300 per lane: each lane now fits easily inside one job budget.
     timeout-minutes: 300
     permissions:
       contents: read
@@ -212,6 +232,11 @@ jobs:
           fi
 
       - name: Run read-only smoke + read-chains regression
+        # Read-only — run ONCE, on the `rest` lane only, so it isn't repeated 4x.
+        # The `rest` lane always runs (matrix runs for every event), so smoke
+        # always executes exactly once on both PR/smoke-only and CRUD runs, and
+        # the `rest` lane is the one that produces the smoke artifact.
+        if: ${{ matrix.lane == 'rest' }}
         env:
           PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY }}
           PR_SERVICE: ${{ vars.SCP_PR_SERVICE }}
@@ -232,7 +257,7 @@ jobs:
           python -m pytest $ARGS 2>&1 | tee -a reports/pytest.log
 
       - name: Comment smoke result on PR
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && matrix.lane == 'rest' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
@@ -305,13 +330,37 @@ jobs:
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
+          # The serial matrix lane this job is running. Each lane is a pytest -k
+          # expression that partitions ALL enabled CRUD lifecycles into 4 shards
+          # (compute / database / networking / rest). The lane filter is what
+          # actually splits the heavy CRUD run across 4 fresh 300-min job budgets.
+          LANE: ${{ matrix.lane }}
         run: |
-          echo "Running CRUD lifecycles (creates/deletes REAL resources)" | tee reports/crud.log
+          echo "Running CRUD lifecycles for lane=$LANE (creates/deletes REAL resources)" | tee reports/crud.log
+          # Lane -k filters (kept in sync with strategy.matrix.lane + the
+          # vpc_schedule lanes in regression/scenarios/dependencies.json):
+          case "$LANE" in
+            compute)    LANE_FILTER="container-ske-cluster-nodepool or compute-virtualserver-full" ;;
+            database)   LANE_FILTER="database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas" ;;
+            networking) LANE_FILTER="heavy-shared-networking or networking-vpc-subnet or networking-vpc-internet-gateway" ;;
+            rest)       LANE_FILTER="not (container-ske-cluster-nodepool or compute-virtualserver-full or database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas or heavy-shared-networking or networking-vpc-subnet or networking-vpc-internet-gateway)" ;;
+            *)          LANE_FILTER="" ;;
+          esac
           # Build argv as an array so a multi-token -k filter survives as ONE
-          # argument, e.g. crud_filter="a or b or c" (VPC-scheduling lanes — see
-          # knowledge/vpc-scheduling-strategy.md). A blank filter is unaffected.
+          # argument (e.g. "a or b or c"). The LANE filter is ALWAYS applied so
+          # the suite is sharded. A manual crud_filter (dispatch input) or the
+          # heavy.txt self-trigger filter still works: it is ANDed with the lane
+          # so a manual filter NARROWS within the lane rather than replacing it
+          # (this keeps the 4 lanes a clean partition even when a manual filter
+          # is given). Blank manual filter => lane filter only.
+          MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
+          if [ -n "$MANUAL" ]; then
+            FILTER="($LANE_FILTER) and ($MANUAL)"
+          else
+            FILTER="$LANE_FILTER"
+          fi
+          echo "lane=$LANE -> -k \"$FILTER\"" | tee -a reports/crud.log
           ARGS=(tests/crud -m crud --junitxml=reports/junit-crud.xml)
-          FILTER="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
           [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
           set -o pipefail
           python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log
@@ -343,10 +392,18 @@ jobs:
           PY
 
       - name: Upload regression reports + results store
+        # One artifact PER LANE (unique name) so the 4 serial lanes don't collide
+        # on a single `regression-reports` upload. The sweep + dashboard jobs then
+        # download ALL of them (pattern: regression-reports-*) and merge. NOTE: we
+        # do NOT use download `merge-multiple` for the merge because every lane
+        # writes the SAME fixed filenames (results/observations.jsonl,
+        # results/findings.jsonl, registry/<run_id>.jsonl, junit-crud.xml) — a
+        # flat merge would clobber lane data (last-writer-wins). Instead each lane
+        # is downloaded into its own subdir and the consumers concatenate.
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: regression-reports
+          name: regression-reports-${{ matrix.lane }}
           path: |
             reports/report.html
             reports/junit.xml
@@ -383,12 +440,34 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Download this run's registry manifest
+      - name: Download every lane's registry manifest
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
-          name: regression-reports
-          path: reports
+          # All 4 lanes upload regression-reports-<lane>; grab them all into
+          # per-lane subdirs (artifacts/regression-reports-<lane>/...). We do NOT
+          # flat-merge here because each lane's registry manifest is named
+          # registry/<run_id>.jsonl (same run_id => same filename) and would
+          # clobber. We flatten them into reports/registry/ under unique names.
+          pattern: regression-reports-*
+          path: artifacts
+      - name: Merge lane registry manifests
+        continue-on-error: true
+        run: |
+          mkdir -p reports/registry
+          # Collect each lane's registry manifest under a lane-unique name so no
+          # two lanes overwrite the same reports/registry/<run_id>.jsonl. The
+          # reconciler sweeps the ACCOUNT by owner tag (is_owned + is_expired),
+          # so it does not actually depend on these local manifests — this merge
+          # is for completeness / debugging artifacts only.
+          for d in artifacts/regression-reports-*/; do
+            lane="$(basename "$d" | sed 's/^regression-reports-//')"
+            for f in "$d"registry/*.jsonl; do
+              [ -e "$f" ] || continue
+              cp "$f" "reports/registry/${lane}-$(basename "$f")"
+            done
+          done
+          ls -la reports/registry || true
       - name: Reconcile leftover resources (tag-scoped)
         continue-on-error: true
         run: |
@@ -567,12 +646,71 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Download regression results
+      - name: Download every lane's regression results
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
-          name: regression-reports
-          path: reports
+          # 4 serial lanes each uploaded regression-reports-<lane>. Pull them all
+          # into per-lane subdirs (artifacts/regression-reports-<lane>/...) so we
+          # can MERGE them. We deliberately avoid merge-multiple: every lane writes
+          # the SAME fixed filenames (results/observations.jsonl, results/
+          # findings.jsonl, junit-crud.xml) and a flat merge would clobber lane
+          # data. The next step concatenates them into the canonical reports/*.
+          pattern: regression-reports-*
+          path: artifacts
+      - name: Merge lane regression results
+        continue-on-error: true
+        run: |
+          mkdir -p reports/results reports/registry
+          # 1) Unified results store — concatenate every lane's OBSERVATIONS JSONL
+          #    (append-only, one record per line) so the dashboard's core.results
+          #    loader sees observations from ALL lanes (rest lane => smoke +
+          #    read-chain + its CRUD probes; the 3 heavy lanes => their CRUD probe
+          #    observations). findings.jsonl is NOT merged here: regression never
+          #    writes findings (only conformance does via record_finding), and the
+          #    "Download conformance results" step below lays down the authoritative
+          #    findings.jsonl — merging it here would just be clobbered anyway.
+          : > "reports/results/observations.jsonl"
+          for f in artifacts/regression-reports-*/results/observations.jsonl; do
+            [ -e "$f" ] || continue
+            cat "$f" >> "reports/results/observations.jsonl"
+          done
+          # 2) smoke_status.tsv — produced ONLY by the rest lane (smoke runs once).
+          for f in artifacts/regression-reports-*/smoke_status.tsv; do
+            [ -e "$f" ] && cp "$f" reports/smoke_status.tsv && break
+          done
+          # 3) junit-crud.xml — each lane ran a disjoint subset of lifecycles
+          #    (the -k lanes partition all ids), so merge every lane's testcases
+          #    into ONE junit file the dashboard parses (parse_crud_junit reads a
+          #    single --crud path). No duplicate lifecycle ids across lanes.
+          python - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          cases = []
+          for f in sorted(glob.glob("artifacts/regression-reports-*/junit-crud.xml")):
+              try:
+                  root = ET.parse(f).getroot()
+              except (ET.ParseError, OSError):
+                  continue
+              cases.extend(root.iter("testcase"))
+          if cases:
+              suites = ET.Element("testsuites")
+              suite = ET.SubElement(suites, "testsuite", {"name": "crud", "tests": str(len(cases))})
+              for tc in cases:
+                  suite.append(tc)
+              ET.ElementTree(suites).write("reports/junit-crud.xml", encoding="utf-8", xml_declaration=True)
+              print(f"merged {len(cases)} crud testcases from lane artifacts")
+          else:
+              print("no junit-crud.xml in any lane (non-CRUD run) — nothing to merge")
+          PY
+          # 4) registry manifests (informational; sweep reconciles by tag).
+          for d in artifacts/regression-reports-*/; do
+            lane="$(basename "$d" | sed 's/^regression-reports-//')"
+            for f in "$d"registry/*.jsonl; do
+              [ -e "$f" ] || continue
+              cp "$f" "reports/registry/${lane}-$(basename "$f")"
+            done
+          done
+          echo "--- merged reports/ ---"; ls -R reports/results reports/registry 2>/dev/null; wc -l reports/results/*.jsonl 2>/dev/null || true
       - name: Download conformance results
         continue-on-error: true
         uses: actions/download-artifact@v4
