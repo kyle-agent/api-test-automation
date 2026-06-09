@@ -192,8 +192,18 @@ to `data/baselines/known_issues.json` so only genuinely new breakage alarms.
 `.github/workflows/api-test.yml` is a single orchestrator:
 **spec** (refresh catalog) → **regression** (smoke + read-chains, opt-in CRUD) →
 **sweep** (`cleanup.reconciler`) and **conformance** (static + runtime + baseline)
-→ **dashboard** (build + publish). Read-only smoke runs on a daily schedule; CRUD
-and destructive steps run only via dispatch with the safety gates checked.
+→ **dashboard** (build + publish).
+
+**Triggers are on-demand only** (live runs are expensive — no cron, no per-push
+runs): touch **`.github/run-request`** and push (runs on that branch; this is
+how a chat session starts a run), or use **workflow_dispatch** for explicit
+inputs (mutations/heavy/filters). Ordinary pushes/PRs run only the cheap
+offline gate `validate.yml` (scenario + knowledge validation, no credentials).
+**Conformance** is further gated: it runs only when the spec actually changed
+(catalog refresh diff), on `claude/run-conformance`/`run-schema-live` pushes,
+with dispatch `run_conformance=true`, or repo var `SCP_RUN_CONFORMANCE=true` —
+when skipped, the dashboard reuses the last committed conformance data (the two
+jobs write disjoint files on `dashboard-data`, nothing is clobbered).
 
 Configure once in **Settings → Secrets and variables → Actions**:
 

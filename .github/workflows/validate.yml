@@ -1,0 +1,35 @@
+name: Validate (offline, no live API)
+
+# Cheap PR gate (<1 min, no credentials): scenario data + formal domain
+# knowledge consistency. The expensive LIVE workflow (api-test.yml) only runs
+# on demand — .github/run-request touch or workflow_dispatch.
+on:
+  pull_request:
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Scenario + knowledge validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Validate scenario data (merged fragments, ids, paths)
+        run: python -m regression.scenarios.validate
+      - name: Validate formal domain knowledge (3-layer model + waivers)
+        run: python knowledge/formal/validate.py
+      - name: Workflow YAML sanity
+        run: python -c "import yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]"
