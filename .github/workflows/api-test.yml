@@ -407,7 +407,10 @@ jobs:
           ARGS=(tests/crud -m crud -n 6 --junitxml=reports/junit-crud-parallel.xml)
           [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
           set -o pipefail
-          python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log
+          rc=0; python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log || rc=$?
+          # exit 5 = no tests matched the filter — normal for scoped runs, not a failure
+          if [ "$rc" = "5" ]; then echo "no lifecycles matched this pass's filter — skipping" | tee -a reports/crud.log; rc=0; fi
+          exit "$rc"
 
       - name: Teardown shared VPC + subnet (before VPC-CRUD pass)
         # VPC HARD cap = 3. Free the shared VPC's slot BEFORE the serial VPC-CRUD
@@ -439,7 +442,10 @@ jobs:
           ARGS=(tests/crud -m crud -n 0 --junitxml=reports/junit-crud-serial.xml)
           [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
           set -o pipefail
-          python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log
+          rc=0; python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log || rc=$?
+          # exit 5 = no tests matched the filter — normal for scoped runs, not a failure
+          if [ "$rc" = "5" ]; then echo "no lifecycles matched this pass's filter — skipping" | tee -a reports/crud.log; rc=0; fi
+          exit "$rc"
 
       - name: Merge per-worker results
         # Under xdist each worker wrote its own shards (observations-gw*.jsonl,
