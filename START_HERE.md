@@ -24,7 +24,9 @@ is accumulated under [`knowledge/`](knowledge/).
    from **static analysis + real runtime probes**.
 
 See [`README.md`](README.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md) for the
-implementation blueprint (this file does not duplicate them).
+implementation blueprint, and [`ROADMAP.md`](ROADMAP.md) for the phase plan
+(coverage 100% → scheduled regression → dedicated-server runs). This file does
+not duplicate them.
 
 ## How a new session should start
 
@@ -49,7 +51,8 @@ implementation blueprint (this file does not duplicate them).
   `DELETE` needs `SCP_ALLOW_DESTRUCTIVE=true`. Never weaken these defaults.
 - **Domain knowledge is data, not code.** Call order, dependencies, quotas and
   scenarios live in `knowledge/` + `regression/scenarios/*.json` so a human can
-  read and adjust them. Agents generate them; humans review them.
+  read and adjust them. Agents generate them; humans review them. The
+  formalized, human-editable form is `knowledge/formal/` (YAML + validator).
 - **Every created resource must be owned and torn down.** Use `core.registry`
   tagging + reverse-order cleanup. The `cleanup.reconciler` only deletes *our*
   owner tag — never weaken this into cross-run deletion.

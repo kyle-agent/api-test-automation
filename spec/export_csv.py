@@ -10,7 +10,6 @@ Outputs (reports/csv/):
   3. runtime_validation_probe.csv    - the live probe verdict per create op
      (names_field / rule_in_prose / opaque / other) + error excerpt.
 
-Ported from tools/export_csv.py (conformance session); logic is unchanged.
 Data input relocated framework/ -> data/ to match the new layout; report paths
 are preserved. The runtime-probe classifier is sourced from conformance.runtime
 (the kernel's runtime axis) instead of the original standalone tools module.

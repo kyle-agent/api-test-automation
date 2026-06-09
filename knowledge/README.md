@@ -19,6 +19,7 @@ the scenario/budget data, in the same commit.
 
 | File | Contents |
 |------|----------|
+| [`formal/`](formal/FORMAT.md) | **The formalized, human-editable form** (YAML): service dependency graph, canonical call orders, combination scenarios + an offline validator (`python knowledge/formal/validate.py`). Edit here first. |
 | [`domain-model.md`](domain-model.md) | SCP concepts: categories, services, per-service hosts (regional vs global), region/env, auth (HMAC). |
 | [`service-dependencies.md`](service-dependencies.md) | Which resources must exist before which — the dependency graph + canonical create/teardown orders. |
 | [`quotas-and-budgets.md`](quotas-and-budgets.md) | Account caps (vpc=5, private-dns=3, …), which scenarios consume them, reserve/skip behavior. |

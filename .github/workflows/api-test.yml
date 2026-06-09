@@ -139,6 +139,13 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Validate scenario data (merged fragments, ids, paths)
+        # Offline guard: catches duplicate lifecycle ids / unresolvable paths /
+        # broken captures across scenarios.json + lifecycles/*.json fragments
+        # BEFORE anything touches the live API.
+        run: |
+          python -m regression.scenarios.validate
+          python knowledge/formal/validate.py
       - name: Verify configuration
         run: |
           if [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then

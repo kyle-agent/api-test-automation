@@ -36,6 +36,11 @@ review and adjust.
 1. **Capture** new facts into the right `knowledge/` file (see `knowledge/README.md`
    for the map): domain-model, service-dependencies, quotas-and-budgets,
    validated-facts, scenario-catalog.
+   - **Formal form first:** dependency edges, call-order patterns and combo
+     scenarios go into `knowledge/formal/*.yaml` (the human-editable model;
+     schema in `knowledge/formal/FORMAT.md`), then run
+     `python knowledge/formal/validate.py`. Combo drafts start at
+     `status: draft` and a **human approves** them before encoding.
 2. **Encode** anything executable as declarative scenario data:
    - add a lifecycle to `scenarios.json` (no new Python — the engine drives it);
    - declare its `quota_kinds`/`prerequisites` in `dependencies.json`;

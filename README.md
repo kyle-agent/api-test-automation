@@ -7,7 +7,9 @@ Automated testing for the Samsung Cloud Platform (SCP) Open APIs documented at
 The suite is **catalog-driven** (the API Reference is parsed once into a
 machine-readable inventory; tests are generated from it) and organised around
 **two axes** on a shared kernel. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the
-full blueprint.
+full blueprint, [`ROADMAP.md`](ROADMAP.md) for the phase plan (coverage 100% →
+scheduled regression → dedicated-server runs), and [`agents/`](agents/README.md)
+for the multi-agent team that does the engineering.
 
 ```
                          core/  (shared kernel)
@@ -38,8 +40,11 @@ conformance/  static · runtime · baseline · rules/  (pluggable Rule lens)
 cleanup/      reconciler   (tag-ownership sweep; legacy name-prefix fallback)
 dashboard/    build        (reads the unified results store; legacy fallback)
 tests/        thin pytest entrypoints that drive the regression engines
+agents/       the multi-agent system: roster · shared context · harness · per-agent prompts
+knowledge/    SCP domain knowledge (human-readable, AI-maintained) + formal/ (editable YAML)
 data/         api_catalog.json · api_bodies.json · api_docs.json · conformance.json
               baselines/known_issues.json
+docs/         session handoff notes (see docs/INDEX.md)
 reports/      per-run output (gitignored): results/*.jsonl, registry/*.jsonl, dashboard/
 .github/workflows/api-test.yml   one orchestrator (spec → regression → sweep + conformance → dashboard)
 ```
@@ -136,6 +141,11 @@ real billable VM / K8s / DB / shared-networking, ~20–60 min) run ONLY when
 dispatch `crud_filter` input. In CI, set repo variable **`SCP_RUN_CRUD=true`** to
 opt a run into CRUD; the result + any teardown is posted as a PR comment.
 `dependencies.json` maps the seven VPC-creating scenarios to their quota kinds.
+
+> **Self-trigger for heavy runs:** a committed `.github/heavy.txt` (first
+> non-comment line = a `crud_filter` expression) lets a push drive which heavy
+> lifecycle runs next — used to chain heavy validations one per run. Empty file
+> = no heavy self-trigger.
 
 ## Endpoints (per-service hosts)
 

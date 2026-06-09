@@ -1,0 +1,82 @@
+# API combination test scenarios — formal, human-editable list of multi-service
+# flows worth testing TOGETHER. Schema: knowledge/formal/FORMAT.md.
+# Validate with: python knowledge/formal/validate.py
+#
+# status lifecycle:  idea (agent suggestion) -> draft (awaiting HUMAN approval)
+#                    -> encoded (a lifecycle in regression/scenarios/ runs it)
+# 사람이 할 일: draft 항목의 flow/value를 검토·수정하고, 승인하면 status를
+# 그대로 두고 메모를 남기거나, 필요 없으면 항목을 지우세요. 승인된 draft는
+# Domain-Knowledge agent가 scenarios.json lifecycle로 인코딩합니다.
+
+version: 1
+
+combos:
+  # --- encoded: already running as lifecycles --------------------------------
+  - id: compute-virtualserver-full
+    status: encoded
+    heavy: true
+    services: [networking/vpc, networking/security-group, compute/virtualserver]
+    flow: [vpc, subnet, security-group, keypair, server-group, server, port, block-volume, image-create, teardown-reverse]
+    value: "the canonical full-VM combination — exercises 6 resource families in one chain (~17 min)"
+    encoded_in: regression/scenarios/scenarios.json
+
+  - id: container-ske-cluster-nodepool
+    status: encoded
+    heavy: true
+    services: [networking/vpc, networking/security-group, compute/virtualserver, storage/filestorage, container/ske]
+    flow: [vpc, subnet, security-group, keypair, filestorage-volume, ske-cluster, ske-nodepool, teardown-reverse]
+    value: "K8s spanning 5 services incl. a cross-service filestorage dependency (~27 min)"
+    encoded_in: regression/scenarios/scenarios.json
+
+  - id: database-mysql-cluster
+    status: encoded
+    heavy: true
+    services: [networking/vpc, database/mysql]
+    flow: [vpc, subnet, mysql-cluster, teardown-reverse]
+    value: "DBaaS-on-network combination"
+    encoded_in: regression/scenarios/scenarios.json
+
+  - id: heavy-shared-networking
+    status: encoded
+    heavy: true
+    services: [networking/vpc, networking/dns]
+    flow: [vpc, subnet, private-dns, teardown-reverse]
+    value: "shared-networking flow consuming two quota kinds (vpc + private-dns)"
+    encoded_in: regression/scenarios/scenarios.json
+
+  # --- drafts: awaiting human review -----------------------------------------
+  - id: vm-public-egress
+    status: draft
+    heavy: true
+    services: [networking/vpc, compute/virtualserver]
+    flow: [vpc, subnet, internet-gateway, security-group, keypair, server, public-ip, attach-public-ip-to-server, verify-egress-route, teardown-reverse]
+    value: "combines the VM chain with IGW + public IP attachment — exercises the attach/detach surface between compute and networking that no current lifecycle crosses"
+
+  - id: lb-two-servers
+    status: draft
+    heavy: true
+    services: [networking/vpc, networking/loadbalancer, compute/virtualserver]
+    flow: [vpc, subnet, security-group, keypair, server, server, load-balancer, lb-listener, lb-member-add-x2, lb-health-check, teardown-reverse]
+    value: "LB fronting two real VMs — validates member registration against live targets instead of fixed dummy IPs (current LB lifecycle uses fixed_ip_map addresses)"
+
+  - id: vm-filestorage-mount
+    status: draft
+    heavy: true
+    services: [networking/vpc, compute/virtualserver, storage/filestorage]
+    flow: [vpc, subnet, security-group, keypair, server, filestorage-volume, volume-access-rule-for-subnet, teardown-reverse]
+    value: "file storage attached to a consumer VM — tests the access-control combination (volume created standalone today; never granted to a live consumer)"
+
+  - id: kms-encrypted-db
+    status: draft
+    heavy: true
+    services: [security/kms, networking/vpc, database/mysql]
+    flow: [kms-key, vpc, subnet, mysql-cluster-with-kms-key, verify-encryption-field, teardown-reverse]
+    value: "security x database combination — does the DB create accept/honor a customer KMS key?"
+
+  # --- ideas: cheap suggestions, promote to draft if interesting -------------
+  - id: snapshot-restore-roundtrip
+    status: idea
+    heavy: true
+    services: [compute/virtualserver]
+    flow: [block-volume, volume-snapshot, restore-volume-from-snapshot, diff-volume-metadata, teardown-reverse]
+    value: "data-path combination: prove a snapshot is actually restorable, not just creatable"

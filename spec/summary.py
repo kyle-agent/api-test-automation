@@ -4,7 +4,6 @@
 Shows totals by category and HTTP method, plus how many endpoints the
 read-only smoke suite can exercise directly vs. those needing CRUD lifecycles.
 
-Ported from tools/catalog_summary.py; imports via core (facade over framework).
 """
 from __future__ import annotations
 

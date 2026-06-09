@@ -1,0 +1,151 @@
+# Service / resource dependency graph — formal, human-editable form of
+# knowledge/service-dependencies.md. Schema: knowledge/formal/FORMAT.md.
+# Validate with: python knowledge/formal/validate.py
+#
+# requires: = must exist BEFORE this resource is created (scenarios create them
+#             inline and tear down in reverse order).
+# lookups:  = read-only finds the create needs (no resource is created).
+
+version: 1
+
+resources:
+  # --- networking ------------------------------------------------------------
+  vpc:
+    service: networking/vpc
+    requires: []
+    quota: vpc
+    provenance: VALIDATED
+    notes: "cidr e.g. 10.x.0.0/20; poll $.vpc.state == ACTIVE; CIDRs must not overlap across live VPCs"
+  subnet:
+    service: networking/vpc
+    requires: [vpc]
+    provenance: VALIDATED
+    notes: "type GENERAL; CIDR must be a sub-range of the VPC CIDR; poll $.subnet.state == ACTIVE"
+  port:
+    service: networking/vpc
+    requires: [subnet]
+    provenance: VALIDATED
+    notes: "security_groups: [] is accepted"
+  internet-gateway:
+    service: networking/vpc
+    requires: [vpc]
+    provenance: VALIDATED
+  public-ip:
+    service: networking/vpc
+    requires: []
+    provenance: VALIDATED
+    notes: "type IGW; standalone"
+  security-group:
+    service: networking/security-group
+    requires: []
+    provenance: VALIDATED
+    notes: "account/region-scoped — NO vpc needed"
+  load-balancer:
+    service: networking/loadbalancer
+    requires: [vpc, subnet]
+    provenance: docs
+  private-dns:
+    service: networking/dns
+    requires: []
+    quota: private-dns
+    provenance: VALIDATED
+    notes: "needs an activate sub-flow before hosted-zone use"
+
+  # --- compute ----------------------------------------------------------------
+  keypair:
+    service: compute/virtualserver
+    requires: []
+    provenance: VALIDATED
+    notes: "standalone, zero-cost"
+  server:
+    service: compute/virtualserver
+    requires: [vpc, subnet, security-group, keypair]
+    lookups: [image, server-type]
+    provenance: VALIDATED
+    notes: "heavy (~17 min, billable)"
+  block-volume:
+    service: compute/virtualserver
+    requires: []
+    provenance: VALIDATED
+    notes: "standalone (no vpc)"
+  volume-snapshot:
+    service: compute/virtualserver
+    requires: [block-volume]
+    provenance: VALIDATED
+
+  # --- container --------------------------------------------------------------
+  ske-cluster:
+    service: container/ske
+    requires: [vpc, subnet, security-group, keypair, filestorage-volume]
+    lookups: [kubernetes-version, server-type]
+    provenance: VALIDATED
+    notes: "heavy (~27 min, billable)"
+  ske-nodepool:
+    service: container/ske
+    requires: [ske-cluster]
+    provenance: VALIDATED
+  scr-registry:
+    service: container/scr
+    requires: []
+    provenance: VALIDATED
+    notes: "poll $.state == Running; DELETE 500-races for minutes — retry"
+  scr-repository:
+    service: container/scr
+    requires: [scr-registry]
+    provenance: VALIDATED
+
+  # --- storage ----------------------------------------------------------------
+  filestorage-volume:
+    service: storage/filestorage
+    requires: []
+    provenance: VALIDATED
+    notes: "standalone NFS volume (no vpc)"
+
+  # --- database ---------------------------------------------------------------
+  mysql-cluster:
+    service: database/mysql
+    requires: [vpc, subnet]
+    provenance: VALIDATED
+    notes: "heavy, billable"
+  postgresql-cluster:
+    service: database/postgresql
+    requires: [vpc, subnet]
+    provenance: VALIDATED
+    notes: "heavy, billable"
+
+  # --- security ---------------------------------------------------------------
+  certificate:
+    service: security/certificatemanager
+    requires: []
+    provenance: VALIDATED
+    notes: "self-sign flow is standalone; import flow currently unsatisfiable"
+  kms-key:
+    service: security/kms
+    requires: []
+    provenance: VALIDATED
+  secret:
+    service: security/secretsmanager
+    requires: []
+    provenance: VALIDATED
+
+  # --- application / management -------------------------------------------
+  queue:
+    service: application-service/queueservice
+    requires: []
+    provenance: VALIDATED
+  resource-group:
+    service: management/resourcemanager
+    requires: []
+    provenance: VALIDATED
+    notes: "global (account-scoped) service — no region segment in host"
+
+quotas:
+  vpc:
+    limit: 3
+    scope: account
+    provenance: VALIDATED
+    notes: "HARD cap; see dependencies.json vpc_schedule for the shared-VPC adopt strategy"
+  private-dns:
+    limit: 3
+    scope: account
+    provenance: VALIDATED

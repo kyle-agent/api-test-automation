@@ -1,0 +1,89 @@
+# Canonical call orders — formal, human-editable form of the per-resource
+# create→poll→teardown patterns in knowledge/service-dependencies.md.
+# Schema: knowledge/formal/FORMAT.md. Validate: python knowledge/formal/validate.py
+#
+# This is the PATTERN level. Exact step-by-step bodies live in
+# regression/scenarios/ (linked via encoded_in); field-level gotchas live in
+# knowledge/validated-facts.md.
+
+version: 1
+
+defaults:
+  teardown: reverse-order          # always delete in reverse creation order
+  delete_poll: {until_status: [404]}   # a delete is done when GET returns 404
+  delete_retry_on: [409, 500]      # dependency-release races — retry, don't fail
+
+call_orders:
+  vpc:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/vpcs
+      capture: $.vpc.id
+      poll: {field: $.vpc.state, until: ACTIVE}
+    delete:
+      api: DELETE /v1/vpcs/{id}
+    notes: "wait for child subnet 404 before deleting the vpc"
+
+  subnet:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/subnets
+      capture: $.subnet.id
+      poll: {field: $.subnet.state, until: ACTIVE}
+    delete:
+      api: DELETE /v1/subnets/{id}
+
+  port:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/ports
+      capture: $.port.id
+    delete:
+      api: DELETE /v1/ports/{id}
+
+  server:
+    provenance: VALIDATED
+    encoded_in: [compute-virtualserver-full]
+    create:
+      api: POST /v1/servers
+      capture: $.servers[0].id
+      poll: {field: state, until: RUNNING}
+    delete:
+      api: DELETE /v1/servers/{id}
+    notes: "full order: vpc → subnet → security-group → keypair → find-image → find-server-type → create; optional in-life ops: attach volume, rename, stop/start, image-create"
+
+  ske-cluster:
+    provenance: VALIDATED
+    encoded_in: [container-ske-cluster-nodepool]
+    create:
+      api: POST /v1/clusters
+      capture: $.resource_id
+      poll: {field: status, until: Running}
+    delete:
+      api: DELETE /v1/clusters/{id}
+    notes: "teardown order: nodepool → cluster → filestorage volume → keypair → sg → subnet → vpc"
+
+  scr-registry:
+    provenance: VALIDATED
+    encoded_in: [container-scr-registry]
+    create:
+      api: POST /v1/container-registries
+      capture: $.id
+      poll: {field: $.state, until: Running}
+    delete:
+      api: DELETE /v1/container-registries/{id}
+    notes: "DELETE 500-races for minutes after repository removal — keep retrying"
+
+  mysql-cluster:
+    provenance: VALIDATED
+    encoded_in: [database-mysql-cluster]
+    create:
+      api: POST /v1/clusters
+      capture: $.resource.id
+      poll: {field: status, until: AVAILABLE}
+    delete:
+      api: DELETE /v1/clusters/{id}
+    notes: "host is mysql.<region>... — /v1/clusters path collides with ske/mariadb across services, per-service hosts disambiguate"

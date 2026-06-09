@@ -2,7 +2,6 @@
 # Lint the locally-generated OpenAPI snapshot (data/openapi/*.json) and write
 # a JSON report. Requires: npm i -g @stoplight/spectral-cli
 #
-# Ported from tools/run_spectral.sh (conformance session); logic is unchanged.
 # OpenAPI inputs relocated framework/openapi -> data/openapi to match the new
 # layout, and the ruleset now lives alongside this script (spec/spectral.yaml).
 set -euo pipefail
