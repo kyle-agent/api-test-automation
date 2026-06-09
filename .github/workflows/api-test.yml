@@ -576,7 +576,7 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p reports
-          python -m cleanup.reconciler 2>&1 | tee reports/sweep.log
+          python -u -m cleanup.reconciler 2>&1 | tee reports/sweep.log
       - name: Comment sweep result on PR
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:

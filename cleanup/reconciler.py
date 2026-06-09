@@ -93,7 +93,8 @@ def _items(body):
 
 
 def _name_of(it):
-    for k in ("name", "volume_name", "registry_name", "policy_name"):
+    for k in ("name", "volume_name", "registry_name", "policy_name",
+              "log_group_name"):
         if it.get(k):
             return str(it[k])
     return ""
@@ -113,11 +114,25 @@ def _list_all(client, service, path):
 
 
 def _select(client, service, path, *, name_prefixes: tuple[str, ...] = ()):
-    """List a collection and return only deletable items."""
-    return [
-        it for it in _list_all(client, service, path)
-        if _is_deletable(it, name_prefixes=name_prefixes)
-    ]
+    """List a collection and return only deletable items.
+
+    Prefix fallback matches the item's display name via ``_name_of`` (some
+    services use ``log_group_name``/``volume_name``/… instead of ``name``,
+    which ``is_owned``'s bare ``name`` check would miss).
+    """
+    listed = _list_all(client, service, path)
+    picked = []
+    for it in listed:
+        if _is_deletable(it, name_prefixes=name_prefixes):
+            picked.append(it)
+        elif name_prefixes and _name_of(it).startswith(name_prefixes) \
+                and not it.get("name"):
+            # name lives under an alternate key — apply the same legacy-orphan
+            # rule is_owned would have applied to item["name"].
+            picked.append(it)
+    if listed:
+        print(f"  {path}: {len(listed)} listed / {len(picked)} deletable")
+    return picked
 
 
 def _delete(client, service, path, json=None):
@@ -474,6 +489,21 @@ def run_sweep(client) -> int:
         if it.get("id") and _delete(c, "iam", f"/v1/policies/{it['id']}"):
             deleted += 1
 
+    # servicewatch alerts / dashboards / event-rules (regralert / regrdash /
+    # regrevtrule) — same bulk-delete-by-ids shape as log groups. Their
+    # lifecycles delete inline, but failed runs orphan them (user-reported).
+    for path, prefix in (("/v1/alerts", "regralert"),
+                         ("/v1/dashboards", "regrdash"),
+                         ("/v1/event-rules", "regrevtrule")):
+        for it in _select(c, "servicewatch", path, name_prefixes=(prefix,)):
+            if not it.get("id"):
+                continue
+            st = _delete(c, "servicewatch", path, json={"ids": [it["id"]]})
+            if st and (200 <= st < 300 or st == 404):
+                deleted += 1
+            else:
+                print(f"  {path} {it['id']} delete -> {st}")
+
     # servicewatch log groups (regrlg). Two gotchas found in the field:
     #   * a group delete is REJECTED while the group still has log streams —
     #     and the custom-ingest lifecycle creates an implicit regrlg* group +
@@ -529,7 +559,13 @@ def main() -> int:
 
     core.settings.require_credentials()
     client = core.ApiClient(core.settings)
-    run_sweep(client)
+    # Run to a FIXED POINT (bounded): list endpoints may paginate, so one pass
+    # can only reap the first page's worth — repeat until a full pass deletes
+    # nothing (or 5 rounds).
+    for rnd in range(1, 6):
+        print(f"--- sweep round {rnd} ---", flush=True)
+        if run_sweep(client) == 0:
+            break
     return 0
 
 
