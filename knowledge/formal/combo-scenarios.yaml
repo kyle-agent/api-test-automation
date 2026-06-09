@@ -2,11 +2,16 @@
 # flows worth testing TOGETHER. Schema: knowledge/formal/FORMAT.md.
 # Validate with: python knowledge/formal/validate.py
 #
-# status lifecycle:  idea (agent suggestion) -> draft (awaiting HUMAN approval)
+# status lifecycle:  idea (agent suggestion) -> draft (awaiting HUMAN review)
 #                    -> encoded (a lifecycle in regression/scenarios/ runs it)
-# 사람이 할 일: draft 항목의 flow/value를 검토·수정하고, 승인하면 status를
-# 그대로 두고 메모를 남기거나, 필요 없으면 항목을 지우세요. 승인된 draft는
-# Domain-Knowledge agent가 scenarios.json lifecycle로 인코딩합니다.
+#
+# SCENARIO-BASED REVIEW: every draft carries a review: block —
+#   decision: pending|approved|rejected   <- 사람이 이 필드를 바꿔서 승인/반려
+#   checks:   what the reviewer must verify before approving
+#   risks:    cost / quota / blast-radius the reviewer accepts by approving
+#   notes:    reviewer's free-text comments
+# 승인(approved)된 draft만 Domain-Knowledge agent가 scenarios.json lifecycle로
+# 인코딩합니다. 인코딩 후 status: encoded 로 바꾸고 review 블록은 기록으로 유지.
 
 version: 1
 
@@ -51,6 +56,15 @@ combos:
     services: [networking/vpc, compute/virtualserver]
     flow: [vpc, subnet, internet-gateway, security-group, keypair, server, public-ip, attach-public-ip-to-server, verify-egress-route, teardown-reverse]
     value: "combines the VM chain with IGW + public IP attachment — exercises the attach/detach surface between compute and networking that no current lifecycle crosses"
+    review:
+      decision: pending
+      checks:
+        - "public-ip attach API: is it on the networking side (POST .../publicips/{id}/attach?) or the compute side (server NIC update)? confirm from catalog before encoding"
+        - "can this adopt the shared VPC, or does the IGW requirement force self-create (vpc_crud class, serial)?"
+      risks:
+        - "billable VM (~17 min) + public IP allocation"
+        - "IGW on the shared VPC would mutate shared infra — likely needs its own VPC (1 of 3 quota)"
+      notes: ""
 
   - id: lb-two-servers
     status: draft
@@ -58,6 +72,15 @@ combos:
     services: [networking/vpc, networking/loadbalancer, compute/virtualserver]
     flow: [vpc, subnet, security-group, keypair, server, server, load-balancer, lb-listener, lb-member-add-x2, lb-health-check, teardown-reverse]
     value: "LB fronting two real VMs — validates member registration against live targets instead of fixed dummy IPs (current LB lifecycle uses fixed_ip_map addresses)"
+    review:
+      decision: pending
+      checks:
+        - "member IPs must be the VMs' real fixed IPs in the shared subnet — confirm capture path for a server's private IP"
+        - "health-check pass needs something listening on the VM — accept 'member registered' as the assertion, or provision a userdata web server?"
+      risks:
+        - "2 billable VMs + 1 LB concurrently (~20+ min)"
+        - "two adopters pinning IPs in the shared subnet — must extend fixed_ip_map to avoid collisions"
+      notes: ""
 
   - id: vm-filestorage-mount
     status: draft
@@ -65,6 +88,14 @@ combos:
     services: [networking/vpc, compute/virtualserver, storage/filestorage]
     flow: [vpc, subnet, security-group, keypair, server, filestorage-volume, volume-access-rule-for-subnet, teardown-reverse]
     value: "file storage attached to a consumer VM — tests the access-control combination (volume created standalone today; never granted to a live consumer)"
+    review:
+      decision: pending
+      checks:
+        - "filestorage access-control API shape: per-subnet grant or per-host? (catalog: storage/filestorage access rules)"
+        - "assertion level: access-rule 2xx is enough (an in-VM NFS mount is out of scope for API tests)"
+      risks:
+        - "billable VM + NFS volume"
+      notes: ""
 
   - id: kms-encrypted-db
     status: draft
@@ -72,6 +103,14 @@ combos:
     services: [security/kms, networking/vpc, database/mysql]
     flow: [kms-key, vpc, subnet, mysql-cluster-with-kms-key, verify-encryption-field, teardown-reverse]
     value: "security x database combination — does the DB create accept/honor a customer KMS key?"
+    review:
+      decision: pending
+      checks:
+        - "does the mysql cluster create body have an encryption/kms field at all? confirm from api_bodies/docs before encoding"
+        - "key deletion while the DB still references it — define teardown order (db first, then key) and the expected error if reversed"
+      risks:
+        - "billable DB cluster; KMS key is cheap but key-in-use deletion may linger"
+      notes: ""
 
   # --- ideas: cheap suggestions, promote to draft if interesting -------------
   - id: snapshot-restore-roundtrip
@@ -80,3 +119,10 @@ combos:
     services: [compute/virtualserver]
     flow: [block-volume, volume-snapshot, restore-volume-from-snapshot, diff-volume-metadata, teardown-reverse]
     value: "data-path combination: prove a snapshot is actually restorable, not just creatable"
+    review:
+      decision: pending
+      checks:
+        - "restore API: new-volume-from-snapshot vs in-place restore — pick from catalog"
+      risks:
+        - "two block volumes alive briefly"
+      notes: ""

@@ -1,0 +1,22 @@
+# Layer 1 — per-service knowledge: storage/filestorage
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+
+version: 1
+service: storage/filestorage
+
+constraints: []
+
+captures:
+  filestorage-volume: $.volume_id   # FLAT — and DIFFERENT from virtualserver block volume ($.id)!
+  filestorage-snapshot: $.snapshot.id
+
+states:
+  filestorage-volume: {field: $.state, ready: [available, AVAILABLE, ACTIVE]}
+
+quirks:
+  - id: create-fields
+    note: "volume create needs protocol: NFS, type_name: HDD (contrast block volume: volume_type, max_iops, max_throughput)"
+    provenance: VALIDATED
+  - id: snapshot-schedule-no-id
+    note: "snapshot-schedule create returns NO id — recover via list"
+    provenance: docs

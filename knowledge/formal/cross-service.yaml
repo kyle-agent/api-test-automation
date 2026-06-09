@@ -1,5 +1,6 @@
-# Service / resource dependency graph — formal, human-editable form of
-# knowledge/service-dependencies.md. Schema: knowledge/formal/FORMAT.md.
+# Layer 2 — CROSS-SERVICE knowledge: the resource dependency graph + constraints
+# that span more than one service. (Per-service knowledge lives in services/;
+# flow-level knowledge in flows.yaml.) Schema: knowledge/formal/FORMAT.md.
 # Validate with: python knowledge/formal/validate.py
 #
 # requires: = must exist BEFORE this resource is created (scenarios create them
@@ -7,6 +8,26 @@
 # lookups:  = read-only finds the create needs (no resource is created).
 
 version: 1
+
+# Constraints that only make sense ACROSS services (one service's resource
+# affecting another service's API behaviour).
+cross_constraints:
+  - id: ske-volume-is-filestorage
+    services: [container/ske, storage/filestorage]
+    rule: "an SKE cluster's volume_id must be a storage/filestorage volume id (created first; torn down after the cluster)"
+    provenance: VALIDATED
+  - id: server-needs-networking-bundle
+    services: [compute/virtualserver, networking/vpc, networking/security-group]
+    rule: "a VM create needs live vpc + subnet (networking/vpc) and a security-group (networking/security-group) plus keypair/image/server-type lookups from its own service"
+    provenance: VALIDATED
+  - id: shared-path-roots-need-per-service-hosts
+    services: [container/ske, database/mysql, database/mariadb, database/postgresql, database/epas, database/sqlserver, database/cachestore]
+    rule: "path roots collide across services (/v1/clusters, /v1/parameters are used by ske + every DBaaS engine) — every call MUST target its own per-service host; coverage matching by (method, path) alone over-counts (each engine needs its own lifecycle)"
+    provenance: VALIDATED
+  - id: shared-subnet-fixed-ip-no-collision
+    services: [networking/vpc, networking/loadbalancer]
+    rule: "lifecycles adopting the ONE shared subnet must pin fixed host IPs at DISTINCT addresses (dependencies.json vpc_schedule.fixed_ip_map; .1 reserved for gateway) so parallel adopters never claim the same IP"
+    provenance: VALIDATED
 
 resources:
   # --- networking ------------------------------------------------------------

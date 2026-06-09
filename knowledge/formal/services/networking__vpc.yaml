@@ -1,0 +1,39 @@
+# Layer 1 — per-service knowledge: networking/vpc
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+
+version: 1
+service: networking/vpc
+
+constraints:
+  - id: vpc-quota-3
+    rule: "account hard cap: max 3 live VPCs (incl. lingering async-deletes; the shared VPC counts as 1). Exceed -> scp-network.vpc.exceed-max-count"
+    provenance: VALIDATED
+  - id: vpc-cidr-no-overlap
+    rule: "any two VPCs alive at the same time must have non-overlapping CIDR blocks (each VPC-creating lifecycle owns a unique /20 — allocation table in knowledge/domain-constraints.md)"
+    provenance: VALIDATED
+  - id: subnet-cidr-within-vpc
+    rule: "a subnet's CIDR must be a sub-range of its parent VPC's CIDR (e.g. shared subnet 10.124.0.0/24 inside shared VPC 10.124.0.0/20)"
+    provenance: VALIDATED
+
+captures:
+  vpc: $.vpc.id
+  subnet: $.subnet.id
+  port: $.port.id
+  internet-gateway: $.internet_gateway.id
+  public-ip: $.publicip.id
+
+states:
+  vpc: {field: $.vpc.state, ready: [ACTIVE]}
+  subnet: {field: $.subnet.state, ready: [ACTIVE]}
+  internet-gateway: {field: $.internet_gateway.state, ready: [ACTIVE, ATTACHED, CREATED, RUNNING]}
+
+quirks:
+  - id: igw-create-fields
+    note: "internet-gateway create needs vpc_id, firewall_enabled, type: IGW"
+    provenance: docs
+  - id: public-ip-type
+    note: "public-ip create uses type: IGW; standalone (no vpc required)"
+    provenance: docs
+  - id: port-empty-sg-ok
+    note: "port create accepts security_groups: []"
+    provenance: VALIDATED

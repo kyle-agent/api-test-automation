@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""Validate knowledge/formal/*.yaml — structure + consistency with the engine data.
+"""Validate knowledge/formal/ — the 3-layer formal domain knowledge model.
 
 Offline (no credentials, no network). Run after every human edit:
 
     python knowledge/formal/validate.py
 
-Checks:
-  service-graph.yaml   requires-references exist · graph is acyclic · quota keys
-                       declared · limits agree with dependencies.json vpc_schedule
-  call-orders.yaml     resource keys exist in the graph · encoded_in lifecycle
-                       ids exist in the merged scenario data
-  combo-scenarios.yaml status enum · encoded combos point at a real lifecycle id
-                       · services exist in the catalog's category/service set
+Layers / checks:
+  services/*.yaml      (L1) filename matches `service:` · service exists in the
+                       catalog · constraints/quirks carry id + provenance
+  cross-service.yaml   (L2) requires-references exist · graph is acyclic ·
+                       quota limits agree with dependencies.json vpc_schedule ·
+                       cross_constraints reference real services
+  flows.yaml           (L3) call-order resources exist in the L2 graph ·
+                       encoded_in lifecycle ids exist · flow_rules ids unique
+  combo-scenarios.yaml status enum · encoded combos point at a real lifecycle ·
+                       draft/idea combos carry a review block with a valid
+                       decision · services exist in the catalog
 """
 from __future__ import annotations
 
@@ -41,18 +45,18 @@ def warn(msg: str) -> None:
     warnings.append(msg)
 
 
-def load_yaml(name: str) -> dict:
-    path = HERE / name
+def load_yaml(path: Path) -> dict:
+    rel = path.relative_to(HERE)
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
-        err(f"{name}: YAML parse error: {exc}")
+        err(f"{rel}: YAML parse error: {exc}")
         return {}
     if not isinstance(data, dict):
-        err(f"{name}: top level must be a mapping")
+        err(f"{rel}: top level must be a mapping")
         return {}
     if data.get("version") != 1:
-        warn(f"{name}: expected version: 1")
+        warn(f"{rel}: expected version: 1")
     return data
 
 
@@ -71,23 +75,83 @@ def catalog_services() -> set[str]:
 PROVENANCE = {"VALIDATED", "docs"}
 
 
-def check_service_graph(graph: dict) -> dict:
+def check_tagged_list(rel: str, section: str, items: list, text_key: str) -> None:
+    """Items must each carry id + provenance + the text field; ids unique."""
+    seen: set[str] = set()
+    for item in items or []:
+        iid = item.get("id")
+        if not iid:
+            err(f"{rel}: {section} entry missing 'id'")
+            continue
+        if iid in seen:
+            err(f"{rel}: duplicate {section} id '{iid}'")
+        seen.add(iid)
+        if item.get("provenance") not in PROVENANCE:
+            err(f"{rel}: {section} '{iid}' provenance must be one of {sorted(PROVENANCE)}")
+        if not item.get(text_key):
+            err(f"{rel}: {section} '{iid}' missing '{text_key}'")
+
+
+# --------------------------------------------------------------------------
+# Layer 1 — services/*.yaml
+# --------------------------------------------------------------------------
+def check_services(services: set[str]) -> int:
+    files = sorted((HERE / "services").glob("*.yaml"))
+    for path in files:
+        rel = str(path.relative_to(HERE))
+        data = load_yaml(path)
+        svc = data.get("service")
+        if not svc:
+            err(f"{rel}: missing 'service'")
+            continue
+        expected = path.stem.replace("__", "/")
+        if svc != expected:
+            err(f"{rel}: service '{svc}' does not match filename (expected '{expected}')")
+        if svc not in services:
+            err(f"{rel}: service '{svc}' not found in the catalog")
+        check_tagged_list(rel, "constraints", data.get("constraints"), "rule")
+        check_tagged_list(rel, "quirks", data.get("quirks"), "note")
+        for res, st in (data.get("states") or {}).items():
+            if not isinstance(st, dict) or "field" not in st or not st.get("ready"):
+                err(f"{rel}: states.{res} must be a mapping with 'field' and non-empty 'ready'")
+    return len(files)
+
+
+# --------------------------------------------------------------------------
+# Layer 2 — cross-service.yaml
+# --------------------------------------------------------------------------
+def check_cross_service(services: set[str]) -> tuple[dict, int]:
+    rel = "cross-service.yaml"
+    graph = load_yaml(HERE / rel)
     resources = graph.get("resources") or {}
     quotas = graph.get("quotas") or {}
+
+    constraints = graph.get("cross_constraints") or []
+    check_tagged_list(rel, "cross_constraints", constraints, "rule")
+    for c in constraints:
+        svcs = c.get("services") or []
+        if len(svcs) < 2:
+            warn(f"{rel}: cross_constraints '{c.get('id')}' lists <2 services — is it per-service (layer 1)?")
+        for svc in svcs:
+            if svc not in services:
+                err(f"{rel}: cross_constraints '{c.get('id')}' references unknown service '{svc}'")
+
     for key, res in resources.items():
         if not isinstance(res, dict):
-            err(f"service-graph: resource '{key}' must be a mapping")
+            err(f"{rel}: resource '{key}' must be a mapping")
             continue
-        if "service" not in res:
-            err(f"service-graph: resource '{key}' missing 'service'")
+        if not res.get("service"):
+            err(f"{rel}: resource '{key}' missing 'service'")
+        elif res["service"] not in services:
+            err(f"{rel}: resource '{key}' service '{res['service']}' not found in the catalog")
         if res.get("provenance") not in PROVENANCE:
-            err(f"service-graph: resource '{key}' provenance must be one of {sorted(PROVENANCE)}")
+            err(f"{rel}: resource '{key}' provenance must be one of {sorted(PROVENANCE)}")
         for dep in res.get("requires") or []:
             if dep not in resources:
-                err(f"service-graph: '{key}' requires unknown resource '{dep}'")
+                err(f"{rel}: '{key}' requires unknown resource '{dep}'")
         q = res.get("quota")
         if q and q not in quotas:
-            err(f"service-graph: '{key}' references undeclared quota '{q}'")
+            err(f"{rel}: '{key}' references undeclared quota '{q}'")
 
     # acyclicity (DFS)
     WHITE, GRAY, BLACK = 0, 1, 2
@@ -99,7 +163,7 @@ def check_service_graph(graph: dict) -> dict:
             if dep not in resources:
                 continue
             if color[dep] == GRAY:
-                err(f"service-graph: dependency cycle: {' -> '.join(path + [node, dep])}")
+                err(f"{rel}: dependency cycle: {' -> '.join(path + [node, dep])}")
             elif color[dep] == WHITE:
                 dfs(dep, path + [node])
         color[node] = BLACK
@@ -116,73 +180,98 @@ def check_service_graph(graph: dict) -> dict:
         engine = engine_limits.get(qkey)
         if engine is not None and q.get("limit") != engine:
             err(
-                f"service-graph: quota '{qkey}' limit={q.get('limit')} disagrees with "
+                f"{rel}: quota '{qkey}' limit={q.get('limit')} disagrees with "
                 f"dependencies.json vpc_schedule ({engine})"
             )
-    return resources
+    return resources, len(constraints)
 
 
-def check_call_orders(orders: dict, resources: dict, ids: set[str]) -> None:
-    for key, order in (orders.get("call_orders") or {}).items():
+# --------------------------------------------------------------------------
+# Layer 3 — flows.yaml
+# --------------------------------------------------------------------------
+def check_flows(resources: dict, ids: set[str]) -> tuple[int, int]:
+    rel = "flows.yaml"
+    flows = load_yaml(HERE / rel)
+    rules = flows.get("flow_rules") or []
+    check_tagged_list(rel, "flow_rules", rules, "rule")
+
+    orders = flows.get("call_orders") or {}
+    for key, order in orders.items():
         if key not in resources:
-            err(f"call-orders: '{key}' is not a resource in service-graph.yaml")
+            err(f"{rel}: call_orders '{key}' is not a resource in cross-service.yaml")
         if order.get("provenance") not in PROVENANCE:
-            err(f"call-orders: '{key}' provenance must be one of {sorted(PROVENANCE)}")
+            err(f"{rel}: call_orders '{key}' provenance must be one of {sorted(PROVENANCE)}")
         for phase in ("create", "delete"):
             spec = order.get(phase)
             if not isinstance(spec, dict) or "api" not in spec:
-                err(f"call-orders: '{key}' {phase} must be a mapping with an 'api'")
+                err(f"{rel}: call_orders '{key}' {phase} must be a mapping with an 'api'")
         for lid in order.get("encoded_in") or []:
             if lid not in ids:
-                err(f"call-orders: '{key}' encoded_in '{lid}' is not a known lifecycle id")
+                err(f"{rel}: call_orders '{key}' encoded_in '{lid}' is not a known lifecycle id")
+    return len(rules), len(orders)
 
 
+# --------------------------------------------------------------------------
+# Combos + scenario-based review — combo-scenarios.yaml
+# --------------------------------------------------------------------------
 COMBO_STATUS = {"encoded", "draft", "idea"}
+REVIEW_DECISION = {"pending", "approved", "rejected"}
 
 
-def check_combos(combos: dict, ids: set[str], services: set[str]) -> None:
+def check_combos(ids: set[str], services: set[str]) -> int:
+    rel = "combo-scenarios.yaml"
+    combos = (load_yaml(HERE / rel)).get("combos") or []
     seen: set[str] = set()
-    for combo in combos.get("combos") or []:
+    for combo in combos:
         cid = combo.get("id", "<missing id>")
         if cid in seen:
-            err(f"combo-scenarios: duplicate combo id '{cid}'")
+            err(f"{rel}: duplicate combo id '{cid}'")
         seen.add(cid)
         status = combo.get("status")
         if status not in COMBO_STATUS:
-            err(f"combo-scenarios: '{cid}' status must be one of {sorted(COMBO_STATUS)}")
+            err(f"{rel}: '{cid}' status must be one of {sorted(COMBO_STATUS)}")
         if status == "encoded":
             if cid not in ids:
-                err(f"combo-scenarios: '{cid}' is encoded but no lifecycle has that id")
+                err(f"{rel}: '{cid}' is encoded but no lifecycle has that id")
             if not combo.get("encoded_in"):
-                err(f"combo-scenarios: '{cid}' is encoded but missing 'encoded_in'")
+                err(f"{rel}: '{cid}' is encoded but missing 'encoded_in'")
+        else:
+            review = combo.get("review")
+            if not isinstance(review, dict):
+                err(f"{rel}: '{cid}' ({status}) must carry a 'review' block (scenario-based review)")
+            else:
+                if review.get("decision") not in REVIEW_DECISION:
+                    err(f"{rel}: '{cid}' review.decision must be one of {sorted(REVIEW_DECISION)}")
+                if not review.get("checks"):
+                    warn(f"{rel}: '{cid}' review.checks is empty — what should the reviewer verify?")
         if not combo.get("flow"):
-            err(f"combo-scenarios: '{cid}' must declare a 'flow'")
+            err(f"{rel}: '{cid}' must declare a 'flow'")
         if not combo.get("value"):
-            warn(f"combo-scenarios: '{cid}' has no 'value' (why is this combo worth testing?)")
+            warn(f"{rel}: '{cid}' has no 'value' (why is this combo worth testing?)")
         for svc in combo.get("services") or []:
             if svc not in services:
-                err(f"combo-scenarios: '{cid}' references unknown service '{svc}'")
+                err(f"{rel}: '{cid}' references unknown service '{svc}'")
+    return len(combos)
 
 
 def main() -> int:
-    graph = load_yaml("service-graph.yaml")
-    orders = load_yaml("call-orders.yaml")
-    combos = load_yaml("combo-scenarios.yaml")
     ids = lifecycle_ids()
     services = catalog_services()
 
-    resources = check_service_graph(graph)
-    check_call_orders(orders, resources, ids)
-    check_combos(combos, ids, services)
+    n_services = check_services(services)
+    resources, n_cross = check_cross_service(services)
+    n_rules, n_orders = check_flows(resources, ids)
+    n_combos = check_combos(ids, services)
 
     for w in warnings:
         print(f"WARN  {w}")
     for e in errors:
         print(f"ERROR {e}")
     print(
-        f"{len(resources)} resource(s) · "
-        f"{len((orders.get('call_orders') or {}))} call-order(s) · "
-        f"{len((combos.get('combos') or []))} combo(s) checked · "
+        f"L1 {n_services} service file(s) · "
+        f"L2 {len(resources)} resource(s) + {n_cross} cross-constraint(s) · "
+        f"L3 {n_rules} flow-rule(s) + {n_orders} call-order(s) · "
+        f"{n_combos} combo(s) checked · "
         f"{len(errors)} error(s) · {len(warnings)} warning(s)"
     )
     return 1 if errors else 0

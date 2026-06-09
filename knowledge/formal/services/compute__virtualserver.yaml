@@ -1,0 +1,41 @@
+# Layer 1 — per-service knowledge: compute/virtualserver
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+
+version: 1
+service: compute/virtualserver
+
+constraints:
+  - id: server-type-prefix-s
+    rule: "server_type_id must be chosen with prefix filter: id starts with 's', NOT 'g' (g-types rejected). Lookup from /v1/server-types"
+    provenance: VALIDATED
+  - id: server-name-pattern
+    rule: "rename (PUT /v1/servers/{id}) requires name matching ^[a-zA-Z0-9-_ ]*$; tags are NOT updatable via this endpoint"
+    provenance: VALIDATED
+
+captures:
+  server: $.servers[0].id        # ARRAY — not $.server.id
+  block-volume: $.id             # FLAT — not $.volume_id (that's filestorage!)
+  volume-snapshot: $.id
+  custom-image: $.image_id
+  keypair: (by NAME)             # keypairs are addressed by name, not id
+
+states:
+  server: {field: $.server.state, ready: [ACTIVE], stopped: [STOPPED, SHUTOFF]}
+  block-volume: {field: $.state, ready: [available, AVAILABLE, ACTIVE], attached: [in-use, IN-USE, in_use]}
+
+quirks:
+  - id: volume-field-name
+    note: "standalone block-volume create field is volume_type (e.g. SSD_Provisioned), NOT type; the inline boot volume in create-server uses type: SSD with boot_index: 0, delete_on_termination: true"
+    provenance: VALIDATED
+  - id: create-server-required
+    note: "create-server requires product_category: compute, product_offering: virtual_server, networks: [{subnet_id}], security_groups: [...]"
+    provenance: VALIDATED
+  - id: image-lookup-params
+    note: "image lookup that works: status=active, scp_original_image_type=standard, visibility=public, limit=50 -> $.images[0].id"
+    provenance: VALIDATED
+  - id: keypair-server-generates
+    note: "omit public_key and SCP generates one; get/delete by /v1/keypairs/{name}; zero-cost, synchronous"
+    provenance: VALIDATED
+  - id: volume-attach-device
+    note: "attach extra volume: POST /v1/servers/{id}/volumes with volume_id + device (/dev/vdb); detach before delete"
+    provenance: VALIDATED

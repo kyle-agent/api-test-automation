@@ -1,0 +1,127 @@
+# Layer 3 — SCENARIO-FLOW knowledge: rules that only exist in the context of a
+# flow (ordering, teardown, races, adoption, scheduling) + the canonical
+# per-resource call-order patterns. (Per-service facts live in services/;
+# cross-service dependencies in cross-service.yaml.)
+# Schema: knowledge/formal/FORMAT.md. Validate: python knowledge/formal/validate.py
+#
+# This is the PATTERN level. Exact step-by-step bodies live in
+# regression/scenarios/ (linked via encoded_in); field-level gotchas live in
+# knowledge/validated-facts.md.
+
+version: 1
+
+defaults:
+  teardown: reverse-order          # always delete in reverse creation order
+  delete_poll: {until_status: [404]}   # a delete is done when GET returns 404
+  delete_retry_on: [409, 500]      # dependency-release races — retry, don't fail
+
+# Rules that apply to FLOWS (multi-step scenarios), not to any single endpoint.
+flow_rules:
+  - id: teardown-reverse-order
+    rule: "always tear down in exact reverse creation order, registry-owned"
+    provenance: VALIDATED
+  - id: wait-child-404-before-parent-delete
+    rule: "before deleting a parent, poll the child's GET to 404 (e.g. subnet 404 before vpc delete) — async deletes linger"
+    provenance: VALIDATED
+  - id: delete-retry-races
+    rule: "deletes racing a dependency release return 409 (or 500 for scr/snapshot/igw) — retry with backoff instead of failing"
+    provenance: VALIDATED
+  - id: poll-ready-as-set
+    rule: "ready-state casing is inconsistent across services (ACTIVE vs Running vs available) — always match a SET of values, never a single string"
+    provenance: VALIDATED
+  - id: budget-reserve-before-quota-create
+    rule: "reserve a core.budgets slot before any quota-bound create (vpc, private-dns); skip (not fail) when exhausted so quota pressure is never a false regression"
+    provenance: VALIDATED
+  - id: shared-vpc-adopt-parallelism
+    rule: "ADOPT-class lifecycles reuse the ONE session-shared VPC+subnet and run in PARALLEL; VPC-CRUD-class (self-create / mutate / need >1 VPC) run SERIALLY; the shared VPC is torn down BEFORE the VPC-CRUD pass so it gets the full 3-VPC budget"
+    provenance: VALIDATED
+  - id: vpc-cidr-allocation-per-lifecycle
+    rule: "every VPC-creating lifecycle owns a unique /20 block (allocation table: knowledge/domain-constraints.md) so even fallback self-creates never overlap"
+    provenance: VALIDATED
+  - id: group-optional-isolation
+    rule: "multi-family scenarios isolate failures with group + optional: one bad body tears down and costs only its own group, not the whole run"
+    provenance: VALIDATED
+  - id: coverage-only-pattern
+    rule: "for billable/destructive resources not worth provisioning: soft-capture an existing id (or guarantee a 404 id), fire every write optional + broad expect_status — the endpoint is called and recorded without touching real resources"
+    provenance: VALIDATED
+  - id: placeholder-seeding
+    rule: "use engine-seeded placeholders ({unique}, {ualpha}, {region}, {today}, {today_plus_5y}) instead of hardcoded values so runs never collide; literal id segments in paths record ZERO coverage — always use {placeholder} tokens"
+    provenance: VALIDATED
+  - id: no-overlapping-mutation-runs
+    rule: "never let two VPC-mutating runs overlap (they compete for the same 3 VPCs) — one CRUD run at a time, wait for the prior regression job to finish"
+    provenance: VALIDATED
+
+call_orders:
+  vpc:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/vpcs
+      capture: $.vpc.id
+      poll: {field: $.vpc.state, until: ACTIVE}
+    delete:
+      api: DELETE /v1/vpcs/{id}
+    notes: "wait for child subnet 404 before deleting the vpc"
+
+  subnet:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/subnets
+      capture: $.subnet.id
+      poll: {field: $.subnet.state, until: ACTIVE}
+    delete:
+      api: DELETE /v1/subnets/{id}
+
+  port:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/ports
+      capture: $.port.id
+    delete:
+      api: DELETE /v1/ports/{id}
+
+  server:
+    provenance: VALIDATED
+    encoded_in: [compute-virtualserver-full]
+    create:
+      api: POST /v1/servers
+      capture: $.servers[0].id
+      poll: {field: state, until: RUNNING}
+    delete:
+      api: DELETE /v1/servers/{id}
+    notes: "full order: vpc → subnet → security-group → keypair → find-image → find-server-type → create; optional in-life ops: attach volume, rename, stop/start, image-create"
+
+  ske-cluster:
+    provenance: VALIDATED
+    encoded_in: [container-ske-cluster-nodepool]
+    create:
+      api: POST /v1/clusters
+      capture: $.resource_id
+      poll: {field: status, until: Running}
+    delete:
+      api: DELETE /v1/clusters/{id}
+    notes: "teardown order: nodepool → cluster → filestorage volume → keypair → sg → subnet → vpc"
+
+  scr-registry:
+    provenance: VALIDATED
+    encoded_in: [container-scr-registry]
+    create:
+      api: POST /v1/container-registries
+      capture: $.id
+      poll: {field: $.state, until: Running}
+    delete:
+      api: DELETE /v1/container-registries/{id}
+    notes: "DELETE 500-races for minutes after repository removal — keep retrying"
+
+  mysql-cluster:
+    provenance: VALIDATED
+    encoded_in: [database-mysql-cluster]
+    create:
+      api: POST /v1/clusters
+      capture: $.resource.id
+      poll: {field: status, until: AVAILABLE}
+    delete:
+      api: DELETE /v1/clusters/{id}
+    notes: "host is mysql.<region>... — /v1/clusters path collides with ske/mariadb across services, per-service hosts disambiguate"
