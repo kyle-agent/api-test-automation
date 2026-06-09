@@ -3050,6 +3050,7 @@
           "name": "create-port",
           "group": "vs-port",
           "optional": true,
+          "service": "vpc",
           "method": "POST",
           "path": "/v1/ports",
           "json": {
@@ -3077,6 +3078,7 @@
           "name": "map-sg-to-port",
           "group": "vs-port",
           "optional": true,
+          "service": "vpc",
           "method": "PUT",
           "path": "/v1/ports/{std_port_id}",
           "json": {
@@ -3154,6 +3156,7 @@
           "group": "vs-port",
           "optional": true,
           "destructive": true,
+          "service": "vpc",
           "method": "DELETE",
           "path": "/v1/ports/{std_port_id}",
           "expect_status": [
