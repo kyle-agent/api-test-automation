@@ -11,6 +11,7 @@
           "name": "list-quick-query",
           "method": "GET",
           "path": "/v1/quick-query",
+          "params": {"size": 20, "page": 0},
           "expect_status": [200],
           "capture_soft": {"quick_query_id": "$.contents[0].id"}
         },

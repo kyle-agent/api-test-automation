@@ -3480,10 +3480,12 @@
           "name": "delete-keypair",
           "method": "DELETE",
           "path": "/v1/keypairs/regrkey{unique}",
+          "_note": "404 tolerated: a destructive teardown delete is idempotent — the keypair may already be gone (e.g. cascade-removed with the server/cluster that referenced it). A 404 here is recorded as reached-not-verified by the dashboard, never as a 2xx-verified delete.",
           "expect_status": [
             200,
             202,
-            204
+            204,
+            404
           ],
           "destructive": true
         },
@@ -3857,11 +3859,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/backups",
           "json": {
-            "backup_option": {
-              "archive_frequency_minute": "30",
-              "retention_period_day": "8",
-              "starting_time_hour": "3"
-            }
+            "archive_frequency_minute": "30",
+            "retention_period_day": "8",
+            "starting_time_hour": "3"
           },
           "expect_status": [
             200,
