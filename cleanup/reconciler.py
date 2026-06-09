@@ -132,6 +132,12 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = ()):
             picked.append(it)
     if listed:
         print(f"  {path}: {len(listed)} listed / {len(picked)} deletable")
+        if len(picked) < len(listed):
+            ids = {id(p) for p in picked}
+            names = [_name_of(s) or "<unnamed>"
+                     for s in listed if id(s) not in ids][:5]
+            print(f"    skipped (live-ttl or name mismatch): {', '.join(names)}"
+                  + (" …" if len(listed) - len(picked) > 5 else ""))
     return picked
 
 
@@ -242,11 +248,21 @@ def run_sweep(client) -> int:
             deleted += 1
             _wait_gone(c, "virtualserver",
                        f"/v1/snapshots/{it['id']}", 300, 15)
+    # Broad "regr" prefix on purpose: a VM create's INLINE boot volume is
+    # auto-created by the platform — it carries NO registry tag (we only tag
+    # what we create directly) and is named after the server (regrsrv*), not
+    # regrvol*. delete_on_termination should reap it, but failed runs leave
+    # tag-less regr* volumes behind (user-reported: 6 orphans).
     for it in _select(c, "virtualserver", "/v1/volumes",
-                      name_prefixes=("regrvol",)):
-        if it.get("id") and _delete(
-                c, "virtualserver", f"/v1/volumes/{it['id']}"):
+                      name_prefixes=("regr", "zznet")):
+        vid = it.get("id")
+        if not vid:
+            continue
+        st = _delete(c, "virtualserver", f"/v1/volumes/{vid}")
+        if st and (200 <= st < 300 or st == 404):
             deleted += 1
+        else:
+            print(f"  volume {_name_of(it)} ({vid}) delete -> {st}")
 
     # 2d. dbaas clusters (regr* per engine service) — MUST go before
     # subnets/vpcs. Issue all deletes, then wait each is gone.
