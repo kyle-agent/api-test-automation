@@ -1,0 +1,19 @@
+# Layer 1 — per-service knowledge: management/organization
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+
+version: 1
+service: management/organization
+
+constraints:
+  - id: highest-blast-radius
+    rule: "organizations / organization-accounts / service-control-policies / delegation-policies / policy-bindings / invitations can sever or DENY the entire account hierarchy and are largely irreversible. ALL org lifecycles are COVERAGE-ONLY: heavy + every write optional + expecting 403/400, never chaining create->attach/accept. NEVER weaken to real create/delete on a shared account"
+    provenance: VALIDATED
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: no-validated-bodies
+    note: "no api_bodies.json entries exist for this service; all request bodies are guessed (docs-derived)"
+    provenance: docs

@@ -1,0 +1,35 @@
+# Layer 1 — per-service knowledge: container/ske
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+
+version: 1
+service: container/ske
+
+constraints:
+  - id: cluster-needs-servicewatch-flag
+    rule: "v1.4 schema: service_watch_logging_enabled is REQUIRED on cluster create (sent as the string \"true\")"
+    provenance: VALIDATED
+  - id: nodepool-provisioned-iops
+    rule: "nodepool with volume_type_name: SSD_Provisioned requires volume_max_iops and volume_max_throughput"
+    provenance: VALIDATED
+  - id: cluster-name-rule
+    rule: "cluster name: starts with a letter; letters/digits/hyphen; 3-30 chars; no duplicate names (userguide)"
+    provenance: docs
+  - id: nodepool-node-limits
+    rule: "max 100 nodes per node pool AND max 100 total nodes across all node pools; all nodes in a pool share the same server type/size/OS image (userguide)"
+    provenance: docs
+
+captures:
+  ske-cluster: $.resource_id     # NOT $.cluster.id
+  ske-nodepool: $.nodepool.id
+
+states:
+  ske-cluster: {field: $.cluster.status, ready: [RUNNING, ACTIVE, Running]}
+  ske-nodepool: {field: $.nodepool.status, ready: [Running, RUNNING, ACTIVE, active]}
+
+quirks:
+  - id: cluster-volume-is-filestorage
+    note: "cluster volume_id is a STRING id of a storage/filestorage volume (cross-service dependency — see cross-service.yaml)"
+    provenance: VALIDATED
+  - id: k8s-version-lookup
+    note: "kubernetes version from /v1/kubernetes-versions -> $.kubernetes_versions[0].kubernetes_version"
+    provenance: VALIDATED

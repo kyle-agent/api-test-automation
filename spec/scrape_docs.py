@@ -20,8 +20,6 @@ Output: data/api_docs.json
 
 Then build_openapi.py assembles this into an OpenAPI 3.0 document.
 
-Ported from tools/scrape_docs.py (conformance session); logic is unchanged.
-Data output relocated framework/ -> data/ to match the new layout.
 """
 from __future__ import annotations
 

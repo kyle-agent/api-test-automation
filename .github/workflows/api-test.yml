@@ -14,18 +14,20 @@ name: SCP API Test (orchestrator)
 # created resource and the reconciler deletes ONLY this run's tag (no cross-run
 # nuking).
 on:
-  pull_request:
-    # PR runs a small, read-only subset. Override scope with the
-    # SCP_PR_CATEGORY / SCP_PR_SERVICE repo variables.
-    paths-ignore:
-      - "**/*.md"
-  # NOTE: scheduled (cron) triggers removed on request — runs are now manual
-  # (workflow_dispatch) or push to the run-* branches only. No daily automation.
+  # NOTE: scheduled (cron) triggers removed on request — no daily automation.
+  # LIVE runs are expensive (~15-60 min), so they are ON-DEMAND only:
+  #   * touch .github/run-request and push  -> runs on that branch
+  #     (this is how a chat session triggers a run: edit the file, push)
+  #   * workflow_dispatch                   -> runs with explicit inputs
+  # Ordinary pushes/PRs do NOT trigger this workflow — the cheap offline
+  # validation lives in validate.yml and runs on every PR instead.
+  # To run conformance: push a run-request touch to claude/run-conformance
+  # (or claude/run-schema-live for the BILLABLE schema-live probe), or
+  # dispatch with run_conformance=true.
   push:
-    # claude/run-conformance: full conformance refresh (read-only probes).
-    # claude/run-schema-live: also enables the data-based, BILLABLE schema-live
-    # probe (creates+deletes REAL resources) — gated, never on the default path.
-    branches: ["claude/run-conformance", "claude/run-schema-live"]
+    # The file does not need to pre-exist: creating or editing it in a push is
+    # the trigger. Keep it OUT of unrelated commits so merges stay silent.
+    paths: [".github/run-request"]
   workflow_dispatch:
     inputs:
       category:
@@ -88,6 +90,10 @@ on:
         description: "Enable the data-based, BILLABLE schema-live probe (creates+deletes REAL resources). Opt-in gate."
         type: boolean
         default: false
+      run_conformance:
+        description: "Run AXIS 2 conformance. Default OFF — conformance only runs when the spec changed, on run-conformance branch pushes, or with this flag."
+        type: boolean
+        default: false
       update_baseline:
         description: "Re-baseline conformance (treat current defects as the new baseline)"
         type: boolean
@@ -131,6 +137,9 @@ jobs:
       contents: read
     outputs:
       ran: "true"
+      # 'true' only when a catalog refresh actually changed the spec — used to
+      # gate the conformance job (no point re-judging an unchanged spec).
+      spec_changed: ${{ steps.specdiff.outputs.spec_changed || 'false' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -139,6 +148,13 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Validate scenario data (merged fragments, ids, paths)
+        # Offline guard: catches duplicate lifecycle ids / unresolvable paths /
+        # broken captures across scenarios.json + lifecycles/*.json fragments
+        # BEFORE anything touches the live API.
+        run: |
+          python -m regression.scenarios.validate
+          python knowledge/formal/validate.py
       - name: Verify configuration
         run: |
           if [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
@@ -150,6 +166,7 @@ jobs:
             exit 1
           fi
       - name: Diff catalog vs published (incremental signal)
+        id: specdiff
         if: ${{ github.event.inputs.refresh_catalog == 'true' }}
         continue-on-error: true
         run: |
@@ -160,6 +177,9 @@ jobs:
           python -m spec.extract_bodies || true
           if [ -f /tmp/catalog_old.json ]; then
             python -m spec.diff /tmp/catalog_old.json data/api_catalog.json | tee -a "$GITHUB_STEP_SUMMARY" || true
+            if ! cmp -s /tmp/catalog_old.json data/api_catalog.json; then
+              echo "spec_changed=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
       - name: Catalog summary
         run: python -m spec.summary >> "$GITHUB_STEP_SUMMARY" || true
@@ -549,7 +569,19 @@ jobs:
   conformance:
     name: AXIS2 conformance (static + runtime + baseline)
     needs: spec
-    if: ${{ !cancelled() }}
+    # The spec doesn't change between builds, so re-judging it every run is
+    # wasted CI. Conformance runs ONLY when: the catalog refresh detected a
+    # spec change · a run-conformance/run-schema-live branch push (those
+    # branches exist for this) · dispatch run_conformance=true · repo var
+    # SCP_RUN_CONFORMANCE=true (for future schedules). When skipped, the
+    # dashboard falls back to the last committed data/conformance.json and the
+    # conformance files on dashboard-data stay untouched — the two jobs write
+    # disjoint files there, so nothing is clobbered.
+    if: ${{ !cancelled() && (
+          (github.event_name == 'push' && (github.ref_name == 'claude/run-conformance' || github.ref_name == 'claude/run-schema-live')) ||
+          github.event.inputs.run_conformance == 'true' ||
+          vars.SCP_RUN_CONFORMANCE == 'true' ||
+          needs.spec.outputs.spec_changed == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

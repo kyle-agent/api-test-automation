@@ -12,7 +12,6 @@ the rendered docs expose no OpenAPI schema and the gateway returns unnamed
 Output: data/api_bodies.json  ->  { "<catalog key>": {<example body>}, ... }
 Resumable: keys already present are skipped. Filter with --key-substr / --method.
 
-Ported from tools/fetch_request_bodies.py; logic is unchanged.
 
 Usage:
   python -m spec.extract_bodies --key-substr security/kms

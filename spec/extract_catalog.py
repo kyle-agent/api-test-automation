@@ -16,7 +16,6 @@ resumable: already-collected entries are skipped on a re-run.
 
 Output: data/api_catalog.json  (same path as the original build_catalog.py)
 
-Ported from tools/build_catalog.py; logic is unchanged.
 """
 from __future__ import annotations
 

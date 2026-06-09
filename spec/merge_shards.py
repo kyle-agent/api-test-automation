@@ -2,8 +2,6 @@
 """Merge per-category shard files (data/shards/*.json) — plus any pre-shard
 data/api_docs.json — into a single data/api_docs.json.
 
-Ported from tools/merge_shards.py (conformance session); logic is unchanged.
-Data input/output relocated framework/ -> data/ to match the new layout.
 """
 from __future__ import annotations
 

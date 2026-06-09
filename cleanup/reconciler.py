@@ -474,16 +474,39 @@ def run_sweep(client) -> int:
         if it.get("id") and _delete(c, "iam", f"/v1/policies/{it['id']}"):
             deleted += 1
 
-    # servicewatch log groups (regrlg) — bulk delete by ids.
-    lg_ids = [
-        it["id"]
-        for it in _select(c, "servicewatch", "/v1/log-groups",
-                          name_prefixes=("regrlg",))
-        if it.get("id")
-    ]
-    if lg_ids and _delete(c, "servicewatch", "/v1/log-groups",
-                          json={"ids": lg_ids}):
-        deleted += len(lg_ids)
+    # servicewatch log groups (regrlg). Two gotchas found in the field:
+    #   * a group delete is REJECTED while the group still has log streams —
+    #     and the custom-ingest lifecycle creates an implicit regrlg* group +
+    #     stream with NO teardown of its own, so orphans always have streams;
+    #   * _delete returns the raw HTTP status, and `if _delete(...)` is truthy
+    #     even on 400/409 — the old bulk delete counted rejected deletes as
+    #     deleted. Delete streams first, then groups one-by-one, and only
+    #     count 2xx (404 = already gone).
+    for it in _select(c, "servicewatch", "/v1/log-groups",
+                      name_prefixes=("regrlg",)):
+        gid = it.get("id")
+        if not gid:
+            continue
+        try:
+            streams = _items(c.get(
+                f"/v1/log-groups/{gid}/log-streams",
+                service="servicewatch").body)
+        except Exception:
+            streams = []
+        s_ids = [s["id"] for s in streams
+                 if isinstance(s, dict) and s.get("id")]
+        if s_ids:
+            st = _delete(c, "servicewatch",
+                         f"/v1/log-groups/{gid}/log-streams",
+                         json={"ids": s_ids})
+            if not (st and (200 <= st < 300 or st == 404)):
+                print(f"  log-streams of {gid} delete -> {st}")
+        st = _delete(c, "servicewatch", "/v1/log-groups",
+                     json={"ids": [gid]})
+        if st and (200 <= st < 300 or st == 404):
+            deleted += 1
+        else:
+            print(f"  log-group {gid} delete -> {st}")
 
     print(f"sweep done: {deleted} resource(s) deleted")
     return deleted

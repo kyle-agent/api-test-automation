@@ -7,7 +7,9 @@ Automated testing for the Samsung Cloud Platform (SCP) Open APIs documented at
 The suite is **catalog-driven** (the API Reference is parsed once into a
 machine-readable inventory; tests are generated from it) and organised around
 **two axes** on a shared kernel. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the
-full blueprint.
+full blueprint, [`ROADMAP.md`](ROADMAP.md) for the phase plan (coverage 100% →
+scheduled regression → dedicated-server runs), and [`agents/`](agents/README.md)
+for the multi-agent team that does the engineering.
 
 ```
                          core/  (shared kernel)
@@ -38,8 +40,11 @@ conformance/  static · runtime · baseline · rules/  (pluggable Rule lens)
 cleanup/      reconciler   (tag-ownership sweep; legacy name-prefix fallback)
 dashboard/    build        (reads the unified results store; legacy fallback)
 tests/        thin pytest entrypoints that drive the regression engines
+agents/       the multi-agent system: roster · shared context · harness · per-agent prompts
+knowledge/    SCP domain knowledge (human-readable, AI-maintained) + formal/ (editable YAML)
 data/         api_catalog.json · api_bodies.json · api_docs.json · conformance.json
               baselines/known_issues.json
+docs/         session handoff notes (see docs/INDEX.md)
 reports/      per-run output (gitignored): results/*.jsonl, registry/*.jsonl, dashboard/
 .github/workflows/api-test.yml   one orchestrator (spec → regression → sweep + conformance → dashboard)
 ```
@@ -137,6 +142,11 @@ dispatch `crud_filter` input. In CI, set repo variable **`SCP_RUN_CRUD=true`** t
 opt a run into CRUD; the result + any teardown is posted as a PR comment.
 `dependencies.json` maps the seven VPC-creating scenarios to their quota kinds.
 
+> **Self-trigger for heavy runs:** a committed `.github/heavy.txt` (first
+> non-comment line = a `crud_filter` expression) lets a push drive which heavy
+> lifecycle runs next — used to chain heavy validations one per run. Empty file
+> = no heavy self-trigger.
+
 ## Endpoints (per-service hosts)
 
 SCP Open API endpoints are **per service**, not one gateway, in two flavours:
@@ -182,8 +192,18 @@ to `data/baselines/known_issues.json` so only genuinely new breakage alarms.
 `.github/workflows/api-test.yml` is a single orchestrator:
 **spec** (refresh catalog) → **regression** (smoke + read-chains, opt-in CRUD) →
 **sweep** (`cleanup.reconciler`) and **conformance** (static + runtime + baseline)
-→ **dashboard** (build + publish). Read-only smoke runs on a daily schedule; CRUD
-and destructive steps run only via dispatch with the safety gates checked.
+→ **dashboard** (build + publish).
+
+**Triggers are on-demand only** (live runs are expensive — no cron, no per-push
+runs): touch **`.github/run-request`** and push (runs on that branch; this is
+how a chat session starts a run), or use **workflow_dispatch** for explicit
+inputs (mutations/heavy/filters). Ordinary pushes/PRs run only the cheap
+offline gate `validate.yml` (scenario + knowledge validation, no credentials).
+**Conformance** is further gated: it runs only when the spec actually changed
+(catalog refresh diff), on `claude/run-conformance`/`run-schema-live` pushes,
+with dispatch `run_conformance=true`, or repo var `SCP_RUN_CONFORMANCE=true` —
+when skipped, the dashboard reuses the last committed conformance data (the two
+jobs write disjoint files on `dashboard-data`, nothing is clobbered).
 
 Configure once in **Settings → Secrets and variables → Actions**:
 

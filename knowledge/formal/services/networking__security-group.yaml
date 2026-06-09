@@ -1,0 +1,30 @@
+# Layer 1 — per-service knowledge: networking/security-group
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+
+version: 1
+service: networking/security-group
+
+constraints:
+  - id: sg-limit-100-per-account
+    rule: "max 100 security groups per account (userguide)"
+    provenance: docs
+  - id: rules-limit
+    rule: "max 100 rules per security group; max 1,000 total SG rules per account (userguide)"
+    provenance: docs
+  - id: no-prerequisites
+    rule: "no prerequisite services (선행 서비스 없음) — account/region-scoped, NO vpc needed (userguide confirms what the VM/ske lifecycles validated)"
+    provenance: VALIDATED
+
+captures:
+  security-group: $.security_group.id
+  security-group-rule: $.security_group_rule.id
+
+states: {}
+
+quirks:
+  - id: default-any-deny
+    note: "a new SG starts Any/Deny — ALL inbound and outbound traffic blocked (even within the same subnet) until explicit rules are added; relevant when a combo scenario expects connectivity (e.g. LB health checks)"
+    provenance: docs
+  - id: rule-create-fields
+    note: "rule create uses direction, ethertype: IPv4, protocol, port_range_min/max, remote_ip_prefix"
+    provenance: VALIDATED

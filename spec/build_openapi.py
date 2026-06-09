@@ -13,8 +13,6 @@ original string is preserved in `x-raw` so nothing is lost.
 
 Usage: python -m spec.build_openapi
 
-Ported from tools/build_openapi.py (conformance session); logic is unchanged.
-Data input/output relocated framework/ -> data/ to match the new layout.
 """
 from __future__ import annotations
 
