@@ -6,7 +6,7 @@ service: networking/vpc
 
 constraints:
   - id: vpc-quota-3
-    rule: "account hard cap: max 3 live VPCs (incl. lingering async-deletes; the shared VPC counts as 1). Exceed -> scp-network.vpc.exceed-max-count"
+    rule: "account hard cap: max 3 live VPCs (incl. lingering async-deletes; the shared VPC counts as 1). Exceed -> scp-network.vpc.exceed-max-count. NOTE: the userguide says the default is 5/account — our account enforces 3; the discrepancy is itself a docs finding"
     provenance: VALIDATED
   - id: vpc-cidr-no-overlap
     rule: "any two VPCs alive at the same time must have non-overlapping CIDR blocks (each VPC-creating lifecycle owns a unique /20 — allocation table in knowledge/domain-constraints.md)"
@@ -14,6 +14,21 @@ constraints:
   - id: subnet-cidr-within-vpc
     rule: "a subnet's CIDR must be a sub-range of its parent VPC's CIDR (e.g. shared subnet 10.124.0.0/24 inside shared VPC 10.124.0.0/20)"
     provenance: VALIDATED
+  - id: vpc-ip-range-limit-6
+    rule: "max 6 IP ranges (CIDR blocks) per VPC: 1 default + 5 additional (userguide) — bounds the vpc-cidr-secondary scenario"
+    provenance: docs
+  - id: subnet-limit-3-per-vpc
+    rule: "default max 3 subnets per VPC (userguide) — load-bearing for the shared-VPC design: parallel adopters must ADOPT the shared subnet, not each create their own"
+    provenance: docs
+  - id: vpc-peering-limit-5
+    rule: "max 5 VPC peerings per account (userguide)"
+    provenance: docs
+  - id: private-nat-limit-3-per-vpc
+    rule: "default max 3 Private NATs per VPC (userguide)"
+    provenance: docs
+  - id: transit-gateway-limits
+    rule: "max 3 Transit Gateways per account; max 5 VPC connections per TGW, same-account VPCs only (userguide) — bounds vpc-transit-gateway-children"
+    provenance: docs
 
 captures:
   vpc: $.vpc.id

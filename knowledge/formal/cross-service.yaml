@@ -11,6 +11,12 @@ version: 1
 
 # Constraints that only make sense ACROSS services (one service's resource
 # affecting another service's API behaviour).
+#
+# Docs source: every userguide service page has a 선행 서비스 (prerequisite
+# services) section — https://docs.e.samsungsdscloud.com/userguide/<cat>/<svc>/overview/
+# Confirmed so far: virtual_server -> VPC + Security Group; k8s_engine -> VPC +
+# Security Group + File Storage; container_registry/security_group -> none.
+# These MATCH the validated graph below (graph stays VALIDATED, the stronger tag).
 cross_constraints:
   - id: ske-volume-is-filestorage
     services: [container/ske, storage/filestorage]

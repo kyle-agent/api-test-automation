@@ -4,7 +4,16 @@
 version: 1
 service: storage/filestorage
 
-constraints: []
+constraints:
+  - id: volume-name-rule
+    rule: "volume name: starts with a lowercase letter; lowercase/digits/underscore; 3-21 chars (userguide) — scenario bodies must respect this"
+    provenance: docs
+  - id: snapshot-limits
+    rule: "max 800 snapshots per volume; max 128 schedule-generated snapshots; snapshot timestamps are Asia/Seoul (GMT+9) (userguide)"
+    provenance: docs
+  - id: protocol-by-os
+    rule: "protocols: NFS for Linux, CIFS for Windows; disk types HDD/SSD/High-performance SSD; all volumes encrypted XTS-AES-256 (userguide)"
+    provenance: docs
 
 captures:
   filestorage-volume: $.volume_id   # FLAT — and DIFFERENT from virtualserver block volume ($.id)!

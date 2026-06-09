@@ -16,6 +16,19 @@
   and `dependencies.json:vpc_schedule.vpc_limit=3`.
 - A run must never hold more than 3 live VPCs at once, *including* lingering
   async-deletes. The shared VPC counts as 1 while alive.
+- **Docs discrepancy:** the
+  [userguide](https://docs.e.samsungsdscloud.com/userguide/networking/vpc/overview/#constraints)
+  says the *default* is **5 VPCs/account** — our account enforces 3 at runtime.
+  Trust the VALIDATED 3; the discrepancy itself is a docs/conformance finding.
+
+### Further userguide limits (from docs, not yet runtime-confirmed)
+
+Per the VPC/SG userguide constraint tables (mirrored in
+`knowledge/formal/services/`): **6 IP ranges per VPC** (1 default + 5 extra),
+**3 subnets per VPC** (default — this is why parallel adopters must ADOPT the
+shared subnet, not create their own), **5 VPC peerings/account**, **3 Private
+NAT/VPC**, **3 Transit Gateways/account** (5 VPC connections each, same account
+only), **100 security groups/account**, **100 rules/SG, 1,000 rules/account**.
 
 ## CIDR rules (confirmed)
 

@@ -17,3 +17,6 @@ quirks:
   - id: registry-delete-500-race
     note: "registry DELETE returns 500 for a few minutes right after creation (provisioning race), then succeeds — retry the delete on 500 for ~6 min; repository delete retries 409/500"
     provenance: VALIDATED
+  - id: no-prerequisite-services
+    note: "userguide: Container Registry has no prerequisite services (선행 서비스 없음); images are stored in Object Storage internally"
+    provenance: docs

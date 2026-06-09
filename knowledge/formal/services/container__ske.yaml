@@ -11,6 +11,12 @@ constraints:
   - id: nodepool-provisioned-iops
     rule: "nodepool with volume_type_name: SSD_Provisioned requires volume_max_iops and volume_max_throughput"
     provenance: VALIDATED
+  - id: cluster-name-rule
+    rule: "cluster name: starts with a letter; letters/digits/hyphen; 3-30 chars; no duplicate names (userguide)"
+    provenance: docs
+  - id: nodepool-node-limits
+    rule: "max 100 nodes per node pool AND max 100 total nodes across all node pools; all nodes in a pool share the same server type/size/OS image (userguide)"
+    provenance: docs
 
 captures:
   ske-cluster: $.resource_id     # NOT $.cluster.id
