@@ -354,12 +354,25 @@ jobs:
           set -o pipefail
           python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log
 
+      - name: Teardown shared VPC + subnet (before VPC-CRUD pass)
+        # VPC HARD cap = 3. Free the shared VPC's slot BEFORE the serial VPC-CRUD
+        # pass so those lifecycles get the full 3-VPC budget (e.g. vpc-peering
+        # needs 2 VPCs at once; transit-gateway needs >1). The VPC-CRUD lifecycles
+        # do NOT use the shared VPC, so tearing it down here is safe. Idempotent
+        # (the final always() teardown below is a no-op backstop). No-op without
+        # SCP_ALLOW_DESTRUCTIVE.
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        run: |
+          python -m regression.scenarios.shared_infra --teardown || true
+
       - name: Run VPC-CRUD class (serial)
         # VPC_CRUD_K lifecycles MUST self-create their own VPC/subnet (their
-        # purpose is vpc/subnet/peering creation, they mutate the shared VPC, or
-        # they need >1 VPC), so they run SERIALLY (-n 0). With the 1 shared VPC
-        # still live, at most 1 self-created VPC exists at a time => <= per-run
-        # vpc cap (3). Runs even if the parallel pass had failures (separate -k).
+        # purpose is vpc/subnet/peering creation, they mutate a VPC, or they need
+        # >1 VPC), so they run SERIALLY (-n 0). The shared VPC was torn down in the
+        # previous step, so these get the full 3-VPC cap. Each VPC-creating
+        # lifecycle uses a UNIQUE, non-overlapping CIDR and subnets carved within
+        # it (knowledge/domain-constraints.md). Runs even if the parallel pass had
+        # failures (separate -k).
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter }}
