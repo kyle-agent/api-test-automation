@@ -3047,6 +3047,133 @@
           ]
         },
         {
+          "name": "create-port",
+          "group": "vs-port",
+          "optional": true,
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/ports",
+          "json": {
+            "name": "regrport{unique}",
+            "description": "API regression standalone port",
+            "subnet_id": "{subnet_id}",
+            "security_groups": [],
+            "fixed_ip_address": "",
+            "tags": []
+          },
+          "capture_soft": {
+            "std_port_id": "$.port.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            404,
+            409,
+            422
+          ]
+        },
+        {
+          "name": "map-sg-to-port",
+          "group": "vs-port",
+          "optional": true,
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/ports/{std_port_id}",
+          "json": {
+            "description": "API regression standalone port (sg mapped)",
+            "security_groups": [
+              "{sg_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            404,
+            409,
+            422
+          ]
+        },
+        {
+          "name": "attach-port-to-server",
+          "group": "vs-port",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/interfaces",
+          "json": {
+            "port_id": "{std_port_id}",
+            "subnet_id": "{subnet_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            404,
+            409,
+            422
+          ]
+        },
+        {
+          "name": "read-attached-port",
+          "group": "vs-port",
+          "optional": true,
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ]
+        },
+        {
+          "name": "detach-port-from-server",
+          "group": "vs-port",
+          "optional": true,
+          "destructive": true,
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{std_port_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-port",
+          "group": "vs-port",
+          "optional": true,
+          "destructive": true,
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/ports/{std_port_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
           "name": "create-volume",
           "method": "POST",
           "path": "/v1/volumes",
