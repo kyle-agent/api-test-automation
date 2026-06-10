@@ -121,31 +121,57 @@ def _list_all(client, service, path):
     return [it for it in _items(r.body) if isinstance(it, dict)]
 
 
-def _select(client, service, path, *, name_prefixes: tuple[str, ...] = ()):
+def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
+            match_token: bool = False, force_unnamed: bool = False):
     """List a collection and return only deletable items.
 
     Prefix fallback matches the item's display name via ``_name_of`` (some
     services use ``log_group_name``/``volume_name``/… instead of ``name``,
     which ``is_owned``'s bare ``name`` check would miss).
+
+    Two extra matchers for platform-AUTO-created derivatives of our resources
+    (field report 2026-06-10 — these leaked forever as "0 deletable"):
+      * ``match_token`` — a TAG-LESS item also matches when ANY token of its
+        name starts with a prefix ("snapshot for regrimggk…", "/scp/ske/regr…"):
+        the platform names derivatives AFTER our regr* resource, not WITH it.
+      * ``force_unnamed`` — in a FORCE sweep (SCP_SWEEP_IGNORE_TTL=true, the
+        explicit post-run cleanup) a TAG-LESS item with NO name at all is ours
+        too (dedicated test account; e.g. VM boot volumes / public IPs that
+        list without any name key).
     """
+    import os
+    import re
+    from core.registry import _tag_value, OWNER_KEY, OWNER
+    force = os.environ.get("SCP_SWEEP_IGNORE_TTL", "").lower() == "true"
     listed = _list_all(client, service, path)
-    picked = []
+    picked, skipped = [], []
     for it in listed:
+        name = _name_of(it)
+        has_tag = _tag_value(it, OWNER_KEY) == OWNER
         if _is_deletable(it, name_prefixes=name_prefixes):
             picked.append(it)
-        elif name_prefixes and _name_of(it).startswith(name_prefixes) \
-                and not it.get("name"):
+            continue
+        if name_prefixes and name.startswith(name_prefixes) and not it.get("name"):
             # name lives under an alternate key — apply the same legacy-orphan
             # rule is_owned would have applied to item["name"].
             picked.append(it)
+            continue
+        if (match_token and not has_tag and name_prefixes
+                and any(t.startswith(tuple(name_prefixes))
+                        for t in re.split(r"[\s/_,]+", name) if t)):
+            picked.append(it)
+            continue
+        if force_unnamed and force and not has_tag and not name:
+            picked.append(it)
+            continue
+        reason = ("live-ttl" if has_tag
+                  else "unnamed" if not name else "name-mismatch")
+        skipped.append(f"{name or '<unnamed>'}({reason})")
     if listed:
         print(f"  {path}: {len(listed)} listed / {len(picked)} deletable")
-        if len(picked) < len(listed):
-            ids = {id(p) for p in picked}
-            names = [_name_of(s) or "<unnamed>"
-                     for s in listed if id(s) not in ids][:5]
-            print(f"    skipped (live-ttl or name mismatch): {', '.join(names)}"
-                  + (" …" if len(listed) - len(picked) > 5 else ""))
+        if skipped:
+            print(f"    skipped: {', '.join(skipped[:5])}"
+                  + (" …" if len(skipped) > 5 else ""))
     return picked
 
 
@@ -250,7 +276,7 @@ def run_sweep(client) -> int:
     # 2c. volume snapshots (regrsnap) then their block volumes (regrvol) —
     # snapshot first so the volume delete isn't blocked.
     for it in _select(c, "virtualserver", "/v1/snapshots",
-                      name_prefixes=("regrsnap",)):
+                      name_prefixes=("regr",), match_token=True):
         if it.get("id") and _delete(
                 c, "virtualserver", f"/v1/snapshots/{it['id']}"):
             deleted += 1
@@ -262,7 +288,8 @@ def run_sweep(client) -> int:
     # regrvol*. delete_on_termination should reap it, but failed runs leave
     # tag-less regr* volumes behind (user-reported: 6 orphans).
     for it in _select(c, "virtualserver", "/v1/volumes",
-                      name_prefixes=("regr", "zznet")):
+                      name_prefixes=("regr", "zznet"),
+                      match_token=True, force_unnamed=True):
         vid = it.get("id")
         if not vid:
             continue
@@ -305,7 +332,7 @@ def run_sweep(client) -> int:
             _wait_gone(c, "vpc",
                        f"/v1/internet-gateways/{it['id']}", 300, 15)
     for it in _select(c, "vpc", "/v1/publicips",
-                      name_prefixes=("regr",)):
+                      name_prefixes=("regr",), force_unnamed=True):
         if it.get("id") and _delete(c, "vpc", f"/v1/publicips/{it['id']}"):
             deleted += 1
 
