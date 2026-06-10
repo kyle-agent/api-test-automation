@@ -159,7 +159,9 @@ jobs:
         # push (file-touch) events so dispatch inputs stay authoritative there.
         run: |
           f=.github/run-request
-          get() { grep -E "^$1=" "$f" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]'; }
+          # trim only LEADING/TRAILING whitespace — crud_filter values contain
+          # spaces ("a or b") that must survive.
+          get() { grep -E "^$1=" "$f" 2>/dev/null | tail -1 | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
           if [ "${{ github.event_name }}" = "push" ] && [ -f "$f" ]; then
             {
               echo "mutations=$(get mutations)"

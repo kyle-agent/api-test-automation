@@ -1,10 +1,11 @@
-# Touch this file (change anything) and push to trigger a LIVE api-test run.
-# KEY=VALUE options are parsed by the spec job and gate the run.
-#
-# request: FINAL cleanup after run #39 ended (00:39 UTC) — force sweep reaps
-#          tagged-but-unexpired orphans (vpc/tgw/log-groups/dashboards/volumes)
-#          with the fully hardened reconciler. No mutating run is live.
+# request: VALIDATION run for the new parallel design —
+#   slowest-first xdist ordering + DB-lane shared subnet (subnet#db).
+#   Target: ADOPT pass wall-clock ~= max(slowest DB ~40-50min).
+#   Scope: the 5 slow heavy lifecycles only; sweep_force cleans up after
+#   (account confirmed idle — no mutating run live).
+mutations=true
 destructive=true
+heavy=true
 sweep_force=true
-category=management
-service=servicewatch
+category=database
+crud_filter=database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas or container-ske-cluster-nodepool or compute-virtualserver-full
