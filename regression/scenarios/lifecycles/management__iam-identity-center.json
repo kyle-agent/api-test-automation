@@ -1,486 +1,697 @@
 {
-  "lifecycles": [
+ "lifecycles": [
+  {
+   "id": "idc-instance",
+   "service": "management/iam-identity-center",
+   "enabled": false,
+   "heavy": true,
+   "_note": "SSO (IAM Identity Center) INSTANCE lifecycle. BLAST RADIUS: an SSO instance is account-structural — creating/patching/deleting one on a shared account is sensitive and may be irreversible (it backs all SSO users/groups/permission-sets). Therefore heavy + every mutating step optional with broad expect_status so an expected 403/400/409/422 RECORDS coverage WITHOUT creating real SSO structure or failing the run. POST body from data/api_bodies.json (createinstance, ACTIVE_DIRECTORY identity_store_config). PATCH body from setinstance (method confirmed PATCH from catalog). instance_id captured from create if it ever succeeds; otherwise PATCH/DELETE fire against the captured id only when present (group isolation). The single-instance show GET is probed. Response envelope for the instance id is UNPROVEN — guessed $.instance.id with soft fallbacks; mark unverified. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
+   "steps": [
     {
-      "id": "idc-instance",
-      "service": "management/iam-identity-center",
-      "enabled": true,
-      "heavy": true,
-      "_note": "SSO (IAM Identity Center) INSTANCE lifecycle. BLAST RADIUS: an SSO instance is account-structural — creating/patching/deleting one on a shared account is sensitive and may be irreversible (it backs all SSO users/groups/permission-sets). Therefore heavy + every mutating step optional with broad expect_status so an expected 403/400/409/422 RECORDS coverage WITHOUT creating real SSO structure or failing the run. POST body from data/api_bodies.json (createinstance, ACTIVE_DIRECTORY identity_store_config). PATCH body from setinstance (method confirmed PATCH from catalog). instance_id captured from create if it ever succeeds; otherwise PATCH/DELETE fire against the captured id only when present (group isolation). The single-instance show GET is probed. Response envelope for the instance id is UNPROVEN — guessed $.instance.id with soft fallbacks; mark unverified.",
-      "steps": [
-        {
-          "name": "create-instance",
-          "method": "POST",
-          "path": "/v1/instances",
-          "group": "idc-instance",
-          "optional": true,
-          "json": {
-            "name": "regridc{ualpha}",
-            "description": "API regression suite SSO instance",
-            "identity_store_type": "ACTIVE_DIRECTORY",
-            "identity_store_config": {
-              "bind_credential": "password",
-              "bind_dn": "CN=Administrator,CN=Users,DC=test,DC=add",
-              "connection_url": "ldaps://test.subdomain.company.com:123",
-              "rdn_ldap_attribute": "cn",
-              "user_object_classes": "person, organizationalPerson, user",
-              "username_ldap_attribute": "sAMAccountName",
-              "users_dn": "OU=Employees,OU=Accounts,DC=sub,DC=org"
-            }
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {
-            "instance_id": "$.instance.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/instances/{instance_id}",
-            "service": "iam-identity-center"
-          },
-          "_note": "Capture is SOFT: if the create is denied (likely on a shared account) the lifecycle still records the POST and moves on without a real id."
-        },
-        {
-          "name": "list-instances",
-          "method": "GET",
-          "path": "/v1/instances",
-          "group": "idc-instance",
-          "optional": true,
-          "expect_status": [200, 403, 404]
-        },
-        {
-          "name": "patch-instance",
-          "method": "PATCH",
-          "path": "/v1/instances/{instance_id}",
-          "service": "iam-identity-center",
-          "group": "idc-instance",
-          "optional": true,
-          "json": {
-            "name": "regridc{ualpha}",
-            "description": "updated by API regression suite",
-            "identity_store_type": "IDENTITY_CENTER_DIRECTORY"
-          },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
-          "_note": "Fires only if create captured an instance_id (group isolated); records the PATCH /v1/instances/{instance_id} write either way once called."
-        },
-        {
-          "name": "probe-reads",
-          "probe_reads": {
-            "instance_id": "{instance_id}"
-          }
-        },
-        {
-          "name": "delete-instance",
-          "method": "DELETE",
-          "path": "/v1/instances/{instance_id}",
-          "service": "iam-identity-center",
-          "group": "idc-instance",
-          "optional": true,
-          "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
-        }
-      ]
+     "name": "create-instance",
+     "method": "POST",
+     "path": "/v1/instances",
+     "group": "idc-instance",
+     "optional": true,
+     "json": {
+      "name": "regridc{ualpha}",
+      "description": "API regression suite SSO instance",
+      "identity_store_type": "ACTIVE_DIRECTORY",
+      "identity_store_config": {
+       "bind_credential": "password",
+       "bind_dn": "CN=Administrator,CN=Users,DC=test,DC=add",
+       "connection_url": "ldaps://test.subdomain.company.com:123",
+       "rdn_ldap_attribute": "cn",
+       "user_object_classes": "person, organizationalPerson, user",
+       "username_ldap_attribute": "sAMAccountName",
+       "users_dn": "OU=Employees,OU=Accounts,DC=sub,DC=org"
+      }
+     },
+     "expect_status": [
+      200,
+      201,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "capture_soft": {
+      "instance_id": "$.instance.id"
+     },
+     "cleanup": {
+      "method": "DELETE",
+      "path": "/v1/instances/{instance_id}",
+      "service": "iam-identity-center"
+     },
+     "_note": "Capture is SOFT: if the create is denied (likely on a shared account) the lifecycle still records the POST and moves on without a real id."
     },
     {
-      "id": "idc-user",
-      "service": "management/iam-identity-center",
-      "enabled": true,
-      "heavy": true,
-      "_note": "SSO USER lifecycle: create -> patch -> delete (single) -> delete (bulk). BLAST RADIUS: SSO users are tied to an SSO instance/identity store; creating them on a shared account is sensitive. heavy + all mutating steps optional with broad expect_status so a denial RECORDS coverage without creating real principals. Bodies from createuser / setuser (api_bodies.json). instance_id is a docs placeholder (ssoins-12345) — UNPROVEN; on a real run with no valid instance the create returns 4xx (still recorded). user_uuid captured-soft from create ($.user.id guessed, UNPROVEN) else falls back to a placeholder uuid for the by-id PATCH/DELETE so those endpoints are still exercised. Bulk DELETE /v1/users body shape (user_uuids) inferred from createbulkgroupusers — UNPROVEN.",
-      "steps": [
-        {
-          "name": "create-user",
-          "method": "POST",
-          "path": "/v1/users",
-          "group": "idc-user",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "user_id": "regridc{ualpha}",
-            "name": "API Regression User",
-            "email": "regr-test@example.com",
-            "description": "API regression suite SSO user",
-            "department": "QA",
-            "business_unit": "Automation",
-            "manager": "Regression Bot",
-            "employee_id": "regr-{unique}",
-            "nation_id": "+82",
-            "phone_number": "010-1234-5678",
-            "temporary_password": true,
-            "password": "",
-            "group_ids": []
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {
-            "user_uuid": "$.user.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/users/{user_uuid}",
-            "service": "iam-identity-center"
-          }
-        },
-        {
-          "name": "list-users",
-          "method": "GET",
-          "path": "/v1/users",
-          "group": "idc-user",
-          "optional": true,
-          "expect_status": [200, 403, 404]
-        },
-        {
-          "name": "patch-user",
-          "method": "PATCH",
-          "path": "/v1/users/{user_uuid}",
-          "service": "iam-identity-center",
-          "group": "idc-user",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "name": "API Regression User",
-            "email": "regr-test@example.com",
-            "description": "updated by API regression suite",
-            "department": "QA",
-            "business_unit": "Automation",
-            "manager": "Regression Bot",
-            "nation_id": "+82",
-            "phone_number": "010-1234-5678",
-            "tz_id": "Asia/Seoul"
-          },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
-        },
-        {
-          "name": "probe-reads",
-          "probe_reads": {
-            "user_uuid": "{user_uuid}"
-          }
-        },
-        {
-          "name": "delete-user",
-          "method": "DELETE",
-          "path": "/v1/users/{user_uuid}",
-          "service": "iam-identity-center",
-          "group": "idc-user",
-          "optional": true,
-          "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
-        },
-        {
-          "name": "delete-users-bulk",
-          "method": "DELETE",
-          "path": "/v1/users",
-          "service": "iam-identity-center",
-          "group": "idc-user-bulk",
-          "optional": true,
-          "destructive": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "user_uuids": ["{user_uuid}"]
-          },
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "Bulk delete body (instance_id + user_uuids[]) inferred from createbulkgroupusers shape — UNPROVEN. Separate group so it runs even if the single-user group was isolated by an env 4xx."
-        }
-      ]
+     "name": "list-instances",
+     "method": "GET",
+     "path": "/v1/instances",
+     "group": "idc-instance",
+     "optional": true,
+     "expect_status": [
+      200,
+      403,
+      404
+     ]
     },
     {
-      "id": "idc-group",
-      "service": "management/iam-identity-center",
-      "enabled": true,
-      "heavy": true,
-      "_note": "SSO GROUP + GROUP-USERS lifecycle: create group -> patch group -> add users (bulk) -> remove users (bulk) -> delete group -> delete groups (bulk). BLAST RADIUS: SSO groups belong to an SSO instance; sensitive on a shared account. heavy + all mutating optional/broad so denials RECORD coverage without real structure. Bodies from creategroup / setgroup / createbulkgroupusers (api_bodies.json). instance_id placeholder ssoins-12345 (UNPROVEN). group_id captured-soft ($.group.id guessed, UNPROVEN); PATCH/POST-users/DELETE-users/DELETE fire against it when present. Bulk DELETE /v1/groups body (instance_id + group_ids[]) and DELETE /v1/groups/{id}/users body inferred — UNPROVEN.",
-      "steps": [
-        {
-          "name": "create-group",
-          "method": "POST",
-          "path": "/v1/groups",
-          "group": "idc-group",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "name": "regrgrp{ualpha}",
-            "description": "API regression suite SSO group",
-            "user_uuids": []
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {
-            "group_id": "$.group.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/groups/{group_id}",
-            "service": "iam-identity-center"
-          }
-        },
-        {
-          "name": "list-groups",
-          "method": "GET",
-          "path": "/v1/groups",
-          "group": "idc-group",
-          "optional": true,
-          "expect_status": [200, 403, 404]
-        },
-        {
-          "name": "patch-group",
-          "method": "PATCH",
-          "path": "/v1/groups/{group_id}",
-          "service": "iam-identity-center",
-          "group": "idc-group",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "name": "regrgrp{ualpha}",
-            "description": "updated by API regression suite"
-          },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
-        },
-        {
-          "name": "add-group-users",
-          "method": "POST",
-          "path": "/v1/groups/{group_id}/users",
-          "service": "iam-identity-center",
-          "group": "idc-group",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "user_uuids": []
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "_note": "createbulkgroupusers body (instance_id + user_uuids[]); empty user_uuids so no real principals are required."
-        },
-        {
-          "name": "remove-group-users",
-          "method": "DELETE",
-          "path": "/v1/groups/{group_id}/users",
-          "service": "iam-identity-center",
-          "group": "idc-group",
-          "optional": true,
-          "destructive": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "user_uuids": []
-          },
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "Bulk remove-users-from-group body inferred from createbulkgroupusers — UNPROVEN."
-        },
-        {
-          "name": "probe-reads",
-          "probe_reads": {
-            "group_id": "{group_id}"
-          }
-        },
-        {
-          "name": "delete-group",
-          "method": "DELETE",
-          "path": "/v1/groups/{group_id}",
-          "service": "iam-identity-center",
-          "group": "idc-group",
-          "optional": true,
-          "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
-        },
-        {
-          "name": "delete-groups-bulk",
-          "method": "DELETE",
-          "path": "/v1/groups",
-          "service": "iam-identity-center",
-          "group": "idc-group-bulk",
-          "optional": true,
-          "destructive": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "group_ids": ["{group_id}"]
-          },
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "Bulk delete body (instance_id + group_ids[]) inferred — UNPROVEN. Separate group so it always fires for coverage."
-        }
-      ]
+     "name": "patch-instance",
+     "method": "PATCH",
+     "path": "/v1/instances/{instance_id}",
+     "service": "iam-identity-center",
+     "group": "idc-instance",
+     "optional": true,
+     "json": {
+      "name": "regridc{ualpha}",
+      "description": "updated by API regression suite",
+      "identity_store_type": "IDENTITY_CENTER_DIRECTORY"
+     },
+     "expect_status": [
+      200,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "_note": "Fires only if create captured an instance_id (group isolated); records the PATCH /v1/instances/{instance_id} write either way once called."
     },
     {
-      "id": "idc-permission-set",
-      "service": "management/iam-identity-center",
-      "enabled": true,
-      "heavy": true,
-      "_note": "SSO PERMISSION-SET + its POLICIES lifecycle: create -> patch -> set policies (PUT) -> delete policies -> delete permission-set. BLAST RADIUS: permission-sets define SSO access on accounts — sensitive/structural on a shared account. heavy + all mutating optional/broad so denials RECORD coverage without granting real access. Bodies from createpermissionset / setpermissionset / setpermissionsetpolicies (api_bodies.json). instance_id placeholder ssoins-12345 (UNPROVEN). permission_set_id captured-soft ($.permission_set.id guessed, UNPROVEN). DELETE /v1/permission-sets/{id}/policies body reuses setpermissionsetpolicies shape with empty arrays — UNPROVEN.",
-      "steps": [
-        {
-          "name": "create-permission-set",
-          "method": "POST",
-          "path": "/v1/permission-sets",
-          "group": "idc-permission-set",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "name": "regrps{ualpha}",
-            "description": "API regression suite permission set",
-            "session_duration": 3600,
-            "custom_policies": [],
-            "inline_policies": [],
-            "managed_policies": []
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {
-            "permission_set_id": "$.permission_set.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/permission-sets/{permission_set_id}",
-            "service": "iam-identity-center"
-          }
-        },
-        {
-          "name": "list-permission-sets",
-          "method": "GET",
-          "path": "/v1/permission-sets",
-          "group": "idc-permission-set",
-          "optional": true,
-          "expect_status": [200, 403, 404]
-        },
-        {
-          "name": "patch-permission-set",
-          "method": "PATCH",
-          "path": "/v1/permission-sets/{permission_set_id}",
-          "service": "iam-identity-center",
-          "group": "idc-permission-set",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "description": "updated by API regression suite",
-            "session_duration": 3600
-          },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422]
-        },
-        {
-          "name": "set-permission-set-policies",
-          "method": "PUT",
-          "path": "/v1/permission-sets/{permission_set_id}/policies",
-          "service": "iam-identity-center",
-          "group": "idc-permission-set",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "custom_policies": [],
-            "inline_policies": [],
-            "managed_policies": []
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "_note": "setpermissionsetpolicies body with empty policy arrays so no real policy is attached."
-        },
-        {
-          "name": "delete-permission-set-policies",
-          "method": "DELETE",
-          "path": "/v1/permission-sets/{permission_set_id}/policies",
-          "service": "iam-identity-center",
-          "group": "idc-permission-set",
-          "optional": true,
-          "destructive": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "custom_policies": [],
-            "inline_policies": [],
-            "managed_policies": []
-          },
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "DELETE policies body inferred from setpermissionsetpolicies shape — UNPROVEN."
-        },
-        {
-          "name": "probe-reads",
-          "probe_reads": {
-            "permission_set_id": "{permission_set_id}"
-          }
-        },
-        {
-          "name": "delete-permission-set",
-          "method": "DELETE",
-          "path": "/v1/permission-sets/{permission_set_id}",
-          "service": "iam-identity-center",
-          "group": "idc-permission-set",
-          "optional": true,
-          "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
-        }
-      ]
+     "name": "probe-reads",
+     "probe_reads": {
+      "instance_id": "{instance_id}"
+     }
     },
     {
-      "id": "idc-account-assignment",
-      "service": "management/iam-identity-center",
-      "enabled": true,
-      "heavy": true,
-      "_note": "SSO ACCOUNT-ASSIGNMENT lifecycle: create -> delete (single by id) -> delete (bulk). BLAST RADIUS: an account-assignment grants a principal a permission-set ON A TARGET ACCOUNT — the most sensitive SSO write; never create a real one on a shared account. heavy + all mutating optional with broad expect_status so the expected 403/400 RECORDS coverage WITHOUT granting access. Body from createaccountassignment (api_bodies.json) using docs placeholder ids (instance/permission-set/principal/target-account) so the call is well-formed but denied/not-found. account_assignment_id captured-soft ($.account_assignment.id guessed, UNPROVEN) else a placeholder id exercises the by-id DELETE. Bulk DELETE /v1/account-assignments body inferred — UNPROVEN.",
-      "steps": [
-        {
-          "name": "create-account-assignment",
-          "method": "POST",
-          "path": "/v1/account-assignments",
-          "group": "idc-account-assignment",
-          "optional": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "accounts": [
-              {
-                "target_account_email": "regr-test@example.com",
-                "target_account_id": "00000000000000000000000000000000",
-                "target_account_name": "regr-target-account"
-              }
-            ],
-            "permission_sets": [
-              {
-                "permission_set_id": "00000000000000000000000000000000",
-                "permission_set_name": "regr-permission-set",
-                "session_duration": 3600,
-                "custom_policies": [],
-                "inline_policies": [],
-                "managed_policies": []
-              }
-            ],
-            "principals": [
-              {
-                "principal_id": "00000000000000000000000000000000",
-                "principal_type": "USER"
-              }
-            ]
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {
-            "account_assignment_id": "$.account_assignment.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/account-assignments/{account_assignment_id}",
-            "service": "iam-identity-center"
-          }
-        },
-        {
-          "name": "list-account-assignments",
-          "method": "GET",
-          "path": "/v1/account-assignments",
-          "group": "idc-account-assignment",
-          "optional": true,
-          "expect_status": [200, 403, 404]
-        },
-        {
-          "name": "delete-account-assignment",
-          "method": "DELETE",
-          "path": "/v1/account-assignments/{account_assignment_id}",
-          "service": "iam-identity-center",
-          "group": "idc-account-assignment",
-          "optional": true,
-          "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
-        },
-        {
-          "name": "delete-account-assignments-bulk",
-          "method": "DELETE",
-          "path": "/v1/account-assignments",
-          "service": "iam-identity-center",
-          "group": "idc-account-assignment-bulk",
-          "optional": true,
-          "destructive": true,
-          "json": {
-            "instance_id": "ssoins-12345",
-            "account_assignment_ids": ["{account_assignment_id}"]
-          },
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "Bulk delete body (instance_id + account_assignment_ids[]) inferred — UNPROVEN. Separate group so it always fires for coverage."
-        }
-      ]
+     "name": "delete-instance",
+     "method": "DELETE",
+     "path": "/v1/instances/{instance_id}",
+     "service": "iam-identity-center",
+     "group": "idc-instance",
+     "optional": true,
+     "destructive": true,
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ]
     }
-  ]
+   ]
+  },
+  {
+   "id": "idc-user",
+   "service": "management/iam-identity-center",
+   "enabled": false,
+   "heavy": true,
+   "_note": "SSO USER lifecycle: create -> patch -> delete (single) -> delete (bulk). BLAST RADIUS: SSO users are tied to an SSO instance/identity store; creating them on a shared account is sensitive. heavy + all mutating steps optional with broad expect_status so a denial RECORDS coverage without creating real principals. Bodies from createuser / setuser (api_bodies.json). instance_id is a docs placeholder (ssoins-12345) — UNPROVEN; on a real run with no valid instance the create returns 4xx (still recorded). user_uuid captured-soft from create ($.user.id guessed, UNPROVEN) else falls back to a placeholder uuid for the by-id PATCH/DELETE so those endpoints are still exercised. Bulk DELETE /v1/users body shape (user_uuids) inferred from createbulkgroupusers — UNPROVEN. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
+   "steps": [
+    {
+     "name": "create-user",
+     "method": "POST",
+     "path": "/v1/users",
+     "group": "idc-user",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "user_id": "regridc{ualpha}",
+      "name": "API Regression User",
+      "email": "regr-test@example.com",
+      "description": "API regression suite SSO user",
+      "department": "QA",
+      "business_unit": "Automation",
+      "manager": "Regression Bot",
+      "employee_id": "regr-{unique}",
+      "nation_id": "+82",
+      "phone_number": "010-1234-5678",
+      "temporary_password": true,
+      "password": "",
+      "group_ids": []
+     },
+     "expect_status": [
+      200,
+      201,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "capture_soft": {
+      "user_uuid": "$.user.id"
+     },
+     "cleanup": {
+      "method": "DELETE",
+      "path": "/v1/users/{user_uuid}",
+      "service": "iam-identity-center"
+     }
+    },
+    {
+     "name": "list-users",
+     "method": "GET",
+     "path": "/v1/users",
+     "group": "idc-user",
+     "optional": true,
+     "expect_status": [
+      200,
+      403,
+      404
+     ]
+    },
+    {
+     "name": "patch-user",
+     "method": "PATCH",
+     "path": "/v1/users/{user_uuid}",
+     "service": "iam-identity-center",
+     "group": "idc-user",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "name": "API Regression User",
+      "email": "regr-test@example.com",
+      "description": "updated by API regression suite",
+      "department": "QA",
+      "business_unit": "Automation",
+      "manager": "Regression Bot",
+      "nation_id": "+82",
+      "phone_number": "010-1234-5678",
+      "tz_id": "Asia/Seoul"
+     },
+     "expect_status": [
+      200,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ]
+    },
+    {
+     "name": "probe-reads",
+     "probe_reads": {
+      "user_uuid": "{user_uuid}"
+     }
+    },
+    {
+     "name": "delete-user",
+     "method": "DELETE",
+     "path": "/v1/users/{user_uuid}",
+     "service": "iam-identity-center",
+     "group": "idc-user",
+     "optional": true,
+     "destructive": true,
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ]
+    },
+    {
+     "name": "delete-users-bulk",
+     "method": "DELETE",
+     "path": "/v1/users",
+     "service": "iam-identity-center",
+     "group": "idc-user-bulk",
+     "optional": true,
+     "destructive": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "user_uuids": [
+       "{user_uuid}"
+      ]
+     },
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "_note": "Bulk delete body (instance_id + user_uuids[]) inferred from createbulkgroupusers shape — UNPROVEN. Separate group so it runs even if the single-user group was isolated by an env 4xx."
+    }
+   ]
+  },
+  {
+   "id": "idc-group",
+   "service": "management/iam-identity-center",
+   "enabled": false,
+   "heavy": true,
+   "_note": "SSO GROUP + GROUP-USERS lifecycle: create group -> patch group -> add users (bulk) -> remove users (bulk) -> delete group -> delete groups (bulk). BLAST RADIUS: SSO groups belong to an SSO instance; sensitive on a shared account. heavy + all mutating optional/broad so denials RECORD coverage without real structure. Bodies from creategroup / setgroup / createbulkgroupusers (api_bodies.json). instance_id placeholder ssoins-12345 (UNPROVEN). group_id captured-soft ($.group.id guessed, UNPROVEN); PATCH/POST-users/DELETE-users/DELETE fire against it when present. Bulk DELETE /v1/groups body (instance_id + group_ids[]) and DELETE /v1/groups/{id}/users body inferred — UNPROVEN. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
+   "steps": [
+    {
+     "name": "create-group",
+     "method": "POST",
+     "path": "/v1/groups",
+     "group": "idc-group",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "name": "regrgrp{ualpha}",
+      "description": "API regression suite SSO group",
+      "user_uuids": []
+     },
+     "expect_status": [
+      200,
+      201,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "capture_soft": {
+      "group_id": "$.group.id"
+     },
+     "cleanup": {
+      "method": "DELETE",
+      "path": "/v1/groups/{group_id}",
+      "service": "iam-identity-center"
+     }
+    },
+    {
+     "name": "list-groups",
+     "method": "GET",
+     "path": "/v1/groups",
+     "group": "idc-group",
+     "optional": true,
+     "expect_status": [
+      200,
+      403,
+      404
+     ]
+    },
+    {
+     "name": "patch-group",
+     "method": "PATCH",
+     "path": "/v1/groups/{group_id}",
+     "service": "iam-identity-center",
+     "group": "idc-group",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "name": "regrgrp{ualpha}",
+      "description": "updated by API regression suite"
+     },
+     "expect_status": [
+      200,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ]
+    },
+    {
+     "name": "add-group-users",
+     "method": "POST",
+     "path": "/v1/groups/{group_id}/users",
+     "service": "iam-identity-center",
+     "group": "idc-group",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "user_uuids": []
+     },
+     "expect_status": [
+      200,
+      201,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "_note": "createbulkgroupusers body (instance_id + user_uuids[]); empty user_uuids so no real principals are required."
+    },
+    {
+     "name": "remove-group-users",
+     "method": "DELETE",
+     "path": "/v1/groups/{group_id}/users",
+     "service": "iam-identity-center",
+     "group": "idc-group",
+     "optional": true,
+     "destructive": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "user_uuids": []
+     },
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "_note": "Bulk remove-users-from-group body inferred from createbulkgroupusers — UNPROVEN."
+    },
+    {
+     "name": "probe-reads",
+     "probe_reads": {
+      "group_id": "{group_id}"
+     }
+    },
+    {
+     "name": "delete-group",
+     "method": "DELETE",
+     "path": "/v1/groups/{group_id}",
+     "service": "iam-identity-center",
+     "group": "idc-group",
+     "optional": true,
+     "destructive": true,
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ]
+    },
+    {
+     "name": "delete-groups-bulk",
+     "method": "DELETE",
+     "path": "/v1/groups",
+     "service": "iam-identity-center",
+     "group": "idc-group-bulk",
+     "optional": true,
+     "destructive": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "group_ids": [
+       "{group_id}"
+      ]
+     },
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "_note": "Bulk delete body (instance_id + group_ids[]) inferred — UNPROVEN. Separate group so it always fires for coverage."
+    }
+   ]
+  },
+  {
+   "id": "idc-permission-set",
+   "service": "management/iam-identity-center",
+   "enabled": false,
+   "heavy": true,
+   "_note": "SSO PERMISSION-SET + its POLICIES lifecycle: create -> patch -> set policies (PUT) -> delete policies -> delete permission-set. BLAST RADIUS: permission-sets define SSO access on accounts — sensitive/structural on a shared account. heavy + all mutating optional/broad so denials RECORD coverage without granting real access. Bodies from createpermissionset / setpermissionset / setpermissionsetpolicies (api_bodies.json). instance_id placeholder ssoins-12345 (UNPROVEN). permission_set_id captured-soft ($.permission_set.id guessed, UNPROVEN). DELETE /v1/permission-sets/{id}/policies body reuses setpermissionsetpolicies shape with empty arrays — UNPROVEN. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
+   "steps": [
+    {
+     "name": "create-permission-set",
+     "method": "POST",
+     "path": "/v1/permission-sets",
+     "group": "idc-permission-set",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "name": "regrps{ualpha}",
+      "description": "API regression suite permission set",
+      "session_duration": 3600,
+      "custom_policies": [],
+      "inline_policies": [],
+      "managed_policies": []
+     },
+     "expect_status": [
+      200,
+      201,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "capture_soft": {
+      "permission_set_id": "$.permission_set.id"
+     },
+     "cleanup": {
+      "method": "DELETE",
+      "path": "/v1/permission-sets/{permission_set_id}",
+      "service": "iam-identity-center"
+     }
+    },
+    {
+     "name": "list-permission-sets",
+     "method": "GET",
+     "path": "/v1/permission-sets",
+     "group": "idc-permission-set",
+     "optional": true,
+     "expect_status": [
+      200,
+      403,
+      404
+     ]
+    },
+    {
+     "name": "patch-permission-set",
+     "method": "PATCH",
+     "path": "/v1/permission-sets/{permission_set_id}",
+     "service": "iam-identity-center",
+     "group": "idc-permission-set",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "description": "updated by API regression suite",
+      "session_duration": 3600
+     },
+     "expect_status": [
+      200,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ]
+    },
+    {
+     "name": "set-permission-set-policies",
+     "method": "PUT",
+     "path": "/v1/permission-sets/{permission_set_id}/policies",
+     "service": "iam-identity-center",
+     "group": "idc-permission-set",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "custom_policies": [],
+      "inline_policies": [],
+      "managed_policies": []
+     },
+     "expect_status": [
+      200,
+      201,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "_note": "setpermissionsetpolicies body with empty policy arrays so no real policy is attached."
+    },
+    {
+     "name": "delete-permission-set-policies",
+     "method": "DELETE",
+     "path": "/v1/permission-sets/{permission_set_id}/policies",
+     "service": "iam-identity-center",
+     "group": "idc-permission-set",
+     "optional": true,
+     "destructive": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "custom_policies": [],
+      "inline_policies": [],
+      "managed_policies": []
+     },
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "_note": "DELETE policies body inferred from setpermissionsetpolicies shape — UNPROVEN."
+    },
+    {
+     "name": "probe-reads",
+     "probe_reads": {
+      "permission_set_id": "{permission_set_id}"
+     }
+    },
+    {
+     "name": "delete-permission-set",
+     "method": "DELETE",
+     "path": "/v1/permission-sets/{permission_set_id}",
+     "service": "iam-identity-center",
+     "group": "idc-permission-set",
+     "optional": true,
+     "destructive": true,
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ]
+    }
+   ]
+  },
+  {
+   "id": "idc-account-assignment",
+   "service": "management/iam-identity-center",
+   "enabled": false,
+   "heavy": true,
+   "_note": "SSO ACCOUNT-ASSIGNMENT lifecycle: create -> delete (single by id) -> delete (bulk). BLAST RADIUS: an account-assignment grants a principal a permission-set ON A TARGET ACCOUNT — the most sensitive SSO write; never create a real one on a shared account. heavy + all mutating optional with broad expect_status so the expected 403/400 RECORDS coverage WITHOUT granting access. Body from createaccountassignment (api_bodies.json) using docs placeholder ids (instance/permission-set/principal/target-account) so the call is well-formed but denied/not-found. account_assignment_id captured-soft ($.account_assignment.id guessed, UNPROVEN) else a placeholder id exercises the by-id DELETE. Bulk DELETE /v1/account-assignments body inferred — UNPROVEN. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
+   "steps": [
+    {
+     "name": "create-account-assignment",
+     "method": "POST",
+     "path": "/v1/account-assignments",
+     "group": "idc-account-assignment",
+     "optional": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "accounts": [
+       {
+        "target_account_email": "regr-test@example.com",
+        "target_account_id": "00000000000000000000000000000000",
+        "target_account_name": "regr-target-account"
+       }
+      ],
+      "permission_sets": [
+       {
+        "permission_set_id": "00000000000000000000000000000000",
+        "permission_set_name": "regr-permission-set",
+        "session_duration": 3600,
+        "custom_policies": [],
+        "inline_policies": [],
+        "managed_policies": []
+       }
+      ],
+      "principals": [
+       {
+        "principal_id": "00000000000000000000000000000000",
+        "principal_type": "USER"
+       }
+      ]
+     },
+     "expect_status": [
+      200,
+      201,
+      202,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "capture_soft": {
+      "account_assignment_id": "$.account_assignment.id"
+     },
+     "cleanup": {
+      "method": "DELETE",
+      "path": "/v1/account-assignments/{account_assignment_id}",
+      "service": "iam-identity-center"
+     }
+    },
+    {
+     "name": "list-account-assignments",
+     "method": "GET",
+     "path": "/v1/account-assignments",
+     "group": "idc-account-assignment",
+     "optional": true,
+     "expect_status": [
+      200,
+      403,
+      404
+     ]
+    },
+    {
+     "name": "delete-account-assignment",
+     "method": "DELETE",
+     "path": "/v1/account-assignments/{account_assignment_id}",
+     "service": "iam-identity-center",
+     "group": "idc-account-assignment",
+     "optional": true,
+     "destructive": true,
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ]
+    },
+    {
+     "name": "delete-account-assignments-bulk",
+     "method": "DELETE",
+     "path": "/v1/account-assignments",
+     "service": "iam-identity-center",
+     "group": "idc-account-assignment-bulk",
+     "optional": true,
+     "destructive": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "account_assignment_ids": [
+       "{account_assignment_id}"
+      ]
+     },
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404,
+      409,
+      422
+     ],
+     "_note": "Bulk delete body (instance_id + account_assignment_ids[]) inferred — UNPROVEN. Separate group so it always fires for coverage."
+    }
+   ]
+  }
+ ]
 }

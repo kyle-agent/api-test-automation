@@ -16,7 +16,8 @@ work-in-progress notes.
 
 | Doc | Topic | Status |
 |-----|-------|--------|
-| [`COVERAGE-CRITERIA.md`](COVERAGE-CRITERIA.md) | The C0–C4 coverage ladder + waiver mechanism — what "100%" means | **draft, awaiting review** |
+| [`COVERAGE-CRITERIA.md`](COVERAGE-CRITERIA.md) | The C0–C4 coverage ladder + waiver mechanism — what "100%" means | **adopted** (2026-06-09) |
+| [`PARALLEL-EXECUTION-PLAN.md`](PARALLEL-EXECUTION-PLAN.md) | Staged foundations + per-VPC lanes — cut wall-clock to max(lane) instead of sum | **draft, awaiting review** |
 
 ## Handoffs
 

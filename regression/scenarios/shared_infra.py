@@ -110,11 +110,15 @@ def provision():
         return 0
     vpc_id = shared_ctx.get("shared_vpc_id")
     subnet_id = shared_ctx.get("shared_subnet_id")
+    db_subnet_id = shared_ctx.get("shared_db_subnet_id")
     if vpc_id:
         print(f"SCP_SHARED_VPC_ID={vpc_id}")
     if subnet_id:
         print(f"SCP_SHARED_SUBNET_ID={subnet_id}")
-    _eprint(f"[shared_infra] provisioned vpc={vpc_id} subnet={subnet_id}")
+    if db_subnet_id:
+        print(f"SCP_SHARED_DB_SUBNET_ID={db_subnet_id}")
+    _eprint(f"[shared_infra] provisioned vpc={vpc_id} subnet={subnet_id} "
+            f"db_subnet={db_subnet_id}")
     return 0
 
 
@@ -127,11 +131,20 @@ def teardown():
         return 0
     vpc_id = os.environ.get(engine._ENV_SHARED_VPC, "").strip()
     subnet_id = os.environ.get(engine._ENV_SHARED_SUBNET, "").strip()
-    if not vpc_id and not subnet_id:
+    db_subnet_id = os.environ.get(engine._ENV_SHARED_DB_SUBNET, "").strip()
+    if not vpc_id and not subnet_id and not db_subnet_id:
         _eprint("[shared_infra] no SCP_SHARED_VPC_ID / SCP_SHARED_SUBNET_ID set — "
                 "nothing to tear down.")
         return 0
-    # subnet THEN vpc (children before parent)
+    # subnets THEN vpc (children before parent)
+    if db_subnet_id:
+        try:
+            client.request("DELETE", f"{engine._SUBNET_CREATE_PATH}/{db_subnet_id}",
+                           service="vpc")
+            _eprint(f"[shared_infra] shared DB subnet {db_subnet_id} deleted")
+        except Exception as exc:
+            _eprint(f"[shared_infra] shared DB subnet {db_subnet_id} delete failed "
+                    f"({exc}); sweep will reclaim")
     if subnet_id:
         try:
             client.request("DELETE", f"{engine._SUBNET_CREATE_PATH}/{subnet_id}",

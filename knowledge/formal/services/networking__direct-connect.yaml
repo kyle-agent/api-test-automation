@@ -1,0 +1,28 @@
+# Layer 1 — per-service knowledge: networking/direct-connect
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/direct_connect/overview/ (제약 사항 · 선행 서비스)
+
+version: 1
+service: networking/direct-connect
+
+constraints:
+  - id: dc-quota-5-per-account
+    rule: "account cap: max 5 Direct Connects per account (userguide)"
+    provenance: docs
+  - id: dc-one-per-vpc
+    rule: "only ONE Direct Connect per VPC within a service zone (Account 기준으로 서비스존 내 VPC당 1:1 생성 가능, userguide) — a second create on the same VPC must fail; relevant when adopting the session-shared VPC"
+    provenance: docs
+  - id: dc-prereq-vpc
+    rule: "선행 서비스: a VPC must exist before a Direct Connect can be created (userguide)"
+    provenance: docs
+  - id: dc-prereq-security-group
+    rule: "선행 서비스: Security Group is listed as a prerequisite service for Direct Connect (userguide)"
+    provenance: docs
+
+captures:
+  direct-connect: $.direct_connect.id
+  dc-routing-rule: $.routing_rule.id
+
+states: {}
+
+quirks: []

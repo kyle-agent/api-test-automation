@@ -1,0 +1,10 @@
+# Layer 1 — per-service knowledge: database/mysql
+version: 1
+service: database/mysql
+constraints: []
+captures: {}
+states: {}
+quirks:
+  - id: backup-delete-intermittent-401
+    note: "DELETE /v1/clusters/{id}/backups intermittently returns 401 Dbaas.Unauthorized.AuthNFailed while every other signed call in the same run succeeds (seen 2026-06-10, twice with different statuses 400/401) — platform-side signing/auth quirk on this route; conformance finding candidate. Step is optional+grouped so it no longer hard-fails"
+    provenance: VALIDATED

@@ -258,11 +258,17 @@ def endpoint_verdicts(cat, tsv_rows):
             for k, cs in obs.items()}
 
 
-def per_service(cat, tsv_rows):
+def per_service(cat, tsv_rows, prior_verified=None):
     called = {}
     for status, _category, key, _method, _path, *_rest in tsv_rows:
         called[key] = (status, _rest[0] if _rest else None)
     verdict = endpoint_verdicts(cat, tsv_rows)
+    # cumulative overlay (same rule as compute()): verified by any past run
+    # stays verified unless THIS run hard-failed it — so the drill-down pages
+    # agree with the cumulative C3 headline.
+    for k in (prior_verified or ()):
+        if verdict.get(k) != "failed":
+            verdict[k] = "verified"
 
     groups = defaultdict(list)
     for e in cat:
@@ -298,7 +304,8 @@ def per_service(cat, tsv_rows):
 # Computation (verbatim from legacy, extended with axis-2 findings count)
 # ---------------------------------------------------------------------------
 
-def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None):
+def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None,
+            prior_verified=None):
     total = len(cat)
     cat_total = Counter(e["category"] for e in cat)
     cat_get = Counter(e["category"] for e in cat if e["method"] == "GET")
@@ -315,6 +322,13 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None)
     verified = {k for k, v in verdict.items() if v == "verified"}
     reached = {k for k, v in verdict.items() if v == "reached"}
     touched = set(verdict)                       # any catalog endpoint observed
+    # CUMULATIVE merge happens HERE so every downstream stat (GET/write split,
+    # category bars, C3) sees the same verified set — an endpoint verified by
+    # any past run stays verified unless THIS run hard-failed it.
+    cat_keys_all = {e["key"] for e in cat}
+    prior_set = (prior_verified or set()) & cat_keys_all
+    failed_now = {k for k, v in verdict.items() if v == "failed"}
+    verified = verified | (prior_set - failed_now)
     get_verified = verified & get_keys
     write_verified = verified - get_keys
     write_reached = reached - get_keys           # 미검증 write 엔드포인트
@@ -344,7 +358,6 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None)
     # must still be C2 (called). Waived endpoints leave both numerator and
     # denominator of the headline; a verified waived endpoint means the waiver
     # is obsolete (surfaced separately).
-    cat_keys_all = {e["key"] for e in cat}
     waived = {w["key"] for w in (waivers or {}).get("waivers", [])} & cat_keys_all
     c3_denom = total - len(waived)
     c3_verified = verified - waived
@@ -372,6 +385,7 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None)
         "write_verified": len(write_verified), "write_reached": len(write_reached),
         "cov_op": cov_op, "cov_get": cov_get, "cov_write": cov_write,
         "cov_c3": cov_c3, "c3_denom": c3_denom, "c3_verified": len(c3_verified),
+        "verified_keys": sorted(verified),
         "waived_total": len(waived), "waived_called": waived_called,
         "waived_verified": waived_verified,
         "get_total": get_total, "nonget_total": nonget_total,
@@ -858,6 +872,7 @@ def build(
     lifecycles: str = "regression/scenarios/scenarios.json",
     known: str = "data/baselines/known_issues.json",
     waivers: str = "data/baselines/coverage_waivers.json",
+    prior: str = "data/verified_endpoints.json",
     conformance: str = "data/conformance.json",
     # Output
     out: str = "reports/dashboard/index.html",
@@ -930,12 +945,19 @@ def build(
                    if os.path.exists(lifecycles) else [])
     known_data = json.load(open(known)) if os.path.exists(known) else {"issues": []}
     waiver_data = json.load(open(waivers)) if os.path.exists(waivers) else {"waivers": []}
+    # cumulative verified set (pulled from the dashboard-data branch by CI)
+    prior_verified = set()
+    if prior and os.path.exists(prior):
+        try:
+            prior_verified = set(json.load(open(prior)).get("verified", []))
+        except (ValueError, OSError):
+            pass
 
     # ------------------------------------------------------------------
     # 5. Compute, history, render
     # ------------------------------------------------------------------
     d = compute(cat, tsv_rows, crud_results, lc_data, known_data, param_rows,
-                waivers=waiver_data)
+                waivers=waiver_data, prior_verified=prior_verified)
     # (2) stable static ceiling from committed scenarios (reflects authoring work
     # immediately, no live run needed) + remaining gap = what to improve next.
     d.update(reachable_ceiling(cat, lc_data))
@@ -946,7 +968,7 @@ def build(
     d["crud_ran"] = (any(o.get("source") == "crud_probe" for o in unified_obs)
                      or any(v == "pass" for v in crud_results.values()))
     hist = append_history(history, d, run_type, sha)
-    services = per_service(cat, tsv_rows)
+    services = per_service(cat, tsv_rows, prior_verified=prior_verified)
 
     meta = {
         "branch": branch,
@@ -962,6 +984,12 @@ def build(
     os.makedirs(outdir, exist_ok=True)
     with open(out, "w") as fh:
         fh.write(htm)
+
+    # Persist the CUMULATIVE verified set (published to dashboard-data so the
+    # next run's C3 builds on it instead of resetting to run scope).
+    with open(os.path.join(outdir, "verified_endpoints.json"), "w") as fh:
+        json.dump({"verified": d.get("verified_keys", []),
+                   "updated": meta["when"], "run_type": run_type}, fh)
 
     # Write per-service drill-down pages
     sdir = os.path.join(outdir, "services")
@@ -1004,6 +1032,8 @@ def main():
     ap.add_argument("--known", default="data/baselines/known_issues.json")
     ap.add_argument("--waivers", default="data/baselines/coverage_waivers.json",
                     help="C3 waiver list (docs/COVERAGE-CRITERIA.md)")
+    ap.add_argument("--prior", default="data/verified_endpoints.json",
+                    help="cumulative verified set from the dashboard-data branch")
     ap.add_argument("--conformance", default="data/conformance.json",
                     help="Legacy fallback: conformance.json")
     ap.add_argument("--history", default="dashboard/history.jsonl")
@@ -1023,6 +1053,7 @@ def main():
         lifecycles=args.lifecycles,
         known=args.known,
         waivers=args.waivers,
+        prior=args.prior,
         conformance=args.conformance,
         history=args.history,
         out=args.out,

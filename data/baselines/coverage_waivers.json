@@ -1,4 +1,565 @@
 {
-  "_comment": "C3 coverage waivers (docs/COVERAGE-CRITERIA.md). Endpoints that can NEVER 2xx on the shared test account BY DESIGN. A waived endpoint leaves the C3 denominator but MUST still be C2 (called; the 4xx is the evidence). class: blast-radius | entitlement | unsatisfiable-flow | billing-prohibitive. HUMANS approve every addition (same review discipline as combo-scenarios). key = catalog endpoint key. The dashboard surfaces waived counts and flags waived endpoints that DO get a 2xx as removal candidates.",
-  "waivers": []
+ "_comment": "C3 coverage waivers (docs/COVERAGE-CRITERIA.md). Endpoints that can NEVER 2xx on the shared test account BY DESIGN. A waived endpoint leaves the C3 denominator but MUST still be C2 (called; the 4xx is the evidence). class: blast-radius | entitlement | unsatisfiable-flow | billing-prohibitive. HUMANS approve every addition (same review discipline as combo-scenarios). key = catalog endpoint key. The dashboard surfaces waived counts and flags waived endpoints that DO get a 2xx as removal candidates.",
+ "waivers": [
+  {
+   "key": "storage/archivestorage/cancelarchiving",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/cancelrecovery",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/createarchivingpolicy",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/createbucket",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/deletebucket",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/deletebucketobjects",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/deletebucketobjectversions",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listarchivinghistories",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listarchivingpolicies",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listbucketobjects",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listbucketobjectversions",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listbuckets",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listrecoveryhistories",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/recoverobjects",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/recoverobjectversions",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/setarchivingpolicy",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/setarchivingpolicystate",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/setbucketencryption",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/setbucketversioning",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showarchivinghistory",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showarchivingpolicy",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showbucket",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showbucketencryption",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showbucketversioning",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showrecoveryhistory",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/acceptinvitation",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/attachpolicybindings",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/cancelinvitations",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createaccount",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createdelegationpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createinvitation",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createorganization",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createorganizationunit",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createservicecontrolpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/declineinvitation",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deleteaccount",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deletedelegationpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deleteorganization",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deleteorganizationunits",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deleteservicecontrolpolicies",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/leaveorganization",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/moveaccount",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/removeaccounts",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/removepolicybindings",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/setdelegationpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/setorganization",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/setorganizationunit",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/setservicecontrolpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/createaccountassignment",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/createbulkgroupusers",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/creategroup",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/createinstance",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/createpermissionset",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/createuser",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deleteaccountassignment",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deletebulkaccountassignments",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deletebulkgroups",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deletebulkgroupusers",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deletebulkusers",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deletegroup",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deleteinstance",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deletepermissionset",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deletepermissionsetpolicies",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/deleteuser",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/listaccountassignments",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/listgroups",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/listgroupusers",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/listinstances",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/listpermissionsetpolicies",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/listpermissionsets",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/listusers",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/setgroup",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/setinstance",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/setpermissionset",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/setpermissionsetpolicies",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/setuser",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/showgroup",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/showinstance",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/showpermissionset",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/iam-identity-center/showuser",
+   "class": "entitlement",
+   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  }
+ ]
 }

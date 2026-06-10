@@ -1,0 +1,30 @@
+# Layer 1 — per-service knowledge: networking/gslb
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/gslb/overview/ (제약 사항 · 선행 서비스)
+
+version: 1
+service: networking/gslb
+
+constraints:
+  - id: gslb-domain-quota-20-per-account
+    rule: "account cap: max 20 GSLB domains per account (userguide)"
+    provenance: docs
+  - id: gslb-resource-quota-8-per-domain
+    rule: "max 8 connectable resources per GSLB domain (userguide) — bounds any set-resources body"
+    provenance: docs
+  - id: gslb-monitoring-needs-allowlist
+    rule: "GSLB health monitoring of a connection target only works if the target's Firewall and Security Group allow the GSLB monitoring traffic (userguide) — the PUT resources call itself succeeds without it, but health checks will fail"
+    provenance: docs
+  - id: gslb-no-prereq-services
+    rule: "선행 서비스: none — GSLB has no prerequisite services (GSLB 서비스는 선행 서비스가 없습니다, userguide); global/account-scoped, VPC-free"
+    provenance: docs
+
+captures:
+  gslb: $.gslb.id
+
+states: {}
+
+quirks:
+  - id: gslb-name-is-fqdn
+    note: "the gslb name field is an FQDN (lifecycle networking-gslb-service uses regr{ualpha}.gslb.e.samsungsdscloud.com) — not a plain resource name"
+    provenance: docs

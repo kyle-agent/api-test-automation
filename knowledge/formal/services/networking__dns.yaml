@@ -1,0 +1,22 @@
+# Layer 1 — per-service knowledge: networking/dns
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+
+version: 1
+service: networking/dns
+
+constraints:
+  - id: private-dns-quota-3
+    rule: "account cap: max 3 private-dns (error scp-network.private-dns.max-count-exceed)"
+    provenance: VALIDATED
+  - id: private-dns-slow-provisioning
+    rule: "private-dns CREATE and DELETE are VERY slow (observed: a heavy run stalled for hours waiting on creation, 2026-06-10). Scenarios must isolate it — own VPC/lane, kick the create off as EARLY as possible and the delete as LATE as possible, generous poll timeouts, and never let other lifecycles serialize behind it"
+    provenance: VALIDATED
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: hosted-zone-needs-activate
+    note: "hosted-zone lifecycle needs a private-dns activate sub-flow first (networking-dns-hosted-zone is disabled until encoded)"
+    provenance: docs

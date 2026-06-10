@@ -1,0 +1,32 @@
+# Layer 1 — per-service knowledge: database/cachestore
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/database/cachestore/overview/
+
+version: 1
+service: database/cachestore
+
+constraints:
+  - id: prereq-vpc
+    rule: "선행 서비스: VPC (+subnet) must exist before a CacheStore cluster (userguide)"
+    provenance: docs
+  - id: engine-versions
+    rule: "supported engines: Redis OSS Sentinel 7.2.11 (EoS 2029-06) and Valkey Sentinel 8.1.4; create bodies must use one of THESE exact versions — a guessed version is the likeliest cause of the create 4xx (21/21 endpoints called-only)"
+    provenance: docs
+  - id: sentinel-topology
+    rule: "single Master + 1 or 2 Replicas, Sentinel-based HA with automatic failover; switch-over toggles Active-Standby — replica_count in bodies must be 1 or 2"
+    provenance: docs
+  - id: server-type-format
+    rule: "server type naming: 'Standard redis1v2m4' = Standard / redis1 spec / v2 vCores / m4 GB memory — look the exact id up from the server-type list API, don't guess"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: redis-commands-not-archive
+    note: "cachestore uses /commands (+sync) instead of the archive/audit/log-export subops other DBaaS engines have (validated-facts Wave 2); parameter modifications ARE supported (userguide)"
+    provenance: docs
+  - id: recovery-creates-new-instance
+    note: "point-in-time recovery creates a SEPARATE DB instance — recovery tests must expect (and tear down) a second cluster"
+    provenance: docs

@@ -39,3 +39,6 @@ quirks:
   - id: volume-attach-device
     note: "attach extra volume: POST /v1/servers/{id}/volumes with volume_id + device (/dev/vdb); detach before delete"
     provenance: VALIDATED
+  - id: boot-volume-untagged-orphan
+    note: "the INLINE boot volume of a server create is auto-created by the platform: it carries NO registry tag (we only tag direct creates) and is named after the server, not regrvol*. delete_on_termination: true should reap it with the VM, but failed runs leave tag-less volumes behind — the reconciler sweeps /v1/volumes with the broad regr* prefix for this reason (6 orphans observed 2026-06-09)"
+    provenance: VALIDATED

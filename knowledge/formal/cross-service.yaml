@@ -76,7 +76,7 @@ resources:
     requires: []
     quota: private-dns
     provenance: VALIDATED
-    notes: "needs an activate sub-flow before hosted-zone use"
+    notes: "needs an activate sub-flow before hosted-zone use. CREATE/DELETE are VERY slow (hours observed) — isolate on its own lane/VPC, create-first/delete-last (see services/networking__dns.yaml)"
 
   # --- compute ----------------------------------------------------------------
   keypair:

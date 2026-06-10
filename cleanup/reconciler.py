@@ -71,10 +71,18 @@ def _is_deletable(item: dict, *, name_prefixes: tuple[str, ...] = ()) -> bool:
     * If the resource carries the owner tag AND is expired → orphan → DELETE.
     * If the resource has no owner tag but matches a name prefix → legacy
       orphan (no TTL concept) → DELETE.
+
+    FORCE override: ``SCP_SWEEP_IGNORE_TTL=true`` treats tagged-but-unexpired
+    resources as deletable too. ONLY for explicitly requested cleanup runs
+    when the operator knows no mutating run is live (a finished run's orphans
+    keep their 6h TTL and would otherwise be protected until it passes).
     """
+    import os
     from core.registry import _tag_value, OWNER_KEY, OWNER
     has_tag = _tag_value(item, OWNER_KEY) == OWNER
     if has_tag:
+        if os.environ.get("SCP_SWEEP_IGNORE_TTL", "").lower() == "true":
+            return True
         return is_expired(item)
     # No owner tag — matched only by prefix. Treat as legacy orphan.
     return bool(name_prefixes) and is_owned(item, name_prefixes=name_prefixes)
@@ -93,7 +101,8 @@ def _items(body):
 
 
 def _name_of(it):
-    for k in ("name", "volume_name", "registry_name", "policy_name"):
+    for k in ("name", "volume_name", "registry_name", "policy_name",
+              "log_group_name"):
         if it.get(k):
             return str(it[k])
     return ""
@@ -113,11 +122,31 @@ def _list_all(client, service, path):
 
 
 def _select(client, service, path, *, name_prefixes: tuple[str, ...] = ()):
-    """List a collection and return only deletable items."""
-    return [
-        it for it in _list_all(client, service, path)
-        if _is_deletable(it, name_prefixes=name_prefixes)
-    ]
+    """List a collection and return only deletable items.
+
+    Prefix fallback matches the item's display name via ``_name_of`` (some
+    services use ``log_group_name``/``volume_name``/… instead of ``name``,
+    which ``is_owned``'s bare ``name`` check would miss).
+    """
+    listed = _list_all(client, service, path)
+    picked = []
+    for it in listed:
+        if _is_deletable(it, name_prefixes=name_prefixes):
+            picked.append(it)
+        elif name_prefixes and _name_of(it).startswith(name_prefixes) \
+                and not it.get("name"):
+            # name lives under an alternate key — apply the same legacy-orphan
+            # rule is_owned would have applied to item["name"].
+            picked.append(it)
+    if listed:
+        print(f"  {path}: {len(listed)} listed / {len(picked)} deletable")
+        if len(picked) < len(listed):
+            ids = {id(p) for p in picked}
+            names = [_name_of(s) or "<unnamed>"
+                     for s in listed if id(s) not in ids][:5]
+            print(f"    skipped (live-ttl or name mismatch): {', '.join(names)}"
+                  + (" …" if len(listed) - len(picked) > 5 else ""))
+    return picked
 
 
 def _delete(client, service, path, json=None):
@@ -227,11 +256,21 @@ def run_sweep(client) -> int:
             deleted += 1
             _wait_gone(c, "virtualserver",
                        f"/v1/snapshots/{it['id']}", 300, 15)
+    # Broad "regr" prefix on purpose: a VM create's INLINE boot volume is
+    # auto-created by the platform — it carries NO registry tag (we only tag
+    # what we create directly) and is named after the server (regrsrv*), not
+    # regrvol*. delete_on_termination should reap it, but failed runs leave
+    # tag-less regr* volumes behind (user-reported: 6 orphans).
     for it in _select(c, "virtualserver", "/v1/volumes",
-                      name_prefixes=("regrvol",)):
-        if it.get("id") and _delete(
-                c, "virtualserver", f"/v1/volumes/{it['id']}"):
+                      name_prefixes=("regr", "zznet")):
+        vid = it.get("id")
+        if not vid:
+            continue
+        st = _delete(c, "virtualserver", f"/v1/volumes/{vid}")
+        if st and (200 <= st < 300 or st == 404):
             deleted += 1
+        else:
+            print(f"  volume {_name_of(it)} ({vid}) delete -> {st}")
 
     # 2d. dbaas clusters (regr* per engine service) — MUST go before
     # subnets/vpcs. Issue all deletes, then wait each is gone.
@@ -474,6 +513,21 @@ def run_sweep(client) -> int:
         if it.get("id") and _delete(c, "iam", f"/v1/policies/{it['id']}"):
             deleted += 1
 
+    # servicewatch alerts / dashboards / event-rules (regralert / regrdash /
+    # regrevtrule) — same bulk-delete-by-ids shape as log groups. Their
+    # lifecycles delete inline, but failed runs orphan them (user-reported).
+    for path, prefix in (("/v1/alerts", "regralert"),
+                         ("/v1/dashboards", "regrdash"),
+                         ("/v1/event-rules", "regrevtrule")):
+        for it in _select(c, "servicewatch", path, name_prefixes=(prefix,)):
+            if not it.get("id"):
+                continue
+            st = _delete(c, "servicewatch", path, json={"ids": [it["id"]]})
+            if st and (200 <= st < 300 or st == 404):
+                deleted += 1
+            else:
+                print(f"  {path} {it['id']} delete -> {st}")
+
     # servicewatch log groups (regrlg). Two gotchas found in the field:
     #   * a group delete is REJECTED while the group still has log streams —
     #     and the custom-ingest lifecycle creates an implicit regrlg* group +
@@ -529,7 +583,13 @@ def main() -> int:
 
     core.settings.require_credentials()
     client = core.ApiClient(core.settings)
-    run_sweep(client)
+    # Run to a FIXED POINT (bounded): list endpoints may paginate, so one pass
+    # can only reap the first page's worth — repeat until a full pass deletes
+    # nothing (or 5 rounds).
+    for rnd in range(1, 6):
+        print(f"--- sweep round {rnd} ---", flush=True)
+        if run_sweep(client) == 0:
+            break
     return 0
 
 
