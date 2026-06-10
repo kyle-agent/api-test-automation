@@ -34,6 +34,7 @@ legacy ``reports/smoke_status.tsv`` so the dashboard keeps working.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -476,6 +477,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
     group_fail_reason: dict = {}
     reserved: dict = {}  # budget kind -> count reserved by this lifecycle
     created_count = 0
+    # Per-lifecycle wall-clock budget for optional-step 4xx retries (the 20s
+    # sleeps below). Guarded coverage lifecycles can have dozens of optional
+    # steps that 4xx; without a cap the retry sleeps alone add ~1 min/step.
+    opt_retry_left = float(os.getenv("SCP_OPT_RETRY_BUDGET_S", "240"))
 
     def _run_cleanup(entry):
         label, method, path, svc, cu_json, _grp, bkind = entry
@@ -604,10 +609,21 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # invalid-state). When 4xx is NOT an expected status for the
                 # step, give it a few spaced retries before classifying — this
                 # converts transient called-only (C2) into verified (C3).
+                # Capped twice: a path that still carries an unresolved {token}
+                # can never turn 2xx (skip retries entirely), and the cumulative
+                # retry sleep per lifecycle is bounded by SCP_OPT_RETRY_BUDGET_S
+                # so guarded coverage lifecycles don't burn ~1 min per 4xx step.
                 if (step.get("optional") and not step.get("retry_on_status")
                         and resp.status in (400, 409, 429)
-                        and resp.status not in step.get("expect_status", [200])):
+                        and resp.status not in step.get("expect_status", [200])
+                        and "{" not in path):
                     for _attempt in range(3):
+                        if opt_retry_left < 20:
+                            print(f"  optional-retry budget exhausted "
+                                  f"(SCP_OPT_RETRY_BUDGET_S) — recording "
+                                  f"'{step['name']}' as-is")
+                            break
+                        opt_retry_left -= 20
                         time.sleep(20)
                         resp = _run_step(client, step, path, body, step_service, ctx)
                         if resp.status not in (400, 409, 429):
