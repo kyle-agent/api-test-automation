@@ -53,6 +53,9 @@ flow_rules:
   - id: slow-provisioners-isolated
     rule: "resources with very slow create/delete (private-dns: hours observed) get their OWN lane/VPC and are scheduled create-first / delete-last with generous poll timeouts, so nothing serializes behind them and a stall doesn't wedge the whole run"
     provenance: VALIDATED
+  - id: db-lane-subnet
+    rule: "the shared VPC carries TWO subnets: main (10.124.0.0/24 — VM/SKE/networking adopters, fixed IPs) and DB lane (10.124.7.0/24, adopt: subnet#db — mysql/postgresql/heavy-shared-dbaas). DB cluster provisioning is the slowest parallel-pass work; isolating it plus slowest-first xdist ordering targets wall-clock ~= max(slowest DB ~40-50min)"
+    provenance: docs
 
 call_orders:
   vpc:

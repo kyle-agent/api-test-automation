@@ -3769,7 +3769,7 @@
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
           },
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "wait-subnet",
@@ -4151,7 +4151,7 @@
             204
           ],
           "destructive": true,
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "wait-subnet-gone",
@@ -4169,7 +4169,7 @@
             "timeout": 300,
             "interval": 10
           },
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "delete-vpc",
@@ -4265,7 +4265,7 @@
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
           },
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "wait-subnet",
@@ -4939,7 +4939,7 @@
           ],
           "retries": 40,
           "retry_interval": 30,
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "wait-subnet-gone",
@@ -4957,7 +4957,7 @@
             "timeout": 300,
             "interval": 15
           },
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "delete-vpc",
@@ -5058,7 +5058,7 @@
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
           },
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "wait-subnet",
@@ -5933,7 +5933,7 @@
           ],
           "retries": 40,
           "retry_interval": 30,
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "wait-subnet-gone",
@@ -5951,7 +5951,7 @@
             "timeout": 300,
             "interval": 15
           },
-          "adopt": "subnet"
+          "adopt": "subnet#db"
         },
         {
           "name": "delete-vpc",

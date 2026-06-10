@@ -102,18 +102,27 @@ _VPC_CREATE_PATH = "/v1/vpcs"
 # shared_ctx the pytest fixture builds via provision_shared_vpc). When the shared
 # id is absent (no fixture / mutations off) an adopt step is a NO-OP and the
 # lifecycle falls back to its own create/delete (so this can never regress CRUD).
-_ADOPT_SHARED = {"vpc": "shared_vpc_id", "subnet": "shared_subnet_id"}
+_ADOPT_SHARED = {"vpc": "shared_vpc_id", "subnet": "shared_subnet_id",
+                 "subnet#db": "shared_db_subnet_id"}
 _SHARED_VPC_CIDR = "10.124.0.0/20"
 # Shared subnet carved from the first /24 of the shared VPC's /20. ADOPT-class
 # lifecycles re-home their fixed host IPs into this range (10.124.0.x) so that
 # parallel adopters do not collide on the SAME host IP in the ONE shared subnet
 # (see knowledge/vpc-scheduling-strategy.md fixed-IP map).
 _SHARED_SUBNET_CIDR = "10.124.0.0/24"
+# DB-lane shared subnet — 10.124.1-6.0/24 are reserved by the adopters'
+# self-create FALLBACK subnets (knowledge/domain-constraints.md), so the DB
+# lane takes the next free /24 of the shared /20.
+_SHARED_DB_SUBNET_CIDR = "10.124.7.0/24"
 _SUBNET_CREATE_PATH = "/v1/subnets"
 # Env keys for cross-process (xdist) adoption of an already-live shared VPC/subnet
 # provisioned once by regression.scenarios.shared_infra --provision.
 _ENV_SHARED_VPC = "SCP_SHARED_VPC_ID"
 _ENV_SHARED_SUBNET = "SCP_SHARED_SUBNET_ID"
+# DB-lane subnet: DB cluster provisioning is the slowest thing in the parallel
+# pass, so the DB lifecycles get their OWN shared subnet (lane isolation) while
+# VM/SKE/networking adopters stay on the main shared subnet (fixed IPs intact).
+_ENV_SHARED_DB_SUBNET = "SCP_SHARED_DB_SUBNET_ID"
 
 
 # --------------------------------------------------------------------------- #
@@ -508,6 +517,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             _adopt = step.get("adopt")
             if _adopt:
                 _shared_val = ctx.get(_ADOPT_SHARED.get(_adopt, ""))
+                # the DB-lane subnet falls back to the main shared subnet when a
+                # provisioner predates the two-subnet design (graceful degrade).
+                if not _shared_val and _adopt == "subnet#db":
+                    _shared_val = ctx.get("shared_subnet_id")
                 if _shared_val:
                     _m = step.get("method", "").upper()
                     if _m == "POST":  # adopt: skip the create, seed its capture vars
@@ -770,8 +783,12 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         env_sub = os.environ.get(_ENV_SHARED_SUBNET, "").strip()
         if env_sub:
             ctx["shared_subnet_id"] = env_sub
+        env_db_sub = os.environ.get(_ENV_SHARED_DB_SUBNET, "").strip()
+        if env_db_sub:
+            ctx["shared_db_subnet_id"] = env_db_sub
         print(f"  adopting pre-provisioned shared VPC={env_vpc}"
-              f"{' subnet=' + env_sub if env_sub else ''} (env)")
+              f"{' subnet=' + env_sub if env_sub else ''}"
+              f"{' db-subnet=' + env_db_sub if env_db_sub else ''} (env)")
         return ctx, (lambda: None)
 
     if not cfg.allow_mutations:
@@ -835,10 +852,47 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
         print(f"  shared-subnet provision failed ({sresp.status}); adopters will "
               f"self-create a subnet under the shared VPC.")
 
+    # 3) DB-lane shared subnet — the DB cluster lifecycles adopt THIS one
+    #    (adopt: "subnet#db") so their slow provisioning is isolated from the
+    #    VM/SKE/networking adopters on the main shared subnet.
+    db_subnet_id = None
+    db_body = _inject_owner_tags({
+        "name": f"regrsubshareddb{uniq}", "description": "API regression shared DB subnet",
+        "cidr": _SHARED_DB_SUBNET_CIDR, "type": "GENERAL", "vpc_id": vpc_id, "tags": [],
+    }, axis="regression")
+    db_create = {"name": "create-shared-db-subnet", "method": "POST", "service": "vpc"}
+    dresp = _run_step(client, db_create, _SUBNET_CREATE_PATH, db_body, "vpc", {})
+    if dresp.status in (200, 201, 202) and dresp.body:
+        db_subnet_id = _capture(dresp.body, "$.subnet.id")
+        if db_subnet_id:
+            db_subnet_id = str(db_subnet_id)
+            dwait = {"name": "wait-shared-db-subnet", "method": "GET", "service": "vpc",
+                     "poll": {"field": "$.subnet.state",
+                              "until": ["ACTIVE", "RUNNING", "CREATED", "AVAILABLE"],
+                              "timeout": 300, "interval": 10}}
+            _run_step(client, dwait, f"{_SUBNET_CREATE_PATH}/{db_subnet_id}",
+                      None, "vpc", {})
+            reg.track(ResourceRecord(service="vpc",
+                                     delete_path=f"{_SUBNET_CREATE_PATH}/{db_subnet_id}",
+                                     resource_id=db_subnet_id, kind="subnet",
+                                     parent=vpc_id))
+            print(f"  shared DB subnet provisioned: {db_subnet_id} ({_SHARED_DB_SUBNET_CIDR})")
+    if not db_subnet_id:
+        print(f"  shared-DB-subnet provision failed ({dresp.status}); DB adopters "
+              f"fall back to the main shared subnet.")
+
     def teardown():
         if not cfg.allow_destructive:
             return
-        # subnet THEN vpc (children before parent)
+        # subnets THEN vpc (children before parent)
+        if db_subnet_id:
+            try:
+                client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{db_subnet_id}",
+                               service="vpc")
+                print(f"  shared DB subnet {db_subnet_id} deleted")
+            except Exception as exc:
+                print(f"  shared DB subnet {db_subnet_id} delete failed ({exc}); "
+                      f"sweep will reclaim")
         if subnet_id:
             try:
                 client.request("DELETE", f"{_SUBNET_CREATE_PATH}/{subnet_id}",
@@ -856,4 +910,6 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     ctx = {"shared_vpc_id": vpc_id}
     if subnet_id:
         ctx["shared_subnet_id"] = subnet_id
+    if db_subnet_id:
+        ctx["shared_db_subnet_id"] = db_subnet_id
     return ctx, teardown
