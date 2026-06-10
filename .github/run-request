@@ -1,10 +1,10 @@
-# Touch this file (change anything) and push to trigger a LIVE api-test run on
-# this branch. KEY=VALUE options below are parsed by the spec job and gate the
-# run (mutations/destructive/heavy/conformance/category/service/crud_filter).
+# Touch this file (change anything) and push to trigger a LIVE api-test run.
+# KEY=VALUE options are parsed by the spec job and gate the run.
 #
-# request: cleanup-only re-run with the hardened reconciler — fixed-point
-#          rounds (pagination), per-collection counts, servicewatch
-#          dashboards/alerts/event-rules, alternate name-key fallback.
+# request: FINAL cleanup after run #39 ended (00:39 UTC) — force sweep reaps
+#          tagged-but-unexpired orphans (vpc/tgw/log-groups/dashboards/volumes)
+#          with the fully hardened reconciler. No mutating run is live.
 destructive=true
+sweep_force=true
 category=management
 service=servicewatch
