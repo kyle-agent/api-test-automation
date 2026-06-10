@@ -25,3 +25,4 @@ work-in-progress notes.
 |-----|-------|--------|
 | [`HANDOFF-crud-setter-validation.md`](HANDOFF-crud-setter-validation.md) | CRUD write/setter coverage validation (PR #44): env constraints, failures, next steps | active |
 | [`SESSION-HANDOFF-parallel-crud.md`](SESSION-HANDOFF-parallel-crud.md) | Parallel-adopt CRUD re-architecture (shared VPC + subnet adoption) | active |
+| [`HANDOFF-fail-new-triage.md`](HANDOFF-fail-new-triage.md) | The 52 fail_new of the 2026-06-10 full heavy run, classified (body-fix vs domain-hunt vs known-red candidates) | active |
