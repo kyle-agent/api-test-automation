@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 # Conservative defaults; override from data/baselines or env as they are learned.
 DEFAULT_LIMITS = {
-    "vpc": 3,            # scp-network.vpc.exceed-max-count — HARD account cap is 3
+    "vpc": 5,            # scp-network.vpc.exceed-max-count — account cap is 5, VALIDATED by the live error "The number(5) of VPCs ... exceeded" (run 27306490231)
     "private-dns": 3,    # scp-network.private-dns.max-count-exceed
 }
 

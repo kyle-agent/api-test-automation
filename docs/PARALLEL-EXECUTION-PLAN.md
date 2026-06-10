@@ -16,7 +16,7 @@
 
 | Constraint | Value | Effect on the plan |
 |---|---|---|
-| VPC account cap | **3 VALIDATED** (docs say default 5 — verify via `management/quota` API) | lanes = cap − 1 (1 slot은 VPC-CRUD 테스트용 예약). cap이 5로 확인되면 lane 4개로 확장 |
+| VPC account cap | **5 VALIDATED** (run 27306490231의 라이브 에러 'The number(5) of VPCs ... exceeded'; 종전 '3 VALIDATED'는 오류) | lanes = cap − 1 = 4 (1 slot은 VPC-CRUD 테스트용 예약) |
 | Subnets per VPC | 3 (docs) | lane당 subnet ≤ 3; DB 병렬은 한 subnet 안에서 이미 동작 확인됨 |
 | VPC CIDR 비중첩 | VALIDATED | 기존 /20 할당표 재사용 (`knowledge/domain-constraints.md`) |
 | security-group | 계정/리전 스코프 — **VPC 불필요** (VALIDATED) | Stage 0으로 이동 (요청에서는 Stage 1이었지만 더 일찍 가능) |

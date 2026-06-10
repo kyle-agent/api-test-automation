@@ -243,9 +243,10 @@ jobs:
     # The complementary VPC-CRUD class (VPC_CRUD_K — lifecycles that MUST
     # self-create/mutate/peer VPCs) runs in the PARALLEL `regression-vpc-crud`
     # job (B) so the full run's wall-clock is max(A, B), not A+B.
-    # VPC math while A∥B overlap: A holds exactly 1 (shared) VPC; B is serial
-    # and its worst lifecycle holds 2 (vpc-peering) -> 3 total = the VALIDATED
-    # account cap (knowledge/vpc-scheduling-strategy.md). PARALLEL_K and
+    # VPC math while A∥B overlap: account cap = 5 (VALIDATED live, run
+    # 27306490231). A holds exactly 1 (shared) VPC; B is serial and its worst
+    # lifecycle holds 2 (vpc-peering) -> 3 of 5, leaving headroom for leftovers
+    # and the slow heavy-shared-networking teardown. PARALLEL_K and
     # VPC_CRUD_K are exact complements (derived from dependencies.json via
     # shared_infra --print-filters) so A+B partition ALL enabled CRUD
     # lifecycles with no overlap/orphan.
@@ -509,9 +510,9 @@ jobs:
   # adopt pass finished).
   # VPC_CRUD_K lifecycles MUST self-create their own VPC/subnet (their purpose
   # is vpc/subnet/peering creation, they mutate a VPC, or they need >1 VPC), so
-  # they run SERIALLY (-n 0). Capacity while A∥B overlap: A holds exactly 1
-  # (shared) VPC, B's worst single lifecycle holds 2 (vpc-peering) -> 3 = the
-  # VALIDATED account cap. Each VPC-creating lifecycle uses a UNIQUE,
+  # they run SERIALLY (-n 0). Capacity while A∥B overlap: account cap = 5
+  # (VALIDATED live, run 27306490231); A holds 1 (shared) VPC, B's worst single
+  # lifecycle holds 2 (vpc-peering). Each VPC-creating lifecycle uses a UNIQUE,
   # non-overlapping CIDR (knowledge/domain-constraints.md).
   # ---------------------------------------------------------------------------
   regression-vpc-crud:
@@ -561,21 +562,47 @@ jobs:
           python -m regression.scenarios.shared_infra --print-filters >> "$GITHUB_ENV"
           echo "derived ADOPT_K / VPC_CRUD_K / PARALLEL_K -> \$GITHUB_ENV"
       - name: Run VPC-CRUD class (serial)
+        # Two sequential pytest passes: everything except heavy-shared-networking
+        # first, then heavy-shared-networking LAST — it is the slow-provisioner
+        # lifecycle (private-dns create/delete can take hours; flows.yaml
+        # slow-provisioners-isolated) and it holds its VPC while it grinds, so
+        # running it last keeps VPC slots free for the cheap lifecycles (run
+        # 27306490231 hit the 5-VPC account cap and skipped 3 lifecycles when it
+        # ran early).
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}
         run: |
           mkdir -p reports
-          echo "Running VPC-CRUD class serially (-n 0)" | tee reports/crud.log
+          echo "Running VPC-CRUD class serially (-n 0; heavy-shared-networking last)" | tee reports/crud.log
           MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
-          if [ -n "$MANUAL" ]; then FILTER="($VPC_CRUD_K) and ($MANUAL)"; else FILTER="$VPC_CRUD_K"; fi
-          echo "vpc-crud-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
-          ARGS=(tests/crud -m crud -n 0 --junitxml=reports/junit-crud.xml)
-          [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
-          set -o pipefail
-          rc=0; python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log || rc=$?
-          # exit 5 = no tests matched the filter — normal for scoped runs, not a failure
-          if [ "$rc" = "5" ]; then echo "no lifecycles matched this pass's filter — skipping" | tee -a reports/crud.log; rc=0; fi
-          exit "$rc"
+          overall=0
+          for PASS in "not heavy-shared-networking" "heavy-shared-networking"; do
+            FILTER="($VPC_CRUD_K) and ($PASS)"
+            [ -n "$MANUAL" ] && FILTER="$FILTER and ($MANUAL)"
+            echo "vpc-crud-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
+            ARGS=(tests/crud -m crud -n 0 --junitxml="reports/junit-crud-$(echo "$PASS" | tr -dc 'a-z-').xml")
+            ARGS+=(-k "$FILTER")
+            set -o pipefail
+            rc=0; python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log || rc=$?
+            # exit 5 = no tests matched the filter — normal for scoped runs, not a failure
+            if [ "$rc" = "5" ]; then echo "no lifecycles matched this pass's filter — skipping" | tee -a reports/crud.log; rc=0; fi
+            [ "$rc" != "0" ] && overall="$rc"
+          done
+          # fold the two junit files into the canonical junit-crud.xml
+          python - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          cases = []
+          for f in sorted(glob.glob("reports/junit-crud-*.xml")):
+              try: cases.extend(ET.parse(f).getroot().iter("testcase"))
+              except (ET.ParseError, OSError): pass
+          if cases:
+              suites = ET.Element("testsuites")
+              suite = ET.SubElement(suites, "testsuite", {"name": "crud", "tests": str(len(cases))})
+              for tc in cases: suite.append(tc)
+              ET.ElementTree(suites).write("reports/junit-crud.xml", encoding="utf-8", xml_declaration=True)
+              print(f"merged {len(cases)} crud testcase(s) into reports/junit-crud.xml")
+          PY
+          exit "$overall"
       - name: Upload VPC-CRUD reports + results store
         # Separate artifact (same inner layout as regression-reports): the
         # dashboard job downloads it NEXT TO job A's and concatenates the

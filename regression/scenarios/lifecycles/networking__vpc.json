@@ -416,7 +416,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; we have only the shared VPC, so requester_vpc_id={vpc_id} and approver_vpc_id/account are {unique} placeholders -> the create likely 4xx's. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
+      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
       "steps": [
         {
           "name": "create-vpc",
@@ -443,6 +443,30 @@
           "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
         },
         {
+          "name": "create-vpc-b",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpcb{unique}",
+            "description": "API regression peering approver",
+            "cidr": "10.141.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"vpc_id_b": "$.vpc.id"},
+          "capture_soft": {"account_id": "$.vpc.account_id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id_b}", "service": "vpc"}
+        },
+        {
+          "name": "wait-vpc-b",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id_b}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE"], "timeout": 180, "interval": 10}
+        },
+        {
           "name": "create-vpc-peering",
           "service": "vpc",
           "method": "POST",
@@ -450,8 +474,8 @@
           "group": "peering",
           "optional": true,
           "json": {
-            "approver_vpc_account_id": "{unique}",
-            "approver_vpc_id": "{unique}",
+            "approver_vpc_account_id": "{account_id}",
+            "approver_vpc_id": "{vpc_id_b}",
             "description": "API regression vpc peering",
             "name": "regrpeer{unique}",
             "requester_vpc_id": "{vpc_id}",
@@ -524,6 +548,15 @@
           "group": "peering",
           "optional": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+        },
+        {
+          "name": "delete-vpc-b",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id_b}",
+          "expect_status": [200, 202, 204],
           "destructive": true,
           "retry_on_status": [409], "retries": 4, "retry_interval": 15
         },
@@ -730,7 +763,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes the subnet-VIP NAT children (4 writes): POST/DELETE /v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports, POST/DELETE .../static-nat-ips. (The VIP itself POST/PUT/DELETE is already covered elsewhere.) Adopts the shared VPC, creates an own subnet, then a VIP under it (create from data/api_bodies.json networking/vpc/createsubnetvip -> $.vip.id UNPROVEN), then exercises connected-ports (createsubnetvipport: needs a real port_id -> {unique} placeholder) and static-nat-ips (createsubnetvipnatip: needs a real publicip_id -> {unique} placeholder). All VIP-child steps optional+grouped+broad expect_status so they record coverage even on 4xx. connected_port_id / static_nat_id captures are soft (envelopes UNPROVEN). heavy:true (real VPC fallback).",
+      "_note": "Closes the subnet-VIP NAT children (4 writes): POST/DELETE /v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports, POST/DELETE .../static-nat-ips. (The VIP itself POST/PUT/DELETE is already covered elsewhere.) Adopts the shared VPC, creates an own subnet, then a VIP under it (create from data/api_bodies.json networking/vpc/createsubnetvip -> envelope VALIDATED as $.subnet_vip.id by the live 201 of run 27306490231; the old $.vip.id capture missed, left the VIP undeleted and caused the recurring delete-subnet 409 RelatedVip), then exercises connected-ports (createsubnetvipport: needs a real port_id -> {unique} placeholder) and static-nat-ips (createsubnetvipnatip: needs a real publicip_id -> {unique} placeholder). All VIP-child steps optional+grouped+broad expect_status so they record coverage even on 4xx. connected_port_id / static_nat_id captures are soft (envelopes UNPROVEN). heavy:true (real VPC fallback).",
       "steps": [
         {
           "name": "create-vpc",
@@ -792,7 +825,7 @@
             "virtual_ip_address": "10.132.9.6"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {"vip_id": "$.vip.id"},
+          "capture": {"vip_id": "$.subnet_vip.id"},
           "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}/vips/{vip_id}", "service": "vpc"}
         },
         {

@@ -243,3 +243,22 @@ Triage: `docs/HANDOFF-fail-new-triage.md`.
 1–8 attached Bare Metal Servers (연결 서버 필수) → `attachments: []` is the 400;
 the ~40-endpoint chain stays called-only without a BM server. Full constraints:
 `knowledge/formal/services/storage__baremetal-blockstorage.yaml`.
+
+## 2026-06-10 — A∥B split run 27306490231 (job B evidence, mid-run)
+
+- **VPC account cap is 5, not 3** — live error `scp-network.vpc.exceed-max-count:
+  "The number(5) of VPCs ... has been exceeded"`. The long-standing "3 VALIDATED"
+  was wrong; budgets/dependencies/cross-service updated to 5 (per-run cap 4).
+  3 lifecycles (vpc-subnet, igw, tgw-children) skipped environmentally when the
+  cap filled during the A∥B overlap + heavy-shared-networking's slow teardown →
+  job B now runs heavy-shared-networking LAST.
+- **subnet-VIP create envelope VALIDATED: `$.subnet_vip.id`** (201 live). The old
+  `$.vip.id` capture missed → cleanup `{vip_id}` unresolved → VIP survived →
+  the recurring `delete-subnet` 409 RelatedVip. Capture fixed.
+- **vpc-peering 404 root cause**: body sent the `{unique}` placeholder as
+  approver_vpc_id (`NotFoundVpcError: VPC ID(<unique-hex>) is not found`) — a
+  real approver VPC-B (reserved 10.141.0.0/20) is now created in the lifecycle.
+- heavy-shared-networking again confirmed the slow-provisioner rule: private-dns
+  stuck in `CREATING` (400 invalid-state on the setter) while LB health-check
+  child 404'd (`LbHealthCheckNotFoundError` — health-check id capture/order issue,
+  not yet fixed).

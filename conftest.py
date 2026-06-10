@@ -49,8 +49,8 @@ def shared_vpc(client, cfg):
 
     # 0) explicit opt-out (SCP_SHARED_VPC_DISABLE=true). The A∥B-split VPC-CRUD
     #    job sets this: its lifecycles never adopt the shared VPC, and a
-    #    self-provisioned one would burn a slot of the 3-VPC cap that job A's
-    #    shared VPC + a 2-VPC lifecycle (vpc-peering) already fill exactly.
+    #    self-provisioned one would burn a VPC slot (account cap 5, validated)
+    #    for nothing while job A's shared VPC and B's own lifecycles need them.
     if os.environ.get("SCP_SHARED_VPC_DISABLE", "").strip().lower() == "true":
         yield {}
         return

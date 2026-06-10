@@ -168,10 +168,10 @@ resources:
 
 quotas:
   vpc:
-    limit: 3
+    limit: 5
     scope: account
     provenance: VALIDATED
-    notes: "HARD cap; see dependencies.json vpc_schedule for the shared-VPC adopt strategy"
+    notes: "cap is 5, validated live by 'The number(5) of VPCs ... exceeded' (run 27306490231); the earlier limit=3 was wrong. See dependencies.json vpc_schedule (per_run_vpc_cap=4 leaves 1 slot headroom) and the shared-VPC adopt strategy"
   private-dns:
     limit: 3
     scope: account

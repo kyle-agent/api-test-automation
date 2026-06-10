@@ -59,10 +59,10 @@
     "/v1/private-dns": "private-dns"
   },
   "vpc_schedule": {
-    "_comment": "Strategy to keep runs from colliding on the account VPC cap (=3, HARD). See knowledge/domain-constraints.md + knowledge/vpc-scheduling-strategy.md. VPCs must NOT overlap CIDRs and a subnet's CIDR must be a sub-range of its VPC's CIDR (see knowledge/domain-constraints.md allocation table). 'per_run_vpc_cap' is the max concurrent live VPCs a single run should hold. In the shared-infra parallel design the shared VPC (1) is torn down BEFORE the serial VPC-CRUD pass, so that pass gets the full cap (e.g. vpc-peering needs 2 at once). 'cross_run_policy' = how to stop concurrent runs from competing for VPCs.",
-    "vpc_limit": 3,
+    "_comment": "Strategy to keep runs from colliding on the account VPC cap (=5, VALIDATED live: 'The number(5) of VPCs ... exceeded', run 27306490231; per-run cap 4 leaves 1 slot of headroom for leftovers / the A-parallel-B overlap). See knowledge/domain-constraints.md + knowledge/vpc-scheduling-strategy.md. VPCs must NOT overlap CIDRs and a subnet's CIDR must be a sub-range of its VPC's CIDR (see knowledge/domain-constraints.md allocation table). 'per_run_vpc_cap' is the max concurrent live VPCs a single run should hold. In the shared-infra parallel design the shared VPC (1) is torn down BEFORE the serial VPC-CRUD pass, so that pass gets the full cap (e.g. vpc-peering needs 2 at once). 'cross_run_policy' = how to stop concurrent runs from competing for VPCs.",
+    "vpc_limit": 5,
     "private_dns_limit": 3,
-    "per_run_vpc_cap": 3,
+    "per_run_vpc_cap": 4,
     "_classification_comment": "Shared-infra parallel design (knowledge/vpc-scheduling-strategy.md). 'adopt_lifecycles' reuse the ONE session-shared VPC+subnet (provisioned once by regression.scenarios.shared_infra --provision; ids passed via SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env) and create only their own child resource -> safe to run in PARALLEL with pytest-xdist. 'vpc_crud_lifecycles' MUST self-create (their purpose is vpc/subnet/peering creation, they MUTATE the shared vpc, or they need >1 vpc) -> run SERIALLY (xdist -n0) so they stay within per_run_vpc_cap (1 shared + <=1 self-created at a time). shared_infra.py --print-filters derives PARALLEL_K = 'not (<vpc_crud ids OR'd>)' and VPC_CRUD_K = '<vpc_crud ids OR'd>' so the two -k selections partition all enabled CRUD lifecycles with no overlap.",
     "adopt_lifecycles": [
       "container-ske-cluster-nodepool",
