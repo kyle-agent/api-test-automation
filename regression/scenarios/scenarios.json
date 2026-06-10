@@ -1993,7 +1993,7 @@
             "path": "/v1/keypairs/regrkey{unique}",
             "service": "virtualserver"
           },
-          "_note_409": "409 KeypairNameUsed = orphan with the same name exists; keypairs are addressed BY NAME so reuse is safe and teardown deletes it"
+          "_note": "409 KeypairNameUsed = orphan with the same name exists; keypairs are addressed BY NAME so reuse is safe and teardown deletes it"
         },
         {
           "name": "find-k8s-version",
@@ -2890,7 +2890,7 @@
             "path": "/v1/keypairs/regrkey{unique}",
             "service": "virtualserver"
           },
-          "_note_409": "409 KeypairNameUsed = orphan with the same name exists; keypairs are addressed BY NAME so reuse is safe and teardown deletes it"
+          "_note": "409 KeypairNameUsed = orphan with the same name exists; keypairs are addressed BY NAME so reuse is safe and teardown deletes it"
         },
         {
           "name": "create-server-group",
@@ -3970,7 +3970,16 @@
             200,
             202,
             204
-          ]
+          ],
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-after-unset-maintenance",
@@ -4048,10 +4057,14 @@
             204
           ],
           "retry_on_status": [
-            401
+            400,
+            401,
+            409,
+            500,
+            503
           ],
-          "retries": 4,
-          "retry_interval": 20,
+          "retries": 8,
+          "retry_interval": 30,
           "group": "mysql-backup",
           "optional": true
         },
@@ -4136,7 +4149,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-cluster-gone",
@@ -4524,7 +4546,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "set-backup",
@@ -4585,10 +4616,14 @@
             204
           ],
           "retry_on_status": [
-            401
+            400,
+            401,
+            409,
+            500,
+            503
           ],
-          "retries": 4,
-          "retry_interval": 20,
+          "retries": 8,
+          "retry_interval": 30,
           "destructive": true
         },
         {
@@ -4651,7 +4686,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "set-audit-log",
@@ -4918,7 +4962,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "wait-cluster-gone",
@@ -5786,7 +5839,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "pg-delete",
@@ -5799,7 +5861,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "maria-delete",
@@ -5812,7 +5883,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "epas-delete",
@@ -5825,7 +5905,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "cache-delete",
@@ -5838,7 +5927,16 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 8,
+          "retry_interval": 30
         },
         {
           "name": "mys-gone",
