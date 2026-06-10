@@ -1,0 +1,23 @@
+# Layer 1 — per-service knowledge: storage/archivestorage
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/storage/archive_storage/overview/
+
+version: 1
+service: storage/archivestorage
+
+constraints:
+  - id: separate-auth-keys-required
+    rule: "Archive Storage requires its OWN 인증키 (authentication keys) generated in the console — the platform HMAC credentials alone are NOT enough. This explains the persistent smoke 401s on all 6 archivestorage GETs. Until the test account provisions these keys (or the suite learns to send them), these endpoints are C2-only -> WAIVER CANDIDATES (class: entitlement, human approval needed)"
+    provenance: docs
+  - id: service-limits
+    rule: "max 1,000 archive storage services per account; max file path length 1,024 bytes UTF-8 (userguide)"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: object-storage-prereq
+    note: "선행 서비스: Object Storage (archives data from object storage buckets) — cross-service edge for the dependency graph"
+    provenance: docs
