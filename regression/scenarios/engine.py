@@ -377,6 +377,13 @@ def _run_step(client, step, path, body, service, ctx):
     until_status = poll.get("until_status")
     field, until = poll.get("field"), poll.get("until", [])
     timeout, interval = float(poll.get("timeout", 300)), float(poll.get("interval", 10))
+    # Optional refire: while polling for a teardown to complete, a resource can
+    # wedge in a FAILED-delete state (field report: a console delete of a
+    # failed-state DB cluster succeeds immediately). When the polled body's
+    # `field` hits one of `when`, re-issue the configured request (usually the
+    # DELETE that preceded this poll) up to `max` times and keep polling.
+    refire = poll.get("refire")
+    refire_left = int(refire.get("max", 3)) if refire else 0
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if until_status is not None:
@@ -386,6 +393,19 @@ def _run_step(client, step, path, body, service, ctx):
             val = _jsonpath_get(resp.body, field) if resp.body else None
             if val in until:
                 return resp
+        if refire and refire_left > 0 and resp.status < 400 and resp.body:
+            _state = _jsonpath_get(resp.body, refire["field"])
+            if _state in refire.get("when", []):
+                refire_left -= 1
+                _rpath = _fill(refire["path"], ctx)
+                print(f"  step '{step.get('name')}': polled state '{_state}' is a "
+                      f"failed-delete state — refiring {refire['method']} {_rpath} "
+                      f"({refire_left} refire(s) left)")
+                try:
+                    rr = client.request(refire["method"], _rpath, service=service)
+                    print(f"    refire -> {rr.status}")
+                except Exception as exc:  # destructive gate / transport — keep polling
+                    print(f"    refire failed: {exc}")
         time.sleep(interval)
         resp = client.request(step["method"], path, json=body, service=service, params=params)
     return resp
