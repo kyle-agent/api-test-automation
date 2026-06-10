@@ -47,6 +47,14 @@ def shared_vpc(client, cfg):
     import os
     from regression.scenarios import engine
 
+    # 0) explicit opt-out (SCP_SHARED_VPC_DISABLE=true). The A∥B-split VPC-CRUD
+    #    job sets this: its lifecycles never adopt the shared VPC, and a
+    #    self-provisioned one would burn a slot of the 3-VPC cap that job A's
+    #    shared VPC + a 2-VPC lifecycle (vpc-peering) already fill exactly.
+    if os.environ.get("SCP_SHARED_VPC_DISABLE", "").strip().lower() == "true":
+        yield {}
+        return
+
     # 1) adopt pre-provisioned live infra by env (provision_shared_vpc is itself
     #    env-aware: it returns the env ids + a no-op teardown).
     if os.environ.get("SCP_SHARED_VPC_ID", "").strip():
