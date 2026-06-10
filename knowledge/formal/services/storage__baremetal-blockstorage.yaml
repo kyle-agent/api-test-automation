@@ -1,0 +1,46 @@
+# Layer 1 — per-service knowledge: storage/baremetal-blockstorage
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/storage/block_storage_bm/ (overview + how_to_guides
+# + volume_group/snapshot/replication guides), fetched 2026-06-10 (retry of the
+# fetch that failed in the previous session). API-reference request examples are
+# already in data/api_bodies.json.
+
+version: 1
+service: storage/baremetal-blockstorage
+
+constraints:
+  - id: prereq-baremetal-server
+    rule: "선행 서비스: Bare Metal Server. 연결 서버 is a REQUIRED create field (1..8 BM servers; Multi Node GPU Cluster also attachable) — this is why create with attachments:[] 400s; the whole ~40-endpoint chain is blocked until a real BM server exists to attach"
+    provenance: docs
+  - id: create-fields
+    rule: "create requires: name (starts with a letter; alnum + '-'; 3~28 chars; immutable), disk_type SSD|HDD (immutable; HDD has NO IOPS/Throughput settings), size_gb 1~16384 (immutable), qos.iops 5000~20000 (SSD only), qos.throughput 250~1000 MB/s (SSD only), attachments[1..8]"
+    provenance: docs
+  - id: volume-group-targets
+    rule: "volume-group create: name 3~28 (same charset rule), target volumes <=16, and EVERY target volume must have snapshot capacity SET, snapshot schedule UNUSED and replication UNUSED — a freshly created bare volume does not qualify until its snapshot capacity is configured"
+    provenance: docs
+  - id: snapshot-requires-capacity
+    rule: "snapshots (and replications) can only be created after the volume's snapshot CAPACITY is set; snapshot cap 1023/volume (128 via schedule); >90% snapshot-space usage auto-deletes oldest snapshots and can PAUSE replication"
+    provenance: docs
+  - id: replication-rules
+    rule: "replication: 1 per volume, source volumes only, requires snapshot capacity set, copy gets the same disk_type, cycle ∈ {5MIN, hourly, daily, weekly, monthly}; kr-south region has NO replication; a replicated volume cannot join a volume group; policy edits only while replication is not in progress (사용↔일시 중지, 삭제 only from 일시 중지)"
+    provenance: docs
+  - id: capacity-resize-only-without-snapshot
+    rule: "volume capacity can be extended ONLY on volumes that do not use snapshots — for snapshot-enabled volumes, add a new volume instead"
+    provenance: docs
+
+captures:
+  volume: "$.result.id"   # VALIDATED in knowledge/validated-facts.md (volume create returns $.result.id)
+
+states:
+  volume_group: {field: "$.state", ready: [Available]}   # Creating/Available/Deleting/Editing/Error Deleting/Error (docs)
+
+quirks:
+  - id: snapshot-restore-needs-detach
+    note: "snapshot restore requires ALL attached servers to be unmounted/offline first, and deletes every snapshot newer than the restore point; group snapshots actually live on the member volumes"
+    provenance: docs
+  - id: recovery-creates-new-volume
+    note: "복구본 생성 (recovery from snapshot) creates a SEPARATE volume with the same size (extra billing) — recovery tests must tear down the second volume; recovery copies hide the snapshot/replication tabs"
+    provenance: docs
+  - id: no-volume-group-delete
+    note: "no DELETE endpoint for volume-group in the catalog — teardown goes through member-volume removal (ledger note, wave 1)"
+    provenance: docs
