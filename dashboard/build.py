@@ -322,6 +322,13 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None,
     verified = {k for k, v in verdict.items() if v == "verified"}
     reached = {k for k, v in verdict.items() if v == "reached"}
     touched = set(verdict)                       # any catalog endpoint observed
+    # CUMULATIVE merge happens HERE so every downstream stat (GET/write split,
+    # category bars, C3) sees the same verified set — an endpoint verified by
+    # any past run stays verified unless THIS run hard-failed it.
+    cat_keys_all = {e["key"] for e in cat}
+    prior_set = (prior_verified or set()) & cat_keys_all
+    failed_now = {k for k, v in verdict.items() if v == "failed"}
+    verified = verified | (prior_set - failed_now)
     get_verified = verified & get_keys
     write_verified = verified - get_keys
     write_reached = reached - get_keys           # 미검증 write 엔드포인트
@@ -351,16 +358,7 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None,
     # must still be C2 (called). Waived endpoints leave both numerator and
     # denominator of the headline; a verified waived endpoint means the waiver
     # is obsolete (surfaced separately).
-    cat_keys_all = {e["key"] for e in cat}
     waived = {w["key"] for w in (waivers or {}).get("waivers", [])} & cat_keys_all
-    # CUMULATIVE C3: an endpoint verified by ANY past run stays verified unless
-    # the CURRENT run saw it hard-fail (5xx/auth). Without this, a scoped or
-    # read-only run publishes a tiny run-scoped headline (observed: 3.06%
-    # right after a 33% full run). prior_verified comes from
-    # verified_endpoints.json on the dashboard-data branch.
-    prior = (prior_verified or set()) & cat_keys_all
-    failed_now = {k for k, v in verdict.items() if v == "failed"}
-    verified = verified | (prior - failed_now)
     c3_denom = total - len(waived)
     c3_verified = verified - waived
     cov_c3 = len(c3_verified) / c3_denom * 100 if c3_denom else 0
