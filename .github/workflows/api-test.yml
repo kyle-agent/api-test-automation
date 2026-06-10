@@ -794,6 +794,9 @@ jobs:
           # pull cumulative trend history from the data branch (if it exists)
           git fetch origin dashboard-data --depth=1 >/dev/null 2>&1 || true
           git show origin/dashboard-data:history.jsonl > dashboard/history.jsonl 2>/dev/null || true
+          # cumulative verified set -> C3 builds across runs (docs/COVERAGE-CRITERIA.md)
+          git show origin/dashboard-data:verified_endpoints.json > data/verified_endpoints.json 2>/dev/null || true
+          [ -s data/verified_endpoints.json ] || rm -f data/verified_endpoints.json
           # consume conformance data published by the conformance axis
           # (keep the committed data/conformance.json as fallback if the pull is empty/absent)
           git show origin/dashboard-data:conformance.json > /tmp/conf.json 2>/dev/null && [ -s /tmp/conf.json ] && cp /tmp/conf.json data/conformance.json || true
@@ -816,6 +819,7 @@ jobs:
           cp dashboard/history.jsonl "$pub"/ 2>/dev/null || true
           # per-service drill-down pages (dashboard/services/*.html)
           cp -r dashboard/services "$pub"/services 2>/dev/null || true
+          cp dashboard/verified_endpoints.json "$pub"/ 2>/dev/null || true
           cp reports/smoke_status.tsv "$pub"/ 2>/dev/null || true
           cp data/conformance.json "$pub"/ 2>/dev/null || true
           cp data/conformance_baseline.json "$pub"/ 2>/dev/null || true

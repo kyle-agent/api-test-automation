@@ -298,7 +298,8 @@ def per_service(cat, tsv_rows):
 # Computation (verbatim from legacy, extended with axis-2 findings count)
 # ---------------------------------------------------------------------------
 
-def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None):
+def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None,
+            prior_verified=None):
     total = len(cat)
     cat_total = Counter(e["category"] for e in cat)
     cat_get = Counter(e["category"] for e in cat if e["method"] == "GET")
@@ -346,6 +347,14 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None)
     # is obsolete (surfaced separately).
     cat_keys_all = {e["key"] for e in cat}
     waived = {w["key"] for w in (waivers or {}).get("waivers", [])} & cat_keys_all
+    # CUMULATIVE C3: an endpoint verified by ANY past run stays verified unless
+    # the CURRENT run saw it hard-fail (5xx/auth). Without this, a scoped or
+    # read-only run publishes a tiny run-scoped headline (observed: 3.06%
+    # right after a 33% full run). prior_verified comes from
+    # verified_endpoints.json on the dashboard-data branch.
+    prior = (prior_verified or set()) & cat_keys_all
+    failed_now = {k for k, v in verdict.items() if v == "failed"}
+    verified = verified | (prior - failed_now)
     c3_denom = total - len(waived)
     c3_verified = verified - waived
     cov_c3 = len(c3_verified) / c3_denom * 100 if c3_denom else 0
@@ -372,6 +381,7 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None)
         "write_verified": len(write_verified), "write_reached": len(write_reached),
         "cov_op": cov_op, "cov_get": cov_get, "cov_write": cov_write,
         "cov_c3": cov_c3, "c3_denom": c3_denom, "c3_verified": len(c3_verified),
+        "verified_keys": sorted(verified),
         "waived_total": len(waived), "waived_called": waived_called,
         "waived_verified": waived_verified,
         "get_total": get_total, "nonget_total": nonget_total,
@@ -858,6 +868,7 @@ def build(
     lifecycles: str = "regression/scenarios/scenarios.json",
     known: str = "data/baselines/known_issues.json",
     waivers: str = "data/baselines/coverage_waivers.json",
+    prior: str = "data/verified_endpoints.json",
     conformance: str = "data/conformance.json",
     # Output
     out: str = "reports/dashboard/index.html",
@@ -930,12 +941,19 @@ def build(
                    if os.path.exists(lifecycles) else [])
     known_data = json.load(open(known)) if os.path.exists(known) else {"issues": []}
     waiver_data = json.load(open(waivers)) if os.path.exists(waivers) else {"waivers": []}
+    # cumulative verified set (pulled from the dashboard-data branch by CI)
+    prior_verified = set()
+    if prior and os.path.exists(prior):
+        try:
+            prior_verified = set(json.load(open(prior)).get("verified", []))
+        except (ValueError, OSError):
+            pass
 
     # ------------------------------------------------------------------
     # 5. Compute, history, render
     # ------------------------------------------------------------------
     d = compute(cat, tsv_rows, crud_results, lc_data, known_data, param_rows,
-                waivers=waiver_data)
+                waivers=waiver_data, prior_verified=prior_verified)
     # (2) stable static ceiling from committed scenarios (reflects authoring work
     # immediately, no live run needed) + remaining gap = what to improve next.
     d.update(reachable_ceiling(cat, lc_data))
@@ -962,6 +980,12 @@ def build(
     os.makedirs(outdir, exist_ok=True)
     with open(out, "w") as fh:
         fh.write(htm)
+
+    # Persist the CUMULATIVE verified set (published to dashboard-data so the
+    # next run's C3 builds on it instead of resetting to run scope).
+    with open(os.path.join(outdir, "verified_endpoints.json"), "w") as fh:
+        json.dump({"verified": d.get("verified_keys", []),
+                   "updated": meta["when"], "run_type": run_type}, fh)
 
     # Write per-service drill-down pages
     sdir = os.path.join(outdir, "services")
@@ -1004,6 +1028,8 @@ def main():
     ap.add_argument("--known", default="data/baselines/known_issues.json")
     ap.add_argument("--waivers", default="data/baselines/coverage_waivers.json",
                     help="C3 waiver list (docs/COVERAGE-CRITERIA.md)")
+    ap.add_argument("--prior", default="data/verified_endpoints.json",
+                    help="cumulative verified set from the dashboard-data branch")
     ap.add_argument("--conformance", default="data/conformance.json",
                     help="Legacy fallback: conformance.json")
     ap.add_argument("--history", default="dashboard/history.jsonl")
@@ -1023,6 +1049,7 @@ def main():
         lifecycles=args.lifecycles,
         known=args.known,
         waivers=args.waivers,
+        prior=args.prior,
         conformance=args.conformance,
         history=args.history,
         out=args.out,

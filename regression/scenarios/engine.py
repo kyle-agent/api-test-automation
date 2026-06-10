@@ -598,6 +598,20 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
 
             try:
                 resp = _run_step(client, step, path, body, step_service, ctx)
+
+                # Optional setter steps routinely race async provisioning (a
+                # DBaaS cluster is busy applying the PREVIOUS setter -> 400
+                # invalid-state). When 4xx is NOT an expected status for the
+                # step, give it a few spaced retries before classifying — this
+                # converts transient called-only (C2) into verified (C3).
+                if (step.get("optional") and not step.get("retry_on_status")
+                        and resp.status in (400, 409, 429)
+                        and resp.status not in step.get("expect_status", [200])):
+                    for _attempt in range(3):
+                        time.sleep(20)
+                        resp = _run_step(client, step, path, body, step_service, ctx)
+                        if resp.status not in (400, 409, 429):
+                            break
             except MutationBlocked as exc:
                 if bkind:  # roll back the reservation we just took
                     budget.release(bkind)
