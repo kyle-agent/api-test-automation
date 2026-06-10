@@ -5052,7 +5052,7 @@
       "service": "networking/vpc",
       "heavy": true,
       "enabled": true,
-      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 5 dbaas engines (mysql/postgresql/mariadb/epas/cachestore); VM excluded (#6 no identifiable boot image); eventstreams (undocumented topology value_error), searchengine/sqlserver/vertica (require a real license) excluded. Subnet/vpc teardown retries 409 to wait out async cluster termination. created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body).",
+      "_note": "Shared-infra parallel heavy plan: ONE vpc+subnet, then 5 dbaas engines (mysql/postgresql/mariadb/epas/cachestore); VM excluded (#6 no identifiable boot image); eventstreams (undocumented topology value_error), searchengine/sqlserver/vertica (require a real license) excluded. Subnet/vpc teardown retries 409 to wait out async cluster termination. created CONCURRENTLY (creates fired back-to-back), waited, probe-read, torn down. Each is an optional group: a bad body skips only that group (cleaned up). Bodies grounded per-engine from api_bodies.json. Service IPs .11-.19 (db) in the shared subnet; VM uses its own sg/keypair. UNVALIDATED per-group until a heavy run surfaces warnings (the runner warns per skipped group with status+body). SLIMMED 2026-06-10 (run e3ba190 timing: 160min wall, ~135min of it teardown wait): mysql/postgresql legs REMOVED (redundant — the standalone database-mysql-cluster/database-postgresql-cluster heavy lifecycles cover the same catalog keys and more); -gone polls capped at 900s (mariadb took ~90min to vanish; a still-deleting cluster just means the subnet delete 409s, which is tolerated); delete-subnet/delete-vpc 409-retry budget 20min->4min each (they burned 45min combined and STILL 409'd — the tag-scoped sweep job is the designed backstop for late-releasing ports).",
       "steps": [
         {
           "name": "create-vpc",
@@ -5142,221 +5142,6 @@
             ],
             "timeout": 300,
             "interval": 10
-          }
-        },
-        {
-          "name": "mys-find-version",
-          "service": "mysql",
-          "group": "mysql",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/engine-versions",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "mys_ver": {
-              "list": "$.contents",
-              "get": "id"
-            }
-          }
-        },
-        {
-          "name": "mys-find-stype",
-          "service": "mysql",
-          "group": "mysql",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "mys_stype": {
-              "list": "$.contents",
-              "get": "name"
-            }
-          }
-        },
-        {
-          "name": "mys-create",
-          "service": "mysql",
-          "group": "mysql",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/clusters",
-          "json": {
-            "ha_enabled": false,
-            "nat_enabled": false,
-            "subnet_id": "{subnet_id}",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "tags": [],
-            "maintenance_option": {
-              "period_hour": "5",
-              "starting_day_of_week": "MON",
-              "starting_time": "0000"
-            },
-            "service_watch_log_collection": true,
-            "origin_cluster_id": "",
-            "vip_public_ip_id": "",
-            "virtual_ip_address": "",
-            "init_config_option": {
-              "database_name": "regrmys",
-              "database_port": 2866,
-              "database_user_name": "regruser",
-              "database_user_password": "Regr1ss@2026",
-              "backup_option": {
-                "archive_frequency_minute": "60",
-                "retention_period_day": "7",
-                "starting_time_hour": "2"
-              },
-              "audit_enabled": "",
-              "database_case_sensitive": false,
-              "database_character_set": "utf8mb4"
-            },
-            "name": "regry{ualpha}",
-            "instance_name_prefix": "regry",
-            "dbaas_engine_version_id": "{mys_ver}",
-            "instance_groups": [
-              {
-                "role_type": "ACTIVE",
-                "server_type_name": "{mys_stype}",
-                "block_storage_groups": [
-                  {
-                    "role_type": "OS",
-                    "size_gb": 104,
-                    "volume_type": "SSD"
-                  }
-                ],
-                "instances": [
-                  {
-                    "role_type": "ACTIVE",
-                    "public_ip_id": ""
-                  }
-                ]
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "mys_cid": "$.resource.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/clusters/{mys_cid}",
-            "service": "mysql"
-          }
-        },
-        {
-          "name": "pg-find-version",
-          "service": "postgresql",
-          "group": "postgresql",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/engine-versions",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "pg_ver": {
-              "list": "$.contents",
-              "get": "id"
-            }
-          }
-        },
-        {
-          "name": "pg-find-stype",
-          "service": "postgresql",
-          "group": "postgresql",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "capture": {
-            "pg_stype": {
-              "list": "$.contents",
-              "get": "name"
-            }
-          }
-        },
-        {
-          "name": "pg-create",
-          "service": "postgresql",
-          "group": "postgresql",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/clusters",
-          "json": {
-            "ha_enabled": false,
-            "nat_enabled": false,
-            "subnet_id": "{subnet_id}",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "tags": [],
-            "maintenance_option": {
-              "period_hour": "5",
-              "starting_day_of_week": "MON",
-              "starting_time": "0000"
-            },
-            "origin_cluster_id": "",
-            "vip_public_ip_id": "",
-            "virtual_ip_address": "",
-            "init_config_option": {
-              "database_name": "regrpg",
-              "database_port": 2866,
-              "database_user_name": "regruser",
-              "database_user_password": "Regr1ss@2026",
-              "backup_option": {
-                "archive_frequency_minute": "60",
-                "retention_period_day": "7",
-                "starting_time_hour": "2"
-              },
-              "audit_enabled": false,
-              "database_encoding": "UTF-8",
-              "database_locale": "C"
-            },
-            "name": "regrp{ualpha}",
-            "instance_name_prefix": "regrp",
-            "dbaas_engine_version_id": "{pg_ver}",
-            "instance_groups": [
-              {
-                "role_type": "ACTIVE",
-                "server_type_name": "{pg_stype}",
-                "block_storage_groups": [
-                  {
-                    "role_type": "OS",
-                    "size_gb": 104,
-                    "volume_type": "SSD"
-                  }
-                ],
-                "instances": [
-                  {
-                    "role_type": "ACTIVE",
-                    "public_ip_id": ""
-                  }
-                ]
-              }
-            ]
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "capture": {
-            "pg_cid": "$.resource.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/clusters/{pg_cid}",
-            "service": "postgresql"
           }
         },
         {
@@ -5679,48 +5464,6 @@
           }
         },
         {
-          "name": "mys-wait",
-          "service": "mysql",
-          "group": "mysql",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/clusters/{mys_cid}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 2400,
-            "interval": 30
-          }
-        },
-        {
-          "name": "pg-wait",
-          "service": "postgresql",
-          "group": "postgresql",
-          "optional": true,
-          "method": "GET",
-          "path": "/v1/clusters/{pg_cid}",
-          "expect_status": [
-            200
-          ],
-          "poll": {
-            "field": "$.service_state",
-            "until": [
-              "RUNNING",
-              "ACTIVE",
-              "AVAILABLE"
-            ],
-            "timeout": 2400,
-            "interval": 30
-          }
-        },
-        {
           "name": "maria-wait",
           "service": "mariadb",
           "group": "mariadb",
@@ -5784,24 +5527,6 @@
           }
         },
         {
-          "name": "mys-probe",
-          "service": "mysql",
-          "group": "mysql",
-          "probe_reads": {
-            "cluster_id": "{mys_cid}",
-            "dbaas_engine_version_id": "{mys_ver}"
-          }
-        },
-        {
-          "name": "pg-probe",
-          "service": "postgresql",
-          "group": "postgresql",
-          "probe_reads": {
-            "cluster_id": "{pg_cid}",
-            "dbaas_engine_version_id": "{pg_ver}"
-          }
-        },
-        {
           "name": "maria-probe",
           "service": "mariadb",
           "group": "mariadb",
@@ -5827,50 +5552,6 @@
             "cluster_id": "{cache_cid}",
             "dbaas_engine_version_id": "{cache_ver}"
           }
-        },
-        {
-          "name": "mys-delete",
-          "service": "mysql",
-          "group": "mysql",
-          "method": "DELETE",
-          "path": "/v1/clusters/{mys_cid}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true,
-          "retry_on_status": [
-            400,
-            401,
-            409,
-            500,
-            503
-          ],
-          "retries": 20,
-          "retry_interval": 60
-        },
-        {
-          "name": "pg-delete",
-          "service": "postgresql",
-          "group": "postgresql",
-          "method": "DELETE",
-          "path": "/v1/clusters/{pg_cid}",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "destructive": true,
-          "retry_on_status": [
-            400,
-            401,
-            409,
-            500,
-            503
-          ],
-          "retries": 20,
-          "retry_interval": 60
         },
         {
           "name": "maria-delete",
@@ -5939,42 +5620,6 @@
           "retry_interval": 60
         },
         {
-          "name": "mys-gone",
-          "service": "mysql",
-          "group": "mysql",
-          "method": "GET",
-          "path": "/v1/clusters/{mys_cid}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 2700,
-            "interval": 30
-          }
-        },
-        {
-          "name": "pg-gone",
-          "service": "postgresql",
-          "group": "postgresql",
-          "method": "GET",
-          "path": "/v1/clusters/{pg_cid}",
-          "expect_status": [
-            200,
-            404
-          ],
-          "poll": {
-            "until_status": [
-              404
-            ],
-            "timeout": 2700,
-            "interval": 30
-          }
-        },
-        {
           "name": "maria-gone",
           "service": "mariadb",
           "group": "mariadb",
@@ -5988,7 +5633,7 @@
             "until_status": [
               404
             ],
-            "timeout": 2700,
+            "timeout": 900,
             "interval": 30
           }
         },
@@ -6006,7 +5651,7 @@
             "until_status": [
               404
             ],
-            "timeout": 2700,
+            "timeout": 900,
             "interval": 30
           }
         },
@@ -6024,7 +5669,7 @@
             "until_status": [
               404
             ],
-            "timeout": 2700,
+            "timeout": 900,
             "interval": 30
           }
         },
@@ -6043,7 +5688,7 @@
           "retry_on_status": [
             409
           ],
-          "retries": 40,
+          "retries": 8,
           "retry_interval": 30,
           "adopt": "subnet#db"
         },
@@ -6060,7 +5705,7 @@
             "until_status": [
               404
             ],
-            "timeout": 300,
+            "timeout": 900,
             "interval": 15
           },
           "adopt": "subnet#db"
@@ -6080,7 +5725,7 @@
           "retry_on_status": [
             409
           ],
-          "retries": 40,
+          "retries": 8,
           "retry_interval": 30,
           "adopt": "vpc"
         }
@@ -7109,7 +6754,7 @@
       "service": "networking/vpc",
       "heavy": true,
       "enabled": true,
-      "_note": "ONE shared vpc(10.140.0.0/20)+subnet(10.140.1.0/24)+publicip, then networking families created back-to-back as optional groups (igw, port, natgw, tgw, subnetvip, lb chain hc->sg->lb->listener->members, dns chain privatedns->activate->zone->record), probe-read per service, torn down children-first. A bad body skips only its group (cleaned up; runner warns with status+body). Bodies grounded from framework/api_bodies.json. Skipped (need backing/external resource): privatelink-service/-endpoint (need backing LB+approval), vpc-peering (cross-account approval), vpc-endpoint (needs a privatelink service), private-nat (separate flow), lb-certificate (needs an uploaded cert), public-domain-name (real paid domain registration order). layer_type:L4 and several LB enum guesses UNVALIDATED until a heavy run surfaces warnings.",
+      "_note": "ONE shared vpc(10.140.0.0/20)+subnet(10.140.1.0/24)+publicip, then networking families created back-to-back as optional groups (igw, port, natgw, tgw, subnetvip, lb chain hc->sg->lb->listener->members, dns chain privatedns->activate->zone->record), probe-read per service, torn down children-first. A bad body skips only its group (cleaned up; runner warns with status+body). Bodies grounded from framework/api_bodies.json. Skipped (need backing/external resource): privatelink-service/-endpoint (need backing LB+approval), vpc-peering (cross-account approval), vpc-endpoint (needs a privatelink service), private-nat (separate flow), lb-certificate (needs an uploaded cert), public-domain-name (real paid domain registration order). layer_type:L4 and several LB enum guesses UNVALIDATED until a heavy run surfaces warnings. 2026-06-10: trailing DELETE 409-retry budgets cut to 8x30s (run e3ba190 burned 21min on delete-vpc and still 409'd; sweep backstop).",
       "steps": [
         {
           "name": "create-vpc",
@@ -8255,7 +7900,7 @@
           "retry_on_status": [
             409
           ],
-          "retries": 20,
+          "retries": 8,
           "retry_interval": 20
         },
         {
@@ -8274,7 +7919,7 @@
           "retry_on_status": [
             409
           ],
-          "retries": 40,
+          "retries": 8,
           "retry_interval": 30
         },
         {
@@ -8310,7 +7955,7 @@
           "retry_on_status": [
             409
           ],
-          "retries": 40,
+          "retries": 8,
           "retry_interval": 30
         }
       ]
