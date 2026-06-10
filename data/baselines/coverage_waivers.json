@@ -175,6 +175,167 @@
    "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
    "provenance": "docs",
    "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/acceptinvitation",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/attachpolicybindings",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/cancelinvitations",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createaccount",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createdelegationpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createinvitation",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createorganization",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createorganizationunit",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/createservicecontrolpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/declineinvitation",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deleteaccount",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deletedelegationpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deleteorganization",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deleteorganizationunits",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/deleteservicecontrolpolicies",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/leaveorganization",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/moveaccount",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/removeaccounts",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/removepolicybindings",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/setdelegationpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/setorganization",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/setorganizationunit",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "management/organization/setservicecontrolpolicy",
+   "class": "blast-radius",
+   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+   "provenance": "VALIDATED",
+   "added": "2026-06-10"
   }
  ]
 }
