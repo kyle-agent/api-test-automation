@@ -258,7 +258,12 @@ def endpoint_verdicts(cat, tsv_rows):
             for k, cs in obs.items()}
 
 
-def per_service(cat, tsv_rows, prior_verified=None):
+def per_service(cat, tsv_rows, prior_verified=None, prior_status=None, sha=""):
+    """prior_status: cumulative key -> [status, elapsed_ms, run_sha] from past
+    runs (endpoint_status.json on dashboard-data). The cumulative-verified
+    overlay marks endpoints ✓ that THIS run never called; without this map
+    their status/time cells go blank on every scoped run (field report:
+    'covered checked but no HTTP status/time for POST/PUT/DELETE')."""
     called = {}
     for status, _category, key, _method, _path, *_rest in tsv_rows:
         called[key] = (status, _rest[0] if _rest else None)
@@ -269,6 +274,14 @@ def per_service(cat, tsv_rows, prior_verified=None):
     for k in (prior_verified or ()):
         if verdict.get(k) != "failed":
             verdict[k] = "verified"
+    cat_keys = {e["key"] for e in cat}
+    # merged cumulative observation map (persisted back to dashboard-data):
+    # last-known status/elapsed per CATALOG endpoint, current run wins.
+    merged_status = {k: list(v) for k, v in (prior_status or {}).items()
+                     if k in cat_keys}
+    for k, (st, el) in called.items():
+        if k in cat_keys and st is not None:
+            merged_status[k] = [st, el, (sha or "")[:7]]
 
     groups = defaultdict(list)
     for e in cat:
@@ -289,15 +302,22 @@ def per_service(cat, tsv_rows, prior_verified=None):
                 wcov += covered
             covn += covered
             reachn += (v == "reached")
-            st_el = called.get(e["key"]) or (None, None)
+            st_el = called.get(e["key"])
+            src = ""                      # "" = observed THIS run
+            if st_el is None:
+                pst = merged_status.get(e["key"])
+                if pst:                   # fall back to the last-known observation
+                    st_el, src = (pst[0], pst[1]), (pst[2] or "이전 런")
+                else:
+                    st_el = (None, None)
             rows.append((e["method"], e["http_path"], e.get("name", ""),
-                         bool(covered), st_el[0], st_el[1], v or ""))
+                         bool(covered), st_el[0], st_el[1], v or "", src))
         services.append({
             "category": category, "service": service, "slug": slug(category, service),
             "total": len(ents), "covered": covn, "reached": reachn,
             "gtot": gtot, "gcov": gcov, "wtot": wtot, "wcov": wcov, "rows": rows})
     services.sort(key=lambda s: (s["category"], s["covered"] / (s["total"] or 1), s["service"]))
-    return services
+    return services, merged_status
 
 
 # ---------------------------------------------------------------------------
@@ -627,7 +647,8 @@ def render_service_page(s, meta):
 
     conf = (meta.get("conf") or {}).get("by_endpoint", {})
     rows = []
-    for method, path, title, covered, st, el, verd in s["rows"]:
+    for method, path, title, covered, st, el, verd, *_src in s["rows"]:
+        src = _src[0] if _src else ""
         if covered:
             chk = '<span style="color:#2da44e">✓</span>'
         elif verd == "reached":
@@ -639,11 +660,16 @@ def render_service_page(s, meta):
         rcls = "" if covered else ' class="unc"'
         key = f'{s["category"]}/{s["service"]}/{title}'
         cc = conf_cell(conf.get(key, {"status": "green", "items": []}))
+        # last-known observation from a PREVIOUS run: keep the cell filled but
+        # mark the provenance so a stale status is never read as this run's.
+        srcnote = (f' <span class="mut" style="font-size:10px" '
+                   f'title="이 런에서는 미호출 — 마지막 관측 런">@{html.escape(src)}</span>'
+                   if src and st is not None else "")
         rows.append(
             f'<tr{rcls}><td><span class="m m-{method}">{method}</span></td>'
             f'<td><code>{html.escape(path)}</code></td>'
             f'<td class="ti">{html.escape(title or "")}</td>'
-            f'<td style="text-align:center">{chk}</td><td>{statcell(st, el)}</td>'
+            f'<td style="text-align:center">{chk}</td><td>{statcell(st, el)}{srcnote}</td>'
             f'<td>{cc}</td></tr>')
     svc = html.escape(s["service"]); category = html.escape(s["category"])
     return (
@@ -660,7 +686,8 @@ def render_service_page(s, meta):
         f'&nbsp;·&nbsp; 쓰기 {s["wcov"]}/{s["wtot"]} ({wpct:.0f}%) &nbsp;— 모두 2xx 기준</div></div>'
         f'<p class="mut" style="margin:4px 0 10px">컬럼 구분 — <b>최근 status</b>: 회귀 테스트의 '
         f'실제 호출 응답(테스트 수행 성공 여부) · <b>설계/동작 결함</b>: 호출 성공 여부와 별개로 '
-        f'정적+런타임 점검에서 찾은 개선/결함(클릭 시 상세). 빈칸 status는 미호출(커버 X).</p>'
+        f'정적+런타임 점검에서 찾은 개선/결함(클릭 시 상세). 빈칸 status는 한 번도 관측되지 않음. '
+        f'<span style="font-size:11px">@sha = 이번 런 미호출, 해당 런의 마지막 관측값.</span></p>'
         f'<table><thead><tr><th>메서드</th><th>경로</th><th>API</th>'
         f'<th>커버</th><th>최근 status<br><span class="mut" style="font-weight:400">회귀 호출결과 · 응답시간</span></th>'
         f'<th>설계/동작 결함<br><span class="mut" style="font-weight:400">별도 점검</span></th>'
@@ -968,7 +995,17 @@ def build(
     d["crud_ran"] = (any(o.get("source") == "crud_probe" for o in unified_obs)
                      or any(v == "pass" for v in crud_results.values()))
     hist = append_history(history, d, run_type, sha)
-    services = per_service(cat, tsv_rows, prior_verified=prior_verified)
+    # cumulative last-known observation per endpoint (status/elapsed/run) —
+    # fills the drill-down status cells for endpoints this run didn't call.
+    prior_status = {}
+    _ps_path = os.path.join(os.path.dirname(prior or "data/x"), "endpoint_status.json")
+    if os.path.exists(_ps_path):
+        try:
+            prior_status = json.load(open(_ps_path)).get("status", {})
+        except (ValueError, OSError):
+            pass
+    services, merged_status = per_service(cat, tsv_rows, prior_verified=prior_verified,
+                                          prior_status=prior_status, sha=sha)
 
     meta = {
         "branch": branch,
@@ -990,6 +1027,10 @@ def build(
     with open(os.path.join(outdir, "verified_endpoints.json"), "w") as fh:
         json.dump({"verified": d.get("verified_keys", []),
                    "updated": meta["when"], "run_type": run_type}, fh)
+    # …and the cumulative last-known observation map (same publish cycle), so
+    # status/elapsed cells survive scoped runs instead of going blank.
+    with open(os.path.join(outdir, "endpoint_status.json"), "w") as fh:
+        json.dump({"status": merged_status, "updated": meta["when"]}, fh)
 
     # Write per-service drill-down pages
     sdir = os.path.join(outdir, "services")
