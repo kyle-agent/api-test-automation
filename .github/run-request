@@ -1,6 +1,6 @@
-# request: FULL HEAVY coverage run — all fixes in (DB-lane subnet,
-# slowest-first, optional-4xx retries, DBaaS delete retries, keypair 409,
-# cumulative C3, 80 waivers). Account assumed idle.
-mutations=true
+# request: post-run FORCE cleanup — reap this run's TTL-protected leftovers
+# (servicewatch log groups from custom-ingest, dashboards, any volumes/vpc).
 destructive=true
-heavy=true
+sweep_force=true
+category=management
+service=servicewatch
