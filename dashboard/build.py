@@ -258,11 +258,17 @@ def endpoint_verdicts(cat, tsv_rows):
             for k, cs in obs.items()}
 
 
-def per_service(cat, tsv_rows):
+def per_service(cat, tsv_rows, prior_verified=None):
     called = {}
     for status, _category, key, _method, _path, *_rest in tsv_rows:
         called[key] = (status, _rest[0] if _rest else None)
     verdict = endpoint_verdicts(cat, tsv_rows)
+    # cumulative overlay (same rule as compute()): verified by any past run
+    # stays verified unless THIS run hard-failed it — so the drill-down pages
+    # agree with the cumulative C3 headline.
+    for k in (prior_verified or ()):
+        if verdict.get(k) != "failed":
+            verdict[k] = "verified"
 
     groups = defaultdict(list)
     for e in cat:
@@ -964,7 +970,7 @@ def build(
     d["crud_ran"] = (any(o.get("source") == "crud_probe" for o in unified_obs)
                      or any(v == "pass" for v in crud_results.values()))
     hist = append_history(history, d, run_type, sha)
-    services = per_service(cat, tsv_rows)
+    services = per_service(cat, tsv_rows, prior_verified=prior_verified)
 
     meta = {
         "branch": branch,
