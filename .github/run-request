@@ -1,0 +1,8 @@
+# request: post-run FORCE cleanup with the new reconciler matchers — reap the
+# auto-named/unnamed leftovers (snapshots 'snapshot for regr*', unnamed VM boot
+# volumes, public IPs, /scp/*/regr* log groups) + this run's TTL-protected
+# leftovers. Smoke scoped tiny on purpose; the sweep is account-wide.
+destructive=true
+sweep_force=true
+category=management
+service=servicewatch
