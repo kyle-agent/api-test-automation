@@ -381,7 +381,28 @@ def quota_kinds_for(lifecycle_id: str) -> list[str]:
 
 
 def active_lifecycles() -> list[dict]:
-    return [lc for lc in LIFECYCLES if lc.get("enabled")]
+    """Enabled lifecycles, SLOWEST-FIRST.
+
+    pytest-xdist hands tests to workers in parametrize order as they free up.
+    With the long provisioners (DB clusters, VM, SKE — tens of minutes each)
+    scattered through the list, two of them can land on the SAME worker
+    back-to-back and run serially (field report: postgresql started only after
+    mysql finished). Putting heavy/known-slow lifecycles FIRST means the
+    initial worker assignment starts them all concurrently, so wall-clock
+    tends to max(slow) instead of sums.
+    """
+    slow_markers = ("database-", "heavy-", "container-ske",
+                    "compute-virtualserver-full", "dns")
+
+    def slow_rank(lc: dict) -> int:
+        if lc.get("heavy"):
+            return 0
+        if any(m in lc["id"] for m in slow_markers):
+            return 1
+        return 2
+
+    return sorted((lc for lc in LIFECYCLES if lc.get("enabled")),
+                  key=lambda lc: (slow_rank(lc), lc["id"]))
 
 
 # --------------------------------------------------------------------------- #
@@ -599,7 +620,12 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # not a regression — skip rather than fail.
             _is_dep_gone = (resp.status == 400 and (
                 "not-active-state" in _tl or "notactivestate" in _tl
-                or "(deleting)" in _tl))
+                or "(deleting)" in _tl
+                # scp-network.subnet.state.invalid-format: "Subnet ... has
+                # invalid state(state : DELETING)" — a dependency is mid-delete
+                # (e.g. the shared subnet being torn down, or a racing sweep).
+                or "state : deleting" in _tl or "state: deleting" in _tl
+                or ("state.invalid-format" in _tl and "deleting" in _tl)))
             if resp.status not in expected and (_is_quota or _is_gateway_block or _is_dep_gone):
                 if bkind:  # the create did not take effect — give the slot back
                     budget.release(bkind)
