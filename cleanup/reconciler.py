@@ -71,10 +71,18 @@ def _is_deletable(item: dict, *, name_prefixes: tuple[str, ...] = ()) -> bool:
     * If the resource carries the owner tag AND is expired → orphan → DELETE.
     * If the resource has no owner tag but matches a name prefix → legacy
       orphan (no TTL concept) → DELETE.
+
+    FORCE override: ``SCP_SWEEP_IGNORE_TTL=true`` treats tagged-but-unexpired
+    resources as deletable too. ONLY for explicitly requested cleanup runs
+    when the operator knows no mutating run is live (a finished run's orphans
+    keep their 6h TTL and would otherwise be protected until it passes).
     """
+    import os
     from core.registry import _tag_value, OWNER_KEY, OWNER
     has_tag = _tag_value(item, OWNER_KEY) == OWNER
     if has_tag:
+        if os.environ.get("SCP_SWEEP_IGNORE_TTL", "").lower() == "true":
+            return True
         return is_expired(item)
     # No owner tag — matched only by prefix. Treat as legacy orphan.
     return bool(name_prefixes) and is_owned(item, name_prefixes=name_prefixes)

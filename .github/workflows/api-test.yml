@@ -145,6 +145,7 @@ jobs:
       # the chat-controllable equivalent of workflow_dispatch inputs).
       req_mutations: ${{ steps.req.outputs.mutations }}
       req_destructive: ${{ steps.req.outputs.destructive }}
+      req_sweep_force: ${{ steps.req.outputs.sweep_force }}
       req_heavy: ${{ steps.req.outputs.heavy }}
       req_conformance: ${{ steps.req.outputs.conformance }}
       req_category: ${{ steps.req.outputs.category }}
@@ -163,6 +164,7 @@ jobs:
             {
               echo "mutations=$(get mutations)"
               echo "destructive=$(get destructive)"
+              echo "sweep_force=$(get sweep_force)"
               echo "heavy=$(get heavy)"
               echo "conformance=$(get conformance)"
               echo "category=$(get category)"
@@ -554,6 +556,10 @@ jobs:
       # resources), not because of these gates.
       SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_mutations == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+      # run-request sweep_force=true: reap tagged-but-unexpired orphans too
+      # (finished runs' resources keep a 6h TTL). Use ONLY when no mutating
+      # run is live.
+      SCP_SWEEP_IGNORE_TTL: ${{ needs.spec.outputs.req_sweep_force == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
