@@ -5,7 +5,7 @@
       "service": "database/cachestore",
       "enabled": true,
       "heavy": true,
-      "_note": "COVERAGE-ONLY guarded lifecycle for the cachestore (Redis) DBaaS cluster sub-op WRITE endpoints. Soft-captures an existing cluster_id (+ instance_group_id/bsg_id) from read-only calls; absent that, tokens normalize to the catalog '*' key so every endpoint is CALLED+RECORDED (4xx counts). All mutating steps optional+grouped+broad-expect_status; heavy:true (SCP_RUN_HEAVY); DELETEs destructive:true. Bodies from api_docs request_example, UNPROVEN. cachestore DIVERGES MOST from the relational template: it uses commands (PUT /commands with {id,name,new_value}) + commands/sync INSTEAD of the full archive/audit/log-export surface, has NO archive/audit-log/log-export/replicas/promote/databases/add-secondary, no add-block-storages, patch body uses dbaas_engine+software_version, backup body omits archive_frequency_minute, and restore wants explicit OS+DATA block_storage_groups.",
+      "_note": "COVERAGE-ONLY guarded lifecycle for the cachestore (Redis) DBaaS cluster sub-op WRITE endpoints. Soft-captures an existing cluster_id (+ instance_group_id/bsg_id) from read-only calls; absent that, tokens normalize to the catalog '*' key so every endpoint is CALLED+RECORDED (4xx counts). All mutating steps optional+grouped+broad-expect_status; heavy:true (SCP_RUN_HEAVY); DELETEs destructive:true. Bodies from api_docs request_example, UNPROVEN. cachestore DIVERGES MOST from the relational template: it uses commands (PUT /commands with {id,name,new_value}) + commands/sync INSTEAD of the full archive/audit/log-export surface, has NO archive/audit-log/log-export/replicas/promote/databases/add-secondary, no add-block-storages, patch body uses dbaas_engine+software_version (filled with the userguide-documented Redis OSS Sentinel 7.2.11 — knowledge/formal/services/database__cachestore.yaml), backup body omits archive_frequency_minute, and restore wants explicit OS+DATA block_storage_groups. remove-backup-histories 401s with valid HMAC (backend quirk, run 27258520218).",
       "steps": [
         {
           "name": "list-clusters",
@@ -337,8 +337,8 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/patch",
           "json": {
-            "dbaas_engine": "",
-            "software_version": ""
+            "dbaas_engine": "redis",
+            "software_version": "7.2.11"
           },
           "expect_status": [
             200,

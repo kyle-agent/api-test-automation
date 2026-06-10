@@ -10,8 +10,8 @@ constraints:
     rule: "선행 서비스: VPC (+subnet) must exist before a CacheStore cluster (userguide)"
     provenance: docs
   - id: engine-versions
-    rule: "supported engines: Redis OSS Sentinel 7.2.11 (EoS 2029-06) and Valkey Sentinel 8.1.4; create bodies must use one of THESE exact versions — a guessed version is the likeliest cause of the create 4xx (21/21 endpoints called-only)"
-    provenance: docs
+    rule: "supported engines: Redis OSS Sentinel 7.2.11 (EoS 2029-06) and Valkey Sentinel 8.1.4; create bodies must use one of THESE exact versions. RESOLVED 2026-06-10 (run 27258520218): the heavy-shared-dbaas cache-create that captures dbaas_engine_version_id dynamically from /v1/engine-versions contents[0] got 202 — the version-guess hypothesis for the called-only gap is DISPROVEN; the subops gap is no-live-cluster timing, not the create body"
+    provenance: VALIDATED
   - id: sentinel-topology
     rule: "single Master + 1 or 2 Replicas, Sentinel-based HA with automatic failover; switch-over toggles Active-Standby — replica_count in bodies must be 1 or 2"
     provenance: docs
@@ -30,3 +30,6 @@ quirks:
   - id: recovery-creates-new-instance
     note: "point-in-time recovery creates a SEPARATE DB instance — recovery tests must expect (and tear down) a second cluster"
     provenance: docs
+  - id: backup-histories-401
+    note: "PUT /v1/clusters/{id}/backup-histories returns 401 with a valid HMAC signature (run 27258520218) — same backend auth quirk family as mysql/postgresql unset-backup DELETE 401 and postgresql backup-histories 401; not a signing bug on our side (sibling subops on the same cluster path 400, not 401)"
+    provenance: VALIDATED
