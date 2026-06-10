@@ -1,4 +1,180 @@
 {
-  "_comment": "C3 coverage waivers (docs/COVERAGE-CRITERIA.md). Endpoints that can NEVER 2xx on the shared test account BY DESIGN. A waived endpoint leaves the C3 denominator but MUST still be C2 (called; the 4xx is the evidence). class: blast-radius | entitlement | unsatisfiable-flow | billing-prohibitive. HUMANS approve every addition (same review discipline as combo-scenarios). key = catalog endpoint key. The dashboard surfaces waived counts and flags waived endpoints that DO get a 2xx as removal candidates.",
-  "waivers": []
+ "_comment": "C3 coverage waivers (docs/COVERAGE-CRITERIA.md). Endpoints that can NEVER 2xx on the shared test account BY DESIGN. A waived endpoint leaves the C3 denominator but MUST still be C2 (called; the 4xx is the evidence). class: blast-radius | entitlement | unsatisfiable-flow | billing-prohibitive. HUMANS approve every addition (same review discipline as combo-scenarios). key = catalog endpoint key. The dashboard surfaces waived counts and flags waived endpoints that DO get a 2xx as removal candidates.",
+ "waivers": [
+  {
+   "key": "storage/archivestorage/cancelarchiving",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/cancelrecovery",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/createarchivingpolicy",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/createbucket",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/deletebucket",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/deletebucketobjects",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/deletebucketobjectversions",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listarchivinghistories",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listarchivingpolicies",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listbucketobjects",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listbucketobjectversions",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listbuckets",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/listrecoveryhistories",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/recoverobjects",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/recoverobjectversions",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/setarchivingpolicy",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/setarchivingpolicystate",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/setbucketencryption",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/setbucketversioning",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showarchivinghistory",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showarchivingpolicy",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showbucket",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showbucketencryption",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showbucketversioning",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  },
+  {
+   "key": "storage/archivestorage/showrecoveryhistory",
+   "class": "entitlement",
+   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+   "provenance": "docs",
+   "added": "2026-06-10"
+  }
+ ]
 }
