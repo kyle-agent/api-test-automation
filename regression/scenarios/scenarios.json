@@ -1985,13 +1985,15 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            409
           ],
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/keypairs/regrkey{unique}",
             "service": "virtualserver"
-          }
+          },
+          "_note_409": "409 KeypairNameUsed = orphan with the same name exists; keypairs are addressed BY NAME so reuse is safe and teardown deletes it"
         },
         {
           "name": "find-k8s-version",
@@ -2880,13 +2882,15 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            409
           ],
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/keypairs/regrkey{unique}",
             "service": "virtualserver"
-          }
+          },
+          "_note_409": "409 KeypairNameUsed = orphan with the same name exists; keypairs are addressed BY NAME so reuse is safe and teardown deletes it"
         },
         {
           "name": "create-server-group",
