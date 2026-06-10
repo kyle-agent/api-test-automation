@@ -1,0 +1,46 @@
+# Layer 1 — per-service knowledge: networking/loadbalancer
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/load_balancer/overview/ (제약 사항 · 선행 서비스)
+
+version: 1
+service: networking/loadbalancer
+
+constraints:
+  - id: lb-quota-50-per-region
+    rule: "default quota: max 50 Load Balancers per region (LOAD_BALANCER.DEFAULT.COUNT=50, userguide; expandable via quota-increase request)"
+    provenance: docs
+  - id: lb-service-subnet-quota-3-per-vpc
+    rule: "default quota: max 3 LB service subnets per VPC (LOAD_BALANCER.SERVICE_SUBNET.DEFAULT.COUNT=3, userguide)"
+    provenance: docs
+  - id: lb-listener-quota-1000-per-region
+    rule: "default quota: max 1000 listeners per region (LOAD_BALANCER.LISTENER.DEFAULT.COUNT=1000, userguide)"
+    provenance: docs
+  - id: lb-server-group-quota-1000-per-region
+    rule: "default quota: max 1000 LB server groups per region (LOAD_BALANCER.SERVER_GROUP.DEFAULT.COUNT=1000, userguide)"
+    provenance: docs
+  - id: lb-member-quota-1000-per-region
+    rule: "default quota: max 1000 members TOTAL across all server groups per region (LOAD_BALANCER.MEMBER.DEFAULT.COUNT=1000, userguide)"
+    provenance: docs
+  - id: lb-health-check-quota-500-per-region
+    rule: "default quota: max 500 health checks per region (LOAD_BALANCER.HEALTH_CHECK.DEFAULT.COUNT=500, userguide)"
+    provenance: docs
+  - id: lb-prereq-vpc
+    rule: "선행 서비스: a VPC (and a subnet inside it) must exist before any Load Balancer resource can be created (userguide)"
+    provenance: docs
+
+captures:
+  loadbalancer: $.loadbalancer.id
+  lb-health-check: $.lb_health_check.id
+  lb-server-group: $.lb_server_group.id
+  lb-member: $.members[0].id
+
+states:
+  loadbalancer: {field: $.loadbalancer.state, ready: [ACTIVE, CREATED, RUNNING, AVAILABLE]}
+
+quirks:
+  - id: lb-quotas-console-expandable
+    note: "current quota usage is visible in the Console and expandable items can be increased via a quota request — the numbers above are DEFAULTS, not hard caps (userguide)"
+    provenance: docs
+  - id: lb-service-ip-must-match-subnet
+    note: "the lifecycle networking-loadbalancer-members-nat hard-codes service_ip 10.124.0.30 / member_ip 10.124.0.31 (shared-VPC 10.124.0.0/24 range) while its self-created fallback subnet is 10.138.5.0/24 — service_ip only resolves when the shared VPC/subnet is actually adopted"
+    provenance: docs

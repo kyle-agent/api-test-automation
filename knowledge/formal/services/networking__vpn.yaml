@@ -1,0 +1,28 @@
+# Layer 1 — per-service knowledge: networking/vpn
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/vpn/overview/ (제약 사항 · 선행 서비스)
+
+version: 1
+service: networking/vpn
+
+constraints:
+  - id: vpn-gateway-quota-3-per-account
+    rule: "account cap: max 3 VPN Gateways per account (userguide)"
+    provenance: docs
+  - id: vpn-tunnel-quota-5-per-gateway
+    rule: "max 5 VPN Tunnels per VPN Gateway (VPN Gateway당 5개 생성 가능, userguide)"
+    provenance: docs
+  - id: vpn-prereq-vpc
+    rule: "선행 서비스: a VPC must exist before a VPN Gateway can be created (userguide; the gateway create additionally needs a public IP for ip_id)"
+    provenance: docs
+
+captures:
+  vpn-gateway: $.vpn_gateway.id
+  vpn-tunnel: $.vpn_tunnel.id
+
+states: {}
+
+quirks:
+  - id: vpn-region-availability
+    note: "VPN is only offered in kr-west1, kr-east1 and kr-south3 — NOT available in Korea South 1/2 (userguide); region-gate any VPN lifecycle"
+    provenance: docs

@@ -1,0 +1,27 @@
+# Layer 1 — per-service knowledge: networking/cdn
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/global_cdn/overview/ (제약 사항 · 선행 서비스)
+
+version: 1
+service: networking/cdn
+
+constraints:
+  - id: cdn-domain-quota-20-per-account
+    rule: "account cap: max 20 Global CDN domains per account (Account당 최대 생성 가능 도메인수 20, userguide)"
+    provenance: docs
+  - id: cdn-no-prereq-services
+    rule: "선행 서비스: none — Global CDN has no prerequisite services (Global CDN 서비스는 선행 서비스가 없습니다, userguide); VPC-free control-plane resource"
+    provenance: docs
+
+captures:
+  cdn: $.cdn.resource_id
+
+states: {}
+
+quirks:
+  - id: cdn-id-is-resource-id
+    note: "create response envelope is {cdn:{account_id,resource_id,workflow_id}} — the usable id is $.cdn.resource_id, NOT $.cdn.id"
+    provenance: docs
+  - id: cdn-domain-prefix-globally-unique
+    note: "cdn_service_domain_prefix must be globally unique (lifecycle networking-cdn-service uses regr{ualpha})"
+    provenance: docs

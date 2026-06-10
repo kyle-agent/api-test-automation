@@ -1,0 +1,27 @@
+# Layer 1 — per-service knowledge: networking/firewall
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/firewall/overview/ (제약 사항 · 선행 서비스)
+
+version: 1
+service: networking/firewall
+
+constraints:
+  - id: firewall-rule-quota-by-size
+    rule: "rule quota depends on the firewall size tier: Extra Small=5, Small=100, Medium=200, Large=500, Extra Large=1000 rules (userguide)"
+    provenance: docs
+  - id: firewall-default-size-exsmall
+    rule: "a firewall is created at size Extra Small by default (5-rule quota); the size can be changed afterwards on the Console firewall details page (userguide) — matches flavor_name EXSMALL in the API"
+    provenance: docs
+  - id: firewall-prereq-gateway-services
+    rule: "선행 서비스: VPC, Direct Connect and Load Balancer must exist first (userguide) — a firewall is an attribute of a gateway-type resource (created implicitly via firewall_enabled:true), not a standalone create"
+    provenance: docs
+
+captures:
+  firewall-rule: $.firewall_rule.id
+
+states: {}
+
+quirks:
+  - id: firewall-no-standalone-create
+    note: "there is no POST /v1/firewalls — only POST /v1/firewalls/rules (needs an existing firewall_id) and PUT /v1/firewalls/{firewall_id}; a firewall_id must be minted by creating a firewall-bearing resource (igw / direct-connect / loadbalancer with firewall_enabled:true)"
+    provenance: docs
