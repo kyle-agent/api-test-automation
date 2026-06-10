@@ -62,6 +62,11 @@ Supports: `spec/` (extract+diff the spec), `dashboard/` (visualize both axes),
 Smoke + read-chains only call `GET`s. Mutations happen exclusively through
 ordered CRUD scenarios. Never relax these as a shortcut.
 
+**Run sequencing (owner rule, 2026-06-10):** one workflow run at a time — before
+pushing anything that triggers `api-test.yml` (any `.github/run-request` touch,
+including the consume/delete commit), confirm the previous run has FULLY
+concluded, sweep job included (`actions_list` status != in_progress).
+
 ## Isolation & teardown (why we don't break other runs)
 
 - Every created resource is stamped by `core.registry` with

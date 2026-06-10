@@ -28,6 +28,10 @@ on:
   push:
     # The file does not need to pre-exist: creating or editing it in a push is
     # the trigger. Keep it OUT of unrelated commits so merges stay silent.
+    # SEQUENCING RULE (owner, 2026-06-10): do NOT push ANY run-request-touching
+    # commit (including the consume/delete) while a previous workflow run —
+    # INCLUDING its sweep job — is still in progress. Wait for the whole run
+    # to conclude first.
     paths: [".github/run-request"]
   workflow_dispatch:
     inputs:
