@@ -3999,7 +3999,9 @@
             200,
             201,
             202
-          ]
+          ],
+          "group": "mysql-backup",
+          "optional": true
         },
         {
           "name": "wait-after-set-backup",
@@ -4017,7 +4019,9 @@
             ],
             "timeout": 600,
             "interval": 20
-          }
+          },
+          "group": "mysql-backup",
+          "optional": true
         },
         {
           "name": "verify-backup-config",
@@ -4026,7 +4030,9 @@
           "expect_status": [
             200,
             404
-          ]
+          ],
+          "group": "mysql-backup",
+          "optional": true
         },
         {
           "name": "unset-backup",
@@ -4041,7 +4047,9 @@
             401
           ],
           "retries": 4,
-          "retry_interval": 20
+          "retry_interval": 20,
+          "group": "mysql-backup",
+          "optional": true
         },
         {
           "name": "wait-after-unset-backup",
@@ -4059,7 +4067,9 @@
             ],
             "timeout": 600,
             "interval": 20
-          }
+          },
+          "group": "mysql-backup",
+          "optional": true
         },
         {
           "name": "list-parameter-values-before",

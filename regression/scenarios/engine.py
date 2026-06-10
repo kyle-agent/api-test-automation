@@ -351,7 +351,17 @@ def _run_step(client, step, path, body, service, ctx):
     """Execute a step; honour retry_on_status and poll (field/until or
     until_status) for async provisioning/teardown."""
     params = step.get("params")
-    resp = client.request(step["method"], path, json=body, service=service, params=params)
+    try:
+        resp = client.request(step["method"], path, json=body, service=service, params=params)
+    except Exception as exc:
+        # One retry on a transport timeout (field case: iam PUT hit the 20s
+        # read timeout once and failed the whole lifecycle). Slow-but-alive
+        # gateways are environmental; a single retry absorbs the blip.
+        if "timeout" not in type(exc).__name__.lower() and "timed out" not in str(exc).lower():
+            raise
+        print(f"  step '{step.get('name')}' transport timeout — retrying once ({exc})")
+        time.sleep(5)
+        resp = client.request(step["method"], path, json=body, service=service, params=params)
     ros = step.get("retry_on_status")
     if ros:
         attempts = int(step.get("retries", 4))
