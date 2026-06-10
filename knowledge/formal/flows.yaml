@@ -50,6 +50,9 @@ flow_rules:
   - id: no-overlapping-mutation-runs
     rule: "never let two VPC-mutating runs overlap (they compete for the same 3 VPCs) — one CRUD run at a time, wait for the prior regression job to finish"
     provenance: VALIDATED
+  - id: slow-provisioners-isolated
+    rule: "resources with very slow create/delete (private-dns: hours observed) get their OWN lane/VPC and are scheduled create-first / delete-last with generous poll timeouts, so nothing serializes behind them and a stall doesn't wedge the whole run"
+    provenance: VALIDATED
 
 call_orders:
   vpc:

@@ -54,6 +54,12 @@ internet-gateway / port. lookups(image, server-type, k8s-version)도 여기서
 | **VPC-C · compute** | VM full (keypair/SG/볼륨은 Stage 0 것 adopt) → LB+VM attach 콤보 · SKE cluster+nodepool (Stage 0 filestorage adopt) | heavy 직렬 2개가 아니라 VM과 SKE를 lane 내 병렬로 |
 | **(예약 슬롯) · VPC-CRUD 직렬** | networking-vpc-subnet · igw · cidr-secondary · **peering(VPC 2개 필요)** · transit-gateway | peering은 예약 슬롯+lane 하나가 비워진 뒤 또는 cap=5 확인 후 |
 
+> **느린 프로비저너 격리 (VALIDATED 2026-06-10):** private-dns는 생성/삭제가
+> **수 시간** 걸릴 수 있다 (run #39이 여기서 정체). private-dns가 포함된
+> 플로우는 **자기 lane/VPC에 격리**하고, 생성은 run 시작 직후·삭제는 마지막에
+> 배치하며, 넉넉한 poll timeout을 준다. 다른 lifecycle이 그 뒤에 직렬로 묶이지
+> 않게 한다 (`flows.yaml: slow-provisioners-isolated`).
+
 ### Stage 3 — Teardown (역순)
 
 lane 내부 자원 → Stage 1 children → Stage 0 foundations. registry-driven,
