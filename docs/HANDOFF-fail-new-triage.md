@@ -88,3 +88,38 @@ Same signature works for sibling calls in the same lifecycle (they 400, not
   run's evidence + the userguide retry pinned its blocker: create REQUIRES
   1–8 attached Bare Metal Servers —
   `knowledge/formal/services/storage__baremetal-blockstorage.yaml`.
+
+## Owner decisions (2026-06-10, applied to coverage_waivers.json)
+
+- **BM 계열 C2-only**: storage/baremetal-blockstorage(39) + compute/baremetal(14)
+  + compute/multinodegpucluster(13) — real BM server is billing-prohibitive.
+- **라이선스 클러스터 C2-only**: database/sqlserver(33) +
+  data-analytics/vertica(19) + data-analytics/searchengine(22).
+  (eventstreams는 waiver 아님 — topology value_error는 도메인 헌트로 계속.)
+- **backup은 agentless만**: agent 계열 8개만 waiver
+  (create/delete/show backupagent, checkconnectionstate, listbackupagenttargets,
+  showinstallfilepath, restoreagentbackup, listagentbackuprestoretargetservers);
+  agentless 백업 본체(createbackup 등 23개)는 C3 타깃 유지.
+- **cloudmonitoring C2-only**(14).
+- 합계 +162 waivers (80 → 242). C3 분모 1292 → 1130.
+
+## SCR 이미지 push 조사 (userguide cliusage, 2026-06-10)
+
+표준 docker/OCI 인증으로 push 가능 — 단 **두 개의 선행 조건**이 있다:
+
+1. **인증 = IAM 인증키 그대로**: `docker login <registry_endpoint>` with
+   Username=AccessKey / Password=SecretKey (CI의 SCP_ACCESS_KEY/SECRET_KEY 재사용
+   가능). 필요 권한: LoginContainerRegistry + PushRepositoryImages. **콘솔 작업
+   필요**: IAM > 인증키 관리 > 보안 설정에서 해당 키의 인증 방식을 "인증키
+   인증"으로 설정해야 함 (API로 가능한지 미확인 — iam accesskey 계열은 현재
+   500/404).
+2. **엔드포인트 도달성**: 문서가 주는 형식은 프라이빗 엔드포인트
+   `[name]-[id].scr.private.[region].[offering].samsungsdscloud.com` — GitHub
+   러너(공인망)에서는 **public endpoint를 켜야** 접근 가능할 것. 그 토글이
+   바로 fail_new의 `updatepublicendpointenabled` PUT **500** — 이 500을 먼저
+   풀어야 함 (빈 바디로 보냈는지 확인; {enabled:true} 류 바디 재시도).
+
+실행 계획(다음 mutation 런): enable-public-endpoint 바디 보정 → 2xx 확인 →
+CI에 skopeo 한 스텝 추가 (`skopeo copy docker://busybox:latest
+docker://<endpoint>/<repo>/regr:c3 --dest-creds $AK:$SK`) → image/tags 계열
+19개 엔드포인트가 read-chain으로 풀림. 콘솔 선행(인증키 인증 설정)은 오너 액션.
