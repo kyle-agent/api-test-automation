@@ -209,3 +209,37 @@ on license); cachestore (Redis) uses `/commands`(+sync) not archive/audit/log-ex
 secretvault has no hard DELETE (PUT .../terminated); secretsmanager
 `POST .../values` is REVEAL not update; certificatemanager import is unsatisfiable
 (coverage-only); firewall has no `POST /v1/firewalls` (implicit on igw/dc/vpc).
+
+## 2026-06-10 — full heavy run 27258520218 + post-run force-cleanup evidence
+
+**cachestore create VALIDATED:** `heavy-shared-dbaas` cache-create got **202**
+(cluster created → waited → 202 delete) with `dbaas_engine_version_id` captured
+dynamically from `/v1/engine-versions` `contents[0]` — the "guessed engine
+version" hypothesis for the 21/21 called-only gap is disproven; the sub-op gap
+is no-live-cluster **timing** (the guarded sub-op lifecycle ran when no cluster
+existed → soft 400s with `*` tokens).
+
+**401 family (valid HMAC):** DBaaS backup sub-resources 401 across engines —
+cachestore/postgresql `PUT .../backup-histories`, mysql/postgresql
+`DELETE .../backups` — while sibling sub-ops on the same cluster path 400.
+Also 401: the two query-param GETs (`scr check-duplication/name`, devops
+`check-duplication`) — suspect HMAC-vs-query-string signing on our side.
+Triage: `docs/HANDOFF-fail-new-triage.md`.
+
+**Sweep/cleanup behavior (run ca493bd sweep log):**
+- `/v1/log-groups`: **15 listed / 0 deletable** every round — the per-service
+  auto-created log groups (`/scp/ske/...`, `/scp/<engine>/.../slowlog|alertlog`)
+  carry no owner tag and their names don't match the `regr` prefix fallback, so
+  the reconciler never reaps them. Servicewatch 로그그룹 0건 아님 — needs either
+  a reconciler rule for `/scp/<svc>/regr*` paths or console cleanup.
+- secrets (12) and KMS transit keys (10+5) re-list as "deletable" every sweep
+  round: deletes return success but the items keep listing — scheduled-deletion
+  retention windows, not sweep failures.
+- 2 cloudmonitoring dashboards 400 on every delete attempt (ids
+  `8b498aa3...`, `bc3343cf...`) — delete body/precondition unknown, recurring
+  sweep noise.
+
+**BM blockstorage blocker pinned (userguide retry):** volume create REQUIRES
+1–8 attached Bare Metal Servers (연결 서버 필수) → `attachments: []` is the 400;
+the ~40-endpoint chain stays called-only without a BM server. Full constraints:
+`knowledge/formal/services/storage__baremetal-blockstorage.yaml`.

@@ -134,12 +134,22 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   85.6%**; residual 198-endpoint gap is exclusively id-bound GETs (read-chain /
   probe_reads auto-covered at runtime, so live `cov_op` runs higher). All bodies
   docs-derived, **PENDING LIVE VALIDATION**.
-- **What to advance next:** a **live CI run** to convert the static ceiling into
-  measured `cov_op` — needs the lane-scheduling work first so the heavy CRUD set
-  fits the 300-min cap (the new fragments add many heavy lifecycles). Then iterate
-  on bodies that 4xx (the docs-derived guesses) using real runtime evidence, and
-  fix the known corrupt `api_bodies.json` entries (iam saml-provider, vpc tgw
-  firewall-connection). Ledger: `agents/coordination/ledger.json`.
+- **Full heavy run landed (2026-06-10, run 27258520218):** cov_op 35.4 / C3 37.5,
+  **fail_new 52 → triaged** in `docs/HANDOFF-fail-new-triage.md` (27 unique:
+  6×401 incl. a suspected query-string HMAC signing bug, 8 DBaaS sub-op 500s
+  needing a live-cluster window, 5 bulk-body fixes, 8 create/setter fixes).
+  Run-time levers since then: optional-step 4xx retries are now capped
+  (placeholder paths never retry; `SCP_OPT_RETRY_BUDGET_S`, default 240s per
+  lifecycle) and the CRUD passes are **A∥B split** — the serial VPC-CRUD class
+  runs in its own `regression-vpc-crud` job in parallel with the adopt-class job
+  (wall-clock = max(A,B); A's 1 shared VPC + B's worst 2 = the validated 3-VPC cap).
+- **What to advance next:** iterate on bodies that 4xx/500 per the fail_new
+  triage doc (harness query-signing first, then bulk bodies), schedule the
+  guarded DBaaS sub-ops into the heavy clusters' live window, and fix the known
+  corrupt `api_bodies.json` entries (iam saml-provider, vpc tgw
+  firewall-connection). Servicewatch auto-created log groups (15) are NOT
+  reaped by the sweep (no owner tag, `/scp/...` names) — needs a reconciler rule
+  or console cleanup. Ledger: `agents/coordination/ledger.json`.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.
