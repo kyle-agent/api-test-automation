@@ -528,16 +528,34 @@ def run_sweep(client) -> int:
             else:
                 print(f"  {path} {it['id']} delete -> {st}")
 
-    # servicewatch log groups (regrlg). Two gotchas found in the field:
+    # servicewatch log groups (regrlg + service-auto-created). Gotchas found in
+    # the field:
     #   * a group delete is REJECTED while the group still has log streams —
     #     and the custom-ingest lifecycle creates an implicit regrlg* group +
     #     stream with NO teardown of its own, so orphans always have streams;
     #   * _delete returns the raw HTTP status, and `if _delete(...)` is truthy
     #     even on 400/409 — the old bulk delete counted rejected deletes as
     #     deleted. Delete streams first, then groups one-by-one, and only
-    #     count 2xx (404 = already gone).
-    for it in _select(c, "servicewatch", "/v1/log-groups",
-                      name_prefixes=("regrlg",)):
+    #     count 2xx (404 = already gone);
+    #   * services AUTO-CREATE log groups for our regr* resources with PATH
+    #     names (`/scp/ske/regrske...`, `/scp/mysql/regry.../slowlog`) — they
+    #     carry no owner tag and the name does not START with regr, so the
+    #     plain prefix fallback skipped them forever (sweep logs: "20 listed /
+    #     0 deletable"). Owner decision 2026-06-10: a log group whose name has
+    #     ANY path segment starting with `regr` is ours — delete it.
+    def _regr_log_group(it):
+        name = _name_of(it)
+        return name.startswith("regrlg") or any(
+            seg.startswith("regr") for seg in name.split("/") if seg)
+
+    _lg_listed = _list_all(c, "servicewatch", "/v1/log-groups")
+    _lg_picked = [it for it in _lg_listed
+                  if _is_deletable(it, name_prefixes=("regrlg",))
+                  or _regr_log_group(it)]
+    if _lg_listed:
+        print(f"  /v1/log-groups: {len(_lg_listed)} listed / "
+              f"{len(_lg_picked)} deletable (incl. auto-created /scp/*/regr*)")
+    for it in _lg_picked:
         gid = it.get("id")
         if not gid:
             continue
