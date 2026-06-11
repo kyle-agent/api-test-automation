@@ -552,13 +552,22 @@
           "retry_on_status": [409], "retries": 4, "retry_interval": 15
         },
         {
+          "name": "wait-peering-gone",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+        },
+        {
           "name": "delete-vpc-b",
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id_b}",
           "expect_status": [200, 202, 204],
           "destructive": true,
-          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+          "retry_on_status": [409], "retries": 12, "retry_interval": 30
         },
         {
           "name": "delete-vpc",
@@ -873,13 +882,23 @@
           "retry_on_status": [409], "retries": 4, "retry_interval": 15
         },
         {
+          "name": "delete-vip",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+          "optional": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409], "retries": 8, "retry_interval": 15
+        },
+        {
           "name": "delete-subnet",
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/subnets/{subnet_id}",
           "expect_status": [200, 202, 204],
           "destructive": true,
-          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+          "retry_on_status": [409], "retries": 8, "retry_interval": 15
         },
         {
           "name": "wait-subnet-gone",

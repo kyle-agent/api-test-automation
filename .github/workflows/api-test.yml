@@ -293,6 +293,40 @@ jobs:
             exit 1
           fi
 
+      - name: Derive lane filters (adopt vs vpc-crud partition)
+        # ADOPT_K / VPC_CRUD_K / PARALLEL_K are derived from dependencies.json so
+        # the workflow never hardcodes the classification. PARALLEL_K is the exact
+        # complement of VPC_CRUD_K -> the two CRUD passes partition all enabled
+        # CRUD lifecycles. Written to $GITHUB_ENV for the run steps below.
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        run: |
+          python -m regression.scenarios.shared_infra --print-filters >> "$GITHUB_ENV"
+          echo "derived ADOPT_K / VPC_CRUD_K / PARALLEL_K -> \$GITHUB_ENV"
+
+      - name: Provision shared VPC + subnet (BEFORE smoke, with retry)
+        # Creates ONE shared VPC + ONE shared subnet and appends SCP_SHARED_* to
+        # $GITHUB_ENV so every xdist worker ADOPTS the same live infra. Runs
+        # BEFORE the ~14-min smoke phase on purpose: run 27314355676 provisioned
+        # AFTER smoke and collided with job B's VPC churn at its peak — the
+        # provision failed silently, every adopt lifecycle fell back to
+        # self-create, and 8 lifecycles (incl. heavy-shared-dbaas) skipped on
+        # the 5-VPC cap. Provisioning at minute 0 (B holds at most 1 VPC then)
+        # plus a 10x45s retry (B keeps freeing slots) wins the slot reliably.
+        # Only well-formed SCP_SHARED_*= lines reach $GITHUB_ENV.
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        run: |
+          for i in $(seq 1 10); do
+            python -m regression.scenarios.shared_infra --provision > shared_ids.txt || true
+            cat shared_ids.txt
+            if grep -qE '^SCP_SHARED_VPC_ID=' shared_ids.txt; then
+              grep -E '^SCP_SHARED_[A-Za-z0-9_]+=' shared_ids.txt >> "$GITHUB_ENV"
+              echo "provisioned shared VPC/subnet on attempt $i"
+              break
+            fi
+            echo "provision attempt $i got no ids (likely VPC cap while job B churns) — retry in 45s"
+            sleep 45
+          done
+
       - name: Run read-only smoke + read-chains regression
         # Read-only — runs once for every event (PR/smoke-only and CRUD runs).
         id: smoke
@@ -386,33 +420,6 @@ jobs:
               echo "heavy self-trigger active: run_heavy=true, crud_filter=$f"
             fi
           fi
-
-      - name: Derive lane filters (adopt vs vpc-crud partition)
-        # ADOPT_K / VPC_CRUD_K / PARALLEL_K are derived from dependencies.json so
-        # the workflow never hardcodes the classification. PARALLEL_K is the exact
-        # complement of VPC_CRUD_K -> the two CRUD passes partition all enabled
-        # CRUD lifecycles. Written to $GITHUB_ENV for the run steps below.
-        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
-        run: |
-          python -m regression.scenarios.shared_infra --print-filters >> "$GITHUB_ENV"
-          echo "derived ADOPT_K / VPC_CRUD_K / PARALLEL_K -> \$GITHUB_ENV"
-
-      - name: Provision shared VPC + subnet (once, for all xdist workers)
-        # Creates ONE shared VPC + ONE shared subnet and appends
-        # SCP_SHARED_VPC_ID / SCP_SHARED_SUBNET_ID to $GITHUB_ENV so every
-        # subsequent pytest (and each xdist worker) ADOPTS the same live infra
-        # instead of provisioning per-worker. No-op (prints nothing) if mutations
-        # are off. Diagnostics go to stderr; only the SCP_SHARED_* lines hit env.
-        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
-        run: |
-          # Capture stdout to a file, then append ONLY well-formed SCP_SHARED_*=
-          # lines to $GITHUB_ENV. This is the robust guard: even if anything
-          # leaks to stdout, a non-KEY=VALUE line can never corrupt $GITHUB_ENV
-          # (which fails the step with "Invalid format"). Diagnostics still print.
-          python -m regression.scenarios.shared_infra --provision > shared_ids.txt
-          cat shared_ids.txt
-          grep -E '^SCP_SHARED_[A-Za-z0-9_]+=' shared_ids.txt >> "$GITHUB_ENV" || true
-          echo "provisioned shared VPC/subnet (SCP_SHARED_* ids -> \$GITHUB_ENV)"
 
       - name: Run ADOPT-class CRUD (parallel)
         id: crud
