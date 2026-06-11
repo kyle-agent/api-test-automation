@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}자원 노드 — {{ node_id }}{% endblock %}
+{% block content %}
+
+<section>
+  <h2><a href="/planning/resources">자원 모델</a> › <code>{{ node_id }}</code>
+    {% if is_new %}<span class="cat">신규</span>
+    {% else %}<span class="status {{ 'done' if node.get('provenance') == 'VALIDATED' else 'dispatched' }}">{{ node.get('provenance', 'docs') }}</span>{% endif %}
+  </h2>
+  <p class="muted">raw YAML이 아닌 폼 — 내부적으로 §1 스키마의 yaml을 생성해
+    {% if file %}<code>knowledge/formal/resources/{{ file }}</code>{% else %}
+    service에서 유도한 <code>&lt;category&gt;__&lt;service&gt;.yaml</code>{% endif %}에
+    저장합니다 (authoring 파이프라인: 검증 통과 시에만 반영 + 로컬 git 커밋).
+    {% if not is_new %}고급 사용자용 raw 편집:
+    <a href="/planning/edit?path=knowledge/formal/resources/{{ file }}&find={{ node_id }}">원본 YAML 편집기</a>{% endif %}</p>
+</section>
+
+<datalist id="node-ids">
+  {% for nid in node_ids %}<option value="{{ nid }}">{% endfor %}
+</datalist>
+
+<form hx-post="/planning/resources/{{ node_id }}/save" hx-target="#save-result"
+      hx-swap="innerHTML">
+<input type="hidden" name="provenance"
+       value="{{ node.get('provenance', 'docs') }}">
+
+<section>
+  <h2>기본 정보</h2>
+  <table>
+    <tr>
+      <th style="width:140px">code (분류 번호)</th>
+      <td><input type="text" name="code" value="{{ node.get('code', '') }}"
+                 placeholder="예: 001-001-a" size="14"></td>
+      <th style="width:140px">service</th>
+      <td><input type="text" name="service" value="{{ node.get('service', '') }}"
+                 placeholder="category/service" size="24" required></td>
+    </tr>
+    <tr>
+      <th>group (생략 시 code 접두)</th>
+      <td><input type="text" name="group" value="{{ node.get('group', '') }}"
+                 placeholder="예: 001-001" size="14"></td>
+      <th>quota (core/budgets)</th>
+      <td><input type="text" name="quota" value="{{ node.get('quota', '') }}"
+                 placeholder="예: vpc" size="14"></td>
+    </tr>
+    <tr>
+      <th>provenance (읽기 전용)</th>
+      <td colspan="3" class="muted">{{ node.get('provenance', 'docs') }} —
+        역추출(라이브 검증) = VALIDATED, 사람/AI 입력 = docs.
+        승격은 scoped run 통과 시 자동 (C5).</td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <h2>전제조건 (requires) — 행 추가식</h2>
+  <p class="muted">type: <b>ref</b>(단일 의존) · <b>count</b>(다중성, 예: vpc×2) ·
+    <b>one_of</b>(OR-의존 — 대상에 콤마로 대안 나열, 항목은 <code>id</code> 또는
+    <code>id:use</code> 예: <code>load-balancer, server:ip</code>).
+    빈 행은 무시됩니다.</p>
+  <table>
+    <tbody id="req-rows">
+      <tr><th style="width:120px">type</th><th>대상 노드</th>
+          <th style="width:90px">count</th></tr>
+      {% for r in req_rows %}
+      <tr>
+        <td><select name="req_type">
+          {% for t in ('ref', 'count', 'one_of') %}
+          <option value="{{ t }}" {{ 'selected' if r.type == t else '' }}>{{ t }}</option>
+          {% endfor %}</select></td>
+        <td><input type="text" name="req_target" value="{{ r.target }}"
+                   list="node-ids" style="width:96%"></td>
+        <td><input type="text" name="req_count" value="{{ r.count }}" size="4"></td>
+      </tr>
+      {% endfor %}
+      <tr class="proto">
+        <td><select name="req_type">
+          <option value="ref">ref</option><option value="count">count</option>
+          <option value="one_of">one_of</option></select></td>
+        <td><input type="text" name="req_target" value="" list="node-ids"
+                   placeholder="노드 id (one_of는 콤마 나열)" style="width:96%"></td>
+        <td><input type="text" name="req_count" value="" size="4"></td>
+      </tr>
+    </tbody>
+  </table>
+  <button type="button" class="ghost" onclick="addRow('req-rows')">행 추가</button>
+</section>
+
+<section>
+  <h2>생성 옵션 (create.options)</h2>
+  <p class="muted">타입: cidr(블록 할당 — pick/of로 정책) · enum(값 목록,
+    vary=yes면 C4 변형 생성 대상) · ref(다른 노드 선행 생성) · string.</p>
+  <table>
+    <tbody id="opt-rows">
+      <tr><th>이름</th><th>타입</th><th>required</th><th>vary</th><th>기본값</th>
+          <th>enum 값들(콤마)</th><th>ref 대상</th><th>pick</th><th>of</th><th>note</th></tr>
+      {% for o in opt_rows %}
+      <tr>
+        <td><input type="text" name="opt_name" value="{{ o.name }}" size="12"></td>
+        <td><select name="opt_type">
+          {% for t in option_types %}
+          <option value="{{ t }}" {{ 'selected' if o.type == t else '' }}>{{ t }}</option>
+          {% endfor %}</select></td>
+        <td><select name="opt_required">
+          <option value="no" {{ '' if o.required else 'selected' }}>no</option>
+          <option value="yes" {{ 'selected' if o.required else '' }}>yes</option></select></td>
+        <td><select name="opt_vary">
+          <option value="no" {{ '' if o.vary else 'selected' }}>no</option>
+          <option value="yes" {{ 'selected' if o.vary else '' }}>yes</option></select></td>
+        <td><input type="text" name="opt_default" value="{{ o.default }}" size="8"></td>
+        <td><input type="text" name="opt_enum" value="{{ o.enum_values }}" size="18"></td>
+        <td><input type="text" name="opt_target" value="{{ o.target }}"
+                   list="node-ids" size="12"></td>
+        <td><input type="text" name="opt_pick" value="{{ o.pick }}" size="10"></td>
+        <td><input type="text" name="opt_of" value="{{ o.of }}" size="8"></td>
+        <td><input type="text" name="opt_note" value="{{ o.note }}" size="14"></td>
+      </tr>
+      {% endfor %}
+      <tr class="proto">
+        <td><input type="text" name="opt_name" value="" size="12" placeholder="옵션명"></td>
+        <td><select name="opt_type">
+          {% for t in option_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select></td>
+        <td><select name="opt_required">
+          <option value="no">no</option><option value="yes">yes</option></select></td>
+        <td><select name="opt_vary">
+          <option value="no">no</option><option value="yes">yes</option></select></td>
+        <td><input type="text" name="opt_default" value="" size="8"></td>
+        <td><input type="text" name="opt_enum" value="" size="18"></td>
+        <td><input type="text" name="opt_target" value="" list="node-ids" size="12"></td>
+        <td><input type="text" name="opt_pick" value="" size="10"></td>
+        <td><input type="text" name="opt_of" value="" size="8"></td>
+        <td><input type="text" name="opt_note" value="" size="14"></td>
+      </tr>
+    </tbody>
+  </table>
+  <button type="button" class="ghost" onclick="addRow('opt-rows')">행 추가</button>
+</section>
+
+<section>
+  <h2>생성 호출 — 검증된 body 템플릿</h2>
+  <p class="inline">
+    <label>create.endpoint
+      <input type="text" name="create_endpoint" size="40"
+             value="{{ (node.get('create') or {}).get('endpoint', '') }}"
+             placeholder="POST /v1/vpcs"></label>
+  </p>
+  <p class="muted">body 템플릿 (JSON — 역추출값 표시, 수정 가능.
+    placeholder: <code>{opt.&lt;옵션&gt;}</code>, <code>{&lt;노드&gt;.&lt;capture&gt;}</code>,
+    <code>{ualpha}</code> 등 엔진 표기 그대로):</p>
+  <textarea name="create_body" spellcheck="false" wrap="off"
+    style="width:100%;height:140px;font:12px/1.5 ui-monospace,Consolas,monospace;
+           border:1px solid var(--line);border-radius:6px;padding:10px">{{ body_text }}</textarea>
+</section>
+
+<section>
+  <h2>capture · ready · delete</h2>
+  <p class="muted">capture — 생성 응답에서 뽑을 산출물
+    (<code>변수: $.jsonpath</code> 한 줄씩):</p>
+  <textarea name="capture" spellcheck="false"
+    style="width:100%;height:64px;font:12px/1.5 ui-monospace,Consolas,monospace;
+           border:1px solid var(--line);border-radius:6px;padding:10px">{{ capture_text }}</textarea>
+  <p class="inline" style="margin-top:8px">
+    <label>ready.field <input type="text" name="ready_field" size="18"
+           value="{{ ready.get('field', '') }}" placeholder="$.vpc.state"></label>
+    <label>until <input type="text" name="ready_until" size="10"
+           value="{{ ready.get('until', '') }}" placeholder="ACTIVE"></label>
+    <label>timeout(s) <input type="text" name="ready_timeout" size="6"
+           value="{{ ready.get('timeout', '') }}"></label>
+  </p>
+  <p class="inline">
+    <label>delete.endpoint <input type="text" name="delete_endpoint" size="40"
+           value="{{ delete.get('endpoint', '') }}"
+           placeholder="DELETE /v1/vpcs/{vpc_id}"></label>
+    <label>destructive <select name="delete_destructive">
+      <option value="yes" {{ 'selected' if delete.get('destructive', True) else '' }}>yes</option>
+      <option value="no" {{ '' if delete.get('destructive', True) else 'selected' }}>no</option>
+    </select></label>
+  </p>
+</section>
+
+<section>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button type="submit"
+            hx-confirm="검증 통과 시 yaml로 저장하고 로컬 git 커밋합니다 — 진행할까요?">
+      검증 + 저장</button>
+    <a href="/planning/resources/compose?targets={{ node_id }}">
+      <button type="button" class="ghost">이 자원만 테스트 (합성) →</button></a>
+    <a href="/planning/resources">목록으로</a>
+  </div>
+  <div id="save-result" style="margin-top:10px"></div>
+</section>
+</form>
+
+<script>
+function addRow(tbodyId) {
+  var tb = document.getElementById(tbodyId);
+  var proto = tb.querySelector("tr.proto");
+  if (!proto) return;
+  var clone = proto.cloneNode(true);
+  clone.classList.remove("proto");
+  tb.appendChild(clone);
+}
+</script>
+
+{% endblock %}

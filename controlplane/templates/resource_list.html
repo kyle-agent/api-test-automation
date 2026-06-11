@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}자원 모델{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Planning › 자원 모델 (resource task model)</h2>
+  <p class="muted">서비스별 자원 노드의 <b>최소 의존조건 + 생성 옵션</b>을 폼으로
+    입력하면 시나리오는 합성기가 조합으로 만든다
+    (docs/RESOURCE-MODEL-PLAN.md). 저장은 기존 authoring 파이프라인
+    (검증 → 쓰기 → 로컬 git 커밋)을 그대로 탄다.</p>
+  <div class="cards">
+    <div class="card"><div class="num">{{ total }}</div><div class="lbl">노드</div></div>
+    <div class="card"><div class="num">{{ validated }}</div>
+      <div class="lbl">VALIDATED (역추출 검증)</div></div>
+    <div class="card"><div class="num">{{ groups|length }}</div><div class="lbl">그룹</div></div>
+    <div class="card"><div class="num">{{ files|length }}</div>
+      <div class="lbl">모델 파일 (knowledge/formal/resources/)</div></div>
+  </div>
+  <p>
+    <a href="/planning/resources/compose"><button>합성 — 단독/묶음/상품 시나리오 →</button></a>
+    {% if not has_composer %}<span class="warn">합성기 미탑재 (R2a 병렬 작업 중) —
+      미리보기/draft 저장은 composer 머지 후 동작합니다.</span>{% endif %}
+  </p>
+</section>
+
+<section>
+  <h2>새 노드</h2>
+  <form class="inline" onsubmit="event.preventDefault();
+      var id=this.node_id.value.trim(), svc=this.service.value.trim();
+      if(id) location='/planning/resources/'+encodeURIComponent(id)
+             +'?service='+encodeURIComponent(svc);">
+    <input type="text" name="node_id" placeholder="노드 id (예: vpc-endpoint)" size="22" required>
+    <input type="text" name="service" placeholder="service (예: networking/vpc)" size="22">
+    <button type="submit">폼 열기</button>
+    <span class="muted">신규 노드는 service에서 유도된
+      <code>&lt;category&gt;__&lt;service&gt;.yaml</code>에 저장됩니다.</span>
+  </form>
+</section>
+
+{% if not groups %}
+<section>
+  <p class="muted">아직 자원 모델이 없습니다 — R1 역추출 파일럿이 머지되면
+    <code>knowledge/formal/resources/</code>의 노드가 여기 나타납니다.
+    위의 "새 노드"로 직접 입력을 시작할 수도 있습니다.</p>
+</section>
+{% endif %}
+
+{% for g in groups %}
+<section>
+  <h2>{{ g.gid }}{% if g.label %} — {{ g.label }}{% endif %}
+    {% if g.category %}<span class="cat">{{ g.category }}</span>{% endif %}
+    <span class="muted">({{ g.nodes|length }} 노드)</span></h2>
+  {% if g.nodes %}
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    {% for n in g.nodes %}
+    <tr>
+      <td class="muted">{{ n.code or '—' }}</td>
+      <td><a href="/planning/resources/{{ n.id }}"><code>{{ n.id }}</code></a></td>
+      <td class="muted">{{ n.service }}</td>
+      <td class="muted">{{ n.requires }}</td>
+      <td>{{ n.options }}</td>
+      <td><span class="status {{ 'done' if n.provenance == 'VALIDATED' else 'dispatched' }}">
+        {{ n.provenance or '?' }}</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">이 그룹에는 아직 노드가 없습니다 (_groups.yaml에만 정의됨).</p>
+  {% endif %}
+</section>
+{% endfor %}
+
+{% endblock %}
