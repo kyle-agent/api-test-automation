@@ -1,4 +1,7 @@
-# request: PLATFORM LIVE VERIFICATION #1 — first run through the platform stack
-# (suite expansion, env-profile path, per-run snapshot upload, static /platform
-# Pages export). Read-only smoke: no mutations, no sweep needed.
-suite=smoke
+# request: PLATFORM LIVE VERIFICATION #2 — scoped service run (coverage levers 3/4)
+# servicewatch metric bodies (doc-exact) + log-group GET, eventstreams
+# request_id read-coverage. Light CRUD only; smoke narrowed to servicewatch.
+# Heavy DBaaS sub-op window + eventstreams-guarded ride the next full-heavy run.
+suite=full
+service=servicewatch
+crud_filter=servicewatch-loggroup-logstream or eventstreams-read-coverage
