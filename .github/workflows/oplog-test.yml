@@ -1,0 +1,81 @@
+name: oplog connectivity test
+
+# One-shot, manually-dispatched check of the persistent ops-log bucket:
+# authenticated write/read via boto3, account-id discovery via list-buckets
+# Owner.ID, then ANONYMOUS public-URL probes so the static ops viewer's read
+# path is verified end-to-end. Creates nothing on SCP except objects in the
+# permanent bucket. Safe to run alongside anything.
+on:
+  workflow_dispatch: {}
+
+env:
+  SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
+  SCP_ENV: ${{ vars.SCP_ENV || 'e' }}
+  SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
+  SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
+  SCP_OPLOG_BUCKET: ${{ vars.SCP_OPLOG_BUCKET || 'apitest-oplog-permanent' }}
+  SCP_OPLOG_S3_ENDPOINT: ${{ vars.SCP_OPLOG_S3_ENDPOINT }}
+  APITEST_RUN_ID: oplog-test-${{ github.run_id }}
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install boto3 requests
+      - name: Authenticated write/read + anonymous public-URL probe
+        run: |
+          python - <<'PY'
+          import json, time
+          import requests
+          from core import oplog
+
+          print("== 1. ensure bucket (create-if-missing + CORS + public-read) ==")
+          oplog.ensure_bucket()
+
+          print("== 2. authenticated PUT/GET roundtrip ==")
+          c, cfg = oplog._client()
+          assert c, "oplog client unavailable (creds/boto3?)"
+          key = f"runs/{oplog._run_id()}/events/{int(time.time()*1000)}-connectivity.json"
+          body = {"hello": "oplog", "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+          assert oplog._put(c, cfg, key, body), "authenticated PUT failed"
+          got = json.loads(c.get_object(Bucket=cfg["bucket"], Key=key)["Body"].read())
+          assert got == body, got
+          print(f"PUT+GET ok: s3://{cfg['bucket']}/{key}")
+
+          print("== 3. account id from list-buckets Owner.ID ==")
+          owner = c.list_buckets().get("Owner", {}).get("ID", "")
+          print("owner id:", owner or "(empty)")
+
+          print("== 4. anonymous public-URL probes ==")
+          ep = cfg["endpoint"].rstrip("/")
+          candidates = [
+              f"{ep}/{owner}/{cfg['bucket']}/{key}",
+              f"{ep}/{owner}:{cfg['bucket']}/{key}",
+              f"{ep}/{cfg['bucket']}/{key}",
+          ]
+          ok_base = ""
+          for u in candidates:
+              try:
+                  r = requests.get(u, timeout=15)
+                  print(f"  {r.status_code} {u[:120]}  cors={r.headers.get('Access-Control-Allow-Origin','-')}")
+                  if r.status_code == 200 and not ok_base:
+                      ok_base = u.rsplit("/" + key, 1)[0]
+              except Exception as e:
+                  print(f"  ERR {u[:120]} {e}")
+          print("== 5. anonymous ListObjectsV2 on the working base ==")
+          if ok_base:
+              r = requests.get(f"{ok_base}/?list-type=2&prefix=runs/", timeout=15)
+              print(f"  {r.status_code} list  cors={r.headers.get('Access-Control-Allow-Origin','-')}")
+              print(" ", (r.text or "")[:300].replace("\n", " "))
+              print(f"\nVIEWER BASE URL >>> {ok_base}")
+          else:
+              print("  no anonymous-readable base found — viewer needs public-read or a different URL shape")
+          PY
