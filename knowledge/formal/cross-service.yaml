@@ -34,6 +34,18 @@ cross_constraints:
     services: [networking/vpc, networking/loadbalancer]
     rule: "lifecycles adopting the ONE shared subnet must pin fixed host IPs at DISTINCT addresses (dependencies.json vpc_schedule.fixed_ip_map; .1 reserved for gateway) so parallel adopters never claim the same IP"
     provenance: VALIDATED
+  - id: firewall-implicit-on-gateway-resources
+    services: [networking/firewall, networking/vpc, networking/direct-connect, networking/loadbalancer]
+    rule: "a Firewall is never created standalone — it is minted by enabling 'Firewall 사용' on an Internet Gateway, Transit Gateway (Uplink Firewall), Direct Connect or Load Balancer (userguide firewall how_to). Firewall-rule scenarios must first create one of those carriers and capture its firewall_id"
+    provenance: docs
+  - id: gslb-monitoring-needs-target-allowlist
+    services: [networking/gslb, networking/firewall, networking/security-group]
+    rule: "GSLB health monitoring only reaches a connection target if the target's Firewall AND Security Group allow the GSLB monitor traffic (userguide) — combo scenarios pairing GSLB with LB/VM targets need allow rules on both layers"
+    provenance: docs
+  - id: dc-prereq-security-group
+    services: [networking/direct-connect, networking/security-group]
+    rule: "Security Group is a documented 선행 서비스 of Direct Connect (userguide) — the DC create body itself only needs the VPC, but workloads behind the DC are expected to be SG-protected; keep an SG in DC combo scenarios"
+    provenance: docs
 
 resources:
   # --- networking ------------------------------------------------------------
@@ -71,12 +83,59 @@ resources:
     service: networking/loadbalancer
     requires: [vpc, subnet]
     provenance: docs
+    notes: "consumes 4 IPs from the service subnet (service + SNAT + 2 health-check); SNAT/HC IPs immutable after create; public NAT additionally needs an internet-gateway on the VPC"
+  lb-health-check:
+    service: networking/loadbalancer
+    requires: []
+    provenance: docs
+    notes: "region-scoped (quota 500/region); reusable across server groups — create BEFORE the server group that references it (run 27306490231 LbHealthCheckNotFoundError was an ordering/capture miss)"
+  lb-server-group:
+    service: networking/loadbalancer
+    requires: [load-balancer]
+    lookups: [lb-health-check]
+    provenance: docs
+    notes: "attaches to exactly ONE load balancer; selects a default or pre-created lb-health-check"
+  lb-member:
+    service: networking/loadbalancer
+    requires: [lb-server-group]
+    provenance: docs
+    notes: "must be a VS/BM server in the SAME VPC as the LB, or a directly entered IP (cheapest for tests)"
   private-dns:
     service: networking/dns
     requires: []
     quota: private-dns
     provenance: VALIDATED
     notes: "needs an activate sub-flow before hosted-zone use. CREATE/DELETE are VERY slow (hours observed) — isolate on its own lane/VPC, create-first/delete-last (see services/networking__dns.yaml)"
+  hosted-zone:
+    service: networking/dns
+    requires: [private-dns]
+    provenance: docs
+    notes: "private hosted zone targets VPCs connected to the (Active) private-dns; max 20 zones/account, 100 records/zone; private-dns cannot be terminated while a hosted-zone exists (delete zone first)"
+  vpn-gateway:
+    service: networking/vpn
+    requires: [vpc, public-ip]
+    provenance: docs
+    notes: "create needs name (3-20 ALNUM ONLY) + vpc + public ip; max 3/account; kr-west1/east1/south3 only; cannot delete while tunnels exist or state is Creating/Editing"
+  vpn-tunnel:
+    service: networking/vpn
+    requires: [vpn-gateway]
+    provenance: docs
+    notes: "max 5 per gateway; needs peer GW IP + remote subnet CIDR(s, max 10) + PSK(8-64) + IKE/IPSec/DPD blocks"
+  direct-connect:
+    service: networking/direct-connect
+    requires: [vpc]
+    provenance: docs
+    notes: "1:1 per VPC in a service zone (second create on the shared VPC must fail); max 5/account; name 3-20 alnum only; uplink 1G|10G required"
+  gslb:
+    service: networking/gslb
+    requires: []
+    provenance: docs
+    notes: "account-scoped, no prereqs; kr-west1/east1 only; domain label 4-40 lowercase+digits; max 20 domains/account, 8 targets/domain"
+  cdn:
+    service: networking/cdn
+    requires: []
+    provenance: docs
+    notes: "account-scoped, no prereqs; kr-west1/east1 only; Akamai-backed async workflow; max 20 domains/account"
 
   # --- compute ----------------------------------------------------------------
   keypair:

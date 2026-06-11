@@ -1,6 +1,7 @@
 # Layer 1 — per-service knowledge: networking/vpn
 # Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
-# Source: userguide /userguide/networking/vpn/overview/ (제약 사항 · 선행 서비스)
+# Source: userguide /userguide/networking/vpn/overview/ + /how_to_guides/ +
+#         /how_to_guides/vpn_tunnel/ (fetched 2026-06-11)
 
 version: 1
 service: networking/vpn
@@ -15,6 +16,27 @@ constraints:
   - id: vpn-prereq-vpc
     rule: "선행 서비스: a VPC must exist before a VPN Gateway can be created (userguide; the gateway create additionally needs a public IP for ip_id)"
     provenance: docs
+  - id: vpn-gateway-name-rules
+    rule: "VPN Gateway name: 3-20 chars, LETTERS AND DIGITS ONLY (영문, 숫자) — NO hyphens/underscores per the userguide create form; a regr-style name containing '-' is a likely 400 on create"
+    provenance: docs
+  - id: vpn-gateway-create-required-fields
+    rule: "gateway create requires: name + connected VPC + Public IP (원격지 통신용 IP, 필수) — a create without a public-ip id should 400"
+    provenance: docs
+  - id: vpn-tunnel-name-rules
+    rule: "VPN Tunnel name: 3-20 chars, letters and digits only (영문, 숫자) — same no-special-chars rule as the gateway"
+    provenance: docs
+  - id: vpn-tunnel-create-required-fields
+    rule: "tunnel create requires: name, vpn_gateway, peer VPN GW IP (plain IP e.g. 192.168.10.0), >=1 remote subnet CIDR (e.g. 20.0.0.0/24, max 10), pre-shared key, IKE settings (version, encryption+digest algorithms, Diffie-Hellman group, SA lifetime), IPSec settings (algorithms, PFS on/off, DH group, SA lifetime), DPD probe interval"
+    provenance: docs
+  - id: vpn-tunnel-psk-length
+    rule: "Pre-shared Key: 8-64 chars (32-char alnum string recommended by the guide)"
+    provenance: docs
+  - id: vpn-tunnel-remote-subnet-max-10
+    rule: "max 10 remote subnet CIDRs per tunnel"
+    provenance: docs
+  - id: vpn-tunnel-dpd-interval-range
+    rule: "DPD probe interval must be 1-3600 seconds"
+    provenance: docs
 
 captures:
   vpn-gateway: $.vpn_gateway.id
@@ -25,4 +47,13 @@ states: {}
 quirks:
   - id: vpn-region-availability
     note: "VPN is only offered in kr-west1, kr-east1 and kr-south3 — NOT available in Korea South 1/2 (userguide); region-gate any VPN lifecycle"
+    provenance: docs
+  - id: vpn-console-states
+    note: "console state machine (gateway AND tunnel): Creating -> Active; also Editing, Deleting, Error (userguide) — poll for Active before dependent calls"
+    provenance: docs
+  - id: vpn-gateway-delete-blocked
+    note: "a VPN Gateway cannot be terminated while any VPN Tunnel (or other connected resource) exists, nor while its state is Creating/Editing (userguide 해지하기 주의) — teardown order: tunnels first, then gateway, and wait for Active before delete"
+    provenance: docs
+  - id: vpn-tunnel-mutable-fields
+    note: "peer GW IP, remote subnets, PSK, IKE/IPSec blocks and DPD interval are all editable on an existing tunnel (per-field PUT targets exist) — usable for cheap update-coverage without recreate"
     provenance: docs

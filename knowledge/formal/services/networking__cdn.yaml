@@ -1,6 +1,7 @@
 # Layer 1 — per-service knowledge: networking/cdn
 # Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
-# Source: userguide /userguide/networking/global_cdn/overview/ (제약 사항 · 선행 서비스)
+# Source: userguide /userguide/networking/global_cdn/overview/ + /how_to_guides/
+#         (fetched 2026-06-11)
 
 version: 1
 service: networking/cdn
@@ -11,6 +12,21 @@ constraints:
     provenance: docs
   - id: cdn-no-prereq-services
     rule: "선행 서비스: none — Global CDN has no prerequisite services (Global CDN 서비스는 선행 서비스가 없습니다, userguide); VPC-free control-plane resource"
+    provenance: docs
+  - id: cdn-region-availability
+    rule: "Global CDN is only offered in kr-west1 and kr-east1 — NOT in kr-south1/2/3 (userguide 리전별 제공 현황) — region-gate any CDN lifecycle"
+    provenance: docs
+  - id: cdn-name-unique
+    rule: "CDN name and CDN service domain must not equal any already-used name (기존에 사용중인 이름과 동일하게 사용 불가) — duplicate-name 4xx is expected on retry-after-partial-create"
+    provenance: docs
+  - id: cdn-cache-expiry-range
+    rule: "Cache 만료시간 (cache expiry TTL) must be 3,600 - 2,592,000 seconds (1h - 30d) — out-of-range values are a 4xx"
+    provenance: docs
+  - id: cdn-custom-headers-max-10
+    rule: "max 10 custom headers each on the origin-request side and on the caching side"
+    provenance: docs
+  - id: cdn-create-required-fields
+    rule: "create requires: CDN name, CDN domain, origin location (domain-name recommended or public IP + protocol + 1 port), caching options incl. cache expiry; origin path / forward-host-header / cache-key hostname / query-string handling are optional knobs"
     provenance: docs
 
 captures:
@@ -24,4 +40,10 @@ quirks:
     provenance: docs
   - id: cdn-domain-prefix-globally-unique
     note: "cdn_service_domain_prefix must be globally unique (lifecycle networking-cdn-service uses regr{ualpha})"
+    provenance: docs
+  - id: cdn-backed-by-akamai
+    note: "the service is fronted by Akamai's network — provisioning is an external workflow (note the workflow_id in the create envelope); allow generous async time between create and readiness, and expect purge/config propagation delays"
+    provenance: docs
+  - id: cdn-protocols
+    note: "supports HTTP, HTTPS and HTTP/2 toward origins; purge of cached content on TTL expiry is exposed as a feature (캐싱 만료 콘텐츠 Purge)"
     provenance: docs

@@ -1,5 +1,7 @@
 # Layer 1 — per-service knowledge: networking/dns
 # Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/dns/overview/ + /how_to_guides/ +
+#         /how_to_guides/private_dns/ (fetched 2026-06-11)
 
 version: 1
 service: networking/dns
@@ -8,6 +10,24 @@ constraints:
   - id: private-dns-quota-3
     rule: "account cap: max 3 private-dns (error scp-network.private-dns.max-count-exceed)"
     provenance: VALIDATED
+  - id: private-dns-docs-quota-1
+    rule: "userguide (overview 제약 사항 + private_dns guide, 2026-06-11) says max 1 Private DNS per account — conflicts with our VALIDATED cap of 3 (error fired at 3). Docs-vs-live discrepancy; do NOT lower the validated number, but expect the console to advertise 1"
+    provenance: docs
+  - id: private-dns-name-rules
+    rule: "Private DNS name: 3-20 chars, lowercase letters + digits + hyphen(-); must be unique across ALL of Samsung Cloud Platform (중복 체크 제공) — a 409/400 on create may simply mean the name is taken platform-wide, not just in our account"
+    provenance: docs
+  - id: private-dns-vpc-connect-max-5
+    rule: "max 5 VPCs can be connected to one Private DNS (per region selection; VPC 연결 is optional at create — newly created/activated Private DNS starts with NO VPC connected)"
+    provenance: docs
+  - id: hosted-zone-quota-20-per-account
+    rule: "account cap: max 20 Hosted Zones per account (userguide 제약 사항)"
+    provenance: docs
+  - id: record-quota-100-per-hosted-zone
+    rule: "max 100 records per Hosted Zone (userguide 제약 사항)"
+    provenance: docs
+  - id: public-dns-restricted-kr-south
+    rule: "Public Domain Name and Public Hosted Zone requests are NOT available in kr-south regions (한국 남부 리전 사용 신청 제한, userguide) — region-gate public-zone scenarios"
+    provenance: docs
   - id: private-dns-slow-provisioning
     rule: "private-dns CREATE and DELETE are VERY slow (observed: a heavy run stalled for hours waiting on creation, 2026-06-10). Scenarios must isolate it — own VPC/lane, kick the create off as EARLY as possible and the delete as LATE as possible, generous poll timeouts, and never let other lifecycles serialize behind it"
     provenance: VALIDATED
@@ -19,4 +39,19 @@ states: {}
 quirks:
   - id: hosted-zone-needs-activate
     note: "hosted-zone lifecycle needs a private-dns activate sub-flow first (networking-dns-hosted-zone is disabled until encoded)"
+    provenance: docs
+  - id: private-dns-account-global
+    note: "the Private DNS NAME is account-global across ALL regions: first create in any one region, then in every other region you ACTIVATE the same name from the Private DNS list (not create) — this is the documented root of the activate sub-flow; Hosted Zone data is shared across regions, but some detail fields (SRN/creator/modifier) are only visible in the region of first creation"
+    provenance: docs
+  - id: private-dns-console-states
+    note: "console state machine: Creating -> Activing -> Active; also Inactive, Editing, Deleting, Error (userguide private_dns guide) — poll for Active before any hosted-zone/VPC-connect call; the validated 400 invalid-state on setters fired while still CREATING"
+    provenance: docs
+  - id: private-dns-delete-blocked-by-hosted-zone
+    note: "Private DNS cannot be terminated while any Hosted Zone is attached (해지 불가) — delete hosted zones (and their records) first; expect 4xx/409 otherwise"
+    provenance: docs
+  - id: record-types
+    note: "supported record types: A, AAAA, TXT, CNAME, MX, SPF (user-settable); NS and SOA are auto-generated per zone — do not attempt to create NS/SOA records"
+    provenance: docs
+  - id: public-domain-via-whois
+    note: "Public Domain Name purchase goes through the external registrar (Whois), bought in 1-year units with auto-renew configurable until 7 days before expiry — billable + external dependency, keep out of automated CRUD (coverage-only)"
     provenance: docs

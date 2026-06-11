@@ -1,6 +1,7 @@
 # Layer 1 — per-service knowledge: networking/loadbalancer
 # Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
-# Source: userguide /userguide/networking/load_balancer/overview/ (제약 사항 · 선행 서비스)
+# Source: userguide /userguide/networking/load_balancer/overview/ +
+#         /how_to_guides/ (제약 사항 · 선행 서비스 · 생성 입력 항목, fetched 2026-06-11)
 
 version: 1
 service: networking/loadbalancer
@@ -27,6 +28,21 @@ constraints:
   - id: lb-prereq-vpc
     rule: "선행 서비스: a VPC (and a subnet inside it) must exist before any Load Balancer resource can be created (userguide)"
     provenance: docs
+  - id: lb-name-rules
+    rule: "Load Balancer name: 3-63 chars, upper/lowercase letters, digits and -_ (영문 대소문자, 숫자, 특수문자(-_), userguide create form)"
+    provenance: docs
+  - id: lb-service-ips-from-subnet
+    rule: "Service IP, Source NAT IP and the 2 health-check IPs must all come from the chosen Service Subnet's range; omit them and they are auto-allocated from the subnet pool — pinning an IP outside the subnet CIDR is a 4xx"
+    provenance: docs
+  - id: lb-snat-hc-ips-immutable
+    rule: "Source NAT IP and the health-check IPs CANNOT be modified after the LB is created; when the subnet already hosts another LB, the existing SNAT/health-check IP allocations are reused/shown — second LB on the same subnet does not get to pick new ones"
+    provenance: docs
+  - id: lb-public-nat-needs-igw
+    rule: "attaching a Public NAT IP to an LB requires the VPC to have an Internet Gateway connected (userguide) — IGW-less VPC + public NAT selection is a 4xx"
+    provenance: docs
+  - id: lb-listener-protocols-by-type
+    rule: "listener protocols depend on the LB 서비스 구분: L4 -> TCP/UDP/TLS, L7 -> HTTP/HTTPS — protocol/type mismatch is a 4xx"
+    provenance: docs
 
 captures:
   loadbalancer: $.loadbalancer.id
@@ -43,4 +59,22 @@ quirks:
     provenance: docs
   - id: lb-service-ip-must-match-subnet
     note: "the lifecycle networking-loadbalancer-members-nat hard-codes service_ip 10.124.0.30 / member_ip 10.124.0.31 (shared-VPC 10.124.0.0/24 range) while its self-created fallback subnet is 10.138.5.0/24 — service_ip only resolves when the shared VPC/subnet is actually adopted"
+    provenance: docs
+  - id: lb-consumes-4-subnet-ips
+    note: "one LB takes 4 IPs out of its service subnet (1 service + 1 source-NAT + 2 health-check) — small/crowded shared subnets can run out; budget fixed_ip_map slots accordingly"
+    provenance: docs
+  - id: lb-server-group-single-lb
+    note: "an LB server group attaches to exactly ONE Load Balancer; an LB health check is reusable across MULTIPLE server groups (userguide 제공 기능)"
+    provenance: docs
+  - id: lb-health-check-before-server-group
+    note: "the server-group create selects a health check from the pre-created list (or the default one) — create/capture the health check BEFORE the server group; run 27306490231 saw LbHealthCheckNotFoundError from a capture/order miss on exactly this edge"
+    provenance: docs
+  - id: lb-member-same-vpc-or-ip
+    note: "a member must be a Virtual Server / Bare Metal Server in the SAME VPC as the LB, or a directly entered IP (userguide) — cross-VPC member ids are a 4xx; direct-IP members are the cheap path for tests"
+    provenance: docs
+  - id: lb-firewall-resource-always-created
+    note: "the create form's Firewall 사용 toggle: when ON a firewall resource is created active; when left unchecked a firewall resource is STILL created in 미사용 (disabled, Any-Allow, unbilled) state; if the subnet already has a firewall in use, that resource is reused (userguide)"
+    provenance: docs
+  - id: lb-no-builtin-acl
+    note: "the LB itself provides NO access control on service IP/port — the docs recommend enabling the LB Firewall for client<->LB and LB<->member control"
     provenance: docs

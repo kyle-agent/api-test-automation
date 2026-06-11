@@ -1,6 +1,7 @@
 # Layer 1 — per-service knowledge: networking/gslb
 # Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
-# Source: userguide /userguide/networking/gslb/overview/ (제약 사항 · 선행 서비스)
+# Source: userguide /userguide/networking/gslb/overview/ + /how_to_guides/
+#         (fetched 2026-06-11)
 
 version: 1
 service: networking/gslb
@@ -18,6 +19,18 @@ constraints:
   - id: gslb-no-prereq-services
     rule: "선행 서비스: none — GSLB has no prerequisite services (GSLB 서비스는 선행 서비스가 없습니다, userguide); global/account-scoped, VPC-free"
     provenance: docs
+  - id: gslb-name-rules
+    rule: "GSLB 도메인명: 4-40 chars, lowercase letters + digits only, and must not equal any name already in use (기존에 사용중인 이름과 동일하게 사용 불가) — uppercase or '-' in the name part is a 4xx; 용도(env) is auto-fixed to PUBLIC"
+    provenance: docs
+  - id: gslb-region-availability
+    rule: "GSLB is only offered in kr-west1 and kr-east1 — NOT in kr-south1/2/3 (userguide 리전별 제공 현황) — region-gate any GSLB lifecycle; a south-region host is a guaranteed failure"
+    provenance: docs
+  - id: gslb-health-check-field-rules
+    rule: "health-check protocol one of ICMP/TCP/HTTP/HTTPS; Service Port required for TCP/HTTP/HTTPS; HTTP(S) auth password must be 8-20 chars containing letters+digits+special(@$!%*#?&); Send String must not contain < > # (newlines as /r/n); Receive String is REQUIRED for HTTP(S) and may contain letters/digits ONLY"
+    provenance: docs
+  - id: gslb-ratio-weight-range
+    rule: "algorithm is Ratio or Round robin; with Ratio every connection target needs a weight in 0-100"
+    provenance: docs
 
 captures:
   gslb: $.gslb.id
@@ -26,5 +39,11 @@ states: {}
 
 quirks:
   - id: gslb-name-is-fqdn
-    note: "the gslb name field is an FQDN (lifecycle networking-gslb-service uses regr{ualpha}.gslb.e.samsungsdscloud.com) — not a plain resource name"
+    note: "the gslb name field is an FQDN (lifecycle networking-gslb-service uses regr{ualpha}.gslb.e.samsungsdscloud.com) — not a plain resource name; the 4-40 lowercase+digit rule applies to the user-chosen label"
+    provenance: docs
+  - id: gslb-console-states
+    note: "console state machine: Creating -> Active (more states follow the usual Editing/Deleting/Error pattern, userguide truncated table)"
+    provenance: docs
+  - id: gslb-target-location
+    note: "each connection target carries a monitoring LOCATION field (choose nearest to the target server) in addition to IP + description — required in the create body's target entries"
     provenance: docs
