@@ -246,4 +246,73 @@ if(new URLSearchParams(location.search).has("sample")){
 }
 tick(); setInterval(tick,30000);
 </script>
+<script>
+// ---- 샘플 데이터 (실제 런 형태를 본뜬 미리보기; ?sample=1 불필요 — 이 파일은 항상 샘플) ----
+(function(){
+  const NOW=Date.now(), M=60000, T=m=>NOW-(95-m)*M;          // 95분짜리 런, 진행 중
+  const TS=m=>new Date(T(m)).toISOString();
+  const ev=(m,action,kind,service,name,res_id,lifecycle,status)=>(
+    {t:T(m),ts:TS(m),action,kind,service,name,res_id,lifecycle,status:status||""});
+  window.SAMPLE_DATA={
+    live:{run_id:"27314355676",sha:"3f59837",events:[
+      {ts:TS(0), job:"spec",        stage:"run-start",  status:"running", detail:"event=push mutations=true destructive=true heavy=true"},
+      {ts:TS(1), job:"regression-B",stage:"vpc-crud",   status:"running", detail:"serial pass (hsn last)"},
+      {ts:TS(14),job:"regression-A",stage:"smoke",      status:"success", detail:"1,059 endpoints called"},
+      {ts:TS(48),job:"regression-B",stage:"vpc-crud",   status:"success", detail:"7 passed (peering 2-VPC fix live)"},
+      {ts:TS(15),job:"regression-A",stage:"adopt-crud", status:"running", detail:"-n 6 · shared-dbaas slimmed"},
+    ]},
+    resEvents:[
+      ev(15,"lifecycle-start","","vpc","heavy-shared-dbaas","","heavy-shared-dbaas"),
+      ev(15.2,"created","vpcs","vpc","regrvpc-shared","vpc-a1","heavy-shared-dbaas"),
+      ev(16,"created","subnets","vpc","regrsub-db","sub-b2","heavy-shared-dbaas"),
+      ev(18,"created","clusters","mariadb","regrmaria","cl-m1","heavy-shared-dbaas"),
+      ev(18.2,"created","clusters","epas","regrepas","cl-e1","heavy-shared-dbaas"),
+      ev(18.4,"created","clusters","cachestore","regrcache","cl-c1","heavy-shared-dbaas"),
+      ev(60,"deleted","clusters","mariadb","","cl-m1","heavy-shared-dbaas"),
+      ev(55,"deleted","clusters","epas","","cl-e1","heavy-shared-dbaas"),
+      ev(52,"deleted","clusters","cachestore","","cl-c1","heavy-shared-dbaas"),
+      ev(62,"deleted","subnets","vpc","","sub-b2","heavy-shared-dbaas"),
+      ev(63,"deleted","vpcs","vpc","","vpc-a1","heavy-shared-dbaas"),
+      ev(64,"lifecycle-end","","vpc","heavy-shared-dbaas","","heavy-shared-dbaas","passed"),
+
+      ev(16,"lifecycle-start","","virtualserver","compute-virtualserver-full","","compute-virtualserver-full"),
+      ev(17,"created","keypairs","virtualserver","regrkey","kp-1","compute-virtualserver-full"),
+      ev(17.5,"created","security-groups","security-group","regrsg","sg-1","compute-virtualserver-full"),
+      ev(19,"created","servers","virtualserver","regrsrv (VM)","srv-1","compute-virtualserver-full"),
+      ev(21,"created","volumes","virtualserver","regrvol-data","vol-1","compute-virtualserver-full"),
+      ev(23,"created","publicips","vpc","","pip-1","compute-virtualserver-full"),
+      ev(44,"deleted","publicips","vpc","","pip-1","compute-virtualserver-full"),
+      ev(45,"deleted","volumes","virtualserver","","vol-1","compute-virtualserver-full"),
+      ev(48,"deleted","servers","virtualserver","","srv-1","compute-virtualserver-full"),
+      ev(49,"deleted","security-groups","security-group","","sg-1","compute-virtualserver-full"),
+      ev(49.5,"deleted","keypairs","virtualserver","","kp-1","compute-virtualserver-full"),
+      ev(50,"lifecycle-end","","virtualserver","compute-virtualserver-full","","compute-virtualserver-full","passed"),
+
+      ev(16,"lifecycle-start","","ske","container-ske-cluster-nodepool","","container-ske-cluster-nodepool"),
+      ev(20,"created","clusters","ske","regrske (K8s)","cl-k1","container-ske-cluster-nodepool"),
+
+      ev(17,"lifecycle-start","","baremetal-blockstorage","blockstorage-volume","","blockstorage-volume"),
+      ev(18,"created","volumes","baremetal-blockstorage","regrbsvol","bsv-1","blockstorage-volume"),
+      ev(30,"created","snapshots","virtualserver","snapshot for regrvol","snap-1","virtualserver-volume-snapshot"),
+      ev(40,"deleted","snapshots","virtualserver","","snap-1","virtualserver-volume-snapshot"),
+      ev(42,"delete-failed","volumes","baremetal-blockstorage","","bsv-1","blockstorage-volume","409 attached"),
+      ev(43,"lifecycle-end","","baremetal-blockstorage","blockstorage-volume","","blockstorage-volume","failed"),
+
+      ev(2,"lifecycle-start","","vpc","vpc-peering","","vpc-peering"),
+      ev(3,"created","vpcs","vpc","regrvpc-peerA","vpc-p1","vpc-peering"),
+      ev(4,"created","vpcs","vpc","regrvpcb-peerB","vpc-p2","vpc-peering"),
+      ev(6,"created","vpc-peerings","vpc","regrpeer","peer-1","vpc-peering"),
+      ev(10,"deleted","vpc-peerings","vpc","","peer-1","vpc-peering"),
+      ev(11,"deleted","vpcs","vpc","","vpc-p2","vpc-peering"),
+      ev(12,"deleted","vpcs","vpc","","vpc-p1","vpc-peering"),
+      ev(12.5,"lifecycle-end","","vpc","vpc-peering","","vpc-peering","passed"),
+    ],
+    index:[
+      {run_id:"27314355676",sha:"3f59837",finished:"",url:"#",history:{crud_ran:true,ok:"",soft:"",fail_new:"",cov_op:"",cov_c3:"",tested:"(진행 중)"}},
+      {run_id:"27306490231",sha:"84df549",finished:"2026-06-10T23:19:21Z",url:"#",history:{crud_ran:true,ok:1098,soft:1217,fail_new:50,cov_op:35.57,cov_c3:37.69,tested:1059}},
+      {run_id:"27258520218",sha:"e3ba190",finished:"2026-06-10T10:36:00Z",url:"#",history:{crud_ran:true,ok:1202,soft:1246,fail_new:52,cov_op:35.35,cov_c3:37.54,tested:1073}},
+    ]};
+  
+})();
+</script>
 </body></html>
