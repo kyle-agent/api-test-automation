@@ -1,0 +1,40 @@
+# Layer 1 — per-service knowledge: management/cloudcontrol
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/management/cloud_control/{overview,how_to_guides}/
+# (fetched 2026-06-11)
+
+version: 1
+service: management/cloudcontrol
+
+constraints:
+  - id: landing-zone-prereq-chain
+    rule: "Cloud Control requires a LANDING ZONE to exist before any management feature works, and the landing zone itself requires Organization + ID Center (자체 디렉토리) + Object Storage + Logging&Audit as 선행 서비스. On an account with no landing zone / not the Organization management account, all writes (and most reads) are denied — this is the most plausible cause of the smoke 403s: entitlement, not permission-policy tuning. WAIVER CANDIDATES until a landing zone exists"
+    provenance: docs
+  - id: org-unit-name-rule
+    rule: "기본/추가 조직 단위 (OU) names: case-sensitive ASCII letters, <= 128 chars; landing-zone shared-account names (Log/Audit Account): 3-30 chars Korean/letters/digits/space and + = - _ @ [ ] ( ) , . ; account emails <= 60 chars and Log vs Audit Account emails MUST differ"
+    provenance: docs
+  - id: home-region-fixed
+    rule: "the landing zone's 홈 리전 is pinned to the account's default region and cannot be changed; all other regions become managed regions; available in all five KR regions"
+    provenance: docs
+  - id: landing-zone-create-irreversible
+    rule: "landing-zone creation cannot be cancelled mid-flight; on failure you must DELETE the landing zone and recreate. Deleting a landing zone does NOT auto-delete the OUs, Accounts, buckets or ID Center it created — they must be cleaned up in Organization / Object Storage / ID Center individually before the same names can be reused"
+    provenance: docs
+
+captures: {}
+
+states:
+  cloudcontrol-account-registration: {field: $.status, ready: [등록]}   # 등록/미등록/등록중/등록 실패 (docs; field name guessed)
+
+quirks:
+  - id: creates-real-shared-accounts
+    note: "landing-zone create provisions REAL resources: 2 OUs, 2 shared accounts (Log Archive + Audit), Trail config, 10 preventive guardrails, and activates Organization control policies — extremely high blast radius; never run real creates on the shared test account (same waiver class as management/organization)"
+    provenance: docs
+  - id: security-ou-locked
+    note: "the Security OU (shared accounts) cannot receive new account registrations and its guardrails cannot be applied/removed; shared accounts cannot be unregistered"
+    provenance: docs
+  - id: detective-guardrails-via-configinspection
+    note: "detective guardrails are implemented as Config Inspection checklist runs (PASS/FAIL/CHECK/ERROR/N-A per item); preventive guardrails are Organization ACPs — cross-service edges to security/configinspection and management/organization"
+    provenance: docs
+  - id: monitoring-not-yet-released
+    note: "monitoring/notification feature and AuditBaseline are scheduled for 2026-07 — endpoints touching them may 404/400 until release"
+    provenance: docs

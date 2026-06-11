@@ -1,0 +1,48 @@
+# Layer 1 — per-service knowledge: compute/baremetal (Bare Metal Server)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/compute/baremetal_server/{overview,how_to_guides}/ (fetched 2026-06-11)
+
+version: 1
+service: compute/baremetal
+
+constraints:
+  - id: vpc-prereq
+    rule: "선행 서비스: VPC (+ a 일반 Subnet inside it) — network settings are a REQUIRED create field: vpc, subnet, IP (auto or manual); NAT/Public IP only selectable when server count is 1 AND the VPC has an Internet Gateway; 로컬 Subnet optional"
+    provenance: docs
+  - id: server-name-rule
+    rule: "서버명 (count=1) / 서버명 Prefix (count 2-5): starts with a lowercase letter; lowercase, digits, '-'; 3-15 chars; must NOT end with '-'; becomes the hostname; multi-create appends '-###' to the prefix; 서버 수 1-5 per create call"
+    provenance: docs
+  - id: admin-account-rule
+    rule: "관리자 계정: RHEL/Ubuntu fixed to root; Windows requires custom name 5-20 chars lowercase+digits, 'Administrator' forbidden"
+    provenance: docs
+  - id: image-enum
+    rule: "images: Oracle Linux 9.6, RHEL 8.10/9.4/9.6, Rocky 8.10/9.6, Ubuntu 22.04/24.04, Windows 2019/2022 (even minor versions only); server types like s3v16m64_metal (vCore = 2x physical, hyperthreading default on, can disable at create)"
+    provenance: docs
+  - id: no-security-group
+    rule: "Bare Metal Server does NOT support Security Groups — traffic control is Firewall-only, and BM Firewall requires a SEPARATE VPC from Virtual Servers joined via Transit Gateway (BM firewall created with the TGW attachment)"
+    provenance: docs
+  - id: delete-preconditions
+    rule: "해지 rejected while: Block Storage(BM) attached (when deleting >=2 servers at once), File Storage attached, Lock enabled, Backup Agent or Load Balancer attachments exist, another BM management op is running in the SAME account (account-wide serialization!), or state is not Running/Stopped. Single-server delete leaves attached Block Storage(BM) ORPHANED — delete it separately"
+    provenance: docs
+
+captures: {}
+
+states:
+  baremetal-server: {field: $.state, ready: [Running, RUNNING]}   # delete requires Running or Stopped (docs; field name guessed)
+
+quirks:
+  - id: account-wide-op-serialization
+    note: "only one BM resource-management operation per account at a time — parallel BM lifecycles in the suite WILL collide (409/4xx); serialize them"
+    provenance: docs
+  - id: local-disk-partitions
+    note: "optional local disk partitions: max 10 incl root, only 90% of disk usable, root partition >= 50GB, extra >= 1GB; partition name (lvm only): letter-first, letters/digits/-_ <= 15 chars; mount point starts with '/', <= 15 chars; fs types xfs/ext4 (+btrfs Ubuntu, +swap for extra partitions)"
+    provenance: docs
+  - id: automation-account-fixed
+    note: "자동화 계정 is auto-created at provisioning for system automation; deleting it breaks network-change and other automated features"
+    provenance: docs
+  - id: monitoring-needs-agent
+    note: "Cloud Monitoring metrics require installing the agent on the BM server — fresh servers report nothing"
+    provenance: docs
+  - id: placement-group
+    note: "Placement Group spreads at most 2 servers across racks"
+    provenance: docs

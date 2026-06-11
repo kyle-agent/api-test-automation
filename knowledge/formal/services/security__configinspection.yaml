@@ -1,0 +1,30 @@
+# Layer 1 — per-service knowledge: security/configinspection
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/security/config_inspection_enterprise/overview/ (fetched 2026-06-11)
+
+version: 1
+service: security/configinspection
+
+constraints:
+  - id: no-prereq
+    rule: "Config Inspection has NO 선행 서비스 — but the diagnosis itself calls Console APIs with an 인증키, so a usable auth key with sufficient permissions must exist for inspections to return non-ERROR results"
+    provenance: docs
+  - id: flow-create-target-then-inspect
+    rule: "flow: create a 진단 대상 (the account as inspection target) via service create -> request 진단 (inspection run) -> read Report (request history + per-item results). Inspection results are per-account, listed under Report"
+    provenance: docs
+
+captures: {}
+
+states:
+  inspection-run: {field: $.status, ready: [완료]}   # 완료 / 오류 (run-level); per-item PASS/FAIL/CHECK/ERROR/N-A (docs; field name guessed)
+
+quirks:
+  - id: error-status-means-auth
+    note: "per-item result ERROR explicitly means '사용자/인증키 권한 또는 API 호출 오류' — ERROR-heavy reports indicate the inspecting auth key lacks permissions, not service failure; useful oracle when validating IAM policy knowledge"
+    provenance: docs
+  - id: single-checklist
+    note: "only one checklist today: Samsung Cloud Platform 'Best Practice', 27 items (IAM/Networking/Database/Logging areas); failed runs (오류) provide no detail — cause shown in resource detail page"
+    provenance: docs
+  - id: cloudcontrol-consumer
+    note: "Cloud Control detective guardrails are built on Config Inspection checklist runs — cross-service edge configinspection <- cloudcontrol"
+    provenance: docs

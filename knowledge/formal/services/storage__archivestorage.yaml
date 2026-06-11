@@ -1,6 +1,7 @@
 # Layer 1 — per-service knowledge: storage/archivestorage
 # Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
-# Source: userguide /userguide/storage/archive_storage/overview/
+# Source: userguide /userguide/storage/archive_storage/{overview,how_to_guides}/
+# (fetched 2026-06-11; how_to_guides adds 인증키 + archiving-policy detail)
 
 version: 1
 service: storage/archivestorage
@@ -9,15 +10,34 @@ constraints:
   - id: separate-auth-keys-required
     rule: "Archive Storage requires its OWN 인증키 (authentication keys) generated in the console — the platform HMAC credentials alone are NOT enough. This explains the persistent smoke 401s on all 6 archivestorage GETs. Until the test account provisions these keys (or the suite learns to send them), these endpoints are C2-only -> WAIVER CANDIDATES (class: entitlement, human approval needed)"
     provenance: docs
+  - id: auth-key-lifecycle-gates-access
+    rule: "The 인증키 is created under IAM My Info > 인증키 관리 (max 2 per user, expiry 1-365 days or 영구). An EXPIRED or 사용 중지 (suspended) auth key immediately revokes Archive Storage access — a previously-working suite can start 401ing when the key expires; check key expiry before blaming the service (how_to_guides 주의)"
+    provenance: docs
   - id: service-limits
     rule: "max 1,000 archive storage services per account; max file path length 1,024 bytes UTF-8 (userguide)"
+    provenance: docs
+  - id: bucket-name-rule
+    rule: "bucket name: 3-63 chars; lowercase letters, digits, '.' and '-' only; must START with lowercase letter or digit; no '..'; '.' and '-' may not be adjacent; may not END with '.' or '-'; no IP-address form (192.168.x.x); 'admin' forbidden; unique per Account/Region; a previously-used bucket name is only reusable after 1 hour"
+    provenance: docs
+  - id: folder-file-name-charset
+    rule: "folder/file names allow Korean/letters/digits but FORBID these chars: % & ? ! < > / = + $ # ` ^ | { } [ ] (files additionally forbid \\); folder/file separated by '/'; full path <= 1,024 bytes UTF-8"
     provenance: docs
 
 captures: {}
 
-states: {}
+states:
+  archivestorage-service: {field: $.status, ready: [Active]}   # Active / Error (해지 중 비정상) / Deleting (docs; field name guessed)
 
 quirks:
   - id: object-storage-prereq
     note: "선행 서비스: Object Storage (archives data from object storage buckets) — cross-service edge for the dependency graph"
+    provenance: docs
+  - id: archiving-target-immutable
+    note: "Archiving 대상 (the Object Storage bucket to archive) can be set only ONCE and never modified; archiving policies can be edited/deactivated but NEVER deleted; each policy runs once a day from when it was added (how_to_guides 참고)"
+    provenance: docs
+  - id: delete-blocked-while-busy
+    note: "service 해지 is rejected while an archiving run or a restore is in progress — teardown must poll archiving/restore history to idle first"
+    provenance: docs
+  - id: encryption-after-create
+    note: "encryption (SSE-S3/AES256) and versioning are NOT create-time options — they are set post-create on the detail page; data uploaded before enabling encryption stays unencrypted until re-uploaded"
     provenance: docs

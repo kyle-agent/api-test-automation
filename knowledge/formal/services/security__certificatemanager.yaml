@@ -1,0 +1,39 @@
+# Layer 1 — per-service knowledge: security/certificatemanager
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/security/certificate_manager/{overview,how_to_guides}/ (fetched 2026-06-11)
+
+version: 1
+service: security/certificatemanager
+
+constraints:
+  - id: no-prereq
+    rule: "Certificate Manager has NO 선행 서비스; region-scoped, quotas 100 user certs + 100 self-signed certs per region (CERTIFICATE_MANAGER.USER_CERT_DEFAULT.COUNT / SELFSIGNED_CERT_DEFAULT.COUNT)"
+    provenance: docs
+  - id: name-rule
+    rule: "인증서명: 3-30 chars; letters, digits and - _ . ; must be unique among existing certificates"
+    provenance: docs
+  - id: user-cert-fields
+    rule: "사용자 인증서 create requires PEM Certificate Body (exactly ONE cert incl BEGIN/END lines), DECRYPTED RSA Private Key (encrypted PEM rejected — openssl rsa to strip passphrase), and Certificate Chain in Intermediate→Root order (required for CA-issued certs; omit only for self-signed/private CA). Server-side validity check runs at create: invalid/inconsistent PEM = create rejected (a likely 400 source for generated test bodies)"
+    provenance: docs
+  - id: selfsigned-fields
+    rule: "자체 발급 인증서 create requires Common Name (domain), Organization Unit, 시작일, 만료일 — easiest automatable variant (no real CA material needed)"
+    provenance: docs
+  - id: delete-blocked-by-attachments
+    rule: "service 해지 is impossible while any resource (Load Balancer HTTPS listener) is attached — detach listeners first (teardown order)"
+    provenance: docs
+
+captures: {}
+
+states:
+  certificate: {field: $.status, ready: [Active, Valid]}   # Creating/Active/Valid/Expired/Editing/Terminating/Error (docs; field name guessed)
+
+quirks:
+  - id: lb-listener-consumer
+    note: "only consumer today is Load Balancer HTTPS listeners (연결된 자원 tab) — cross-service edge certificatemanager -> networking/loadbalancer combos"
+    provenance: docs
+  - id: expiry-notification
+    note: "만료 알림 optional; if enabled, 알림 수신자 is REQUIRED (up to 100 users); mails at D-45/30/15/7/1; expired certs cannot have notification settings edited"
+    provenance: docs
+  - id: lets-encrypt-chain
+    note: "Let's Encrypt certs need the chain re-extracted (docs: Chain 인증서 추출하기) — previously saved chain values fail validation"
+    provenance: docs

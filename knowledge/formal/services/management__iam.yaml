@@ -1,0 +1,42 @@
+# Layer 1 — per-service knowledge: management/iam
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/management/iam/overview/ + how_to_guides/myinfo/
+# (fetched 2026-06-11 — myinfo page is the 인증키/auth-key reference for the whole platform)
+
+version: 1
+service: management/iam
+
+constraints:
+  - id: no-prereq
+    rule: "IAM has NO 선행 서비스"
+    provenance: docs
+  - id: policies-attach-to-groups-not-users
+    rule: "policies CANNOT be attached directly to users — only to 사용자 그룹 (user groups); a user's effective permissions = union of policies on the groups they belong to. Lifecycles must chain user-group create -> policy attach -> user add, never user->policy directly"
+    provenance: docs
+  - id: auth-key-limits
+    rule: "인증키 (API auth keys, created in My Info > 인증키 관리): max 2 per user; expiry 1-365 days or 영구; up to 5 임시키 (temporary keys) issuable per auth key VIA API ONLY (console can only list/delete temp keys); a key must be 사용 중지 (suspended) before it can be deleted; keys bound to a Secret Vault cannot be suspended/deleted until the Vault is terminated"
+    provenance: docs
+  - id: auth-method-gates-api-calls
+    rule: "each auth key's 보안 설정 has an 인증 방식 of either 임시키 or 인증키 — API calls are ONLY accepted when made with the configured method. A key configured for 임시키-only will 401 direct auth-key (HMAC) calls. PLATFORM-WIDE 401 suspect: if smoke 401s appear across services, check the test key's 인증 방식 and expiry first"
+    provenance: docs
+  - id: allow-ip-empty-means-deny-all
+    rule: "auth-key 접근 허용 IP: when enabled with NO IPs registered, ALL access is DENIED (not allowed); disabled = all IPs allowed; max 50 entries, IP or CIDR (kr-south region: plain IPs only, NO CIDR). Another silent 401/403 source"
+    provenance: docs
+  - id: password-policy
+    rule: "user passwords: 9-20 chars; >=1 each of upper/lower/digit/special(!@#$%&*^); no 3+ repeated chars, no 4+ sequential chars, not the ID/username, 90-day rotation — relevant for user-create bodies"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: console-ip-control-scope
+    note: "Console 접근 IP 제어 (login-IP restriction, max 50 IP/CIDR) is separate from per-auth-key 접근 허용 IP; available to Root and IAM users only — not ID Center users or roles"
+    provenance: docs
+  - id: roles-are-virtual
+    note: "역할 (roles) are virtual identities unaffected by the assuming user's own permissions; role-switch is how cross-account access works"
+    provenance: docs
+  - id: shared-account-blast-radius
+    note: "user/group/policy writes on the shared test account can lock real humans out — treat destructive IAM writes (policy detach, user delete, access-IP changes) as high blast radius, coverage-only"
+    provenance: docs

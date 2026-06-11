@@ -1,0 +1,45 @@
+# Layer 1 — per-service knowledge: management/iam-identity-center (ID Center)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/management/id_center/{overview,how_to_guides}/
+# (fetched 2026-06-11)
+
+version: 1
+service: management/iam-identity-center
+
+constraints:
+  - id: management-account-only
+    rule: "ONLY the Organization's Management Account can create an ID Center instance (how_to_guides 참고). On a member/standalone account, instance create is expected to fail — likely the root cause of the smoke 400s on idc writes: the test account is not the Organization management account (or no Organization exists). Treat instance-create 400/403 as entitlement, not body errors"
+    provenance: docs
+  - id: organization-prereq
+    rule: "선행 서비스: Organization — an Organization must exist before ID Center can be created (overview 선행 서비스 table)"
+    provenance: docs
+  - id: single-region-management
+    rule: "ID Center can only be MANAGED in the region where it was created; one instance per organization. Calls against the wrong region 4xx even with a valid instance"
+    provenance: docs
+  - id: region-availability
+    rule: "available in kr-west1/kr-east1/kr-south1/kr-south2; NOT offered in kr-south3 (overview 리전별 제공 현황)"
+    provenance: docs
+  - id: name-rule
+    rule: "ID Center name: 3-128 chars; letters, digits and + = - _ @ , . ; description <= 1,000 chars"
+    provenance: docs
+  - id: delegated-account-restrictions
+    rule: "an account that received delegated admin rights CANNOT delete the ID Center (delete button hidden for 위임 Account); only one delegation may exist at a time (권한 위임 button only shows when none exists)"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: identity-source-change-wipes-everything
+    note: "changing the 자격 증명 소스 (identity source: internal directory <-> AD) DELETES all users, groups, account assignments and permission sets — never exercise this write on a shared instance"
+    provenance: docs
+  - id: delete-cascades
+    note: "deleting the ID Center deletes every user/group/permission-set and all account assignments; deletion requires typing the instance name (console) and is async (completion via notification)"
+    provenance: docs
+  - id: ad-link-via-sr-only
+    note: "AD (Active Directory) identity source is provisioned via a Support Center service request after preparing VPC + Load Balancer + PrivateLink — not API-automatable; AD syncs daily 00-06h Asia/Seoul"
+    provenance: docs
+  - id: mfa-mandatory
+    note: "ID Center users always have MFA enforced; users log in via the separate Access Portal URL, not the main console"
+    provenance: docs
