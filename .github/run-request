@@ -1,8 +1,10 @@
-# request: post-run FORCE cleanup with the new reconciler matchers — reap the
-# auto-named/unnamed leftovers (snapshots 'snapshot for regr*', unnamed VM boot
-# volumes, public IPs, /scp/*/regr* log groups) + this run's TTL-protected
-# leftovers. Smoke scoped tiny on purpose; the sweep is account-wide.
+# request: FULL HEAVY coverage run #3 — first run with ALL of today's fixes
+# live at once: A||B split + optional-retry caps (validated -43%), slimmed
+# heavy-shared-dbaas (mys/pg legs dropped, gone-polls 900s, teardown budgets
+# 4min), failed-delete refire, VPC cap=5 + clean account, vip capture +
+# real peering approver VPC, hsn-last ordering, waivers 242, cumulative
+# dashboard status. Goal: measure coverage (C3 vs 1130 denom) + wall-clock
+# (~1.5h target) + refire/peering/vip verification.
+mutations=true
 destructive=true
-sweep_force=true
-category=management
-service=servicewatch
+heavy=true
