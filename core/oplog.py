@@ -177,6 +177,7 @@ def emit(stage: str, status: str, detail: str = "", job: str = "") -> bool:
 # ---------------------------------------------------------------------------
 _RES_BUF: list = []
 _RES_FIRST_TS = [0.0]
+_RES_SEQ = [0]
 # Flush IMMEDIATELY by default (one object per event): a run only produces a
 # few hundred resource events, and buffering hid events during long polls
 # (a 30-min cluster wait emits nothing, so the age check never ran and the
@@ -234,7 +235,11 @@ def flush_resources() -> None:
             return
         batch, _RES_BUF = _RES_BUF, []
         _RES_FIRST_TS[0] = 0.0
-        key = f"runs/{_run_id()}/res/{int(time.time()*1000)}-{os.getpid()}.json"
+        _RES_SEQ[0] += 1
+        # ms+pid alone collides when two flushes land in the same millisecond
+        # (caught by the offline test) — the per-process sequence disambiguates.
+        key = (f"runs/{_run_id()}/res/{int(time.time()*1000)}"
+               f"-{os.getpid()}-{_RES_SEQ[0]}.json")
         _put(c, cfg, key, {"events": batch})
     except Exception:
         _RES_BUF = []
