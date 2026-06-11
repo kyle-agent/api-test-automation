@@ -53,7 +53,8 @@ def _cfg():
         # wrong for the account.
         region = os.getenv("SCP_REGION", "kr-west1").strip()
         env = os.getenv("SCP_ENV", "e").strip()
-        endpoint = f"https://objectstorage.{region}.{env}.samsungsdscloud.com"
+        # live-verified 2026-06-11: the S3 endpoint host is object-store.<region>.<env>
+        endpoint = f"https://object-store.{region}.{env}.samsungsdscloud.com"
     # SDK region: kr-west1 -> kr-west, kr-south1/2/3 -> kr-south (userguide)
     region = os.getenv("SCP_REGION", "kr-west1").strip()
     sdk_region = "kr-south" if region.startswith("kr-south") else "kr-west"
