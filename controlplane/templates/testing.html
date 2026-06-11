@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block title %}Testing{% endblock %}
 {% block content %}
 
 <section>
@@ -22,6 +23,24 @@
     <button type="submit">실행</button>
   </form>
 </section>
+
+{% if live %}
+<section>
+  <h2>진행 중 run — 라이브</h2>
+  {% for item in live %}
+  <p><a href="/runs/{{ item.run['gh_run_id'] }}"><b>run {{ item.run['gh_run_id'] }}</b></a>
+     · {{ item.run['suite'] or '-' }} × {{ item.run['profile'] or '-' }}
+     · <span class="status {{ item.run['status'] }}">{{ item.run['status'] }}</span></p>
+  <table>
+    <tr><th>ts</th><th>job</th><th>stage</th><th>status</th></tr>
+    {% for e in item.milestones %}
+    <tr><td class="muted">{{ e['ts'] }}</td><td>{{ e['job'] }}</td>
+        <td>{{ e['stage'] }}</td><td>{{ e['status'] }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endfor %}
+</section>
+{% endif %}
 
 <section>
   <h2>스케줄 (cron, UTC)</h2>
@@ -69,7 +88,7 @@
   <div hx-get="/partials/runs" hx-trigger="every 10s" hx-swap="innerHTML">
     {% include "_runs_table.html" %}
   </div>
-  <p><a href="/runs">전체 히스토리 →</a></p>
+  <p><a href="/reporting">전체 히스토리는 Reporting →</a></p>
 </section>
 
 {% endblock %}

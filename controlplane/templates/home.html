@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if coverage %}
+<section>
+  <h2>현재 커버리지 (최근 발행 대시보드 기준 · {{ coverage.get('ts','') }})</h2>
+  <div class="cards">
+    <div class="card"><div class="num">{{ coverage.get('cov_op','-') }}%</div>
+      <div class="lbl">write-op 커버리지 (cov_op)</div></div>
+    <div class="card"><div class="num">{{ coverage.get('cov_get','-') }}%</div>
+      <div class="lbl">GET 커버리지 (cov_get)</div></div>
+    <div class="card"><div class="num">{{ coverage.get('cov_c3','-') }}%</div>
+      <div class="lbl">누적 C3 커버리지</div></div>
+    <div class="card"><div class="num">{{ coverage.get('reachable_pct','-') }}%</div>
+      <div class="lbl">static reachable</div></div>
+    <div class="card"><div class="num">{{ coverage.get('tested','-') }}/{{ coverage.get('total','-') }}</div>
+      <div class="lbl">이번 run 호출 endpoints</div></div>
+    <div class="card"><div class="num">{{ coverage.get('fail_new','-') }}</div>
+      <div class="lbl">신규 fail</div></div>
+  </div>
+  <p><a href="/dashboard/index.html">📊 현재 전체 대시보드 열기</a></p>
+</section>
+{% else %}
+<section>
+  <h2>현재 커버리지</h2>
+  <p class="muted">dashboard-data 브랜치를 읽을 수 없습니다 — git 원격 접근을 확인하세요.</p>
+</section>
+{% endif %}
+
+<section>
+  <h2>플랫폼 영역</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="num"><a href="/planning">Planning</a></div>
+      <div class="lbl">환경 {{ profiles|length }} · 스위트 {{ suites|length }} ·
+        시나리오 {{ scenario_stats.total }}개({{ scenario_stats.services }}개 서비스) ·
+        knowledge</div>
+    </div>
+    <div class="card">
+      <div class="num"><a href="/testing">Testing</a></div>
+      <div class="lbl">수동 실행 · 스케줄 {{ schedules|length }}건 ·
+        진행 중 run {{ running|length }}건</div>
+    </div>
+    <div class="card">
+      <div class="num"><a href="/reporting">Reporting</a></div>
+      <div class="lbl">커버리지 · run 히스토리 · 스냅샷 대시보드 · AI triage</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>최근 run</h2>
+  <div hx-get="/partials/runs?limit=5" hx-trigger="every 15s" hx-swap="innerHTML">
+    {% include "_runs_table.html" %}
+  </div>
+</section>
+
+{% endblock %}

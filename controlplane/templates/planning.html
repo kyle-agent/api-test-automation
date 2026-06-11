@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Planning{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Planning — Global 설정 · 시나리오 · Knowledge</h2>
+  <p class="muted">현재는 repo 파일의 read-only 뷰입니다 — 편집 도구는 M3에서
+    이 화면 위에 추가됩니다 (docs/PLATFORM-PLAN.md).</p>
+</section>
+
+<section>
+  <h2>환경 프로파일 (regression 대상)</h2>
+  <table>
+    <tr><th>id</th><th>label</th><th>region/env</th><th>안전 게이트(forbid)</th>
+        <th>quota override</th><th></th></tr>
+    {% for p in profile_list %}
+    <tr>
+      <td><code>{{ p.get('id') }}</code></td>
+      <td>{{ p.get('label','') }}</td>
+      <td>{{ p.get('env',{}).get('SCP_REGION','-') }} /
+          {{ p.get('env',{}).get('SCP_ENV','-') }}</td>
+      <td>{% if p.get('forbid') %}<span class="warn">{{ p['forbid']|join(', ') }} 금지</span>
+          {% else %}<span class="muted">없음</span>{% endif %}</td>
+      <td class="muted">{{ p.get('quota_overrides',{}) or '-' }}</td>
+      <td><a href="/planning/view?path=environments/{{ p.get('id') }}.yaml">원본</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>스위트 (run 형태)</h2>
+  <table>
+    <tr><th>id</th><th>label</th><th>옵션</th><th></th></tr>
+    {% for s in suite_list %}
+    <tr>
+      <td><code>{{ s.get('id') }}</code></td>
+      <td>{{ s.get('label','') }}</td>
+      <td class="muted">{% for k, v in (s.get('request') or {}).items() %}{{ k }}={{ v }} {% endfor %}</td>
+      <td><a href="/planning/view?path=suites/{{ s.get('id') }}.yaml">원본</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>시나리오 카탈로그</h2>
+  <div class="cards">
+    <div class="card"><div class="num">{{ scenario_stats.total }}</div>
+      <div class="lbl">전체 lifecycle</div></div>
+    <div class="card"><div class="num">{{ scenario_stats.enabled }}</div>
+      <div class="lbl">enabled</div></div>
+    <div class="card"><div class="num">{{ scenario_stats.heavy }}</div>
+      <div class="lbl">heavy (과금성)</div></div>
+    <div class="card"><div class="num">{{ scenario_stats.services }}</div>
+      <div class="lbl">서비스</div></div>
+  </div>
+  <p><a href="/planning/scenarios">시나리오 목록 →</a></p>
+</section>
+
+<section>
+  <h2>Knowledge</h2>
+  <p><a href="/planning/knowledge">서비스별 제약 · validated facts · formal YAML 브라우저 →</a></p>
+</section>
+
+{% endblock %}

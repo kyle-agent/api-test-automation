@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}시나리오 카탈로그{% endblock %}
+{% block content %}
+
+<section>
+  <h2>시나리오 카탈로그 ({{ rows|length }}건{% if service %} · 필터: {{ service }}{% endif %})</h2>
+  <form class="inline" method="get" action="/planning/scenarios">
+    <input type="text" name="service" value="{{ service }}"
+           placeholder="서비스 필터 (예: networking)">
+    <button type="submit">필터</button>
+    {% if service %}<a href="/planning/scenarios">전체 보기</a>{% endif %}
+  </form>
+  <table style="margin-top:10px">
+    <tr><th>id</th><th>service</th><th>steps</th><th>속성</th><th>비고</th></tr>
+    {% for l in rows %}
+    <tr>
+      <td><code>{{ l.id }}</code></td>
+      <td>{{ l.service }}</td>
+      <td>{{ l.steps }}</td>
+      <td>
+        {% if not l.enabled %}<span class="cat">disabled</span>{% endif %}
+        {% if l.heavy %}<span class="cat test_bug">heavy</span>{% endif %}
+        {% if l.adopt %}<span class="cat environment">adopt:{{ l.adopt }}</span>{% endif %}
+      </td>
+      <td class="muted">{{ l.note }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+{% endblock %}

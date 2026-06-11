@@ -378,9 +378,13 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
    git + GitHub Actions를 유지** (원격 협업 매체) — 파일 직접 변경 모드로의
    컷오버는 배포 직전 M4에서 수행.
 
+4. **multi-tenancy** — **필요로 확정** (2026-06-11). M2에서 DB 스키마에
+   tenant 컬럼(runs/schedules/triage) + 환경 프로파일·스위트의 tenant 소유
+   필드를 도입하고, UI에 tenant 선택자를 추가한다. 인증 도입(리버스 프록시
+   or 자체) 시 tenant 매핑.
+
 ### 미결
 
-4. **multi-tenancy 여부** — 팀/프로젝트 단위 분리가 필요한가? (필요 시
-   M1 DB 스키마에 org 컬럼 선반영)
 5. **Conformance baseline의 환경별 분리** — 검증계와 운영계의 known_issues
-   를 분리 관리할 것인가 (권고: 환경 프로파일에 귀속).
+   를 분리 관리할 것인가 (권고: 환경 프로파일에 귀속). multi-env 운영 시작
+   전(M2)까지 결정.

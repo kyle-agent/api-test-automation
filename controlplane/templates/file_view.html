@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ rel }}{% endblock %}
+{% block content %}
+
+<section>
+  <h2>{{ rel }} <span class="muted">(read-only — 편집은 M3에서)</span></h2>
+  <pre>{{ content }}</pre>
+</section>
+
+{% endblock %}

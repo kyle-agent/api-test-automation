@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Knowledge{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Knowledge — 서비스별 제약 · validated facts (read-only)</h2>
+  <table>
+    <tr><th>문서 (narrative)</th><th>크기</th></tr>
+    {% for f in narrative %}
+    <tr><td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
+        <td class="muted">{{ f.kb }} KB</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>Formal (머신 가독 YAML — source of truth 후보)</h2>
+  <table>
+    <tr><th>파일</th><th>크기</th></tr>
+    {% for f in formal %}
+    <tr><td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
+        <td class="muted">{{ f.kb }} KB</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>스위트 · 환경 정의 파일</h2>
+  <table>
+    <tr><th>파일</th><th>크기</th></tr>
+    {% for f in suite_files + env_files %}
+    <tr><td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
+        <td class="muted">{{ f.kb }} KB</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+{% endblock %}

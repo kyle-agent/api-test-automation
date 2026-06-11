@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Reporting{% endblock %}
+{% block content %}
+
+{% if coverage %}
+<section>
+  <h2>현재 커버리지 ({{ coverage.get('ts','') }} · sha {{ coverage.get('sha','') }})</h2>
+  <div class="cards">
+    <div class="card"><div class="num">{{ coverage.get('cov_op','-') }}%</div>
+      <div class="lbl">write-op (cov_op)</div></div>
+    <div class="card"><div class="num">{{ coverage.get('cov_get','-') }}%</div>
+      <div class="lbl">GET (cov_get)</div></div>
+    <div class="card"><div class="num">{{ coverage.get('cov_c3','-') }}%</div>
+      <div class="lbl">누적 C3</div></div>
+    <div class="card"><div class="num">{{ coverage.get('reachable_pct','-') }}%</div>
+      <div class="lbl">static reachable</div></div>
+    <div class="card"><div class="num">{{ coverage.get('ok','-') }}/{{ coverage.get('tested','-') }}</div>
+      <div class="lbl">ok / 호출 (전체 {{ coverage.get('total','-') }})</div></div>
+    <div class="card"><div class="num">{{ coverage.get('fail_new','-') }}</div>
+      <div class="lbl">신규 fail</div></div>
+  </div>
+  <p><a href="/dashboard/index.html">📊 현재 전체 대시보드 (서비스별 드릴다운 포함)</a>
+     · <a href="/dashboard/ops.html">🔭 ops 라이브 뷰어</a></p>
+</section>
+
+<section>
+  <h2>커버리지 추이 (최근 {{ trend|length }}개 run)</h2>
+  <table>
+    <tr><th>ts</th><th>sha</th><th>cov_op</th><th>cov_get</th><th>C3</th>
+        <th>ok</th><th>soft</th><th>신규 fail</th><th>호출</th></tr>
+    {% for h in trend %}
+    <tr>
+      <td class="muted">{{ h.get('ts','') }}</td>
+      <td class="muted">{{ h.get('sha','') }}</td>
+      <td>{{ h.get('cov_op','-') }}%</td>
+      <td>{{ h.get('cov_get','-') }}%</td>
+      <td>{{ h.get('cov_c3','-') }}%</td>
+      <td>{{ h.get('ok','-') }}</td>
+      <td>{{ h.get('soft','-') }}</td>
+      <td>{% if h.get('fail_new') %}<b>{{ h['fail_new'] }}</b>{% else %}0{% endif %}</td>
+      <td class="muted">{{ h.get('tested','-') }}/{{ h.get('total','-') }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% else %}
+<section>
+  <h2>현재 커버리지</h2>
+  <p class="muted">dashboard-data 브랜치를 읽을 수 없습니다 — git 원격 접근을 확인하세요.</p>
+</section>
+{% endif %}
+
+<section>
+  <h2>Run 히스토리 (control plane 기록)</h2>
+  <div hx-get="/partials/runs?limit=100" hx-trigger="every 15s" hx-swap="innerHTML">
+    {% include "_runs_table.html" %}
+  </div>
+</section>
+
+<section>
+  <h2>아카이브 (oplog 버킷 index — control plane 이전 run 포함)</h2>
+  <table>
+    <tr><th>run</th><th>sha</th><th>finished</th></tr>
+    {% for row in archive %}
+    <tr>
+      <td><a href="/runs/{{ row['run_id'] }}">{{ row['run_id'] }}</a></td>
+      <td class="muted">{{ row.get('sha', '') }}</td>
+      <td class="muted">{{ row.get('finished', '') }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3" class="muted">버킷 index를 읽을 수 없습니다
+        (credential 미설정이거나 아직 run이 없음).</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+{% endblock %}

@@ -13,7 +13,14 @@
   header { background:#fff; border-bottom:1px solid var(--line); padding:10px 24px;
            display:flex; gap:18px; align-items:baseline; }
   header h1 { font-size:16px; margin:0; }
-  header nav a { color:var(--accent); text-decoration:none; margin-right:12px; }
+  header nav a { color:var(--accent); text-decoration:none; margin-right:14px;
+                 padding:4px 2px; }
+  header nav a.on { font-weight:700; border-bottom:2px solid var(--accent); }
+  .cards { display:flex; gap:14px; flex-wrap:wrap; }
+  .card { flex:1; min-width:140px; background:#f1f6fb; border-radius:8px;
+          padding:10px 14px; }
+  .card .num { font-size:22px; font-weight:700; }
+  .card .lbl { font-size:12px; color:var(--muted); }
   main { max-width:1100px; margin:20px auto; padding:0 24px; }
   section { background:#fff; border:1px solid var(--line); border-radius:8px;
             padding:16px 20px; margin-bottom:18px; }
@@ -48,10 +55,11 @@
 </head>
 <body>
 <header>
-  <h1>SCP API Regression Test Platform</h1>
+  <h1><a href="/" style="color:inherit;text-decoration:none">SCP API Regression Test Platform</a></h1>
   <nav>
-    <a href="/">개요</a>
-    <a href="/runs">Run 히스토리</a>
+    <a href="/planning" class="{{ 'on' if active == 'planning' else '' }}">Planning</a>
+    <a href="/testing" class="{{ 'on' if active == 'testing' else '' }}">Testing</a>
+    <a href="/reporting" class="{{ 'on' if active == 'reporting' else '' }}">Reporting</a>
   </nav>
 </header>
 <main>
