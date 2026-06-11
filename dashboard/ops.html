@@ -46,12 +46,13 @@
 <div class="mut">소스: 영구 Object Storage 버킷(<code id="bsrc"></code>)의 진행 이벤트/런 이력 ·
 <a href="index.html">커버리지 대시보드 →</a></div>
 
-<div class="panel cfg">
-  <b>버킷 엔드포인트</b>
-  <input id="ep" placeholder="https://object-store.kr-west1.e.samsungsdscloud.com/<account_id>:apitest-oplog-permanent (콜론 구분, 라이브 검증됨)">
+<details class="panel cfg" style="padding:8px 14px">
+  <summary class="mut" style="cursor:pointer;font-size:12px">고급 — 버킷 엔드포인트 변경 (기본값 내장됨, 보통 불필요)</summary>
+  <div style="margin-top:6px">
+  <input id="ep" placeholder="기본: <account_id>:apitest-oplog-permanent path-style 엔드포인트">
   <button onclick="saveCfg()">저장</button>
-  <span class="mut" id="cfgmsg"></span>
-</div>
+  <span class="mut" id="cfgmsg"></span></div>
+</details>
 
 <div class="panel" id="live"><b>진행 중인 런</b><div id="liveBody" class="mut">불러오는 중…</div></div>
 
