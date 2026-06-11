@@ -416,7 +416,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). 2026-06-11 run #4: create 202 but approve/set/DELETE of the peering all 400 in its initial state -> the peering survives and the VPC deletes 409 (now tolerated in expect_status; the own-run sweep reaps the leftovers). Next run records the 400 bodies (soft-write notes) to learn the peering state machine. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
+      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). 2026-06-11 run #4: create 202 but approve/set/DELETE of the peering all 400 in its initial state -> the peering survives and the VPC deletes 409 (now tolerated in expect_status; the own-run sweep reaps the leftovers). STATE MACHINE LEARNED (run #5 notes): create -> CREATING (set/delete/rules all 400 'not Active/changeable/deletable'); approval body is {\"type\": \"CREATE_APPROVE\"} (doc page; our old {action:APPROVE} drew ValidationError Field-required, leaving peerings STUCK in CREATING and their 2 VPCs undeletable -> the cap-poisoning root). Approve retries 400 to ride out CREATING, then wait-peering-active gates the sub-ops; delete retries 400/409. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
       "steps": [
         {
           "name": "create-vpc",
@@ -495,6 +495,27 @@
           "expect_status": [200]
         },
         {
+          "name": "approve-vpc-peering",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}/approval",
+          "group": "peering",
+          "optional": true,
+          "json": {"type": "CREATE_APPROVE"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "retry_on_status": [400], "retries": 8, "retry_interval": 15
+        },
+        {
+          "name": "wait-peering-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}",
+          "group": "peering",
+          "optional": true,
+          "expect_status": [200, 400, 404],
+          "poll": {"field": "$.vpc_peering.state", "until": ["ACTIVE"], "timeout": 300, "interval": 15}
+        },
+        {
           "name": "create-peering-routing-rule",
           "service": "vpc",
           "method": "POST",
@@ -520,16 +541,6 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
-          "name": "approve-vpc-peering",
-          "service": "vpc",
-          "method": "PUT",
-          "path": "/v1/vpc-peerings/{vpc_peering_id}/approval",
-          "group": "peering",
-          "optional": true,
-          "json": {"action": "APPROVE"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
-        },
-        {
           "name": "delete-peering-routing-rule",
           "service": "vpc",
           "method": "DELETE",
@@ -549,7 +560,7 @@
           "optional": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409],
           "destructive": true,
-          "retry_on_status": [409], "retries": 4, "retry_interval": 15
+          "retry_on_status": [400, 409], "retries": 8, "retry_interval": 15
         },
         {
           "name": "wait-peering-gone",

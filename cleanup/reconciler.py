@@ -344,6 +344,31 @@ def run_sweep(client) -> int:
         if it.get("id") and _delete(c, "vpc", f"/v1/publicips/{it['id']}"):
             deleted += 1
 
+    # 3b-2. VPC PEERINGS — must go before the VPCs they lock (run #5 evidence:
+    # a peering stuck in CREATING blocks BOTH its VPCs with 409
+    # related-resource, and a peering only becomes deletable after approval:
+    # PUT .../approval {"type": "CREATE_APPROVE"} — the proven body). Approve
+    # best-effort, then delete with a short 400/409 retry.
+    for it in _select(c, "vpc", "/v1/vpc-peerings",
+                      name_prefixes=("regrpeer",)):
+        pid = it.get("id")
+        if not pid:
+            continue
+        try:  # approval is a no-op 4xx if already ACTIVE/REJECTED — best-effort
+            c.put(f"/v1/vpc-peerings/{pid}/approval", service="vpc",
+                  json={"type": "CREATE_APPROVE"})
+        except Exception:
+            pass
+        st = None
+        for _ in range(6):
+            st = _delete(c, "vpc", f"/v1/vpc-peerings/{pid}")
+            if st and (200 <= st < 300 or st == 404):
+                deleted += 1
+                break
+            time.sleep(15)
+        if not (st and (200 <= st < 300 or st == 404)):
+            print(f"  vpc-peering {pid} delete -> {st}")
+
     # 3c. shared-networking lifecycle children. private-dns holds quota;
     # transit-gateways and load-balancers would 409-block the vpc.
     for it in _select(c, "dns", "/v1/private-dns",
