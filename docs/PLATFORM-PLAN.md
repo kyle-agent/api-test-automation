@@ -331,12 +331,17 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - 배포 절차: 서버 기동(`controlplane/README.md`) + repo Variables에
       `APITEST_PLATFORM_URL`/`APITEST_PLATFORM_TOKEN` 설정 + dispatch PAT
 
-### M2 — 관제와 개입
-- [ ] 라이브 run 뷰 (보고 훅 수신 → 진행현황 스트림)
-- [ ] 리소스 인벤토리 + 단일 리소스 삭제 액션 (reconciler scope 호출)
-- [ ] 명령 채널 (engine 체크포인트 폴링): 시나리오 skip · run abort ·
-      폴링 강제 종료
-- [ ] run 비교 뷰 (A vs B diff)
+### M2 — 관제와 개입 — DONE (live 검증 대기)
+- [x] 라이브 run 뷰 — Testing 화면의 진행 중 run + 마일스톤 타임라인 (M1에서 선구현)
+- [x] 리소스 인벤토리 + 단일 리소스 삭제 — `/testing/resources`,
+      `controlplane/resources.py` (reconciler의 per-kind 삭제 매핑 재사용,
+      `SCP_ALLOW_DESTRUCTIVE` 게이트 + 시도 기록)
+- [x] 명령 채널 — `core/commands.py`(10s 스로틀 폴링) + `engine.py` step
+      경계/폴링 루프 체크포인트(skip·abort·stop_polling, cleanup 보장) +
+      서버 API(`/api/runs/{id}/commands`, ack). abort는 run 종료까지 재노출
+      (xdist 다중 워커 대응)
+- [x] run 비교 뷰 — `/reporting/compare` (new-fail/fixed/still-failing/변화)
+- [x] multi-tenancy 스키마 기초 — runs/schedules tenant 컬럼 (UI 선택자는 후속)
 
 ### M3 — 저작도구 + AI 파이프라인 완성
 - [ ] 시나리오/스위트 편집 UI — 검증 + 쓰기 로직 (개발 기간 반영 방식:
