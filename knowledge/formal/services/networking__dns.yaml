@@ -32,13 +32,17 @@ constraints:
     rule: "private-dns CREATE and DELETE are VERY slow (observed: a heavy run stalled for hours waiting on creation, 2026-06-10). Scenarios must isolate it — own VPC/lane, kick the create off as EARLY as possible and the delete as LATE as possible, generous poll timeouts, and never let other lifecycles serialize behind it"
     provenance: VALIDATED
 
-captures: {}
+captures:
+  private-dns: $.private_dns.id
+  hosted-zone: $.id
+  hosted-zone-record: $.id
 
-states: {}
+states:
+  private-dns: {field: $.private_dns.state, ready: [ACTIVE]}
 
 quirks:
   - id: hosted-zone-needs-activate
-    note: "hosted-zone lifecycle needs a private-dns activate sub-flow first (networking-dns-hosted-zone is disabled until encoded)"
+    note: "SUPERSEDED understanding (kept for history): the hosted-zone chain does NOT need an activate sub-flow when the private-dns is freshly CREATED in the run region — activate is only for re-using the account-global name in ANOTHER region (see private-dns-account-global). The chain create-private-dns -> poll Active -> connect VPC -> hosted zone -> A record -> reverse teardown is now encoded in networking-dns-hosted-zone-private (lifecycles/networking__dns.json, 2026-06-11, pending live validation); the old networking-dns-hosted-zone stays disabled"
     provenance: docs
   - id: private-dns-account-global
     note: "the Private DNS NAME is account-global across ALL regions: first create in any one region, then in every other region you ACTIVATE the same name from the Private DNS list (not create) — this is the documented root of the activate sub-flow; Hosted Zone data is shared across regions, but some detail fields (SRN/creator/modifier) are only visible in the region of first creation"
@@ -51,6 +55,9 @@ quirks:
     provenance: docs
   - id: record-types
     note: "supported record types: A, AAAA, TXT, CNAME, MX, SPF (user-settable); NS and SOA are auto-generated per zone — do not attempt to create NS/SOA records"
+    provenance: docs
+  - id: hosted-zone-bare-envelope-ids
+    note: "createhostedzone AND createhostedzonerecord responses are BARE envelopes — the id is $.id (NOT $.hosted_zone.id / $.record.id; API reference response examples, data/api_docs.json). The legacy heavy-shared-networking dns group still captures $.hosted_zone.id and is expected to capture-miss; the new networking-dns-hosted-zone-private captures $.id. createprivatedns DOES wrap: $.private_dns.id, state at $.private_dns.state (CREATING in the create response)"
     provenance: docs
   - id: public-domain-via-whois
     note: "Public Domain Name purchase goes through the external registrar (Whois), bought in 1-year units with auto-renew configurable until 7 days before expiry — billable + external dependency, keep out of automated CRUD (coverage-only)"

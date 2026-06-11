@@ -67,7 +67,7 @@ quirks:
     note: "an LB server group attaches to exactly ONE Load Balancer; an LB health check is reusable across MULTIPLE server groups (userguide 제공 기능)"
     provenance: docs
   - id: lb-health-check-before-server-group
-    note: "the server-group create selects a health check from the pre-created list (or the default one) — create/capture the health check BEFORE the server group; run 27306490231 saw LbHealthCheckNotFoundError from a capture/order miss on exactly this edge"
+    note: "the server-group create selects a health check from the pre-created list (or the default one) — create/capture the health check BEFORE the server group; run 27306490231 saw LbHealthCheckNotFoundError from a capture/order miss on exactly this edge. APPLIED 2026-06-11 (pending live validation): lb-healthcheck-create now precedes lb-create in BOTH LB lifecycles (networking-loadbalancer-members-nat, heavy-shared-networking) so the HC has the whole LB-provisioning window to settle, and heavy-shared-networking's xcov setlbservergroup step no longer hardcodes a stale lb_health_check_id (now the captured {lb_health_check_id})"
     provenance: docs
   - id: lb-member-same-vpc-or-ip
     note: "a member must be a Virtual Server / Bare Metal Server in the SAME VPC as the LB, or a directly entered IP (userguide) — cross-VPC member ids are a 4xx; direct-IP members are the cheap path for tests"

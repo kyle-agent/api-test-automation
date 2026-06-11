@@ -52,6 +52,10 @@
     ],
     "networking-direct-connect-routing": [
       "vpc"
+    ],
+    "networking-dns-hosted-zone-private": [
+      "vpc",
+      "private-dns"
     ]
   },
   "budget_paths": {
@@ -74,7 +78,8 @@
       "vpc-endpoint",
       "networking-loadbalancer-members-nat",
       "networking-vpn-gateway-tunnel",
-      "networking-direct-connect-routing"
+      "networking-direct-connect-routing",
+      "networking-dns-hosted-zone-private"
     ],
     "vpc_crud_lifecycles": [
       "networking-vpc-subnet",
@@ -175,7 +180,11 @@
     "heavy-shared-networking": [
       "vpc",
       "private-dns"
+    ],
+    "networking-dns-hosted-zone-private": [
+      "vpc",
+      "private-dns"
     ]
   },
-  "notes": "Quota kinds come from core.budgets.DEFAULT_LIMITS (vpc=5, private-dns=3). networking-dns-hosted-zone is currently disabled (needs a private-dns activate sub-flow) and so carries no quota row yet; when re-enabled it should declare private-dns. The four heavy lifecycles each stand up their own VPC inline, so under the 5-VPC cap a scheduler must serialize them (and the two light VPC lifecycles) rather than run them concurrently. The engine reserves a slot in core.budgets before each /v1/vpcs (and /v1/private-dns) create and releases it on teardown; a multi-process scheduler should first Budget.sync() each kind from a live list call, then gate concurrency on Budget.available(kind)."
+  "notes": "Quota kinds come from core.budgets.DEFAULT_LIMITS (vpc=5, private-dns=3). networking-dns-hosted-zone (scenarios.json) stays disabled — superseded 2026-06-11 by networking-dns-hosted-zone-private (lifecycles/networking__dns.json), an ADOPT-class heavy lifecycle that declares [vpc, private-dns] (it ADOPTS the shared VPC for the private-dns connect step and self-creates only the private-dns, which the engine budget-gates via POST /v1/private-dns; fallback self-create VPC block 10.142.0.0/20). private-dns provisioning is VERY slow (hours observed) so the lifecycle is heavy and must not have others serialized behind it. The four heavy lifecycles each stand up their own VPC inline, so under the 5-VPC cap a scheduler must serialize them (and the two light VPC lifecycles) rather than run them concurrently. The engine reserves a slot in core.budgets before each /v1/vpcs (and /v1/private-dns) create and releases it on teardown; a multi-process scheduler should first Budget.sync() each kind from a live list call, then gate concurrency on Budget.available(kind)."
 }

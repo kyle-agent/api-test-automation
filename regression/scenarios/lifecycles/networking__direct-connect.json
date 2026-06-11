@@ -5,7 +5,7 @@
       "service": "networking/direct-connect",
       "enabled": true,
       "heavy": true,
-      "_note": "Direct Connect + routing-rule CRUD (Wave 2, NOT runtime-proven, HEAVY/billable). A direct-connect attaches to a base VPC: the session-shared VPC (adopt:vpc, per knowledge/vpc-scheduling-strategy.md — does NOT self-create a VPC). Then: create-dc -> get/set-dc, create-routing-rule -> delete-routing-rule, delete-dc. All dc/routing-rule writes are one optional 'dc' group so a bad body skips only this family (cleaned up children-first). Bodies from data/api_docs.json request_example. create-dc returns $.direct_connect.id; create-routing-rule returns $.routing_rule.id (both soft-captured; dependent steps reference {direct_connect_id}/{routing_rule_id} -> real chain on success, literal-but-norm-matching on 4xx so coverage still records). NOTE: the docs createdirectconnect example sends tags as a STRINGIFIED list (\"[{'key':...}]\") which is almost certainly a doc bug; we send a proper JSON list [] (the engine merges owner tags). bandwidth=1 (Gbps?) is a docs guess; routing-rule destination_type=ON_PREMISE with destination_cidr; destination_resource_id omitted (we have no on-premise resource) which may 4xx -> optional/tolerant. Covers all 5 direct-connect WRITE ops: POST /v1/direct-connects, PUT /v1/direct-connects/{direct_connect_id}, DELETE /v1/direct-connects/{direct_connect_id}, POST /v1/direct-connects/{direct_connect_id}/routing-rules, DELETE /v1/direct-connects/{direct_connect_id}/routing-rules/{routing_rule_id}.",
+      "_note": "Direct Connect + routing-rule CRUD (Wave 2, NOT runtime-proven, HEAVY/billable). A direct-connect attaches to a base VPC: the session-shared VPC (adopt:vpc, per knowledge/vpc-scheduling-strategy.md — does NOT self-create a VPC). Then: create-dc -> get/set-dc, create-routing-rule -> delete-routing-rule, delete-dc. All dc/routing-rule writes are one optional 'dc' group so a bad body skips only this family (cleaned up children-first). Bodies from data/api_docs.json request_example. create-dc returns $.direct_connect.id; create-routing-rule returns $.routing_rule.id (both soft-captured; dependent steps reference {direct_connect_id}/{routing_rule_id} -> real chain on success, literal-but-norm-matching on 4xx so coverage still records). NOTE: the docs createdirectconnect example sends tags as a STRINGIFIED list (\"[{'key':...}]\") which is almost certainly a doc bug; we send a proper JSON list [] (the engine merges owner tags). bandwidth=1 (Gbps?) is a docs guess; routing-rule destination_type=ON_PREMISE with destination_cidr; destination_resource_id omitted (we have no on-premise resource) which may 4xx -> optional/tolerant. USERGUIDE FACTS APPLIED 2026-06-11 (knowledge/formal/services/networking__direct-connect.yaml, pending live validation): DC name must be 3-20 chars, upper/lowercase LETTERS+DIGITS ONLY (no hyphens/underscores) — regrdc{ualpha} (14 alnum chars) complies; uplink bandwidth enum is 1G|10G so bandwidth=1 stays a guess about the field encoding; max 5 DCs/account; ONE DC per VPC (1:1) — encoded as the negative step create-direct-connect-duplicate-must-4xx (expects [400,409,422] ONLY, the engine treats expect_status as exhaustive so an unexpected 2xx fails the group = platform regression signal); Security Group is a documented prerequisite SERVICE of DC but is not a create-body field, so none is created here. Covers all 5 direct-connect WRITE ops: POST /v1/direct-connects, PUT /v1/direct-connects/{direct_connect_id}, DELETE /v1/direct-connects/{direct_connect_id}, POST /v1/direct-connects/{direct_connect_id}/routing-rules, DELETE /v1/direct-connects/{direct_connect_id}/routing-rules/{routing_rule_id}.",
       "steps": [
         {
           "name": "create-vpc",
@@ -66,6 +66,24 @@
           "optional": true,
           "json": {"description": "API regression suite (updated)"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-direct-connect-duplicate-must-4xx",
+          "_note": "NEGATIVE expectation (userguide dc-one-per-vpc, provenance docs): only ONE Direct Connect per VPC in a service zone, so a SECOND create on the same (shared) VPC MUST 4xx — this step expects ONLY [400,409,422] and fails the 'dc' group if the platform ever lets it through. Runs inside group 'dc' so it only fires when the first create actually succeeded (group-skip otherwise, i.e. no false positive against an empty VPC). Deliberately carries no cleanup: on the documented behaviour nothing is created; in the regression case (unexpected 2xx) the duplicate would leak until the name-prefix sweep (name regrdcdup{ualpha} = 17 alnum chars, within the 3-20 letters+digits-only rule). Pending live validation.",
+          "method": "POST",
+          "path": "/v1/direct-connects",
+          "group": "dc",
+          "optional": true,
+          "json": {
+            "bandwidth": 1,
+            "description": "API regression suite (duplicate on same VPC must fail)",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "name": "regrdcdup{ualpha}",
+            "tags": [],
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [400, 409, 422]
         },
         {
           "name": "create-routing-rule",

@@ -5,7 +5,7 @@
       "service": "networking/loadbalancer",
       "enabled": true,
       "heavy": true,
-      "_note": "Loadbalancer server-group MEMBERS + static-NAT write coverage (Wave 2, NOT runtime-proven, HEAVY/billable). The 8 uncovered LB writes all hang off a real loadbalancer / lb-server-group, so this lifecycle stands up a minimal LB stack under the session-shared VPC (adopt:vpc — does NOT self-create a VPC) and creates its OWN subnet under it (the heavy lifecycles share the VPC but each make their own subnet, per vpc-scheduling-strategy.md): subnet -> lb -> lb-health-check -> lb-server-group (bodies mirror the proven heavy-shared-networking LB chain). Then it exercises members (add -> set -> remove-single -> remove-bulk) and static-nats (public static-nat create/delete on the loadbalancer, private static-nat create/delete). MEMBERS family: addlbservergroupmembers POST returns $.members[0].id (soft-captured into member_id from response_example); set/remove-single reference {member_id}; remove-bulk uses {member_id_list:[{member_id}]}. member_ip is an arbitrary in-subnet IP — no backend VM required to register a member. STATIC-NAT family: createloadbalancerpublicnatip needs a real publicip_id and createloadbalancerprivatenatip needs private_nat_id+private_nat_ip_id — we have none, so those POSTs send empty-string ids, are OPTIONAL and 4xx-tolerant; the static_nat create returns $.static_nat.id (soft-captured) so the matching DELETE reuses it, else sends {static_nat_id} literal which still norm-matches the catalog '*' and records coverage. All families are isolated optional groups so one bad body skips only its family (cleaned up children-first). layer_type:L4 + LB enum guesses inherit the heavy-shared-networking UNVALIDATED caveat. Covers all 8 LB WRITE ops: POST/DELETE /v1/lb-server-groups/{id}/members, PUT/DELETE /v1/lb-server-groups/{id}/members/{member_id}, POST/DELETE /v1/loadbalancers/{id}/static-nats, POST/DELETE /v1/loadbalancers/{id}/private-static-nats.",
+      "_note": "Loadbalancer server-group MEMBERS + static-NAT write coverage (Wave 2, NOT runtime-proven, HEAVY/billable). The 8 uncovered LB writes all hang off a real loadbalancer / lb-server-group, so this lifecycle stands up a minimal LB stack under the session-shared VPC (adopt:vpc — does NOT self-create a VPC) and creates its OWN subnet under it (the heavy lifecycles share the VPC but each make their own subnet, per vpc-scheduling-strategy.md): subnet -> LB-HEALTH-CHECK FIRST -> lb -> lb-server-group (bodies mirror the proven heavy-shared-networking LB chain). ORDERING FIX (userguide lb-health-check-before-server-group, run 27306490231 LbHealthCheckNotFoundError): the server-group create selects a health check from the PRE-CREATED list, so lb-healthcheck-create now runs BEFORE lb-create/lb-server-group — the HC gets the whole LB provisioning window to settle before the server group references {lb_health_check_id}. Other userguide facts (networking__loadbalancer.yaml, 2026-06-11, pending live validation): LB name 3-63 [A-Za-z0-9-_] (regrlb{ualpha} complies); one LB consumes 4 IPs of its service subnet (service+SNAT+2 HC — our own 10.138.5.0/24 fallback subnet has room; service_ip 10.124.0.30 only resolves when the shared subnet is adopted, per fixed_ip_map); SNAT/HC IPs are immutable post-create; attaching a Public NAT IP requires an IGW on the VPC — static-nat-create sends an empty publicip_id on an IGW-less VPC and stays 4xx-tolerant by design. Then it exercises members (add -> set -> remove-single -> remove-bulk) and static-nats (public static-nat create/delete on the loadbalancer, private static-nat create/delete). MEMBERS family: addlbservergroupmembers POST returns $.members[0].id (soft-captured into member_id from response_example); set/remove-single reference {member_id}; remove-bulk uses {member_id_list:[{member_id}]}. member_ip is an arbitrary in-subnet IP — no backend VM required to register a member. STATIC-NAT family: createloadbalancerpublicnatip needs a real publicip_id and createloadbalancerprivatenatip needs private_nat_id+private_nat_ip_id — we have none, so those POSTs send empty-string ids, are OPTIONAL and 4xx-tolerant; the static_nat create returns $.static_nat.id (soft-captured) so the matching DELETE reuses it, else sends {static_nat_id} literal which still norm-matches the catalog '*' and records coverage. All families are isolated optional groups so one bad body skips only its family (cleaned up children-first). layer_type:L4 + LB enum guesses inherit the heavy-shared-networking UNVALIDATED caveat. Covers all 8 LB WRITE ops: POST/DELETE /v1/lb-server-groups/{id}/members, PUT/DELETE /v1/lb-server-groups/{id}/members/{member_id}, POST/DELETE /v1/loadbalancers/{id}/static-nats, POST/DELETE /v1/loadbalancers/{id}/private-static-nats.",
       "steps": [
         {
           "name": "create-vpc",
@@ -46,6 +46,30 @@
           "poll": {"field": "$.subnet.state", "until": ["ACTIVE"], "timeout": 300, "interval": 10}
         },
         {
+          "name": "lb-healthcheck-create",
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "group": "lb",
+          "optional": true,
+          "json": {
+            "lb_health_check": {
+              "description": "API regression suite",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "name": "regrhc{ualpha}",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture_soft": {"lb_health_check_id": "$.lb_health_check.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/lb-health-checks/{lb_health_check_id}", "service": "loadbalancer"}
+        },
+        {
           "name": "lb-create",
           "method": "POST",
           "path": "/v1/loadbalancers",
@@ -78,30 +102,6 @@
           "optional": true,
           "expect_status": [200, 404],
           "poll": {"field": "$.loadbalancer.state", "until": ["ACTIVE", "CREATED", "RUNNING", "AVAILABLE"], "timeout": 600, "interval": 20}
-        },
-        {
-          "name": "lb-healthcheck-create",
-          "method": "POST",
-          "path": "/v1/lb-health-checks",
-          "group": "lb",
-          "optional": true,
-          "json": {
-            "lb_health_check": {
-              "description": "API regression suite",
-              "health_check_count": 3,
-              "health_check_interval": 5,
-              "health_check_port": 80,
-              "health_check_timeout": 5,
-              "name": "regrhc{ualpha}",
-              "protocol": "TCP",
-              "subnet_id": "{subnet_id}",
-              "tags": [],
-              "vpc_id": "{vpc_id}"
-            }
-          },
-          "capture_soft": {"lb_health_check_id": "$.lb_health_check.id"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "cleanup": {"method": "DELETE", "path": "/v1/lb-health-checks/{lb_health_check_id}", "service": "loadbalancer"}
         },
         {
           "name": "lb-servergroup-create",

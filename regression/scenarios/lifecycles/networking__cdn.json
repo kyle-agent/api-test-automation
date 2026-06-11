@@ -5,7 +5,7 @@
       "service": "networking/cdn",
       "enabled": true,
       "heavy": false,
-      "_note": "CDN service CRUD (Wave 2, NOT runtime-proven). CDN is a VPC-free control-plane resource, so no shared-VPC adoption. Create -> read -> update -> update-description -> start -> stop -> purge -> delete, all in one optional 'cdn' group so a bad body skips only this family (cleaned up). Bodies from data/api_docs.json request_example. create returns $.cdn.resource_id (NOT $.id and NOT $.cdn.id — confirmed from createcdnservice response_example {cdn:{account_id,resource_id,workflow_id}}); captured SOFT into cdn_id. Dependent steps reference {cdn_id}: when create succeeds this is a real reversible chain; when create 4xx's, cdn_id stays unset and {cdn_id} is sent literally — it still norm-matches catalog /v1/cdns/* and records the call (coverage) with an expected 4xx. Enum guesses (UNVALIDATED): cache_key_hostname=REQUEST_HOST_HEADER, forward_host_header=REQUEST_HOST_HEADER, origin_hostname_type=DOMAIN, cdn_origin_hostname=test.example.com; cdn_service_domain_prefix must be globally unique -> regr{ualpha}. start/stop/purge sent with empty bodies (no request body in docs). Covers all 7 CDN WRITE ops: POST /v1/cdns, PUT /v1/cdns/{id}, PUT /v1/cdns/{id}/description, POST /v1/cdns/{id}/start, POST /v1/cdns/{id}/stop, POST /v1/cdns/{id}/purge, DELETE /v1/cdns/{id}.",
+      "_note": "CDN service CRUD (Wave 2, NOT runtime-proven; userguide-tightened 2026-06-11, pending live validation). REGION GATE (knowledge/formal/services/networking__cdn.yaml cdn-region-availability, docs): Global CDN exists ONLY in kr-west1/kr-east1 — NOT kr-south1/2/3. The engine (regression/scenarios/engine.py) has NO region-guard mechanism today, so the gate is recorded here: on a kr-south profile this lifecycle must be disabled/filtered out (a declarative 'regions' lifecycle key + engine env-skip is FUTURE WORK); current default env is stage-kr-west1, which is in-gate. Body rule applied from the userguide: cache_expiry_time was '' and is now '86400' (docs: cache expiry TTL MUST be 3600-2592000s — an empty/out-of-range value is a 4xx); custom header fields stay empty (docs cap: max 10 each side). CDN is a VPC-free control-plane resource, so no shared-VPC adoption. Create -> read -> update -> update-description -> start -> stop -> purge -> delete, all in one optional 'cdn' group so a bad body skips only this family (cleaned up). Bodies from data/api_docs.json request_example. create returns $.cdn.resource_id (NOT $.id and NOT $.cdn.id — confirmed from createcdnservice response_example {cdn:{account_id,resource_id,workflow_id}}); captured SOFT into cdn_id. Dependent steps reference {cdn_id}: when create succeeds this is a real reversible chain; when create 4xx's, cdn_id stays unset and {cdn_id} is sent literally — it still norm-matches catalog /v1/cdns/* and records the call (coverage) with an expected 4xx. Enum guesses (UNVALIDATED): cache_key_hostname=REQUEST_HOST_HEADER, forward_host_header=REQUEST_HOST_HEADER, origin_hostname_type=DOMAIN, cdn_origin_hostname=test.example.com; cdn_service_domain_prefix must be globally unique -> regr{ualpha}. start/stop/purge sent with empty bodies (no request body in docs). Covers all 7 CDN WRITE ops: POST /v1/cdns, PUT /v1/cdns/{id}, PUT /v1/cdns/{id}/description, POST /v1/cdns/{id}/start, POST /v1/cdns/{id}/stop, POST /v1/cdns/{id}/purge, DELETE /v1/cdns/{id}.",
       "steps": [
         {
           "name": "create-cdn",
@@ -14,7 +14,7 @@
           "group": "cdn",
           "optional": true,
           "json": {
-            "cache_expiry_time": "",
+            "cache_expiry_time": "86400",
             "cache_key_hostname": "REQUEST_HOST_HEADER",
             "caching_option": "",
             "cdn_origin_hostname": "test.example.com",
@@ -57,7 +57,7 @@
           "group": "cdn",
           "optional": true,
           "json": {
-            "cache_expiry_time": "",
+            "cache_expiry_time": "86400",
             "cache_key_hostname": "REQUEST_HOST_HEADER",
             "caching_option": "",
             "cdn_origin_hostname": "test.example.com",

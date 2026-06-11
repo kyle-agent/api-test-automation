@@ -131,3 +131,24 @@ call_orders:
     delete:
       api: DELETE /v1/clusters/{id}
     notes: "host is mysql.<region>... — /v1/clusters path collides with ske/mariadb across services, per-service hosts disambiguate"
+
+  private-dns:
+    provenance: docs
+    encoded_in: [networking-dns-hosted-zone-private]
+    create:
+      api: POST /v1/private-dns
+      capture: $.private_dns.id
+      poll: {field: $.private_dns.state, until: ACTIVE}
+    delete:
+      api: DELETE /v1/private-dns/{id}
+    notes: "name account-global unique (3-20 lc/digits/hyphen); VERY slow create/delete (hours observed) — heavy lane, generous timeouts; connect VPCs AFTER Active via PUT connected_vpc_ids (setters 400 invalid-state while CREATING); no activate call needed in the creation region (activate = other-region name reuse); delete blocked while any hosted zone exists"
+
+  hosted-zone:
+    provenance: docs
+    encoded_in: [networking-dns-hosted-zone-private]
+    create:
+      api: POST /v1/hosted-zones
+      capture: $.id
+    delete:
+      api: DELETE /v1/hosted-zones/{id}
+    notes: "needs private_dns_id of an ACTIVE private-dns + type:private; create response is a BARE envelope ($.id, not $.hosted_zone.id) — same for records ($.id); teardown record -> zone -> private-dns (reverse order, zone delete must precede the private-dns delete)"

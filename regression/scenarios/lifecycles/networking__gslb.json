@@ -5,7 +5,7 @@
       "service": "networking/gslb",
       "enabled": true,
       "heavy": false,
-      "_note": "GSLB CRUD (Wave 2, NOT runtime-proven). GSLB is a global/account-scoped, VPC-free resource, so no shared-VPC adoption. Create -> get -> set -> set-health-check -> set-resources -> set-routing-control -> delete, all in one optional 'gslb' group so a bad body skips only this family (cleaned up). Bodies from data/api_docs.json request_example. create returns $.gslb.id (from creategslb response_example {gslb:{...,health_check:{id:...}}} — the top-level gslb.id is the resource id, health_check.id is a sub-id). Captured SOFT into gslb_id; dependent steps reference {gslb_id} (real chain on success; literal-but-norm-matching on 4xx -> still records coverage). Enum guesses (UNVALIDATED): algorithm=ROUND_ROBIN, env_usage=PUBLIC, name must be an FQDN -> regr{ualpha}.gslb.e.samsungsdscloud.com. health_check/resources sub-objects sent mostly empty per docs example (empty strings); set-resources requires resources:[{description,destination,region,weight}]; set-routing-control requires {region,status:ENABLE}. region filled with {region}. Covers all 6 GSLB WRITE ops: POST /v1/gslbs, PUT /v1/gslbs/{gslb_id}, PUT /v1/gslbs/{gslb_id}/health-check, PUT /v1/gslbs/{gslb_id}/resources, PUT /v1/gslbs/{gslb_id}/routing-control, DELETE /v1/gslbs/{gslb_id}.",
+      "_note": "GSLB CRUD (Wave 2, NOT runtime-proven; userguide-tightened 2026-06-11, pending live validation). REGION GATE (knowledge/formal/services/networking__gslb.yaml gslb-region-availability, docs): GSLB exists ONLY in kr-west1/kr-east1 — NOT kr-south1/2/3. The engine (regression/scenarios/engine.py) has NO region-guard mechanism today, so the gate is recorded here: on a kr-south profile this lifecycle must be disabled/filtered out (a declarative 'regions' lifecycle key + engine env-skip is FUTURE WORK); current default env is stage-kr-west1, which is in-gate. Body rules applied from the userguide: health_check now sends protocol=TCP + service_port=80 (Service Port REQUIRED for TCP/HTTP/HTTPS; Receive String only required — and alnum-only — for HTTP/HTTPS, so it stays empty under TCP); resource weight stays 0 (Ratio weights must be 0-100); name label regr{ualpha} = 12 lowercase+digit chars (rule: 4-40, lowercase+digits only). GSLB is a global/account-scoped, VPC-free resource, so no shared-VPC adoption. Create -> get -> set -> set-health-check -> set-resources -> set-routing-control -> delete, all in one optional 'gslb' group so a bad body skips only this family (cleaned up). Bodies from data/api_docs.json request_example. create returns $.gslb.id (from creategslb response_example {gslb:{...,health_check:{id:...}}} — the top-level gslb.id is the resource id, health_check.id is a sub-id). Captured SOFT into gslb_id; dependent steps reference {gslb_id} (real chain on success; literal-but-norm-matching on 4xx -> still records coverage). Enum guesses (UNVALIDATED): algorithm=ROUND_ROBIN, env_usage=PUBLIC, name must be an FQDN -> regr{ualpha}.gslb.e.samsungsdscloud.com. health_check/resources sub-objects sent mostly empty per docs example (empty strings); set-resources requires resources:[{description,destination,region,weight}]; set-routing-control requires {region,status:ENABLE}. region filled with {region}. Covers all 6 GSLB WRITE ops: POST /v1/gslbs, PUT /v1/gslbs/{gslb_id}, PUT /v1/gslbs/{gslb_id}/health-check, PUT /v1/gslbs/{gslb_id}/resources, PUT /v1/gslbs/{gslb_id}/routing-control, DELETE /v1/gslbs/{gslb_id}.",
       "steps": [
         {
           "name": "create-gslb",
@@ -22,10 +22,10 @@
               "health_check_probe_timeout": "",
               "health_check_user_id": "",
               "health_check_user_password": "",
-              "protocol": "",
+              "protocol": "TCP",
               "receive_string": "",
               "send_string": "",
-              "service_port": "",
+              "service_port": "80",
               "timeout": ""
             },
             "name": "regr{ualpha}.gslb.e.samsungsdscloud.com",
@@ -71,10 +71,10 @@
             "health_check_probe_timeout": "",
             "health_check_user_id": "",
             "health_check_user_password": "",
-            "protocol": "",
+            "protocol": "TCP",
             "receive_string": "",
             "send_string": "",
-            "service_port": "",
+            "service_port": "80",
             "timeout": ""
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]

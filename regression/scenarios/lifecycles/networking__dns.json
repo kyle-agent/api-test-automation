@@ -101,6 +101,178 @@
           "expect_status": [200, 202, 204, 400, 403, 404, 409]
         }
       ]
+    },
+    {
+      "id": "networking-dns-hosted-zone-private",
+      "service": "networking/dns",
+      "enabled": true,
+      "heavy": true,
+      "_note": "Private DNS -> hosted zone -> A record REAL chain (NEW 2026-06-11, userguide-grounded, NOT runtime-proven — pending live validation; supersedes the disabled networking-dns-hosted-zone in scenarios.json). Encodes the now-ingested userguide flow (knowledge/formal/services/networking__dns.yaml): create private-dns (name regrpdns{ualpha} = 16 chars, rule 3-20 lowercase/digits/hyphen, ACCOUNT-GLOBAL unique across the whole platform — a 409/400 may mean the name is taken platform-wide) -> poll $.private_dns.state to ACTIVE (console machine Creating->Activing->Active; setters 400 invalid-state while CREATING — VALIDATED) -> connect the SHARED VPC via PUT connected_vpc_ids (max 5 VPCs/private-dns; a fresh create starts with NO VPC connected, and per private-dns-account-global NO activate call is needed in the creation region — activate is only for re-using the name in ANOTHER region) -> hosted zone (type private, limit 20/account; create response is a BARE envelope: id at $.id, NOT $.hosted_zone.id — api_docs response example) -> A record (ttl 3600, id at $.id; max 100 records/zone; only A/AAAA/TXT/CNAME/MX/SPF are user-settable) -> REVERSE teardown: record -> zone (private-dns delete is BLOCKED while a hosted zone exists) -> disconnect VPC -> private-dns. VPC handling: ADOPTS the session-shared VPC (adopt:vpc — connect step needs a live VPC id; fallback self-create uses the new unique 10.142.0.0/20 block per knowledge/domain-constraints.md). QUOTAS: private-dns capped at 3/account (VALIDATED) — the engine reserves the 'private-dns' budget slot on POST /v1/private-dns (path-mapped) and dependencies.json quota_kinds declares [vpc, private-dns] for this lifecycle. HEAVY because private-dns create/delete are VERY slow (hours observed in a heavy run, VALIDATED) — generous poll timeout (3600s) and this lifecycle must not be serialized behind by others (slow-provisioners-isolated flow rule). All dns writes form one optional 'pdns' group so a bad body or the platform-wide-name 409 skips only this family (cleaned up children-first). Covers DNS WRITE ops: POST /v1/private-dns, PUT /v1/private-dns/{private_dns_id} (connect+disconnect), POST /v1/hosted-zones, POST /v1/hosted-zones/{hosted_zone_id}/records, DELETE record/zone/private-dns.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression dns",
+            "cidr": "10.142.0.0/20",
+            "tags": []
+          },
+          "capture": {"vpc_id": "$.vpc.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_id}", "service": "vpc"},
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {"field": "$.vpc.state", "until": ["ACTIVE", "CREATED", "RUNNING"], "timeout": 300, "interval": 10}
+        },
+        {
+          "name": "create-private-dns",
+          "method": "POST",
+          "path": "/v1/private-dns",
+          "group": "pdns",
+          "optional": true,
+          "json": {
+            "connected_vpc_ids": [],
+            "description": "API regression suite",
+            "name": "regrpdns{ualpha}",
+            "tags": []
+          },
+          "capture": {"private_dns_id": "$.private_dns.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/private-dns/{private_dns_id}", "service": "dns"}
+        },
+        {
+          "name": "wait-private-dns-active",
+          "method": "GET",
+          "path": "/v1/private-dns/{private_dns_id}",
+          "group": "pdns",
+          "optional": true,
+          "expect_status": [200],
+          "poll": {"field": "$.private_dns.state", "until": ["ACTIVE"], "timeout": 3600, "interval": 30}
+        },
+        {
+          "name": "connect-vpc-to-private-dns",
+          "method": "PUT",
+          "path": "/v1/private-dns/{private_dns_id}",
+          "group": "pdns",
+          "optional": true,
+          "json": {
+            "connected_vpc_ids": ["{vpc_id}"],
+            "description": "API regression suite"
+          },
+          "expect_status": [200, 201, 202]
+        },
+        {
+          "name": "create-hosted-zone",
+          "method": "POST",
+          "path": "/v1/hosted-zones",
+          "group": "pdns",
+          "optional": true,
+          "json": {
+            "description": "API regression suite",
+            "name": "regr{ualpha}.example.com",
+            "private_dns_id": "{private_dns_id}",
+            "tags": [],
+            "type": "private"
+          },
+          "capture": {"hosted_zone_id": "$.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/hosted-zones/{hosted_zone_id}", "service": "dns"}
+        },
+        {
+          "name": "create-a-record",
+          "method": "POST",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records",
+          "group": "pdns",
+          "optional": true,
+          "json": {
+            "description": "API regression suite",
+            "name": "www.regr{ualpha}.example.com",
+            "records": ["192.0.2.10"],
+            "ttl": 3600,
+            "type": "A"
+          },
+          "capture": {"record_id": "$.id"},
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}", "service": "dns"}
+        },
+        {
+          "name": "probe-dns-reads",
+          "probe_reads": {
+            "private_dns_id": "{private_dns_id}",
+            "hosted_zone_id": "{hosted_zone_id}",
+            "record_id": "{record_id}"
+          }
+        },
+        {
+          "name": "delete-a-record",
+          "method": "DELETE",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+          "group": "pdns",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404],
+          "retry_on_status": [409],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-hosted-zone",
+          "method": "DELETE",
+          "path": "/v1/hosted-zones/{hosted_zone_id}",
+          "group": "pdns",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404],
+          "retry_on_status": [409],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "disconnect-vpc-from-private-dns",
+          "method": "PUT",
+          "path": "/v1/private-dns/{private_dns_id}",
+          "group": "pdns",
+          "optional": true,
+          "json": {
+            "connected_vpc_ids": [],
+            "description": "API regression suite"
+          },
+          "expect_status": [200, 201, 202, 400, 404, 409]
+        },
+        {
+          "name": "delete-private-dns",
+          "method": "DELETE",
+          "path": "/v1/private-dns/{private_dns_id}",
+          "group": "pdns",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 404, 409],
+          "retry_on_status": [409],
+          "retries": 10,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
     }
   ]
 }

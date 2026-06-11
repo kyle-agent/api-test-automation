@@ -45,3 +45,6 @@ quirks:
   - id: dc-physical-line-via-sr
     note: "the actual customer line attach/detach is a Support-Center SR through an SDS sales rep — NOT API-automatable; an API-created DC is control-plane-only until the line SR completes"
     provenance: docs
+  - id: dc-second-create-negative-encoded
+    note: "the dc-one-per-vpc 1:1 rule is encoded as a NEGATIVE step (2026-06-11, pending live validation): networking-direct-connect-routing step create-direct-connect-duplicate-must-4xx fires a second create on the same (shared) VPC with expect_status [400,409,422] ONLY — the engine treats expect_status as exhaustive, so an unexpected 2xx fails the 'dc' group and is the regression signal that the platform stopped enforcing 1:1 (the duplicate would then leak until the regrdc* name-prefix sweep)"
+    provenance: docs

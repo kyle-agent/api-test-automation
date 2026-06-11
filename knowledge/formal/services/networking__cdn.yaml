@@ -47,3 +47,9 @@ quirks:
   - id: cdn-protocols
     note: "supports HTTP, HTTPS and HTTP/2 toward origins; purge of cached content on TTL expiry is exposed as a feature (캐싱 만료 콘텐츠 Purge)"
     provenance: docs
+  - id: cdn-region-gate-not-engine-enforced
+    note: "the kr-west1/kr-east1-only gate (cdn-region-availability) is NOT enforceable by the engine today — regression/scenarios/engine.py has no region-guard/region-skip mechanism (checked 2026-06-11), so the gate is recorded in the networking-cdn-service _note; on a kr-south profile the lifecycle must be disabled/filtered manually. FUTURE WORK: a declarative 'regions' lifecycle key that the engine turns into an environmental skip. Default env stage-kr-west1 is in-gate, so no behavior change there"
+    provenance: docs
+  - id: cdn-cache-ttl-applied
+    note: "cache_expiry_time in networking-cdn-service create/update bodies set to '86400' (2026-06-11, pending live validation) per cdn-cache-expiry-range — the docs example's empty string is below the documented 3600-2592000s floor and a likely 4xx; field is sent as a STRING to match the API reference example typing"
+    provenance: docs

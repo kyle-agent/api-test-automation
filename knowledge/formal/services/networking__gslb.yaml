@@ -47,3 +47,9 @@ quirks:
   - id: gslb-target-location
     note: "each connection target carries a monitoring LOCATION field (choose nearest to the target server) in addition to IP + description — required in the create body's target entries"
     provenance: docs
+  - id: gslb-health-check-body-applied
+    note: "networking-gslb-service health_check bodies (create + set-health-check) now send protocol=TCP + service_port='80' (2026-06-11, pending live validation) per gslb-health-check-field-rules: Service Port is REQUIRED for TCP/HTTP/HTTPS, and TCP avoids the HTTP(S)-only Receive String (alnum-only) / auth-password requirements — receive_string/send_string stay empty under TCP; values sent as STRINGS to match the API reference example typing"
+    provenance: docs
+  - id: gslb-region-gate-not-engine-enforced
+    note: "the kr-west1/kr-east1-only gate (gslb-region-availability) is NOT enforceable by the engine today — regression/scenarios/engine.py has no region-guard/region-skip mechanism (checked 2026-06-11), so the gate is recorded in the networking-gslb-service _note; on a kr-south profile the lifecycle must be disabled/filtered manually. FUTURE WORK: a declarative 'regions' lifecycle key that the engine turns into an environmental skip. Default env stage-kr-west1 is in-gate, so no behavior change there"
+    provenance: docs

@@ -6022,7 +6022,7 @@
       "service": "networking/dns",
       "enabled": false,
       "heavy": false,
-      "_note": "DISABLED pending a private-dns activation sub-flow. Real bodies now known (framework/api_bodies.json): createhostedzone requires private_dns_id (+type:'private'), which comes from createprivatedns ($.private_dns.id) followed by activateprivatedns and an active-state wait; record create $.id, zone create $.id (bare envelope, not $.hosted_zone.id). Re-enable once the private-dns create+activate+wait chain is built.",
+      "_note": "DISABLED — SUPERSEDED 2026-06-11 by networking-dns-hosted-zone-private (regression/scenarios/lifecycles/networking__dns.json), which encodes the full userguide chain: create private-dns -> poll Active -> connect shared VPC -> hosted zone -> A record -> reverse teardown (zone before private-dns delete). Per the ingested userguide facts (networking__dns.yaml private-dns-account-global), an ACTIVATE call is only needed when re-using the account-global private-dns name in ANOTHER region — a fresh create in the run region polls straight to Active, so no activate sub-flow is required. Kept disabled as a historical record; bodies here lack the required private_dns_id chain. Real response shapes (framework/api_bodies.json + api_docs response examples): createprivatedns $.private_dns.id; createhostedzone and createhostedzonerecord return BARE envelopes — the id is $.id (not $.hosted_zone.id / $.record.id).",
       "steps": [
         {
           "name": "create-zone",
@@ -7040,7 +7040,7 @@
       "service": "networking/vpc",
       "heavy": true,
       "enabled": true,
-      "_note": "ONE shared vpc(10.140.0.0/20)+subnet(10.140.1.0/24)+publicip, then networking families created back-to-back as optional groups (igw, port, natgw, tgw, subnetvip, lb chain hc->sg->lb->listener->members, dns chain privatedns->activate->zone->record), probe-read per service, torn down children-first. A bad body skips only its group (cleaned up; runner warns with status+body). Bodies grounded from framework/api_bodies.json. Skipped (need backing/external resource): privatelink-service/-endpoint (need backing LB+approval), vpc-peering (cross-account approval), vpc-endpoint (needs a privatelink service), private-nat (separate flow), lb-certificate (needs an uploaded cert), public-domain-name (real paid domain registration order). layer_type:L4 and several LB enum guesses UNVALIDATED until a heavy run surfaces warnings. 2026-06-10: trailing DELETE 409-retry budgets cut to 8x30s (run e3ba190 burned 21min on delete-vpc and still 409'd; sweep backstop).",
+      "_note": "ONE shared vpc(10.140.0.0/20)+subnet(10.140.1.0/24)+publicip, then networking families created back-to-back as optional groups (igw, port, natgw, tgw, subnetvip, lb chain hc->sg->lb->listener->members, dns chain privatedns->activate->zone->record), probe-read per service, torn down children-first. A bad body skips only its group (cleaned up; runner warns with status+body). Bodies grounded from framework/api_bodies.json. Skipped (need backing/external resource): privatelink-service/-endpoint (need backing LB+approval), vpc-peering (cross-account approval), vpc-endpoint (needs a privatelink service), private-nat (separate flow), lb-certificate (needs an uploaded cert), public-domain-name (real paid domain registration order). layer_type:L4 and several LB enum guesses UNVALIDATED until a heavy run surfaces warnings. 2026-06-10: trailing DELETE 409-retry budgets cut to 8x30s (run e3ba190 burned 21min on delete-vpc and still 409'd; sweep backstop). LB ORDERING FIX 2026-06-11 (userguide lb-health-check-before-server-group, knowledge/formal/services/networking__loadbalancer.yaml; run 27306490231 LbHealthCheckNotFoundError): the server-group create selects a health check from the PRE-CREATED list, so lb-healthcheck-create now runs BEFORE lb-create (group teardown order adjusts automatically), and the xcov setlbservergroup step no longer hardcodes a stale lb_health_check_id — it references the captured placeholder. Pending live validation.",
       "steps": [
         {
           "name": "create-vpc",
@@ -7398,6 +7398,41 @@
           }
         },
         {
+          "name": "lb-healthcheck-create",
+          "service": "loadbalancer",
+          "group": "lb",
+          "optional": true,
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "json": {
+            "lb_health_check": {
+              "description": "API regression shared-net",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "name": "regrhc{ualpha}",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "tags": [],
+              "vpc_id": "{vpc_id}"
+            }
+          },
+          "capture": {
+            "lb_health_check_id": "$.lb_health_check.id"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-health-checks/{lb_health_check_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
           "name": "lb-create",
           "service": "loadbalancer",
           "group": "lb",
@@ -7453,41 +7488,6 @@
             ],
             "timeout": 600,
             "interval": 20
-          }
-        },
-        {
-          "name": "lb-healthcheck-create",
-          "service": "loadbalancer",
-          "group": "lb",
-          "optional": true,
-          "method": "POST",
-          "path": "/v1/lb-health-checks",
-          "json": {
-            "lb_health_check": {
-              "description": "API regression shared-net",
-              "health_check_count": 3,
-              "health_check_interval": 5,
-              "health_check_port": 80,
-              "health_check_timeout": 5,
-              "name": "regrhc{ualpha}",
-              "protocol": "TCP",
-              "subnet_id": "{subnet_id}",
-              "tags": [],
-              "vpc_id": "{vpc_id}"
-            }
-          },
-          "capture": {
-            "lb_health_check_id": "$.lb_health_check.id"
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/lb-health-checks/{lb_health_check_id}",
-            "service": "loadbalancer"
           }
         },
         {
@@ -7828,7 +7828,7 @@
           "json": {
             "lb_server_group": {
               "description": "this is an lb server group",
-              "lb_health_check_id": "46c681018e33453085ca7c8db54e0076",
+              "lb_health_check_id": "{lb_health_check_id}",
               "lb_method": "ROUND_ROBIN"
             }
           },

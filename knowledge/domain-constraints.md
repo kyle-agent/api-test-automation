@@ -63,6 +63,7 @@ only), **100 security groups/account**, **100 rules/SG, 1,000 rules/account**.
 | networking-loadbalancer-members-nat | `10.138.0.0/20` | adopt (fallback) |
 | networking-vpn-gateway-tunnel | `10.139.0.0/20` | adopt (fallback) |
 | heavy-shared-networking | `10.140.0.0/20` | vpc-crud (+ private-dns) |
+| networking-dns-hosted-zone-private | `10.142.0.0/20` | adopt (fallback) (+ private-dns) |
 
 > "adopt (fallback)" lifecycles ADOPT the shared VPC+subnet at runtime (they
 > create no VPC); their own CIDR is used only in the degraded self-create
