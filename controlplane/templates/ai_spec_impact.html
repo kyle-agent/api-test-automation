@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}A1 Spec-diff 영향 분석{% endblock %}
+{% block content %}
+
+<section>
+  <h2>A1 — Spec-diff 영향 분석</h2>
+  <p class="muted">baseline: <code>{{ r.baseline }}</code> · 생성: {{ r.created }}
+    {% if r.draft_name %} · 저장됨: <a href="/ai/drafts/{{ r.draft_name }}">drafts/{{ r.draft_name }}</a>{% endif %}
+    · <a href="/ai">← AI 파이프라인</a></p>
+  <div class="cards">
+    <div class="card"><div class="num">+{{ r.summary_counts.added }}</div><div class="lbl">added</div></div>
+    <div class="card"><div class="num">-{{ r.summary_counts.removed }}</div><div class="lbl">removed</div></div>
+    <div class="card"><div class="num">~{{ r.summary_counts.changed }}</div><div class="lbl">changed</div></div>
+    <div class="card"><div class="num">{{ r.summary_counts.unchanged }}</div><div class="lbl">unchanged</div></div>
+  </div>
+</section>
+
+<section>
+  <h2>AI 영향 분석</h2>
+  {% if r.ai %}
+  <p>{{ r.ai.summary }}</p>
+  {% if r.ai.impacted_services %}
+  <table>
+    <tr><th>서비스</th><th>이유</th><th>권고 조치</th></tr>
+    {% for s in r.ai.impacted_services %}
+    <tr><td><code>{{ s.service }}</code></td><td>{{ s.why }}</td>
+        <td>{{ s.suggested_action }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  <p style="margin-top:10px">
+    재실행 제안: suites={{ r.ai.rerun.suites }} ·
+    service_filters={{ r.ai.rerun.service_filters }} ·
+    crud_filters={{ r.ai.rerun.crud_filters }}
+  </p>
+  <a href="/testing{% if rerun_query %}?{{ rerun_query }}{% endif %}"><button>이 범위로 실행 →</button></a>
+  {% else %}
+  <p class="warn">AI 분석 비활성 — {{ r.ai_error }}</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>영향 서비스 (mechanical) — enabled lifecycles</h2>
+  {% if r.affected_services %}
+  <table>
+    <tr><th>서비스</th><th>enabled lifecycles</th></tr>
+    {% for svc in r.affected_services %}
+    <tr><td><code>{{ svc }}</code></td>
+        <td class="muted">{{ r.enabled_lifecycles.get(svc, [])|join(', ') or '없음' }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">변경된 서비스가 없습니다.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Mechanical diff</h2>
+  {% if r.diff.added %}
+  <h2>Added ({{ r.summary_counts.added }})</h2>
+  <table>{% for e in r.diff.added %}
+    <tr><td><code>{{ e.key }}</code></td><td class="muted">{{ e.sig }}</td></tr>
+  {% endfor %}</table>
+  {% endif %}
+  {% if r.diff.removed %}
+  <h2>Removed ({{ r.summary_counts.removed }})</h2>
+  <table>{% for e in r.diff.removed %}
+    <tr><td><code>{{ e.key }}</code></td><td class="muted">{{ e.sig }}</td></tr>
+  {% endfor %}</table>
+  {% endif %}
+  {% if r.diff.changed %}
+  <h2>Changed ({{ r.summary_counts.changed }})</h2>
+  <table>{% for c in r.diff.changed %}
+    <tr><td><code>{{ c.key }}</code></td>
+        <td class="muted">{{ c.sig_old }} → {{ c.sig_new }}</td>
+        <td class="muted">{{ c.fields.keys()|join(', ') }}</td></tr>
+  {% endfor %}</table>
+  {% endif %}
+  {% if not (r.diff.added or r.diff.removed or r.diff.changed) %}
+  <p class="muted">변경 없음.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

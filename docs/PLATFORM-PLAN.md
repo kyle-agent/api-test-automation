@@ -348,8 +348,22 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       git 커밋 + push → Actions가 클론해서 사용)
 - [ ] 의존 그래프 시각화·편집 (dependencies.json ↔ cross-service.yaml)
 - [ ] knowledge 브라우저/편집 + 검증상태 필드화
-- [ ] AI A1(spec-diff 분석→부분 재실행 제안)·A2(시나리오 초안)·A3(fact
-      추출) 파이프라인 + C1 탐색 모드
+- [x] AI A1(spec-diff 분석→부분 재실행 제안)·A2(시나리오 초안)·A3(fact
+      추출) 파이프라인 — `controlplane/ai_pipelines.py` + `/ai` 라우트
+      (`controlplane/ai_routes.py`, app에 include_router로 연결). 산출물은
+      전부 `drafts/` 검토용 초안 파일(자동 활성화 없음): A1은 spec/diff.py
+      mechanical diff 위에 Claude 영향분석 + 재실행 범위(키 없으면
+      mechanical-only), A2는 카탈로그·body 템플릿·formal knowledge·검증
+      lifecycle few-shot 기반 lifecycle JSON 초안(enabled:false 고정 + 기계
+      검증: 카탈로그 경로/placeholder 순서/destructive teardown), A3는 run의
+      2xx observation에서 fact 후보 + formal YAML 제안(observation이 담지
+      않는 body/capture 경로는 추정 금지 — 'probable'로 강등). 오프라인
+      테스트 `controlplane/tests_ai_offline.py` (Claude는 `_client` seam stub)
+- [ ] **C1 탐색 모드 — 명시적 DEFERRED (live 검증 이후로 연기)**: inline
+      엔진 AI(4xx 읽고 body 수정 후 1회 재시도)는 실제 live run에서의 에러
+      메시지·재시도 동작을 보며 튜닝해야 하므로, M1~M3 산출물의 live 검증이
+      끝난 뒤 별도 작업으로 진행한다 (`SCP_AI_EXPLORE` 게이트 설계는 §4-C1
+      그대로 유지)
 
 ### M4 — 배포 전환 (마지막: 로컬 파일 모드로 컷오버)
 - [ ] 동일 호스트 worker: run 큐 직접 소비 → spec → regression → sweep →

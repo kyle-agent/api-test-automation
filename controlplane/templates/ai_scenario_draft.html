@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}A2 시나리오 초안{% endblock %}
+{% block content %}
+
+<section>
+  <h2>A2 — 시나리오 초안: {{ r.service }}</h2>
+  <p class="muted">생성: {{ r.created }}
+    {% if r.draft_name %} · 저장됨: <a href="/ai/drafts/{{ r.draft_name }}">drafts/{{ r.draft_name }}</a>{% endif %}
+    · <a href="/ai">← AI 파이프라인</a></p>
+</section>
+
+{% if r.lifecycle %}
+<section>
+  <h2>기계 검증 결과</h2>
+  {% if r.validation_problems %}
+  <p class="warn">{{ r.validation_problems|length }}건의 문제 — 사람 검토에서 반드시 해결하세요:</p>
+  <ul>{% for p in r.validation_problems %}<li class="warn">{{ p }}</li>{% endfor %}</ul>
+  {% else %}
+  <p>기계 검증 통과 (카탈로그 경로 · placeholder 정의 순서 · destructive teardown).</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>불확실성 (AI notes)</h2>
+  {% if r.notes %}
+  <ul>{% for n in r.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+  {% else %}<p class="muted">없음.</p>{% endif %}
+</section>
+
+<section>
+  <h2>Lifecycle JSON 초안 (enabled:false 고정)</h2>
+  <p class="muted">{{ r.review_hint }}</p>
+  <pre>{{ r.lifecycle | tojson(indent=2) }}</pre>
+</section>
+{% else %}
+<section>
+  <h2>초안 없음</h2>
+  <p class="warn">{{ r.ai_error or 'AI 응답을 받지 못했습니다.' }}</p>
+  <p class="muted">A2는 Claude 없이 동작할 수 없습니다 — ANTHROPIC_API_KEY 필요.</p>
+</section>
+{% endif %}
+
+{% endblock %}

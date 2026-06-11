@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}AI 파이프라인{% endblock %}
+{% block content %}
+
+<section>
+  <h2>AI 파이프라인 (M3 §4-A1·A2·A3)</h2>
+  <p class="muted">결과는 전부 <code>drafts/</code>의 검토용 초안 파일로 저장되며,
+    어떤 것도 자동으로 활성화·머지되지 않습니다.
+    {% if not ai_ok %}<span class="warn">ANTHROPIC_API_KEY 미설정 — Claude 분석은
+    비활성입니다 (A1은 mechanical diff만, A2/A3는 실행 불가).</span>{% endif %}</p>
+</section>
+
+<div class="cards">
+  <div class="card" style="min-width:300px">
+    <div class="num">A1</div>
+    <div class="lbl">Spec-diff 영향 분석</div>
+    <p class="muted" style="font-size:12px">현재 <code>data/api_catalog.json</code>을
+      이전 버전(git rev 또는 파일 경로)과 비교 → 영향 서비스 + 재실행 범위 제안.</p>
+    <form class="inline" method="post" action="/ai/spec-impact">
+      <input type="text" name="rev" placeholder="git rev (예: HEAD~1)" style="width:140px">
+      <input type="text" name="old_path" placeholder="또는 이전 카탈로그 파일 경로" style="width:200px">
+      <button>분석 실행</button>
+    </form>
+    <p class="warn" style="font-size:11px">동기 실행 — AI 분석 포함 시 ~1분 걸릴 수 있습니다.</p>
+  </div>
+
+  <div class="card" style="min-width:300px">
+    <div class="num">A2</div>
+    <div class="lbl">시나리오 초안 생성</div>
+    <p class="muted" style="font-size:12px">서비스의 카탈로그 + body 템플릿 + knowledge로
+      lifecycle JSON 초안 작성 (<b>enabled:false 고정</b>) + 기계 검증.</p>
+    <form class="inline" method="post" action="/ai/scenario-draft">
+      <select name="service" required>
+        <option value="" disabled selected>category/service 선택</option>
+        {% for s in services %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+      <button {% if not ai_ok %}disabled{% endif %}>초안 생성</button>
+    </form>
+    <p class="warn" style="font-size:11px">동기 실행 — ~1분 걸릴 수 있습니다.
+      {% if not ai_ok %}ANTHROPIC_API_KEY 필요.{% endif %}</p>
+  </div>
+
+  <div class="card" style="min-width:300px">
+    <div class="num">A3</div>
+    <div class="lbl">Validated-fact 추출</div>
+    <p class="muted" style="font-size:12px">종료된 run의 2xx observation에서 검증된
+      사실 후보 + formal YAML 제안 추출.</p>
+    <form class="inline" method="post" action="/ai/extract-facts">
+      {% if run_ids %}
+      <select name="run_id" required>
+        <option value="" disabled selected>run 선택</option>
+        {% for rid in run_ids %}<option value="{{ rid }}">{{ rid }}</option>{% endfor %}
+      </select>
+      {% else %}
+      <input type="text" name="run_id" placeholder="gh_run_id" required>
+      {% endif %}
+      <button {% if not ai_ok %}disabled{% endif %}>추출 실행</button>
+    </form>
+    <p class="warn" style="font-size:11px">동기 실행 — ~1분 걸릴 수 있습니다.
+      {% if not ai_ok %}ANTHROPIC_API_KEY 필요.{% endif %}</p>
+  </div>
+</div>
+
+<section>
+  <h2>저장된 초안 (drafts/)</h2>
+  {% if drafts %}
+  <table>
+    <tr><th>파일</th><th>종류</th><th>생성</th><th>크기</th></tr>
+    {% for d in drafts %}
+    <tr>
+      <td><a href="/ai/drafts/{{ d.name }}">{{ d.name }}</a></td>
+      <td><span class="cat">{{ d.kind }}</span></td>
+      <td class="muted">{{ d.created }}</td>
+      <td class="muted">{{ d.kb }} KB</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">아직 초안이 없습니다.</p>
+  {% endif %}
+</section>
+
+{% endblock %}
