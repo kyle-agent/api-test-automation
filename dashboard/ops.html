@@ -148,11 +148,28 @@ function kindLabel(e){
   const base=KIND_LABEL[e.kind]||e.kind;
   return e.kind==="clusters"&&e.service?`Cluster · ${e.service}`:base;
 }
+const RES_CACHE=new Map();   // key -> events[] (objects are immutable; fetch once)
 async function loadResEvents(rid){
   const keys=RES_KEYS.filter(k=>k.startsWith(`runs/${rid}/res/`)).sort();
-  const batches=await Promise.all(keys.map(k=>jget(k).catch(()=>null)));
-  return batches.filter(Boolean).flatMap(b=>b.events||[]);
+  const missing=keys.filter(k=>!RES_CACHE.has(k));
+  // limited-concurrency incremental fetch with progress (385 objects through
+  // the browser's ~6-connection limit took tens of seconds and the 30s tick
+  // kept restarting it — now each object is fetched ONCE per session)
+  let done=0;
+  const workers=Array.from({length:8},async()=>{
+    for(;;){
+      const k=missing.shift(); if(!k) return;
+      try{ const b=await jget(k); RES_CACHE.set(k,(b.events)||[]); }
+      catch(e){ RES_CACHE.set(k,[]); }
+      done++;
+      if(done%25===0||done===missing.length)
+        $("#resBody").textContent=`이벤트 로딩 중… ${done} 객체`;
+    }
+  });
+  await Promise.all(workers);
+  return keys.flatMap(k=>RES_CACHE.get(k)||[]);
 }
+let RES_BUSY=false;
 function foldResources(evs){
   // pair created→deleted by res_id (fallback kind+lifecycle FIFO)
   const res=[]; const open={}; const lcs={};
@@ -235,10 +252,13 @@ function renderTree(res,lcs){
 let SELECTED_RUN="";
 async function renderRes(){
   SELECTED_RUN=$("#resRun").value||SELECTED_RUN;
-  if(!SELECTED_RUN){ return; }
+  if(!SELECTED_RUN||RES_BUSY){ return; }
+  RES_BUSY=true;
   try{ const evs=await loadResEvents(SELECTED_RUN);
-       const {res,lcs}=foldResources(evs); renderTree(res,lcs);
+       if(!evs.length){ $("#resBody").textContent="이 런에는 자원 이벤트가 없습니다 (read-only/정리 런)"; }
+       else { const {res,lcs}=foldResources(evs); renderTree(res,lcs); }
   }catch(e){ $("#resBody").textContent="자원 이벤트 조회 실패: "+e.message; }
+  finally{ RES_BUSY=false; }
 }
 function fillRunSelect(ids){
   // only runs that actually HAVE resource events, newest first, newest default
