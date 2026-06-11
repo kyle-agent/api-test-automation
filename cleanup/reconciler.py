@@ -492,13 +492,15 @@ def run_sweep(client) -> int:
                 json={"waiting_time_ndays": 7}):
             deleted += 1
 
-    # 11. KMS keys created by the kms + secret lifecycles (regrkms / regrskms)
-    for prefix in ("regrkms", "regrskms"):
-        for it in _select(c, "kms", "/v1/kms/transit",
-                          name_prefixes=(prefix,)):
-            if it.get("id") and _delete(
-                    c, "kms", f"/v1/kms/transit/{it['id']}"):
-                deleted += 1
+    # 11. KMS keys. Lifecycles stamp several shapes (regrkms / regrskms /
+    # regrswkms / regrkmsc — field sweep 2026-06-10 showed 15 skipped as
+    # name-mismatch under the old two-prefix loop), so match the broad regr*
+    # prefix in ONE pass like the other collections.
+    for it in _select(c, "kms", "/v1/kms/transit",
+                      name_prefixes=("regr",)):
+        if it.get("id") and _delete(
+                c, "kms", f"/v1/kms/transit/{it['id']}"):
+            deleted += 1
 
     # 12. light create->read lifecycle types (scf, apigateway, iam, servicewatch).
     # scf cloud functions (regrscf): delete each function's triggers first,
@@ -552,8 +554,24 @@ def run_sweep(client) -> int:
             st = _delete(c, "servicewatch", path, json={"ids": [it["id"]]})
             if st and (200 <= st < 300 or st == 404):
                 deleted += 1
-            else:
-                print(f"  {path} {it['id']} delete -> {st}")
+                continue
+            # field 2026-06-10: 3 regrdash dashboards 400 on EVERY round with
+            # the {ids:[…]} bulk body (shape unproven, ledger note). Log the
+            # response body for diagnosis and try the one plausible alternate
+            # envelope once before giving up.
+            try:
+                r = c.delete(path, service="servicewatch",
+                             json={"dashboard_ids" if "dashboards" in path
+                                   else "alert_ids" if "alerts" in path
+                                   else "event_rule_ids": [it["id"]]})
+                if r.ok or r.status == 404:
+                    deleted += 1
+                    print(f"  {path} {it['id']} deleted with alternate body key")
+                    continue
+                print(f"  {path} {it['id']} delete -> {st}; alt-key -> "
+                      f"{r.status}: {(r.raw_text or '')[:200]}")
+            except Exception as exc:
+                print(f"  {path} {it['id']} delete -> {st}; alt-key error: {exc}")
 
     # servicewatch log groups (regrlg + service-auto-created). Gotchas found in
     # the field:
