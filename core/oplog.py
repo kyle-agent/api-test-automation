@@ -157,6 +157,77 @@ def emit(stage: str, status: str, detail: str = "", job: str = "") -> bool:
     return ok
 
 
+# ---------------------------------------------------------------------------
+# Resource-level events (engine hooks) — BUFFERED so a heavy run's hundreds of
+# create/delete events become a handful of batch objects, not per-event PUTs.
+# Keys are unique per process (pid+ms) -> race-free across xdist workers and
+# the parallel A/B jobs. The ops viewer folds the batches into a per-resource
+# created→testing→deleted timeline (간트).
+# ---------------------------------------------------------------------------
+_RES_BUF: list = []
+_RES_FIRST_TS = [0.0]
+_FLUSH_EVERY = 15          # events
+_FLUSH_MAX_AGE = 30.0      # seconds
+
+
+def _kind_of(path: str) -> str:
+    """'/v1/vpcs/{id}' -> 'vpcs'; '/v1/subnets' -> 'subnets' (raw segment —
+    the viewer prettifies; service qualifies colliding roots like clusters)."""
+    segs = [s for s in (path or "").split("?")[0].split("/") if s]
+    return segs[1] if len(segs) > 1 else (segs[0] if segs else "")
+
+
+def emit_resource(action: str, *, path: str = "", service: str = "",
+                  name: str = "", res_id: str = "", lifecycle: str = "",
+                  status: str = "") -> None:
+    """Buffer one resource/lifecycle event (best-effort, never raises)."""
+    try:
+        if _cfg() is None:
+            return
+        # delete events carry the live path (/v1/vpcs/<id>) — recover the id so
+        # the viewer can pair created→deleted bars without guessing.
+        if not res_id and path:
+            last = [s for s in path.split("?")[0].split("/") if s][-1:]
+            if last and "{" not in last[0] and last[0] != _kind_of(path):
+                res_id = last[0]
+        now = time.time()
+        _RES_BUF.append({
+            "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
+            "t": int(now * 1000), "action": action, "kind": _kind_of(path),
+            "service": service or "", "name": str(name or "")[:120],
+            "res_id": str(res_id or "")[:80], "lifecycle": lifecycle or "",
+            "status": str(status or "")[:40]})
+        if not _RES_FIRST_TS[0]:
+            _RES_FIRST_TS[0] = now
+        if (len(_RES_BUF) >= _FLUSH_EVERY
+                or now - _RES_FIRST_TS[0] >= _FLUSH_MAX_AGE):
+            flush_resources()
+    except Exception:
+        pass
+
+
+def flush_resources() -> None:
+    """PUT the buffered events as one batch object (best-effort)."""
+    global _RES_BUF
+    if not _RES_BUF:
+        return
+    try:
+        c, cfg = _client()
+        if not c:
+            _RES_BUF = []
+            return
+        batch, _RES_BUF = _RES_BUF, []
+        _RES_FIRST_TS[0] = 0.0
+        key = f"runs/{_run_id()}/res/{int(time.time()*1000)}-{os.getpid()}.json"
+        _put(c, cfg, key, {"events": batch})
+    except Exception:
+        _RES_BUF = []
+
+
+import atexit
+atexit.register(flush_resources)
+
+
 def finalize(history_path: str = "dashboard/history.jsonl") -> bool:
     """Called once by the dashboard job (single writer): write summary.json for
     this run and fold it into the newest-first index.json (kept ≤ 200 rows)."""

@@ -43,6 +43,10 @@ from pathlib import Path
 
 from core import budgets as _budgets
 from core import registry, results
+try:                       # ops-log resource events (best-effort; never breaks a run)
+    from core import oplog as _oplog
+except Exception:          # pragma: no cover
+    _oplog = None
 from core.registry import ResourceRecord, ResourceRegistry
 from core.results import Observation
 from core.catalog import load_catalog
@@ -477,6 +481,9 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
     reg = resource_registry if resource_registry is not None else ResourceRegistry()
 
     service = lifecycle.get("service", "").split("/")[-1] or None
+    if _oplog:
+        _oplog.emit_resource("lifecycle-start", service=service or "",
+                             name=lifecycle["id"], lifecycle=lifecycle["id"])
 
     _now = time.gmtime()
     ctx: dict[str, str] = {
@@ -508,8 +515,15 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             if cfg.allow_destructive:
                 client.request(method, path, json=cu_json, service=svc)
                 print(f"  cleanup: {method} {path}")
+                if _oplog:
+                    _oplog.emit_resource("deleted", path=path, service=svc or "",
+                                         lifecycle=lifecycle["id"],
+                                         status="cleanup")
         except Exception as exc:  # best-effort; report and continue
             print(f"  cleanup FAILED for {label} ({path}): {exc}")
+            if _oplog:
+                _oplog.emit_resource("delete-failed", path=path, service=svc or "",
+                                     lifecycle=lifecycle["id"], status=str(exc)[:40])
         finally:
             if bkind:  # release the reserved budget slot regardless of outcome
                 budget.release(bkind)
@@ -671,6 +685,11 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 if _ck:
                     _record_smoke(resp.status, _cat, _ck, step["method"],
                                   step.get("path", path), _ems)
+            if (_oplog and step["method"].upper() == "DELETE"
+                    and 200 <= resp.status < 300):
+                _oplog.emit_resource("deleted", path=path,
+                                     service=step_service or "",
+                                     lifecycle=lifecycle["id"])
 
             expected = step.get("expect_status", [200])
             _txt = resp.raw_text or ""
@@ -773,7 +792,17 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 reg.track(ResourceRecord(
                     service=cu_svc or "", delete_path=cu_path, resource_id=rid,
                     kind=bkind or step["name"], parent=grp))
+                if _oplog:
+                    _oplog.emit_resource(
+                        "created", path=cu_path, service=cu_svc or "",
+                        name=(body or {}).get("name", "") if isinstance(body, dict) else "",
+                        res_id=rid, lifecycle=lifecycle["id"])
     except LifecycleSkip as exc:
+        if _oplog:
+            _oplog.emit_resource("lifecycle-end", service=service or "",
+                                 name=lifecycle["id"], lifecycle=lifecycle["id"],
+                                 status="skipped")
+            _oplog.flush_resources()
         return {"id": lifecycle["id"], "status": "skipped", "reason": str(exc),
                 "failed_groups": sorted(failed_groups), "created": created_count}
     except Exception as exc:
@@ -787,6 +816,12 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
 
 def _finish(lifecycle, status, failed_groups, group_fail_reason, created, *,
             reason=None, raised=None):
+    if _oplog:
+        _oplog.emit_resource("lifecycle-end",
+                             service=lifecycle.get("service", "").split("/")[-1],
+                             name=lifecycle["id"], lifecycle=lifecycle["id"],
+                             status=status)
+        _oplog.flush_resources()
     if failed_groups:
         import warnings
         for g in sorted(failed_groups):

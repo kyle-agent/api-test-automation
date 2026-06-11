@@ -22,6 +22,21 @@
  #live .job{font-weight:600;margin-top:8px}
  .bar{height:8px;background:#eaeef2;border-radius:4px;overflow:hidden;margin:2px 0 8px}
  .bar div{height:100%;background:#2da44e}
+ /* resource gantt */
+ .g-kind{font-weight:600;font-size:12px;color:#57606a;margin:10px 0 2px}
+ .g-row{display:flex;align-items:center;gap:6px;height:18px}
+ .g-label{width:230px;font-size:11px;white-space:nowrap;overflow:hidden;
+          text-overflow:ellipsis;color:#1f2328}
+ .g-track{position:relative;flex:1;height:10px;background:#f0f3f6;border-radius:5px}
+ .g-bar{position:absolute;top:0;height:10px;border-radius:5px;min-width:6px}
+ .g-alive{background:#2da44e;animation:pulse 1.6s infinite}
+ .g-done{background:#a5b0bb}
+ .g-fail{background:#cf222e}
+ @keyframes pulse{50%{opacity:.55}}
+ .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+ .chip{border:1px solid #d0d7de;border-radius:12px;padding:1px 10px;font-size:12px;background:#fff}
+ .chip b{color:#1a7f37} .chip s{color:#656d76;text-decoration:none}
+ .lcst{font-size:11px}
 </style>
 </head>
 <body><div class="wrap">
@@ -37,6 +52,13 @@
 </div>
 
 <div class="panel" id="live"><b>진행 중인 런</b><div id="liveBody" class="mut">불러오는 중…</div></div>
+
+<div class="panel" id="res"><b>자원 타임라인</b>
+  <span class="mut">(생성→테스트 중→삭제 · <span style="color:#2da44e">■ 살아있음/테스트 중</span>
+  <span style="color:#a5b0bb">■ 삭제됨</span> <span style="color:#cf222e">■ 정리 실패</span>)</span>
+  <select id="resRun" onchange="renderRes()" style="font-size:12px"></select>
+  <div class="chips" id="resChips"></div>
+  <div id="resBody" class="mut">런 선택…</div></div>
 
 <div class="panel"><b>런 이력</b> <span class="mut">(index.json, 최신순)</span>
 <table id="hist"><thead><tr>
@@ -112,11 +134,115 @@ async function loadLive(idx){
     $("#liveBody").innerHTML=html;
   }catch(e){ $("#liveBody").textContent="라이브 조회 실패: "+e.message; }
 }
+// ---------------- resource gantt ----------------
+let RES_KEYS=[];           // bucket keys cache from the last listing
+const KIND_LABEL={vpcs:"VPC",subnets:"Subnet",servers:"VM(Server)",volumes:"Block Storage(Volume)",
+  snapshots:"Snapshot",clusters:"Cluster(DB/SKE)",keypairs:"Keypair","security-groups":"Security Group",
+  publicips:"Public IP","internet-gateways":"Internet Gateway","log-groups":"Log Group",
+  secrets:"Secret","kms":"KMS Key",functions:"Function",apis:"API",queues:"Queue",
+  registries:"Registry","vpc-peerings":"VPC Peering",lifecycle:"Lifecycle"};
+function kindLabel(e){
+  const base=KIND_LABEL[e.kind]||e.kind;
+  return e.kind==="clusters"&&e.service?`Cluster · ${e.service}`:base;
+}
+async function loadResEvents(rid){
+  const keys=RES_KEYS.filter(k=>k.startsWith(`runs/${rid}/res/`)).sort();
+  const batches=await Promise.all(keys.map(k=>jget(k).catch(()=>null)));
+  return batches.filter(Boolean).flatMap(b=>b.events||[]);
+}
+function foldResources(evs){
+  // pair created→deleted by res_id (fallback kind+lifecycle FIFO)
+  const res=[]; const open={}; const lcs={};
+  for(const e of evs.sort((a,b)=>a.t-b.t)){
+    if(e.action==="lifecycle-start"){ lcs[e.lifecycle]={name:e.lifecycle,start:e.t,svc:e.service}; continue; }
+    if(e.action==="lifecycle-end"){ const l=lcs[e.lifecycle]; if(l){l.end=e.t;l.status=e.status;} continue; }
+    const key=e.res_id?`id:${e.res_id}`:`k:${e.service}/${e.kind}/${e.lifecycle}`;
+    if(e.action==="created"){
+      const r={kind:e.kind,service:e.service,name:e.name||e.res_id||e.lifecycle,
+               lifecycle:e.lifecycle,start:e.t,state:"alive"};
+      res.push(r); (open[key]=open[key]||[]).push(r);
+    }else if(e.action==="deleted"||e.action==="delete-failed"){
+      const q=open[key]||open[`k:${e.service}/${e.kind}/${e.lifecycle}`]||[];
+      const r=q.find(x=>x.state==="alive");
+      if(r){ r.end=e.t; r.state=e.action==="deleted"?"done":"fail"; }
+      else res.push({kind:e.kind,service:e.service,name:e.res_id||e.lifecycle,
+                     lifecycle:e.lifecycle,start:e.t,end:e.t,
+                     state:e.action==="deleted"?"done":"fail"});
+    }
+  }
+  return {res,lcs:Object.values(lcs)};
+}
+function renderGantt(res,lcs){
+  const all=[...res,...lcs.map(l=>({kind:"lifecycle",service:l.svc,name:l.name,
+    start:l.start,end:l.end,state:l.end?(l.status==="failed"?"fail":"done"):"alive"}))];
+  if(!all.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; return; }
+  const t0=Math.min(...all.map(r=>r.start));
+  const t1=Math.max(Date.now(),...all.map(r=>r.end||r.start));
+  const span=Math.max(t1-t0,1);
+  // chips: per kind created/alive/deleted
+  const agg={};
+  for(const r of res){ const k=kindLabel(r); (agg[k]=agg[k]||{c:0,a:0,d:0,f:0}).c++;
+    if(r.state==="alive")agg[k].a++; else if(r.state==="fail")agg[k].f++; else agg[k].d++; }
+  $("#resChips").innerHTML=Object.entries(agg).map(([k,v])=>
+    `<span class="chip">${k} <b>${v.c}</b><s> 생성</s>${v.a?` · <span class="run">${v.a} 테스트중</span>`:""}` +
+    `${v.d?` · <s>${v.d} 삭제</s>`:""}${v.f?` · <span class="bad">${v.f} 정리실패</span>`:""}</span>`).join("");
+  // gantt grouped by kind, lifecycles last
+  const groups={};
+  for(const r of all){ const k=r.kind==="lifecycle"?"~Lifecycle 진행":kindLabel(r);
+    (groups[k]=groups[k]||[]).push(r); }
+  let html="";
+  for(const k of Object.keys(groups).sort()){
+    html+=`<div class="g-kind">${k.replace(/^~/,"")} <span class="mut">(${groups[k].length})</span></div>`;
+    for(const r of groups[k].sort((a,b)=>a.start-b.start)){
+      const l=((r.start-t0)/span*100).toFixed(2);
+      const w=Math.max(((r.end||t1)-r.start)/span*100,0.6).toFixed(2);
+      const cls=r.state==="alive"?"g-alive":r.state==="fail"?"g-fail":"g-done";
+      const dur=r.end?`${Math.round((r.end-r.start)/1000)}s`:"진행 중";
+      html+=`<div class="g-row"><div class="g-label" title="${r.name} · ${r.lifecycle||""}">${r.name}</div>
+        <div class="g-track"><div class="g-bar ${cls}" style="left:${l}%;width:${w}%"
+          title="${r.name} · ${dur}${r.lifecycle?" · "+r.lifecycle:""}"></div></div></div>`;
+    }
+  }
+  $("#resBody").innerHTML=html;
+}
+let SELECTED_RUN="";
+async function renderRes(){
+  SELECTED_RUN=$("#resRun").value||SELECTED_RUN;
+  if(!SELECTED_RUN){ return; }
+  try{ const evs=await loadResEvents(SELECTED_RUN);
+       const {res,lcs}=foldResources(evs); renderGantt(res,lcs);
+  }catch(e){ $("#resBody").textContent="자원 이벤트 조회 실패: "+e.message; }
+}
+function fillRunSelect(ids){
+  const sel=$("#resRun"); const cur=sel.value;
+  sel.innerHTML=ids.map(i=>`<option value="${i}">${i}</option>`).join("");
+  sel.value=cur&&ids.includes(cur)?cur:(ids[ids.length-1]||"");
+}
 async function tick(){
   $("#bsrc").textContent=base()||"(엔드포인트 미설정)";
   $("#ep").value=localStorage.getItem("oplog_ep")||"";
+  if(window.SAMPLE){ renderSample(); return; }
   const idx=await loadHistory();
+  try{ RES_KEYS=await xlist("runs/"); }catch(e){ RES_KEYS=[]; }
   await loadLive(idx);
+  const ids=[...new Set(RES_KEYS.map(k=>k.split("/")[1]))];
+  fillRunSelect(ids); await renderRes();
+}
+// --------------- sample mode (?sample=1) ---------------
+function renderSample(){
+  const d=window.SAMPLE;
+  $("#bsrc").textContent="(샘플 데이터)";
+  $("#hist tbody").innerHTML=d.index.map(fmtRow).join("");
+  $("#liveBody").innerHTML=`<div class="job">run <a>${d.live.run_id}</a> <code>${d.live.sha}</code>
+    <span class="pill run">in flight</span></div>`+d.live.events.map(e=>
+    `<div class="ev"><time>${e.ts.slice(11,19)}</time><span class="pill">${e.job}</span>
+     <b>${e.stage}</b> <span class="${e.status==='success'?'ok':e.status==='failure'?'bad':'run'}">${e.status}</span>
+     <span class="mut">${e.detail||""}</span></div>`).join("");
+  fillRunSelect([d.live.run_id]);
+  const {res,lcs}=foldResources(d.resEvents); renderGantt(res,lcs);
+}
+if(new URLSearchParams(location.search).has("sample")){
+  window.SAMPLE=window.SAMPLE_DATA||null;
 }
 tick(); setInterval(tick,30000);
 </script>
