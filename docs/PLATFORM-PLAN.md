@@ -301,11 +301,18 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 기존 ROADMAP Phase 1(커버리지 100%)은 그대로 선행 조건. 플랫폼 작업은
 병행 가능하되 M2부터는 Phase 1 완료가 전제.
 
-### M0 — 기반 정비 (엔진 레벨, 서버 불필요)
-- [ ] Suite 정의 도입 (`suites/*.yaml` → 기존 CLI 필터로 컴파일)
-- [ ] 환경 프로파일 도입 (`environments/*.yaml` → env var 로더)
-- [ ] run별 결과 스냅샷 보관 (S3, run_id 경로) + 카탈로그 버전 보관
-- [ ] 엔진 보고 훅 (oplog 확장: 플랫폼 API POST, 실패 무시)
+### M0 — 기반 정비 (엔진 레벨, 서버 불필요) — DONE (live 검증 대기)
+- [x] Suite 정의 도입 — `suites/*.yaml` + `core/suites.py` (render →
+      `.github/run-request` 옵션으로 컴파일; dispatch `suite` 입력 / 파일
+      `suite=` 라인 양쪽 지원, 명시 라인이 suite 기본값을 override)
+- [x] 환경 프로파일 도입 — `environments/*.yaml` + `core/profiles.py`
+      (export → `$GITHUB_ENV`/shell; credential은 참조만; `forbid:` 게이트를
+      `core/config.py`가 강제 — 운영계 프로파일은 구조적으로 read-only)
+- [x] run별 결과 스냅샷 보관 — `core/snapshot.py` (oplog 버킷
+      `runs/<run_id>/snapshot/`에 results JSONL + 대시보드 HTML + meta.json,
+      meta에 suite/profile/카탈로그 sha256 기록)
+- [x] 엔진 보고 훅 — `core/oplog.py`에 `APITEST_PLATFORM_URL` POST 미러
+      (fire-and-forget, 기본 비활성 — M1 서버가 수신)
 
 ### M1 — Control Plane MVP (실행은 GitHub Actions 그대로)
 - [ ] FastAPI 서버 + SQLite (environments / suites / schedules / runs)

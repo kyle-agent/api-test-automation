@@ -1,0 +1,9 @@
+# Full regression without the billing-heavy lifecycles: smoke + read-chains +
+# every light CRUD lifecycle (A∥B lane split per dependencies.json), swept.
+id: full
+label: Full — smoke + all light CRUD lifecycles (no heavy)
+request:
+  mutations: true
+  destructive: true
+  heavy: false
+  conformance: false

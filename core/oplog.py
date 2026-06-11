@@ -26,6 +26,12 @@ Everything here is BEST-EFFORT and self-disabling: missing boto3, missing
 credentials, or an unreachable endpoint prints one notice and no-ops — a
 broken oplog must never fail a test run.
 
+When APITEST_PLATFORM_URL is set, every event is ALSO mirrored to the platform
+control plane (POST <url>/api/ingest/events, optional Bearer
+APITEST_PLATFORM_TOKEN) so the M1 server can show a live run view without
+polling the bucket (docs/PLATFORM-PLAN.md §2.5). Same fire-and-forget rule:
+unset by default, failures are swallowed silently.
+
 CLI:
   python -m core.oplog ensure                      # create bucket + CORS + ACL
   python -m core.oplog emit --stage smoke --status done [--detail '...']
@@ -92,6 +98,30 @@ def _run_id() -> str:
     return os.getenv("APITEST_RUN_ID") or os.getenv("GITHUB_RUN_ID") or "local"
 
 
+def _post_platform(kind: str, payload: dict) -> None:
+    """Mirror one event to the platform control plane (fire-and-forget).
+
+    Disabled unless APITEST_PLATFORM_URL is set; a slow/unreachable server
+    must never stall a test run, so the timeout is short and every failure
+    is swallowed. Env is read per call so jobs can set it via $GITHUB_ENV."""
+    url = os.getenv("APITEST_PLATFORM_URL", "").strip()
+    if not url:
+        return
+    try:
+        import urllib.request
+        body = json.dumps({"kind": kind, "run_id": _run_id(), **payload},
+                          ensure_ascii=False).encode()
+        headers = {"Content-Type": "application/json"}
+        token = os.getenv("APITEST_PLATFORM_TOKEN", "").strip()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        req = urllib.request.Request(url.rstrip("/") + "/api/ingest/events",
+                                     data=body, headers=headers, method="POST")
+        urllib.request.urlopen(req, timeout=3)
+    except Exception:
+        pass
+
+
 def _put(c, cfg, key, payload: dict) -> bool:
     body = json.dumps(payload, ensure_ascii=False).encode()
     # public-read PER OBJECT: live test 2026-06-11 showed bucket-level
@@ -145,15 +175,17 @@ def ensure_bucket() -> bool:
 
 def emit(stage: str, status: str, detail: str = "", job: str = "") -> bool:
     """Write one milestone event (unique key — race-free across jobs)."""
-    c, cfg = _client()
-    if not c:
-        return False
     rid = _run_id()
     now_ms = int(time.time() * 1000)
     job = job or os.getenv("GITHUB_JOB", "")
     ev = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
           "run_id": rid, "job": job, "stage": stage, "status": status,
           "detail": detail[:2000]}
+    # platform mirror is independent of the S3 oplog being configured
+    _post_platform("milestone", ev)
+    c, cfg = _client()
+    if not c:
+        return False
     ok = _put(c, cfg, f"runs/{rid}/events/{now_ms}-{stage}.json", ev)
     # first emit of a run also drops the manifest (idempotent overwrite)
     manifest = {"run_id": rid,
@@ -199,7 +231,7 @@ def emit_resource(action: str, *, path: str = "", service: str = "",
                   status: str = "", parent: str = "") -> None:
     """Buffer one resource/lifecycle event (best-effort, never raises)."""
     try:
-        if _cfg() is None:
+        if _cfg() is None and not os.getenv("APITEST_PLATFORM_URL", "").strip():
             return
         # delete events carry the live path (/v1/vpcs/<id>) — recover the id so
         # the viewer can pair created→deleted bars without guessing.
@@ -229,12 +261,13 @@ def flush_resources() -> None:
     if not _RES_BUF:
         return
     try:
-        c, cfg = _client()
-        if not c:
-            _RES_BUF = []
-            return
         batch, _RES_BUF = _RES_BUF, []
         _RES_FIRST_TS[0] = 0.0
+        # platform mirror is independent of the S3 oplog being configured
+        _post_platform("resources", {"events": batch})
+        c, cfg = _client()
+        if not c:
+            return
         _RES_SEQ[0] += 1
         # ms+pid alone collides when two flushes land in the same millisecond
         # (caught by the offline test) — the per-process sequence disambiguates.

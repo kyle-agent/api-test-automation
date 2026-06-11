@@ -31,5 +31,9 @@ jobs:
         run: python -m regression.scenarios.validate
       - name: Validate formal domain knowledge (3-layer model + waivers)
         run: python knowledge/formal/validate.py
+      - name: Validate suites + environment profiles
+        run: |
+          python -m core.suites validate
+          python -m core.profiles validate
       - name: Workflow YAML sanity
         run: python -c "import yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('.github/workflows/*.yml')]"

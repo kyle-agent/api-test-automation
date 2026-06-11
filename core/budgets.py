@@ -22,9 +22,27 @@ DEFAULT_LIMITS = {
 }
 
 
+def _env_limits() -> dict:
+    """SCP_BUDGET_LIMITS (JSON {"kind": int}) — per-environment quota overrides
+    exported by core.profiles from a profile's `quota_overrides:`; merged over
+    the validated defaults so other accounts/environments need no code change."""
+    import json
+    import os
+    raw = os.environ.get("SCP_BUDGET_LIMITS", "").strip()
+    if not raw:
+        return {}
+    try:
+        val = json.loads(raw)
+        if isinstance(val, dict):
+            return {str(k): int(v) for k, v in val.items()}
+    except (ValueError, TypeError):
+        pass
+    return {}
+
+
 @dataclass
 class Budget:
-    limits: dict = field(default_factory=lambda: dict(DEFAULT_LIMITS))
+    limits: dict = field(default_factory=lambda: {**DEFAULT_LIMITS, **_env_limits()})
     used: dict = field(default_factory=dict)
 
     def sync(self, kind: str, live_count: int) -> None:
