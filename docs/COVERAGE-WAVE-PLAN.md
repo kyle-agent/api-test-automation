@@ -33,6 +33,11 @@ since 2026-06-10.
 
 ### storage/archivestorage — 13 writes (+6 getid)
 
+**대상 제외 확정 (owner 재확인 2026-06-11)** — 전용 인증키를 발급하지 않고
+전체 25개 엔드포인트를 커버리지 대상에서 영구 제외한다. waiver 25/25 완비,
+lifecycle은 `enabled:false` 유지. 향후 세션은 이 서비스를 다시 끌어올리지
+말 것 (인증키 정책이 바뀌면 owner가 먼저 결정을 갱신한다).
+
 Waiver class **entitlement** ("separate auth keys" — the archive-storage data plane
 is not reachable with the CI account's keys). Lifecycles `archivestorage-bucket` /
 `archivestorage-archiving-policy` exist (heavy, docs-derived), `enabled:false`.
