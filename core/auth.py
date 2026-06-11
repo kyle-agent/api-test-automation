@@ -22,7 +22,7 @@ import time
 from typing import Protocol
 from urllib.parse import quote, urlsplit
 
-from .config import Settings
+from .config import Settings, _bool
 
 
 class Signer(Protocol):
@@ -47,10 +47,47 @@ class BearerSigner:
 # Python's quote() never escapes alphanumerics or "_.-~"; add the rest here.
 _ENCODE_URI_SAFE = "!#$&'()*+,/:;=?@~"
 
+# Wire-faithful variant of the encodeURI keep-set, for signing the URL exactly
+# as `requests` puts it on the wire:
+#   * '%'  — the harness assembles URLs whose query is ALREADY percent-encoded
+#     (urlencode); a strict encodeURI clone re-escapes '%' -> '%25', so the
+#     signature covers `name=%25ED...` while the wire carries `name=%ED...`
+#     (systematic 401 on every URL containing a %XX escape). encodeURI(raw)
+#     and the wire form agree everywhere else, so keeping '%' makes the
+#     transform idempotent on already-encoded URLs.
+#   * '[]' — requests' requote_uri keeps brackets where it leaves them (e.g.
+#     IPv6 hosts); escaping them here would diverge from the wire.
+_ENCODE_URI_WIRE_SAFE = _ENCODE_URI_SAFE + "%[]"
+
 
 def _encode_uri(path: str) -> str:
     """Match JavaScript encodeURI(): escape spaces etc., keep reserved/unreserved."""
     return quote(path, safe=_ENCODE_URI_SAFE)
+
+
+def _encode_uri_wire(path: str) -> str:
+    """encodeURI-equivalent that never re-escapes an existing %XX sequence.
+
+    Identity on a URL already prepared by `requests` (proven in
+    tests/offline/test_hmac_signing.py), and encodeURI-equivalent on raw
+    input that carries no '%' — i.e. byte-identical to the legacy transform
+    for every request shape that signed correctly before.
+    """
+    return quote(path, safe=_ENCODE_URI_WIRE_SAFE)
+
+
+def sign_encodeuri_wire_enabled() -> bool:
+    """SCP_SIGN_ENCODEURI toggle (read per call so tests/runs can flip it).
+
+    true (default): sign the wire-identical form — existing %XX escapes in the
+        assembled URL are NOT re-escaped, so the signed URL is byte-identical
+        to what `requests` sends (core.http_client also pre-normalizes the URL
+        with requests' own preparation under this toggle).
+    false: legacy behavior — a strict JS-encodeURI clone over the assembled
+        URL, which double-encodes '%' and therefore 401s any request whose
+        query/path contains a percent-escape (Korean/space/brace values).
+    """
+    return _bool("SCP_SIGN_ENCODEURI", True)
 
 
 class HmacSigner:
@@ -76,7 +113,8 @@ class HmacSigner:
         return parts.path + (("?" + parts.query) if parts.query else "")
 
     def signing_string(self, method: str, url: str, ts: str) -> str:
-        return (method.upper() + _encode_uri(self._url_for_sign(url)) + ts
+        encode = _encode_uri_wire if sign_encodeuri_wire_enabled() else _encode_uri
+        return (method.upper() + encode(self._url_for_sign(url)) + ts
                 + self._cfg.access_key + self._cfg.client_type)
 
     def headers(self, method: str, url: str, body: bytes = b"") -> dict[str, str]:

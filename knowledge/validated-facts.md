@@ -332,3 +332,32 @@ sweep 마일스톤만 누락된 원인.)
   (read-only GETs + no-body sync-state + restart); upgrades/promotes/restores/
   stop-start(mysql) explicitly excluded. Scoped validation:
   `crud_filter="database-mysql-cluster or database-postgresql-cluster"` heavy run.
+
+## 2026-06-11 — query-string HMAC 401: root cause found OFFLINE (fix landed, live-verify pending)
+
+> Offline-proven in `tests/offline/test_hmac_signing.py` (21 tests); promote to
+> validated after the scoped live run 2xxes. Do NOT remove the two
+> `known_issues.json` unset-backup entries until then.
+
+- **Root cause (byte-level):** the harness folds `urlencode(params)` into the URL
+  (already percent-encoded), then the signer applied a strict JS-encodeURI clone
+  — and JS `encodeURI()` escapes `%` → `%25`. So the signature covered
+  `...check-duplication?name=regrscr%257Bunique%257D` while the wire carried
+  `...?name=regrscr%7Bunique%7D` → systematic 401 for EVERY URL containing a
+  `%XX` escape. Trigger in practice: scenario `params` are NOT `_fill()`ed
+  (engine passes `step.get("params")` raw), so `{unique}`/`{reg_id}` placeholders
+  go out as `%7B...%7D` and trip the double-encode. Plain-ASCII query URLs
+  (`?page=0&size=1`, smoke's `name=regrprobesmoke`) never diverged — which is why
+  most param GETs passed.
+- **Fix (`core/auth.py` + `core/http_client.py`, toggle `SCP_SIGN_ENCODEURI`,
+  default ON):** http_client pre-normalizes the assembled URL with requests' own
+  `PreparedRequest.prepare_url` (idempotent) and signs/sends that exact string; the
+  signer's transform (`_encode_uri_wire`) keeps `%` and `[]` so it is the
+  identity on a prepared URL and encodeURI-equivalent on raw input. Proven
+  byte-identical signing string for all previously-passing shapes (no-op), so
+  default-on is safe. `SCP_SIGN_ENCODEURI=false` restores legacy signing.
+- **Unset-backup caveat:** `DELETE /v1/clusters/{id}/backups` carries no query
+  and no `%` — offline, legacy signing was ALREADY wire-identical for it, so the
+  401 there may be backend (RBAC/quirk), not this bug. The scoped live run
+  decides: if it still 401s with the fix, reclassify the two known_issues
+  entries as Product Bug instead of removing them.

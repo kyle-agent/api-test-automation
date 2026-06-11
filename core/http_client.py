@@ -17,7 +17,7 @@ from typing import Any
 
 import requests
 
-from .auth import build_signer
+from .auth import build_signer, sign_encodeuri_wire_enabled
 from .config import Settings, settings
 
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
@@ -72,6 +72,17 @@ class ApiClient:
         if params:
             from urllib.parse import urlencode
             url = url + ("&" if "?" in url else "?") + urlencode(params)
+        # Sign EXACTLY the bytes that go on the wire. `requests` re-quotes the
+        # URL it sends (requote_uri/IDNA), so pre-normalize with requests' own
+        # preparation and sign THAT. Preparation is idempotent (proven in
+        # tests/offline/test_hmac_signing.py), so the session emits these exact
+        # bytes — the gateway's HMAC check sees the same URL we signed.
+        # Gated by SCP_SIGN_ENCODEURI (default on; set false for the legacy
+        # raw-assembled-URL signing, which 401s any %XX-carrying query).
+        if sign_encodeuri_wire_enabled():
+            _prepared = requests.PreparedRequest()
+            _prepared.prepare_url(url, None)
+            url = _prepared.url
         body = _json.dumps(json).encode("utf-8") if json is not None else b""
         backoff = 2.0
         last_exc: Exception | None = None
