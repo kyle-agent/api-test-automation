@@ -675,7 +675,11 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # record the step call itself for coverage/timing
             _cat = categorize(resp.status, resp.raw_text or "")
             _ems = getattr(resp, "elapsed_ms", None)
-            _note = (resp.raw_text or "")[:400] if _cat == results.FAIL else ""
+            _note = ""
+            if _cat == results.FAIL or (
+                    _cat == results.SOFT and step["method"].upper() != "GET"
+                    and resp.status >= 400):
+                _note = (resp.raw_text or "")[:400]
             _record_smoke(resp.status, _cat,
                           f"{lifecycle['id']}:{step['name']}", step["method"],
                           step.get("path", path), _ems, note=_note)

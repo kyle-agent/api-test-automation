@@ -78,10 +78,18 @@ def _is_deletable(item: dict, *, name_prefixes: tuple[str, ...] = ()) -> bool:
     keep their 6h TTL and would otherwise be protected until it passes).
     """
     import os
-    from core.registry import _tag_value, OWNER_KEY, OWNER
+    from core.registry import _tag_value, OWNER_KEY, OWNER, RUN_KEY
     has_tag = _tag_value(item, OWNER_KEY) == OWNER
     if has_tag:
         if os.environ.get("SCP_SWEEP_IGNORE_TTL", "").lower() == "true":
+            return True
+        # OWN-RUN override (2026-06-11): when the sweep runs, ITS run is over —
+        # anything still alive with THIS run id is a failed-teardown leftover by
+        # definition. The 6h TTL exists to protect OTHER (possibly live) runs;
+        # honoring it for our own run let leftovers poison the NEXT run's VPC
+        # cap (runs #3->#4: 10 lifecycles cap-skipped).
+        my_run = os.environ.get("APITEST_RUN_ID", "")
+        if my_run and _tag_value(item, RUN_KEY) == my_run:
             return True
         return is_expired(item)
     # No owner tag — matched only by prefix. Treat as legacy orphan.

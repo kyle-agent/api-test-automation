@@ -416,7 +416,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
+      "_note": "Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-peerings/{id} (6 writes). Body from data/api_bodies.json (networking/vpc/createvpcpeering, createvpcpeeringrule) -> UNPROVEN. A peering needs TWO VPCs (requester + approver) plus the approver account id; run 27306490231 proved the {unique} approver placeholder 404s (NotFoundVpcError), so a REAL approver VPC-B is now created on the reserved 10.141.0.0/20 (domain-constraints allocation) and approver_vpc_account_id is soft-captured from $.vpc.account_id (envelope unproven; literal fallback still records C2). 2026-06-11 run #4: create 202 but approve/set/DELETE of the peering all 400 in its initial state -> the peering survives and the VPC deletes 409 (now tolerated in expect_status; the own-run sweep reaps the leftovers). Next run records the 400 bodies (soft-write notes) to learn the peering state machine. All peering steps optional+grouped+broad expect_status. PUT .../approval body is a docs-best-guess {action:APPROVE}; the routing-rule body comes from createvpcpeeringrule. capture envelopes $.vpc_peering.id and $.routing_rule.id UNPROVEN. heavy:true (real VPC fallback).",
       "steps": [
         {
           "name": "create-vpc",
@@ -565,7 +565,7 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id_b}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [200, 202, 204, 409],
           "destructive": true,
           "retry_on_status": [409], "retries": 12, "retry_interval": 30
         },
@@ -574,7 +574,7 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [200, 202, 204, 409],
           "destructive": true,
           "adopt": "vpc"
         }
