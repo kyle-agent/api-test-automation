@@ -1,4 +1,4 @@
-# Ops dashboard — 영구 oplog 버킷 + 정적 뷰어
+# Ops dashboard — 영구 oplog 버킷(apitest-oplog-permanent) + 정적 뷰어
 
 > Status: **active** (2026-06-11 도입, 오너 제안). 워크플로 전체 진행현황과
 > 과거 런 이력을 GitHub과 독립적으로 보는 운영 대시보드.
@@ -6,7 +6,7 @@
 ## 구조
 
 ```
-[CI 각 잡] --core/oplog.py--> s3://apitest-oplog (영구, 절대 미삭제)
+[CI 각 잡] --core/oplog.py--> s3://apitest-oplog-permanent (영구, 절대 미삭제)
                                 ├ runs/<run_id>/run.json            런 메타
                                 ├ runs/<run_id>/events/<ms>-<단계>.json  진행 이벤트
                                 ├ runs/<run_id>/summary.json        종료 요약

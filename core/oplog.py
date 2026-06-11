@@ -1,6 +1,7 @@
 """Operations log — persistent, cross-run workflow progress on Object Storage.
 
-A single NEVER-DELETED S3-compatible bucket (default ``apitest-oplog``) on the
+A single NEVER-DELETED S3-compatible bucket (default ``apitest-oplog-permanent``
+— named so no sweep matcher can ever touch it and the intent is self-evident) on the
 test account accumulates one small JSON object per workflow milestone, so a
 static viewer (``dashboard/ops.html``) can show the LIVE progress of the
 current run and the history of every past run — independent of GitHub.
@@ -42,7 +43,7 @@ _NOTICE_SHOWN = False
 
 def _cfg():
     """Resolve endpoint/bucket/credentials from env (None = disabled)."""
-    bucket = os.getenv("SCP_OPLOG_BUCKET", "apitest-oplog").strip()
+    bucket = os.getenv("SCP_OPLOG_BUCKET", "apitest-oplog-permanent").strip()
     access = (os.getenv("SCP_OPLOG_ACCESS_KEY") or os.getenv("SCP_ACCESS_KEY") or "").strip()
     secret = (os.getenv("SCP_OPLOG_SECRET_KEY") or os.getenv("SCP_SECRET_KEY") or "").strip()
     endpoint = os.getenv("SCP_OPLOG_S3_ENDPOINT", "").strip()

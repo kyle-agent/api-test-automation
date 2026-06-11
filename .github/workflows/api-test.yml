@@ -134,7 +134,7 @@ env:
   # Same access/secret keys as the Open APIs (owner-confirmed 2026-06-11).
   # Override the endpoint with the Object Storage Public URL if the
   # per-service-host default guess is wrong.
-  SCP_OPLOG_BUCKET: ${{ vars.SCP_OPLOG_BUCKET || 'apitest-oplog' }}
+  SCP_OPLOG_BUCKET: ${{ vars.SCP_OPLOG_BUCKET || 'apitest-oplog-permanent' }}
   SCP_OPLOG_S3_ENDPOINT: ${{ vars.SCP_OPLOG_S3_ENDPOINT }}
 
 jobs:
