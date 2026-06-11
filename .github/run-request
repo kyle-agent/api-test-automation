@@ -1,7 +1,9 @@
-# request: PLATFORM LIVE VERIFICATION #4 — combined light wave
-# (1) HMAC wire-signing fix (SCP_SIGN_ENCODEURI default-on): full unscoped
-#     smoke is the broad no-regression proof + unblocks the check-duplication
-#     query-param 401 class (scr/devops/aimlops/queues/cloud-functions...).
-# (2) networking wave body fixes: gslb (TCP health-check) + cdn (cache TTL).
+# request: PLATFORM LIVE VERIFICATION #5 — networking heavy lane
+# Validates the userguide-grounded fixes: LB health-check-before-server-group
+# ordering, Direct Connect 1:1 negative test (duplicate create must 4xx),
+# VPN gateway(+public-ip)/tunnel chain. hosted-zone lifecycle deliberately
+# EXCLUDED (private-dns provisioning takes hours — rides a later overnight run).
 suite=full
-crud_filter=networking-gslb-service or networking-cdn-service
+heavy=true
+service=networking
+crud_filter=networking-loadbalancer-members-nat or networking-direct-connect-routing or networking-vpn-gateway-tunnel
