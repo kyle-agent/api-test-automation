@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
 from controlplane import ai_pipelines, db, dispatch, triage
@@ -93,6 +93,36 @@ def scenario_draft(request: Request, service: str = Form(...)):
     return _render(request, "ai_scenario_draft.html", r=result)
 
 
+# --- R2c 자원 task 정의 초안 ----------------------------------------------------------
+
+@router.get("/task-draft", response_class=HTMLResponse)
+def task_draft_page(request: Request):
+    """Picker + 모델 공백 (work queue) — no AI call, pure mechanical."""
+    return _render(request, "ai_taskdraft.html",
+                   services=ai_pipelines.list_catalog_services(),
+                   gaps=ai_pipelines.model_gap_services(),
+                   r=None)
+
+
+@router.post("/task-draft", response_class=HTMLResponse)
+def task_draft_run(request: Request, service: str = Form(...)):
+    try:
+        result = ai_pipelines.task_draft(service.strip())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return _render(request, "ai_taskdraft.html", r=result)
+
+
+@router.get("/taskdefs/{name}")
+def taskdef_yaml(name: str):
+    """Raw yaml draft download (guarded, drafts/ only)."""
+    path = ai_pipelines.taskdef_yaml_path(name)
+    if path is None:
+        raise HTTPException(404, "taskdef draft not found")
+    return PlainTextResponse(path.read_text(encoding="utf-8"),
+                             media_type="text/yaml; charset=utf-8")
+
+
 # --- A3 fact 추출 -------------------------------------------------------------------
 
 @router.post("/extract-facts", response_class=HTMLResponse)
@@ -108,7 +138,8 @@ def extract_facts(request: Request, run_id: str = Form(...)):
 
 _KIND_TEMPLATE = {"spec-impact": "ai_spec_impact.html",
                   "scenario-draft": "ai_scenario_draft.html",
-                  "facts": "ai_facts.html"}
+                  "facts": "ai_facts.html",
+                  "taskdef": "ai_taskdraft.html"}
 
 
 @router.get("/drafts/{name}", response_class=HTMLResponse)
