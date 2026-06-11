@@ -1,9 +1,8 @@
-# request: PLATFORM LIVE VERIFICATION #5 — networking heavy lane
-# Validates the userguide-grounded fixes: LB health-check-before-server-group
-# ordering, Direct Connect 1:1 negative test (duplicate create must 4xx),
-# VPN gateway(+public-ip)/tunnel chain. hosted-zone lifecycle deliberately
-# EXCLUDED (private-dns provisioning takes hours — rides a later overnight run).
+# request: OVERNIGHT — networking-dns-hosted-zone-private (slow provisioner)
+# private-dns create can take HOURS (VALIDATED); cheap resources, long wall
+# clock. Full chain: private-dns -> connect shared VPC -> hosted zone ->
+# A record -> reverse teardown. Nothing else rides this run on purpose.
 suite=full
 heavy=true
 service=networking
-crud_filter=networking-loadbalancer-members-nat or networking-direct-connect-routing or networking-vpn-gateway-tunnel
+crud_filter=networking-dns-hosted-zone-private
