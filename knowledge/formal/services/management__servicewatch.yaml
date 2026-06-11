@@ -1,0 +1,35 @@
+# Layer 1 — per-service knowledge: management/servicewatch
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: data/api_docs.json + data/api_bodies.json servicewatch entries
+# Recorded 2026-06-11 while fixing the metric POST bodies (coverage lever 3).
+
+version: 1
+service: management/servicewatch
+
+constraints:
+  - id: metric-posts-are-queries
+    rule: "POST /v1/metrics (listmetricinfos), POST /v1/metrics/data (listmetricdata) and POST /v1/metrics/data/download/image (downloadmetricdataimage) are POST-as-read queries, not resource creates — no teardown needed; doc response examples return empty result sets for non-matching filters"
+    provenance: docs
+  - id: metric-names-are-catalog-values
+    rule: "metric queries validate namespace_name/name against the PLATFORM metric catalog — use real values from the docs ('Virtual Server' namespace, 'CPU Usage/Core[Basic]' metric, statistic_type enum {AVG,SUM,MAX,MIN,CNT}, period 300, unix-second start/end); synthetic regr{unique} namespace/metric names are rejected (pre-2026-06-11 lifecycle bodies 400'd for this reason)"
+    provenance: docs
+  - id: metric-search-fields-optional
+    rule: "MetricSearchRequestV1Dot1 (POST /v1/metrics) has ALL fields optional — metric_name + namespaces[{name, dimensions}] alone is a valid search; namespaces[].dimensions is a STRING of a JSON array (doc example '[[\"resource_id\"]]'), not a nested array"
+    provenance: docs
+  - id: alert-eventrule-need-real-ids
+    rule: "createalert requires a real metric_id/namespace_id (uuids from the metric catalog) and createeventrule requires real event_ids/resource_type_id/service_id — doc-sample ids 4xx on this account; promoting these to C3 needs ids harvested from listmetricinfos / event catalog reads first"
+    provenance: docs
+
+captures:
+  log_group: $.log_group.id        # createloggroup response (doc-confirmed)
+  log_stream: $.log_stream.id      # createloggrouplogstream response (doc-confirmed)
+
+states: {}
+
+quirks:
+  - id: bulk-deletes-take-ids-body
+    note: "alerts/dashboards/event-rules/log-groups delete via collection-level DELETE with {ids:[...]} body (no path id); only deleteloggroups is runtime-proven, the other three mirror it (unproven)"
+    provenance: docs
+  - id: auto-created-scp-loggroups-unreapable
+    note: "per-service auto-created log groups (/scp/ske/..., /scp/<engine>/.../slowlog|alertlog) carry no owner tag and don't match the regr prefix — the sweep reconciler lists 15 / deletes 0 every round (2026-06-10 sweep evidence); needs a reconciler rule or console cleanup, do NOT count them as leaked lifecycle resources"
+    provenance: VALIDATED

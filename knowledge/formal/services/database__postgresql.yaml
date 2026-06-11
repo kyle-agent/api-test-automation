@@ -1,0 +1,24 @@
+# Layer 1 — per-service knowledge: database/postgresql
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: data/api_docs.json postgresql entries
+# Recorded 2026-06-11 with the DBaaS sub-op window prep (coverage lever 1).
+
+version: 1
+service: database/postgresql
+
+constraints:
+  - id: async-writes-return-request-id
+    rule: "write calls answer with AsyncResponse {request_id, resource:{id}} (api_docs response examples) — request_id is the ONLY key to GET /v1/requests/{request_id} (postgresqlshowrequest); capture it from the create response, no list exposes it"
+    provenance: docs
+  - id: subop-window-conservative-set
+    rule: "cluster-window sub-ops added 2026-06-11 (group pg-subop-window in database-postgresql-cluster): read-only GETs (requests/{id}, engine-versions/{id}/properties, archive read-back, log-export-configs, replicas) + no-body POST sync-state; restart/stop/start/backup-histories/parameter reads already existed. Excluded as not obviously reversible: kernel-upgrade, patch, promote/switchover/reset-replica, restore, replica create, log-export-config writes, remove-backup-histories"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: backup-subresource-401-family
+    note: "PUT /v1/clusters/{id}/backup-histories and DELETE /v1/clusters/{id}/backups return 401 with a valid HMAC while sibling sub-ops on the same cluster path 400 (run 27258520218) — backend auth quirk family shared with mysql/cachestore; retry once during a live-cluster window before registering as known-red"
+    provenance: VALIDATED

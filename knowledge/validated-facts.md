@@ -302,3 +302,33 @@ sweep 마일스톤만 누락된 원인.)
 
 **ops 대시보드 운영 사실:** GitHub MCP 토큰 만료 시에도 버킷 직접 조회로 런
 상태 확인 가능 (sweep 종료 등) — 독립 관측 채널로서 실효 입증.
+
+## 2026-06-11 — coverage-expansion authoring (docs-derived, NOT yet runtime-proven)
+
+> Levers ①③④ of `docs/SESSION-HANDOFF-run6-and-ops.md`; full analysis in
+> `docs/COVERAGE-WAVE-PLAN.md`. Promote after a live 2xx.
+
+- **gap_write 32 = 100% waived/disabled** (idc 19 blast-radius + archivestorage 13
+  entitlement) — no authorable write gap remains; static ceiling moved by getid
+  steps only (85.57% → 86.3%, gap_getid 166 → 156).
+- **`/v1/requests/{request_id}` is a SHARED normalized path** across 9 DBaaS-family
+  services — ONE explicit GET step (added to mysql/pg heavy + eventstreams-read)
+  closes the static gap for all of them; request_id exists ONLY in write
+  AsyncResponse envelopes (`{request_id, resource:{id}}`, docs).
+- **eventstreams sub-op bodies were wrong-model** (docs): add-instances takes
+  `{instance_count, service_ip_addresses}` NOT an instances[] array; POST
+  maintenance takes MaintenanceRequest (start_day_of_week/start_minute/start_time/
+  term_hour) NOT the create-time MaintenanceOption; security-group-rules takes
+  `{add_ip_addresses, del_ip_addresses}` NOT rule objects; parameters update takes
+  `{id, new_value, old_value}` triplets. All fixed in the fragment; facts in
+  `knowledge/formal/services/data-analytics__eventstreams.yaml`. Create-cluster
+  topology (valid Kafka role_type combos) remains undocumented — DOMAIN-HUNT.
+- **servicewatch metric POSTs are catalog-validated queries** (docs): bodies must
+  reference real namespace/metric ('Virtual Server', 'CPU Usage/Core[Basic]');
+  regr{unique} names were the cause of the 400s. showloggroup got an explicit step
+  (probe_reads doesn't count statically).
+- **DBaaS sub-op window prep**: conservative-only groups `mysql-subop-window`,
+  `mysql-restart`, `pg-subop-window` added INSIDE the existing heavy lifecycles
+  (read-only GETs + no-body sync-state + restart); upgrades/promotes/restores/
+  stop-start(mysql) explicitly excluded. Scoped validation:
+  `crud_filter="database-mysql-cluster or database-postgresql-cluster"` heavy run.

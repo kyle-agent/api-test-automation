@@ -142,3 +142,21 @@ CRUD probe_reads discover at runtime — so measured live `cov_op` runs above th
 static figure. All bodies are docs-derived and **pending live validation** (see
 `validated-facts.md`). Next step: a lane-scheduled live CI run to convert the static
 ceiling into measured coverage.
+
+## Coverage expansion — 2026-06-11 (levers ①③④, docs-derived)
+
+No new lifecycles; existing ones extended (see `docs/COVERAGE-WAVE-PLAN.md`):
+
+- **DBaaS sub-op window prep (①)**: `database-mysql-cluster` + `database-postgresql-cluster`
+  gained conservative-only window groups (`mysql-subop-window`/`mysql-restart`/
+  `pg-subop-window`) — read-only sub-op GETs incl. `show-request` (AsyncResponse
+  `request_id` capture), no-body `sync-state`, mysql `restart`+wait. Still gated by
+  `heavy:true`.
+- **servicewatch (③)**: metric POST bodies fixed to real catalog namespace/metric;
+  explicit `get-group` step closes the showloggroup static gap.
+- **eventstreams (④)**: guarded sub-op bodies re-derived from the correct api_docs
+  models; sync-state/parameters-sync/unset-maintenance added; read-coverage
+  literal-uuid bug fixed (closes the shared `/v1/requests/*` static gap for 9
+  DBaaS-family services).
+
+Static ceiling **85.6% → 86.3%** (gap_getid 166 → 156; gap_write 32 = all waived).

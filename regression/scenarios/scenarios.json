@@ -3709,7 +3709,7 @@
       "service": "database/mysql",
       "enabled": true,
       "heavy": true,
-      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address left blank so the platform auto-assigns a free IP from the subnet (a hardcoded IP can collide / be reserved -> 'not available'). | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch).",
+      "_note": "HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears everything down. Slow (~20-40min). Runs only via dispatch run_heavy=true. v1.1 schema: server_type_name (name, not id) + dbaas_engine_version_id from list endpoints; service_ip_address left blank so the platform auto-assigns a free IP from the subnet (a hardcoded IP can collide / be reserved -> 'not available'). | EXPANDED (best-guess bodies/JSONPaths, validate via heavy dispatch). | SUB-OP WINDOW 2026-06-11 (lever 1 prep, docs-derived pending live validation): while the cluster is RUNNING, group mysql-subop-window fires the conservative sub-ops only — read-only GETs (show-request via AsyncResponse request_id capture, engine-version properties, parameter-groups/parameters, backup-histories, log-export-configs, replicas) + no-body sync-state + restart with wait (group mysql-restart). Deliberately EXCLUDED as not obviously reversible: kernel-upgrade, patch (minor version), promote/switchover/reset-replica, restore, replica create, stop/start, log-export-config writes, remove-backup-histories. Gated by the lifecycle's own heavy:true (SCP_RUN_HEAVY).",
       "steps": [
         {
           "name": "create-vpc",
@@ -3894,6 +3894,9 @@
           "capture": {
             "cluster_id": "$.resource.id"
           },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
           "expect_status": [
             200,
             201,
@@ -3903,7 +3906,8 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "mysql"
-          }
+          },
+          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived."
         },
         {
           "name": "wait-cluster",
@@ -4151,6 +4155,140 @@
           ]
         },
         {
+          "name": "show-request",
+          "method": "GET",
+          "path": "/v1/requests/{request_id}",
+          "group": "mysql-subop-window",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "_note": "DBaaS sub-op window (2026-06-11, docs-derived): mysqlshowrequest — request_id soft-captured from the create AsyncResponse; if absent the literal token 404s and still records the endpoint."
+        },
+        {
+          "name": "show-engine-version-properties",
+          "method": "GET",
+          "path": "/v1/engine-versions/{engine_version_id}/properties",
+          "group": "mysql-subop-window",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "_note": "DBaaS sub-op window: read-only engine-version properties (mysqllistengineversionproperties)."
+        },
+        {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "group": "mysql-subop-window",
+          "optional": true,
+          "expect_status": [
+            200
+          ],
+          "capture_soft": {
+            "dbaas_parameter_group_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          },
+          "_note": "DBaaS sub-op window: read-only (mysqllistparametergroups); id feeds list-parameters."
+        },
+        {
+          "name": "list-parameters",
+          "method": "GET",
+          "path": "/v1/parameters?dbaas_parameter_group_id={dbaas_parameter_group_id}",
+          "group": "mysql-subop-window",
+          "optional": true,
+          "expect_status": [
+            200
+          ],
+          "_note": "DBaaS sub-op window: read-only (mysqllistparameters); dbaas_parameter_group_id is a required query param per api_docs."
+        },
+        {
+          "name": "list-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/backup-histories",
+          "group": "mysql-subop-window",
+          "optional": true,
+          "expect_status": [
+            200
+          ],
+          "_note": "DBaaS sub-op window: read-only backup-history list while the cluster is live (mysqllistbackuphistories)."
+        },
+        {
+          "name": "list-log-export-configs",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "group": "mysql-subop-window",
+          "optional": true,
+          "expect_status": [
+            200
+          ],
+          "_note": "DBaaS sub-op window: read-only (mysqllistlogexportconfigs)."
+        },
+        {
+          "name": "list-replicas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "group": "mysql-subop-window",
+          "optional": true,
+          "expect_status": [
+            200
+          ],
+          "_note": "DBaaS sub-op window: read-only (mysqllistreplicas) — expect an empty list, no replica is created."
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "group": "mysql-subop-window",
+          "optional": true,
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "_note": "DBaaS sub-op window: state-sync reconciliation (mysqlsyncclusterstate, no body per api_docs) — read-side effect only, safe on a RUNNING cluster."
+        },
+        {
+          "name": "restart-cluster",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restart",
+          "group": "mysql-restart",
+          "optional": true,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "_note": "DBaaS sub-op window: restart (mysqlrestartcluster, no body per api_docs) — explicitly reversible; mirrors the validated-pattern pg-restart group."
+        },
+        {
+          "name": "wait-after-restart",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "group": "mysql-restart",
+          "optional": true,
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
           "name": "delete-cluster",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}",
@@ -4249,7 +4387,7 @@
       "service": "database/postgresql",
       "enabled": true,
       "heavy": true,
-      "_note": "HEAVY: real billable PostgreSQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet; create->RUNNING, then config writes (maintenance/backup/archive/audit/parameters) + lifecycle actions (restart/stop/start) + instance-group/block-storage resizes, each optional+grouped so a bad body isolates; then delete. ~30-50min, SCP_RUN_HEAVY only. PG bodies grounded from api_docs.json request examples (NOTE: PG maintenance/backup/parameter shapes differ from MySQL: database_encoding/database_locale, audit_enabled boolean, flat setter bodies). NOT yet dispatch-validated; validate via crud_filter=database-postgresql-cluster. Replica/restore/log-export/upgrade endpoints deliberately omitted (need a 2nd billable cluster, a completed backup, an external OBS bucket, or an upgrade-eligible target).",
+      "_note": "HEAVY: real billable PostgreSQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet; create->RUNNING, then config writes (maintenance/backup/archive/audit/parameters) + lifecycle actions (restart/stop/start) + instance-group/block-storage resizes, each optional+grouped so a bad body isolates; then delete. ~30-50min, SCP_RUN_HEAVY only. PG bodies grounded from api_docs.json request examples (NOTE: PG maintenance/backup/parameter shapes differ from MySQL: database_encoding/database_locale, audit_enabled boolean, flat setter bodies). NOT yet dispatch-validated; validate via crud_filter=database-postgresql-cluster. Replica/restore/log-export/upgrade endpoints deliberately omitted (need a 2nd billable cluster, a completed backup, an external OBS bucket, or an upgrade-eligible target). | SUB-OP WINDOW 2026-06-11 (lever 1 prep, docs-derived pending live validation): group pg-subop-window adds the conservative reads while the cluster is RUNNING — show-request (AsyncResponse request_id capture), engine-version properties, archive-config read-back, log-export-configs, replicas — plus no-body sync-state. Write-side sub-ops not already present (kernel-upgrade, patch, promote/switchover/reset-replica, restore, replica create, log-export-config writes, remove-backup-histories) stay EXCLUDED as not obviously reversible. Gated by heavy:true (SCP_RUN_HEAVY).",
       "steps": [
         {
           "name": "create-vpc",
@@ -4433,6 +4571,9 @@
           "capture": {
             "cluster_id": "$.resource.id"
           },
+          "capture_soft": {
+            "request_id": "$.request_id"
+          },
           "expect_status": [
             200,
             201,
@@ -4442,7 +4583,8 @@
             "method": "DELETE",
             "path": "/v1/clusters/{cluster_id}",
             "service": "postgresql"
-          }
+          },
+          "_note": "request_id capture_soft added 2026-06-11: AsyncResponse is documented as {request_id, resource:{id}} (api_docs response_example) — feeds the show-request window read. Docs-derived."
         },
         {
           "name": "wait-cluster",
@@ -4807,6 +4949,80 @@
             202,
             409
           ]
+        },
+        {
+          "name": "show-request",
+          "method": "GET",
+          "path": "/v1/requests/{request_id}",
+          "group": "pg-subop-window",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "_note": "DBaaS sub-op window (2026-06-11, docs-derived): postgresqlshowrequest — request_id soft-captured from the create AsyncResponse; if absent the literal token 404s and still records the endpoint."
+        },
+        {
+          "name": "show-engine-version-properties",
+          "method": "GET",
+          "path": "/v1/engine-versions/{engine_version_id}/properties",
+          "group": "pg-subop-window",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "_note": "DBaaS sub-op window: read-only engine-version properties (postgresqllistengineversionproperties)."
+        },
+        {
+          "name": "show-archive-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "group": "pg-subop-window",
+          "optional": true,
+          "expect_status": [
+            200,
+            404
+          ],
+          "_note": "DBaaS sub-op window: read-only (postgresqlshowarchiveconfig) — PG previously wrote archive config but never read it back."
+        },
+        {
+          "name": "list-log-export-configs",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/log-export-configs",
+          "group": "pg-subop-window",
+          "optional": true,
+          "expect_status": [
+            200
+          ],
+          "_note": "DBaaS sub-op window: read-only (postgresqllistlogexportconfigs)."
+        },
+        {
+          "name": "list-replicas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "group": "pg-subop-window",
+          "optional": true,
+          "expect_status": [
+            200
+          ],
+          "_note": "DBaaS sub-op window: read-only (postgresqllistreplicas) — expect an empty list, no replica is created."
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "group": "pg-subop-window",
+          "optional": true,
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "_note": "DBaaS sub-op window: state-sync reconciliation (postgresqlsyncclusterstate, no body per api_docs) — read-side effect only, safe on a RUNNING cluster."
         },
         {
           "name": "restart-cluster",
@@ -8301,7 +8517,7 @@
       "id": "servicewatch-loggroup-logstream",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "Light child-resource lifecycle: create log group -> create log stream under it -> read both -> probe path-param GETs (covers showloggroup AND showloggrouplogstream) -> delete stream -> delete group. Bodies grounded from createloggroup / createloggrouplogstream; envelopes $.log_group.id and $.log_stream.id / $.log_stream.log_group_id confirmed from doc responses.",
+      "_note": "Light child-resource lifecycle: create log group -> create log stream under it -> read both (explicit get-group closes the showloggroup static gap; probe-reads alone does not count statically) -> delete stream -> delete group. Bodies grounded from createloggroup / createloggrouplogstream; envelopes $.log_group.id and $.log_stream.id / $.log_stream.log_group_id confirmed from doc responses. 2026-06-11 metric-POST body fix (lever 3, docs-derived pending live validation): listmetricdata/listmetricinfos previously sent garbage regr{unique} namespace/metric names and 400'd; bodies replaced with the exact data/api_bodies.json doc bodies which reference the REAL platform namespace 'Virtual Server' and metric 'CPU Usage/Core[Basic]' — metric queries are POST-as-read, so a filter that matches nothing still returns 200 with an empty series (docs response examples).",
       "steps": [
         {
           "name": "create-group",
@@ -8356,6 +8572,15 @@
           }
         },
         {
+          "name": "get-group",
+          "method": "GET",
+          "path": "/v1/log-groups/{log_group_id}",
+          "expect_status": [
+            200
+          ],
+          "_note": "Explicit showloggroup step (2026-06-11): GET /v1/log-groups/{log_group_id} was the last servicewatch static gap — probe_reads exercises it at runtime but does not count toward the static C1 ceiling."
+        },
+        {
           "name": "get-stream",
           "method": "GET",
           "path": "/v1/log-groups/{log_group_id}/log-streams/{log_stream_id}",
@@ -8387,9 +8612,9 @@
                     "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
                   }
                 ],
-                "display_name": "regr{unique}",
-                "name": "regr{unique}",
-                "namespace_name": "regr{unique}",
+                "display_name": "Virtual Server | VirtualServer001 | CPU Usage/Core[Basic]",
+                "name": "CPU Usage/Core[Basic]",
+                "namespace_name": "Virtual Server",
                 "period": 300,
                 "statistic_type": "AVG"
               }
@@ -8398,6 +8623,7 @@
             "start": 1640995200,
             "statistic_type": "AVG"
           },
+          "_note": "Body = exact data/api_bodies.json listmetricdata doc body (real namespace 'Virtual Server' + metric 'CPU Usage/Core[Basic]'); previous regr{unique} namespace was rejected. Docs-derived, pending live validation.",
           "expect_status": [
             200,
             201,
@@ -8412,22 +8638,15 @@
           "group": "xcov-listmetricinfos",
           "optional": true,
           "json": {
-            "metric_name": "regr{unique}",
+            "metric_name": "CPU Usage/Core[Basic]",
             "namespaces": [
               {
                 "dimensions": "[[\"resource_id\"]]",
-                "name": "regr{unique}"
-              }
-            ],
-            "resource_id": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502",
-            "resource_name": "regr{unique}",
-            "tags": [
-              {
-                "key": "key01",
-                "value": "value01"
+                "name": "Virtual Server"
               }
             ]
           },
+          "_note": "Body from data/api_bodies.json listmetricinfos doc body; all MetricSearchRequestV1Dot1 fields are optional so the doc-sample resource_id/resource_name/tags filters (which match nothing on this account) are dropped — namespace+metric_name alone is a valid search per the model. Docs-derived, pending live validation.",
           "expect_status": [
             200,
             201,
