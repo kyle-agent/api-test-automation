@@ -447,8 +447,9 @@ jobs:
       - name: Oplog — adopt-class CRUD milestone
         if: ${{ always() }}
         continue-on-error: true
-        run: python -m core.oplog emit --stage adopt-crud --status "${{ steps.crud.outcome }}" --job regression-A \
-               --detail "$(tail -3 reports/crud.log 2>/dev/null | tr '\n' ' ' | head -c 300)" || true
+        run: |
+          python -m core.oplog emit --stage adopt-crud --status "${{ steps.crud.outcome }}" --job regression-A \
+            --detail "$(tail -3 reports/crud.log 2>/dev/null | tr '\n' ' ' | head -c 300)" || true
 
       - name: Merge per-worker results
         # Under xdist each worker wrote its own shards (observations-gw*.jsonl,
@@ -643,8 +644,9 @@ jobs:
       - name: Oplog — VPC-CRUD milestone
         if: ${{ always() }}
         continue-on-error: true
-        run: python -m core.oplog emit --stage vpc-crud --status "${{ steps.vpccrud.outcome }}" --job regression-B \
-               --detail "$(tail -3 reports/crud.log 2>/dev/null | tr '\n' ' ' | head -c 300)" || true
+        run: |
+          python -m core.oplog emit --stage vpc-crud --status "${{ steps.vpccrud.outcome }}" --job regression-B \
+            --detail "$(tail -3 reports/crud.log 2>/dev/null | tr '\n' ' ' | head -c 300)" || true
 
       - name: Upload VPC-CRUD reports + results store
         # Separate artifact (same inner layout as regression-reports): the
@@ -717,8 +719,9 @@ jobs:
       - name: Oplog — sweep milestone
         if: ${{ always() }}
         continue-on-error: true
-        run: python -m core.oplog emit --stage sweep --status done --job sweep \
-               --detail "$(grep 'sweep done' reports/sweep.log 2>/dev/null | tail -1 | head -c 200)" || true
+        run: |
+          python -m core.oplog emit --stage sweep --status done --job sweep \
+            --detail "$(grep 'sweep done' reports/sweep.log 2>/dev/null | tail -1 | head -c 200)" || true
       - name: Comment sweep result on PR
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
