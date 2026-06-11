@@ -1,13 +1,15 @@
-# Control-plane server dependencies (separate from the engine's
-# requirements.txt so CI test runs stay lean).
+# Control-plane server — REQUIRED to run the UI. Kept dependency-light so it
+# installs cleanly behind corporate mirrors (no httpx/httpcore chain here).
 fastapi>=0.110
 uvicorn>=0.29
 jinja2>=3.1
 python-multipart>=0.0.9
 croniter>=2.0
-anthropic>=0.40
 requests>=2.31
 PyYAML>=6.0
+# bucket reads: run-history archive, snapshot dashboards, resource inventory
 boto3>=1.34
-# dev/offline checks
-httpx>=0.27
+
+# OPTIONAL features (lazy-imported — the server runs without them):
+#   AI triage / AI pipelines:  pip install -r controlplane/requirements-ai.txt
+#   offline tests (dev only):  pip install httpx
