@@ -7,6 +7,20 @@
       "type": "Product Bug",
       "since": "2026-06-01",
       "note": "SCP backend 500 on /v1/planned-computes/server-types; tracked upstream, not a regression in our suite."
+    },
+    {
+      "key": "database/mysql/mysqlunsetbackup",
+      "status": 401,
+      "type": "Automation Bug",
+      "since": "2026-06-11",
+      "note": "DELETE /v1/clusters/{id}/backups 401s while every other sub-op in the same live-cluster window 2xxes (run 27346642059, lifecycle database-mysql-cluster) — matches the known backup-family/query-string HMAC signing suspicion (handoff: '401 backup-family retry'). Harness-side signing fix queued; unmute when it lands."
+    },
+    {
+      "key": "database/postgresql/postgresqlunsetbackup",
+      "status": 401,
+      "type": "Automation Bug",
+      "since": "2026-06-11",
+      "note": "DELETE /v1/clusters/{id}/backups 401s while every other sub-op in the same live-cluster window 2xxes (run 27346642059, lifecycle database-postgresql-cluster) — matches the known backup-family/query-string HMAC signing suspicion (handoff: '401 backup-family retry'). Harness-side signing fix queued; unmute when it lands."
     }
   ]
 }
