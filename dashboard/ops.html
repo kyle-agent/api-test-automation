@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SCP API Test — 워크플로 운영 대시보드</title>
+<style>
+ body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+      margin:0;background:#f6f8fa;color:#1f2328}
+ .wrap{max-width:1080px;margin:0 auto;padding:20px}
+ h1{font-size:20px;margin:0 0 4px} .mut{color:#656d76}
+ .panel{background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:14px;margin:12px 0}
+ table{border-collapse:collapse;width:100%} th,td{padding:5px 8px;text-align:left;
+      border-bottom:1px solid #eaeef2;font-size:13px} th{color:#656d76;font-weight:600}
+ code{background:#eff1f3;padding:1px 5px;border-radius:4px;font-size:12px}
+ .ok{color:#1a7f37}.bad{color:#cf222e}.run{color:#9a6700}
+ .ev{display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px dashed #eaeef2}
+ .ev time{color:#656d76;font-size:12px;white-space:nowrap}
+ .pill{display:inline-block;padding:0 8px;border-radius:10px;font-size:11px;border:1px solid #d0d7de}
+ .cfg input{width:420px;font-size:12px;padding:3px 6px}
+ a{color:#0969da;text-decoration:none}
+ #live .job{font-weight:600;margin-top:8px}
+ .bar{height:8px;background:#eaeef2;border-radius:4px;overflow:hidden;margin:2px 0 8px}
+ .bar div{height:100%;background:#2da44e}
+</style>
+</head>
+<body><div class="wrap">
+<h1>워크플로 운영 대시보드 <span class="mut" style="font-size:13px">oplog bucket 직접 조회 · 30초 자동 갱신</span></h1>
+<div class="mut">소스: 영구 Object Storage 버킷(<code id="bsrc"></code>)의 진행 이벤트/런 이력 ·
+<a href="index.html">커버리지 대시보드 →</a></div>
+
+<div class="panel cfg">
+  <b>버킷 엔드포인트</b>
+  <input id="ep" placeholder="https://apitest-oplog.objectstorage.kr-west1.e.samsungsdscloud.com (virtual-host) 또는 path-style 엔드포인트/버킷">
+  <button onclick="saveCfg()">저장</button>
+  <span class="mut" id="cfgmsg"></span>
+</div>
+
+<div class="panel" id="live"><b>진행 중인 런</b><div id="liveBody" class="mut">불러오는 중…</div></div>
+
+<div class="panel"><b>런 이력</b> <span class="mut">(index.json, 최신순)</span>
+<table id="hist"><thead><tr>
+  <th>run</th><th>sha</th><th>종료(UTC)</th><th>형태</th><th>ok</th><th>soft</th>
+  <th>fail<sub>new</sub></th><th>cov_op</th><th>C3</th><th>tested</th>
+</tr></thead><tbody></tbody></table></div>
+
+<footer class="mut" style="font-size:12px;margin:20px 0">
+이벤트는 각 CI 잡이 <code>core.oplog</code>로 적재 — 키가 런/타임스탬프별로 고유해 A∥B 병렬 잡 간 경합이 없습니다.
+이력 행은 런 종료 시 dashboard 잡(단일 작성자)이 <code>index.json</code>에 누적합니다.</footer>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+function base(){
+  // stored endpoint may be virtual-host (bucket in host) or path-style root;
+  // we treat it as the URL PREFIX that object keys append to.
+  let ep=localStorage.getItem("oplog_ep")||"";
+  return ep.replace(/\/+$/,"");
+}
+function saveCfg(){ localStorage.setItem("oplog_ep",$("#ep").value.trim());
+  $("#cfgmsg").textContent="저장됨 — 새로고침"; setTimeout(()=>location.reload(),600); }
+async function jget(key){
+  const r=await fetch(base()+"/"+key,{cache:"no-store"});
+  if(!r.ok) throw new Error(r.status+" "+key);
+  return r.json();
+}
+async function xlist(prefix){
+  // S3 ListObjectsV2 (public): ?list-type=2&prefix=...
+  const r=await fetch(base()+"/?list-type=2&prefix="+encodeURIComponent(prefix),{cache:"no-store"});
+  if(!r.ok) throw new Error(r.status+" list "+prefix);
+  const xml=new DOMParser().parseFromString(await r.text(),"text/xml");
+  return [...xml.querySelectorAll("Contents>Key")].map(k=>k.textContent);
+}
+function fmtRow(s){
+  const h=s.history||{};
+  return `<tr><td><a href="${s.url||'#'}" target="_blank">${s.run_id}</a></td>
+   <td><code>${s.sha||h.sha||""}</code></td><td>${(s.finished||"").replace("T"," ").replace("Z","")}</td>
+   <td>${h.crud_ran?"CRUD":"read-only"}</td><td class="ok">${h.ok??""}</td><td>${h.soft??""}</td>
+   <td class="${(h.fail_new||0)>0?'bad':'ok'}">${h.fail_new??""}</td>
+   <td>${h.cov_op??""}%</td><td>${h.cov_c3??""}%</td><td>${h.tested??""}</td></tr>`;
+}
+async function loadHistory(){
+  try{
+    const idx=await jget("index.json");
+    $("#hist tbody").innerHTML=idx.map(fmtRow).join("");
+    return idx;
+  }catch(e){ $("#hist tbody").innerHTML=
+    `<tr><td colspan="10" class="mut">index.json 읽기 실패 (${e.message}) — 엔드포인트/공개권한 확인</td></tr>`;
+    return []; }
+}
+async function loadLive(idx){
+  try{
+    // a run currently in flight = has events but no summary yet; probe the
+    // newest few run prefixes from the listing.
+    const keys=await xlist("runs/");
+    const ids=[...new Set(keys.map(k=>k.split("/")[1]))];
+    const done=new Set(idx.map(s=>String(s.run_id)));
+    const liveIds=ids.filter(i=>!done.has(String(i))).slice(-2);
+    if(!liveIds.length){ $("#liveBody").textContent="진행 중인 런 없음"; return; }
+    let html="";
+    for(const rid of liveIds){
+      let man={}; try{ man=await jget(`runs/${rid}/run.json`);}catch(e){}
+      const evKeys=keys.filter(k=>k.startsWith(`runs/${rid}/events/`)).sort();
+      const evs=await Promise.all(evKeys.slice(-40).map(k=>jget(k).catch(()=>null)));
+      html+=`<div class="job">run <a href="${man.url||'#'}" target="_blank">${rid}</a>
+        <code>${man.sha||""}</code> <span class="pill run">in flight</span></div>`;
+      html+=evs.filter(Boolean).map(e=>
+        `<div class="ev"><time>${(e.ts||"").slice(11,19)}</time>
+         <span class="pill">${e.job||"?"}</span> <b>${e.stage}</b>
+         <span class="${e.status==='done'?'ok':e.status==='fail'?'bad':'run'}">${e.status}</span>
+         <span class="mut">${(e.detail||"").slice(0,140)}</span></div>`).join("");
+    }
+    $("#liveBody").innerHTML=html;
+  }catch(e){ $("#liveBody").textContent="라이브 조회 실패: "+e.message; }
+}
+async function tick(){
+  $("#bsrc").textContent=base()||"(엔드포인트 미설정)";
+  $("#ep").value=localStorage.getItem("oplog_ep")||"";
+  const idx=await loadHistory();
+  await loadLive(idx);
+}
+tick(); setInterval(tick,30000);
+</script>
+</body></html>

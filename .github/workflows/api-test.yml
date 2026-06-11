@@ -129,6 +129,13 @@ env:
   # core.registry stamps (owner, run_id, axis, ttl) on every created resource
   # so the reconciler deletes only THIS run's tag.
   APITEST_RUN_ID: ${{ github.run_id }}
+  # --- ops log (core/oplog.py): persistent S3-compatible bucket where every
+  # job drops progress events; the static ops dashboard reads it directly.
+  # Same access/secret keys as the Open APIs (owner-confirmed 2026-06-11).
+  # Override the endpoint with the Object Storage Public URL if the
+  # per-service-host default guess is wrong.
+  SCP_OPLOG_BUCKET: ${{ vars.SCP_OPLOG_BUCKET || 'apitest-oplog' }}
+  SCP_OPLOG_S3_ENDPOINT: ${{ vars.SCP_OPLOG_S3_ENDPOINT }}
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -202,6 +209,12 @@ jobs:
             echo "::error::Set SCP_REGION (variable) so per-service hosts can be built, or SCP_BASE_URL/SCP_SERVICE_HOSTS."
             exit 1
           fi
+      - name: Oplog — ensure bucket + run-start event
+        continue-on-error: true
+        run: |
+          python -m core.oplog ensure || true
+          python -m core.oplog emit --stage run-start --status running --job spec \
+            --detail "event=${{ github.event_name }} mutations=${{ steps.req.outputs.mutations }} destructive=${{ steps.req.outputs.destructive }} heavy=${{ steps.req.outputs.heavy }}" || true
       - name: Diff catalog vs published (incremental signal)
         id: specdiff
         if: ${{ github.event.inputs.refresh_catalog == 'true' }}
@@ -282,6 +295,7 @@ jobs:
 
       - name: Run read-only smoke + read-chains regression
         # Read-only — runs once for every event (PR/smoke-only and CRUD runs).
+        id: smoke
         env:
           PR_CATEGORY: ${{ vars.SCP_PR_CATEGORY }}
           PR_SERVICE: ${{ vars.SCP_PR_SERVICE }}
@@ -300,6 +314,11 @@ jobs:
           echo "event=${{ github.event_name }} -> python -m pytest $ARGS" | tee reports/pytest.log
           set -o pipefail
           python -m pytest $ARGS 2>&1 | tee -a reports/pytest.log
+
+      - name: Oplog — smoke milestone
+        if: ${{ always() }}
+        continue-on-error: true
+        run: python -m core.oplog emit --stage smoke --status "${{ steps.smoke.outcome }}" --job regression-A || true
 
       - name: Comment smoke result on PR
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
@@ -417,6 +436,12 @@ jobs:
           # exit 5 = no tests matched the filter — normal for scoped runs, not a failure
           if [ "$rc" = "5" ]; then echo "no lifecycles matched this pass's filter — skipping" | tee -a reports/crud.log; rc=0; fi
           exit "$rc"
+
+      - name: Oplog — adopt-class CRUD milestone
+        if: ${{ always() }}
+        continue-on-error: true
+        run: python -m core.oplog emit --stage adopt-crud --status "${{ steps.crud.outcome }}" --job regression-A \
+               --detail "$(tail -3 reports/crud.log 2>/dev/null | tr '\n' ' ' | head -c 300)" || true
 
       - name: Merge per-worker results
         # Under xdist each worker wrote its own shards (observations-gw*.jsonl,
@@ -566,6 +591,7 @@ jobs:
           python -m regression.scenarios.shared_infra --print-filters >> "$GITHUB_ENV"
           echo "derived ADOPT_K / VPC_CRUD_K / PARALLEL_K -> \$GITHUB_ENV"
       - name: Run VPC-CRUD class (serial)
+        id: vpccrud
         # Two sequential pytest passes: everything except heavy-shared-networking
         # first, then heavy-shared-networking LAST — it is the slow-provisioner
         # lifecycle (private-dns create/delete can take hours; flows.yaml
@@ -607,6 +633,12 @@ jobs:
               print(f"merged {len(cases)} crud testcase(s) into reports/junit-crud.xml")
           PY
           exit "$overall"
+      - name: Oplog — VPC-CRUD milestone
+        if: ${{ always() }}
+        continue-on-error: true
+        run: python -m core.oplog emit --stage vpc-crud --status "${{ steps.vpccrud.outcome }}" --job regression-B \
+               --detail "$(tail -3 reports/crud.log 2>/dev/null | tr '\n' ' ' | head -c 300)" || true
+
       - name: Upload VPC-CRUD reports + results store
         # Separate artifact (same inner layout as regression-reports): the
         # dashboard job downloads it NEXT TO job A's and concatenates the
@@ -675,6 +707,11 @@ jobs:
         run: |
           mkdir -p reports
           python -u -m cleanup.reconciler 2>&1 | tee reports/sweep.log
+      - name: Oplog — sweep milestone
+        if: ${{ always() }}
+        continue-on-error: true
+        run: python -m core.oplog emit --stage sweep --status done --job sweep \
+               --detail "$(grep 'sweep done' reports/sweep.log 2>/dev/null | tail -1 | head -c 200)" || true
       - name: Comment sweep result on PR
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
@@ -935,6 +972,8 @@ jobs:
           cp -r dashboard/services "$pub"/services 2>/dev/null || true
           cp dashboard/verified_endpoints.json "$pub"/ 2>/dev/null || true
           cp dashboard/endpoint_status.json "$pub"/ 2>/dev/null || true
+          # static ops viewer (reads the persistent oplog bucket directly)
+          cp dashboard/ops.html "$pub"/ 2>/dev/null || true
           cp reports/smoke_status.tsv "$pub"/ 2>/dev/null || true
           cp data/conformance.json "$pub"/ 2>/dev/null || true
           cp data/conformance_baseline.json "$pub"/ 2>/dev/null || true
@@ -951,6 +990,13 @@ jobs:
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
             dashboard-data
           echo "published dashboard-data (enable Pages -> Deploy from branch -> dashboard-data /root)"
+      - name: Oplog — finalize run (summary + index.json)
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          python -m core.oplog emit --stage dashboard --status done --job dashboard || true
+          python -m core.oplog finalize --history dashboard/history.jsonl || true
+
       - name: Test result summary
         if: ${{ always() }}
         run: |
