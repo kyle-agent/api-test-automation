@@ -241,9 +241,12 @@ async function renderRes(){
   }catch(e){ $("#resBody").textContent="자원 이벤트 조회 실패: "+e.message; }
 }
 function fillRunSelect(ids){
+  // only runs that actually HAVE resource events, newest first, newest default
+  const withRes=[...new Set(RES_KEYS.filter(k=>k.includes("/res/")).map(k=>k.split("/")[1]))];
+  const sorted=withRes.sort((a,b)=>String(b).localeCompare(String(a),undefined,{numeric:true}));
   const sel=$("#resRun"); const cur=sel.value;
-  sel.innerHTML=ids.map(i=>`<option value="${i}">${i}</option>`).join("");
-  sel.value=cur&&ids.includes(cur)?cur:(ids[ids.length-1]||"");
+  sel.innerHTML=sorted.map(i=>`<option value="${i}">${i}</option>`).join("");
+  sel.value=cur&&sorted.includes(cur)?cur:(sorted[0]||"");
 }
 async function tick(){
   $("#bsrc").textContent=base()||"(엔드포인트 미설정)";
