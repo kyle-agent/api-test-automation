@@ -1,6 +1,7 @@
 # Layer 1 — per-service knowledge: networking/firewall
 # Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
-# Source: userguide /userguide/networking/firewall/overview/ (제약 사항 · 선행 서비스)
+# Source: userguide /userguide/networking/firewall/overview/ + /how_to_guides/
+#         (fetched 2026-06-11)
 
 version: 1
 service: networking/firewall
@@ -10,7 +11,7 @@ constraints:
     rule: "rule quota depends on the firewall size tier: Extra Small=5, Small=100, Medium=200, Large=500, Extra Large=1000 rules (userguide)"
     provenance: docs
   - id: firewall-default-size-exsmall
-    rule: "a firewall is created at size Extra Small by default (5-rule quota); the size can be changed afterwards on the Console firewall details page (userguide) — matches flavor_name EXSMALL in the API"
+    rule: "a firewall is created at size Extra Small by default (5-rule quota!); the size can be changed afterwards on the Console firewall details page (userguide) — matches flavor_name EXSMALL in the API. Any scenario adding >5 rules must resize first or expect a quota 4xx"
     provenance: docs
   - id: firewall-prereq-gateway-services
     rule: "선행 서비스: VPC, Direct Connect and Load Balancer must exist first (userguide) — a firewall is an attribute of a gateway-type resource (created implicitly via firewall_enabled:true), not a standalone create"
@@ -23,5 +24,17 @@ states: {}
 
 quirks:
   - id: firewall-no-standalone-create
-    note: "there is no POST /v1/firewalls — only POST /v1/firewalls/rules (needs an existing firewall_id) and PUT /v1/firewalls/{firewall_id}; a firewall_id must be minted by creating a firewall-bearing resource (igw / direct-connect / loadbalancer with firewall_enabled:true)"
+    note: "there is no POST /v1/firewalls — only POST /v1/firewalls/rules (needs an existing firewall_id) and PUT /v1/firewalls/{firewall_id}; a firewall_id must be minted by creating a firewall-bearing resource: IGW (firewall_enabled), Transit Gateway (Uplink Firewall 연계서비스), Direct Connect or Load Balancer (userguide how_to: 단독으로 신규 생성할 수 없습니다)"
+    provenance: docs
+  - id: firewall-name-auto-generated
+    note: "the firewall NAME is auto-generated as {선행 서비스 타입}_Firewall / {자원명_Firewall_연결명} — it is never user-supplied; don't send a name on create-by-proxy and don't expect regr-prefix names in lists (sweep/reconciler must match by VPC/owner tag instead)"
+    provenance: docs
+  - id: firewall-default-any-deny
+    note: "a freshly ENABLED firewall applies a base Any-Deny: ALL inbound+outbound traffic is blocked until explicit Allow rules are added; a firewall toggled to 미사용 (disabled) instead applies Any-Allow and is NOT billed (userguide) — dataplane tests behind a new firewall need allow rules first"
+    provenance: docs
+  - id: firewall-rules-top-down
+    note: "rules apply in list order (top-down first-match); each rule has direction Inbound/Outbound, action Allow/Deny, an enable flag (비활성 rules don't act), a unique rule ID and an Index used in log analysis; bulk creation via form/xlsx exists in console"
+    provenance: docs
+  - id: firewall-console-states
+    note: "console state machine: Creating -> Active; also Editing, Deploying (배포 완료), Deleting, Error (userguide) — rule writes during Editing/Deploying are the suspected invalid-state 4xx window"
     provenance: docs
