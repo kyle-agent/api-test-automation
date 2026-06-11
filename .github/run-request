@@ -1,7 +1,8 @@
-# request: FORCE cleanup before measurement run #5 — reap run #4 leftovers
-# (vpc-peering VPCs that 409'd, anything TTL-protected). Account must be at
-# 0 regr VPCs so provision-first + the 10 heavy/adopt lifecycles get slots.
+# request: FULL HEAVY measurement run #5 — clean account (force-swept),
+# own-run reap live (no more leftover poisoning), provision-first+retry,
+# slimmed dbaas, refire, soft-write body notes, immediate-flush oplog.
+# Expect: 10 heavy/adopt lifecycles recovered, dbaas wall measured,
+# peering 400 bodies recorded, ops dashboard live per-event.
+mutations=true
 destructive=true
-sweep_force=true
-category=management
-service=servicewatch
+heavy=true
