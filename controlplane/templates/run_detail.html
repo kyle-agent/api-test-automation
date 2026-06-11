@@ -33,6 +33,54 @@
   </p>
 </section>
 
+{% if run and run['status'] == 'running' %}
+<section>
+  <h2>개입 — 명령 채널 (엔진이 step 경계마다 폴링)</h2>
+  <p class="muted">명령은 즉시 적용되지 않습니다 — 엔진이 다음 step 경계에서
+     수신(ack)할 때 반영됩니다. abort 시에도 역순 cleanup은 수행됩니다.</p>
+  <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end">
+    <form method="post" action="/runs/{{ gh_run_id }}/commands"
+          onsubmit="return confirm('정말 run 전체를 중단할까요? 진행 중 시나리오의 역순 cleanup 후 종료됩니다.')">
+      <input type="hidden" name="action" value="abort_run">
+      <button type="submit" style="background:#b02a37">run 전체 중단</button>
+    </form>
+    <form class="inline" method="post" action="/runs/{{ gh_run_id }}/commands"
+          onsubmit="return confirm('해당 시나리오를 skip할까요?')">
+      <input type="hidden" name="action" value="skip_scenario">
+      <input type="text" name="target" placeholder="lifecycle id (예: network/vpc)"
+             required size="24">
+      <button type="submit">시나리오 skip</button>
+    </form>
+    <form class="inline" method="post" action="/runs/{{ gh_run_id }}/commands"
+          onsubmit="return confirm('진행 중인 폴링을 강제 타임아웃할까요?')">
+      <input type="hidden" name="action" value="stop_polling">
+      <input type="text" name="target" placeholder="대상 (선택)" size="16">
+      <button type="submit" class="ghost">폴링 강제 종료</button>
+    </form>
+  </div>
+</section>
+{% endif %}
+
+{% if commands %}
+<section>
+  <h2>개입 명령 이력</h2>
+  <table>
+    <tr><th>id</th><th>action</th><th>target</th><th>상태</th><th>생성</th><th>수신(ack)</th></tr>
+    {% for c in commands %}
+    <tr>
+      <td class="muted">{{ c['id'] }}</td>
+      <td><code>{{ c['action'] }}</code></td>
+      <td>{{ c['target'] or '-' }}</td>
+      <td><span class="status {{ 'dispatched' if c['status'] == 'pending' else 'done' }}">{{
+          '대기 중' if c['status'] == 'pending' else 'ack됨' }}</span></td>
+      <td class="muted">{{ c['created_at'] or '-' }}</td>
+      <td class="muted">{{ c['acked_at'] or '-' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+
 <section>
   <h2>마일스톤 타임라인</h2>
   <table>

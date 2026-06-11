@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}리소스 인벤토리{% endblock %}
+{% block content %}
+
+<section>
+  <h2>리소스 인벤토리 — 살아있는 테스트 리소스 ({{ live_count }}개 live)</h2>
+  {% if msg %}<p class="warn"><b>{{ msg }}</b></p>{% endif %}
+  {% if not destructive %}
+  <p class="warn">SCP_ALLOW_DESTRUCTIVE=true 미설정 — 삭제 버튼이 비활성화되어
+     있습니다. 서버 환경변수로 활성화하면 단일 리소스 삭제(reconciler와 동일한
+     DELETE 매핑)가 가능합니다.</p>
+  {% endif %}
+  <form class="inline" method="get" action="/testing/resources" style="margin-bottom:10px">
+    <input type="text" name="gh_run_id" value="{{ gh_run_id }}"
+           placeholder="gh_run_id 필터" size="14" list="run-ids">
+    <datalist id="run-ids">
+      {% for rid in run_ids %}<option value="{{ rid }}">{% endfor %}
+    </datalist>
+    <button type="submit">필터</button>
+    {% if gh_run_id %}<a href="/testing/resources">전체 보기</a>{% endif %}
+  </form>
+  <table>
+    <tr><th>상태</th><th>run</th><th>service</th><th>kind</th><th>name</th>
+        <th>res_id</th><th>lifecycle</th><th>age</th><th></th></tr>
+    {% for r in rows %}
+    <tr {% if r.live %}style="background:#fff8e1"{% endif %}>
+      <td>{% if r.live %}<span class="status running"><b>live</b></span>
+          {% else %}<span class="status done">gone</span>{% endif %}</td>
+      <td>{% if r.run %}<a href="/runs/{{ r.run }}">{{ r.run }}</a>{% else %}-{% endif %}</td>
+      <td>{{ r.service or '-' }}</td>
+      <td>{{ r.kind or '-' }}</td>
+      <td>{% if r.live %}<b>{{ r.name or '-' }}</b>{% else %}{{ r.name or '-' }}{% endif %}</td>
+      <td><code>{{ r.res_id }}</code></td>
+      <td class="muted">{{ r.lifecycle or '-' }}</td>
+      <td>{{ r.age or '-' }}</td>
+      <td>
+        {% if r.live %}
+        <form method="post" action="/testing/resources/delete"
+              onsubmit="return confirm('정말 {{ r.kind }} {{ r.name or r.res_id }} 리소스를 삭제할까요? 되돌릴 수 없습니다.')">
+          <input type="hidden" name="gh_run_id" value="{{ r.run }}">
+          <input type="hidden" name="service" value="{{ r.service }}">
+          <input type="hidden" name="kind" value="{{ r.kind }}">
+          <input type="hidden" name="res_id" value="{{ r.res_id }}">
+          <input type="hidden" name="name" value="{{ r.name }}">
+          <input type="hidden" name="lifecycle" value="{{ r.lifecycle }}">
+          <input type="hidden" name="filter_run" value="{{ gh_run_id }}">
+          <button type="submit" style="background:#b02a37"
+                  {% if not destructive %}disabled
+                  title="SCP_ALLOW_DESTRUCTIVE=true 필요"{% endif %}>삭제</button>
+        </form>
+        {% else %}
+        <span class="muted">{{ r.last_action }}</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="muted">표시할 리소스 이벤트가 없습니다.
+        이 목록은 <b>플랫폼으로 ingest된 이벤트만</b> 반영합니다 —
+        APITEST_PLATFORM_URL 미러 없이 실행된 run의 리소스는 나타나지 않으며,
+        그런 리소스는 전량 sweep(cleanup.reconciler)으로 정리하세요.</td></tr>
+    {% endfor %}
+  </table>
+  <p class="muted">created → live, deleted/platform-delete(성공) → gone —
+     res_id별 최신 이벤트 기준의 추정 상태입니다 (실계정과 차이가 있을 수 있음).</p>
+</section>
+
+{% endblock %}

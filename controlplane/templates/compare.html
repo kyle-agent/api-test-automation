@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Run 비교{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Run 비교 — A vs B (스냅샷 observations diff)</h2>
+  <form class="inline" method="get" action="/reporting/compare">
+    <label>A (기준)
+      <select name="a">
+        <option value="">— run 선택 —</option>
+        {% for rid in run_ids %}
+        <option value="{{ rid }}" {{ 'selected' if rid == a else '' }}>{{ rid }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>B (비교 대상)
+      <select name="b">
+        <option value="">— run 선택 —</option>
+        {% for rid in run_ids %}
+        <option value="{{ rid }}" {{ 'selected' if rid == b else '' }}>{{ rid }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">비교</button>
+  </form>
+  {% if a_missing %}<p class="warn">run {{ a }}의 스냅샷 observations를 읽을 수
+     없습니다 (버킷 미설정이거나 스냅샷 미업로드) — A를 빈 결과로 비교합니다.</p>{% endif %}
+  {% if b_missing %}<p class="warn">run {{ b }}의 스냅샷 observations를 읽을 수
+     없습니다 (버킷 미설정이거나 스냅샷 미업로드) — B를 빈 결과로 비교합니다.</p>{% endif %}
+</section>
+
+{% if result %}
+<section>
+  <h2>요약 — {{ a }} → {{ b }}</h2>
+  <div class="cards">
+    <div class="card"><div class="num" style="color:#b02a37">{{ result.new_fails|length }}</div>
+      <div class="lbl">새로 깨짐 (→fail)</div></div>
+    <div class="card"><div class="num" style="color:#146c43">{{ result.fixed|length }}</div>
+      <div class="lbl">고쳐짐 (fail→)</div></div>
+    <div class="card"><div class="num">{{ result.still|length }}</div>
+      <div class="lbl">계속 실패</div></div>
+    <div class="card"><div class="num">{{ result.changed|length }}</div>
+      <div class="lbl">분류 변화 (ok↔soft)</div></div>
+    <div class="card"><div class="num">{{ result.a_total }} / {{ result.b_total }}</div>
+      <div class="lbl">측정 endpoint (A / B)</div></div>
+  </div>
+  <p class="muted">endpoint_key + method 기준 조인 · run 내 중복 관측은 최악
+     분류로 접음 · '—'는 해당 run에서 미측정.</p>
+</section>
+
+{% for bucket, label in [('new_fails', '새로 깨짐'), ('fixed', '고쳐짐'),
+                         ('still', '계속 실패'), ('changed', '분류 변화')] %}
+{% if result[bucket] %}
+<section>
+  <h2>{{ label }} ({{ result[bucket]|length }})</h2>
+  <table>
+    <tr><th>endpoint</th><th>A 분류</th><th>A status</th><th>B 분류</th><th>B status</th></tr>
+    {% for row in result[bucket] %}
+    <tr>
+      <td><code>{{ row.key }}</code></td>
+      <td><span class="cat {{ 'real_regression' if row.a == 'fail' else 'environment' if row.a == 'ok' else '' }}">{{ row.a }}</span></td>
+      <td class="muted">{{ row.a_status or '-' }}</td>
+      <td><span class="cat {{ 'real_regression' if row.b == 'fail' else 'environment' if row.b == 'ok' else '' }}">{{ row.b }}</span></td>
+      <td class="muted">{{ row.b_status or '-' }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+{% endfor %}
+
+{% if not (result.new_fails or result.fixed or result.still or result.changed) %}
+<section>
+  <p class="muted">두 run 사이에 분류 변화가 없습니다{% if result.a_total == 0 and
+     result.b_total == 0 %} (양쪽 모두 관측 데이터 없음){% endif %}.</p>
+</section>
+{% endif %}
+{% endif %}
+
+{% endblock %}

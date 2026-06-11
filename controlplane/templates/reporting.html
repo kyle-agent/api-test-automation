@@ -51,6 +51,11 @@
 {% endif %}
 
 <section>
+  <h2>분석 도구</h2>
+  <p><a href="/reporting/compare">⚖️ Run 비교 (A vs B) — 무엇이 새로 깨졌나/고쳐졌나</a></p>
+</section>
+
+<section>
   <h2>Run 히스토리 (control plane 기록)</h2>
   <div hx-get="/partials/runs?limit=100" hx-trigger="every 15s" hx-swap="innerHTML">
     {% include "_runs_table.html" %}
