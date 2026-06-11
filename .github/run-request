@@ -1,7 +1,8 @@
-# request: PLATFORM LIVE VERIFICATION #2 — scoped service run (coverage levers 3/4)
-# servicewatch metric bodies (doc-exact) + log-group GET, eventstreams
-# request_id read-coverage. Light CRUD only; smoke narrowed to servicewatch.
-# Heavy DBaaS sub-op window + eventstreams-guarded ride the next full-heavy run.
+# request: PLATFORM LIVE VERIFICATION #3 — heavy window (DBaaS sub-ops + eventstreams guarded)
+# Validates the docs-derived sub-op steps inside the mysql/postgresql heavy
+# lifecycles (read-only/reversible sub-ops while the cluster is live) and the
+# corrected eventstreams guarded bodies. Billable: 2 DB clusters (~40min).
 suite=full
-service=servicewatch
-crud_filter=servicewatch-loggroup-logstream or eventstreams-read-coverage
+heavy=true
+service=eventstreams
+crud_filter=database-mysql-cluster or database-postgresql-cluster or eventstreams-cluster-subops-guarded
