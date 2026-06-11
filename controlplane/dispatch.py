@@ -1,10 +1,19 @@
-"""Trigger a test run — development-period executor is GitHub Actions.
+"""Trigger a test run — switchable executor (M4, docs/PLATFORM-PLAN.md §3).
 
-The control plane dispatches api-test.yml via the workflow_dispatch REST API
-(docs/PLATFORM-PLAN.md §2.4); at the M4 cutover this module is swapped for a
-same-host worker queue while the run records and UI stay unchanged.
+PLATFORM_EXECUTOR selects who consumes the run record:
+
+  actions (default)  development period — dispatch api-test.yml via the
+                     workflow_dispatch REST API (§2.4). Unchanged behaviour.
+  worker             deployment mode — GitHub is skipped entirely; the run
+                     record itself (status 'dispatched', gh_run_id NULL) IS
+                     the queue, and the same-host runner/worker.py claims and
+                     executes it (ROADMAP Phase 3 Step 2).
+
+Run records, schedules and the UI are identical in both modes — only this
+dispatch implementation differs.
 
 Config (env):
+  PLATFORM_EXECUTOR         actions (default) | worker
   PLATFORM_GITHUB_TOKEN     PAT with `actions:write` (or GITHUB_TOKEN)
   PLATFORM_GITHUB_REPO      owner/repo
   PLATFORM_GITHUB_REF       branch to run on (default: main)
@@ -17,7 +26,16 @@ import os
 import requests
 
 
+def executor() -> str:
+    """'actions' (default) or 'worker' — unknown values fall back to actions
+    so a typo can never silently swallow runs."""
+    mode = os.environ.get("PLATFORM_EXECUTOR", "").strip().lower()
+    return "worker" if mode == "worker" else "actions"
+
+
 def configured() -> bool:
+    if executor() == "worker":
+        return True  # the queue is the local DB — nothing external to configure
     return bool((os.environ.get("PLATFORM_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN"))
                 and os.environ.get("PLATFORM_GITHUB_REPO"))
 
@@ -25,7 +43,12 @@ def configured() -> bool:
 def dispatch_run(suite: str, profile: str = "") -> tuple[bool, str]:
     """Fire workflow_dispatch with the suite × profile inputs. Returns
     (ok, message); an unconfigured dispatcher records the run without firing
-    so the UI keeps working in local development."""
+    so the UI keeps working in local development.
+
+    In worker mode there is nothing to fire: the caller's run record (status
+    'dispatched', no gh_run_id) is the queue the same-host worker polls."""
+    if executor() == "worker":
+        return True, "queued for local worker"
     token = os.environ.get("PLATFORM_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN")
     repo = os.environ.get("PLATFORM_GITHUB_REPO", "")
     if not (token and repo):

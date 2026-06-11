@@ -1,0 +1,55 @@
+# SCP API Regression Test Platform — M4 배포 번들 (docs/PLATFORM-PLAN.md §1
+# 원칙 5: AWS·로컬 PC·내부 VM 어디서든 같은 형태).
+#
+#   server  control plane UI/API (uvicorn controlplane.app, port 8800)
+#   worker  same-host executor (python -m runner.worker) — consumes the run
+#           queue the server records (PLATFORM_EXECUTOR=worker)
+#
+# THE REPO DIRECTORY IS THE SHARED SOURCE OF TRUTH: both services bind-mount
+# ./ at /app, so UI edits (authoring.py writes + local git commits) are read
+# by the very next worker run, and the SQLite DB + snapshots live inside it
+# (controlplane/data/, gitignored). 호스트 이전 = 이 디렉토리를 통째로 이동.
+#
+# Setup:   cp .env.platform.example .env.platform   # fill in credentials
+# Run:     docker compose up -d --build
+# Runbook: docs/DEPLOY.md
+services:
+  server:
+    build: .
+    image: scp-apitest-platform
+    command: uvicorn controlplane.app:app --host 0.0.0.0 --port 8800
+    working_dir: /app
+    ports:
+      - "8800:8800"
+    env_file: .env.platform
+    environment:
+      # deployment mode: runs are queued for the local worker, not GitHub.
+      # Set PLATFORM_EXECUTOR=actions in .env.platform to switch back —
+      # environment: wins over env_file, so flip it HERE (or remove this line)
+      # when reverting to the Actions executor.
+      PLATFORM_EXECUTOR: worker
+      PYTHONPATH: /app
+    volumes:
+      # the working copy IS the platform state: declarative data (suites/,
+      # environments/, scenarios, knowledge) + SQLite DB + per-run reports.
+      - ./:/app
+    restart: unless-stopped
+
+  worker:
+    build: .
+    image: scp-apitest-platform
+    command: python -m runner.worker --poll 15
+    working_dir: /app
+    env_file: .env.platform
+    environment:
+      PLATFORM_EXECUTOR: worker
+      # children (engine) mirror oplog events to the server's ingest API —
+      # the worker also writes milestones to the shared DB directly, so the
+      # UI stays live even if this URL is unreachable.
+      APITEST_PLATFORM_URL: http://server:8800
+      PYTHONPATH: /app
+    volumes:
+      - ./:/app   # SAME working copy + SAME controlplane/data DB as the server
+    depends_on:
+      - server
+    restart: unless-stopped

@@ -1,9 +1,15 @@
-# controlplane/ — 플랫폼 제어 평면 서버 (M1+M2+M3)
+# controlplane/ — 플랫폼 제어 평면 서버 (M1+M2+M3+M4)
 
 FastAPI + SQLite + htmx로 구현된 SCP API Regression Test Platform의 control
-plane입니다 (docs/PLATFORM-PLAN.md M1·M2·M3). 개발 기간 동안 실행기는 GitHub
-Actions(`workflow_dispatch`)이고, M4 컷오버에서 동일 호스트 worker로
-교체됩니다 — run 레코드/스케줄/UI는 그대로 유지.
+plane입니다 (docs/PLATFORM-PLAN.md M1~M4). 실행기는
+`PLATFORM_EXECUTOR`로 전환합니다 (controlplane/dispatch.py):
+
+- `actions` (기본, 개발 기간) — `api-test.yml`을 `workflow_dispatch`로 트리거
+- `worker` (배포 모드) — run 레코드(status `dispatched`)가 곧 큐이고, 동일
+  호스트의 `runner/worker.py`가 claim해 같은 스테이지 시퀀스를 실행
+
+run 레코드/스케줄/UI는 두 모드에서 동일합니다. Docker Compose 배포 번들
+(server + worker + 공유 repo 볼륨)과 운영 runbook은 `docs/DEPLOY.md` 참고.
 
 ## 기능
 
@@ -58,7 +64,8 @@ uvicorn controlplane.app:app --host 0.0.0.0 --port 8800
 | 변수 | 용도 |
 |---|---|
 | `PLATFORM_DB` | SQLite 경로 (기본 `controlplane/data/platform.db`) |
-| `PLATFORM_GITHUB_TOKEN` | `actions:write` PAT — 수동/스케줄 실행 dispatch |
+| `PLATFORM_EXECUTOR` | `actions`(기본) \| `worker` — M4 실행기 전환 (worker면 dispatch 없이 큐잉만) |
+| `PLATFORM_GITHUB_TOKEN` | `actions:write` PAT — 수동/스케줄 실행 dispatch (actions 실행기) |
 | `PLATFORM_GITHUB_REPO` | `owner/repo` |
 | `PLATFORM_GITHUB_REF` | dispatch 대상 브랜치 (기본 `main`) |
 | `PLATFORM_INGEST_TOKEN` | 설정 시 `/api/ingest/events`에 Bearer 토큰 요구 |
@@ -100,6 +107,8 @@ POST /api/commands/<id>/ack
 
 ```sh
 PYTHONPATH=. python3 controlplane/tests_offline.py
+PYTHONPATH=. python3 controlplane/tests_ai_offline.py
+PYTHONPATH=. python3 runner/tests_offline.py      # M4 worker/실행기 전환
 ```
 
 네트워크/버킷/credential 없이 명령 채널 · 인벤토리 폴딩 · 비교 뷰 · tenant
@@ -112,6 +121,10 @@ PYTHONPATH=. python3 controlplane/tests_offline.py
 `gh_run_id` 없이 생성되고 **첫 ingest 이벤트가 가장 오래된 미결 기록에
 FIFO로 바인딩**됩니다(Actions 큐 순서와 일치). 파일 트리거/외부 run은
 `external` 레코드로 자동 생성됩니다.
+
+worker 실행기(M4)에서는 미결 dispatched 기록이 곧 **로컬 worker의 큐**라서
+ingest가 FIFO 바인딩을 하지 않습니다 — worker가 claim 시점에 `local-<ts>`
+id를 직접 부여하고, 병행 Actions run은 항상 `external` 레코드를 받습니다.
 
 ## 보안 주의
 

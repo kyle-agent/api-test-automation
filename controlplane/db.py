@@ -120,13 +120,18 @@ def attach_run(gh_run_id: str) -> int:
     workflow_dispatch doesn't return the run id it started, so the first
     ingested event claims the OLDEST still-unbound dispatched record (FIFO —
     matches the Actions queue order); with none pending (file-triggered or
-    out-of-band runs) a fresh 'external' record is created."""
+    out-of-band runs) a fresh 'external' record is created.
+
+    Worker executor (M4): unbound dispatched records ARE the local worker's
+    queue (runner/worker.py claims them itself), so ingest must never FIFO-
+    steal one — an out-of-band Actions run gets an 'external' record instead."""
     with connect() as con:
         row = con.execute(
             "SELECT id FROM runs WHERE gh_run_id = ?", (gh_run_id,)).fetchone()
         if row:
             return row["id"]
-        row = con.execute(
+        from controlplane import dispatch
+        row = None if dispatch.executor() == "worker" else con.execute(
             "SELECT id FROM runs WHERE gh_run_id IS NULL AND status = 'dispatched'"
             " ORDER BY id LIMIT 1").fetchone()
         if row:

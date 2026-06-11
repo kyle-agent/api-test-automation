@@ -373,14 +373,25 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       끝난 뒤 별도 작업으로 진행한다 (`SCP_AI_EXPLORE` 게이트 설계는 §4-C1
       그대로 유지)
 
-### M4 — 배포 전환 (마지막: 로컬 파일 모드로 컷오버)
-- [ ] 동일 호스트 worker: run 큐 직접 소비 → spec → regression → sweep →
-      conformance → dashboard (ROADMAP Phase 3 Step 2의 `runner/` 스크립트)
-- [ ] Docker Compose 패키징 (server + worker + repo 볼륨) — AWS/로컬/VM 공통
-- [ ] UI 편집 반영을 git push → **호스트 파일 직접 변경**(§3.1)으로 전환
-      (검증 로직은 그대로, 마지막 반영 단계만 교체)
-- [ ] 디스패치를 workflow_dispatch → worker 큐로 교체, Actions는 보조로 유지
-- [ ] 운영 runbook: 신규 호스트 프로비저닝 = compose up 한 번
+### M4 — 배포 전환 (마지막: 로컬 파일 모드로 컷오버) — DONE (live/docker 검증 대기)
+- [x] 동일 호스트 worker: run 큐 직접 소비 → validate → regression(adopt∥B를
+      직렬로, 동일 -k 파티션) → sweep → conformance → dashboard/snapshot —
+      `runner/worker.py` (ROADMAP Phase 3 Step 2의 `runner/`; api-test.yml의
+      게이트·always() 의미를 미러, 마일스톤은 DB 직접 기록 + 엔진 미러 유지)
+- [x] Docker Compose 패키징 (server + worker + repo 볼륨) — `Dockerfile` +
+      `docker-compose.yml` + `.env.platform.example`; AWS/로컬/VM 공통,
+      호스트 이전 = 디렉토리 이동
+- [x] UI 편집 반영 — 코드 변경 없음으로 확인: authoring.py의 검증→쓰기→로컬
+      커밋(push는 PLATFORM_GIT_PUSH 옵트인)이 이미 §3.1 파일 모드이고, worker가
+      같은 working copy를 읽어 다음 run에 즉시 반영 (docs/DEPLOY.md)
+- [x] 디스패치 전환 — `PLATFORM_EXECUTOR=actions(기본)|worker`
+      (controlplane/dispatch.py): actions 경로는 그대로, worker 모드는 run
+      레코드(=큐)만 기록. Actions는 보조 실행기로 유지
+- [x] 운영 runbook `docs/DEPLOY.md`: 신규 호스트 = compose up 한 번, 업그레이드
+      = git pull + compose up, 이전 = 디렉토리 이동, 실행기 되돌리기, 보안 주의
+- 오프라인 테스트: `runner/tests_offline.py` (claim 단일 승자 · suite→게이트
+  매핑 · 스테이지 시퀀싱/게이팅 · 실패해도 sweep/dashboard · 마일스톤 기록).
+  Docker 빌드/compose 기동은 실 호스트에서 검증 필요.
 
 ### 마일스톤별 가치
 - M0만으로도: 멀티 환경 매트릭스 + run 히스토리가 생김 (서버 없이).
