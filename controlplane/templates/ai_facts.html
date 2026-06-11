@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}A3 Fact 추출{% endblock %}
+{% block content %}
+
+<section>
+  <h2>A3 — Validated-fact 추출: run {{ r.run_id }}</h2>
+  <p class="muted">생성: {{ r.created }} · 2xx observation {{ r.observation_count }}건
+    / endpoint {{ r.endpoint_count }}개
+    {% if r.draft_name %} · 저장됨: <a href="/ai/drafts/{{ r.draft_name }}">drafts/{{ r.draft_name }}</a>{% endif %}
+    · <a href="/ai">← AI 파이프라인</a></p>
+  <p class="muted">데이터 한계: observation은 endpoint·method·path·status·source·note만
+    담습니다 — request/response body나 id capture 경로는 없으므로, 여기서의
+    "validated"는 "해당 시나리오의 호출이 실제 2xx로 성공했다"는 사실까지입니다.</p>
+</section>
+
+{% if r.ai %}
+<section>
+  <h2>Fact 후보 ({{ r.ai.facts|length }})</h2>
+  {% if r.ai.facts %}
+  <table>
+    <tr><th>서비스</th><th>fact</th><th>근거</th><th>신뢰도</th></tr>
+    {% for f in r.ai.facts %}
+    <tr><td><code>{{ f.service }}</code></td><td>{{ f.fact }}</td>
+        <td class="muted">{{ f.evidence }}</td>
+        <td><span class="cat {{ 'environment' if f.confidence == 'validated' else 'test_bug' }}">{{ f.confidence }}</span></td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">추출된 fact가 없습니다.</p>{% endif %}
+</section>
+
+<section>
+  <h2>formal YAML 제안</h2>
+  <p class="muted">{{ r.review_hint }}</p>
+  <pre>{{ r.ai.formal_yaml_suggestions }}</pre>
+</section>
+{% else %}
+<section>
+  <h2>추출 결과 없음</h2>
+  <p class="warn">{{ r.ai_error or 'AI 응답을 받지 못했습니다.' }}</p>
+  <p class="muted">A3는 Claude 없이 동작할 수 없습니다 — ANTHROPIC_API_KEY 필요.</p>
+</section>
+{% endif %}
+
+{% endblock %}
