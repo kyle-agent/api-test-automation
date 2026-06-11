@@ -1,10 +1,9 @@
-# request: FULL HEAVY coverage run #3 — first run with ALL of today's fixes
-# live at once: A||B split + optional-retry caps (validated -43%), slimmed
-# heavy-shared-dbaas (mys/pg legs dropped, gone-polls 900s, teardown budgets
-# 4min), failed-delete refire, VPC cap=5 + clean account, vip capture +
-# real peering approver VPC, hsn-last ordering, waivers 242, cumulative
-# dashboard status. Goal: measure coverage (C3 vs 1130 denom) + wall-clock
-# (~1.5h target) + refire/peering/vip verification.
+# request: FULL HEAVY run #4 — pre-run tune-up applied: provision-first+retry
+# (recovers the 8 cap-skipped lifecycles incl. heavy-shared-dbaas), fail
+# response bodies recorded in observations (self-diagnosing reds),
+# resourcemanager bulk/tag bodies, scr public-endpoint toggle ON, explicit
+# vip delete, peering teardown waits. First run with oplog live (bucket
+# verified) -> ops dashboard gets real data.
 mutations=true
 destructive=true
 heavy=true
