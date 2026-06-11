@@ -1,8 +1,4 @@
-# request: FULL HEAVY measurement run #5 — clean account (force-swept),
-# own-run reap live (no more leftover poisoning), provision-first+retry,
-# slimmed dbaas, refire, soft-write body notes, immediate-flush oplog.
-# Expect: 10 heavy/adopt lifecycles recovered, dbaas wall measured,
-# peering 400 bodies recorded, ops dashboard live per-event.
-mutations=true
-destructive=true
-heavy=true
+# request: PLATFORM LIVE VERIFICATION #1 — first run through the platform stack
+# (suite expansion, env-profile path, per-run snapshot upload, static /platform
+# Pages export). Read-only smoke: no mutations, no sweep needed.
+suite=smoke
