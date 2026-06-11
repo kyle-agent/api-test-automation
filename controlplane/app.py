@@ -319,9 +319,16 @@ def runs_partial(request: Request, limit: int = 15):
 
 
 @app.post("/runs/trigger")
-def trigger_run(suite: str = Form(""), profile: str = Form("")):
-    ok, msg = dispatch.dispatch_run(suite, profile)
-    db.create_run(suite, profile, trigger="manual", detail="" if ok else msg)
+def trigger_run(suite: str = Form(""), profile: str = Form(""),
+                service: str = Form(""), crud_filter: str = Form("")):
+    ok, msg = dispatch.dispatch_run(suite, profile, service, crud_filter)
+    # narrowing options ride in detail as KEY=VALUE lines: traceability in the
+    # UI, and in worker mode the worker merges them over the suite expansion
+    lines = [f"{k}={v}" for k, v in (("service", service),
+                                     ("crud_filter", crud_filter)) if v]
+    if not ok:
+        lines.append(msg)
+    db.create_run(suite, profile, trigger="manual", detail="\n".join(lines))
     return RedirectResponse("/testing", status_code=303)
 
 

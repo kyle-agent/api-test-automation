@@ -245,7 +245,7 @@ def claim_next() -> dict | None:
     exactly one sees rowcount 1 (the loser gets 0 and polls again)."""
     with db.connect() as con:
         row = con.execute(
-            "SELECT id, suite, profile FROM runs"
+            "SELECT id, suite, profile, detail FROM runs"
             " WHERE status = 'dispatched' AND gh_run_id IS NULL"
             " ORDER BY id LIMIT 1").fetchone()
         if row is None:
@@ -262,7 +262,9 @@ def claim_next() -> dict | None:
             if cur.rowcount != 1:
                 return None  # another worker won this row
             return {"id": row["id"], "gh_run_id": local_id + suffix,
-                    "suite": row["suite"] or "", "profile": row["profile"] or ""}
+                    "suite": row["suite"] or "", "profile": row["profile"] or "",
+                    # dispatch-form narrowing (service/crud_filter) rides in detail
+                    "options": row["detail"] or ""}
     return None
 
 
@@ -284,6 +286,8 @@ def process_run(run: dict) -> str:
     # a bad suite/profile fails BEFORE anything touches the live API.
     try:
         opts = expand_suite(suite)
+        # per-run narrowing from the dispatch form (KEY=VALUE lines in detail)
+        opts.update(parse_kv_lines(run.get("options", "")))
         g = gates(opts)
         env = build_env(gh, profile, g)
     except Exception as exc:

@@ -40,13 +40,17 @@ def configured() -> bool:
                 and os.environ.get("PLATFORM_GITHUB_REPO"))
 
 
-def dispatch_run(suite: str, profile: str = "") -> tuple[bool, str]:
-    """Fire workflow_dispatch with the suite × profile inputs. Returns
-    (ok, message); an unconfigured dispatcher records the run without firing
-    so the UI keeps working in local development.
+def dispatch_run(suite: str, profile: str = "", service: str = "",
+                 crud_filter: str = "") -> tuple[bool, str]:
+    """Fire workflow_dispatch with the suite × profile (+ optional service /
+    crud_filter narrowing — "이 서비스만 실행"). Returns (ok, message); an
+    unconfigured dispatcher records the run without firing so the UI keeps
+    working in local development.
 
     In worker mode there is nothing to fire: the caller's run record (status
-    'dispatched', no gh_run_id) is the queue the same-host worker polls."""
+    'dispatched', no gh_run_id) is the queue the same-host worker polls — the
+    narrowing options travel in the run record's detail (KEY=VALUE lines the
+    worker merges over the suite expansion)."""
     if executor() == "worker":
         return True, "queued for local worker"
     token = os.environ.get("PLATFORM_GITHUB_TOKEN") or os.environ.get("GITHUB_TOKEN")
@@ -56,7 +60,8 @@ def dispatch_run(suite: str, profile: str = "") -> tuple[bool, str]:
                        "PLATFORM_GITHUB_REPO) — run recorded only")
     ref = os.environ.get("PLATFORM_GITHUB_REF", "main")
     workflow = os.environ.get("PLATFORM_GITHUB_WORKFLOW", "api-test.yml")
-    inputs = {k: v for k, v in (("suite", suite), ("profile", profile)) if v}
+    inputs = {k: v for k, v in (("suite", suite), ("profile", profile),
+                                ("service", service), ("crud_filter", crud_filter)) if v}
     try:
         resp = requests.post(
             f"https://api.github.com/repos/{repo}/actions/workflows/{workflow}/dispatches",

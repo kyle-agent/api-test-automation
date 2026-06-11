@@ -20,8 +20,12 @@
         {% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
       </select>
     </label>
+    <input type="text" name="service" placeholder="service (선택 — smoke 범위)" size="18">
+    <input type="text" name="crud_filter" placeholder="crud_filter (선택 — lifecycle -k)" size="22">
     <button type="submit">실행</button>
   </form>
+  <p class="muted">특정 서비스만 검증: suite=full + service/crud_filter에 서비스명 —
+    해당 lifecycle만 도는 몇 분짜리 run이 됩니다.</p>
 </section>
 
 {% if live %}
