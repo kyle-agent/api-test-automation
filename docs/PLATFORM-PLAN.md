@@ -344,10 +344,18 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - [x] multi-tenancy 스키마 기초 — runs/schedules tenant 컬럼 (UI 선택자는 후속)
 
 ### M3 — 저작도구 + AI 파이프라인 완성
-- [ ] 시나리오/스위트 편집 UI — 검증 + 쓰기 로직 (개발 기간 반영 방식:
-      git 커밋 + push → Actions가 클론해서 사용)
-- [ ] 의존 그래프 시각화·편집 (dependencies.json ↔ cross-service.yaml)
-- [ ] knowledge 브라우저/편집 + 검증상태 필드화
+- [x] 시나리오/스위트/환경 편집 UI — `controlplane/authoring.py`의
+      validate→write→commit 파이프라인 (§3.1 공용 코드: 임시 적용 → 해당
+      validator → 실패 시 byte-identical 복원, 통과 시 원자적 교체 + 로컬
+      git 커밋; push는 `PLATFORM_GIT_PUSH=true`일 때만 — 기본은 운영자 수동
+      push, M4에서 이 마지막 단계만 교체) + 저장 시 할당량 시뮬레이션
+      (peak 동시 VPC > core/budgets 한도면 경고)
+- [x] 의존 그래프 시각화 — `/planning/dependencies` (dependencies.json
+      vpc_schedule의 adopt/직렬 분류·lanes ↔ cross-service.yaml requires
+      그래프, 서버 렌더 SVG; 편집은 원본 파일 편집기 링크로)
+- [x] knowledge 브라우저/편집 (`/planning/knowledge` → 같은 편집기,
+      `knowledge/formal/validate.py` 게이트) — 검증상태 필드화(fact별
+      `verified:` 승격)는 A3 fact-추출과 함께 후속
 - [ ] AI A1(spec-diff 분석→부분 재실행 제안)·A2(시나리오 초안)·A3(fact
       추출) 파이프라인 + C1 탐색 모드
 

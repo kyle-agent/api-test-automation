@@ -9,9 +9,12 @@
            placeholder="서비스 필터 (예: networking)">
     <button type="submit">필터</button>
     {% if service %}<a href="/planning/scenarios">전체 보기</a>{% endif %}
+    <span class="muted">편집은 lifecycle을 담은 파일 전체를 엽니다
+      (scenarios.json 또는 lifecycles/&lt;service&gt;.json fragment) —
+      해당 lifecycle 위치로 자동 스크롤.</span>
   </form>
   <table style="margin-top:10px">
-    <tr><th>id</th><th>service</th><th>steps</th><th>속성</th><th>비고</th></tr>
+    <tr><th>id</th><th>service</th><th>steps</th><th>속성</th><th>비고</th><th></th></tr>
     {% for l in rows %}
     <tr>
       <td><code>{{ l.id }}</code></td>
@@ -23,6 +26,9 @@
         {% if l.adopt %}<span class="cat environment">adopt:{{ l.adopt }}</span>{% endif %}
       </td>
       <td class="muted">{{ l.note }}</td>
+      <td style="white-space:nowrap" title="{{ l.file }}">
+        <a href="/planning/view?path={{ l.file }}">보기</a> ·
+        <a href="/planning/edit?path={{ l.file }}&find={{ l.id }}">편집</a></td>
     </tr>
     {% endfor %}
   </table>

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ rel }} 편집{% endblock %}
+{% block content %}
+
+<section>
+  <h2>{{ rel }} 편집</h2>
+  <p class="muted">검증 통과 시에만 저장됩니다 — 저장 = working copy 반영 +
+    로컬 git 커밋{% if push %} + 원격 push (PLATFORM_GIT_PUSH=true)
+    {% else %} (push는 운영자 수동 — PLATFORM_GIT_PUSH 참고){% endif %}.
+    실패 시 원본이 그대로 유지됩니다 (docs/PLATFORM-PLAN.md §3.1).</p>
+  <form hx-post="/planning/edit/validate" hx-target="#edit-result" hx-swap="innerHTML">
+    <input type="hidden" name="path" value="{{ rel }}">
+    <textarea name="content" id="content" spellcheck="false" wrap="off"
+      style="width:100%;height:62vh;font:12px/1.5 ui-monospace,Consolas,monospace;
+             border:1px solid var(--line);border-radius:6px;padding:10px;
+             resize:vertical">{{ content }}</textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button type="submit" class="ghost">검증만</button>
+      <button type="submit" hx-post="/planning/edit/save" hx-target="#edit-result"
+              hx-confirm="검증 통과 시 저장하고 로컬 git 커밋합니다 — 진행할까요?">
+        검증 + 저장</button>
+      <a href="/planning/view?path={{ rel }}">읽기 전용 보기</a>
+      <span class="muted" id="edit-busy" style="display:none">검증 중…</span>
+    </div>
+  </form>
+  <div id="edit-result" style="margin-top:10px"></div>
+</section>
+
+{% if find %}
+<script>
+(function () {
+  var q = {{ find|tojson }};
+  var ta = document.getElementById("content");
+  if (!q || !ta) return;
+  var i = ta.value.indexOf('"id": "' + q + '"');     // lifecycle JSON 형태 우선
+  if (i < 0) i = ta.value.indexOf(q);
+  if (i < 0) return;
+  ta.focus();
+  ta.setSelectionRange(i, i + q.length);
+  var line = ta.value.slice(0, i).split("\n").length;
+  ta.scrollTop = Math.max(0, (line - 6) * 18);
+})();
+</script>
+{% endif %}
+<script>
+document.body.addEventListener("htmx:beforeRequest", function () {
+  var b = document.getElementById("edit-busy"); if (b) b.style.display = "";
+});
+document.body.addEventListener("htmx:afterRequest", function () {
+  var b = document.getElementById("edit-busy"); if (b) b.style.display = "none";
+});
+</script>
+
+{% endblock %}

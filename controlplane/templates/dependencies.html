@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}의존 그래프{% endblock %}
+{% block content %}
+
+<section>
+  <h2>의존 그래프 — dependencies.json × cross-service.yaml (read-only 시각화)</h2>
+  <p class="muted">시나리오 스케줄 전략(공유 VPC adopt vs 직렬 vpc-crud)과
+    서비스 간 리소스 의존을 한눈에. 편집은 원본 파일 편집기로 —
+    <a href="/planning/edit?path=regression/scenarios/dependencies.json">dependencies.json 편집</a> ·
+    <a href="/planning/edit?path=knowledge/formal/cross-service.yaml">cross-service.yaml 편집</a></p>
+  {% for e in load_errs %}<p class="warn">⚠ {{ e }}</p>{% endfor %}
+</section>
+
+<section>
+  <h2>할당량 + 시뮬레이션 (core/budgets.py × vpc_schedule)</h2>
+  <div class="cards">
+    <div class="card"><div class="num">{{ sim.limit if sim.limit is not none else '—' }}</div>
+      <div class="lbl">계정 VPC 한도</div></div>
+    <div class="card"><div class="num">{{ sched.get('private_dns_limit', '—') }}</div>
+      <div class="lbl">private-dns 한도</div></div>
+    <div class="card"><div class="num">{{ sim.cap if sim.cap is not none else '—' }}</div>
+      <div class="lbl">per-run VPC cap</div></div>
+    <div class="card"><div class="num">{{ sim.peak }}</div>
+      <div class="lbl">시뮬레이션 peak 동시 VPC (공유 {{ sim.shared }} + 직렬 최악
+        {{ sim.worst }}{% if sim.worst_id %} · {{ sim.worst_id }}{% endif %})</div></div>
+  </div>
+  {% if sim_warnings %}{% for w in sim_warnings %}<p class="warn">⚠ {{ w }}</p>{% endfor %}
+  {% else %}<p class="muted" style="margin-bottom:0">peak가 한도 이내입니다 —
+    저장 시에도 같은 시뮬레이션이 자동으로 돕니다.</p>{% endif %}
+</section>
+
+<section>
+  <h2>vpc_schedule — 공유 VPC adopt (병렬) vs 직렬 vpc-crud</h2>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">
+    <div style="flex:1;min-width:280px;border:1px solid #198754;border-radius:8px;padding:12px">
+      <strong>ADOPT — 병렬 (xdist)</strong>
+      <div class="muted" style="margin:4px 0 8px">세션 공유 VPC <b>1개</b>
+        ({{ sched.get('shared_subnet_cidr','') }})를 adopt — 자체 VPC 생성 없음</div>
+      {% for lid in sched.get('adopt_lifecycles', []) %}
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>{{ lid }}</code>
+          {% if lid in fixed_ip_map %}<span class="cat environment"
+            title="{{ fixed_ip_map[lid] }}">fixed-ip</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <div style="display:flex;align-items:center" class="muted">→ 공유 VPC 해체 후 →</div>
+    <div style="flex:1;min-width:280px;border:1px solid #9a3412;border-radius:8px;padding:12px">
+      <strong>VPC-CRUD — 직렬 (-n0)</strong>
+      <div class="muted" style="margin:4px 0 8px">자체 VPC를 생성/변형 —
+        한 번에 한 lifecycle만</div>
+      {% for row in crud_rows %}
+        <div style="background:#fdf3ee;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>{{ row.id }}</code>
+          <span class="muted">self-create VPC {{ row.creates }}개</span>
+          {% for k in quota_kinds.get(row.id, []) %}<span class="cat">{{ k }}</span>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if sched.get('lanes') %}
+<section>
+  <h2>lanes (cross-run 분할)</h2>
+  <table>
+    <tr><th>lane</th><th>run_heavy</th><th>crud_filter</th><th>vpc lifecycles</th><th>peak VPC</th></tr>
+    {% for lane in sched.get('lanes', []) %}
+    <tr>
+      <td><code>{{ lane.id }}</code></td>
+      <td>{{ lane.run_heavy }}</td>
+      <td class="muted">{{ lane.crud_filter or '(전체)' }}</td>
+      <td>{% for l in lane.vpc_lifecycles %}<code>{{ l }}</code> {% endfor %}</td>
+      <td>{{ lane.peak_vpcs }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="muted">budget_paths: {% for p, k in budget_paths.items() %}
+    <code>{{ p }}</code>→{{ k }} {% endfor %}</p>
+</section>
+{% endif %}
+
+<section>
+  <h2>cross-service 리소스 그래프 (requires →)</h2>
+  <p class="muted">초록 테두리 = VALIDATED · 주황 = docs 출처 ·
+    배지 = quota kind. 화살표는 "먼저 있어야 함"을 가리킵니다.</p>
+  <div style="overflow-x:auto">
+  <svg width="{{ graph.w }}" height="{{ graph.h }}" font-family="ui-monospace,Consolas,monospace">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3"
+              orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L7,3 L0,6 z" fill="#9aa7b5"/>
+      </marker>
+    </defs>
+    {% for e in graph.edges %}
+    <path d="M{{ e.x1 }},{{ e.y1 }} C{{ e.x1 + 36 }},{{ e.y1 }} {{ e.x2 - 36 }},{{ e.y2 }} {{ e.x2 }},{{ e.y2 }}"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    {% endfor %}
+    {% for n in graph.nodes %}
+    <g>
+      <title>{{ n.id }} ({{ n.service }}){% if n.notes %} — {{ n.notes }}{% endif %}</title>
+      <rect x="{{ n.x }}" y="{{ n.y }}" width="{{ graph.bw }}" height="{{ graph.bh }}"
+            rx="6" fill="#fff"
+            stroke="{{ '#198754' if n.provenance == 'VALIDATED' else '#d97706' }}"
+            stroke-width="1.4"/>
+      <text x="{{ n.x + 8 }}" y="{{ n.y + 16 }}" font-size="12" font-weight="600"
+            fill="#1c2733">{{ n.id }}{% if n.quota %} ⛔{{ n.quota }}{% endif %}</text>
+      <text x="{{ n.x + 8 }}" y="{{ n.y + 31 }}" font-size="10"
+            fill="#6b7a8d">{{ n.service }}</text>
+    </g>
+    {% endfor %}
+  </svg>
+  </div>
+</section>
+
+{% if cross_constraints %}
+<section>
+  <h2>cross_constraints (서비스 간 제약)</h2>
+  <table>
+    <tr><th>id</th><th>services</th><th>rule</th><th>출처</th></tr>
+    {% for c in cross_constraints %}
+    <tr>
+      <td><code>{{ c.id }}</code></td>
+      <td>{% for s in c.services %}<span class="cat">{{ s }}</span> {% endfor %}</td>
+      <td class="muted">{{ c.rule }}</td>
+      <td>{% if c.provenance == 'VALIDATED' %}<span class="cat environment">VALIDATED</span>
+          {% else %}<span class="cat test_bug">{{ c.provenance }}</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+
+{% endblock %}

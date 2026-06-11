@@ -1,4 +1,5 @@
-"""Offline tests for the control-plane M2 features (명령 채널 · 인벤토리 · 비교 뷰).
+"""Offline tests for the control-plane M2+M3 features (명령 채널 · 인벤토리 ·
+비교 뷰 · 저작 편집기/authoring 파이프라인 · 의존 그래프 · 할당량 시뮬레이션).
 
 No network, no bucket, no credentials — the snapshot reader is stubbed and the
 DB is a throwaway temp file. Rerunnable any time from the repo root:
@@ -9,21 +10,24 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import traceback
+from pathlib import Path
 
 # fresh throwaway DB + a clean engine-API env, BEFORE the app import
 os.environ["PLATFORM_DB"] = os.path.join(
     tempfile.mkdtemp(prefix="platform-test-"), "platform.db")
 for var in ("PLATFORM_INGEST_TOKEN", "SCP_ALLOW_DESTRUCTIVE",
             "PLATFORM_AUTO_TRIAGE", "SCP_ACCESS_KEY", "SCP_SECRET_KEY",
-            "SCP_OPLOG_ACCESS_KEY", "SCP_OPLOG_SECRET_KEY"):
+            "SCP_OPLOG_ACCESS_KEY", "SCP_OPLOG_SECRET_KEY",
+            "PLATFORM_GIT_PUSH", "SCP_BUDGET_LIMITS"):
     os.environ.pop(var, None)
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from controlplane import compare, db, resources, snapshots  # noqa: E402
+from controlplane import authoring, compare, db, resources, snapshots  # noqa: E402
 from controlplane.app import app  # noqa: E402
 
 client = TestClient(app)
@@ -231,6 +235,149 @@ def test_compare_view_with_stubbed_snapshots():
         snapshots.observations = real
 
 
+# --- 5. authoring — 편집기 + validate→write→commit 파이프라인 (M3) ------------------
+
+def test_editor_pages_render():
+    page = client.get("/planning/edit?path=suites/smoke.yaml").text
+    assert "<textarea" in page and "id: smoke" in page
+    assert "검증만" in page and "검증 + 저장" in page
+    # out-of-scope / traversal paths are 404, not served
+    assert client.get("/planning/edit?path=core/budgets.py").status_code == 404
+    assert client.get("/planning/edit?path=../etc/passwd").status_code == 404
+    assert client.get("/planning/edit?path=docs/PLATFORM-PLAN.md").status_code == 404
+    # scenario rows expose 보기/편집 against the CONTAINING file (loader merge)
+    page = client.get("/planning/scenarios?service=networking").text
+    assert "/planning/edit?path=regression/scenarios/scenarios.json" in page
+    assert "&find=networking-vpc-subnet" in page
+    assert "/planning/edit?path=regression/scenarios/lifecycles/networking__vpc.json" in page
+    # knowledge browser links the same editor
+    page = client.get("/planning/knowledge").text
+    assert "/planning/edit?path=knowledge/formal/cross-service.yaml" in page
+
+
+def test_dependencies_view_renders():
+    page = client.get("/planning/dependencies").text
+    # vpc_schedule: adopt vs vpc-crud classes, lanes, quota cards
+    assert "ADOPT — 병렬" in page and "VPC-CRUD — 직렬" in page
+    assert "heavy-shared-networking" in page and "vpc-peering" in page
+    assert "L3-networking" in page                       # lanes table
+    assert "<svg" in page and "ske-cluster" in page      # cross-service graph
+    assert "filestorage-volume" in page
+    # read-only this round — editing goes through the file editor
+    assert "/planning/edit?path=regression/scenarios/dependencies.json" in page
+    assert "/planning/edit?path=knowledge/formal/cross-service.yaml" in page
+
+
+def test_propose_edit_rejects_and_restores():
+    path = Path("suites/smoke.yaml")
+    orig = path.read_bytes()
+    # bad YAML never reaches the validators
+    r = authoring.propose_edit("suites/smoke.yaml", "id: [unclosed")
+    assert not r["ok"] and any("YAML" in e for e in r["errors"]), r
+    # out-of-scope paths (engine code, traversal) are refused outright
+    for bad in ("core/budgets.py", "../outside.yaml",
+                "regression/scenarios/engine.py", ".github/workflows/x.yml"):
+        r = authoring.propose_edit(bad, "x: 1")
+        assert not r["ok"] and "편집 가능 범위 밖" in r["errors"][0], (bad, r)
+    # parses fine but the suite validator rejects (id != filename stem) →
+    # temp-applied state is rolled back byte-identical
+    r = authoring.propose_edit("suites/smoke.yaml",
+                               "id: not-smoke\nlabel: x\nrequest: {}\n")
+    assert not r["ok"] and any("must match" in e for e in r["errors"]), r
+    assert path.read_bytes() == orig
+    # htmx validate endpoint shows the errors inline (fragment, no save)
+    body = client.post("/planning/edit/validate",
+                       data={"path": "suites/smoke.yaml",
+                             "content": "id: [broken"}).text
+    assert "검증 실패" in body and "원본" in body
+    assert path.read_bytes() == orig
+
+
+def test_validate_only_passes_real_validators_and_restores():
+    path = Path("environments/stage-kr-west1.yaml")
+    orig = path.read_bytes()
+    content = orig.decode() + "# edited-by-offline-test\n"
+    r = authoring.propose_edit("environments/stage-kr-west1.yaml", content,
+                               validate_only=True)
+    assert r["ok"] and not r["errors"] and r["commit"] == "", r
+    assert path.read_bytes() == orig  # validate-only always restores
+    body = client.post("/planning/edit/validate",
+                       data={"path": "environments/stage-kr-west1.yaml",
+                             "content": content}).text
+    assert "검증 통과" in body
+    assert path.read_bytes() == orig
+
+
+def test_good_edit_applies_and_git_commits():
+    # a throwaway git repo as the working copy (PLAN constraint: never push)
+    root = Path(tempfile.mkdtemp(prefix="platform-authoring-"))
+    sub = subprocess.run
+    sub(["git", "init", "-q", str(root)], check=True)
+    for k, v in (("user.name", "Platform UI"), ("user.email", "platform@local"),
+                 ("commit.gpgsign", "false")):
+        sub(["git", "-C", str(root), "config", k, v], check=True)
+    (root / "suites").mkdir()
+    (root / "suites" / "smoke.yaml").write_text("id: smoke\n")
+    sub(["git", "-C", str(root), "add", "-A"], check=True)
+    sub(["git", "-C", str(root), "commit", "-qm", "init"], check=True)
+    new = "id: smoke\nlabel: 편집 테스트\nrequest:\n  smoke: true\n"
+    r = authoring.propose_edit("suites/smoke.yaml", new, root=root)
+    assert r["ok"], r
+    assert (root / "suites" / "smoke.yaml").read_text() == new
+    assert r["commit"], r            # local commit made (identity fallback ok)
+    assert r["pushed"] is False      # PLATFORM_GIT_PUSH unset → never pushes
+    log = sub(["git", "-C", str(root), "log", "-1", "--pretty=%s"],
+              capture_output=True, text=True).stdout.strip()
+    assert log == "authoring: suites/smoke.yaml via platform UI", log
+    porcelain = sub(["git", "-C", str(root), "status", "--porcelain"],
+                    capture_output=True, text=True).stdout.strip()
+    assert porcelain == "", porcelain  # nothing left uncommitted
+
+
+def test_quota_simulation_warns_on_peak_over_limit():
+    deps = {"budget_paths": {"/v1/vpcs": "vpc"},
+            "vpc_schedule": {"adopt_lifecycles": ["adopter"],
+                             "vpc_crud_lifecycles": ["greedy", "mild"],
+                             "per_run_vpc_cap": 4}}
+    lifecycles = [
+        {"id": "adopter", "steps": [
+            {"method": "POST", "path": "/v1/vpcs", "adopt": "vpc"}]},
+        {"id": "greedy", "steps": [
+            {"method": "POST", "path": "/v1/vpcs"}] * 5},   # 5 self-created
+        {"id": "mild", "steps": [{"method": "POST", "path": "/v1/vpcs"}]},
+    ]
+    sim = authoring.vpc_peak(deps, lifecycles)
+    assert sim["peak"] == 6 and sim["worst_id"] == "greedy", sim  # 1 shared + 5
+    ws = authoring.vpc_quota_warnings(deps, lifecycles)
+    assert any("peak 동시 VPC 6개" in w and "한도" in w for w in ws), ws
+    # a sane schedule (the real repo data shape) warns nothing
+    lifecycles[1]["steps"] = [{"method": "POST", "path": "/v1/vpcs"}]
+    assert authoring.vpc_quota_warnings(deps, lifecycles) == []
+    # unknown lifecycle ids in the schedule are flagged (authoring aid)
+    deps["vpc_schedule"]["adopt_lifecycles"] = ["no-such-lifecycle"]
+    ws = authoring.vpc_quota_warnings(deps, lifecycles)
+    assert any("존재하지 않는 lifecycle" in w for w in ws), ws
+
+
+def test_quota_simulation_runs_on_dependencies_save():
+    # full pipeline: temp-apply dependencies.json + real scenario validator,
+    # with a 1-VPC env override so the REAL schedule's peak (2) now warns
+    path = Path("regression/scenarios/dependencies.json")
+    orig = path.read_bytes()
+    deps = json.loads(orig)
+    deps["notes"] = (deps.get("notes") or "") + " [offline-test]"
+    os.environ["SCP_BUDGET_LIMITS"] = '{"vpc": 1}'
+    try:
+        r = authoring.propose_edit("regression/scenarios/dependencies.json",
+                                   json.dumps(deps, indent=2, ensure_ascii=False),
+                                   validate_only=True)
+    finally:
+        del os.environ["SCP_BUDGET_LIMITS"]
+    assert r["ok"], r                                  # warn, never block
+    assert any("할당량 시뮬레이션" in w for w in r["warnings"]), r
+    assert path.read_bytes() == orig
+
+
 # --- runner -----------------------------------------------------------------------
 
 TESTS = [
@@ -245,6 +392,13 @@ TESTS = [
     test_empty_inventory_explains_ingest_only,
     test_compare_diff_buckets,
     test_compare_view_with_stubbed_snapshots,
+    test_editor_pages_render,
+    test_dependencies_view_renders,
+    test_propose_edit_rejects_and_restores,
+    test_validate_only_passes_real_validators_and_restores,
+    test_good_edit_applies_and_git_commits,
+    test_quota_simulation_warns_on_peak_over_limit,
+    test_quota_simulation_runs_on_dependencies_save,
 ]
 
 
