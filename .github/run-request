@@ -1,8 +1,7 @@
-# request: PLATFORM LIVE VERIFICATION #3 — heavy window (DBaaS sub-ops + eventstreams guarded)
-# Validates the docs-derived sub-op steps inside the mysql/postgresql heavy
-# lifecycles (read-only/reversible sub-ops while the cluster is live) and the
-# corrected eventstreams guarded bodies. Billable: 2 DB clusters (~40min).
+# request: PLATFORM LIVE VERIFICATION #4 — combined light wave
+# (1) HMAC wire-signing fix (SCP_SIGN_ENCODEURI default-on): full unscoped
+#     smoke is the broad no-regression proof + unblocks the check-duplication
+#     query-param 401 class (scr/devops/aimlops/queues/cloud-functions...).
+# (2) networking wave body fixes: gslb (TCP health-check) + cdn (cache TTL).
 suite=full
-heavy=true
-service=eventstreams
-crud_filter=database-mysql-cluster or database-postgresql-cluster or eventstreams-cluster-subops-guarded
+crud_filter=networking-gslb-service or networking-cdn-service
