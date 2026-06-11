@@ -93,9 +93,18 @@ def _run_id() -> str:
 
 
 def _put(c, cfg, key, payload: dict) -> bool:
+    body = json.dumps(payload, ensure_ascii=False).encode()
+    # public-read PER OBJECT: live test 2026-06-11 showed bucket-level
+    # public-read grants anonymous LIST but object GETs still 403 without an
+    # object ACL (RGW semantics). Fall back to a private put if ACL is rejected.
     try:
-        c.put_object(Bucket=cfg["bucket"], Key=key,
-                     Body=json.dumps(payload, ensure_ascii=False).encode(),
+        c.put_object(Bucket=cfg["bucket"], Key=key, Body=body,
+                     ContentType="application/json", ACL="public-read")
+        return True
+    except Exception:
+        pass
+    try:
+        c.put_object(Bucket=cfg["bucket"], Key=key, Body=body,
                      ContentType="application/json")
         return True
     except Exception as exc:
