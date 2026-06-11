@@ -74,10 +74,10 @@
 </div>
 <script>
 const $=s=>document.querySelector(s);
+const DEFAULT_BASE="https://object-store.kr-west1.e.samsungsdscloud.com/ec11538abf8f46d2953539521f745366:apitest-oplog-permanent";  // live-verified 2026-06-11 (anon GET 200 + CORS)
 function base(){
-  // stored endpoint may be virtual-host (bucket in host) or path-style root;
-  // we treat it as the URL PREFIX that object keys append to.
-  let ep=localStorage.getItem("oplog_ep")||"";
+  // URL PREFIX that object keys append to (RGW tenant syntax account:bucket)
+  let ep=localStorage.getItem("oplog_ep")||DEFAULT_BASE;
   return ep.replace(/\/+$/,"");
 }
 function saveCfg(){ localStorage.setItem("oplog_ep",$("#ep").value.trim());
