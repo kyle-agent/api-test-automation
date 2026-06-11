@@ -313,6 +313,10 @@ tick(); setInterval(tick,30000);
       {run_id:"27258520218",sha:"e3ba190",finished:"2026-06-10T10:36:00Z",url:"#",history:{crud_ran:true,ok:1202,soft:1246,fail_new:52,cov_op:35.35,cov_c3:37.54,tested:1073}},
     ]};
   
+  if(new URLSearchParams(location.search).has("sample")){
+    window.SAMPLE=window.SAMPLE_DATA;
+    tick();                       // re-render now (the first tick ran before this block)
+  }
 })();
 </script>
 </body></html>
