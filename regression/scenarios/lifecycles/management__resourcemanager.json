@@ -143,14 +143,14 @@
           "service": "resourcemanager",
           "json": {
             "tags": {
-              "": []
+              "{rg_srn}": ["regrkey"]
             }
           },
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "rm-bulk",
           "destructive": true,
-          "_note": "deletetags — bulk DELETE /v1/tags (no path id), body mirrors the proven updatetags shape ({\"tags\":{\"\":[...]}}) with an EMPTY selection so even on a permissive account nothing real is deleted; the call still RECORDS coverage. Body shape UNPROVEN for the delete variant."
+          "_note": "deletetags — bulk DELETE /v1/tags (no path id). 2026-06-11: the EMPTY-SRN map ({\"tags\":{\"\":[]}}) drew a 500 in three runs — now keyed by OUR captured {rg_srn} with our own regrkey, so the selection stays self-scoped (nothing foreign deletable) and the backend gets a parseable body. Shape UNPROVEN for the delete variant."
         },
         {
           "name": "delete-resource-groups-bulk",
@@ -158,13 +158,13 @@
           "path": "/v1/resource-groups",
           "service": "resourcemanager",
           "json": {
-            "resource_group_ids": []
+            "resource_group_ids": ["00000000000000000000000000000000"]
           },
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "rm-bulk",
           "destructive": true,
-          "_note": "deleteresourcegroups — bulk DELETE /v1/resource-groups (no path id). Deliberately EMPTY selection (resource_group_ids:[]) so our own rg is NOT deleted here (the explicit delete-rg below owns that). Body field name UNPROVEN; an empty/invalid 4xx still records coverage."
+          "_note": "deleteresourcegroups — bulk DELETE /v1/resource-groups (no path id). Synthetic all-zero id (2026-06-11; the empty list drew 500s) — still cannot delete anything real (the explicit delete-rg below owns that). Body field name UNPROVEN; an empty/invalid 4xx still records coverage."
         },
         {
           "name": "probe-reads",
