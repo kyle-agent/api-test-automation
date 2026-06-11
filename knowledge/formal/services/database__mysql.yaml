@@ -1,7 +1,16 @@
 # Layer 1 — per-service knowledge: database/mysql
 version: 1
 service: database/mysql
-constraints: []
+constraints:
+  - id: async-writes-return-request-id
+    rule: "write calls answer with AsyncResponse {request_id, resource:{id}} (api_docs response examples) — request_id is the ONLY key to GET /v1/requests/{request_id} (mysqlshowrequest); capture it from the create response, no list exposes it"
+    provenance: docs
+  - id: list-parameters-needs-group-id
+    rule: "GET /v1/parameters REQUIRES query param dbaas_parameter_group_id (api_docs required:true) — harvest it from GET /v1/parameter-groups contents[].id first"
+    provenance: docs
+  - id: subop-window-conservative-set
+    rule: "cluster-window sub-ops added 2026-06-11 (group mysql-subop-window in database-mysql-cluster): read-only GETs (requests/{id}, engine-versions/{id}/properties, parameter-groups, parameters, backup-histories, log-export-configs, replicas) + no-body POST sync-state + restart(+wait). Excluded as not obviously reversible: kernel-upgrade, patch, promote/switchover/reset-replica, restore, replica create, stop/start, log-export-config writes, remove-backup-histories"
+    provenance: docs
 captures: {}
 states: {}
 quirks:

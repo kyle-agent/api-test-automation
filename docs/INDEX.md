@@ -28,3 +28,4 @@ work-in-progress notes.
 | [`HANDOFF-fail-new-triage.md`](HANDOFF-fail-new-triage.md) | The 52 fail_new of the 2026-06-10 full heavy run, classified (body-fix vs domain-hunt vs known-red candidates) | active |
 | [`OPS-DASHBOARD.md`](OPS-DASHBOARD.md) | 영구 oplog 버킷 + 정적 ops 뷰어 (워크플로 진행현황/이력) | active |
 | [`SESSION-HANDOFF-run6-and-ops.md`](SESSION-HANDOFF-run6-and-ops.md) | 측정 런 #6 재개 절차 + peering 근원수정 + ops 대시보드 인수인계 | active |
+| [`COVERAGE-WAVE-PLAN.md`](COVERAGE-WAVE-PLAN.md) | 잔여 정적 갭 전수 분석 (write 32 = 전부 waived/disabled) + 다음 웨이브 (DBaaS 윈도우 prep ①, servicewatch ③, eventstreams ④) | active |

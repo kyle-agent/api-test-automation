@@ -5,7 +5,7 @@
       "service": "data-analytics/eventstreams",
       "enabled": true,
       "heavy": true,
-      "_note": "COVERAGE-ONLY guarded lifecycle for the eventstreams (Kafka DBaaS) WRITE endpoints. Primary target (the service's own GAP-write set): eventstreamsaddinstances (POST /v1/clusters/{cluster_id}/add-instances). Also re-exercises the shared cluster sub-ops (restart/maintenance/security-group-rules/patch/resize/block-storage-resize) and eventstreamssetparametervalues (PUT /v1/clusters/{cluster_id}/parameters — eventstreams-specific) so they record under eventstreams' own catalog keys (the gap analyzer matches path-only, but the engine records WRITE steps per (method,path,service)). Does NOT provision a real billable cluster: soft-captures an EXISTING cluster_id from the read-only list; when none exists the {cluster_id}/{instance_group_id}/{block_storage_group_id} tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 4xx counts as covered). Every mutating step is optional + grouped + broad expect_status; DELETEs destructive:true. heavy:true gates behind SCP_RUN_HEAVY. Bodies best-effort from path/field semantics + data/api_bodies.json eventstreamscreatecluster shape — UNPROVEN, promote after a real 2xx. set-parameter-values needs a real parameter-group/parameter name/value (doc-sample used; likely 4xx, still records).",
+      "_note": "COVERAGE-ONLY guarded lifecycle for the eventstreams (Kafka DBaaS) WRITE endpoints. Does NOT provision a billable cluster: soft-captures an EXISTING cluster_id from the read-only list; when none exists the {cluster_id}/{instance_group_id}/{block_storage_group_id} tokens stay literal and normalize to the catalog '*' key so each endpoint is still CALLED and RECORDED. Every mutating step optional + grouped + broad expect_status; heavy:true gates behind SCP_RUN_HEAVY. | BODY FIX 2026-06-11 (lever 4, docs-derived pending live validation, all from data/api_docs.json models): add-instances now sends EventStreamsClusterAddInstancesRequest {instance_count, service_ip_addresses} (the old {instances:[{role_type,...}]} array was a DIFFERENT model and could never validate); set-maintenance now sends MaintenanceRequest {start_day_of_week,start_minute,start_time,term_hour} (the old {period_hour,starting_day_of_week,starting_time} was the create-time MaintenanceOption shape, wrong model for POST .../maintenance) with the same values the mysql/pg heavy lifecycles use for the identical model; set-security-group-rules now sends UpdateSecurityGroupRulesRequest {add_ip_addresses,del_ip_addresses} exactly as the doc request example (both empty = no-op, reversible by definition; the old security_group_rules rule-object array was a different service's shape); set-parameter-values now sends ParametersRequest entries {id,new_value,old_value} with id/value soft-captured from GET .../parameters and new_value==old_value==applied_value (documented no-op, reversible). ADDED no-body sub-ops from api_docs (body 'None'): sync-state, parameters/sync, unset-maintenance (DELETE, reversible — set-maintenance precedes it). patch-minor-version DELIBERATELY keeps the empty body (MinorPatchDbEngineRequest is a version upgrade — not obviously reversible, excluded by the conservative sub-op rule; the 4xx still records C2). start/stop NOT added: stopping an adopted live cluster is not obviously reversible operationally. eventstreamscreatecluster stays OUT of heavy-shared-dbaas (undocumented topology value_error) — the docs-derived topology facts for a future attempt are recorded in knowledge/formal/services/data-analytics__eventstreams.yaml.",
       "steps": [
         {
           "name": "list-clusters",
@@ -30,40 +30,85 @@
           }
         },
         {
+          "name": "list-parameter-values",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "es-parameters",
+          "capture_soft": {
+            "es_param_id": "$.contents[0].id",
+            "es_param_value": "$.contents[0].applied_value"
+          },
+          "_note": "eventstreamslistparametervalues (read-only) — feeds the no-op set-parameter-values below; contents[].id/applied_value fields from the api_docs response example."
+        },
+        {
           "name": "add-instances",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/add-instances",
-          "json": {"instances": [{"role_type": "ACTIVE", "service_ip_address": "192.168.10.20/32"}]},
+          "json": {"instance_count": 1, "service_ip_addresses": [""]},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "es-instances"
+          "group": "es-instances",
+          "_note": "EventStreamsClusterAddInstancesRequest per api_docs: instance_count (int, required) + service_ip_addresses (array[string], required; doc request example sends [\"\"] — empty string = platform-assigned, same convention as the validated mysql create service_ip_address:\"\"). public_ip_ids optional, omitted. Docs-derived, pending live validation."
         },
         {
           "name": "set-parameter-values",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/parameters",
-          "json": {"parameters": []},
+          "json": {"parameters": [{"id": "{es_param_id}", "new_value": "{es_param_value}", "old_value": "{es_param_value}"}]},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "es-parameters"
+          "group": "es-parameters",
+          "_note": "ParametersRequest -> ParameterRequest {id,new_value,old_value} (all required per api_docs model). new_value==old_value==applied_value captured from the live cluster = documented no-op write, reversible. With no live cluster the tokens stay literal and the call records C2. Docs-derived."
         },
         {
           "name": "set-security-group-rules",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
-          "json": {"security_group_rules": [{"direction": "INBOUND", "protocol": "TCP", "port_min": 9091, "port_max": 9091, "remote_ip_prefix": "10.0.0.0/8", "description": "regr coverage probe"}]},
+          "json": {"add_ip_addresses": [], "del_ip_addresses": []},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "es-sg-rules"
+          "group": "es-sg-rules",
+          "_note": "UpdateSecurityGroupRulesRequest per api_docs: add_ip_addresses/del_ip_addresses (both optional arrays); doc request example sends both empty = no-op, reversible. Docs-derived."
         },
         {
           "name": "set-maintenance",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
-          "json": {"period_hour": "5", "starting_day_of_week": "MON", "starting_time": "0000"},
+          "json": {"start_day_of_week": "SUN", "start_minute": "00", "start_time": "03", "term_hour": "4"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "es-maintenance"
+          "group": "es-maintenance",
+          "_note": "MaintenanceRequest per api_docs (start_day_of_week enum MON..SUN, start_minute, start_time, term_hour pattern ^(0\\.5|[1-5]\\.5|[1-9]|1[0-9]|2[0-4])$) — same model and values as the mysql/pg heavy set-maintenance steps. Reversed by unset-maintenance below. Docs-derived."
+        },
+        {
+          "name": "unset-maintenance",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "destructive": true,
+          "group": "es-maintenance",
+          "_note": "eventstreamsunsetmaintenance (no body per api_docs) — reverses set-maintenance; config-only delete, no resource destroyed. Docs-derived."
+        },
+        {
+          "name": "sync-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/parameters/sync",
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-parameters",
+          "_note": "eventstreamssyncparametervalues (no body per api_docs) — read-side reconciliation, safe. Docs-derived."
+        },
+        {
+          "name": "sync-cluster-state",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "es-power",
+          "_note": "eventstreamssyncclusterstate (no body per api_docs) — read-side reconciliation, safe. Docs-derived."
         },
         {
           "name": "patch-minor-version",
@@ -72,7 +117,8 @@
           "json": {},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "es-patch"
+          "group": "es-patch",
+          "_note": "Body kept DELIBERATELY empty: MinorPatchDbEngineRequest {dbaas_engine, software_version} is a version upgrade — not obviously reversible, excluded by the conservative sub-op rule. The guaranteed 4xx records C2 only."
         },
         {
           "name": "restart-cluster",
@@ -99,7 +145,8 @@
           "json": {"size_gb": 20},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "es-resize"
+          "group": "es-resize",
+          "_note": "ResizeBlockStorageGroupRequest size_gb min 16 per api_docs; 20 stays a coverage-only call (no live cluster expected)."
         }
       ]
     },
@@ -108,7 +155,7 @@
       "service": "data-analytics/eventstreams",
       "enabled": true,
       "heavy": false,
-      "_note": "COVERAGE-ONLY read lifecycle for eventstreams' two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-param name (dbaas_engine_version_id) so the final probe-reads step exercises eventstreamslistengineversionproperties (/v1/engine-versions/{dbaas_engine_version_id}/properties). KNOWN-HARD: eventstreamsshowrequest (/v1/requests/{request_id}) — request_id is only returned by async write ops and is NOT exposed by any list/collection GET, so it cannot be harvested in a read-only run; it is called with a literal placeholder id so the endpoint is at least CALLED and RECORDED (a 404 counts as reached/covered per the engine). When the engine-versions collection is empty the {dbaas_engine_version_id} normalizes to the catalog '*' key so the properties endpoint is still CALLED. Every step optional + grouped + broad expect_status so an isolated failure never fails the run.",
+      "_note": "COVERAGE-ONLY read lifecycle for eventstreams' two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-param name (dbaas_engine_version_id) so the final probe-reads step exercises eventstreamslistengineversionproperties. KNOWN-HARD: eventstreamsshowrequest (/v1/requests/{request_id}) — request_id is only returned by async write ops and is NOT exposed by any list/collection GET. FIXED 2026-06-11: the step previously used a LITERAL placeholder uuid, which records ZERO static coverage (the Wave-1 catalog-matching gotcha: literal id segments never normalize to '*'); it now uses the {request_id} token backed by a deliberately-never-matching capture_soft ($.request_id does not exist in the engine-versions list response), so the token stays literal at runtime (guaranteed 404 = C2 recorded) AND the step matches the catalog key statically — closing the /v1/requests/{request_id} GAP-get-id shared path. Every step optional + grouped + broad expect_status.",
       "steps": [
         {
           "name": "list-engine-versions",
@@ -117,7 +164,11 @@
           "expect_status": [200, 400, 404],
           "optional": true,
           "group": "es-read",
-          "capture_soft": {"dbaas_engine_version_id": "$.contents[0].id"}
+          "capture_soft": {
+            "dbaas_engine_version_id": "$.contents[0].id",
+            "request_id": "$.request_id"
+          },
+          "_note": "request_id capture_soft is DELIBERATELY a path that never matches this response — see lifecycle _note."
         },
         {
           "name": "get-engine-version-properties",
@@ -130,7 +181,7 @@
         {
           "name": "get-request",
           "method": "GET",
-          "path": "/v1/requests/00000000-0000-0000-0000-000000000000",
+          "path": "/v1/requests/{request_id}",
           "expect_status": [200, 400, 404],
           "optional": true,
           "group": "es-read"

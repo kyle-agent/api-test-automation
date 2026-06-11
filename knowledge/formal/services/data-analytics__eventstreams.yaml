@@ -1,0 +1,45 @@
+# Layer 1 — per-service knowledge: data-analytics/eventstreams (Kafka DBaaS)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: data/api_docs.json endpoint+model entries (apireference .../eventstreams/...)
+# Recorded 2026-06-11 while fixing the guarded sub-op lifecycle bodies (coverage lever 4).
+
+version: 1
+service: data-analytics/eventstreams
+
+constraints:
+  - id: add-instances-request-model
+    rule: "POST /v1/clusters/{id}/add-instances takes EventStreamsClusterAddInstancesRequest: instance_count (int, REQUIRED) + service_ip_addresses (array[string], REQUIRED; doc example sends [\"\"]) + public_ip_ids (optional). It does NOT take an instances[] array of {role_type, service_ip_address} — that is the create-time InstanceRequest model; the pre-2026-06-11 lifecycle body used the wrong model"
+    provenance: docs
+  - id: maintenance-two-models
+    rule: "eventstreams has TWO maintenance shapes: create-time maintenance_option = MaintenanceOption {period_hour, starting_day_of_week, starting_time}; POST /v1/clusters/{id}/maintenance = MaintenanceRequest {start_day_of_week (enum MON..SUN), start_minute, start_time, term_hour (pattern ^(0\\.5|[1-5]\\.5|[1-9]|1[0-9]|2[0-4])$)} — all four REQUIRED. Same split as mysql/postgresql. DELETE .../maintenance has no body"
+    provenance: docs
+  - id: security-group-rules-ip-lists
+    rule: "POST /v1/clusters/{id}/security-group-rules takes UpdateSecurityGroupRulesRequest {add_ip_addresses[], del_ip_addresses[]} (both optional; doc example sends both EMPTY = valid no-op). It is an allowed-IP list update, NOT a direction/protocol/port rule object"
+    provenance: docs
+  - id: parameter-update-triplet
+    rule: "PUT /v1/clusters/{id}/parameters takes ParametersRequest {parameters: [{id, new_value, old_value} — ALL REQUIRED]}; parameter id + applied_value are read from GET /v1/clusters/{id}/parameters (contents[].id/.applied_value), so new_value==old_value==applied_value is a documented reversible no-op probe"
+    provenance: docs
+  - id: create-cluster-required-init-config
+    rule: "POST /v1/clusters (EventStreamsClusterCreateRequestV1Dot1) REQUIRES init_config_option with broker_sasl_id/broker_sasl_password/zookeeper_sasl_id/zookeeper_sasl_password (sasl ids pattern ^[a-z]+$ len 2-20), plus dbaas_engine_version_id, instance_groups, instance_name_prefix (^[a-z][a-zA-Z0-9\\-]*$ len 3-13), name (^[a-zA-Z]*$ len 3-20), service_watch_log_collection, subnet_id, timezone. The api_bodies.json sample carries empty strings for the required fields — sending it as-is yields the field-less 400 ValidationError (8x value_error) seen in validation_probe"
+    provenance: docs
+  - id: kafka-topology-roles
+    rule: "instance_groups[].role_type for the Kafka engine draws from the enum {ZOOKEEPER_BROKER, BROKER, ZOOKEEPER, AKHQ, CONSOLE} (InstanceGroupRequest enum; the generic 'ACTIVE' in the doc sample belongs to other engines) — which role-type COMBINATIONS form a valid topology is NOT documented; the live create attempt failed with an undocumented topology value_error, so eventstreams stays out of heavy-shared-dbaas until a console-derived topology is confirmed (DOMAIN-HUNT continues)"
+    provenance: docs
+  - id: minor-patch-is-upgrade
+    rule: "PUT /v1/clusters/{id}/patch takes MinorPatchDbEngineRequest {dbaas_engine, software_version} (both REQUIRED) and performs an engine version patch — treated as NOT reversible; the regression lifecycle deliberately sends an empty body (guaranteed 4xx, C2-only) per the conservative sub-op rule"
+    provenance: docs
+
+captures:
+  cluster: $.contents[0].id              # from GET /v1/clusters (list; coverage-only adopt)
+  parameter: $.contents[0].id            # from GET /v1/clusters/{id}/parameters
+  parameter_value: $.contents[0].applied_value
+
+states: {}
+
+quirks:
+  - id: request-id-only-from-async-writes
+    note: "GET /v1/requests/{request_id} (eventstreamsshowrequest): request_id appears ONLY in AsyncResponse envelopes of write calls ({request_id, resource:{id}}); no list/collection GET exposes it — a read-only run can only C2 this endpoint (literal-token 404)"
+    provenance: docs
+  - id: no-body-subops
+    note: "restart, start, stop, sync-state, parameters/sync and DELETE maintenance are documented WITHOUT a request body (api_docs body=None) — send no/empty body"
+    provenance: docs
