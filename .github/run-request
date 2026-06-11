@@ -1,9 +1,7 @@
-# request: FULL HEAVY run #4 — pre-run tune-up applied: provision-first+retry
-# (recovers the 8 cap-skipped lifecycles incl. heavy-shared-dbaas), fail
-# response bodies recorded in observations (self-diagnosing reds),
-# resourcemanager bulk/tag bodies, scr public-endpoint toggle ON, explicit
-# vip delete, peering teardown waits. First run with oplog live (bucket
-# verified) -> ops dashboard gets real data.
-mutations=true
+# request: FORCE cleanup before measurement run #5 — reap run #4 leftovers
+# (vpc-peering VPCs that 409'd, anything TTL-protected). Account must be at
+# 0 regr VPCs so provision-first + the 10 heavy/adopt lifecycles get slots.
 destructive=true
-heavy=true
+sweep_force=true
+category=management
+service=servicewatch
