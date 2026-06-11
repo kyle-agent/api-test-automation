@@ -47,6 +47,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SCP API Regression Test Platform", lifespan=lifespan)
 
+# AI pipelines (M3 A1~A3) live in their own router — see controlplane/ai_routes.py
+from controlplane import ai_routes  # noqa: E402  (import after app to match layout)
+app.include_router(ai_routes.router)
+
 
 def _catalog() -> dict:
     """Suites + profiles for the trigger forms (live from the repo files)."""
