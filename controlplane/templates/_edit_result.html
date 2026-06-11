@@ -1,0 +1,15 @@
+{% if result.errors %}
+  <p class="warn">검증 실패 — 파일은 변경되지 않았습니다 (원본 그대로 복원).</p>
+  <pre>{% for e in result.errors %}{{ e }}
+{% endfor %}</pre>
+{% elif saved %}
+  <p>저장됨 — <code>{{ result.rel }}</code>
+    {% if result.commit %} · 로컬 커밋 <code>{{ result.commit }}</code>{% endif %}
+    {% if result.pushed %} · 원격 push 완료{% endif %}
+    · <a href="/planning">Planning으로</a></p>
+{% else %}
+  <p>검증 통과 — 저장 가능합니다 (파일은 아직 변경되지 않았습니다).</p>
+{% endif %}
+{% for w in result.warnings %}
+  <p class="warn">⚠ {{ w }}</p>
+{% endfor %}

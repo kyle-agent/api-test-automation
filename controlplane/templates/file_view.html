@@ -3,7 +3,9 @@
 {% block content %}
 
 <section>
-  <h2>{{ rel }} <span class="muted">(read-only — 편집은 M3에서)</span></h2>
+  <h2>{{ rel }}
+    {% if editable %}<a href="/planning/edit?path={{ rel }}">편집 →</a>
+    {% else %}<span class="muted">(read-only)</span>{% endif %}</h2>
   <pre>{{ content }}</pre>
 </section>
 

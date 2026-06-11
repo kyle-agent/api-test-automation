@@ -29,8 +29,8 @@ from fastapi import FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from controlplane import (compare, dashdata, db, dispatch, resources,
-                          scheduler, snapshots, triage)
+from controlplane import (authoring, compare, dashdata, db, dispatch,
+                          resources, scheduler, snapshots, triage)
 from core import profiles as core_profiles
 from core import suites as core_suites
 
@@ -119,10 +119,19 @@ def planning(request: Request):
                    scenario_stats=_scenario_stats())
 
 
+def _fragment_rel(source_name: str) -> str:
+    """loader.load_lifecycles(with_sources=True) filename -> repo-relative path
+    (the merge in regression/scenarios/loader.py is the mapping's source of
+    truth: the base scenarios.json plus one fragment file per service)."""
+    if source_name == "scenarios.json":
+        return "regression/scenarios/scenarios.json"
+    return f"regression/scenarios/lifecycles/{source_name}"
+
+
 @app.get("/planning/scenarios", response_class=HTMLResponse)
 def planning_scenarios(request: Request, service: str = ""):
     from regression.scenarios.loader import load_lifecycles
-    lifecycles = load_lifecycles()
+    lifecycles, sources = load_lifecycles(with_sources=True)
     if service:
         lifecycles = [l for l in lifecycles if service in (l.get("service") or "")]
     rows = [{
@@ -130,6 +139,7 @@ def planning_scenarios(request: Request, service: str = ""):
         "enabled": bool(l.get("enabled")), "heavy": bool(l.get("heavy")),
         "adopt": l.get("adopt", ""), "steps": len(l.get("steps") or []),
         "note": (l.get("_note") or "")[:160],
+        "file": _fragment_rel(sources.get(l.get("id"), "scenarios.json")),
     } for l in lifecycles]
     return _render(request, "scenarios.html", "planning",
                    rows=rows, service=service)
@@ -163,7 +173,128 @@ def planning_view(request: Request, path: str):
     except OSError:
         raise HTTPException(500, "unreadable")
     return _render(request, "file_view.html", "planning",
-                   rel=path, content=content[:400_000])
+                   rel=path, content=content[:400_000],
+                   editable=authoring.editable_path(path) is not None)
+
+
+# --- Planning: 저작 편집기 (M3 §3.1 — 검증 → 쓰기 → 로컬 git 커밋) -----------------
+
+@app.get("/planning/edit", response_class=HTMLResponse)
+def planning_edit(request: Request, path: str, find: str = ""):
+    f = authoring.editable_path(path)
+    if not f or not f.is_file():
+        raise HTTPException(404, "file not found (or outside the editable dirs)")
+    if f.stat().st_size > 2_000_000:
+        raise HTTPException(413, "file too large for the textarea editor")
+    rel = f.relative_to(ROOT).as_posix()
+    return _render(request, "editor.html", "planning",
+                   rel=rel, content=f.read_text(errors="replace"),
+                   find=find[:200], push=authoring.push_enabled())
+
+
+@app.post("/planning/edit/validate", response_class=HTMLResponse)
+def planning_edit_validate(request: Request, path: str = Form(...),
+                           content: str = Form("")):
+    result = authoring.propose_edit(path, content, validate_only=True)
+    return templates.TemplateResponse(request, "_edit_result.html",
+                                      {"result": result, "saved": False})
+
+
+@app.post("/planning/edit/save", response_class=HTMLResponse)
+def planning_edit_save(request: Request, path: str = Form(...),
+                       content: str = Form("")):
+    result = authoring.propose_edit(path, content)
+    return templates.TemplateResponse(request, "_edit_result.html",
+                                      {"result": result, "saved": result["ok"]})
+
+
+# --- Planning: 의존 그래프 뷰 (M3 §2.3 — read-only, 편집은 원본 파일 편집기로) -------
+
+def _cross_graph(cross: dict) -> dict:
+    """cross-service.yaml resources -> layered boxes/arrows for an inline SVG
+    (column = requires-depth; arrows point prerequisite -> dependent)."""
+    res = {k: (v or {}) for k, v in (cross.get("resources") or {}).items()}
+    memo: dict[str, int] = {}
+
+    def depth(name: str, seen: tuple = ()) -> int:
+        if name in memo:
+            return memo[name]
+        if name in seen:           # cycle — validator rejects it, degrade here
+            return 0
+        reqs = [r for r in res[name].get("requires") or [] if r in res]
+        memo[name] = 0 if not reqs else 1 + max(
+            depth(r, seen + (name,)) for r in reqs)
+        return memo[name]
+
+    cols: dict[int, list[str]] = {}
+    for name in res:
+        cols.setdefault(depth(name), []).append(name)
+    BW, BH, XGAP, YGAP = 190, 38, 252, 50
+    pos, nodes = {}, []
+    for d in sorted(cols):
+        for i, name in enumerate(sorted(cols[d],
+                                        key=lambda n: (res[n].get("service", ""), n))):
+            x, y = 12 + d * XGAP, 12 + i * YGAP
+            pos[name] = (x, y)
+            nodes.append({"id": name, "x": x, "y": y,
+                          "service": res[name].get("service", ""),
+                          "quota": res[name].get("quota", ""),
+                          "provenance": res[name].get("provenance", ""),
+                          "notes": (res[name].get("notes") or "")[:200]})
+    edges = []
+    for name, r in res.items():
+        for req in r.get("requires") or []:
+            if req in pos:
+                (x1, y1), (x2, y2) = pos[req], pos[name]
+                edges.append({"x1": x1 + BW, "y1": y1 + BH // 2,
+                              "x2": x2, "y2": y2 + BH // 2})
+    return {"nodes": nodes, "edges": edges, "bw": BW, "bh": BH,
+            "w": 24 + (max(cols, default=0) + 1) * XGAP,
+            "h": 24 + max((len(v) for v in cols.values()), default=1) * YGAP}
+
+
+@app.get("/planning/dependencies", response_class=HTMLResponse)
+def planning_dependencies(request: Request):
+    import yaml
+    deps, cross, load_errs = {}, {}, []
+    try:
+        deps = json.loads((ROOT / "regression" / "scenarios"
+                           / "dependencies.json").read_text())
+    except Exception as exc:
+        load_errs.append(f"dependencies.json 읽기 실패: {exc}")
+    try:
+        cross = yaml.safe_load((ROOT / "knowledge" / "formal"
+                                / "cross-service.yaml").read_text()) or {}
+    except Exception as exc:
+        load_errs.append(f"cross-service.yaml 읽기 실패: {exc}")
+    try:
+        from regression.scenarios.loader import load_lifecycles
+        lifecycles = load_lifecycles()
+    except Exception as exc:
+        lifecycles, load_errs = [], load_errs + [f"lifecycle 로드 실패: {exc}"]
+    sched = deps.get("vpc_schedule") or {}
+    sim = authoring.vpc_peak(deps, lifecycles)
+    vpc_paths = {str(p).split("?")[0].rstrip("/") for p, k
+                 in (deps.get("budget_paths") or {"/v1/vpcs": "vpc"}).items()
+                 if k == "vpc"}
+    by_id = {l.get("id"): l for l in lifecycles}
+    crud_rows = [{"id": lid, "creates": sum(
+        1 for s in (by_id.get(lid, {}).get("steps") or [])
+        if isinstance(s, dict) and str(s.get("method", "")).upper() == "POST"
+        and str(s.get("path") or "").split("?")[0].rstrip("/") in vpc_paths
+        and not s.get("adopt"))}
+        for lid in sched.get("vpc_crud_lifecycles") or []]
+    return _render(request, "dependencies.html", "planning",
+                   load_errs=load_errs, sched=sched, sim=sim,
+                   sim_warnings=authoring.vpc_quota_warnings(deps, lifecycles),
+                   crud_rows=crud_rows,
+                   fixed_ip_map={k: v for k, v in
+                                 (sched.get("fixed_ip_map") or {}).items()
+                                 if not k.startswith("_")},
+                   quota_kinds=deps.get("quota_kinds") or {},
+                   budget_paths=deps.get("budget_paths") or {},
+                   graph=_cross_graph(cross),
+                   cross_constraints=cross.get("cross_constraints") or [])
 
 
 # --- Testing -------------------------------------------------------------------

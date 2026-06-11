@@ -4,8 +4,9 @@
 
 <section>
   <h2>Planning — Global 설정 · 시나리오 · Knowledge</h2>
-  <p class="muted">현재는 repo 파일의 read-only 뷰입니다 — 편집 도구는 M3에서
-    이 화면 위에 추가됩니다 (docs/PLATFORM-PLAN.md).</p>
+  <p class="muted">repo 파일이 source of truth입니다 — 편집은 검증 통과 시에만
+    반영되고 로컬 git 커밋으로 이력이 남습니다 (push는 운영자 수동,
+    docs/PLATFORM-PLAN.md §3.1).</p>
 </section>
 
 <section>
@@ -22,7 +23,8 @@
       <td>{% if p.get('forbid') %}<span class="warn">{{ p['forbid']|join(', ') }} 금지</span>
           {% else %}<span class="muted">없음</span>{% endif %}</td>
       <td class="muted">{{ p.get('quota_overrides',{}) or '-' }}</td>
-      <td><a href="/planning/view?path=environments/{{ p.get('id') }}.yaml">원본</a></td>
+      <td><a href="/planning/view?path=environments/{{ p.get('id') }}.yaml">원본</a> ·
+          <a href="/planning/edit?path=environments/{{ p.get('id') }}.yaml">편집</a></td>
     </tr>
     {% endfor %}
   </table>
@@ -37,7 +39,8 @@
       <td><code>{{ s.get('id') }}</code></td>
       <td>{{ s.get('label','') }}</td>
       <td class="muted">{% for k, v in (s.get('request') or {}).items() %}{{ k }}={{ v }} {% endfor %}</td>
-      <td><a href="/planning/view?path=suites/{{ s.get('id') }}.yaml">원본</a></td>
+      <td><a href="/planning/view?path=suites/{{ s.get('id') }}.yaml">원본</a> ·
+          <a href="/planning/edit?path=suites/{{ s.get('id') }}.yaml">편집</a></td>
     </tr>
     {% endfor %}
   </table>
@@ -55,7 +58,8 @@
     <div class="card"><div class="num">{{ scenario_stats.services }}</div>
       <div class="lbl">서비스</div></div>
   </div>
-  <p><a href="/planning/scenarios">시나리오 목록 →</a></p>
+  <p><a href="/planning/scenarios">시나리오 목록 (보기/편집) →</a> ·
+     <a href="/planning/dependencies">의존 그래프 · VPC 스케줄 →</a></p>
 </section>
 
 <section>
