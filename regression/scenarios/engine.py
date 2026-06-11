@@ -47,6 +47,10 @@ try:                       # ops-log resource events (best-effort; never breaks 
     from core import oplog as _oplog
 except Exception:          # pragma: no cover
     _oplog = None
+try:                       # platform command channel (best-effort; never breaks a run)
+    from core import commands as _commands
+except Exception:          # pragma: no cover
+    _commands = None
 from core.registry import ResourceRecord, ResourceRegistry
 from core.results import Observation
 from core.catalog import load_catalog
@@ -355,9 +359,10 @@ def _budget_kind_for_path(path: str) -> str | None:
 # --------------------------------------------------------------------------- #
 # step execution (poll + retry, ported)
 # --------------------------------------------------------------------------- #
-def _run_step(client, step, path, body, service, ctx):
+def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = ""):
     """Execute a step; honour retry_on_status and poll (field/until or
-    until_status) for async provisioning/teardown."""
+    until_status) for async provisioning/teardown. ``lifecycle_id`` lets the
+    platform command channel target this step's poll loop (stop_polling)."""
     params = step.get("params")
     try:
         resp = client.request(step["method"], path, json=body, service=service, params=params)
@@ -413,6 +418,13 @@ def _run_step(client, step, path, body, service, ctx):
                     print(f"    refire -> {rr.status}")
                 except Exception as exc:  # destructive gate / transport — keep polling
                     print(f"    refire failed: {exc}")
+        # Platform command channel: an operator can force a wedged wait to end
+        # NOW. Break out exactly as a poll timeout would — the engine's normal
+        # timeout handling (expect_status check on the last response) applies.
+        if _commands is not None and _commands.should_stop_polling(lifecycle_id):
+            print(f"  step '{step.get('name')}': platform command stop_polling "
+                  f"— abandoning wait (handled like a poll timeout)")
+            break
         time.sleep(interval)
         resp = client.request(step["method"], path, json=body, service=service, params=params)
     return resp
@@ -558,6 +570,25 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             ctx.update(pem)
 
         for step in lifecycle["steps"]:
+            # Platform command channel (M2): a step boundary is the only point
+            # where stopping mid-lifecycle is safe — _teardown() reclaims every
+            # resource created so far (reverse order, budget slots released),
+            # then the existing environmental-skip path records the outcome, so
+            # pytest reports a skip rather than a crash. abort is sticky in
+            # core.commands, so every remaining lifecycle skips at ITS first
+            # step boundary too — after its own (empty) teardown.
+            if _commands is not None:
+                if _commands.should_abort_run():
+                    _teardown()
+                    raise LifecycleSkip(
+                        f"[{lifecycle['id']}] platform command: run abort — "
+                        f"remaining steps skipped after cleanup")
+                if _commands.should_skip(lifecycle["id"]):
+                    _teardown()
+                    raise LifecycleSkip(
+                        f"[{lifecycle['id']}] platform command: scenario "
+                        f"skipped after cleanup of created resources")
+
             grp = step.get("group")
             if grp and grp in failed_groups:
                 continue  # an earlier step in this group failed — skip the rest
@@ -639,7 +670,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 reserved[bkind] = reserved.get(bkind, 0) + 1
 
             try:
-                resp = _run_step(client, step, path, body, step_service, ctx)
+                resp = _run_step(client, step, path, body, step_service, ctx,
+                                 lifecycle_id=lifecycle["id"])
 
                 # Optional setter steps routinely race async provisioning (a
                 # DBaaS cluster is busy applying the PREVIOUS setter -> 400
@@ -662,7 +694,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                             break
                         opt_retry_left -= 20
                         time.sleep(20)
-                        resp = _run_step(client, step, path, body, step_service, ctx)
+                        resp = _run_step(client, step, path, body, step_service,
+                                         ctx, lifecycle_id=lifecycle["id"])
                         if resp.status not in (400, 409, 429):
                             break
             except MutationBlocked as exc:
