@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}자원 합성{% endblock %}
+{% block content %}
+
+<section>
+  <h2><a href="/planning/resources">자원 모델</a> › 합성 (단독 · 묶음 · 상품)</h2>
+  <p class="muted">대상 노드를 멀티선택하면 의존 폐포 합집합 + dedup으로 하나의
+    lifecycle을 합성합니다 (§2.5 — 단독 1개 = <code>gen-&lt;node&gt;</code>,
+    여러 개 = bundle/상품). 산출물은 <code>drafts/lifecycle-*.json</code>
+    draft로만 저장되며 자동 enable되지 않습니다 (C4).</p>
+  {% if not has_composer %}
+  <p class="warn">합성기 미탑재 — <code>regression/scenarios/composer.py</code>(R2a)가
+    아직 머지되지 않았습니다. 대상 선택 화면은 동작하지만 plan 미리보기와
+    draft 저장은 composer 머지 후 활성화됩니다.</p>
+  {% endif %}
+  {% if targets_error %}<p class="warn">{{ targets_error }}</p>{% endif %}
+</section>
+
+<form method="post" action="/planning/resources/compose">
+<section>
+  <h2>대상 노드 + 분기/옵션 선택</h2>
+  {% if not nodes %}
+  <p class="muted">모델에 노드가 없습니다 —
+    <a href="/planning/resources">자원 모델</a>에서 먼저 노드를 입력하세요.</p>
+  {% endif %}
+  <table>
+    <tr><th></th><th>code</th><th>id</th><th>requires</th>
+        <th>one_of 분기</th><th>옵션 값</th></tr>
+    {% for n in nodes %}
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="{{ n.id }}"{{ ' checked' if n.id in selected else '' }}></td>
+      <td class="muted">{{ n.code or '—' }}</td>
+      <td><code>{{ n.id }}</code></td>
+      <td class="muted">{{ n.requires }}</td>
+      <td>
+        {% if n.branches %}
+        <select name="choice__{{ n.id }}">
+          <option value="">(기본 분기)</option>
+          {% for b in n.branches %}
+          <option value="{{ b }}" {{ 'selected' if choices.get(n.id) == b else '' }}>{{ b }}</option>
+          {% endfor %}
+        </select>
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+      <td>
+        {% for o in n.opts %}
+        <label style="white-space:nowrap">{{ o.name }}
+          <input type="text" name="opt__{{ n.id }}__{{ o.name }}" size="10"
+                 value="{{ options.get(n.id, {}).get(o.name, '') }}"
+                 placeholder="{{ o.enum_values or o.type }}"></label>
+        {% else %}<span class="muted">—</span>{% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="inline" style="margin-top:10px">
+    <label>lifecycle id (선택 — 기본 <code>gen-&lt;node&gt;</code>/<code>bundle-&lt;id&gt;</code>)
+      <input type="text" name="lifecycle_id" value="{{ lifecycle_id }}" size="24"></label>
+    <button type="submit" name="action" value="plan"
+            {{ 'disabled' if not has_composer else '' }}>합성 미리보기 (plan)</button>
+    <button type="submit" name="action" value="save"
+            {{ 'disabled' if not has_composer else '' }}
+            class="ghost">compose + draft 저장</button>
+  </p>
+</section>
+</form>
+
+{% if plan_error %}
+<section><p class="warn">{{ plan_error }}</p></section>
+{% endif %}
+
+{% if plan %}
+<section>
+  <h2>Plan 미리보기 — 생성/검증/삭제 순서표</h2>
+  <table>
+    <tr><th>#</th><th>단계</th><th>노드</th><th>상세</th></tr>
+    {% for r in plan_rows %}
+    <tr>
+      <td class="muted">{{ loop.index }}</td>
+      <td><span class="status {{ 'done' if r.action == 'create' else 'failed' if r.action == 'delete' else 'running' }}">{{ r.action or 'step' }}</span></td>
+      <td><code>{{ r.node }}</code></td>
+      <td class="muted">{{ r.detail }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div class="cards" style="margin-top:12px">
+    <div class="card">
+      <div class="lbl">dedup (공유 선행자원 1회 생성)</div>
+      {% if plan.get('dedup') %}
+      {% for k, v in plan.get('dedup', {}).items() %}
+      <div><code>{{ k }}</code> <span class="muted">{{ v }}</span></div>
+      {% endfor %}
+      {% else %}<div class="muted">없음</div>{% endif %}
+    </div>
+    <div class="card">
+      <div class="lbl">peak quota (할당량 시뮬레이션)</div>
+      {% if plan.get('peak_quota') %}
+      {% for k, v in plan.get('peak_quota', {}).items() %}
+      <div><code>{{ k }}</code> <b>{{ v }}</b></div>
+      {% endfor %}
+      {% else %}<div class="muted">—</div>{% endif %}
+    </div>
+    <div class="card">
+      <div class="lbl">one_of 분기 선택</div>
+      {% if plan.get('branches') %}
+      {% for k, v in plan.get('branches', {}).items() %}
+      <div><code>{{ k }}</code> → {{ v }}</div>
+      {% endfor %}
+      {% else %}<div class="muted">기본 분기</div>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if saved %}
+<section>
+  <h2>draft 저장됨</h2>
+  <p><code>drafts/{{ saved.name }}</code> — lifecycle
+    <code>{{ saved.lifecycle_id }}</code> ({{ saved.steps }} steps,
+    <b>enabled: false</b> 고정). 리뷰 후 scoped run으로 라이브 검증하세요.</p>
+  <form class="inline" method="post" action="/runs/trigger">
+    <label>suite <select name="suite">
+      {% for s in suites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+    </select></label>
+    <label>profile <select name="profile">
+      <option value="">(기본)</option>
+      {% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+    </select></label>
+    <input type="hidden" name="crud_filter" value="{{ saved.lifecycle_id }}">
+    <button type="submit">crud_filter={{ saved.lifecycle_id }} 로 실행</button>
+  </form>
+  <p><a href="/testing?crud_filter={{ saved.lifecycle_id }}">Testing 화면으로
+    (crud_filter 프리필) →</a></p>
+</section>
+{% endif %}
+
+{% endblock %}
