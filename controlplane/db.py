@@ -204,10 +204,18 @@ def add_command(gh_run_id: str, action: str, target: str = "") -> int:
 
 
 def pending_commands(gh_run_id: str) -> list[sqlite3.Row]:
+    """Commands the engine should still see. Plain pending rows, PLUS acked
+    abort_run rows while the run is still running: under pytest-xdist the
+    first worker to consume the abort acks it, but every sibling worker must
+    keep seeing it (the engine never re-applies an id it already consumed)."""
     with connect() as con:
         return con.execute(
-            "SELECT * FROM commands WHERE gh_run_id = ? AND status = 'pending'"
-            " ORDER BY id", (gh_run_id,)).fetchall()
+            "SELECT c.* FROM commands c WHERE c.gh_run_id = ? AND ("
+            "  c.status = 'pending'"
+            "  OR (c.action = 'abort_run' AND EXISTS ("
+            "      SELECT 1 FROM runs r WHERE r.gh_run_id = c.gh_run_id"
+            "      AND r.status = 'running'))"
+            ") ORDER BY c.id", (gh_run_id,)).fetchall()
 
 
 def ack_command(command_id: int) -> bool:
