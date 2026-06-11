@@ -28,36 +28,36 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/container/k8s_engine/overview/ | container/ske |
 | ✅ | P1 | /userguide/container/container_registry/overview/ | container/scr |
 | ✅ | P1 | /userguide/storage/file_storage/overview/ | storage/filestorage |
-| — | P1 | /userguide/networking/load_balancer/overview/ | networking/loadbalancer |
-| — | P1 | /userguide/networking/dns/overview/ | networking/dns |
-| — | P1 | /userguide/networking/vpn/overview/ | networking/vpn |
-| — | P1 | /userguide/networking/direct_connect/overview/ | networking/direct-connect |
-| — | P1 | /userguide/networking/firewall/overview/ | networking/firewall |
-| — | P1 | /userguide/networking/gslb/overview/ | networking/gslb |
-| — | P1 | /userguide/networking/global_cdn/overview/ | networking/cdn |
+| ✅ | P1 | /userguide/networking/load_balancer/overview/ | networking/loadbalancer |
+| ✅ | P1 | /userguide/networking/dns/overview/ | networking/dns |
+| ✅ | P1 | /userguide/networking/vpn/overview/ | networking/vpn |
+| ✅ | P1 | /userguide/networking/direct_connect/overview/ | networking/direct-connect |
+| ✅ | P1 | /userguide/networking/firewall/overview/ | networking/firewall |
+| ✅ | P1 | /userguide/networking/gslb/overview/ | networking/gslb |
+| ✅ | P1 | /userguide/networking/global_cdn/overview/ | networking/cdn |
 | — | P1 | /userguide/database/mysql/overview/ | database/mysql |
 | — | P1 | /userguide/database/mariadb/overview/ | database/mariadb |
 | — | P1 | /userguide/database/postgresql/overview/ | database/postgresql |
 | — | P1 | /userguide/database/epas/overview/ | database/epas |
 | — | P1 | /userguide/database/mssql/overview/ | database/sqlserver |
 | — | P1 | /userguide/database/cachestore/overview/ | database/cachestore |
-| — | P1 | /userguide/compute/baremetal_server/overview/ | compute/baremetal |
+| ✅ | P1 | /userguide/compute/baremetal_server/overview/ | compute/baremetal |
 | — | P1 | /userguide/compute/block_storage_vm/overview/ | compute/virtualserver (volumes) |
-| — | P1 | /userguide/compute/cloud_functions/overview/ | compute/scf |
+| ✅ | P1 | /userguide/compute/cloud_functions/overview/ | compute/scf |
 | — | P1 | /userguide/compute/mngc/overview/ | compute/multinodegpucluster |
-| — | P1 | /userguide/storage/archive_storage/overview/ | storage/archivestorage (smoke 401s!) |
-| — | P1 | /userguide/storage/backup/overview/ | storage/backup |
-| — | P1 | /userguide/storage/block_storage_bm/overview/ | storage/baremetal-blockstorage |
-| — | P1 | /userguide/storage/parallel_file_storage/overview/ | storage/parallel-filestorage |
-| — | P1 | /userguide/security/kms/overview/ | security/kms |
-| — | P1 | /userguide/security/secrets_manager/overview/ | security/secretsmanager |
-| — | P1 | /userguide/security/secret_vault/overview/ | security/secretvault |
-| — | P1 | /userguide/security/certificate_manager/overview/ | security/certificatemanager |
-| — | P1 | /userguide/security/config_inspection_enterprise/overview/ | security/configinspection |
-| — | P1 | /userguide/management/iam/overview/ | management/iam |
-| — | P1 | /userguide/management/id_center/overview/ | management/iam-identity-center (smoke 400s) |
-| — | P1 | /userguide/management/organization/overview/ | management/organization (waiver class) |
-| — | P1 | /userguide/management/cloud_control/overview/ | management/cloudcontrol (smoke 403s) |
+| ✅ | P1 | /userguide/storage/archive_storage/overview/ | storage/archivestorage (smoke 401s!) |
+| ✅ | P1 | /userguide/storage/backup/overview/ | storage/backup |
+| ✅ | P1 | /userguide/storage/block_storage_bm/overview/ | storage/baremetal-blockstorage |
+| ✅ | P1 | /userguide/storage/parallel_file_storage/overview/ | storage/parallel-filestorage |
+| ✅ | P1 | /userguide/security/kms/overview/ | security/kms |
+| ✅ | P1 | /userguide/security/secrets_manager/overview/ | security/secretsmanager |
+| ✅ | P1 | /userguide/security/secret_vault/overview/ | security/secretvault |
+| ✅ | P1 | /userguide/security/certificate_manager/overview/ | security/certificatemanager |
+| ✅ | P1 | /userguide/security/config_inspection_enterprise/overview/ | security/configinspection |
+| ✅ | P1 | /userguide/management/iam/overview/ | management/iam |
+| ✅ | P1 | /userguide/management/id_center/overview/ | management/iam-identity-center (smoke 400s) |
+| ✅ | P1 | /userguide/management/organization/overview/ | management/organization (waiver class) |
+| ✅ | P1 | /userguide/management/cloud_control/overview/ | management/cloudcontrol (smoke 403s) |
 | — | P1 | /userguide/management/cloud_monitoring/overview/ | management/cloudmonitoring (smoke 400s) |
 | — | P1 | /userguide/management/logging_audit/overview/ | management/loggingaudit |
 | — | P1 | /userguide/management/service_watch/overview/ | management/servicewatch |

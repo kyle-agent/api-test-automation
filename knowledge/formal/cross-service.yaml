@@ -225,6 +225,57 @@ resources:
     provenance: VALIDATED
     notes: "global (account-scoped) service — no region segment in host"
 
+  # --- security/management/storage prerequisites (userguide ingestion 2026-06-11,
+  # provenance docs — see knowledge/formal/services/* for the page-level facts) --
+  archive-storage-account:
+    service: storage/archivestorage
+    requires: []
+    provenance: docs
+    notes: "needs its OWN 인증키 (IAM My Info > 인증키 관리) — platform HMAC creds alone 401; key expiry/suspension revokes access"
+  backup-policy:
+    service: storage/backup
+    requires: [server]
+    provenance: docs
+    notes: "agent-type backups need a Backup Agent installed on the target server first; retention enum 14/31/93/186/365 days"
+  kms-key:
+    service: security/kms
+    requires: []
+    provenance: docs
+  secretsmanager-secret:
+    service: security/secretsmanager
+    requires: [kms-key]
+    provenance: docs
+    notes: "encrypt-capable KMS key required; 퍼블릭 접근 제어 IP list is a REQUIRED create field; delete enters 7-30 day waiting period"
+  secretvault-vault:
+    service: security/secretvault
+    requires: []
+    provenance: docs
+    notes: "needs a pre-existing IAM auth key in 임시키 mode (not expired, >=30d left); 1 key per vault; vault blocks deletion of its auth key"
+  certificate:
+    service: security/certificatemanager
+    requires: []
+    provenance: docs
+    notes: "PEM validated at create (decrypted RSA key, single body cert, Intermediate->Root chain order); delete blocked while attached to LB listeners"
+  iam-identity-center:
+    service: management/iam-identity-center
+    requires: []
+    provenance: docs
+    notes: "only the Organization MANAGEMENT account can create (Organization prereq); single region; not in kr-south3 — explains smoke 400s (entitlement, not body)"
+  cloudcontrol-landing-zone:
+    service: management/cloudcontrol
+    requires: [iam-identity-center]
+    provenance: docs
+    notes: "needs Organization + ID Center + Object Storage + Logging&Audit and management-account privileges; provisions real shared accounts/OUs — waiver class like organization; explains smoke 403s"
+  scf-function:
+    service: compute/scf
+    requires: []
+    provenance: docs
+    notes: "kr-west1/kr-east1 only; every config/code change flips status to Deploying (poll before next write); Java runtime additionally needs Object Storage + auth key"
+  baremetal-server:
+    service: compute/baremetal
+    requires: [vpc]
+    provenance: docs
+    notes: "ONE BM management op per account at a time (parallel lifecycles collide); no Security Groups (Firewall+TGW only); single-server delete orphans attached Block Storage(BM)"
 quotas:
   vpc:
     limit: 5
