@@ -23,12 +23,14 @@ import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from controlplane import dashdata, db, dispatch, scheduler, snapshots, triage
+from controlplane import (compare, dashdata, db, dispatch, resources,
+                          scheduler, snapshots, triage)
 from core import profiles as core_profiles
 from core import suites as core_suites
 
@@ -210,6 +212,53 @@ def schedule_delete(schedule_id: int):
     return RedirectResponse("/testing", status_code=303)
 
 
+# --- Testing: 리소스 인벤토리 + 단일 리소스 삭제 (M2 §2.5) -------------------------
+
+@app.get("/testing/resources", response_class=HTMLResponse)
+def testing_resources(request: Request, gh_run_id: str = "", msg: str = ""):
+    rows = resources.inventory(gh_run_id or None)
+    run_ids = [r["gh_run_id"] for r in db.list_runs(limit=50) if r["gh_run_id"]]
+    return _render(request, "resources.html", "testing",
+                   rows=rows, gh_run_id=gh_run_id, msg=msg[:300],
+                   live_count=sum(1 for r in rows if r["live"]),
+                   destructive=resources.destructive_enabled(),
+                   run_ids=run_ids)
+
+
+@app.post("/testing/resources/delete")
+def testing_resource_delete(gh_run_id: str = Form(""), service: str = Form(""),
+                            kind: str = Form(""), res_id: str = Form(...),
+                            name: str = Form(""), lifecycle: str = Form(""),
+                            filter_run: str = Form("")):
+    if not resources.destructive_enabled():
+        msg = ("SCP_ALLOW_DESTRUCTIVE=true 미설정 — 삭제가 차단되었습니다 "
+               "(서버 환경변수로 활성화 후 재시도).")
+    else:
+        ok, msg = resources.delete_resource(service, kind, res_id, name=name)
+        # the attempt itself is part of the run's resource history
+        resources.record_attempt(gh_run_id, service=service, kind=kind,
+                                 res_id=res_id, name=name, lifecycle=lifecycle,
+                                 ok=ok, message=msg)
+        msg = f"{kind} {name or res_id}: {msg}"
+    q = urlencode({"gh_run_id": filter_run, "msg": msg})
+    return RedirectResponse(f"/testing/resources?{q}", status_code=303)
+
+
+# --- 개입 명령 (M2 명령 채널 — UI가 쌓고 엔진이 폴링/ack) ---------------------------
+
+COMMAND_ACTIONS = ("abort_run", "skip_scenario", "stop_polling")
+
+
+@app.post("/runs/{gh_run_id}/commands")
+def add_run_command(gh_run_id: str, action: str = Form(...), target: str = Form("")):
+    if action not in COMMAND_ACTIONS:
+        raise HTTPException(400, f"unknown command action {action!r}")
+    if action == "skip_scenario" and not target.strip():
+        raise HTTPException(400, "skip_scenario 명령에는 lifecycle id(target)가 필요합니다")
+    db.add_command(gh_run_id, action, target.strip())
+    return RedirectResponse(f"/runs/{gh_run_id}", status_code=303)
+
+
 # --- Reporting -----------------------------------------------------------------
 
 @app.get("/reporting", response_class=HTMLResponse)
@@ -233,6 +282,25 @@ def current_dashboard(rel_path: str = ""):
     return Response(content=body, media_type=ctype)
 
 
+@app.get("/reporting/compare", response_class=HTMLResponse)
+def reporting_compare(request: Request, a: str = "", b: str = ""):
+    """Run A vs B diff (M2 §2.6) — joins both snapshots' observations."""
+    run_ids = [r["gh_run_id"] for r in db.list_runs(limit=100) if r["gh_run_id"]]
+    for row in snapshots.archive_index(limit=100):
+        rid = str(row.get("run_id", ""))
+        if rid and rid not in run_ids:
+            run_ids.append(rid)
+    result = a_missing = b_missing = None
+    if a and b:
+        a_obs = snapshots.observations(a)
+        b_obs = snapshots.observations(b)
+        a_missing, b_missing = not a_obs, not b_obs
+        result = compare.diff(a_obs, b_obs)
+    return _render(request, "compare.html", "reporting",
+                   a=a, b=b, run_ids=run_ids, result=result,
+                   a_missing=a_missing, b_missing=b_missing)
+
+
 @app.get("/runs", include_in_schema=False)
 def runs_legacy():
     return RedirectResponse("/reporting", status_code=307)
@@ -252,6 +320,7 @@ def run_detail(request: Request, gh_run_id: str):
                    gh_run_id=gh_run_id, run=run,
                    meta=snapshots.meta(gh_run_id),
                    milestones=db.list_events(gh_run_id, kind="milestone"),
+                   commands=db.list_commands(gh_run_id),
                    triage=tri, triage_detail=tri_detail)
 
 
@@ -277,15 +346,39 @@ def snapshot_file(gh_run_id: str, rel_path: str):
     return Response(content=body, media_type=ctype)
 
 
-# --- ingest (core/oplog.py mirror: APITEST_PLATFORM_URL) -----------------------
+# --- engine-facing API (oplog 미러 ingest + M2 명령 채널) ------------------------
 
-@app.post("/api/ingest/events")
-async def ingest(request: Request):
+def _require_ingest_token(request: Request) -> None:
+    """Shared bearer check — PLATFORM_INGEST_TOKEN guards every engine-facing
+    endpoint (ingest / command poll / ack) with the same token."""
     token = os.environ.get("PLATFORM_INGEST_TOKEN", "").strip()
     if token:
         auth = request.headers.get("authorization", "")
         if auth != f"Bearer {token}":
             raise HTTPException(401, "bad ingest token")
+
+
+@app.get("/api/runs/{gh_run_id}/commands")
+def api_pending_commands(request: Request, gh_run_id: str):
+    """Pending (un-acked) intervention commands — the engine polls this at
+    step boundaries (PLATFORM-PLAN §2.5 명령 채널)."""
+    _require_ingest_token(request)
+    return {"commands": [
+        {"id": c["id"], "action": c["action"], "target": c["target"]}
+        for c in db.pending_commands(gh_run_id)]}
+
+
+@app.post("/api/commands/{command_id}/ack")
+def api_ack_command(request: Request, command_id: int):
+    _require_ingest_token(request)
+    if not db.ack_command(command_id):
+        raise HTTPException(404, "no such command")
+    return {"ok": True}
+
+
+@app.post("/api/ingest/events")
+async def ingest(request: Request):
+    _require_ingest_token(request)
     try:
         payload = await request.json()
     except ValueError:

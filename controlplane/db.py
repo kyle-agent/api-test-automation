@@ -1,8 +1,10 @@
-"""SQLite store for the platform control plane (M1, docs/PLATFORM-PLAN.md).
+"""SQLite store for the platform control plane (M1+M2, docs/PLATFORM-PLAN.md).
 
-Holds what git does NOT: run records, schedules, ingested live events and AI
-triage results. Everything declarative (suites / environments / scenarios /
-knowledge) stays in the repo files — the DB only tracks executions of them.
+Holds what git does NOT: run records, schedules, ingested live events, AI
+triage results and intervention commands (M2 명령 채널 — the engine polls
+GET /api/runs/<id>/commands at step boundaries and acks what it consumed).
+Everything declarative (suites / environments / scenarios / knowledge) stays
+in the repo files — the DB only tracks executions of them.
 
 Connection-per-call keeps things trivially safe across FastAPI workers and the
 scheduler thread; volumes are tiny (a few rows per run).
@@ -50,7 +52,24 @@ CREATE TABLE IF NOT EXISTS triage (
   summary TEXT DEFAULT '',               -- one-paragraph natural-language summary
   detail TEXT DEFAULT ''                 -- JSON: per-endpoint classifications
 );
+CREATE TABLE IF NOT EXISTS commands (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  gh_run_id TEXT NOT NULL,
+  action TEXT NOT NULL,                  -- abort_run | skip_scenario | stop_polling
+  target TEXT DEFAULT '',                -- skip_scenario: lifecycle id
+  status TEXT DEFAULT 'pending',         -- pending | acked
+  created_at TEXT, acked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_commands_run ON commands(gh_run_id);
 """
+
+# Multi-tenancy groundwork (§6 확정 4): tenant column on runs/schedules.
+# SQLite has no ADD COLUMN IF NOT EXISTS — the duplicate-column error IS the
+# "already migrated" signal, so each statement is individually guarded.
+MIGRATIONS = (
+    "ALTER TABLE runs ADD COLUMN tenant TEXT DEFAULT ''",
+    "ALTER TABLE schedules ADD COLUMN tenant TEXT DEFAULT ''",
+)
 
 
 def now() -> str:
@@ -62,18 +81,24 @@ def connect() -> sqlite3.Connection:
     con = sqlite3.connect(DB_PATH, timeout=10)
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    for stmt in MIGRATIONS:
+        try:
+            con.execute(stmt)
+        except sqlite3.OperationalError:
+            pass  # duplicate column name — already migrated
     return con
 
 
 # --- runs --------------------------------------------------------------------
 
 def create_run(suite: str, profile: str, trigger: str = "manual",
-               gh_run_id: str | None = None, detail: str = "") -> int:
+               gh_run_id: str | None = None, detail: str = "",
+               tenant: str = "") -> int:
     with connect() as con:
         cur = con.execute(
-            "INSERT INTO runs (gh_run_id, suite, profile, trigger, requested_at, detail)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (gh_run_id, suite, profile, trigger, now(), detail))
+            "INSERT INTO runs (gh_run_id, suite, profile, trigger, requested_at,"
+            " detail, tenant) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (gh_run_id, suite, profile, trigger, now(), detail, tenant))
         return cur.lastrowid
 
 
@@ -154,13 +179,67 @@ def list_events(gh_run_id: str, kind: str | None = None, limit: int = 500) -> li
             (gh_run_id, limit)).fetchall()
 
 
-# --- schedules ---------------------------------------------------------------
+def list_resource_events(gh_run_id: str | None = None,
+                         limit: int = 4000) -> list[sqlite3.Row]:
+    """Ingested resource events (kind='resource'), oldest first — the
+    inventory fold relies on chronological order (latest action wins)."""
+    with connect() as con:
+        if gh_run_id:
+            return con.execute(
+                "SELECT * FROM events WHERE kind = 'resource' AND gh_run_id = ?"
+                " ORDER BY id LIMIT ?", (gh_run_id, limit)).fetchall()
+        return con.execute(
+            "SELECT * FROM events WHERE kind = 'resource' ORDER BY id LIMIT ?",
+            (limit,)).fetchall()
 
-def add_schedule(cron: str, suite: str, profile: str = "", note: str = "") -> int:
+
+# --- commands (M2 명령 채널 — engine polls, then acks) -------------------------
+
+def add_command(gh_run_id: str, action: str, target: str = "") -> int:
     with connect() as con:
         cur = con.execute(
-            "INSERT INTO schedules (cron, suite, profile, note) VALUES (?, ?, ?, ?)",
-            (cron, suite, profile, note))
+            "INSERT INTO commands (gh_run_id, action, target, status, created_at)"
+            " VALUES (?, ?, ?, 'pending', ?)", (gh_run_id, action, target, now()))
+        return cur.lastrowid
+
+
+def pending_commands(gh_run_id: str) -> list[sqlite3.Row]:
+    with connect() as con:
+        return con.execute(
+            "SELECT * FROM commands WHERE gh_run_id = ? AND status = 'pending'"
+            " ORDER BY id", (gh_run_id,)).fetchall()
+
+
+def ack_command(command_id: int) -> bool:
+    """Mark a command acked (idempotent — re-acks keep the first acked_at).
+    Returns False only when the id does not exist."""
+    with connect() as con:
+        row = con.execute("SELECT id FROM commands WHERE id = ?",
+                          (command_id,)).fetchone()
+        if not row:
+            return False
+        con.execute(
+            "UPDATE commands SET status = 'acked', acked_at = COALESCE(acked_at, ?)"
+            " WHERE id = ?", (now(), command_id))
+        return True
+
+
+def list_commands(gh_run_id: str, limit: int = 50) -> list[sqlite3.Row]:
+    with connect() as con:
+        return con.execute(
+            "SELECT * FROM commands WHERE gh_run_id = ? ORDER BY id DESC LIMIT ?",
+            (gh_run_id, limit)).fetchall()
+
+
+# --- schedules ---------------------------------------------------------------
+
+def add_schedule(cron: str, suite: str, profile: str = "", note: str = "",
+                 tenant: str = "") -> int:
+    with connect() as con:
+        cur = con.execute(
+            "INSERT INTO schedules (cron, suite, profile, note, tenant)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (cron, suite, profile, note, tenant))
         return cur.lastrowid
 
 
