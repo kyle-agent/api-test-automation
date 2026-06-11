@@ -217,7 +217,8 @@ def test_list_page_renders_groups_and_nodes():
     assert "load-balancer | server:ip" in page          # OR-의존 요약
     assert "VALIDATED" in page and "docs" in page       # provenance 배지
     assert "/planning/resources/vpc-endpoint" in page   # 노드 -> 폼 링크
-    assert "합성기 미탑재" in page                       # composer 없는 degrade
+    # composer는 R2a 머지로 실재 — 목록 페이지는 미탑재 배너가 없어야 한다
+    assert "합성기 미탑재" not in page
 
 
 def test_list_page_with_empty_model_still_renders():
@@ -386,7 +387,9 @@ def test_save_validation_failure_keeps_file_intact():
 # --- 5. compose — composer 미탑재 degrade + 스텁 합성기 ---------------------------------
 
 def test_compose_page_degrades_without_composer():
-    assert resource_routes._composer() is None          # R2a 병렬 — 아직 없음
+    # composer는 main에 실재 — 부재 상황은 _composer 패치로 시뮬레이션 (통합 후 형태)
+    orig_composer = resource_routes._composer
+    resource_routes._composer = lambda: None
     page = client.get("/planning/resources/compose").text
     assert "합성기 미탑재" in page and "disabled" in page
     assert 'value="vpc-endpoint"' in page               # 대상 체크박스는 동작
@@ -397,6 +400,7 @@ def test_compose_page_degrades_without_composer():
     # 프리필: 노드 폼의 "이 자원만 테스트" 링크 경로
     page = client.get("/planning/resources/compose?targets=vpc").text
     assert 'value="vpc" checked' in page
+    resource_routes._composer = orig_composer
 
 
 class _stub_composer:

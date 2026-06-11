@@ -51,6 +51,10 @@ app = FastAPI(title="SCP API Regression Test Platform", lifespan=lifespan)
 from controlplane import ai_routes  # noqa: E402  (import after app to match layout)
 app.include_router(ai_routes.router)
 
+# Resource-task-model form UI + composer screens (M5 R2b) — resource_routes.py
+from controlplane import resource_routes  # noqa: E402
+app.include_router(resource_routes.router)
+
 
 def _catalog() -> dict:
     """Suites + profiles for the trigger forms (live from the repo files)."""
