@@ -1071,6 +1071,8 @@ jobs:
           cp dashboard/endpoint_status.json "$pub"/ 2>/dev/null || true
           # static ops viewer (reads the persistent oplog bucket directly)
           cp dashboard/ops.html "$pub"/ 2>/dev/null || true
+          # view-only platform pages (controlplane/static_export.py)
+          cp -r reports/platform-static "$pub"/platform 2>/dev/null || true
           cp reports/smoke_status.tsv "$pub"/ 2>/dev/null || true
           cp data/conformance.json "$pub"/ 2>/dev/null || true
           cp data/conformance_baseline.json "$pub"/ 2>/dev/null || true
@@ -1087,6 +1089,14 @@ jobs:
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
             dashboard-data
           echo "published dashboard-data (enable Pages -> Deploy from branch -> dashboard-data /root)"
+      - name: Export static platform views for Pages (/platform/)
+        # Read-only Planning/coverage pages rendered through the real app —
+        # view-only on Pages; actions need the live server (controlplane/).
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          pip install -q -r controlplane/requirements.txt httpx
+          python -m controlplane.static_export --out reports/platform-static || true
       - name: Snapshot run results (per-run archive on the oplog bucket)
         # docs/PLATFORM-PLAN.md M0: every run's canonical outputs (results
         # JSONL + dashboard HTML + meta incl. catalog version) are archived
