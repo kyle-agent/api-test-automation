@@ -262,3 +262,43 @@ the ~40-endpoint chain stays called-only without a BM server. Full constraints:
   stuck in `CREATING` (400 invalid-state on the setter) while LB health-check
   child 404'd (`LbHealthCheckNotFoundError` — health-check id capture/order issue,
   not yet fixed).
+
+## 2026-06-11 — runs #3~#5 + oplog 구축에서 VALIDATED된 사실들
+
+**런 시간/커버리지 추이 (풀 헤비):** #1 e3ba190 3h49m (fail_new 52) → #2 84df549
+2h11m (50) → #3 3f59837 1h21m (50, C3 43.27%/분모 1130) → #4 63a139f 51m (48,
+단 heavy 10개 캡 스킵) → #5 22a3b22 진행 중 (heavy 10개 전부 시작 확인).
+
+**VPC 캡 오염 체인 (#3→#4에서 입증):** lifecycle teardown 실패 → 잔존 VPC가
+"자기 런"의 6h TTL 보호로 sweep 통과 → 다음 런 시작 시 캡 잠식 → 공유 VPC
+프로비저닝 실패 → adopt 전원 self-create 폴백 → 연쇄 캡 스킵. 수정 = sweep의
+**own-run override** (run_id 태그가 자기 런이면 TTL 무시 reap; 타 런 보호 유지)
++ 프로비저닝을 smoke 앞(minute 0) + 10×45s 재시도.
+
+**vpc-subnet-vip-nat 409의 원인 2개 (둘 다 잡고 #4에서 PASS):**
+① VIP 생성 응답 envelope은 `$.subnet_vip.id` (201 라이브 검증; 종전 `$.vip.id`
+캡처 미스 → cleanup 미해석), ② cleanup은 실패 시에만 발동하므로 happy-path에
+명시적 delete-vip 스텝이 없으면 VIP가 살아남음.
+
+**vpc-peering 상태머신 (#4):** create 202 직후 상태에서 approve/set/**DELETE
+모두 400** → peering 잔존 → VPC 삭제 409. 동일계정 2-VPC + 실 approver_vpc_id
+구성으로 createvpcpeering 자체는 VALIDATED(202). 삭제 규칙은 soft-write note로
+다음 런에서 채집.
+
+**SCP Object Storage S3 (oplog 버킷에서 검증):**
+- 엔드포인트 호스트 = `object-store.<region>.<env>.samsungsdscloud.com`
+  (objectstorage 아님); Open API와 동일 access/secret 사용 가능.
+- 인증 호출은 bare 버킷명으로 동작; **익명(공개) 경로는 RGW tenant 문법
+  `/<account_id>:<bucket>/<key>`** (slash 구분은 NotFoundBucketNameInPath).
+- list-buckets Owner.ID 형식은 `<account_id>$<account_id>`.
+- bucket ACL public-read는 **LIST만** 허용; 객체 GET은 **객체별 public-read
+  ACL** 필요 (put_object에 ACL 지정). CORS는 put-bucket-cors로 정상 적용.
+- 버킷: `apitest-oplog-permanent` (영구; sweep 어떤 매처에도 불일치).
+
+**GitHub Actions YAML 함정:** plain scalar 멀티라인 `run:`의 백슬래시 연속은
+폴딩되며 `\ `(이스케이프 공백)가 되어 argparse가 거부 — `|| true`가 삼켜
+조용히 실패. 멀티라인 명령은 반드시 `run: |` 블록으로. (#4에서 adopt/vpc-crud/
+sweep 마일스톤만 누락된 원인.)
+
+**ops 대시보드 운영 사실:** GitHub MCP 토큰 만료 시에도 버킷 직접 조회로 런
+상태 확인 가능 (sweep 종료 등) — 독립 관측 채널로서 실효 입증.

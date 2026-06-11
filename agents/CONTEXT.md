@@ -139,6 +139,13 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   85.6%**; residual 198-endpoint gap is exclusively id-bound GETs (read-chain /
   probe_reads auto-covered at runtime, so live `cov_op` runs higher). All bodies
   docs-derived, **PENDING LIVE VALIDATION**.
+- **Run-time/ops infra (2026-06-11):** full-run wall 3h49m → 51m~1h21m (A∥B split,
+  retry caps, slimmed shared-dbaas, provision-first, own-run sweep reap — the
+  leftover→VPC-cap poisoning chain is closed). Persistent ops log on Object
+  Storage (`apitest-oplog-permanent`, core/oplog.py) + static viewer
+  `ops.html` on Pages: live per-event resource tree + run history,
+  independent of GitHub. Fail/soft-write response bodies now recorded in
+  observation notes (self-diagnosing artifacts). Facts: knowledge/validated-facts.md.
 - **Full heavy run landed (2026-06-10, run 27258520218):** cov_op 35.4 / C3 37.5,
   **fail_new 52 → triaged** in `docs/HANDOFF-fail-new-triage.md` (27 unique:
   6×401 incl. a suspected query-string HMAC signing bug, 8 DBaaS sub-op 500s
