@@ -1,0 +1,25 @@
+# 검증계 · kr-west1 — the current default target (mirrors the repo vars the
+# workflow falls back to, so exporting this profile is a no-op change today).
+id: stage-kr-west1
+label: 검증계 (stage) · kr-west1
+
+env:
+  SCP_REGION: kr-west1
+  SCP_ENV: e
+
+# Default credentials: the standard secrets already in the environment
+# (SCP_ACCESS_KEY etc.) — same-name indirection means "keep as-is".
+credentials:
+  SCP_ACCESS_KEY: SCP_ACCESS_KEY
+  SCP_SECRET_KEY: SCP_SECRET_KEY
+  SCP_PROJECT_ID: SCP_PROJECT_ID
+
+# Stage allows everything; the per-run gates (SCP_ALLOW_MUTATIONS /
+# SCP_ALLOW_DESTRUCTIVE / SCP_RUN_HEAVY) still apply as usual.
+forbid: []
+
+# Account caps VALIDATED on this account (core/budgets.py defaults match —
+# kept here so other environments can override without code changes).
+quota_overrides:
+  vpc: 5
+  private-dns: 3

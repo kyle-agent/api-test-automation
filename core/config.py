@@ -44,6 +44,14 @@ def _bool(name: str, default: bool = False) -> bool:
     return _env(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _forbidden() -> frozenset:
+    """SCP_PROFILE_FORBID (comma list, set by core.profiles from an environment
+    profile's `forbid:`): a hard per-environment gate — e.g. a production
+    profile refuses mutations no matter what the trigger requested."""
+    return frozenset(
+        s.strip().lower() for s in _env("SCP_PROFILE_FORBID").split(",") if s.strip())
+
+
 # Account-scoped (region-less) services, verified by DNS against the platform:
 # their host is <service>.<env>.samsungsdscloud.com (no region segment).
 DEFAULT_GLOBAL_SERVICES = frozenset({
@@ -137,13 +145,18 @@ class Settings:
     timeout: int = field(default_factory=lambda: int(os.environ.get("SCP_TIMEOUT", "60")))
     max_retries: int = field(default_factory=lambda: int(os.environ.get("SCP_MAX_RETRIES", "4")))
     # Heavy lifecycles (real VM / K8s cluster) only run when opted in.
-    run_heavy: bool = field(default_factory=lambda: _bool("SCP_RUN_HEAVY", False))
+    # Each opt-in gate is additionally vetoed by the environment profile's
+    # forbid list (SCP_PROFILE_FORBID) — see _forbidden().
+    run_heavy: bool = field(default_factory=lambda: _bool("SCP_RUN_HEAVY", False)
+                            and "heavy" not in _forbidden())
     # Safety gate: mutating operations (POST/PUT/PATCH/DELETE) are skipped
     # unless this is explicitly enabled, so a smoke run never creates/deletes
     # real cloud resources by accident.
-    allow_mutations: bool = field(default_factory=lambda: _bool("SCP_ALLOW_MUTATIONS", False))
+    allow_mutations: bool = field(default_factory=lambda: _bool("SCP_ALLOW_MUTATIONS", False)
+                                  and "mutations" not in _forbidden())
     # Extra guard for destructive deletes even when mutations are allowed.
-    allow_destructive: bool = field(default_factory=lambda: _bool("SCP_ALLOW_DESTRUCTIVE", False))
+    allow_destructive: bool = field(default_factory=lambda: _bool("SCP_ALLOW_DESTRUCTIVE", False)
+                                    and "destructive" not in _forbidden())
 
     def is_global(self, service: str | None) -> bool:
         return bool(service) and service in self.global_services

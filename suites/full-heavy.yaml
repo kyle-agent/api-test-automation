@@ -1,0 +1,9 @@
+# The complete surface: full regression INCLUDING heavy lifecycles (real VM,
+# K8s cluster, DBs — 20-60 min each, billable) plus conformance re-judge.
+id: full-heavy
+label: Full+Heavy — everything incl. billable heavy lifecycles + conformance
+request:
+  mutations: true
+  destructive: true
+  heavy: true
+  conformance: true

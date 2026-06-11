@@ -1,0 +1,25 @@
+# 운영계 (production) · kr-west1 — TEMPLATE. Hosts follow the same per-service
+# convention with a different env code; fix SCP_ENV (and credentials sources)
+# against the real production account before first use.
+#
+# The forbid gate below is the point of this profile: even if a trigger
+# requests mutations=true, core/config.py refuses it — production runs are
+# READ-ONLY (smoke + read-chains + read-only conformance probes) by design.
+id: prod-kr-west1
+label: 운영계 (production) · kr-west1 — read-only
+
+env:
+  SCP_REGION: kr-west1
+  # TODO: confirm the production env code (검증계 is 'e').
+  SCP_ENV: p
+
+# Production credentials live in their OWN secrets (never reuse stage keys).
+# Set SCP_ACCESS_KEY_PROD / SCP_SECRET_KEY_PROD / SCP_PROJECT_ID_PROD in the
+# repo secrets (and map them in the workflow env) before using this profile.
+credentials:
+  SCP_ACCESS_KEY: SCP_ACCESS_KEY_PROD
+  SCP_SECRET_KEY: SCP_SECRET_KEY_PROD
+  SCP_PROJECT_ID: SCP_PROJECT_ID_PROD
+
+# Hard environment gate — mutating/destructive/heavy runs are impossible here.
+forbid: [mutations, destructive, heavy]

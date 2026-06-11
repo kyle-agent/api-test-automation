@@ -1,0 +1,9 @@
+# AXIS 2 only: static analysis + read-only/empty-body runtime probes +
+# baseline diff. No resource creation (schema-live stays behind its own gate).
+id: conformance
+label: Conformance — static + read-only runtime probes + baseline diff
+request:
+  mutations: false
+  destructive: false
+  heavy: false
+  conformance: true

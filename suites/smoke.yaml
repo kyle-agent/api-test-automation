@@ -1,0 +1,9 @@
+# Read-only fence: smoke + read-chains across the whole catalog. Cheap enough
+# to schedule daily once Phase 2 cron returns (ROADMAP Phase 2).
+id: smoke
+label: Smoke — read-only smoke + read-chains, whole catalog (~15 min)
+request:
+  mutations: false
+  destructive: false
+  heavy: false
+  conformance: false

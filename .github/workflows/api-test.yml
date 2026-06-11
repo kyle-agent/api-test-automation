@@ -35,6 +35,14 @@ on:
     paths: [".github/run-request"]
   workflow_dispatch:
     inputs:
+      suite:
+        description: "Named suite from suites/*.yaml (e.g. smoke, full). Suite values OR into the gates below; explicit inputs still apply on top."
+        required: false
+        default: ""
+      profile:
+        description: "Environment profile from environments/*.yaml (e.g. stage-kr-west1). Blank = repo vars (current behaviour)."
+        required: false
+        default: ""
       category:
         description: "Limit to one category (e.g. compute). Blank = all."
         required: false
@@ -136,6 +144,11 @@ env:
   # per-service-host default guess is wrong.
   SCP_OPLOG_BUCKET: ${{ vars.SCP_OPLOG_BUCKET || 'apitest-oplog-permanent' }}
   SCP_OPLOG_S3_ENDPOINT: ${{ vars.SCP_OPLOG_S3_ENDPOINT }}
+  # --- platform control plane mirror (core/oplog.py): when the var is set,
+  # every milestone/resource event is ALSO POSTed to the platform server's
+  # /api/ingest/events (fire-and-forget; a down server never affects the run).
+  APITEST_PLATFORM_URL: ${{ vars.APITEST_PLATFORM_URL }}
+  APITEST_PLATFORM_TOKEN: ${{ secrets.APITEST_PLATFORM_TOKEN }}
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -152,8 +165,12 @@ jobs:
       # 'true' only when a catalog refresh actually changed the spec — used to
       # gate the conformance job (no point re-judging an unchanged spec).
       spec_changed: ${{ steps.specdiff.outputs.spec_changed || 'false' }}
-      # Options parsed from .github/run-request (file-triggered runs only —
-      # the chat-controllable equivalent of workflow_dispatch inputs).
+      # Options resolved from the suite (suites/*.yaml) + .github/run-request
+      # (file-triggered runs) — the chat-controllable equivalent of
+      # workflow_dispatch inputs. Suite defaults apply first; explicit
+      # run-request lines override them.
+      req_suite: ${{ steps.req.outputs.suite }}
+      req_profile: ${{ steps.req.outputs.profile }}
       req_mutations: ${{ steps.req.outputs.mutations }}
       req_destructive: ${{ steps.req.outputs.destructive }}
       req_sweep_force: ${{ steps.req.outputs.sweep_force }}
@@ -164,34 +181,59 @@ jobs:
       req_crud_filter: ${{ steps.req.outputs.crud_filter }}
     steps:
       - uses: actions/checkout@v4
-      - name: Parse .github/run-request (file-triggered run options)
-        id: req
-        # KEY=VALUE lines (last one wins; # comments ignored). Only honored for
-        # push (file-touch) events so dispatch inputs stay authoritative there.
-        run: |
-          f=.github/run-request
-          # trim only LEADING/TRAILING whitespace — crud_filter values contain
-          # spaces ("a or b") that must survive.
-          get() { grep -E "^$1=" "$f" 2>/dev/null | tail -1 | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
-          if [ "${{ github.event_name }}" = "push" ] && [ -f "$f" ]; then
-            {
-              echo "mutations=$(get mutations)"
-              echo "destructive=$(get destructive)"
-              echo "sweep_force=$(get sweep_force)"
-              echo "heavy=$(get heavy)"
-              echo "conformance=$(get conformance)"
-              echo "category=$(get category)"
-              echo "service=$(get service)"
-              echo "crud_filter=$(get crud_filter)"
-            } >> "$GITHUB_OUTPUT"
-            echo "run-request options:"; grep -E '^[a-z_]+=' "$f" || echo "(none — read-only smoke run)"
-          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Resolve run options (suite + .github/run-request)
+        id: req
+        # A run is "suite × profile" (docs/PLATFORM-PLAN.md). The suite
+        # (suites/*.yaml, via the dispatch input or a `suite=<id>` line in the
+        # run-request file) expands to KEY=VALUE defaults; explicit KEY=VALUE
+        # lines in .github/run-request (push events) override them — last one
+        # wins, # comments ignored. An unknown suite id fails here, BEFORE
+        # anything touches the live API.
+        run: |
+          f=.github/run-request
+          SUITE="${{ github.event.inputs.suite }}"
+          if [ -z "$SUITE" ] && [ "${{ github.event_name }}" = "push" ] && [ -f "$f" ]; then
+            SUITE="$(grep -E '^suite=' "$f" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
+          fi
+          : > /tmp/suite.req
+          if [ -n "$SUITE" ]; then
+            python -m core.suites render "$SUITE" > /tmp/suite.req
+            echo "suite $SUITE expands to:"; grep -E '^[a-z_]+=' /tmp/suite.req
+          fi
+          # trim only LEADING/TRAILING whitespace — crud_filter values contain
+          # spaces ("a or b") that must survive.
+          get() { { cat /tmp/suite.req; if [ "${{ github.event_name }}" = "push" ] && [ -f "$f" ]; then cat "$f"; fi; } | grep -E "^$1=" 2>/dev/null | tail -1 | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+          PROFILE="${{ github.event.inputs.profile }}"
+          [ -z "$PROFILE" ] && PROFILE="$(get profile)"
+          {
+            echo "suite=$SUITE"
+            echo "profile=$PROFILE"
+            echo "mutations=$(get mutations)"
+            echo "destructive=$(get destructive)"
+            echo "sweep_force=$(get sweep_force)"
+            echo "heavy=$(get heavy)"
+            echo "conformance=$(get conformance)"
+            echo "category=$(get category)"
+            echo "service=$(get service)"
+            echo "crud_filter=$(get crud_filter)"
+          } >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "push" ] && [ -f "$f" ]; then
+            echo "run-request options:"; grep -E '^[a-z_]+=' "$f" || echo "(none — read-only smoke run)"
+          fi
+      - name: Apply environment profile
+        if: ${{ steps.req.outputs.profile != '' }}
+        # environments/<id>.yaml -> SCP_* vars for every later step in THIS job
+        # (the other jobs apply the same profile themselves). Values are not
+        # echoed: the export resolves credential references.
+        run: |
+          python -m core.profiles export "${{ steps.req.outputs.profile }}" >> "$GITHUB_ENV"
+          echo "applied environment profile: ${{ steps.req.outputs.profile }}"
       - name: Validate scenario data (merged fragments, ids, paths)
         # Offline guard: catches duplicate lifecycle ids / unresolvable paths /
         # broken captures across scenarios.json + lifecycles/*.json fragments
@@ -286,6 +328,12 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Apply environment profile
+        if: ${{ (github.event.inputs.profile || needs.spec.outputs.req_profile) != '' }}
+        run: |
+          P="${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}"
+          python -m core.profiles export "$P" >> "$GITHUB_ENV"
+          echo "applied environment profile: $P"
       - name: Verify configuration
         run: |
           if [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
@@ -577,6 +625,12 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Apply environment profile
+        if: ${{ (github.event.inputs.profile || needs.spec.outputs.req_profile) != '' }}
+        run: |
+          P="${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}"
+          python -m core.profiles export "$P" >> "$GITHUB_ENV"
+          echo "applied environment profile: $P"
       - name: Verify configuration
         run: |
           if [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
@@ -696,6 +750,12 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Apply environment profile
+        if: ${{ (github.event.inputs.profile || needs.spec.outputs.req_profile) != '' }}
+        run: |
+          P="${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}"
+          python -m core.profiles export "$P" >> "$GITHUB_ENV"
+          echo "applied environment profile: $P"
       - name: Download regression registry manifest
         continue-on-error: true
         uses: actions/download-artifact@v4
@@ -791,6 +851,12 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Apply environment profile
+        if: ${{ (github.event.inputs.profile || needs.spec.outputs.req_profile) != '' }}
+        run: |
+          P="${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}"
+          python -m core.profiles export "$P" >> "$GITHUB_ENV"
+          echo "applied environment profile: $P"
       - name: Verify configuration
         run: |
           [ -n "$SCP_ACCESS_KEY" ] && [ -n "$SCP_SECRET_KEY" ] || { echo "::error::missing creds"; exit 1; }
@@ -894,7 +960,9 @@ jobs:
   # ---------------------------------------------------------------------------
   dashboard:
     name: Build + publish dashboard
-    needs: [regression, regression-vpc-crud, conformance]
+    # spec is in needs (its outputs carry suite/profile for the snapshot);
+    # regression already depends on it, so this adds no serialization.
+    needs: [spec, regression, regression-vpc-crud, conformance]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -908,6 +976,12 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Apply environment profile
+        if: ${{ (github.event.inputs.profile || needs.spec.outputs.req_profile) != '' }}
+        run: |
+          P="${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}"
+          python -m core.profiles export "$P" >> "$GITHUB_ENV"
+          echo "applied environment profile: $P"
       - name: Download regression results
         continue-on-error: true
         uses: actions/download-artifact@v4
@@ -1000,6 +1074,16 @@ jobs:
             "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
             dashboard-data
           echo "published dashboard-data (enable Pages -> Deploy from branch -> dashboard-data /root)"
+      - name: Snapshot run results (per-run archive on the oplog bucket)
+        # docs/PLATFORM-PLAN.md M0: every run's canonical outputs (results
+        # JSONL + dashboard HTML + meta incl. catalog version) are archived
+        # under runs/<run_id>/snapshot/ so past dashboards can be reopened.
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          python -m core.snapshot upload \
+            --suite "${{ github.event.inputs.suite || needs.spec.outputs.req_suite }}" \
+            --profile "${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}" || true
       - name: Oplog — finalize run (summary + index.json)
         if: ${{ always() }}
         continue-on-error: true
