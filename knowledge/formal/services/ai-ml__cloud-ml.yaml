@@ -1,0 +1,16 @@
+# Cloud ML — owner-provided domain knowledge (2026-06-11), provenance docs
+# until live-validated. Correction included: there is NO create-new-k8s fork —
+# cloud-ml only REFERENCES an existing Kubernetes Engine cluster.
+version: 1
+service: ai-ml/cloud-ml
+constraints:
+  - id: cloudml-needs-existing-ske-cluster
+    rule: "Cloud ML creation requires an EXISTING container/ske cluster (referenced at create — there is no create-along fork; owner corrected 2026-06-11). For test composition this means an ske-cluster prerequisite, which cascades SKE's own closure (vpc + subnet + security-group + filestorage volume)."
+    provenance: docs
+  - id: cloudml-needs-scr-with-auth-key
+    rule: "Cloud ML requires a Container Registry (container/scr) AND its 인증키 (container registry auth key — console-issued credential, same class as the SCR-push blocker). Without the auth key configured on the test account, cloud-ml creates are expected to fail at the registry-credential step."
+    provenance: docs
+quirks:
+  - id: cloudml-credential-precondition-class
+    note: "The SCR 인증키 is a CREDENTIAL precondition, not an API-creatable resource — model it like archivestorage's separate auth key: a precondition check, not a create step. Resource-model schema gains a credential-type requires entry for this (RESOURCE-MODEL-PLAN §1)."
+    provenance: docs

@@ -276,6 +276,16 @@ resources:
     requires: [vpc]
     provenance: docs
     notes: "ONE BM management op per account at a time (parallel lifecycles collide); no Security Groups (Firewall+TGW only); single-server delete orphans attached Block Storage(BM)"
+  cloud-ml:
+    service: ai-ml/cloud-ml
+    requires: [ske-cluster, container-registry]
+    provenance: docs
+    notes: "owner 2026-06-11: references an EXISTING ske cluster (no create-along fork — corrected) + needs the container registry's console-issued 인증키 (credential precondition, not a create step)"
+  container-registry:
+    service: container/scr
+    requires: []
+    provenance: docs
+    notes: "registry itself is API-creatable; its 인증키 is console-issued (credential class — see ai-ml__cloud-ml.yaml / SCR-push blocker)"
 quotas:
   vpc:
     limit: 5
