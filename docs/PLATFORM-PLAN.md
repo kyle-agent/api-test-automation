@@ -314,12 +314,22 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - [x] 엔진 보고 훅 — `core/oplog.py`에 `APITEST_PLATFORM_URL` POST 미러
       (fire-and-forget, 기본 비활성 — M1 서버가 수신)
 
-### M1 — Control Plane MVP (실행은 GitHub Actions 그대로)
-- [ ] FastAPI 서버 + SQLite (environments / suites / schedules / runs)
-- [ ] 수동 실행 UI (suite × 환경 → `workflow_dispatch`) + cron 스케줄러
-- [ ] run 히스토리 화면 + per-run 대시보드 서빙 (스냅샷 복원)
-- [ ] **AI B1: 실패 triage 후처리** + B2 요약 알림 (Claude Agent SDK,
-      `agents/regression-agent.md` 프롬프트 재사용)
+### M1 — Control Plane MVP (실행은 GitHub Actions 그대로) — DONE (배포 대기)
+- [x] FastAPI 서버 + SQLite — `controlplane/` (suites/environments는 repo
+      파일을 라이브로 읽고, DB는 runs/schedules/events/triage만 보유)
+- [x] 수동 실행 UI (suite × 환경 → `workflow_dispatch`) + cron 스케줄러
+      (UTC, 30s 폴링 데몬; dispatch 미설정 시 기록만 — 로컬 개발 가능)
+- [x] run 히스토리 화면 + per-run 대시보드 서빙 — DB 기록 + oplog 버킷
+      index 아카이브 병합, `runs/<id>/snapshot/` 프록시로 과거 대시보드 복원
+- [x] 라이브 추적 — oplog 미러(`APITEST_PLATFORM_URL`) 수신
+      `/api/ingest/events` → run 상태 자동 전이 + 마일스톤 타임라인
+- [x] **AI B1: 실패 triage 후처리** — baseline 외 신규 fail을 Claude
+      (claude-opus-4-8, structured output)가 environment/spec_change/
+      test_bug/real_regression으로 분류, `agents/regression-agent.md`를
+      시스템 프롬프트에 재사용. 수동 버튼 + `PLATFORM_AUTO_TRIAGE` 자동 훅
+- [x] B2 요약 알림 — `PLATFORM_NOTIFY_WEBHOOK` (Slack 호환)
+- 배포 절차: 서버 기동(`controlplane/README.md`) + repo Variables에
+      `APITEST_PLATFORM_URL`/`APITEST_PLATFORM_TOKEN` 설정 + dispatch PAT
 
 ### M2 — 관제와 개입
 - [ ] 라이브 run 뷰 (보고 훅 수신 → 진행현황 스트림)

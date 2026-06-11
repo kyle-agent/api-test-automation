@@ -1,0 +1,13 @@
+# Control-plane server dependencies (separate from the engine's
+# requirements.txt so CI test runs stay lean).
+fastapi>=0.110
+uvicorn>=0.29
+jinja2>=3.1
+python-multipart>=0.0.9
+croniter>=2.0
+anthropic>=0.40
+requests>=2.31
+PyYAML>=6.0
+boto3>=1.34
+# dev/offline checks
+httpx>=0.27

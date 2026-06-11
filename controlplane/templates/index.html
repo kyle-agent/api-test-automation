@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section>
+  <h2>수동 실행 — suite × 환경 프로파일</h2>
+  {% if not dispatch_ok %}
+  <p class="warn">GitHub dispatch 미설정 (PLATFORM_GITHUB_TOKEN / PLATFORM_GITHUB_REPO)
+     — 실행 요청은 기록만 됩니다.</p>
+  {% endif %}
+  <form class="inline" method="post" action="/runs/trigger">
+    <label>suite
+      <select name="suite">
+        {% for s in suites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>profile
+      <select name="profile">
+        <option value="">(repo vars 기본)</option>
+        {% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit">실행</button>
+  </form>
+</section>
+
+<section>
+  <h2>스케줄 (cron, UTC)</h2>
+  <table>
+    <tr><th>cron</th><th>suite</th><th>profile</th><th>상태</th><th>최근 실행</th>
+        <th>메모</th><th></th></tr>
+    {% for s in schedules %}
+    <tr>
+      <td><code>{{ s['cron'] }}</code></td>
+      <td>{{ s['suite'] }}</td>
+      <td>{{ s['profile'] or '-' }}</td>
+      <td>{{ '활성' if s['enabled'] else '중지' }}</td>
+      <td class="muted">{{ s['last_fired'] or '-' }}</td>
+      <td class="muted">{{ s['note'] }}</td>
+      <td style="white-space:nowrap">
+        <form style="display:inline" method="post" action="/schedules/{{ s['id'] }}/toggle">
+          <button class="ghost" type="submit">{{ '중지' if s['enabled'] else '재개' }}</button>
+        </form>
+        <form style="display:inline" method="post" action="/schedules/{{ s['id'] }}/delete"
+              onsubmit="return confirm('스케줄을 삭제할까요?')">
+          <button class="ghost" type="submit">삭제</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="muted">등록된 스케줄이 없습니다.</td></tr>
+    {% endfor %}
+  </table>
+  <form class="inline" method="post" action="/schedules" style="margin-top:10px">
+    <input type="text" name="cron" placeholder="0 2 * * *" required size="12">
+    <select name="suite">
+      {% for s in suites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+    </select>
+    <select name="profile">
+      <option value="">(repo vars 기본)</option>
+      {% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+    </select>
+    <input type="text" name="note" placeholder="메모" size="20">
+    <button type="submit">스케줄 추가</button>
+  </form>
+</section>
+
+<section>
+  <h2>최근 run</h2>
+  <div hx-get="/partials/runs" hx-trigger="every 10s" hx-swap="innerHTML">
+    {% include "_runs_table.html" %}
+  </div>
+  <p><a href="/runs">전체 히스토리 →</a></p>
+</section>
+
+{% endblock %}

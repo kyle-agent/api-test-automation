@@ -144,6 +144,11 @@ env:
   # per-service-host default guess is wrong.
   SCP_OPLOG_BUCKET: ${{ vars.SCP_OPLOG_BUCKET || 'apitest-oplog-permanent' }}
   SCP_OPLOG_S3_ENDPOINT: ${{ vars.SCP_OPLOG_S3_ENDPOINT }}
+  # --- platform control plane mirror (core/oplog.py): when the var is set,
+  # every milestone/resource event is ALSO POSTed to the platform server's
+  # /api/ingest/events (fire-and-forget; a down server never affects the run).
+  APITEST_PLATFORM_URL: ${{ vars.APITEST_PLATFORM_URL }}
+  APITEST_PLATFORM_TOKEN: ${{ secrets.APITEST_PLATFORM_TOKEN }}
 
 jobs:
   # ---------------------------------------------------------------------------

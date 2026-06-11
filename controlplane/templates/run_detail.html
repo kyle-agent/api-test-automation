@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Run {{ gh_run_id }}{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Run {{ gh_run_id }}</h2>
+  <table>
+    {% if run %}
+    <tr><th>status</th><td><span class="status {{ run['status'] }}">{{ run['status'] }}</span></td>
+        <th>trigger</th><td>{{ run['trigger'] }}</td></tr>
+    <tr><th>suite</th><td>{{ run['suite'] or (meta and meta.get('suite')) or '-' }}</td>
+        <th>profile</th><td>{{ run['profile'] or (meta and meta.get('profile')) or '-' }}</td></tr>
+    <tr><th>requested</th><td>{{ run['requested_at'] or '-' }}</td>
+        <th>finished</th><td>{{ run['finished_at'] or '-' }}</td></tr>
+    {% else %}
+    <tr><td class="muted" colspan="4">control plane 기록 없음 (이전/외부 run) —
+        아래 스냅샷 정보만 표시합니다.</td></tr>
+    {% endif %}
+    {% if meta %}
+    <tr><th>region/env</th><td>{{ meta.get('region','-') }} / {{ meta.get('env','-') }}</td>
+        <th>catalog</th>
+        <td class="muted">{{ meta.get('catalog',{}).get('endpoints','?') }} endpoints ·
+            sha {{ (meta.get('catalog',{}).get('sha256','') or '')[:12] }}</td></tr>
+    {% endif %}
+  </table>
+  <p>
+    {% if meta %}
+    <a href="/runs/{{ gh_run_id }}/snapshot/dashboard/index.html">📊 이 run의 대시보드 열기
+       (커버리지 포함, 스냅샷 복원)</a>
+    {% else %}
+    <span class="muted">스냅샷 없음 — M0 이전 run이거나 아직 업로드되지 않았습니다.</span>
+    {% endif %}
+  </p>
+</section>
+
+<section>
+  <h2>마일스톤 타임라인</h2>
+  <table>
+    <tr><th>ts</th><th>job</th><th>stage</th><th>status</th><th>detail</th></tr>
+    {% for e in milestones %}
+    <tr><td class="muted">{{ e['ts'] }}</td><td>{{ e['job'] }}</td>
+        <td>{{ e['stage'] }}</td><td>{{ e['status'] }}</td>
+        <td class="muted">{{ e['detail'][:160] }}</td></tr>
+    {% else %}
+    <tr><td colspan="5" class="muted">수신된 이벤트 없음 — 워크플로우에
+        APITEST_PLATFORM_URL이 설정되어 있어야 라이브 이벤트가 들어옵니다.</td></tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section>
+  <h2>AI 실패 triage</h2>
+  {% if triage %}
+  <p class="muted">{{ triage['ts'] }} · model {{ triage['model'] }}</p>
+  <p>{{ triage['summary'] }}</p>
+  {% if triage_detail and triage_detail.get('classifications') %}
+  <table>
+    <tr><th>endpoint</th><th>분류</th><th>원인</th><th>조치</th></tr>
+    {% for c in triage_detail['classifications'] %}
+    <tr>
+      <td><code>{{ c['endpoint_key'] }}</code></td>
+      <td><span class="cat {{ c['category'] }}">{{ c['category'] }}</span></td>
+      <td>{{ c['reason'] }}</td>
+      <td>{{ c['suggested_action'] }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+  {% endif %}
+  {% if triage_ok %}
+  <form method="post" action="/runs/{{ gh_run_id }}/triage" style="margin-top:8px">
+    <button type="submit">{{ '다시 분석' if triage else '신규 실패 분석 실행' }}</button>
+    <span class="muted">(스냅샷의 observations에서 baseline 외 fail을 분류합니다 —
+      수십 초 걸릴 수 있음)</span>
+  </form>
+  {% elif not triage %}
+  <p class="warn">ANTHROPIC_API_KEY 미설정 — AI triage 비활성.</p>
+  {% endif %}
+</section>
+
+{% endblock %}
