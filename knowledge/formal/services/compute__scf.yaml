@@ -1,0 +1,39 @@
+# Layer 1 — per-service knowledge: compute/scf (Cloud Functions)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/compute/cloud_functions/{overview,how_to_guides}/ (fetched 2026-06-11)
+
+version: 1
+service: compute/scf
+
+constraints:
+  - id: function-name-rule
+    rule: "Function name: starts with a lowercase letter; lowercase letters, digits, '-'; 3-64 chars"
+    provenance: docs
+  - id: region-availability
+    rule: "ONLY kr-west1 and kr-east1 provide Cloud Functions; kr-south1/2/3 do NOT — calls in southern regions are expected 4xx regardless of body"
+    provenance: docs
+  - id: runtime-enum
+    rule: "create requires a supported runtime+version: GO 1.21/1.23/1.25, Java 17, Node.js 18/20/22/24, PHP 8.1/8.4/8.5, Python 3.9/3.10/3.11/3.14 (GO 1.21/1.23, Node 18/20, PHP 8.1, Python 3.9 deprecated 2026-07-30; new creates on EoTS runtimes are rejected after 2026-07, and EoTS functions cannot be edited)"
+    provenance: docs
+  - id: prereq-optional-only
+    rule: "선행 서비스 is OPTIONAL: API Gateway (for API trigger integration) — function create itself needs nothing pre-existing, so SCF is a cheap standalone write lifecycle"
+    provenance: docs
+
+captures: {}
+
+states:
+  function: {field: $.status, ready: [Ready, Running]}   # Ready/Not Ready/Deploying/Running (docs; field name guessed)
+
+quirks:
+  - id: deploying-after-every-change
+    note: "code edit, jar check, trigger add/change and 구성 change all flip the function to Deploying — poll back to Ready before the next write (write-after-write 409/400 source)"
+    provenance: docs
+  - id: java-needs-object-storage
+    note: "Java runtime has NO inline editor — code comes as .jar/.zip pulled from an Object Storage bucket private URL; requires (1) an 인증키 for Object Storage and (2) the bucket's 접근제어 allowing the Cloud Functions service — otherwise import fails. Prefer Node/Python for automated lifecycles"
+    provenance: docs
+  - id: function-url-auth
+    note: "함수 URL supports 인증 유형 IAM (only authenticated IAM users may call) + IP access control; disabling access control deletes the registered IP list"
+    provenance: docs
+  - id: min-instances-cost
+    note: "함수 실행 최소 작업수 >= 1 prevents cold starts but bills continuously — keep 0 in test bodies"
+    provenance: docs

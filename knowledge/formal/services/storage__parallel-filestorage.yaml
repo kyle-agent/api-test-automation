@@ -1,0 +1,29 @@
+# Layer 1 — per-service knowledge: storage/parallel-filestorage
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/storage/parallel_file_storage/overview/ (fetched 2026-06-11)
+
+version: 1
+service: storage/parallel-filestorage
+
+constraints:
+  - id: volume-name-rule
+    rule: "volume name: starts with a lowercase letter; lowercase letters, digits, underscore; 3-21 chars — SAME rule as storage/filestorage volumes (and different from block-storage naming)"
+    provenance: docs
+  - id: mngc-prereq
+    rule: "선행 서비스: Multi-node GPU Cluster — Parallel File Storage volumes can ONLY be attached from Multi-node GPU Cluster (compute/multinodegpucluster); attach flows without an MNGC are dead ends, and full lifecycle validation is gated on the expensive MNGC resource"
+    provenance: docs
+  - id: snapshot-limit
+    rule: "max 50 snapshots per volume"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: snapshot-restore-not-released
+    note: "snapshot RESTORE is '추후 제공될 예정' (not yet released); recovery today = create a NEW volume from a snapshot — restore endpoints may 404/400 until release"
+    provenance: docs
+  - id: all-nvme
+    note: "All-NVMe distributed storage aimed at AI/ML + bigdata; volume = base unit (name + capacity at create)"
+    provenance: docs

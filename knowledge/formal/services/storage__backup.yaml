@@ -1,0 +1,32 @@
+# Layer 1 — per-service knowledge: storage/backup
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/storage/backup/overview/ (fetched 2026-06-11)
+
+version: 1
+service: storage/backup
+
+constraints:
+  - id: server-prereq
+    rule: "선행 서비스: Virtual Server 또는 Bare Metal Server — a backup needs an existing target server; Agentless backup (VM Image: Virtual Server / GPU Server) works straight from service create, Agent backup (Filesystem, incl. Bare Metal) requires a Backup Agent created and configured on the server BEFORE the Backup service can be created — creates without a live target are expected 400s"
+    provenance: docs
+  - id: schedule-limits
+    rule: "schedule: exactly 1 Full Backup + up to 6 Incremental Backup schedules; frequencies 매일/매주/매월; start time hour 1-23, minutes only 00 or 30; weekly needs day-of-week, monthly needs week-of-month (1,2,3,4,last) + day"
+    provenance: docs
+  - id: retention-enum
+    rule: "보관 기간 (retention) is an ENUM, not free-form: 14, 31, 93, 186 or 365 days (2주/1개월/3개월/6개월/1년) — arbitrary day counts are a likely 400"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: replication-follows-source
+    note: "Agent backups can replicate to another location; the replica's schedule and retention are FORCED equal to the source (not independently settable); Agentless backups instead support 원격지 백업 (remote-site backup)"
+    provenance: docs
+  - id: retention-auto-delete
+    note: "backups past retention auto-delete — list assertions on old backups are flaky by design; 즉시 Backup creates an off-schedule restore point"
+    provenance: docs
+  - id: encryption-fixed
+    note: "AES-256 encryption is always applied; not a request parameter"
+    provenance: docs

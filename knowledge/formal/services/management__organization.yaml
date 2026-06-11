@@ -8,6 +8,9 @@ constraints:
   - id: highest-blast-radius
     rule: "organizations / organization-accounts / service-control-policies / delegation-policies / policy-bindings / invitations can sever or DENY the entire account hierarchy and are largely irreversible. ALL org lifecycles are COVERAGE-ONLY: heavy + every write optional + expecting 403/400, never chaining create->attach/accept. NEVER weaken to real create/delete on a shared account"
     provenance: VALIDATED
+  - id: no-prereq
+    rule: "Organization has NO 선행 서비스 — but it is itself the prerequisite for ID Center and Cloud Control (and the Management-Account-only gate behind their smoke 400s/403s)"
+    provenance: docs
 
 captures: {}
 
@@ -16,4 +19,7 @@ states: {}
 quirks:
   - id: no-validated-bodies
     note: "no api_bodies.json entries exist for this service; all request bodies are guessed (docs-derived)"
+    provenance: docs
+  - id: account-add-types
+    note: "accounts join an Organization either by 생성 (created inside) or 가입 (invited existing account); 통제 정책 (control policies / ACP) cascade to every OU and account below the attach point — overview /userguide/management/organization/overview/ (fetched 2026-06-11)"
     provenance: docs

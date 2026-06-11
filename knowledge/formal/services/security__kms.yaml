@@ -1,0 +1,39 @@
+# Layer 1 — per-service knowledge: security/kms
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/security/kms/{overview,how_to_guides}/ (fetched 2026-06-11)
+
+version: 1
+service: security/kms
+
+constraints:
+  - id: no-prereq
+    rule: "KMS has NO 선행 서비스 — keys can be created on a bare account (good first write candidate for the security category)"
+    provenance: docs
+  - id: quotas
+    rule: "10,000 KMS keys per region; 100 공공 인증 알고리즘 (public-sector ARIA) keys per account (KR SOUTH only); key rotation capped at 100 versions per key (older-version ciphertext stays decryptable across rotations)"
+    provenance: docs
+  - id: region-scoped
+    rule: "KMS is a region service — a key is usable only inside the region it was created in; cross-region references 4xx"
+    provenance: docs
+  - id: create-fields
+    rule: "create requires: 키 이름 (required), 용도/key spec (required: AES-256 encrypt/decrypt, RSA-2048 encrypt+sign, ECDSA sign/verify, HMAC generate/verify; ARIA only with 공공 인증 알고리즘 on KR SOUTH); optional auto-rotation with period 1-730 days (defaults to 90 if enabled without a value); description and tags (<=50) optional"
+    provenance: docs
+
+captures: {}
+
+states:
+  kms-key: {field: $.status, ready: [Active]}   # Active / Stop (disabled) / To be terminated / Creating (docs; field name guessed)
+
+quirks:
+  - id: delete-is-deferred
+    note: "키 해지 offers 즉시 해지 (immediate) or 예약 해지 (permanent deletion after 72h, cancellable — cancelled keys come back DISABLED and need explicit re-activation). Teardown should use immediate; a key stuck in Creating allows only immediate termination"
+    provenance: docs
+  - id: detail-blocked-while-creating
+    note: "while status is Creating the detail page (and likely detail GET) is unavailable; persistent Creating means create failed — delete and recreate"
+    provenance: docs
+  - id: rotation-preserves-data-keys
+    note: "rotation only changes the master-key material (version +1); existing data-key ciphertext/plaintext stays valid; rewrapData API re-wraps under the rotated version"
+    provenance: docs
+  - id: disabled-key-blocks-consumers
+    note: "deactivating a key immediately breaks every service using it (e.g. Secrets Manager secrets encrypted with it) — order teardown consumers-first"
+    provenance: docs
