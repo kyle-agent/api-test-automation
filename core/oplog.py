@@ -177,7 +177,12 @@ def emit(stage: str, status: str, detail: str = "", job: str = "") -> bool:
 # ---------------------------------------------------------------------------
 _RES_BUF: list = []
 _RES_FIRST_TS = [0.0]
-_FLUSH_EVERY = 15          # events
+# Flush IMMEDIATELY by default (one object per event): a run only produces a
+# few hundred resource events, and buffering hid events during long polls
+# (a 30-min cluster wait emits nothing, so the age check never ran and the
+# viewer saw the create up to 30min late). Raise via env if PUT volume ever
+# becomes a concern.
+_FLUSH_EVERY = int(os.getenv("SCP_OPLOG_FLUSH_EVERY", "1"))
 _FLUSH_MAX_AGE = 30.0      # seconds
 
 
