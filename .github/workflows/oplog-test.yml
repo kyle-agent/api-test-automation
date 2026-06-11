@@ -7,6 +7,10 @@ name: oplog connectivity test
 # permanent bucket. Safe to run alongside anything.
 on:
   workflow_dispatch: {}
+  push:
+    # the MCP token cannot dispatch workflows (403) — editing THIS file in a
+    # push is the chat-driven trigger, same pattern as .github/run-request.
+    paths: [".github/workflows/oplog-test.yml"]
 
 env:
   SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
