@@ -179,7 +179,7 @@ def _kind_of(path: str) -> str:
 
 def emit_resource(action: str, *, path: str = "", service: str = "",
                   name: str = "", res_id: str = "", lifecycle: str = "",
-                  status: str = "") -> None:
+                  status: str = "", parent: str = "") -> None:
     """Buffer one resource/lifecycle event (best-effort, never raises)."""
     try:
         if _cfg() is None:
@@ -196,7 +196,7 @@ def emit_resource(action: str, *, path: str = "", service: str = "",
             "t": int(now * 1000), "action": action, "kind": _kind_of(path),
             "service": service or "", "name": str(name or "")[:120],
             "res_id": str(res_id or "")[:80], "lifecycle": lifecycle or "",
-            "status": str(status or "")[:40]})
+            "status": str(status or "")[:40], "parent": str(parent or "")[:80]})
         if not _RES_FIRST_TS[0]:
             _RES_FIRST_TS[0] = now
         if (len(_RES_BUF) >= _FLUSH_EVERY

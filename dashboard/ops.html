@@ -22,17 +22,19 @@
  #live .job{font-weight:600;margin-top:8px}
  .bar{height:8px;background:#eaeef2;border-radius:4px;overflow:hidden;margin:2px 0 8px}
  .bar div{height:100%;background:#2da44e}
- /* resource gantt */
- .g-kind{font-weight:600;font-size:12px;color:#57606a;margin:10px 0 2px}
- .g-row{display:flex;align-items:center;gap:6px;height:18px}
- .g-label{width:230px;font-size:11px;white-space:nowrap;overflow:hidden;
-          text-overflow:ellipsis;color:#1f2328}
- .g-track{position:relative;flex:1;height:10px;background:#f0f3f6;border-radius:5px}
- .g-bar{position:absolute;top:0;height:10px;border-radius:5px;min-width:6px}
- .g-alive{background:#2da44e;animation:pulse 1.6s infinite}
- .g-done{background:#a5b0bb}
- .g-fail{background:#cf222e}
- @keyframes pulse{50%{opacity:.55}}
+ /* resource hierarchy tree */
+ .t-children{margin-left:13px;padding-left:14px;border-left:2px solid #e3e8ee}
+ .t-node{display:inline-flex;align-items:center;gap:7px;padding:2px 10px;margin:3px 0;
+         border:1px solid #d8dee4;border-radius:6px;background:#fff;font-size:12px}
+ .t-kind{color:#57606a;font-size:11px}
+ .dot{width:9px;height:9px;border-radius:50%;flex:none}
+ .st-alive .dot{background:#2da44e;animation:pulse 1.4s infinite}
+ .st-alive{border-color:#2da44e}
+ .st-done{opacity:.62} .st-done .dot{background:#a5b0bb}
+ .st-fail{border-color:#cf222e;background:#fff5f5} .st-fail .dot{background:#cf222e}
+ .t-dur{font-weight:600;color:#0969da;font-size:11px}
+ .t-grp{font-weight:600;font-size:12px;color:#57606a;margin:12px 0 3px}
+ @keyframes pulse{50%{opacity:.5}}
  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
  .chip{border:1px solid #d0d7de;border-radius:12px;padding:1px 10px;font-size:12px;background:#fff}
  .chip b{color:#1a7f37} .chip s{color:#656d76;text-decoration:none}
@@ -53,9 +55,9 @@
 
 <div class="panel" id="live"><b>진행 중인 런</b><div id="liveBody" class="mut">불러오는 중…</div></div>
 
-<div class="panel" id="res"><b>자원 타임라인</b>
-  <span class="mut">(생성→테스트 중→삭제 · <span style="color:#2da44e">■ 살아있음/테스트 중</span>
-  <span style="color:#a5b0bb">■ 삭제됨</span> <span style="color:#cf222e">■ 정리 실패</span>)</span>
+<div class="panel" id="res"><b>자원 계층 · 상태</b>
+  <span class="mut">(VPC → Subnet → VM/DB… · <span style="color:#2da44e">● 살아있음/테스트 중</span>
+  <span style="color:#a5b0bb">● 삭제됨</span> <span style="color:#cf222e">● 정리 실패</span> · 숫자 = 수행시간)</span>
   <select id="resRun" onchange="renderRes()" style="font-size:12px"></select>
   <div class="chips" id="resChips"></div>
   <div id="resBody" class="mut">런 선택…</div></div>
@@ -159,7 +161,8 @@ function foldResources(evs){
     const key=e.res_id?`id:${e.res_id}`:`k:${e.service}/${e.kind}/${e.lifecycle}`;
     if(e.action==="created"){
       const r={kind:e.kind,service:e.service,name:e.name||e.res_id||e.lifecycle,
-               lifecycle:e.lifecycle,start:e.t,state:"alive"};
+               lifecycle:e.lifecycle,start:e.t,state:"alive",
+               res_id:e.res_id||"",parent:e.parent||""};
       res.push(r); (open[key]=open[key]||[]).push(r);
     }else if(e.action==="deleted"||e.action==="delete-failed"){
       const q=open[key]||open[`k:${e.service}/${e.kind}/${e.lifecycle}`]||[];
@@ -172,36 +175,59 @@ function foldResources(evs){
   }
   return {res,lcs:Object.values(lcs)};
 }
-function renderGantt(res,lcs){
-  const all=[...res,...lcs.map(l=>({kind:"lifecycle",service:l.svc,name:l.name,
-    start:l.start,end:l.end,state:l.end?(l.status==="failed"?"fail":"done"):"alive"}))];
-  if(!all.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; return; }
-  const t0=Math.min(...all.map(r=>r.start));
-  const t1=Math.max(Date.now(),...all.map(r=>r.end||r.start));
-  const span=Math.max(t1-t0,1);
-  // chips: per kind created/alive/deleted
+function fmtDur(ms){
+  const sec=Math.max(1,Math.round(ms/1000));
+  if(sec<90) return sec+"s";
+  const m=Math.floor(sec/60), s2=sec%60;
+  if(m<90) return s2?`${m}m ${s2}s`:`${m}m`;
+  return `${Math.floor(m/60)}h ${m%60}m`;
+}
+function nodeHtml(r){
+  const cls=r.state==="alive"?"st-alive":r.state==="fail"?"st-fail":"st-done";
+  const dur=r.end?fmtDur(r.end-r.start):fmtDur(Date.now()-r.start)+" 진행";
+  const st =r.state==="alive"?"테스트 중":r.state==="fail"?"정리 실패":"삭제됨";
+  return `<span class="t-node ${cls}" title="${r.name} · ${st}${r.lifecycle?" · "+r.lifecycle:""}">
+    <span class="dot"></span><span class="t-kind">${kindLabel(r)}</span>
+    <b>${r.name||r.res_id||"?"}</b><span class="t-dur">${dur}</span></span>`;
+}
+function renderTree(res,lcs){
+  if(!res.length&&!lcs.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; return; }
+  // chips: per kind 생성/테스트중/삭제/정리실패
   const agg={};
   for(const r of res){ const k=kindLabel(r); (agg[k]=agg[k]||{c:0,a:0,d:0,f:0}).c++;
     if(r.state==="alive")agg[k].a++; else if(r.state==="fail")agg[k].f++; else agg[k].d++; }
   $("#resChips").innerHTML=Object.entries(agg).map(([k,v])=>
     `<span class="chip">${k} <b>${v.c}</b><s> 생성</s>${v.a?` · <span class="run">${v.a} 테스트중</span>`:""}` +
     `${v.d?` · <s>${v.d} 삭제</s>`:""}${v.f?` · <span class="bad">${v.f} 정리실패</span>`:""}</span>`).join("");
-  // gantt grouped by kind, lifecycles last
-  const groups={};
-  for(const r of all){ const k=r.kind==="lifecycle"?"~Lifecycle 진행":kindLabel(r);
-    (groups[k]=groups[k]||[]).push(r); }
+  // hierarchy: children by parent res_id
+  const byId={}; for(const r of res) if(r.res_id) byId[r.res_id]=r;
+  const kids={};  const roots=[];
+  for(const r of res){
+    if(r.parent && byId[r.parent] && byId[r.parent]!==r) (kids[r.parent]=kids[r.parent]||[]).push(r);
+    else roots.push(r);
+  }
+  const renderNode=r=>{
+    const ch=(kids[r.res_id]||[]).sort((a,b)=>a.start-b.start);
+    return `<div>${nodeHtml(r)}${ch.length?`<div class="t-children">${ch.map(renderNode).join("")}</div>`:""}</div>`;
+  };
+  // VPC trees first, then remaining roots grouped by kind
+  const vpcs=roots.filter(r=>r.kind==="vpcs").sort((a,b)=>a.start-b.start);
+  const rest=roots.filter(r=>r.kind!=="vpcs");
   let html="";
-  for(const k of Object.keys(groups).sort()){
-    html+=`<div class="g-kind">${k.replace(/^~/,"")} <span class="mut">(${groups[k].length})</span></div>`;
-    for(const r of groups[k].sort((a,b)=>a.start-b.start)){
-      const l=((r.start-t0)/span*100).toFixed(2);
-      const w=Math.max(((r.end||t1)-r.start)/span*100,0.6).toFixed(2);
-      const cls=r.state==="alive"?"g-alive":r.state==="fail"?"g-fail":"g-done";
-      const dur=r.end?`${Math.round((r.end-r.start)/1000)}s`:"진행 중";
-      html+=`<div class="g-row"><div class="g-label" title="${r.name} · ${r.lifecycle||""}">${r.name}</div>
-        <div class="g-track"><div class="g-bar ${cls}" style="left:${l}%;width:${w}%"
-          title="${r.name} · ${dur}${r.lifecycle?" · "+r.lifecycle:""}"></div></div></div>`;
-    }
+  if(vpcs.length){ html+=`<div class="t-grp">네트워크 계층</div>`+vpcs.map(renderNode).join(""); }
+  const grp={};
+  for(const r of rest){ const k=kindLabel(r); (grp[k]=grp[k]||[]).push(r); }
+  for(const k of Object.keys(grp).sort()){
+    html+=`<div class="t-grp">${k} <span class="mut">(${grp[k].length})</span></div>`
+        + grp[k].sort((a,b)=>a.start-b.start).map(renderNode).join(" ");
+  }
+  // lifecycles: 수행시간 숫자 + 상태색 (간트 없음)
+  if(lcs.length){
+    html+=`<div class="t-grp">Lifecycle 수행시간</div>`+lcs.sort((a,b)=>a.start-b.start).map(l=>{
+      const state=l.end?(l.status==="failed"?"fail":"done"):"alive";
+      return nodeHtml({kind:"lifecycle",service:l.svc,name:l.name,start:l.start,end:l.end,
+                       state,res_id:"",lifecycle:""});
+    }).join(" ");
   }
   $("#resBody").innerHTML=html;
 }
@@ -210,7 +236,7 @@ async function renderRes(){
   SELECTED_RUN=$("#resRun").value||SELECTED_RUN;
   if(!SELECTED_RUN){ return; }
   try{ const evs=await loadResEvents(SELECTED_RUN);
-       const {res,lcs}=foldResources(evs); renderGantt(res,lcs);
+       const {res,lcs}=foldResources(evs); renderTree(res,lcs);
   }catch(e){ $("#resBody").textContent="자원 이벤트 조회 실패: "+e.message; }
 }
 function fillRunSelect(ids){
@@ -239,7 +265,7 @@ function renderSample(){
      <b>${e.stage}</b> <span class="${e.status==='success'?'ok':e.status==='failure'?'bad':'run'}">${e.status}</span>
      <span class="mut">${e.detail||""}</span></div>`).join("");
   fillRunSelect([d.live.run_id]);
-  const {res,lcs}=foldResources(d.resEvents); renderGantt(res,lcs);
+  const {res,lcs}=foldResources(d.resEvents); renderTree(res,lcs);
 }
 if(new URLSearchParams(location.search).has("sample")){
   window.SAMPLE=window.SAMPLE_DATA||null;
@@ -251,8 +277,8 @@ tick(); setInterval(tick,30000);
 (function(){
   const NOW=Date.now(), M=60000, T=m=>NOW-(95-m)*M;          // 95분짜리 런, 진행 중
   const TS=m=>new Date(T(m)).toISOString();
-  const ev=(m,action,kind,service,name,res_id,lifecycle,status)=>(
-    {t:T(m),ts:TS(m),action,kind,service,name,res_id,lifecycle,status:status||""});
+  const ev=(m,action,kind,service,name,res_id,lifecycle,status,parent)=>(
+    {t:T(m),ts:TS(m),action,kind,service,name,res_id,lifecycle,status:status||"",parent:parent||""});
   window.SAMPLE_DATA={
     live:{run_id:"27314355676",sha:"3f59837",events:[
       {ts:TS(0), job:"spec",        stage:"run-start",  status:"running", detail:"event=push mutations=true destructive=true heavy=true"},
@@ -262,25 +288,26 @@ tick(); setInterval(tick,30000);
       {ts:TS(15),job:"regression-A",stage:"adopt-crud", status:"running", detail:"-n 6 · shared-dbaas slimmed"},
     ]},
     resEvents:[
+      // ev(분, action, kind, service, name, res_id, lifecycle, status, parent)
       ev(15,"lifecycle-start","","vpc","heavy-shared-dbaas","","heavy-shared-dbaas"),
       ev(15.2,"created","vpcs","vpc","regrvpc-shared","vpc-a1","heavy-shared-dbaas"),
-      ev(16,"created","subnets","vpc","regrsub-db","sub-b2","heavy-shared-dbaas"),
-      ev(18,"created","clusters","mariadb","regrmaria","cl-m1","heavy-shared-dbaas"),
-      ev(18.2,"created","clusters","epas","regrepas","cl-e1","heavy-shared-dbaas"),
-      ev(18.4,"created","clusters","cachestore","regrcache","cl-c1","heavy-shared-dbaas"),
+      ev(16,"created","subnets","vpc","regrsub-main","sub-s1","heavy-shared-dbaas","","vpc-a1"),
+      ev(16.3,"created","subnets","vpc","regrsub-db","sub-b2","heavy-shared-dbaas","","vpc-a1"),
+      ev(18,"created","clusters","mariadb","regrmaria (DB)","cl-m1","heavy-shared-dbaas","","sub-b2"),
+      ev(18.2,"created","clusters","epas","regrepas (DB)","cl-e1","heavy-shared-dbaas","","sub-b2"),
+      ev(18.4,"created","clusters","cachestore","regrcache (Redis)","cl-c1","heavy-shared-dbaas","","sub-b2"),
       ev(60,"deleted","clusters","mariadb","","cl-m1","heavy-shared-dbaas"),
       ev(55,"deleted","clusters","epas","","cl-e1","heavy-shared-dbaas"),
       ev(52,"deleted","clusters","cachestore","","cl-c1","heavy-shared-dbaas"),
       ev(62,"deleted","subnets","vpc","","sub-b2","heavy-shared-dbaas"),
-      ev(63,"deleted","vpcs","vpc","","vpc-a1","heavy-shared-dbaas"),
       ev(64,"lifecycle-end","","vpc","heavy-shared-dbaas","","heavy-shared-dbaas","passed"),
 
       ev(16,"lifecycle-start","","virtualserver","compute-virtualserver-full","","compute-virtualserver-full"),
       ev(17,"created","keypairs","virtualserver","regrkey","kp-1","compute-virtualserver-full"),
       ev(17.5,"created","security-groups","security-group","regrsg","sg-1","compute-virtualserver-full"),
-      ev(19,"created","servers","virtualserver","regrsrv (VM)","srv-1","compute-virtualserver-full"),
-      ev(21,"created","volumes","virtualserver","regrvol-data","vol-1","compute-virtualserver-full"),
-      ev(23,"created","publicips","vpc","","pip-1","compute-virtualserver-full"),
+      ev(19,"created","servers","virtualserver","regrsrv (VM)","srv-1","compute-virtualserver-full","","sub-s1"),
+      ev(21,"created","volumes","virtualserver","regrvol-data","vol-1","compute-virtualserver-full","","sub-s1"),
+      ev(23,"created","publicips","vpc","public-ip","pip-1","compute-virtualserver-full"),
       ev(44,"deleted","publicips","vpc","","pip-1","compute-virtualserver-full"),
       ev(45,"deleted","volumes","virtualserver","","vol-1","compute-virtualserver-full"),
       ev(48,"deleted","servers","virtualserver","","srv-1","compute-virtualserver-full"),
@@ -289,11 +316,11 @@ tick(); setInterval(tick,30000);
       ev(50,"lifecycle-end","","virtualserver","compute-virtualserver-full","","compute-virtualserver-full","passed"),
 
       ev(16,"lifecycle-start","","ske","container-ske-cluster-nodepool","","container-ske-cluster-nodepool"),
-      ev(20,"created","clusters","ske","regrske (K8s)","cl-k1","container-ske-cluster-nodepool"),
+      ev(20,"created","clusters","ske","regrske (K8s)","cl-k1","container-ske-cluster-nodepool","","sub-s1"),
 
       ev(17,"lifecycle-start","","baremetal-blockstorage","blockstorage-volume","","blockstorage-volume"),
-      ev(18,"created","volumes","baremetal-blockstorage","regrbsvol","bsv-1","blockstorage-volume"),
-      ev(30,"created","snapshots","virtualserver","snapshot for regrvol","snap-1","virtualserver-volume-snapshot"),
+      ev(18,"created","volumes","baremetal-blockstorage","regrbsvol (BM)","bsv-1","blockstorage-volume"),
+      ev(30,"created","snapshots","virtualserver","snapshot for regrvol","snap-1","virtualserver-volume-snapshot","","vol-1"),
       ev(40,"deleted","snapshots","virtualserver","","snap-1","virtualserver-volume-snapshot"),
       ev(42,"delete-failed","volumes","baremetal-blockstorage","","bsv-1","blockstorage-volume","409 attached"),
       ev(43,"lifecycle-end","","baremetal-blockstorage","blockstorage-volume","","blockstorage-volume","failed"),
@@ -301,7 +328,7 @@ tick(); setInterval(tick,30000);
       ev(2,"lifecycle-start","","vpc","vpc-peering","","vpc-peering"),
       ev(3,"created","vpcs","vpc","regrvpc-peerA","vpc-p1","vpc-peering"),
       ev(4,"created","vpcs","vpc","regrvpcb-peerB","vpc-p2","vpc-peering"),
-      ev(6,"created","vpc-peerings","vpc","regrpeer","peer-1","vpc-peering"),
+      ev(6,"created","vpc-peerings","vpc","regrpeer","peer-1","vpc-peering","","vpc-p1"),
       ev(10,"deleted","vpc-peerings","vpc","","peer-1","vpc-peering"),
       ev(11,"deleted","vpcs","vpc","","vpc-p2","vpc-peering"),
       ev(12,"deleted","vpcs","vpc","","vpc-p1","vpc-peering"),

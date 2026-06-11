@@ -793,10 +793,16 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                     service=cu_svc or "", delete_path=cu_path, resource_id=rid,
                     kind=bkind or step["name"], parent=grp))
                 if _oplog:
+                    _parent = ""
+                    if isinstance(body, dict):
+                        _parent = str(body.get("subnet_id")
+                                      or body.get("vpc_id") or "")
+                        if "{" in _parent:   # unresolved placeholder
+                            _parent = ""
                     _oplog.emit_resource(
                         "created", path=cu_path, service=cu_svc or "",
                         name=(body or {}).get("name", "") if isinstance(body, dict) else "",
-                        res_id=rid, lifecycle=lifecycle["id"])
+                        res_id=rid, lifecycle=lifecycle["id"], parent=_parent)
     except LifecycleSkip as exc:
         if _oplog:
             _oplog.emit_resource("lifecycle-end", service=service or "",
