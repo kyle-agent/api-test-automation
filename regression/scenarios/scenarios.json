@@ -48,7 +48,11 @@
           "path": "/v1/resource-groups/{rg_id}",
           "json": {
             "name": "regr-rg-{unique}",
-            "description": "updated by API regression suite"
+            "description": "updated by API regression suite",
+            "resource_types": [
+              "resourcemanager:resource-group"
+            ],
+            "tags": []
           },
           "expect_status": [
             200,
@@ -95,10 +99,10 @@
           "optional": true,
           "json": {
             "tags": {
-              "": [
+              "{rg_srn}": [
                 {
-                  "key": "tag-key",
-                  "value": "tag-value"
+                  "key": "regrk",
+                  "value": "{unique}"
                 }
               ]
             }
@@ -662,12 +666,18 @@
           "method": "PUT",
           "path": "/v1/container-registries/{reg_id}/enable-public-endpoint",
           "json": {
-            "public_endpoint_enabled": false
+            "public_endpoint_enabled": true
           },
           "expect_status": [
             200,
+            201,
             202,
-            204
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
           ],
           "optional": true,
           "group": "scr-registry-acl"

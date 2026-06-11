@@ -147,11 +147,14 @@ def categorize(status: int, text: str) -> str:
     return results.SOFT  # 400/403/404/409/422 — needs params/permission/provisioning
 
 
-def _record_smoke(status, category, key, method, path, elapsed_ms=None):
-    """Dual-write: unified Observation store AND legacy smoke TSV."""
+def _record_smoke(status, category, key, method, path, elapsed_ms=None, note=""):
+    """Dual-write: unified Observation store AND legacy smoke TSV. `note`
+    carries the response body for fail-category calls so every red row in the
+    artifacts is self-diagnosing (no log spelunking)."""
     results.record(Observation(
         endpoint_key=key, method=method, path=path, status=status,
-        category=category, elapsed_ms=elapsed_ms, source="crud_probe"))
+        category=category, elapsed_ms=elapsed_ms, source="crud_probe",
+        note=(note or "")[:400]))
     import os
     ems = "" if elapsed_ms is None else f"{elapsed_ms:.0f}"
     # Under pytest-xdist each worker writes its OWN smoke shard (smoke_status-gw0.tsv)
@@ -672,9 +675,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # record the step call itself for coverage/timing
             _cat = categorize(resp.status, resp.raw_text or "")
             _ems = getattr(resp, "elapsed_ms", None)
+            _note = (resp.raw_text or "")[:400] if _cat == results.FAIL else ""
             _record_smoke(resp.status, _cat,
                           f"{lifecycle['id']}:{step['name']}", step["method"],
-                          step.get("path", path), _ems)
+                          step.get("path", path), _ems, note=_note)
             # ALSO record WRITE steps under their real catalog endpoint key so the
             # dashboard surfaces their HTTP status + response time per endpoint, the
             # same way GETs do (reads already arrive under the catalog key via smoke
@@ -684,7 +688,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 _ck = _catalog_key_for(step["method"], step.get("path", ""), step_service)
                 if _ck:
                     _record_smoke(resp.status, _cat, _ck, step["method"],
-                                  step.get("path", path), _ems)
+                                  step.get("path", path), _ems, note=_note)
             if (_oplog and step["method"].upper() == "DELETE"
                     and 200 <= resp.status < 300):
                 _oplog.emit_resource("deleted", path=path,
