@@ -43,8 +43,12 @@ _DUP_NAME = "regrprobesmoke"
 def load_known_issues(path: str = "data/baselines/known_issues.json") -> dict:
     """Baseline of already-tracked backend failures. A smoke 'fail' whose key is
     listed here is treated as a known issue (still recorded) rather than a NEW
-    regression, so the gate stays green unless a new endpoint breaks."""
-    p = Path(path)
+    regression, so the gate stays green unless a new endpoint breaks.
+
+    Per-environment: a profile-suffixed sibling (known_issues.<profile>.json)
+    wins when the run uses that environment profile (core/baselines.py)."""
+    from core import baselines
+    p = baselines.resolve(path)
     if not p.exists():
         return {}
     try:

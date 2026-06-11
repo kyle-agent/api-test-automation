@@ -970,6 +970,9 @@ def build(
     except Exception:
         lc_data = (json.load(open(lifecycles)).get("lifecycles", [])
                    if os.path.exists(lifecycles) else [])
+    # per-environment baseline: profile-suffixed sibling wins (core/baselines.py)
+    from core import baselines as _baselines
+    known = str(_baselines.resolve(known))
     known_data = json.load(open(known)) if os.path.exists(known) else {"issues": []}
     waiver_data = json.load(open(waivers)) if os.path.exists(waivers) else {"waivers": []}
     # cumulative verified set (pulled from the dashboard-data branch by CI)

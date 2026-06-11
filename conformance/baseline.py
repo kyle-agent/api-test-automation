@@ -66,7 +66,9 @@ def main() -> None:
 
     conf = json.loads(CONF.read_text())
     cur = {k: v["status"] for k, v in conf["by_endpoint"].items()}
-    bpath = Path(args.baseline)
+    # per-environment baseline: profile-suffixed sibling wins (core/baselines.py)
+    from core import baselines as _baselines
+    bpath = Path(_baselines.resolve(args.baseline))
     baseline = load_baseline(bpath)
 
     if baseline is None:

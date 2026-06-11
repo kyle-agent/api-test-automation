@@ -62,17 +62,22 @@ def enabled() -> bool:
     return bool(os.environ.get("ANTHROPIC_API_KEY"))
 
 
-def _known_issue_keys() -> set[str]:
+def _known_issue_keys(profile: str = "") -> set[str]:
+    """Baseline keys for the run's environment — profile-suffixed file wins
+    (core/baselines.py, 파일 분리 결정)."""
+    from core import baselines
+    path = baselines.resolve(ROOT / "data" / "baselines" / "known_issues.json",
+                             profile=profile)
     try:
-        data = json.loads((ROOT / "data" / "baselines" / "known_issues.json").read_text())
+        data = json.loads(Path(path).read_text())
         return {i.get("key", "") for i in data.get("issues", [])}
     except (OSError, ValueError):
         return set()
 
 
-def new_fails(gh_run_id: str) -> list[dict]:
+def new_fails(gh_run_id: str, profile: str = "") -> list[dict]:
     """The run's fail-category observations not muted by the baseline."""
-    known = _known_issue_keys()
+    known = _known_issue_keys(profile)
     fails = []
     for obs in snapshots.observations(gh_run_id):
         if obs.get("category") != "fail":
@@ -112,8 +117,8 @@ def run_triage(gh_run_id: str) -> dict | None:
     nothing to triage / the snapshot is unavailable."""
     if not enabled():
         return None
-    fails = new_fails(gh_run_id)
     meta = snapshots.meta(gh_run_id) or {}
+    fails = new_fails(gh_run_id, profile=meta.get("profile", ""))
     if not fails:
         result = {"summary": "새로운 실패 없음 — baseline 외 fail이 발견되지 않았습니다.",
                   "classifications": []}

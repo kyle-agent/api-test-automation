@@ -908,16 +908,27 @@ jobs:
             --limit "${PROBE_LIMIT:-0}" \
             --filter "${PROBE_FILTER}" | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Pull prior baseline
+        # Baselines are split PER ENVIRONMENT PROFILE (PLATFORM-PLAN §6 확정:
+        # 파일 분리): the published name carries the profile suffix
+        # (conformance_baseline.<profile>.json); the local working name stays
+        # fixed so the snapshot/publish plumbing is unchanged.
         run: |
           mkdir -p data
+          P="${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}"
+          BN="conformance_baseline${P:+.$P}.json"
+          echo "BASELINE_NAME=$BN" >> "$GITHUB_ENV"
           git fetch origin dashboard-data --depth=1 >/dev/null 2>&1 || true
-          git show origin/dashboard-data:conformance_baseline.json > data/conformance_baseline.json 2>/dev/null || true
+          git show "origin/dashboard-data:$BN" > data/conformance_baseline.json 2>/dev/null || true
           [ -s data/conformance_baseline.json ] || rm -f data/conformance_baseline.json
       - name: Baseline diff (only NEW defects alarm)
+        # --baseline points at the file the pull step ACTUALLY wrote. The
+        # module default (data/baselines/...) never matched the pulled path, so
+        # CI re-seeded every run and NEW-defect detection silently no-opped.
         run: |
           EXTRA=""
           [ "${{ github.event.inputs.update_baseline }}" = "true" ] && EXTRA="--update"
-          python -m conformance.baseline --init-if-missing $EXTRA | tee -a "$GITHUB_STEP_SUMMARY" || true
+          python -m conformance.baseline --baseline data/conformance_baseline.json \
+            --init-if-missing $EXTRA | tee -a "$GITHUB_STEP_SUMMARY" || true
       - name: Publish conformance data (non-destructive)
         continue-on-error: true
         run: |
@@ -929,7 +940,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # update ONLY the conformance axis's own data files (HTML stays owned by the dashboard job)
           cp "$GITHUB_WORKSPACE/data/conformance.json" . 2>/dev/null || true
-          cp "$GITHUB_WORKSPACE/data/conformance_baseline.json" . 2>/dev/null || true
+          # baseline publishes under its per-profile name (BASELINE_NAME from the pull step)
+          cp "$GITHUB_WORKSPACE/data/conformance_baseline.json" "./${BASELINE_NAME:-conformance_baseline.json}" 2>/dev/null || true
           cp "$GITHUB_WORKSPACE/reports/conformance_new.json" . 2>/dev/null || true
           touch .nojekyll
           git add -A
@@ -1035,7 +1047,8 @@ jobs:
           # consume conformance data published by the conformance axis
           # (keep the committed data/conformance.json as fallback if the pull is empty/absent)
           git show origin/dashboard-data:conformance.json > /tmp/conf.json 2>/dev/null && [ -s /tmp/conf.json ] && cp /tmp/conf.json data/conformance.json || true
-          git show origin/dashboard-data:conformance_baseline.json > data/conformance_baseline.json 2>/dev/null || true
+          P="${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}"
+          git show "origin/dashboard-data:conformance_baseline${P:+.$P}.json" > data/conformance_baseline.json 2>/dev/null || true
           git show origin/dashboard-data:conformance_new.json > reports/conformance_new.json 2>/dev/null || true
           [ -s data/conformance_baseline.json ] || rm -f data/conformance_baseline.json
           [ -s reports/conformance_new.json ] || rm -f reports/conformance_new.json

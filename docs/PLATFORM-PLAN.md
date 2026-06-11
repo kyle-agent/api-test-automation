@@ -383,8 +383,11 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
    필드를 도입하고, UI에 tenant 선택자를 추가한다. 인증 도입(리버스 프록시
    or 자체) 시 tenant 매핑.
 
-### 미결
+5. **baseline 환경별 분리** — **파일 분리로 확정·구현** (2026-06-11).
+   `core/baselines.py`: profile-suffixed sibling이 존재하면 우선
+   (`known_issues.<profile>.json`, `conformance_baseline.<profile>.json` —
+   후자는 dashboard-data 브랜치 발행명에 suffix). 미존재 시 기본 파일로
+   폴백 — 단일 환경 운영은 무변경. 부수 수정: CI에서 conformance baseline
+   경로 불일치로 매 run 재시드되던 버그(--baseline 명시)를 함께 해결.
 
-5. **Conformance baseline의 환경별 분리** — 검증계와 운영계의 known_issues
-   를 분리 관리할 것인가 (권고: 환경 프로파일에 귀속). multi-env 운영 시작
-   전(M2)까지 결정.
+(미결 결정 없음 — 모두 확정.)
