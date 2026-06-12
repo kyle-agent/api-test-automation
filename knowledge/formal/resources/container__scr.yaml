@@ -1,0 +1,88 @@
+# Resource-task model — container/scr (ct-scr group, Container Registry).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from container-scr-registry
+# (enabled, live-validated) + scr-image/tags-write-coverage (docker-push-born
+# resources -> no_api, like networking__firewall.yaml).
+#
+# Node id: cross-service.yaml carries BOTH 'scr-registry' (VALIDATED edge) and
+# 'container-registry' (docs edge, the key the ai-ml entries reference) — the
+# model uses container-registry (the fan-out contract's key); the validator's
+# scr-repository divergence warning vs the legacy 'scr-registry' edge is the
+# expected alias artifact, reconcile the L2 duplicate during R3.
+version: 1
+resources:
+  container-registry:
+    code: "ct-scr-registry"
+    service: container/scr
+    requires: []
+    create:
+      endpoint: "POST /v1/container-registries"
+      body: {name: "regrscr{unique}", private_acl_enabled: false,
+             private_acl_resources: [], public_acl_resources: [],
+             public_visible_enabled: false}
+    capture: {reg_id: "$.id"}
+    ready: {field: "$.state", until: [Running, RUNNING, active, ACTIVE],
+            timeout: 180, interval: 10}
+    delete: {endpoint: "DELETE /v1/container-registries/{reg_id}",
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: container-scr-registry,
+             steps: [create, wait-running, delete, wait-gone]}
+    notes: "선행 서비스 없음 (services quirk no-prerequisite-services). DELETE는 생성 직후 수 분간 500 레이스 — 소스는 500 재시도 12×30s + 404 폴링 (registry-delete-500-race VALIDATED); 합성기의 충돌-재시도 시맨틱에 500 포함 필요 (R3). 레지스트리의 인증키는 콘솔 발급 (credential class) — scr-image 노드의 {credential: scr-auth-key} 참조."
+
+  scr-repository:
+    code: "ct-scr-repository"
+    service: container/scr
+    requires: [container-registry]
+    create:
+      endpoint: "POST /v1/repositories"
+      body:
+        name: "regrrepo{unique}"
+        description: "API regression suite"
+        registry_id: "{container-registry.reg_id}"
+        lifecycle_policy:
+          lifecycle_policy_enabled: false
+          outdated_rule_enabled: false
+          outdated_rule_duration: 90
+          outdated_rule_tag_expression: "*"
+          untagged_rule_enabled: false
+          untagged_rule_duration: 90
+        lock_policy: {locked: false}
+        pull_policy:
+          critical_limit: 0
+          high_limit: 0
+          unmodified_excepted: false
+          unscanned_image_pull_prevented: false
+          vulnerable_image_pull_prevented: false
+        scan_policy:
+          auto_scan_enabled: false
+          fixed_version_excepted: false
+          language_excepted: false
+          scan_policy_enabled: false
+          secret_excepted: false
+          severity_limit: High
+        tags: []
+    capture: {repo_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/repositories/{repo_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: container-scr-registry, steps: [create-repo, delete-repo]}
+    notes: "정책 블록(lifecycle/lock/pull/scan)은 모두 no-op/disabled 값의 VALIDATED 템플릿 — 동일 shape이 repo/image/tag 정책 PUT들에 재사용된다. 삭제는 409/500 재시도 6×20s (소스 시맨틱). registry보다 먼저 삭제."
+
+  scr-image:
+    code: "ct-scr-image"
+    service: container/scr
+    no_api: true
+    requires:
+      - scr-repository
+      - {credential: scr-auth-key}
+    provenance: docs
+    source: {lifecycle: scr-image-write-coverage, steps: [seed-image-placeholder]}
+    notes: "Open API create 없음: SCR 이미지 id는 repository로의 `docker push`로 태어난다 — REST POST가 존재하지 않는다 (scr-image-write-coverage _note). push에는 레지스트리의 콘솔 발급 인증키가 필요 → {credential: scr-auth-key} 사전조건 (cross-service container-registry note; 환경에 미표시면 env-skip, archivestorage 패턴). 카탈로그에 있는 것은 image의 정책/설명 PUT과 DELETE /v1/images/{id}뿐. 합성 경로는 R3에서 push 가능한 러너가 생겨야 열린다 — 그때까지 그래프 문서화 전용."
+
+  scr-tag:
+    code: "ct-scr-tag"
+    service: container/scr
+    no_api: true
+    requires: [scr-image]
+    provenance: docs
+    source: {lifecycle: scr-tags-write-coverage, steps: [seed-tags-placeholder]}
+    notes: "Open API create 없음: 태그(tags/'tagses') 역시 docker push 산물이다. 카탈로그에는 PUT .../check-vulnerability·lock-policy와 DELETE /v1/tagses(BULK, body {ids:[...]})·DELETE /v1/tagses/{tags_id}만 존재. scr-image처럼 R3 push 러너 전까지 composer 대상 불가."
