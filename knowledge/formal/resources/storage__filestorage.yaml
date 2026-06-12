@@ -48,10 +48,10 @@ resources:
              retry_on_status: [500, 409], retries: 4, retry_interval: 15,
              destructive: true}
     # delete도 volume_id 쿼리 필수 (docs + run 27421363609 400 Field required)
-    provenance: docs
+    provenance: VALIDATED  # gen-wave2-fs 전 단계 2xx — run 27424991237 (create/read/list/delete, capture $.snapshot.id 증명)
     source: {lifecycle: filestorage-replication-schedule,
              steps: [create-snapshot, delete-snapshot]}
-    notes: "capture envelope $.snapshot.id는 validated-facts에 '(unproven)'으로 분류 — docs 유지, R3 라이브 2xx 후 승격. 볼륨당 최대 800 스냅샷(스케줄 생성분 128). 삭제는 소스에서 409/500 재시도 4×15s. restore는 PUT /v1/snapshots/{snapshot_id}/restore — 소유자 확인(2026-06-12): 스냅샷 생성은 볼륨만 있으면 즉시 가능, 복구는 스냅샷 생성 후에만 가능 (C4 verify 후보)."
+    notes: "capture envelope $.snapshot.id 라이브 증명 (run 27424991237 gen-wave2-fs). 볼륨당 최대 800 스냅샷(스케줄 생성분 128). 삭제는 소스에서 409/500 재시도 4×15s. restore는 PUT /v1/snapshots/{snapshot_id}/restore — 소유자 확인(2026-06-12): 스냅샷 생성은 볼륨만 있으면 즉시 가능, 복구는 스냅샷 생성 후에만 가능 (C4 verify 후보)."
 
   fs-snapshot-schedule:
     code: "st-fs-snapshot-schedule"

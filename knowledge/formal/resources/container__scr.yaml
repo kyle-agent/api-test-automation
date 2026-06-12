@@ -79,7 +79,9 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/repositories/{repo_id}",
          expect_status: [200]}
-      - {name: check-dup, endpoint: "GET /v1/repositories/check-duplication/name?name=regrrepo{unique}",
+      # registry_id: name만 보내면 라이브 400 ValidationError ["Field required"]
+      # (run 27424991237) — repo 이름은 레지스트리 스코프라 registry_id 필수
+      - {name: check-dup, endpoint: "GET /v1/repositories/check-duplication/name?name=regrrepo{unique}&registry_id={container-registry.reg_id}",
          expect_status: [200]}
       - {name: images-empty, endpoint: "GET /v1/repositories/{repo_id}/images",
          expect_status: [200]}

@@ -728,7 +728,7 @@
       "id": "gen-wave2-scr",
       "service": "container/scr",
       "enabled": true,
-      "_note": "recomposed — private-acl verify ACTUALLY removed (3rd attempt; batch-script deaths kept reverting it)",
+      "_note": "recomposed after run 27424991237 — repo check-dup 400 ValidationError ['Field required']: registry_id query param required (repo names are registry-scoped)",
       "steps": [
         {
           "name": "create-container-registry",
@@ -871,7 +871,7 @@
           "name": "verify-scr-repository-check-dup",
           "service": "scr",
           "method": "GET",
-          "path": "/v1/repositories/check-duplication/name?name=regrrepo{unique}",
+          "path": "/v1/repositories/check-duplication/name?name=regrrepo{unique}&registry_id={reg_id}",
           "expect_status": [
             200
           ],

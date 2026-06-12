@@ -317,7 +317,10 @@ resources:
   server-static-nat:
     code: "cp-vs-static-nat"
     service: compute/virtualserver
-    requires: [server-interface, server, port, public-ip]
+    # internet-gateway: 라이브 400(run 27424991237) VirtualServer.InvalidVpcPublicIp
+    # "The VPC should have at least one Internet Gateway when attaching Internet
+    # NAT" — NAT attach 전에 같은 VPC에 IGW 필수 (유저가이드에 없는 선행조건)
+    requires: [server-interface, server, port, public-ip, internet-gateway]
     create:
       endpoint: "POST /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats"
       # 라이브 ValidationError(run 27421363609)가 필드명을 직접 줌: publicip_id

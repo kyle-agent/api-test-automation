@@ -5,7 +5,7 @@
       "id": "gen-heavy-vs-netops",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "recomposed after run 27421363609 (publicip_id field, fs delete volume_id query)",
+      "_note": "recomposed after run 27424991237 — live 400 VirtualServer.InvalidVpcPublicIp: VPC needs an Internet Gateway before Internet NAT attach (undocumented prereq -> internet-gateway added to server-static-nat requires)",
       "steps": [
         {
           "name": "create-keypair",
@@ -313,6 +313,53 @@
           "group": "server-interface"
         },
         {
+          "name": "create-internet-gateway",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "json": {
+            "description": "API regression suite",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "type": "IGW",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "internet_gateway_id": "$.internet_gateway.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/internet-gateways/{internet_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-internet-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ATTACHED",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
           "name": "create-public-ip",
           "service": "vpc",
           "method": "POST",
@@ -405,6 +452,25 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-internet-gateway",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
           "expect_status": [
             200,
             202,
