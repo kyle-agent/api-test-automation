@@ -286,6 +286,11 @@ resources:
     requires: []
     provenance: docs
     notes: "registry itself is API-creatable; its 인증키 is console-issued (credential class — see ai-ml__cloud-ml.yaml / SCR-push blocker)"
+  aimlops-platform:
+    service: ai-ml/aimlops-platform
+    requires: [ske-cluster]
+    provenance: docs
+    notes: "owner 2026-06-11: ske-cluster prerequisite has a REAL existing-or-create fork — reference an existing cluster OR provision a new one inside the aimlops create (branch carries SKE's full closure + cost). See ai-ml__aimlops-platform.yaml"
 quotas:
   vpc:
     limit: 5

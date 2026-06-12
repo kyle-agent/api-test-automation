@@ -1,0 +1,12 @@
+# AIMLOps Platform — owner-provided domain knowledge (2026-06-11),
+# provenance docs until live-validated.
+version: 1
+service: ai-ml/aimlops-platform
+constraints:
+  - id: aimlops-needs-k8s-existing-or-create
+    rule: "AIMLOps Platform requires a Kubernetes Engine (container/ske) cluster, with a REAL fork at create time: ① reference an EXISTING cluster, or ② provision a NEW cluster as part of the aimlops create — branch ② carries SKE's full dependency closure (vpc + subnet + security-group + filestorage volume) and SKE-cluster cost/quota. (Contrast: cloud-ml has NO such fork — existing cluster reference only.)"
+    provenance: docs
+quirks:
+  - id: aimlops-fork-is-c4-variation
+    note: "For test composition the fork is an existing_or_create branch on the ske-cluster prerequisite (RESOURCE-MODEL-PLAN §1): variant A pre-creates an ske-cluster node and references it; variant B uses the new-cluster create body form with no external prerequisite but heavy cost accounting. Both variants are C4 coverage targets."
+    provenance: docs
