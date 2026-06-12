@@ -709,7 +709,7 @@
       "id": "gen-wave2-scr",
       "service": "container/scr",
       "enabled": true,
-      "_note": "composed wave — SCR userguide surface: registry check-dup/connectable/private-acl + repository policy PUT 7종 + empty images list (no docker push needed)",
+      "_note": "composed wave — SCR userguide surface: registry check-dup/connectable/private-acl + repository policy PUT 7종 + empty images list (docker push 불필요 영역)",
       "steps": [
         {
           "name": "create-container-registry",
@@ -758,12 +758,48 @@
           }
         },
         {
-          "name": "verify-container-registry",
+          "name": "verify-container-registry-read",
           "service": "scr",
           "method": "GET",
           "path": "/v1/container-registries/{reg_id}",
           "expect_status": [
             200
+          ],
+          "group": "container-registry"
+        },
+        {
+          "name": "verify-container-registry-check-dup",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/container-registries/check-duplication/name?name=regrscr{unique}",
+          "expect_status": [
+            200
+          ],
+          "group": "container-registry"
+        },
+        {
+          "name": "verify-container-registry-connectable",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/container-registries/connectable-resources",
+          "expect_status": [
+            200
+          ],
+          "group": "container-registry"
+        },
+        {
+          "name": "verify-container-registry-private-acl",
+          "service": "scr",
+          "method": "PUT",
+          "path": "/v1/container-registries/{reg_id}/private-acl",
+          "json": {
+            "private_acl_enabled": false,
+            "private_acl_resources": []
+          },
+          "expect_status": [
+            200,
+            202,
+            204
           ],
           "group": "container-registry"
         },
@@ -819,12 +855,129 @@
           }
         },
         {
-          "name": "verify-scr-repository",
+          "name": "verify-scr-repository-read",
           "service": "scr",
           "method": "GET",
           "path": "/v1/repositories/{repo_id}",
           "expect_status": [
             200
+          ],
+          "group": "scr-repository"
+        },
+        {
+          "name": "verify-scr-repository-check-dup",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/repositories/check-duplication/name?name=regrrepo{unique}",
+          "expect_status": [
+            200
+          ],
+          "group": "scr-repository"
+        },
+        {
+          "name": "verify-scr-repository-images-empty",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/repositories/{repo_id}/images",
+          "expect_status": [
+            200
+          ],
+          "group": "scr-repository"
+        },
+        {
+          "name": "verify-scr-repository-description",
+          "service": "scr",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/description",
+          "json": {
+            "description": "API regression suite"
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "scr-repository"
+        },
+        {
+          "name": "verify-scr-repository-lock-policy",
+          "service": "scr",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/lock-policy",
+          "json": {
+            "lock_policy": {
+              "locked": false
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "scr-repository"
+        },
+        {
+          "name": "verify-scr-repository-pull-policy",
+          "service": "scr",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/pull-policy",
+          "json": {
+            "pull_policy": {
+              "critical_limit": 0,
+              "high_limit": 0,
+              "unmodified_excepted": false,
+              "unscanned_image_pull_prevented": false,
+              "vulnerable_image_pull_prevented": false
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "scr-repository"
+        },
+        {
+          "name": "verify-scr-repository-scan-policy",
+          "service": "scr",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/scan-policy",
+          "json": {
+            "scan_policy": {
+              "auto_scan_enabled": false,
+              "fixed_version_excepted": false,
+              "language_excepted": false,
+              "scan_policy_enabled": false,
+              "secret_excepted": false,
+              "severity_limit": "High"
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "scr-repository"
+        },
+        {
+          "name": "verify-scr-repository-lifecycle-policy",
+          "service": "scr",
+          "method": "PUT",
+          "path": "/v1/repositories/{repo_id}/lifecycle-policy",
+          "json": {
+            "lifecycle_policy": {
+              "lifecycle_policy_enabled": false,
+              "outdated_rule_enabled": false,
+              "outdated_rule_duration": 90,
+              "outdated_rule_tag_expression": "*",
+              "untagged_rule_enabled": false,
+              "untagged_rule_count": 10
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
           ],
           "group": "scr-repository"
         },

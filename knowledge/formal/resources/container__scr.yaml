@@ -24,6 +24,17 @@ resources:
             timeout: 180, interval: 10}
     delete: {endpoint: "DELETE /v1/container-registries/{reg_id}",
              destructive: true}
+    verify:
+      - {name: read, endpoint: "GET /v1/container-registries/{reg_id}",
+         expect_status: [200]}
+      - {name: check-dup, endpoint: "GET /v1/container-registries/check-duplication/name?name=regrscr{unique}",
+         expect_status: [200]}
+      - {name: connectable, endpoint: "GET /v1/container-registries/connectable-resources",
+         expect_status: [200]}
+      - {name: private-acl, endpoint: "PUT /v1/container-registries/{reg_id}/private-acl",
+         json: {private_acl_enabled: false, private_acl_resources: []},
+         expect_status: [200, 202, 204],
+         note: "PrivateAclSetRequest (api_docs) — 비활성 재설정이라 무해. public-acl/enable-public-endpoint는 userguide 보안 경고로 제외 (C4-careful)"}
     provenance: VALIDATED
     source: {lifecycle: container-scr-registry,
              steps: [create, wait-running, delete, wait-gone]}
@@ -63,6 +74,33 @@ resources:
         tags: []
     capture: {repo_id: "$.id"}
     delete: {endpoint: "DELETE /v1/repositories/{repo_id}", destructive: true}
+    verify:
+      - {name: read, endpoint: "GET /v1/repositories/{repo_id}",
+         expect_status: [200]}
+      - {name: check-dup, endpoint: "GET /v1/repositories/check-duplication/name?name=regrrepo{unique}",
+         expect_status: [200]}
+      - {name: images-empty, endpoint: "GET /v1/repositories/{repo_id}/images",
+         expect_status: [200]}
+      - {name: description, endpoint: "PUT /v1/repositories/{repo_id}/description",
+         json: {description: "API regression suite"}, expect_status: [200, 202, 204]}
+      - {name: lock-policy, endpoint: "PUT /v1/repositories/{repo_id}/lock-policy",
+         json: {lock_policy: {locked: false}}, expect_status: [200, 202, 204]}
+      - {name: pull-policy, endpoint: "PUT /v1/repositories/{repo_id}/pull-policy",
+         json: {pull_policy: {critical_limit: 0, high_limit: 0, unmodified_excepted: false,
+                              unscanned_image_pull_prevented: false,
+                              vulnerable_image_pull_prevented: false}},
+         expect_status: [200, 202, 204]}
+      - {name: scan-policy, endpoint: "PUT /v1/repositories/{repo_id}/scan-policy",
+         json: {scan_policy: {auto_scan_enabled: false, fixed_version_excepted: false,
+                              language_excepted: false, scan_policy_enabled: false,
+                              secret_excepted: false, severity_limit: "High"}},
+         expect_status: [200, 202, 204]}
+      - {name: lifecycle-policy, endpoint: "PUT /v1/repositories/{repo_id}/lifecycle-policy",
+         json: {lifecycle_policy: {lifecycle_policy_enabled: false, outdated_rule_enabled: false,
+                                   outdated_rule_duration: 90, outdated_rule_tag_expression: "*",
+                                   untagged_rule_enabled: false, untagged_rule_count: 10}},
+         expect_status: [200, 202, 204],
+         note: "repo-레벨 정책/설명 PUT 7종 — body는 image-레벨 probe 검증 형태 + api_docs DTO (repo-레벨 라이브 미증명; userguide '리포지토리 관리하기' 2026-06-12). 이미지/태그-레벨 ops는 docker push(SCR 인증키) 전까지 불가"}
     provenance: VALIDATED
     source: {lifecycle: container-scr-registry, steps: [create-repo, delete-repo]}
     notes: "정책 블록(lifecycle/lock/pull/scan)은 모두 no-op/disabled 값의 VALIDATED 템플릿 — 동일 shape이 repo/image/tag 정책 PUT들에 재사용된다. 삭제는 409/500 재시도 6×20s (소스 시맨틱). registry보다 먼저 삭제."
