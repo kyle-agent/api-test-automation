@@ -21,7 +21,7 @@ sitting on one shared **kernel**.
 │  ├─ reporting: run history, per-run snapshot restore, run-A-vs-B compare      │
 │  ├─ AI seams (ai_pipelines.py): triage (B1), summaries (B2), spec-impact (A1),│
 │  │            scenario/task drafts (A2), fact extraction (A3) — draft-only    │
-│  └─ static_export.py → Pages /platform/ (~198 read-only pages, all clickable) │
+│  └─ static_export.py → Pages /platform/ (~199 read-only pages, all clickable) │
 └──────────────┬───────────────────────────────────────────────┬───────────────┘
                │ dispatch / commands                 heartbeat / │ results
 ┌──────────────▼────────────── Execution Plane ──────────────────▼──────────────┐
@@ -78,7 +78,7 @@ deterministic (AI sits at authoring time and post-run only).
 ## The M5 composer layer (resource model → scenarios)
 
 Axis-1 scenarios are no longer only hand-written. The **resource-task model**
-(`knowledge/formal/resources/*.yaml` — 127 nodes, readable codes
+(`knowledge/formal/resources/*.yaml` — 128 nodes, readable codes
 `<cat>-<group>-<resource>` such as `nw-vpc-vpc`, groups in `_groups.yaml`)
 declares per resource: its dependency requirements (`requires`, incl. `one_of`
 branches, `count` multiplicity and console-issued `credential` prerequisites),
@@ -89,8 +89,9 @@ to ordinary lifecycle JSON:
 ```
 resources/*.yaml ──load_model()──► dependency closure ──► topological order
    + capture wiring ──► verify steps ──► reverse teardown (conflict-retry
-   deletes, delete bodies / PUT-style teardown, filter-object captures,
-   lookup nodes) ──► gen-<node> / bundle-<group> lifecycle JSON ──► engine
+   deletes incl. per-node retry_on_status passthrough, delete bodies /
+   PUT-style teardown, filter-object captures, step headers, lookup nodes,
+   credential surfacing) ──► gen-<node> / bundle-<group> lifecycle JSON ──► engine
 ```
 
 The engine is **unmodified** — composed lifecycles run, sweep and report like
@@ -120,7 +121,11 @@ live run passes. Full design: `docs/RESOURCE-MODEL-PLAN.md`.
   `/api/ingest/events` (fire-and-forget; a dead platform never blocks a run).
 - **`dashboard/ops.html`** is a static viewer over that bucket: a
   **dependency-ordered live resource view** per run (resources attach under the
-  node they depend on), run pills, filters, and a run-finished verdict — works
+  node they depend on; the kind-level dependency map is generated from the
+  resource model by `dashboard/gen_dep_map.py`), in-flight-only run pills with
+  history-row selection, filters (incl. an `oplog-test-*` dev-prefix guard), a
+  run-finished **cleanup-integrity verdict** (testing / leaked /
+  cleanup-failed / deleted), paginated S3 listing and KST timestamps — works
   on Pages with no server and no GitHub access.
 - **`core/snapshot.py`** archives every run's results JSONL + built dashboard +
   `meta.json` (suite, profile, catalog sha256) under `runs/<run_id>/snapshot/`
