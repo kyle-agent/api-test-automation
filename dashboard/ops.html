@@ -57,7 +57,7 @@
 <div class="panel" id="live"><b>진행 중인 런</b><div id="liveBody" class="mut">불러오는 중…</div></div>
 
 <div class="panel" id="res"><b>자원 계층 · 상태</b>
-  <span class="mut">(VPC → Subnet → VM/DB… · <span style="color:#2da44e">● 살아있음/테스트 중</span>
+  <span class="mut">(자원 모델 의존 순서로 중첩·정렬: VPC → Subnet → Port/GW → VM/DB… · <span style="color:#2da44e">● 살아있음/테스트 중</span>
   <span style="color:#a5b0bb">● 삭제됨</span> <span style="color:#cf222e">● 정리 실패</span> · 숫자 = 수행시간)</span>
   <select id="resRun" onchange="renderRes()" style="font-size:12px"></select>
   <div class="chips" id="resChips"></div>
@@ -169,6 +169,9 @@ async function loadResEvents(rid){
   await Promise.all(workers);
   return keys.flatMap(k=>RES_CACHE.get(k)||[]);
 }
+// ---- DEP-MAP (generated — python3 dashboard/gen_dep_map.py) ----
+const DEP={"depth": {"access-keys": 0, "account-assignments": 2, "aimlops-platform": 3, "alerts": 0, "apis": 5, "archiving-policies": 0, "auto-scaling-groups": 3, "backup-agents": 2, "backups": 0, "baremetals": 2, "buckets": 0, "budgets": 0, "certificatemanager": 0, "cloud-functions": 2, "cloud-ml": 3, "cloudmonitorings": 0, "clusters": 2, "configinspection": 0, "container-registries": 0, "dashboards": 0, "data-flow-services": 2, "data-flows": 3, "data-ops": 3, "data-ops-services": 2, "delegation-policies": 1, "devops-services": 0, "direct-connects": 1, "event-rules": 0, "gpu-nodes": 2, "groups": 1, "hosted-zones": 1, "images": 0, "instances": 0, "internet-gateways": 1, "invitations": 1, "keypairs": 0, "kms": 0, "kubernetes-versions": 0, "landing-zones": 1, "launch-configurations": 1, "lb-health-checks": 2, "lb-listeners": 4, "lb-server-groups": 4, "loadbalancers": 2, "log-groups": 1, "nat-gateways": 2, "network-logging": 0, "nodepools": 3, "organization-accounts": 1, "organization-units": 1, "organizations": 0, "permission-sets": 1, "planned-computes": 0, "policies": 0, "ports": 2, "private-dns": 0, "private-nats": 0, "privatelink-endpoints": 0, "publicips": 0, "queues": 0, "quick-query": 2, "replications": 1, "repositories": 1, "resource-groups": 0, "roles": 0, "secrets": 1, "secretvault": 0, "security-group-rules": 1, "security-groups": 0, "server-groups": 0, "server-types": 0, "servers": 3, "service-control-policies": 1, "snapshot-schedules": 1, "snapshots": 1, "subnets": 1, "trails": 0, "transit-gateways": 0, "triggers": 1, "users": 1, "volume-groups": 2, "volume-transfer": 1, "volumes": 1, "vpc-endpoints": 2, "vpc-peerings": 1, "vpcs": 0}, "parent": {"account-assignments": "permission-sets", "aimlops-platform": "clusters", "auto-scaling-groups": "launch-configurations", "backup-agents": "subnets", "baremetals": "subnets", "cloud-functions": "subnets", "cloud-ml": "clusters", "clusters": "subnets", "data-flow-services": "subnets", "data-flows": "data-flow-services", "data-ops": "data-ops-services", "data-ops-services": "subnets", "delegation-policies": "organizations", "direct-connects": "vpcs", "gpu-nodes": "subnets", "groups": "instances", "hosted-zones": "private-dns", "internet-gateways": "vpcs", "invitations": "organizations", "landing-zones": "instances", "launch-configurations": "images", "lb-health-checks": "subnets", "lb-listeners": "lb-server-groups", "lb-server-groups": "lb-health-checks", "loadbalancers": "subnets", "nat-gateways": "subnets", "nodepools": "clusters", "organization-accounts": "organizations", "organization-units": "organizations", "permission-sets": "instances", "ports": "subnets", "quick-query": "subnets", "replications": "volumes", "repositories": "container-registries", "secrets": "kms", "security-group-rules": "security-groups", "servers": "subnets", "service-control-policies": "organizations", "snapshot-schedules": "volumes", "snapshots": "volumes", "subnets": "vpcs", "triggers": "cloud-functions", "users": "instances", "volume-groups": "volumes", "volume-transfer": "volumes", "vpc-endpoints": "subnets", "vpc-peerings": "vpcs"}};
+// ---- /DEP-MAP ----
 let RES_BUSY=false;
 function foldResources(evs){
   // pair created→deleted by res_id (fallback kind+lifecycle FIFO)
@@ -208,8 +211,25 @@ function nodeHtml(r){
     <span class="dot"></span><span class="t-kind">${kindLabel(r)}</span>
     <b>${r.name||r.res_id||"?"}</b><span class="t-dur">${dur}</span></span>`;
 }
+function attachByDep(res){
+  // model-declared parent kind (DEP.parent) fills in when the event stream
+  // didn't carry an explicit parent res_id — prefer same lifecycle, then the
+  // most recent instance created before the child
+  const byKind={}; for(const r of res)(byKind[r.kind]=byKind[r.kind]||[]).push(r);
+  for(const r of res){
+    if(r.parent) continue;
+    const pk=DEP.parent[r.kind]; if(!pk||pk===r.kind) continue;
+    const cands=(byKind[pk]||[]).filter(p=>p!==r&&p.res_id);
+    if(!cands.length) continue;
+    let best=cands.filter(p=>p.lifecycle===r.lifecycle&&p.start<=r.start);
+    if(!best.length) best=cands.filter(p=>p.start<=r.start);
+    if(!best.length) best=cands;
+    r.parent=best.sort((a,b)=>b.start-a.start)[0].res_id;
+  }
+}
 function renderTree(res,lcs){
   if(!res.length&&!lcs.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; return; }
+  attachByDep(res);
   // chips: per kind 생성/테스트중/삭제/정리실패
   const agg={};
   for(const r of res){ const k=kindLabel(r); (agg[k]=agg[k]||{c:0,a:0,d:0,f:0}).c++;
@@ -234,9 +254,14 @@ function renderTree(res,lcs){
   let html="";
   if(vpcs.length){ html+=`<div class="t-grp">네트워크 계층</div>`+vpcs.map(renderNode).join(""); }
   const grp={};
-  for(const r of rest){ const k=kindLabel(r); (grp[k]=grp[k]||[]).push(r); }
-  for(const k of Object.keys(grp).sort()){
-    html+=`<div class="t-grp">${k} <span class="mut">(${grp[k].length})</span></div>`
+  for(const r of rest){ (grp[r.kind]=grp[r.kind]||[]).push(r); }
+  // 의존 깊이 순(선행자원 먼저) — 자원 모델(knowledge/formal/resources) 기반
+  const kinds=Object.keys(grp).sort((a,b)=>
+    (DEP.depth[a]??99)-(DEP.depth[b]??99)||a.localeCompare(b));
+  for(const k of kinds){
+    const lbl=kindLabel(grp[k][0]);
+    const d=DEP.depth[k];
+    html+=`<div class="t-grp">${lbl} <span class="mut">(${grp[k].length}${d!=null?` · 의존단계 ${d}`:""})</span></div>`
         + grp[k].sort((a,b)=>a.start-b.start).map(renderNode).join(" ");
   }
   // lifecycles: 수행시간 숫자 + 상태색 (간트 없음)
