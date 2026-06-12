@@ -1,0 +1,37 @@
+# Resource-task model — financial-management/billingplan (fm-billing group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# billingplan-planned-computes-guarded (enabled, heavy, COVERAGE-ONLY — a
+# planned compute is a RESERVED/COMMITTED purchase, never actually bought by
+# the source lifecycle; body/capture UNPROVEN -> docs).
+version: 1
+resources:
+  planned-compute:
+    code: "fm-billing-planned-compute"
+    service: financial-management/billingplan
+    heavy: true
+    requires: []
+    create:
+      endpoint: "POST /v1/planned-computes"
+      body:
+        name: "regr-plannedcompute-{unique}"
+        product_offering: "{opt.product_offering}"
+        product_category: compute
+        term_months: 12
+        quantity: 1
+        payment_type: "{opt.payment_type}"
+      options:
+        product_offering: {type: string, required: true, default: virtual_server,
+                           note: "실 product-offering id/spec 필요 — 소스 lifecycle 값 virtual_server는 best-effort(4xx 예상). 실값 출처는 R3 과제"}
+        payment_type: {type: string, required: true, default: ALL_UPFRONT,
+                       note: "결제 방식 — enum 후보군 미문서(docs JS-rendered), 소스 값 ALL_UPFRONT"}
+    capture: {planned_compute_id: "$.id"}
+    verify:
+      - {name: show-cancellation-fee,
+         endpoint: "POST /v1/planned-computes/cancellation-fee",
+         json: {planned_compute_id: "{planned_compute_id}"},
+         expect_status: [200, 201, 400, 403, 404]}
+    provenance: docs
+    source: {lifecycle: billingplan-planned-computes-guarded,
+             steps: [list-planned-computes, show-cancellation-fee,
+                     create-planned-computes, update-planned-compute]}
+    notes: "GLOBAL(account-scoped) 서비스. 약정 컴퓨트 구매 = 실제 금융 커밋(기간 과금, 자유 취소 불가) — DELETE API가 없어 의도적으로 teardown 없음: 해지는 cancellation-fee 견적(verify의 read-like POST) 경로뿐이며 수수료가 발생한다. 합성기는 이 노드를 기본적으로 생성 비대상(heavy + 구매 권한/실 offering 필요)으로 다뤄야 한다. body와 capture envelope $.id 모두 UNPROVEN(docs) — 소스는 구매가 일어나지 않도록 4xx를 기대하는 coverage probe."

@@ -1,0 +1,28 @@
+# Resource-task model — financial-management/budget (fm-budget group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from budget-account-budget
+# (enabled, light, guarded — body/capture UNPROVEN per the lifecycle's own
+# note -> docs) by extract.py, curated by hand.
+version: 1
+resources:
+  account-budget:
+    code: "fm-budget-account"
+    service: financial-management/budget
+    requires: []
+    create:
+      endpoint: "POST /v1/budgets/account"
+      body:
+        name: "regr-budget-{unique}"
+        budget_amount: 1000000
+        currency: KRW
+        period_type: MONTHLY
+        notifications:
+          - threshold_percent: 80
+            notification_emails: ["kchoic.ai+budget{unique}@gmail.com"]
+    capture: {budget_id: "$.budget.id"}
+    delete: {endpoint: "DELETE /v1/budgets/account/{budget_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: budget-account-budget,
+             steps: [create-account-budget, show-account-budget,
+                     set-account-budget, delete-account-budget]}
+    notes: "GLOBAL(account-scoped, region 세그먼트 없음) 서비스 — 비과금 지출 알림 설정(인프라 없음 → light). 공유 계정에 budget이 이미 있으면 create가 409 — 단일성(계정당 1개 추정) 충돌은 합성 시 env-skip/adopt 후보. body(amount/threshold/notification 필드)와 capture envelope $.budget.id 모두 소스 lifecycle이 best-effort/추측으로 명시 — UNPROVEN(docs), 실 2xx 후 승격. PUT /v1/budgets/account/{id}(setaccountbudget)는 lifecycle 영역."

@@ -1,0 +1,23 @@
+# Resource-task model — devops-tools/devopsservice (dt-devops group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# devopsservice-write-coverage (enabled, light, guarded REAL-create attempt —
+# body/capture UNPROVEN per the lifecycle's own note -> docs) by extract.py,
+# curated by hand.
+version: 1
+resources:
+  devops-service:
+    code: "dt-devops-service"
+    service: devops-tools/devopsservice
+    requires: []
+    create:
+      endpoint: "POST /v1/devops-services"
+      body: {name: "regr-devops-{ualpha}",
+             description: "API regression suite"}
+    capture: {devops_service_id: "$.devops_service.id"}
+    delete: {endpoint: "DELETE /v1/devops-services/{devops_service_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: devopsservice-write-coverage,
+             steps: [check-name-duplication, create-devops-service,
+                     delete-devops-service]}
+    notes: "컨트롤플레인 CI/CD 워크스페이스(명백한 billable 인프라 없음 → light). body(name/description)는 best-effort(공식 문서 JS-rendered, api_bodies 없음), capture envelope $.devops_service.id는 소스 lifecycle도 '추측'으로 명시한 capture_soft — 모두 UNPROVEN(docs), 실 2xx 후 승격. 생성 전 GET /v1/devops-services/check-duplication?name=...으로 이름 중복 점검(소스 step), 삭제 전 checkdeletabledevopsservice GET 존재."
