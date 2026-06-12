@@ -317,8 +317,10 @@ def test_save_roundtrips_through_authoring_pipeline():
     assert r.status_code == 200, r.text[:300]
     assert "저장됨" in r.text, r.text[:500]
     assert "networking__vpc.yaml" in r.text
-    # 전용 validator 미탑재 degrade 안내 (R1 머지 전)
-    assert "validator 미탑재" in r.text
+    # R1 머지 후: knowledge/formal/validate.py가 resources 레이어를 검사하므로
+    # '전용 validator 미탑재' degrade 안내는 더 이상 나오지 않아야 한다
+    assert resource_model.validator_knows_resources()
+    assert "validator 미탑재" not in r.text
     # 파일이 §1 구조로 round-trip 되었는가
     doc = yaml.safe_load((RES_DIR / "networking__vpc.yaml").read_text())
     saved = doc["resources"]["vpc"]
