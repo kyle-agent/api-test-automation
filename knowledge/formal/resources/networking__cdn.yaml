@@ -1,0 +1,60 @@
+# Resource-task model — networking/cdn (nw-cdn group, Global CDN).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from networking-cdn-service
+# (light + enabled, but per its _note "NOT runtime-proven … pending live
+# validation" and the capture is capture_soft — so C5 keeps everything docs
+# until a live pass upgrades it; body copied verbatim from the lifecycle).
+version: 1
+resources:
+  cdn:
+    code: "nw-cdn-cdn"
+    service: networking/cdn
+    requires: []
+    create:
+      endpoint: "POST /v1/cdns"
+      body:
+        cache_expiry_time: "86400"
+        cache_key_hostname: REQUEST_HOST_HEADER
+        caching_option: ""
+        cdn_origin_hostname: "{opt.origin_hostname}"
+        cdn_origin_port: ""
+        cdn_origin_protocol: ""
+        cdn_service_domain_prefix: "regr{ualpha}"
+        cdn_service_origin_path: "/test/global/"
+        content_policy: ""
+        custom_forward_host_header: ""
+        description: "API regression suite"
+        forward_host_header: REQUEST_HOST_HEADER
+        name: "regr{ualpha}"
+        origin_hostname_type: DOMAIN
+        query_string_ignored: ""
+        range_request_allowed: ""
+        request_custom_headers: ""
+        response_custom_headers: ""
+        tags: []
+      options:
+        origin_hostname: {type: string, required: true,
+                          default: "test.example.com",
+                          note: "원본(origin) 도메인 — 기본값은 소스 lifecycle의
+                            placeholder (도메인명 방식 권장; 공인 IP 방식이면
+                            protocol/port도 필요, cdn-create-required-fields).
+                            실서빙 검증에는 실존 origin이 필요하다"}
+    capture: {cdn_id: "$.cdn.resource_id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/cdns/{cdn_id}", expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/cdns/{cdn_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-cdn-service, steps: [create-cdn, delete-cdn]}
+    notes: "선행 서비스 없음 — 계정 스코프, VPC-free (cdn-no-prereq-services).
+      REGION GATE: kr-west1/kr-east1 전용 (cdn-region-availability — 엔진
+      region-guard 부재, 소스 lifecycle _note의 운영 게이트). 사용 가능 id는
+      $.cdn.resource_id — $.cdn.id 아님 (cdn-id-is-resource-id; create envelope은
+      {cdn:{account_id,resource_id,workflow_id}}). Akamai 외부 워크플로라
+      프로비저닝이 비동기 — workflow_id 참고, 전파 지연 허용
+      (cdn-backed-by-akamai). cache_expiry_time '86400'은 userguide 범위
+      3600-2592000s 적용형 (cdn-cache-ttl-applied; 문자열 타입은 API reference
+      예제 일치). enum 추정치 (UNVALIDATED): cache_key_hostname/
+      forward_host_header=REQUEST_HOST_HEADER, origin_hostname_type=DOMAIN.
+      name/domain prefix는 전역 유일해야 한다 (cdn-domain-prefix-globally-unique;
+      계정당 도메인 20개 cap). capture는 소스에서 capture_soft — envelope은 docs
+      response_example 근거라 docs 유지. verify GET가 cdn의 gap_getid 1건
+      (detailcdnservice)을 닫는다."
