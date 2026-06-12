@@ -105,6 +105,7 @@ resources:
 | "lb 연결 또는 vm의 ip 연결" | `one_of:` + `use:` (참조의 어떤 산출물을 쓰는지) |
 | "security group 선택(선택사항)" | `options.<k>: {type: ref, required: false}` |
 | "dns/objectstorage/... 대상 등록" | `options.<k>: {type: enum, vary: true}` |
+| "container registry **인증키** 필요" (cloud-ml, owner 2026-06-11) | `requires: [{credential: scr-auth-key}]` — API로 생성 불가한 콘솔 발급 자격은 create step이 아니라 **사전조건 체크**: 합성기는 환경에 해당 credential이 표시돼 있지 않으면 env-skip 처리 (archivestorage 패턴) |
 
 ## 2. 합성기 (composer) — 자원 모델 → lifecycle JSON
 
