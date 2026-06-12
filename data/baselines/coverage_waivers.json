@@ -1,1699 +1,1748 @@
 {
- "_comment": "C3 coverage waivers (docs/COVERAGE-CRITERIA.md). Endpoints that can NEVER 2xx on the shared test account BY DESIGN. A waived endpoint leaves the C3 denominator but MUST still be C2 (called; the 4xx is the evidence). class: blast-radius | entitlement | unsatisfiable-flow | billing-prohibitive. HUMANS approve every addition (same review discipline as combo-scenarios). key = catalog endpoint key. The dashboard surfaces waived counts and flags waived endpoints that DO get a 2xx as removal candidates.",
- "waivers": [
-  {
-   "key": "storage/archivestorage/cancelarchiving",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/cancelrecovery",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/createarchivingpolicy",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/createbucket",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/deletebucket",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/deletebucketobjects",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/deletebucketobjectversions",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/listarchivinghistories",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/listarchivingpolicies",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/listbucketobjects",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/listbucketobjectversions",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/listbuckets",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/listrecoveryhistories",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/recoverobjects",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/recoverobjectversions",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/setarchivingpolicy",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/setarchivingpolicystate",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/setbucketencryption",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/setbucketversioning",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/showarchivinghistory",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/showarchivingpolicy",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/showbucket",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/showbucketencryption",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/showbucketversioning",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/archivestorage/showrecoveryhistory",
-   "class": "entitlement",
-   "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/acceptinvitation",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/attachpolicybindings",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/cancelinvitations",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/createaccount",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/createdelegationpolicy",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/createinvitation",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/createorganization",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/createorganizationunit",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/createservicecontrolpolicy",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/declineinvitation",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/deleteaccount",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/deletedelegationpolicy",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/deleteorganization",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/deleteorganizationunits",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/deleteservicecontrolpolicies",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/leaveorganization",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/moveaccount",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/removeaccounts",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/removepolicybindings",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/setdelegationpolicy",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/setorganization",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/setorganizationunit",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/organization/setservicecontrolpolicy",
-   "class": "blast-radius",
-   "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/createaccountassignment",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/createbulkgroupusers",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/creategroup",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/createinstance",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/createpermissionset",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/createuser",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deleteaccountassignment",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deletebulkaccountassignments",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deletebulkgroups",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deletebulkgroupusers",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deletebulkusers",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deletegroup",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deleteinstance",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deletepermissionset",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deletepermissionsetpolicies",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/deleteuser",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/listaccountassignments",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/listgroups",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/listgroupusers",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/listinstances",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/listpermissionsetpolicies",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/listpermissionsets",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/listusers",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/setgroup",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/setinstance",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/setpermissionset",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/setpermissionsetpolicies",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/setuser",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/showgroup",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/showinstance",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/showpermissionset",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/iam-identity-center/showuser",
-   "class": "entitlement",
-   "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
-   "provenance": "VALIDATED",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/addvolumegroupmembers",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolume",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumeattachments",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumegroup",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumegrouprecovery",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumegroupreplication",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumegroupsnapshot",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumegroupsnapshotschedule",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumerecovery",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumereplication",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumesnapshot",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumesnapshotrate",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/createvolumesnapshotschedule",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolume",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolumeattachments",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolumegroupreplication",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolumegroupsnapshot",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolumegroupsnapshotschedule",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolumereplication",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolumesnapshot",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolumesnapshotrate",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/deletevolumesnapshotschedule",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/listvolumegroupsnapshots",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/listvolumesnapshots",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/removevolumegroupmembers",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/restorevolumegroupsnapshot",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/restorevolumesnapshot",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/setvolumegroupreplicationcycle",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/setvolumegroupreplicationpolicy",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/setvolumegroupsnapshotschedule",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/setvolumeqos",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/setvolumereplicationcycle",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/setvolumereplicationpolicy",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/setvolumesnapshotrate",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/setvolumesnapshotschedule",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/showvolume",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/showvolumegroup",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/showvolumegroupreplication",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/baremetal-blockstorage/showvolumereplication",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/assignbaremetalprivatenatip",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/assignbaremetalpublicnatip",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/attachlocalsubnetbaremetal",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/createbaremetals",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/deletebaremetalprivatenatip",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/deletebaremetalpublicnatip",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/deletebaremetals",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/detachlocalsubnetbaremetal",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/listbaremetalimages",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/lockbaremetalserver",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/showbaremetal",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/startbaremetals",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/stopbaremetals",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/baremetal/unlockbaremetalserver",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/assigngpunodepublicnatip",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/creategpunodes",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/deletegpunodes",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/listgpunodeimages",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/listnodepools",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/lockgpunode",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/modifyclusterfabricmembers",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/releasegpunodepublicnatip",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/showclusterfabric",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/showgpunode",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/startgpunodes",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/stopgpunodes",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "compute/multinodegpucluster/unlockgpunode",
-   "class": "billing-prohibitive",
-   "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserveraddblockstorages",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserveraddsecondary",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlservercreatecluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlservercreaterestore",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverdeletecluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverexportlog",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverlistbackuphistories",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverlistlogexportconfigs",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverlistparameters",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverlistparametervalues",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverpatchminorversion",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverregisterlogexportconfig",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverremovebackuphistories",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverrestartcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetauditlog",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetbackup",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetblockstoragesize",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetdatabases",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetlogexportconfig",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetmaintenance",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetparametervalues",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetsecuritygrouprules",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversetservertype",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlservershowcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlservershowrequest",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverstartcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverstopcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverswitchovercluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversyncclusterstate",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserversyncparametervalues",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverunregisterlogexportconfig",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverunsetbackup",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "database/sqlserver/sqlserverunsetmaintenance",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticaaddblockstorages",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticacreatecluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticacreaterestore",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticadeletecluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticalistbackuphistories",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticaremovebackuphistories",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticarestartcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticasetbackup",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticasetblockstoragesize",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticasetmaintenance",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticasetsecuritygrouprules",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticasetservertype",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticashowcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticashowrequest",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticastartcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticastopcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticasyncclusterstate",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticaunsetbackup",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/vertica/verticaunsetmaintenance",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchengineaddblockstorages",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchengineaddinstances",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginecreatecluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginecreaterestore",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginedeletecluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginelistbackuphistories",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginepatchminorversion",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchengineremovebackuphistories",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginerestartcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginerestartdashboard",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginesetbackup",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginesetblockstoragesize",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginesetmaintenance",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginesetsecuritygrouprules",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginesetservertype",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchengineshowcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchengineshowrequest",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginestartcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginestopcluster",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchenginesyncclusterstate",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchengineunsetbackup",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "data-analytics/searchengine/searchengineunsetmaintenance",
-   "class": "entitlement",
-   "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/backup/checkconnectionstate",
-   "class": "unsatisfiable-flow",
-   "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/backup/createbackupagent",
-   "class": "unsatisfiable-flow",
-   "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/backup/deletebackupagent",
-   "class": "unsatisfiable-flow",
-   "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/backup/listagentbackuprestoretargetservers",
-   "class": "unsatisfiable-flow",
-   "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/backup/listbackupagenttargets",
-   "class": "unsatisfiable-flow",
-   "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/backup/restoreagentbackup",
-   "class": "unsatisfiable-flow",
-   "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/backup/showbackupagent",
-   "class": "unsatisfiable-flow",
-   "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "storage/backup/showinstallfilepath",
-   "class": "unsatisfiable-flow",
-   "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/deleteeventpolicy",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/getaccounteventlist",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/getaccountproductlist",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/getadressbookmemberlist",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/geteventdetail",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/geteventnotificationstates",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/geteventpolicydetail",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/geteventpolicyhistories",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/geteventpolicynotification",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/getmetricperfdatalist",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/getproducteventlist",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/getproducteventpolicylist",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/modifyeventpolicy",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  },
-  {
-   "key": "management/cloudmonitoring/puteventpolicy",
-   "class": "entitlement",
-   "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
-   "provenance": "docs",
-   "added": "2026-06-10"
-  }
- ]
+  "_comment": "C3 coverage waivers (docs/COVERAGE-CRITERIA.md). Endpoints that can NEVER 2xx on the shared test account BY DESIGN. A waived endpoint leaves the C3 denominator but MUST still be C2 (called; the 4xx is the evidence). class: blast-radius | entitlement | unsatisfiable-flow | billing-prohibitive. HUMANS approve every addition (same review discipline as combo-scenarios). key = catalog endpoint key. The dashboard surfaces waived counts and flags waived endpoints that DO get a 2xx as removal candidates.",
+  "waivers": [
+    {
+      "key": "storage/archivestorage/cancelarchiving",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/cancelrecovery",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/createarchivingpolicy",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/createbucket",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/deletebucket",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/deletebucketobjects",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/deletebucketobjectversions",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/listarchivinghistories",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/listarchivingpolicies",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/listbucketobjects",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/listbucketobjectversions",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/listbuckets",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/listrecoveryhistories",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/recoverobjects",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/recoverobjectversions",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/setarchivingpolicy",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/setarchivingpolicystate",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/setbucketencryption",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/setbucketversioning",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/showarchivinghistory",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/showarchivingpolicy",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/showbucket",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/showbucketencryption",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/showbucketversioning",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/archivestorage/showrecoveryhistory",
+      "class": "entitlement",
+      "reason": "Archive Storage requires its own console-issued auth keys the test account does not have (userguide; smoke 401s). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/acceptinvitation",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/attachpolicybindings",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/cancelinvitations",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/createaccount",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/createdelegationpolicy",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/createinvitation",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/createorganization",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/createorganizationunit",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/createservicecontrolpolicy",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/declineinvitation",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/deleteaccount",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/deletedelegationpolicy",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/deleteorganization",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/deleteorganizationunits",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/deleteservicecontrolpolicies",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/leaveorganization",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/moveaccount",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/removeaccounts",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/removepolicybindings",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/setdelegationpolicy",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/setorganization",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/setorganizationunit",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/organization/setservicecontrolpolicy",
+      "class": "blast-radius",
+      "reason": "organization WRITES can sever/deny the whole account hierarchy and are largely irreversible — coverage-only by design (called, expecting 403/400, never 2xx on the shared account). READS stay in the C3 target. Owner decision 2026-06-10: 조회만.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/createaccountassignment",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/createbulkgroupusers",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/creategroup",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/createinstance",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/createpermissionset",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/createuser",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deleteaccountassignment",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deletebulkaccountassignments",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deletebulkgroups",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deletebulkgroupusers",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deletebulkusers",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deletegroup",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deleteinstance",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deletepermissionset",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deletepermissionsetpolicies",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/deleteuser",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/listaccountassignments",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/listgroups",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/listgroupusers",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/listinstances",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/listpermissionsetpolicies",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/listpermissionsets",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/listusers",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/setgroup",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/setinstance",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/setpermissionset",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/setpermissionsetpolicies",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/setuser",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/showgroup",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/showinstance",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/showpermissionset",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/iam-identity-center/showuser",
+      "class": "entitlement",
+      "reason": "ID Center (SSO) needs an instance/enablement the test account does not have (smoke 400 ValidationError on every list). EXCLUDED from the C3 target by owner decision 2026-06-10.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/addvolumegroupmembers",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolume",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumeattachments",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumegroup",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumegrouprecovery",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumegroupreplication",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumegroupsnapshot",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumegroupsnapshotschedule",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumerecovery",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumereplication",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumesnapshot",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumesnapshotrate",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/createvolumesnapshotschedule",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolume",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolumeattachments",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolumegroupreplication",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolumegroupsnapshot",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolumegroupsnapshotschedule",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolumereplication",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolumesnapshot",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolumesnapshotrate",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/deletevolumesnapshotschedule",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/listvolumegroupsnapshots",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/listvolumesnapshots",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/removevolumegroupmembers",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/restorevolumegroupsnapshot",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/restorevolumesnapshot",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/setvolumegroupreplicationcycle",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/setvolumegroupreplicationpolicy",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/setvolumegroupsnapshotschedule",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/setvolumeqos",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/setvolumereplicationcycle",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/setvolumereplicationpolicy",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/setvolumesnapshotrate",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/setvolumesnapshotschedule",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/showvolume",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/showvolumegroup",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/showvolumegroupreplication",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/baremetal-blockstorage/showvolumereplication",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/assignbaremetalprivatenatip",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/assignbaremetalpublicnatip",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/attachlocalsubnetbaremetal",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/createbaremetals",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/deletebaremetalprivatenatip",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/deletebaremetalpublicnatip",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/deletebaremetals",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/detachlocalsubnetbaremetal",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/listbaremetalimages",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/lockbaremetalserver",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/showbaremetal",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/startbaremetals",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/stopbaremetals",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/baremetal/unlockbaremetalserver",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/assigngpunodepublicnatip",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/creategpunodes",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/deletegpunodes",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/listgpunodeimages",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/listnodepools",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/lockgpunode",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/modifyclusterfabricmembers",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/releasegpunodepublicnatip",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/showclusterfabric",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/showgpunode",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/startgpunodes",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/stopgpunodes",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "compute/multinodegpucluster/unlockgpunode",
+      "class": "billing-prohibitive",
+      "reason": "Requires a real (expensive) Bare Metal server attached/provisioned — C2-only by owner decision 2026-06-10 (BM은 C2까지만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserveraddblockstorages",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserveraddsecondary",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlservercreatecluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlservercreaterestore",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverdeletecluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverexportlog",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverlistbackuphistories",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverlistlogexportconfigs",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverlistparameters",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverlistparametervalues",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverpatchminorversion",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverregisterlogexportconfig",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverremovebackuphistories",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverrestartcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetauditlog",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetbackup",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetblockstoragesize",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetdatabases",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetlogexportconfig",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetmaintenance",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetparametervalues",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetsecuritygrouprules",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversetservertype",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlservershowcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlservershowrequest",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverstartcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverstopcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverswitchovercluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversyncclusterstate",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserversyncparametervalues",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverunregisterlogexportconfig",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverunsetbackup",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "database/sqlserver/sqlserverunsetmaintenance",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticaaddblockstorages",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticacreatecluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticacreaterestore",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticadeletecluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticalistbackuphistories",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticaremovebackuphistories",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticarestartcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticasetbackup",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticasetblockstoragesize",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticasetmaintenance",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticasetsecuritygrouprules",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticasetservertype",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticashowcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticashowrequest",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticastartcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticastopcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticasyncclusterstate",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticaunsetbackup",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/vertica/verticaunsetmaintenance",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineaddblockstorages",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineaddinstances",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginecreatecluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginecreaterestore",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginedeletecluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginelistbackuphistories",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginepatchminorversion",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineremovebackuphistories",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginerestartcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginerestartdashboard",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginesetbackup",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginesetblockstoragesize",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginesetmaintenance",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginesetsecuritygrouprules",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginesetservertype",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineshowcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineshowrequest",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginestartcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginestopcluster",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchenginesyncclusterstate",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineunsetbackup",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "data-analytics/searchengine/searchengineunsetmaintenance",
+      "class": "entitlement",
+      "reason": "Cluster create requires a commercial license the test account does not hold — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/backup/checkconnectionstate",
+      "class": "unsatisfiable-flow",
+      "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/backup/createbackupagent",
+      "class": "unsatisfiable-flow",
+      "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/backup/deletebackupagent",
+      "class": "unsatisfiable-flow",
+      "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/backup/listagentbackuprestoretargetservers",
+      "class": "unsatisfiable-flow",
+      "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/backup/listbackupagenttargets",
+      "class": "unsatisfiable-flow",
+      "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/backup/restoreagentbackup",
+      "class": "unsatisfiable-flow",
+      "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/backup/showbackupagent",
+      "class": "unsatisfiable-flow",
+      "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/backup/showinstallfilepath",
+      "class": "unsatisfiable-flow",
+      "reason": "Backup Agent requires an agent installed on a live server — agentless backup only by owner decision 2026-06-10 (agent 없는 백업으로만).",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/deleteeventpolicy",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/getaccounteventlist",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/getaccountproductlist",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/getadressbookmemberlist",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/geteventdetail",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/geteventnotificationstates",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/geteventpolicydetail",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/geteventpolicyhistories",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/geteventpolicynotification",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/getmetricperfdatalist",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/getproducteventlist",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/getproducteventpolicylist",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/modifyeventpolicy",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "management/cloudmonitoring/puteventpolicy",
+      "class": "entitlement",
+      "reason": "Read-side aggregation API needing console-style query context — C2-only by owner decision 2026-06-10.",
+      "provenance": "docs",
+      "added": "2026-06-10"
+    },
+    {
+      "key": "storage/parallel-filestorage/createsnapshot",
+      "class": "owner-exclusion",
+      "reason": "Parallel File Storage: reads-only scope by owner decision 2026-06-12 — 사용(쓰기) 테스트 제외. GET endpoints remain C3 targets.",
+      "provenance": "docs",
+      "added": "2026-06-12"
+    },
+    {
+      "key": "storage/parallel-filestorage/createvolume",
+      "class": "owner-exclusion",
+      "reason": "Parallel File Storage: reads-only scope by owner decision 2026-06-12 — 사용(쓰기) 테스트 제외. GET endpoints remain C3 targets.",
+      "provenance": "docs",
+      "added": "2026-06-12"
+    },
+    {
+      "key": "storage/parallel-filestorage/deletesnapshot",
+      "class": "owner-exclusion",
+      "reason": "Parallel File Storage: reads-only scope by owner decision 2026-06-12 — 사용(쓰기) 테스트 제외. GET endpoints remain C3 targets.",
+      "provenance": "docs",
+      "added": "2026-06-12"
+    },
+    {
+      "key": "storage/parallel-filestorage/deletevolume",
+      "class": "owner-exclusion",
+      "reason": "Parallel File Storage: reads-only scope by owner decision 2026-06-12 — 사용(쓰기) 테스트 제외. GET endpoints remain C3 targets.",
+      "provenance": "docs",
+      "added": "2026-06-12"
+    },
+    {
+      "key": "storage/parallel-filestorage/restoresnapshot",
+      "class": "owner-exclusion",
+      "reason": "Parallel File Storage: reads-only scope by owner decision 2026-06-12 — 사용(쓰기) 테스트 제외. GET endpoints remain C3 targets.",
+      "provenance": "docs",
+      "added": "2026-06-12"
+    },
+    {
+      "key": "storage/parallel-filestorage/setaccessrule",
+      "class": "owner-exclusion",
+      "reason": "Parallel File Storage: reads-only scope by owner decision 2026-06-12 — 사용(쓰기) 테스트 제외. GET endpoints remain C3 targets.",
+      "provenance": "docs",
+      "added": "2026-06-12"
+    },
+    {
+      "key": "storage/parallel-filestorage/setvolumecapacity",
+      "class": "owner-exclusion",
+      "reason": "Parallel File Storage: reads-only scope by owner decision 2026-06-12 — 사용(쓰기) 테스트 제외. GET endpoints remain C3 targets.",
+      "provenance": "docs",
+      "added": "2026-06-12"
+    }
+  ]
 }

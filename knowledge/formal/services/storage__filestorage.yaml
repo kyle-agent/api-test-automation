@@ -14,6 +14,18 @@ constraints:
   - id: protocol-by-os
     rule: "protocols: NFS for Linux, CIFS for Windows; disk types HDD/SSD/High-performance SSD; all volumes encrypted XTS-AES-256 (userguide)"
     provenance: docs
+  - id: fs-volume-no-prereqs
+    rule: "File Storage volume creation has NO prerequisites (owner 2026-06-12) — consistent with the live-proven standalone create."
+    provenance: VALIDATED
+  - id: fs-replication-cross-region
+    rule: "Replication is created AFTER a volume exists, and the replication target is a DIFFERENT region — kr-east1 is the one selected in practice (owner 2026-06-12). Same-region replication is not the intended use (the extractor's kr-west1 default was wrong). Valid targets discoverable via GET /v1/replications/regions."
+    provenance: docs
+  - id: fs-disk-backup-needs-second-volume
+    rule: "디스크백업 backs a volume up TO ANOTHER File Storage volume — a second volume must be created first and selected as the destination (owner 2026-06-12). Likely the replication_type=backup variant of POST /v1/replications; the destination-volume field mapping needs userguide confirmation before composing."
+    provenance: docs
+  - id: fs-snapshot-then-restore
+    rule: "Snapshot creation is immediately possible once the volume exists; snapshot RESTORE (PUT /v1/snapshots/{id}/restore) is only possible after a snapshot has been created (owner 2026-06-12)."
+    provenance: docs
 
 captures:
   filestorage-volume: $.volume_id   # FLAT — and DIFFERENT from virtualserver block volume ($.id)!

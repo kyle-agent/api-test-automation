@@ -36,7 +36,7 @@ resources:
     provenance: docs
     source: {lifecycle: filestorage-replication-schedule,
              steps: [create-snapshot, delete-snapshot]}
-    notes: "capture envelope $.snapshot.id는 validated-facts에 '(unproven)'으로 분류 — docs 유지, R3 라이브 2xx 후 승격. 볼륨당 최대 800 스냅샷(스케줄 생성분 128). 삭제는 소스에서 409/500 재시도 4×15s. restore는 PUT /v1/snapshots/{snapshot_id}/restore (verify 후보, 소스 restore-snapshot 스텝)."
+    notes: "capture envelope $.snapshot.id는 validated-facts에 '(unproven)'으로 분류 — docs 유지, R3 라이브 2xx 후 승격. 볼륨당 최대 800 스냅샷(스케줄 생성분 128). 삭제는 소스에서 409/500 재시도 4×15s. restore는 PUT /v1/snapshots/{snapshot_id}/restore — 소유자 확인(2026-06-12): 스냅샷 생성은 볼륨만 있으면 즉시 가능, 복구는 스냅샷 생성 후에만 가능 (C4 verify 후보)."
 
   fs-snapshot-schedule:
     code: "st-fs-snapshot-schedule"
@@ -67,14 +67,17 @@ resources:
         volume_id: "{filestorage-volume.volume_id}"
         region: "{opt.region}"
         replication_frequency: 5min
-        replication_type: replication
+        replication_type: "{opt.replication_type}"
         backup_retention_count: 2
       options:
-        region: {type: string, required: true, default: "kr-west1",
-                 note: "원격 DR 리전 (문서 예시 kr-west1) — DR/리전 미가용 시 4xx 가능 (소스 _note)"}
+        region: {type: string, required: true, default: "kr-east1",
+                 note: "복제 대상 리전 — 소유자 지식(2026-06-12): 볼륨과 DIFFERENT 리전을 선택하며 실사용은 kr-east1 (추출기의 kr-west1 기본값은 오류였음). 유효 목록은 GET /v1/replications/regions (R3 lookup 노드 후보)"}
+        replication_type: {type: enum, values: [replication, backup],
+                 default: replication, vary: true,
+                 note: "소유자 지식(2026-06-12): replication=타리전 DR 복제, backup=디스크백업(다른 FS 볼륨을 대상으로 — 두 번째 볼륨 선행 생성 필요). backup 변형의 대상 볼륨 필드 매핑은 유저가이드 확인 후 배선 (그 전까지 backup 변형 합성 금지)"}
     capture: {replication_id: "$.replication_id"}
     delete: {endpoint: "DELETE /v1/replications/{replication_id}", destructive: true}
     provenance: docs
     source: {lifecycle: filestorage-replication-schedule,
              steps: [create-replication, delete-replication]}
-    notes: "body는 api_docs ReplicationCreateRequest (createvolumereplication은 api_bodies에도 존재), capture $.replication_id는 소스에서 capture_soft (envelope UNPROVEN) — docs 유지."
+    notes: "body는 api_docs ReplicationCreateRequest, capture $.replication_id는 capture_soft (envelope UNPROVEN) — docs 유지. 소유자 지식(2026-06-12): 복제는 볼륨 생성 후 + 대상은 다른 리전(kr-east1). 디스크백업(replication_type=backup 추정)은 두 번째 FS 볼륨이 대상 — services fs-disk-backup-needs-second-volume."

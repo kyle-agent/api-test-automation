@@ -2,6 +2,9 @@
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # parallel-filestorage-capacity-restore (enabled+heavy; source _note says
 # bodies are DOCS-ONLY, no live 2xx → all nodes docs until an R3 scoped run).
+# OWNER SCOPE (2026-06-12): Parallel File Storage is READS-ONLY in testing —
+# 사용(쓰기) 제외. These nodes stay as documentation; do NOT compose them
+# (writes are coverage-waived, the write lifecycle is disabled).
 version: 1
 resources:
   pfs-volume:

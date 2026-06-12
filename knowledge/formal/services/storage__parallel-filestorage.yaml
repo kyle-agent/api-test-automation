@@ -6,6 +6,9 @@ version: 1
 service: storage/parallel-filestorage
 
 constraints:
+  - id: pfs-reads-only-scope
+    rule: "Parallel File Storage is READS-ONLY in the test scope (owner 2026-06-12): 사용(생성/변경/삭제/복구)은 테스트 대상에서 제외, GET 조회만 커버한다. Write endpoints are coverage-waived (owner-exclusion class); the capacity-restore lifecycle is disabled."
+    provenance: docs
   - id: volume-name-rule
     rule: "volume name: starts with a lowercase letter; lowercase letters, digits, underscore; 3-21 chars — SAME rule as storage/filestorage volumes (and different from block-storage naming)"
     provenance: docs

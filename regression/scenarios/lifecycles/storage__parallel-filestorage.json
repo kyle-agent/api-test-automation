@@ -3,7 +3,7 @@
     {
       "id": "parallel-filestorage-capacity-restore",
       "service": "storage/parallel-filestorage",
-      "enabled": true,
+      "enabled": false,
       "heavy": true,
       "_note": "Parallel FileStorage CAPACITY + SNAPSHOT-RESTORE lifecycle (billable parallel volume -> heavy, gated by SCP_RUN_HEAVY). Closes the 2 remaining write gaps: PUT /v1/volumes/{volume_id}/capacity and PUT /v1/snapshots/{snapshot_id}/restore. Flow: create a parallel volume (VolumeCreateRequest: name pattern ^[a-z]([a-z0-9_]){2,20}$, capacity_tb min 1, tags) -> capture $.id (Volume.id) -> set-capacity (VolumeCapacityRequest capacity_tb, min 1 max 1000 -> we send 2 to exercise a grow) -> create snapshot (capture $.snapshot.id from SnapshotCreateResponse.snapshot.id) -> restore snapshot (empty body) -> tear down snapshot + volume. Volume create/snapshot create/delete are already covered by an existing parallel-filestorage scenario surface; here they are the anchors required to reach the two uncovered PUTs. capacity_tb of 1 TB is the documented minimum; this is BILLABLE -> heavy. Bodies from data/api_docs.json model schemas; provenance DOCS-ONLY (no live 2xx). All steps optional+grouped so a failing family is isolated.",
       "steps": [
@@ -17,8 +17,19 @@
             "capacity_tb": 1,
             "tags": []
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {"volume_id": "$.id"},
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture": {
+            "volume_id": "$.id"
+          },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/volumes/{volume_id}",
@@ -30,10 +41,17 @@
           "method": "GET",
           "path": "/v1/volumes/{volume_id}",
           "optional": true,
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
             "field": "$.state",
-            "until": ["available", "AVAILABLE", "ACTIVE"],
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
             "timeout": 300,
             "interval": 15
           }
@@ -44,8 +62,19 @@
           "path": "/v1/volumes/{volume_id}/capacity",
           "group": "pfs-capacity",
           "optional": true,
-          "json": {"capacity_tb": 2},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "json": {
+            "capacity_tb": 2
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "create-snapshot",
@@ -53,9 +82,22 @@
           "path": "/v1/snapshots",
           "group": "pfs-snapshot",
           "optional": true,
-          "json": {"volume_id": "{volume_id}"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {"snapshot_id": "$.snapshot.id"},
+          "json": {
+            "volume_id": "{volume_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture": {
+            "snapshot_id": "$.snapshot.id"
+          },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/snapshots/{snapshot_id}",
@@ -69,11 +111,22 @@
           "group": "pfs-snapshot",
           "optional": true,
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ]
         },
         {
           "name": "probe-reads",
-          "probe_reads": {"volume_id": "{volume_id}"}
+          "probe_reads": {
+            "volume_id": "{volume_id}"
+          }
         },
         {
           "name": "delete-snapshot",
@@ -82,8 +135,20 @@
           "group": "pfs-snapshot",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 404, 409, 400, 403, 422],
-          "retry_on_status": [409, 500],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409,
+            400,
+            403,
+            422
+          ],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 4,
           "retry_interval": 15
         },
@@ -93,8 +158,17 @@
           "path": "/v1/volumes/{volume_id}",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 404, 409],
-          "retry_on_status": [409, 500],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409
+          ],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 6,
           "retry_interval": 20
         },
@@ -103,10 +177,20 @@
           "method": "GET",
           "path": "/v1/volumes/{volume_id}",
           "optional": true,
-          "expect_status": [200, 404],
-          "poll": {"until_status": [404], "timeout": 300, "interval": 15}
+          "expect_status": [
+            200,
+            404
+          ],
+          "poll": {
+            "until_status": [
+              404
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
         }
-      ]
+      ],
+      "_disabled_reason": "Parallel File Storage 쓰기는 테스트 대상 제외 (owner 2026-06-12) — 읽기 GET만 smoke로 커버"
     }
   ]
 }
