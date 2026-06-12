@@ -1,6 +1,9 @@
-# HEAVY rev 3: NAT publicip_id field + probe registry-borrow + fs delete query (54c9b47, 0cf1c75)
+# HEAVY rev 4: IGW prereq for static NAT (PF-13) + wave3 read-only first pass.
+# scr chain EXCLUDED so the docker probe can create its own registry
+# (rev 3 probe 403'd: the wave2-scr chain held the NON_VISIBILITY 1EA slot
+# and its registry was already deleting when the probe ran).
 mutations=true
 destructive=true
 heavy=true
-crud_filter=gen-
+crud_filter=gen- and not scr
 docker_probe=true
