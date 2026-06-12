@@ -21,6 +21,13 @@
       "type": "Automation Bug",
       "since": "2026-06-11",
       "note": "DELETE /v1/clusters/{id}/backups 401s while every other sub-op in the same live-cluster window 2xxes (run 27346642059, lifecycle database-postgresql-cluster) — matches the known backup-family/query-string HMAC signing suspicion (handoff: '401 backup-family retry'). Harness-side signing fix queued; unmute when it lands."
+    },
+    {
+      "key": "financial-management/budget/createaccountbudget",
+      "status": 500,
+      "classification": "Product Bug",
+      "note": "POST /v1/budgets/account -> 500 ContactAdminForAssistance with a complete-looking body incl. amount (run 27395331657, gen-wave-mgmisc). A validation problem must not 500. Muted pending backend fix; node stays docs-provenance and out of composed waves.",
+      "added": "2026-06-12"
     }
   ]
 }

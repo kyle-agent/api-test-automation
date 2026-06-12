@@ -71,7 +71,8 @@ resources:
         recipient_ids: []
         statistic: AVG
         tags: []
-        threshold: 80.0
+        # threshold 제거 — live 400 "threshold must not be set when operator
+        # is 'RANGE'" (run 27395331657); RANGE는 lower/upper_bound만 사용
         upper_bound: 90.0
         violation_count: 2
       options:
@@ -85,7 +86,7 @@ resources:
       destructive: true
     provenance: docs
     source: {lifecycle: servicewatch-alert, steps: [create-alert, delete-alert]}
-    notes: "body는 api_bodies createalert 기반이지만 metric_id/namespace_id/dimension 값들이 doc 샘플 id — 실 namespace/metric id 없이는 4xx 예상 (alert-eventrule-need-real-ids). envelope $.alert.id 추정 UNPROVEN. 실 id 조회(GET namespaces/metrics) 배선은 R3 과제."
+    notes: "body는 api_bodies createalert 기반이지만 metric_id/namespace_id/dimension 값들이 doc 샘플 id. COMPOSITION-BLOCKED: namespace/metric 목록 GET이 카탈로그에 없어 실 id를 API로 발견할 수 없음 — Planning 폼(M5)에서 소유자가 콘솔의 실 id를 옵션으로 입력해야 합성 가능. threshold/RANGE 충돌은 수정됨(run 27395331657)."
 
   dashboard:
     code: "mg-sw-dashboard"
@@ -150,4 +151,4 @@ resources:
       destructive: true
     provenance: docs
     source: {lifecycle: servicewatch-event-rule, steps: [create-event-rule, delete-event-rule]}
-    notes: "event_ids/resource_type_id/service_id가 doc 샘플 id — 이 계정에선 4xx 예상 (alert-eventrule-need-real-ids). envelope $.event_rule.id 추정 UNPROVEN. 실 event/service id 조회 배선은 R3 과제."
+    notes: "event_ids/resource_type_id/service_id가 doc 샘플 id. COMPOSITION-BLOCKED: event/service/resource-type 목록 GET이 카탈로그에 없어 실 id를 API로 발견할 수 없음 — Planning 폼(M5)에서 소유자가 콘솔의 실 id를 입력해야 합성 가능."

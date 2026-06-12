@@ -151,6 +151,11 @@ resources:
         target: {type: enum, values: [FS, OBS, SCR], default: FS,
                  required: true, vary: true,
                  note: "유효 enum은 라이브 ValidationError가 직접 알려줌(run 27394211896): 'VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)' — dns는 유효 타입이 아님 (VALIDATED enum)"}
+        # R3 BLOCKER (run 27395331657): type=FS -> 400 scp-network.vpc-endpoint
+        # .subnet-not-found "VPC Endpoint Type Subnet not found" — the API looks
+        # up the TARGET service's subnet from resource_key, so a real FS volume
+        # (resource_key = its id) is required, not a placeholder. Needs
+        # filestorage-volume wiring + userguide research before composing.
         endpoint_ip_address: {type: string, required: true, default: "10.124.0.20",
                               note: "선택한 subnet cidr 내부의 빈 IP여야 한다 — 기본값은 소스 lifecycle의 공유 subnet에 묶인 값"}
     capture: {vpc_endpoint_id: "$.vpc_endpoint.id"}

@@ -24,6 +24,9 @@ resources:
     delete: {endpoint: "DELETE /v1/budgets/account/{budget_id}",
              destructive: true}
     provenance: docs
+    # BLOCKED: live 500 ContactAdminForAssistance (run 27395331657) — Product
+    # Bug baselined in data/baselines/known_issues.json. Excluded from composed
+    # waves until the backend fix; retest then.
     source: {lifecycle: budget-account-budget,
              steps: [create-account-budget, show-account-budget,
                      set-account-budget, delete-account-budget]}
