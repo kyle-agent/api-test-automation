@@ -249,6 +249,22 @@ function fmtDur(ms){
   if(m<90) return s2?`${m}m ${s2}s`:`${m}m`;
   return `${Math.floor(m/60)}h ${m%60}m`;
 }
+function attachByDep(res){
+  // model-declared parent kind (DEP.parent) fills in when the event stream
+  // didn't carry an explicit parent res_id — prefer same lifecycle, then the
+  // most recent instance created before the child
+  const byKind={}; for(const r of res)(byKind[r.kind]=byKind[r.kind]||[]).push(r);
+  for(const r of res){
+    if(r.parent) continue;
+    const pk=DEP.parent[r.kind]; if(!pk||pk===r.kind) continue;
+    const cands=(byKind[pk]||[]).filter(p=>p!==r&&p.res_id);
+    if(!cands.length) continue;
+    let best=cands.filter(p=>p.lifecycle===r.lifecycle&&p.start<=r.start);
+    if(!best.length) best=cands.filter(p=>p.start<=r.start);
+    if(!best.length) best=cands;
+    r.parent=best.sort((a,b)=>b.start-a.start)[0].res_id;
+  }
+}
 // ---- status vocabulary: run finished -> alive means LEAKED, not testing ----
 window.DONE_RUNS=window.DONE_RUNS||new Set();
 let RFILTER={mode:"tree",type:null,q:""};
