@@ -1,0 +1,104 @@
+# Resource-task model — networking/vpn (nw-vpn group, the gateway->tunnel
+# chain). Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# networking-vpn-gateway-tunnel (HEAVY/billable; its _note says "NOT
+# runtime-proven … Wave 2" and both captures are capture_soft — so per C5
+# every body/capture stays docs until a heavy-window live pass upgrades it).
+#
+# Chain wiring mirrors the lb chain: vpn-gateway consumes the shared vpc
+# (adopt) + a self-created public-ip (ip_id), vpn-tunnel consumes
+# {vpn-gateway.vpn_gateway_id}. Delete retry semantics copied from the source
+# steps (tunnel 409x6, gateway 409x8 — gateway is not deletable while tunnels
+# exist or while Creating/Editing, services quirk vpn-gateway-delete-blocked).
+version: 1
+resources:
+  vpn-gateway:
+    code: "nw-vpn-gw"
+    service: networking/vpn
+    heavy: true
+    requires: [vpc, public-ip]
+    create:
+      endpoint: "POST /v1/vpn-gateways"
+      body: {description: "API regression suite",
+             ip_id: "{public-ip.publicip_id}", ip_type: PUBLIC,
+             name: "regrvpngw{ualpha}", tags: [], vpc_id: "{vpc.vpc_id}"}
+    capture: {vpn_gateway_id: "$.vpn_gateway.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/vpn-gateways/{vpn_gateway_id}",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/vpn-gateways/{vpn_gateway_id}",
+             retry_on_status: [409], retries: 8, retry_interval: 15,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-vpn-gateway-tunnel,
+             steps: [create-vpn-gateway, delete-vpn-gateway]}
+    notes: "이름은 3-20자 영숫자만 — 하이픈/언더스코어 금지 (vpn-gateway-name-rules;
+      regrvpngw{ualpha}=17 영숫자). Public IP(ip_id) + VPC 필수
+      (vpn-gateway-create-required-fields). 계정당 3개 cap. REGION GATE:
+      kr-west1/kr-east1/kr-south3 전용 (vpn-region-availability — 엔진
+      region-guard 부재, 소스 lifecycle _note의 운영 게이트). 상태기계
+      Creating->Active (vpn-console-states, docs) — 소스 lifecycle은 poll 없이
+      delete 409-재시도로 흡수하므로 모델도 ready 없이 동일 재시도 시맨틱 유지
+      ($.vpn_gateway.state 필드 경로는 UNPROVEN이라 ready 선언 보류). capture는
+      소스에서 capture_soft($.vpn_gateway.id) — envelope UNPROVEN이라 docs.
+      verify GET가 vpn gap_getid 중 showvpngateway를 닫는다."
+
+  vpn-tunnel:
+    code: "nw-vpn-tunnel"
+    service: networking/vpn
+    heavy: true
+    requires: [vpn-gateway]
+    create:
+      endpoint: "POST /v1/vpn-tunnels"
+      body:
+        description: "API regression suite"
+        name: "regrvpntun{ualpha}"
+        phase1:
+          dpd_retry_interval: 60
+          ike_version: 2
+          peer_gateway_ip: "{opt.peer_gateway_ip}"
+          phase1_diffie_hellman_groups: [14]
+          phase1_encryptions: ["aes256-sha256"]
+          phase1_life_time: 86400
+          pre_shared_key: "{opt.pre_shared_key}"
+        phase2:
+          perfect_forward_secrecy: ENABLE
+          phase2_diffie_hellman_groups: [14]
+          phase2_encryptions: ["aes256-sha256"]
+          phase2_life_time: 43200
+          remote_subnets: ["{opt.remote_subnet}"]
+        tags: []
+        vpn_gateway_id: "{vpn-gateway.vpn_gateway_id}"
+      options:
+        peer_gateway_ip: {type: string, required: true, default: "203.0.113.2",
+                          note: "온프레미스 peer VPN GW의 공인 IP — 실제 터널
+                            연결에는 실존 peer가 필요하다. 기본값은 소스
+                            lifecycle의 TEST-NET-3 문서용 IP (CRUD 형태 검증용
+                            placeholder; 터널은 생성되되 협상은 실패 예상)"}
+        pre_shared_key: {type: string, required: true,
+                         default: "regrPreSharedKey1",
+                         note: "PSK 8-64자 (vpn-tunnel-psk-length; 기본값 17자
+                           — 가이드 권장은 32자 영숫자). 실연결 시 peer와 동일
+                           값이어야 한다"}
+        remote_subnet: {type: cidr, required: true, default: "10.1.1.0/24",
+                        note: "온프레미스 원격 subnet CIDR — 터널당 최대 10개
+                          (vpn-tunnel-remote-subnet-max-10; 모델은 소스와 동일하게
+                          1개만 전송). 실연결 시 peer 측 실제 대역이어야 한다"}
+    capture: {vpn_tunnel_id: "$.vpn_tunnel.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/vpn-tunnels/{vpn_tunnel_id}",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/vpn-tunnels/{vpn_tunnel_id}",
+             retry_on_status: [409], retries: 6, retry_interval: 15,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-vpn-gateway-tunnel,
+             steps: [create-vpn-tunnel, delete-vpn-tunnel]}
+    notes: "이름은 3-20자 영숫자만 (vpn-tunnel-name-rules; regrvpntun{ualpha}=18).
+      gateway당 5개 cap. phase1/phase2의 encryption/diffie-hellman enum 값은
+      docs-example 추정 (UNVALIDATED — 거부될 수 있음); DPD interval 60은 1-3600s
+      범위 내 (vpn-tunnel-dpd-interval-range). peer_gateway_ip/PSK/remote_subnet은
+      온프레미스 peer 값이라 옵션으로 노출 (기본값 = 소스 lifecycle placeholder).
+      teardown은 tunnel 먼저, gateway 나중 (vpn-gateway-delete-blocked) — composer의
+      interval-scheduled teardown이 보장. capture는 소스에서
+      capture_soft($.vpn_tunnel.id) — envelope UNPROVEN이라 docs. verify GET가
+      vpn gap_getid 중 showvpntunnel을 닫는다."
