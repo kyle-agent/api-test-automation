@@ -697,189 +697,446 @@ def render_service_page(s, meta):
         f'</div></body></html>')
 
 
+def _dist_color(code: int) -> str:
+    fam = code // 100
+    if fam == 2:
+        return {200: "#15924f", 201: "#7cc69b", 202: "#3aa86a",
+                204: "#a9d9bf"}.get(code, "#57b87f")
+    if fam == 4:
+        return {400: "#b5740b", 401: "#d28a1f", 403: "#c63434",
+                404: "#cf8a3a", 409: "#9a6700"}.get(code, "#b5740b")
+    if fam == 5:
+        return "#c63434"
+    return "#7a838d"
+
+
+def _bar_color(pct: float) -> str:
+    return "var(--red)" if pct < 25 else "var(--amber)" if pct < 55 else "var(--green)"
+
+
 def render(d, hist, meta, services):
     called = d["ok"] + d["soft"] + d["fail_new"] + d["fail_known"]
     pass_rate = (d["ok"] / called * 100) if called else 0
     healthy = d["fail_new"] == 0
-    badge = ('<span class="badge ok">● HEALTHY — 0 new regressions</span>' if healthy
-             else f'<span class="badge bad">● {d["fail_new"]} NEW REGRESSION(S)</span>')
+    pill = ('<span class="pill"><span class="d"></span>HEALTHY</span>' if healthy
+            else f'<span class="pill bad"><span class="d"></span>{d["fail_new"]} NEW REGRESSION(S)</span>')
 
-    segs = sorted(((str(c), n, STATUS_COLORS.get(c // 100, "#656d76"))
-                   for c, n in d["dist"].items()), key=lambda x: x[0])
-    legend = "".join(f'<div class="lg"><span class="dot" style="background:{col}"></span>'
-                     f'{code} · {v}</div>' for code, v, col in segs) or \
-        '<div class="mut">no smoke results in this run</div>'
+    # ---- category aggregates (verified ops / total ops, services as source)
+    cat_agg = {}
+    for s in services:
+        a = cat_agg.setdefault(s["category"], {"cov": 0, "tot": 0})
+        a["cov"] += s["covered"]
+        a["tot"] += s["total"]
+    cats = sorted(({"name": c, "cov": a["cov"], "tot": a["tot"],
+                    "pct": round(a["cov"] / a["tot"] * 100) if a["tot"] else 0}
+                   for c, a in cat_agg.items()), key=lambda x: x["pct"])
 
-    def card(label, value, sub, color):
-        return (f'<div class="card"><div class="card-val" style="color:{color}">{value}</div>'
-                f'<div class="card-lbl">{label}</div><div class="card-sub">{sub}</div></div>')
+    # ---- action banner ----
+    if healthy:
+        low = ", ".join(f'<b>{c["name"]} {c["pct"]}%</b>({c["cov"]}/{c["tot"]})'
+                        for c in cats[:3])
+        action = (f'<div class="action"><div><b>새 회귀 {d["fail_new"]}건 — 배포 안전.</b> '
+                  f'신규 5xx/auth 실패 없음, known-red {d["fail_known"]}. '
+                  f'<span class="next">다음 우선순위 →</span> 커버리지가 가장 낮은 곳은 '
+                  f'{low}. 쓰기 시나리오 추가가 가장 큰 레버.</div></div>')
+    else:
+        items = "".join(f'<div><code>{html.escape(k)}</code> → {st}</div>'
+                        for k, st, _ in d["new_regressions"][:6])
+        action = (f'<div class="action bad"><div><b>새 회귀 {d["fail_new"]}건 — 조치 필요.</b>'
+                  f'{items}</div></div>')
+
+    # ---- health cards ----
+    def card(value, vcls, label, sub, ok=False):
+        return (f'<div class="card hc{" ok" if ok else ""}"><div class="n {vcls}">{value}</div>'
+                f'<div class="t">{label}</div><div class="s">{sub}</div></div>')
     run_scope = "full CRUD" if d.get("crud_ran") else "read-only"
-    cards = (card("New regressions", str(d["fail_new"]),
-                  "vs known baseline", "#2da44e" if healthy else "#cf222e")
-             + card("Pass rate", f"{pass_rate:.1f}%", f'{d["ok"]} ok / {called} calls', "#1f2328")
-             + card("C3 검증 커버리지", f'{d.get("cov_c3", 0):.1f}%',
-                    f'{d.get("c3_verified", 0)} / {d.get("c3_denom", d["total"])} · 목표 100%', "#0969da")
-             + card("Known-red", str(d["fail_known"]),
-                    "tracked backend bugs", "#cf222e" if d["fail_known"] else "#2da44e"))
+    cards = (card(d["fail_new"], "g" if healthy else "r", "신규 회귀", "vs known baseline", ok=healthy)
+             + card(f"{pass_rate:.1f}%", "", "Pass rate", f'{d["ok"]} ok / {called} calls')
+             + card(f'{d.get("cov_c3", 0):.1f}%', "a", "C3 검증 커버리지",
+                    f'{d.get("c3_verified", 0)} / {d.get("c3_denom", d["total"])} · 목표 100%')
+             + card(d["fail_known"], "r" if d["fail_known"] else "g", "Known-red",
+                    "tracked backend bugs"))
 
-    def covbar(c, tested, g, tot):
-        pct = (tested / g * 100) if g else 0
-        zero = "zero" if tested == 0 else ""
-        col = ("#cf222e" if pct == 0 else "#bf8700" if pct < 25
-               else "#2da44e" if pct >= 50 else "#0969da")
-        return (f'<div class="cb {zero}"><div class="cb-h"><span>{c}</span>'
-                f'<span class="cb-n">{tested}/{g} GET · {tot} ops</span></div>'
-                f'<div class="cb-track"><div class="cb-fill" style="width:{pct:.0f}%;'
-                f'background:{col}"></div></div></div>')
-    covbars = "".join(covbar(*r) for r in d["cat_rows"])
+    # ---- coverage ladder ----
+    c3p = d.get("cov_c3", 0)
+    c2p = d.get("reach_measured_pct", 0)
+    c1p = d.get("reachable_pct", 0)
+    ladder = f'''
+    <div class="lad"><span class="lv">C3</span><div class="bar"><i style="width:{c3p:.1f}%;background:var(--green)"></i></div><span class="pct" style="color:var(--green)">{c3p:.1f}%</span>
+      <span class="desc"><b class="tip" title="2xx 동작 확인 — GET 200, 쓰기 2xx. 이 API는 동작한다">검증됨</b> · {d.get("c3_verified", 0)}/{d.get("c3_denom", d["total"])} · {run_scope} · 목표 100%</span></div>
+    <div class="lad"><span class="lv">C2</span><div class="bar"><i style="width:{c2p:.1f}%;background:var(--amber)"></i></div><span class="pct" style="color:var(--amber)">{c2p:.1f}%</span>
+      <span class="desc"><b class="tip" title="4xx 포함 응답 수신 — 호출은 된다(404 POST/DELETE는 생성/삭제 안 함)">호출됨</b> · {d["tested"]}/{d["total"]} (이번 run)</span></div>
+    <div class="lad"><span class="lv">C1</span><div class="bar"><i style="width:{c1p:.1f}%;background:var(--blue)"></i></div><span class="pct" style="color:var(--blue)">{c1p:.1f}%</span>
+      <span class="desc"><b class="tip" title="시나리오 정적 도달 가능">도달가능</b> · {d.get("reachable", 0)}/{d["total"]}</span></div>
+    <div class="lad-foot">읽기 GET 2xx <b>{d["cov_get"]:.1f}%</b> ({d["get_verified"]}/{d["get_total"]}) · 쓰기 2xx <b>{d["cov_write"]:.1f}%</b> ({d["write_hit"]}/{d["nonget_total"]}) · C2뿐인 write {d["write_reached"]} · waiver {d.get("waived_total", 0)}개(C2 충족 {d.get("waived_called", 0)}, 해제 후보 {d.get("waived_verified", 0)}) · 남은 gap → write <b>{d.get("gap_write", 0)}</b> · id-bound GET <b>{d.get("gap_getid", 0)}</b></div>'''
 
-    icon = {"pass": "✅", "skip": "🔒", "fail": "⛔"}
-    def chip(id_, kind, st, steps):
-        label = st
+    # ---- response code distribution ----
+    segs = sorted(d["dist"].items())
+    tot_calls = sum(d["dist"].values()) or 1
+    distbar = "".join(
+        f'<div style="flex:{n};background:{_dist_color(int(c))}" title="{c} · {n}">'
+        f'{n if n / tot_calls > 0.06 else ""}</div>' for c, n in segs) or \
+        '<div style="flex:1;background:var(--grey-bg);color:var(--muted)">no calls</div>'
+    distleg = "".join(
+        f'<span><i style="background:{_dist_color(int(c))}"></i><code>{c}</code> · {n}</span>'
+        for c, n in segs)
+
+    # ---- category bars (ascending = backlog) ----
+    catrows = "".join(
+        f'<div class="catrow"><div class="cn">{html.escape(c["name"])}'
+        f'<span class="ops">{c["tot"]} ops</span>'
+        f'{"<span class=blind>사각지대</span>" if c["cov"] == 0 else ""}</div>'
+        f'<div class="cbar"><i style="width:{c["pct"]}%;background:{_bar_color(c["pct"])}"></i></div>'
+        f'<div class="cp">{c["pct"]}% <span class="frac">{c["cov"]}/{c["tot"]}</span></div></div>'
+        for c in cats)
+
+    # ---- design integrity ----
+    conf = meta.get("conf", {}) or {}
+    cs = conf.get("summary", {})
+    if cs:
+        sys_rows = "".join(
+            f'<tr><td class="dic amber">개선 {it.get("count") or ""}</td>'
+            f'<td><code>{html.escape(it["type"])}</code> '
+            f'<span class="scope">#{it["issue"]} · {html.escape(it["scope"])}</span><br>'
+            f'<span class="desc">{html.escape(it["detail"])}</span></td></tr>'
+            for it in conf.get("systemic", []))
+        di = f'''<h2>설계/동작 정합성 <span class="hint">회귀(호출 성공)와 별개 · 정적+런타임 점검에서 찾은 설계·구현 결함</span></h2>
+  <div class="card di">
+    <div class="di-stat">
+      <div><span class="din red">{cs.get("red", 0)}</span>결함<small>계약 위반 구현버그</small></div>
+      <div><span class="din amber">{cs.get("yellow", 0)}</span>개선<small>설계/문서 결함</small></div>
+      <div><span class="din green">{cs.get("green", 0)}</span>정상<small>API별 고유 이슈 없음</small></div>
+      <div class="ditot">총 {cs.get("total", 0)} API</div>
+    </div>
+    <p class="dinote">※ "정상"이어도 아래 <b>플랫폼 전역 항목</b>은 공통 적용됩니다. 서비스 클릭 → API별 <b>설계/동작 결함</b> 열에서 상세 확인.</p>
+    <table class="di-tbl"><thead><tr><th>건수</th><th>플랫폼 전역 점검 항목 (모든 서비스 공통)</th></tr></thead>
+    <tbody>{sys_rows}</tbody></table></div>'''
+    else:
+        di = ""
+
+    # ---- services / crud JSON for the client-side controls ----
+    svc_json = json.dumps([
+        {"n": s["service"], "c": s["category"], "cov": s["covered"],
+         "tot": s["total"], "u": f'services/{s["slug"]}.html'}
+        for s in services], ensure_ascii=False)
+    crud_states = []
+    for id_, kind, st, steps in d["crud_rows"]:
+        state = st
         if st == "skip" and kind == "heavy":
-            label = "gated"
-        return (f'<div class="crud {st}"><div class="crud-top">{icon.get(st, "·")} <b>{id_}</b></div>'
-                f'<div class="crud-meta"><span class="tag {kind}">{kind}</span> '
-                f'{steps} steps · {label}</div></div>')
-    crudgrid = "".join(chip(*c) for c in d["crud_rows"])
+            state = "gated"
+        crud_states.append({"name": id_, "w": kind, "steps": steps, "state": state})
+    crud_json = json.dumps(crud_states, ensure_ascii=False)
+    n_fail = sum(1 for c in crud_states if c["state"] == "fail")
 
+    # ---- known issues + trends (kept from the original design) ----
     knrows = "".join(
-        f'<tr><td><code>{k}</code></td><td>{s}</td><td>Product Bug</td></tr>'
+        f'<tr><td><code>{html.escape(k)}</code></td><td>{s}</td><td>Product Bug</td></tr>'
         for k, s, _ in d["known_red"]) or \
-        '<tr><td colspan="3" class="mut">none</td></tr>'
-
+        '<tr><td colspan="3" class="kn-none">none</td></tr>'
     pr_series = [h["ok"] / max(1, h["ok"] + h["soft"] + h["fail_new"] + h["fail_known"]) * 100
                  for h in hist[-12:]]
-    # Trend: C1 (stable, monotonic with authoring) AND C3 (the goal metric) on
-    # one shared scale. Old history rows without cov_c3 fall back to cov_op
-    # (same semantics before waivers existed).
     c1_series = [h.get("reachable_pct", h.get("cov_op", 0)) for h in hist[-12:]]
     c3_series = [h.get("cov_c3", h.get("cov_op", 0)) for h in hist[-12:]]
 
-    writeax = "◑" if d["cov_write"] > 0 else "✗"
-    measured = d.get("param_attempted", 0) > 0
-    paramax = "◑" if measured else "✗"
-    param_stat = (f'<div><div style="font-size:22px;font-weight:700">{d["cov_param"]:.0f}%</div>'
-                  f'<div class="mut">파라미터 ({d["param_accepted"]}/{d["param_attempted"]})</div></div>'
-                  ) if measured else ""
-    writeax_cls = "part" if d["cov_write"] > 0 else "off"
-    paramax_cls = "part" if measured else "off"
-
-    return TEMPLATE.format(
-        branch=html.escape(meta["branch"]), when=meta["when"], run_type=meta["run_type"],
-        services_nav=render_services_nav(services),
-        conformance_section=render_conformance_section(meta.get("conf", {})),
-        badge=badge, cards=cards, donut=donut(segs, called), legend=legend,
-        cov_op=f'{d["cov_op"]:.1f}', tested=d["tested"], total=d["total"],
-        cov_c3=f'{d.get("cov_c3", d["cov_op"]):.1f}',
-        c3_verified=d.get("c3_verified", d["verified"]),
-        c3_denom=d.get("c3_denom", d["total"]),
-        waived_total=d.get("waived_total", 0), waived_called=d.get("waived_called", 0),
-        waived_verified=d.get("waived_verified", 0),
-        verified=d["verified"], reach_measured=f'{d["reach_measured_pct"]:.1f}',
-        get_verified=d["get_verified"], write_reached=d["write_reached"],
-        reach_pct=f'{d.get("reachable_pct", 0):.1f}', reachable=d.get("reachable", 0),
-        gap_write=d.get("gap_write", 0), gap_getid=d.get("gap_getid", 0),
-        run_scope=run_scope,
-        cov_get=f'{d["cov_get"]:.1f}', get_total=d["get_total"],
-        cov_write=f'{d["cov_write"]:.1f}', write_hit=d["write_hit"],
-        nonget_total=d["nonget_total"], writeax=writeax,
-        paramax=paramax, paramax_cls=paramax_cls, param_stat=param_stat,
-        covbars=covbars, ok=d["ok"], soft=d["soft"],
-        fail_new=d["fail_new"], fail_known=d["fail_known"],
-        new_cls="ok" if healthy else "bad",
-        crudgrid=crudgrid, knrows=knrows,
-        writeax_cls=writeax_cls,
-        spark_pr=spark(pr_series, color="#2da44e"),
-        spark_cov=spark_multi([(c1_series, "#2da44e"), (c3_series, "#0969da")]),
-        runs=len(hist))
+    out = TEMPLATE
+    for k, v in {
+        "@@BRANCH@@": html.escape(meta["branch"]), "@@WHEN@@": str(meta["when"]),
+        "@@RUNTYPE@@": str(meta["run_type"]), "@@PILL@@": pill,
+        "@@ACTION@@": action, "@@CARDS@@": cards, "@@LADDER@@": ladder,
+        "@@NCALLS@@": str(called), "@@DISTBAR@@": distbar, "@@DISTLEG@@": distleg,
+        "@@CATROWS@@": catrows, "@@DI@@": di,
+        "@@SVCJSON@@": svc_json, "@@CRUDJSON@@": crud_json,
+        "@@CRUDFAIL@@": str(n_fail),
+        "@@KNROWS@@": knrows, "@@RUNS@@": str(len(hist)),
+        "@@SPARKPR@@": spark(pr_series, color="#15924f"),
+        "@@SPARKCOV@@": spark_multi([(c1_series, "#15924f"), (c3_series, "#2563c9")]),
+    }.items():
+        out = out.replace(k, v)
+    return out
 
 
 TEMPLATE = """<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SCP API Regression — Dashboard</title><style>
-:root{{--bg:#f6f8fa;--fg:#1f2328;--mut:#656d76;--bd:#d0d7de;--cardbg:#fff}}
-*{{box-sizing:border-box}}body{{margin:0;font-family:-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;background:var(--bg);color:var(--fg)}}
-.wrap{{max-width:1080px;margin:0 auto;padding:24px}}
-header{{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--bd);padding-bottom:14px}}
-h1{{font-size:20px;margin:0}}.mut{{color:var(--mut);font-size:13px}}
-.badge{{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:600}}
-.badge.ok{{background:#dafbe1;color:#1a7f37;border:1px solid #2da44e44}}
-.badge.bad{{background:#ffebe9;color:#a40e26;border:1px solid #cf222e44}}
-section{{margin-top:22px}}h2{{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin:0 0 12px}}
-.cards{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}}
-.card{{background:var(--cardbg);border:1px solid var(--bd);border-radius:10px;padding:16px}}
-.card-val{{font-size:30px;font-weight:800;line-height:1}}.card-lbl{{font-weight:600;margin-top:6px}}.card-sub{{color:var(--mut);font-size:12px;margin-top:2px}}
-.grid2{{display:grid;grid-template-columns:1fr 1.4fr;gap:16px}}
-.panel{{background:var(--cardbg);border:1px solid var(--bd);border-radius:10px;padding:16px}}
-.donutwrap{{display:flex;gap:16px;align-items:center}}
-.lg{{font-size:12px;margin:3px 0;display:flex;align-items:center;gap:6px}}.dot{{width:10px;height:10px;border-radius:50%}}
-.axes{{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}}
-.ax{{font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--bd)}}
-.ax.on{{background:#dafbe1;border-color:#2da44e55;color:#1a7f37}}.ax.off{{background:#ffebe9;border-color:#cf222e44;color:#a40e26}}.ax.part{{background:#fff8c5;border-color:#d4a72c55;color:#7d4e00}}
-.cb{{margin:7px 0}}.cb-h{{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}}.cb-n{{color:var(--mut)}}
-.cb-track{{height:8px;background:#eaeef2;border-radius:6px;overflow:hidden}}.cb-fill{{height:100%}}
-.cb.zero .cb-h span:first-child::after{{content:" ⚠ 사각지대";color:#cf222e;font-size:11px}}
-.svc-cat{{margin:16px 0}}.svc-cat h3{{font-size:13px;margin:0 0 8px}}
-.svc-grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}}
-.svc{{display:block;text-decoration:none;color:inherit;background:var(--cardbg);border:1px solid var(--bd);border-radius:8px;padding:10px 12px}}
-.svc:hover{{border-color:#0969da;box-shadow:0 1px 5px #0969da22}}
-.svc-n{{font-weight:600;font-size:13px;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
-.svc-bar{{height:6px;background:#eaeef2;border-radius:6px;overflow:hidden}}.svc-bar>div{{height:100%}}
-.svc-m{{font-size:11px;color:var(--mut);margin-top:5px}}
-.crudgrid{{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}}
-.crud{{border:1px solid var(--bd);border-radius:8px;padding:10px 12px;background:#fff}}
-.crud.pass{{border-left:3px solid #2da44e}}.crud.skip{{border-left:3px solid #8250df}}.crud.fail{{border-left:3px solid #cf222e}}
-.crud-top{{font-size:13px}}.crud-meta{{font-size:11px;color:var(--mut);margin-top:4px}}
-.tag{{font-size:10px;padding:1px 6px;border-radius:10px;font-weight:600}}.tag.light{{background:#ddf4ff;color:#0969da}}.tag.heavy{{background:#fbefff;color:#8250df}}
-table{{width:100%;border-collapse:collapse;font-size:13px}}td,th{{text-align:left;padding:6px 8px;border-bottom:1px solid var(--bd)}}th{{color:var(--mut);font-weight:600}}
-.bignum{{font-size:34px;font-weight:800}}
-.trendgrid{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
-footer{{margin-top:28px;color:var(--mut);font-size:12px;border-top:1px solid var(--bd);padding-top:12px}}
-@media(max-width:760px){{.cards,.grid2,.crudgrid,.trendgrid{{grid-template-columns:1fr}}}}
+:root{--bg:#fbfcfd;--surface:#fff;--surface2:#f5f7f9;--border:#e4e7eb;
+  --text:#1d2530;--muted:#6b7480;--faint:#9aa3ad;
+  --green:#15924f;--green-bg:#e7f6ed;--amber:#b5740b;--amber-bg:#fdf3e2;
+  --red:#c63434;--red-bg:#fbe9e9;--blue:#2563c9;--blue-bg:#e8f0fd;
+  --grey:#7a838d;--grey-bg:#eef1f4;
+  --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",'Noto Sans KR',sans-serif;
+  font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+h2{font-size:14px;letter-spacing:.2px;margin:30px 0 12px;display:flex;align-items:center;gap:8px}
+h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:13px;box-shadow:var(--shadow)}
+.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.top h1{margin:0;font-size:22px;letter-spacing:-.3px}
+.top .meta{color:var(--muted);font-size:12.5px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+  padding:4px 11px;border-radius:20px;background:var(--green-bg);color:var(--green)}
+.pill .d{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.pill.bad{background:var(--red-bg);color:var(--red)}.pill.bad .d{background:var(--red)}
+.action{display:flex;gap:11px;align-items:flex-start;background:var(--green-bg);
+  border:1px solid #c2e6d0;border-radius:12px;padding:13px 16px;margin:14px 0 8px;font-size:13.5px}
+.action b{color:#0d6e3a}.action .next{color:var(--amber)}
+.action.bad{background:var(--red-bg);border-color:#eec3c3}.action.bad b{color:var(--red)}
+.health{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+.hc{padding:15px 16px}
+.hc .n{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1}
+.hc .n.g{color:var(--green)}.hc .n.a{color:var(--amber)}.hc .n.r{color:var(--red)}
+.hc .t{font-size:12.5px;font-weight:600;margin-top:7px}
+.hc .s{font-size:11.5px;color:var(--muted);margin-top:2px}
+.hc.ok{background:linear-gradient(180deg,#f3fbf6,#fff)}
+.ladder{padding:16px 18px}
+.lad{display:flex;align-items:center;gap:13px;margin:11px 0}
+.lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:30px}
+.lad .bar{flex:1;height:22px;border-radius:6px;background:var(--grey-bg);overflow:hidden;position:relative}
+.lad .bar i{display:block;height:100%;border-radius:6px}
+.lad .pct{width:54px;text-align:right;font-weight:700;font-size:13px}
+.lad .desc{width:340px;font-size:12px;color:var(--muted)}
+.lad .desc b{color:var(--text)}
+.lad-foot{font-size:11.5px;color:var(--muted);margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+.dist{padding:16px 18px}
+.distbar{display:flex;height:26px;border-radius:7px;overflow:hidden;border:1px solid var(--border)}
+.distbar div{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:24px}
+.distleg{display:flex;gap:16px;flex-wrap:wrap;margin-top:11px;font-size:12px}
+.distleg span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.distleg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.cats{padding:8px 18px 16px}
+.catrow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #eef1f3}
+.catrow:last-child{border:0}
+.catrow .cn{width:200px;font-size:12.5px;font-weight:600}
+.catrow .cn .ops{font-weight:400;color:var(--faint);font-size:11px;margin-left:4px}
+.catrow .cbar{flex:1;height:16px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+.catrow .cbar i{display:block;height:100%;border-radius:5px}
+.catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+.catrow .cp .frac{font-weight:400;color:var(--muted);font-size:11px}
+.blind{font-size:11px;font-weight:700;color:var(--red);background:var(--red-bg);padding:1px 7px;border-radius:10px;margin-left:8px}
+.svc-controls{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.svc-controls select,.svc-controls input{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 10px;font-size:12.5px;font-family:inherit;color:var(--text)}
+.svc-controls input{width:200px}
+.svcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
+.svc{display:block;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);transition:.12s}
+.svc:hover{border-color:var(--blue);text-decoration:none;transform:translateY(-1px)}
+.svc .sh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.svc .sn{font-weight:700;font-size:13px;color:var(--text)}
+.svc .sp{font-size:13px;font-weight:800}
+.svc .sbar{height:7px;border-radius:4px;background:var(--grey-bg);overflow:hidden;margin:8px 0 4px}
+.svc .sbar i{display:block;height:100%;border-radius:4px}
+.svc .sfrac{font-size:11px;color:var(--muted)}
+.catsec{margin-bottom:16px}
+.catsec-h{display:flex;align-items:center;gap:12px;padding:7px 4px 9px;border-bottom:2px solid var(--border);margin-bottom:11px}
+.catsec-h .csn{font-weight:800;font-size:14.5px;letter-spacing:-.2px}
+.catsec-h .cso{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
+.catsec-h .csbar{width:130px;height:8px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+.catsec-h .csbar i{display:block;height:100%;border-radius:5px}
+.catsec-h .csp{font-size:14px;font-weight:800}
+.catsec-h .cscount{margin-left:auto;font-size:11.5px;color:var(--faint)}
+.crud-sum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.badge{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:9px;
+  background:var(--surface);padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted)}
+.badge .c{font-size:15px;font-weight:800;color:var(--text)}
+.badge.on{border-color:var(--blue);background:var(--blue-bg)}
+.badge.pass .c{color:var(--green)}.badge.gated .c{color:var(--amber)}.badge.skip .c{color:var(--grey)}.badge.fail .c{color:var(--red)}
+#crudList{display:none;margin-top:4px}
+#crudList.show{display:block}
+.crud-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.crud-tbl td{padding:7px 12px;border-bottom:1px solid #eef1f3}
+.crud-tbl tr:hover{background:#fafbfc}
+.cstate{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px}
+.cstate.pass{background:var(--green-bg);color:var(--green)}
+.cstate.gated{background:var(--amber-bg);color:var(--amber)}
+.cstate.skip{background:var(--grey-bg);color:var(--grey)}
+.cstate.fail{background:var(--red-bg);color:var(--red)}
+.wt{font-size:10.5px;color:var(--faint);text-transform:uppercase}
+.toggle{font-size:12px;color:var(--blue);cursor:pointer;background:none;border:0;text-decoration:underline;padding:0}
+.di{padding:16px 18px}
+.di-stat{display:flex;gap:26px;flex-wrap:wrap;align-items:baseline;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.di-stat>div{font-size:12.5px;color:var(--muted)}
+.din{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-right:5px}
+.din.red{color:var(--red)}.din.amber{color:var(--amber)}.din.green{color:var(--green)}
+.di-stat small{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+.di-stat .ditot{margin-left:auto;font-weight:700;color:var(--text)}
+.dinote{font-size:12px;color:var(--muted);margin:11px 0 13px}
+.di-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.di-tbl th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:6px 10px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+.di-tbl td{padding:8px 10px;border-bottom:1px solid #eef1f3;vertical-align:top}
+.di-tbl tr:last-child td{border-bottom:0}
+.dic{font-weight:700;white-space:nowrap}.dic.amber{color:var(--amber)}
+.di-tbl code{font-size:11.5px;color:var(--text);font-weight:600}
+.di-tbl .scope{font-size:11px;color:var(--faint)}
+.di-tbl .desc{color:var(--muted);font-size:12px}
+.kn-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.kn-tbl th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:6px 12px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+.kn-tbl td{padding:7px 12px;border-bottom:1px solid #eef1f3}
+.kn-none{color:var(--faint)}
+.trendgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.trend{padding:14px 16px}.trend .tl{font-size:12px;color:var(--muted);margin-bottom:6px}
+.tip{cursor:help;border-bottom:1px dotted var(--faint)}
+.foot{margin-top:26px;font-size:11.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:12px}
+@media(max-width:720px){.health{grid-template-columns:repeat(2,1fr)}.lad .desc{display:none}.catrow .cn{width:130px}.di-stat{gap:16px}.trendgrid{grid-template-columns:1fr}}
 </style></head><body><div class="wrap">
-<header><div><h1>SCP API Regression</h1>
-<div class="mut">branch <code>{branch}</code> · 최근 실행 {when} · {run_type}</div></div>
-<div style="text-align:right">{badge}</div></header>
-<section><h2>건강도</h2><div class="cards">{cards}</div></section>
-<section><div class="grid2">
-<div class="panel"><h2>응답 코드 분포</h2><div class="donutwrap">{donut}<div>{legend}</div></div></div>
-<div class="panel"><h2>커버리지 — C1→C2→C3 사다리 <span class="mut" style="text-transform:none">(docs/COVERAGE-CRITERIA.md)</span></h2>
-<div style="display:flex;gap:28px;align-items:baseline;flex-wrap:wrap">
-<div><div class="bignum" style="color:#0969da">{cov_c3}%</div><div class="mut"><b>C3 검증됨</b> — 2xx 동작 확인 ({c3_verified}/{c3_denom} · {run_scope}) · <b>목표 100%</b></div></div>
-<div><div style="font-size:22px;font-weight:700;color:#8250df">{reach_measured}%</div><div class="mut"><b>C2 호출됨</b> — 4xx 포함 응답 수신 ({tested}/{total})</div></div>
-<div><div style="font-size:22px;font-weight:700;color:#2da44e">{reach_pct}%</div><div class="mut"><b>C1 도달가능</b> — 시나리오 정적 ({reachable}/{total})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_get}%</div><div class="mut">C3-읽기 GET 2xx ({get_verified}/{get_total})</div></div>
-<div><div style="font-size:22px;font-weight:700">{cov_write}%</div><div class="mut">C3-쓰기 2xx ({write_hit}/{nonget_total}) · C2뿐 {write_reached}</div></div>{param_stat}</div>
-<div class="mut" style="margin-top:8px"><b>C2 호출됨</b>="이 API는 호출은 된다"(4xx 포함 — 404 POST/DELETE는 아무것도 생성/삭제 안 함) · <b>C3 검증됨</b>="이 API는 동작한다"(GET 200, 쓰기 2xx) · <b>100% = waiver 제외 전부 C3 + waived는 C2 필수</b></div>
-<div class="mut" style="margin-top:6px">waiver {waived_total}개 (C2 충족 {waived_called} · 2xx 확인되어 waiver 해제 후보 {waived_verified}) — data/baselines/coverage_waivers.json</div>
-<div class="mut" style="margin-top:6px">남은 gap → write <b>{gap_write}</b> · id-bound GET <b>{gap_getid}</b> &nbsp;(write=시나리오 추가, id-GET=read-chain/probe로 런타임 자동 도달)</div>
-<div class="mut" style="margin-top:12px">C4 심화 축 (100% 이후 — swagger-coverage/ReadyAPI 기준)</div>
-<div class="axes"><span class="ax on">✓ operation</span><span class="ax part">◑ status-code</span>
-<span class="ax {writeax_cls}">{writeax} write/CRUD</span><span class="ax {paramax_cls}">{paramax} parameter</span><span class="ax off">✗ schema</span></div></div>
-</div></section>
-<section><h2>카테고리별 커버리지 (사각지대 탐지)</h2><div class="panel">{covbars}</div></section>
-{conformance_section}
-<section><h2>서비스별 드릴다운 <span class="mut" style="text-transform:none">— 서비스 클릭 시 해당 서비스의 API별 커버 현황 + 설계/동작 결함</span></h2>{services_nav}</section>
-<section><div class="grid2">
-<div class="panel"><h2>실패 분류</h2><table>
-<tr><th>분류</th><th>수</th><th>의미</th></tr>
-<tr><td>✅ 검증(2xx) 엔드포인트</td><td>{verified}</td><td>실제 동작 확인 = covered</td></tr>
-<tr><td>◑ 미검증(도달) write</td><td>{write_reached}</td><td>호출됐으나 4xx(404 포함) — 생성/삭제 미발생, covered 아님</td></tr>
-<tr><td>🟡 soft 호출 (4xx)</td><td>{soft}</td><td>파라미터/권한/엔타이틀먼트 한계 (call 단위)</td></tr>
-<tr><td>⛔ new regression</td><td><b class="badge {new_cls}" style="border:0;background:0;padding:0">{fail_new}</b></td><td>새로 깨진 5xx/auth — 알림 대상</td></tr>
-<tr><td>🔴 known-red</td><td>{fail_known}</td><td>등록된 백엔드 버그(known_issues)</td></tr></table></div>
-<div class="panel"><h2>CRUD 라이프사이클</h2><div class="crudgrid">{crudgrid}</div></div>
-</div></section>
-<section><h2>추세 <span class="mut" style="text-transform:none">— {runs} runs 누적 (dashboard-data 브랜치)</span></h2>
-<div class="panel trendgrid">
-<div><div class="mut">성공률</div>{spark_pr}</div>
-<div><div class="mut">커버리지 — <span style="color:#2da44e">C1 도달가능</span> · <span style="color:#0969da">C3 검증(목표)</span></div>{spark_cov}</div></div></section>
-<section><h2>알려진 이슈 (data/baselines/known_issues.json)</h2><div class="panel"><table>
-<tr><th>endpoint</th><th>status</th><th>유형</th></tr>{knrows}</table></div></section>
-<footer>생성: <code>dashboard/build.py</code> ← unified results store (reports/results/*.jsonl) + legacy fallback (smoke_status.tsv, junit-crud.xml, api_catalog.json)
-&nbsp;|&nbsp; 추세: <code>dashboard-data</code> 브랜치 <code>history.jsonl</code> &nbsp;|&nbsp; 배포: GitHub Pages</footer>
-</div></body></html>"""
+
+<div class="top">
+  <h1>SCP API Regression</h1>
+  @@PILL@@
+  <span class="meta">branch <code>@@BRANCH@@</code> · 최근 실행 @@WHEN@@ · @@RUNTYPE@@</span>
+</div>
+
+@@ACTION@@
+
+<div class="health">@@CARDS@@</div>
+
+<h2>커버리지 사다리 <span class="hint">C1 도달 → C2 호출 → C3 검증 (docs/COVERAGE-CRITERIA.md)</span></h2>
+<div class="card ladder">@@LADDER@@</div>
+
+<h2>응답 코드 분포 <span class="hint">@@NCALLS@@ calls</span></h2>
+<div class="card dist">
+  <div class="distbar">@@DISTBAR@@</div>
+  <div class="distleg">@@DISTLEG@@</div>
+</div>
+
+<h2>카테고리별 커버리지 <span class="hint">검증 ops 기준 · 낮은 순 = 작업 백로그</span></h2>
+<div class="card cats">@@CATROWS@@</div>
+
+@@DI@@
+
+<h2>서비스 드릴다운 <span class="hint">카테고리별 · 클릭 → API별 커버 현황 + 설계/동작 결함</span></h2>
+<div class="svc-controls">
+  <select id="svcSort">
+    <option value="pct">서비스: 커버리지 낮은 순</option>
+    <option value="pctd">서비스: 커버리지 높은 순</option>
+    <option value="ops">서비스: 규모(ops) 큰 순</option>
+    <option value="name">서비스: 이름순</option>
+  </select>
+  <select id="catOrder">
+    <option value="name">카테고리: 이름순</option>
+    <option value="pct">카테고리: 커버리지 낮은 순</option>
+    <option value="ops">카테고리: 규모(ops) 큰 순</option>
+  </select>
+  <input id="svcSearch" placeholder="서비스 검색">
+  <span style="font-size:12px;color:var(--muted)"><b id="svcCount"></b>개 서비스 · <b id="catCount"></b>개 카테고리</span>
+</div>
+<div id="svcWrap"></div>
+
+<h2>CRUD 라이프사이클 <span class="hint">대부분 skip/gated — 기본 접힘</span></h2>
+<div class="crud-sum" id="crudSum"></div>
+<button class="toggle" id="crudToggle">전체 시나리오 펼치기 ▾</button>
+<div class="card" id="crudList"><table class="crud-tbl"><tbody id="crudBody"></tbody></table></div>
+
+<h2>추세 <span class="hint">@@RUNS@@ runs 누적 (dashboard-data 브랜치)</span></h2>
+<div class="trendgrid">
+  <div class="card trend"><div class="tl">성공률</div>@@SPARKPR@@</div>
+  <div class="card trend"><div class="tl">커버리지 — <span style="color:var(--green)">C1 도달가능</span> · <span style="color:var(--blue)">C3 검증(목표)</span></div>@@SPARKCOV@@</div>
+</div>
+
+<h2>알려진 이슈 <span class="hint">data/baselines/known_issues.json</span></h2>
+<div class="card"><table class="kn-tbl">
+<thead><tr><th>endpoint</th><th>status</th><th>유형</th></tr></thead>
+<tbody>@@KNROWS@@</tbody></table></div>
+
+<div class="foot">생성 <code>dashboard/build.py</code> ← unified results store (reports/results/*.jsonl) + legacy fallback · 추세 <code>dashboard-data</code> 브랜치 · 배포 GitHub Pages</div>
+</div>
+
+<script>
+var SVCS=@@SVCJSON@@;
+var CRUD=@@CRUDJSON@@;
+function barColor(p){return p<25?'var(--red)':p<55?'var(--amber)':'var(--green)';}
+var catMeta={};
+SVCS.forEach(function(s){
+  s.pct=s.tot?Math.round(s.cov/s.tot*100):0;
+  var m=catMeta[s.c]||(catMeta[s.c]={cov:0,tot:0});
+  m.cov+=s.cov;m.tot+=s.tot;
+});
+Object.keys(catMeta).forEach(function(c){var m=catMeta[c];m.pct=m.tot?Math.round(m.cov/m.tot*100):0;});
+function svcCard(s){
+  return '<a class="svc" href="'+s.u+'">'
+    +'<div class="sh"><span class="sn">'+s.n+'</span><span class="sp" style="color:'+barColor(s.pct)+'">'+s.pct+'%</span></div>'
+    +'<div class="sbar"><i style="width:'+s.pct+'%;background:'+barColor(s.pct)+'"></i></div>'
+    +'<div class="sfrac">'+s.cov+'/'+s.tot+' ops 검증</div></a>';
+}
+function renderSvcs(){
+  var q=document.getElementById('svcSearch').value.toLowerCase();
+  var sort=document.getElementById('svcSort').value;
+  var corder=document.getElementById('catOrder').value;
+  var categories=Object.keys(catMeta);
+  categories.sort(function(a,b){
+    if(corder==='pct')return catMeta[a].pct-catMeta[b].pct;
+    if(corder==='ops')return catMeta[b].tot-catMeta[a].tot;
+    return a.localeCompare(b);
+  });
+  var htmlOut='',totSvc=0,totCat=0;
+  categories.forEach(function(cat){
+    var list=SVCS.filter(function(s){return s.c===cat&&(!q||s.n.indexOf(q)>=0);});
+    if(!list.length)return;
+    list.sort(function(a,b){
+      if(sort==='pct')return a.pct-b.pct;
+      if(sort==='pctd')return b.pct-a.pct;
+      if(sort==='ops')return b.tot-a.tot;
+      return a.n.localeCompare(b.n);
+    });
+    totSvc+=list.length;totCat++;
+    var m=catMeta[cat];
+    htmlOut+='<div class="catsec"><div class="catsec-h">'
+      +'<span class="csn">'+cat+'</span>'
+      +'<span class="cso">'+m.cov+'/'+m.tot+' ops</span>'
+      +'<span class="csbar"><i style="width:'+m.pct+'%;background:'+barColor(m.pct)+'"></i></span>'
+      +'<span class="csp" style="color:'+barColor(m.pct)+'">'+m.pct+'%</span>'
+      +(m.cov===0?'<span class="blind">사각지대</span>':'')
+      +'<span class="cscount">'+list.length+' svc</span>'
+      +'</div><div class="svcgrid">'+list.map(svcCard).join('')+'</div></div>';
+  });
+  document.getElementById('svcWrap').innerHTML=htmlOut||'<div style="color:var(--muted)">검색 결과 없음</div>';
+  document.getElementById('svcCount').textContent=totSvc;
+  document.getElementById('catCount').textContent=totCat;
+}
+document.getElementById('svcSort').onchange=renderSvcs;
+document.getElementById('catOrder').onchange=renderSvcs;
+document.getElementById('svcSearch').oninput=renderSvcs;
+renderSvcs();
+
+var counts={pass:0,gated:0,skip:0,fail:0};
+CRUD.forEach(function(c){counts[c.state]=(counts[c.state]||0)+1;});
+var crudFilter=null;
+var ORDER={fail:0,pass:1,gated:2,skip:3};
+function showList(){document.getElementById('crudList').classList.add('show');
+  document.getElementById('crudToggle').textContent='전체 시나리오 접기 ▴';}
+function renderSum(){
+  var defs=[['fail','fail',counts.fail],['pass','통과',counts.pass],
+            ['gated','gated (heavy)',counts.gated],['skip','skip (light)',counts.skip]];
+  var el=document.getElementById('crudSum');
+  el.innerHTML=defs.filter(function(d){return d[2]>0;}).map(function(d){
+    return '<span class="badge '+d[0]+(crudFilter===d[0]?' on':'')+'" data-k="'+d[0]+'">'
+      +'<span class="c">'+d[2]+'</span> '+d[1]+'</span>';
+  }).join('')+'<span class="badge'+(crudFilter===null?' on':'')+'" data-k="all">'
+    +'<span class="c">'+CRUD.length+'</span> 전체</span>';
+  el.querySelectorAll('.badge').forEach(function(b){
+    b.onclick=function(){crudFilter=b.dataset.k==='all'?null:b.dataset.k;
+      showList();renderSum();renderCrud();};
+  });
+}
+function renderCrud(){
+  var list=CRUD.filter(function(c){return !crudFilter||c.state===crudFilter;})
+    .slice().sort(function(a,b){return (ORDER[a.state]-ORDER[b.state])||(b.steps-a.steps);});
+  document.getElementById('crudBody').innerHTML=list.map(function(c){
+    return '<tr><td><span class="cstate '+c.state+'">'+c.state+'</span></td>'
+      +'<td><code>'+c.name+'</code></td>'
+      +'<td class="wt">'+c.w+' · '+c.steps+' steps</td></tr>';
+  }).join('');
+}
+document.getElementById('crudToggle').onclick=function(){
+  var el=document.getElementById('crudList');el.classList.toggle('show');
+  this.textContent=el.classList.contains('show')?'전체 시나리오 접기 ▴':'전체 시나리오 펼치기 ▾';
+};
+renderSum();renderCrud();
+if(@@CRUDFAIL@@>0){crudFilter='fail';showList();renderSum();renderCrud();}
+</script>
+</body></html>"""
 
 
 # ---------------------------------------------------------------------------
