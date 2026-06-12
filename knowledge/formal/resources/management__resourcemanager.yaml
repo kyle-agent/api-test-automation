@@ -1,0 +1,21 @@
+# Resource-task model — management/resourcemanager (mg-rm group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# resourcemanager-resource-group (enabled, live-validated) by extract.py,
+# curated by hand. The tag write family (per-tag PUT/DELETE on both the SRN
+# and region/service/type/id addressing schemes, bulk tag deletes) are
+# operations on existing resources — they stay in
+# resourcemanager-tag-lifecycle, not modeled as nodes.
+version: 1
+resources:
+  resource-group:
+    code: "mg-rm-resource-group"
+    service: management/resourcemanager
+    requires: []
+    create:
+      endpoint: "POST /v1/resource-groups"
+      body: {name: "regr-rg-{unique}", description: "created by API regression suite"}
+    capture: {rg_id: "$.resource_group.id"}
+    delete: {endpoint: "DELETE /v1/resource-groups/{rg_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: resourcemanager-resource-group, steps: [create, delete]}
+    notes: "글로벌(account-scoped) 서비스 — host에 region 세그먼트 없음 (cross-service와 일치). 싸고 가역적인 실생성 자원 — tag-write 계열의 실 SRN 공급원으로 쓰인다. 소스는 $.resource_group.srn도 capture_soft하지만 envelope UNPROVEN이라 모델 capture에는 넣지 않음 (vpc-peering의 미검증 capture 배제 원칙) — srn이 필요한 합성은 R3에서 envelope 확정 후."
