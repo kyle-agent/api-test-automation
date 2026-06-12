@@ -632,11 +632,22 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
                                 f"'{popt or 'cidr'}'")
 
         # capture / ready / verify / delete -----------------------------------
+        # a capture value is a JSONPath string OR a filter-object selector
+        # (engine._capture): {list: $.path, get: field, where_prefix?,
+        # where_not_prefix?} — the validated lookup-node pattern.
+        def _cap_ok(v) -> bool:
+            if isinstance(v, str):
+                return True
+            return (isinstance(v, dict) and isinstance(v.get("list"), str)
+                    and isinstance(v.get("get"), str)
+                    and set(v) <= {"list", "get", "where_prefix",
+                                   "where_not_prefix"})
+
         caps = task.get("capture") or {}
         if not isinstance(caps, dict) or not all(
-                isinstance(k, str) and isinstance(v, str)
-                for k, v in caps.items()):
-            err(f"{where}: capture must be a {{var: $.jsonpath}} mapping")
+                isinstance(k, str) and _cap_ok(v) for k, v in caps.items()):
+            err(f"{where}: capture must map var -> $.jsonpath or a filter "
+                "object {list, get, where_prefix?, where_not_prefix?}")
             caps = {}
 
         ready = task.get("ready")

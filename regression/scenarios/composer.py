@@ -161,13 +161,14 @@ def load_model(dir: str = DEFAULT_MODEL_DIR) -> dict:
 # ---------------------------------------------------------------------------
 # requires-entry normalisation
 
-def _norm_requires(task: dict) -> tuple[list, list]:
-    """Split a node's requires into (and_deps, one_of_groups).
+def _norm_requires(task: dict) -> tuple[list, list, list]:
+    """Split a node's requires into (and_deps, one_of_groups, credentials).
 
     and_deps:      [{"ref": node, "count": n}]
     one_of_groups: [{"bind": name|None, "branches": [{"ref":..,"use":..}]}]
+    credentials:   [name, ...] — preconditions, never create steps (§1)
     """
-    and_deps, groups = [], []
+    and_deps, groups, creds = [], [], []
     for entry in task.get("requires") or []:
         if isinstance(entry, str):
             and_deps.append({"ref": entry, "count": 1})
@@ -179,12 +180,14 @@ def _norm_requires(task: dict) -> tuple[list, list]:
                 else:
                     branches.append({"ref": b["ref"], "use": b.get("use")})
             groups.append({"bind": entry.get("bind"), "branches": branches})
+        elif isinstance(entry, dict) and "credential" in entry:
+            creds.append(str(entry["credential"]))
         elif isinstance(entry, dict) and "ref" in entry:
             and_deps.append({"ref": entry["ref"],
                              "count": int(entry.get("count", 1))})
         else:
             raise ComposeError(f"unrecognised requires entry: {entry!r}")
-    return and_deps, groups
+    return and_deps, groups, creds
 
 
 def _ref_option_targets(task: dict, node_id: str, options: dict) -> dict:
@@ -221,7 +224,7 @@ def _branch_cost(node: str, model: dict, _memo: dict, _stack: frozenset
         raise ComposeError(f"unknown resource node '{node}'")
     stack = _stack | {node}
     creates, heavy = 1, (1 if task.get("heavy") else 0)
-    and_deps, groups = _norm_requires(task)
+    and_deps, groups, _creds = _norm_requires(task)
     for dep in and_deps:
         # count:N adds N instances of the ref node but its own prerequisite
         # closure is shared, so cost = closure once + (count-1) extras.
@@ -295,6 +298,7 @@ def plan(targets: list, choices: dict | None = None,
     binds: dict[str, dict] = {}          # node -> {bind_name: {"ref","use"}}
     branch_refs: dict[str, set] = {}     # node -> all one_of branch refs
     branches_taken: dict[str, object] = {}
+    credentials: set[str] = set()        # §1 credential preconditions (no steps)
     pending_groups: list = []            # (node, group_index, group)
 
     def _expand(node: str):
@@ -306,7 +310,9 @@ def plan(targets: list, choices: dict | None = None,
         task = model.get(node)
         if task is None:
             raise ComposeError(f"unknown resource node '{node}'")
-        and_deps, groups = _norm_requires(task)
+        and_deps, groups, creds = _norm_requires(task)
+        for c in creds:
+            credentials.add(c)
         for d in and_deps:
             deps[node].append((d["ref"], d["count"]))
             consumers.setdefault(d["ref"], set()).add(node)
@@ -443,6 +449,7 @@ def plan(targets: list, choices: dict | None = None,
         "dedup": dedup,
         "peak_quota": peak_quota,
         "branches": dict(sorted(branches_taken.items())),
+        "credentials": sorted(credentials),
         "instances": {n: pool[n] for n in sorted(pool,
                                                  key=lambda x: decl_index.get(
                                                      x, 10 ** 6))},
@@ -762,6 +769,8 @@ def compose(targets: list, choices: dict | None = None,
         if delete.get("endpoint"):
             dmethod, dpath = _split_endpoint(delete["endpoint"])
             cleanup = {"method": dmethod, "path": ctx.sub(inst, dpath)}
+            if delete.get("json") is not None:
+                cleanup["json"] = ctx.sub(inst, delete["json"])
             if svc:
                 cleanup["service"] = svc
             step["cleanup"] = cleanup
@@ -835,6 +844,8 @@ def compose(targets: list, choices: dict | None = None,
         dstep.update({"method": dmethod, "path": ctx.sub(inst, dpath),
                       "expect_status": [200, 202, 204],
                       "destructive": True})
+        if delete.get("json") is not None:  # body-carrying teardown (PUT/POST
+            dstep["json"] = ctx.sub(inst, delete["json"])  # terminate etc.)
         # A parent's delete can race its children's async (202) deletes and
         # 409 until they finish — the same conflict-retry semantics every
         # VALIDATED hand-written lifecycle carries on such deletes (live
@@ -843,6 +854,9 @@ def compose(targets: list, choices: dict | None = None,
             dstep.update({"expect_status": [200, 202, 204, 409, 404],
                           "retry_on_status": [409],
                           "retries": 40, "retry_interval": 30})
+        # an explicit model expectation wins over both defaults
+        if delete.get("expect_status"):
+            dstep["expect_status"] = list(delete["expect_status"])
         if task.get("adopt") and "#" not in inst:
             dstep["adopt"] = task["adopt"]
         steps.append(dstep)
@@ -857,9 +871,16 @@ def compose(targets: list, choices: dict | None = None,
                   + ", ".join(sorted(target_set))
                   + (("; branches: " + json.dumps(planned["branches"],
                                                   sort_keys=True))
-                     if planned["branches"] else "")),
+                     if planned["branches"] else "")
+                  + (("; needs credentials: "
+                      + ", ".join(planned.get("credentials") or []))
+                     if planned.get("credentials") else "")),
         "steps": steps,
     }
+    # §1 credential preconditions surface on the lifecycle (no create steps);
+    # the run gate / operator checks these before enabling.
+    if planned.get("credentials"):
+        lifecycle["credentials"] = list(planned["credentials"])
     _validate_composed(lifecycle)
     return lifecycle
 

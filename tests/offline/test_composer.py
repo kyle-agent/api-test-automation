@@ -253,6 +253,89 @@ def test_teardown_conflict_retry_on_parent_deletes(model):
 
 
 # ---------------------------------------------------------------------------
+# R2a gaps: credential requires · body/PUT teardown · filter-object capture
+
+R2A_YAML = """
+resources:
+  bucket:
+    code: st-as-bucket
+    service: storage/archivestorage
+    requires:
+      - {credential: archivestorage-auth-key}
+    create:
+      endpoint: "POST /v1/buckets"
+      body: {name: "regrbkt{ualpha}"}
+    capture: {bucket_id: "$.bucket.id"}
+    delete: {endpoint: "DELETE /v1/buckets/{bucket_id}", destructive: true}
+
+  vault:
+    code: sec-sv-vault
+    service: security/secretvault
+    requires: []
+    create:
+      endpoint: "POST /v1/vaults"
+      body: {name: "regrvault{ualpha}"}
+    capture: {vault_id: "$.vault.id"}
+    delete:
+      endpoint: "PUT /v1/vaults/{vault_id}/state"
+      json: {state: terminated}
+      expect_status: [200, 202]
+      destructive: true
+
+  flavor:
+    code: cp-vs-server-type
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: "GET /v1/server-types"
+    capture:
+      flavor_id:
+        list: "$.server_types"
+        where_prefix: {id: "s"}
+        where_not_prefix: {id: "g"}
+        get: "id"
+    verify:
+      - {name: read, endpoint: "GET /v1/server-types/{flavor_id}",
+         expect_status: [200, 404]}
+"""
+
+
+@pytest.fixture(scope="module")
+def r2a_model():
+    return yaml.safe_load(R2A_YAML)["resources"]
+
+
+def test_credential_requires_collected_not_created(r2a_model):
+    p = plan(["bucket"], model=r2a_model)
+    assert p["credentials"] == ["archivestorage-auth-key"]
+    assert list(p["instances"]) == ["bucket"]  # no create step for the cred
+    lc = compose(["bucket"], model=r2a_model)
+    assert lc["credentials"] == ["archivestorage-auth-key"]
+    assert "needs credentials: archivestorage-auth-key" in lc["_note"]
+    assert _names(lc) == ["create-bucket", "verify-bucket", "delete-bucket"]
+
+
+def test_body_carrying_put_teardown(r2a_model):
+    lc = compose(["vault"], model=r2a_model)
+    create = _step(lc, "create-vault")
+    assert create["cleanup"]["method"] == "PUT"
+    assert create["cleanup"]["json"] == {"state": "terminated"}
+    d = _step(lc, "delete-vault")
+    assert d["method"] == "PUT"
+    assert d["path"] == "/v1/vaults/{vault_id}/state"
+    assert d["json"] == {"state": "terminated"}
+    assert d["expect_status"] == [200, 202]  # explicit model expectation wins
+    assert d["destructive"] is True
+
+
+def test_filter_object_capture_passthrough(r2a_model):
+    lc = compose(["flavor"], model=r2a_model)
+    cap = _step(lc, "create-flavor")["capture"]["flavor_id"]
+    assert cap == {"list": "$.server_types", "where_prefix": {"id": "s"},
+                   "where_not_prefix": {"id": "g"}, "get": "id"}
+
+
+# ---------------------------------------------------------------------------
 # option substitution: cidr derivation + enum
 
 def test_cidr_unique_block_and_sub_block(model):

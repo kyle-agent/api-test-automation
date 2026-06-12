@@ -58,13 +58,18 @@ resources:
     requires: []
     create:
       endpoint: "GET /v1/server-types"
-    capture: {server_type_id: "$.server_types[0].id"}
+    capture:
+      server_type_id:
+        list: "$.server_types"
+        where_prefix: {id: "s"}
+        where_not_prefix: {id: "g"}
+        get: "id"
     verify:
       - {name: read, endpoint: "GET /v1/server-types/{server_type_id}",
          expect_status: [200, 404]}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-full, steps: [find-server-type]}
-    notes: "읽기 전용 LOOKUP 노드. 소스 capture는 필터 셀렉터({list: $.server_types, where_prefix: {id: s}, where_not_prefix: {id: g}, get: id} — s-타입만, g-타입 거부, services constraint server-type-prefix-s VALIDATED)인데 모델 capture 스키마는 단일 jsonpath만 지원해 $.server_types[0].id로 단순화 — 첫 항목이 g-타입이면 소비자 create가 4xx난다. composer에 필터 capture 지원이 들어가기 전까지 docs (R3 과제)."
+    notes: "읽기 전용 LOOKUP 노드. capture는 소스 find-server-type의 필터 셀렉터 verbatim(s-타입만, g-타입 거부 — services constraint server-type-prefix-s VALIDATED). 필터 capture는 engine._capture 네이티브 지원, composer/validator도 dict capture 통과 (R2a 반영)."
 
   server:
     code: "cp-vs-server"

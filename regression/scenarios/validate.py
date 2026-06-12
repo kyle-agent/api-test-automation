@@ -31,7 +31,7 @@ from regression.scenarios.loader import load_lifecycles, FRAGMENTS_DIR
 _HERE = Path(__file__).parent
 _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 
-LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps",
+LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps", "credentials",
                   "needs_cert_material", "_note", "_comment", "_disabled_reason"}
 STEP_KEYS = {"name", "method", "path", "service", "json", "params",
              "expect_status", "capture", "capture_soft", "cleanup", "poll",
