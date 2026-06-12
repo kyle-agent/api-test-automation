@@ -1,10 +1,10 @@
-# Resource-task model — networking/security-group (001-002).
+# Resource-task model — networking/security-group (nw-sg group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from networking-security-group
 # (enabled, live-validated) by knowledge/formal/resources/extract.py, curated by hand.
 version: 1
 resources:
   security-group:
-    code: "001-002-a"
+    code: "nw-sg-sg"
     service: networking/security-group
     requires: []
     create:
@@ -18,7 +18,7 @@ resources:
     notes: "account/region 스코프 — VPC 불필요 (cross-service와 일치)"
 
   security-group-rule:
-    code: "001-002-b"
+    code: "nw-sg-rule"
     service: networking/security-group
     requires: [security-group]
     create:

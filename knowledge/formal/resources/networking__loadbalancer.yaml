@@ -1,4 +1,4 @@
-# Resource-task model — networking/loadbalancer (001-003, the LB chain).
+# Resource-task model — networking/loadbalancer (nw-lb group, the LB chain).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from heavy-shared-networking
 # (enabled, live-validated bodies/captures) + networking-loadbalancer-members-nat.
 #
@@ -9,7 +9,7 @@
 version: 1
 resources:
   lb-health-check:
-    code: "001-003-a"
+    code: "nw-lb-health-check"
     service: networking/loadbalancer
     requires: [vpc, subnet]
     create:
@@ -35,7 +35,7 @@ resources:
     notes: "region 스코프 재사용 자원 — 참조할 server group보다 먼저 생성 (run 27306490231 LbHealthCheckNotFoundError 교훈)"
 
   load-balancer:
-    code: "001-003-b"
+    code: "nw-lb-lb"
     service: networking/loadbalancer
     heavy: true
     requires: [vpc, subnet]
@@ -65,7 +65,7 @@ resources:
     source: {lifecycle: heavy-shared-networking, steps: [lb-create, lb-wait, lb-delete]}
 
   lb-server-group:
-    code: "001-003-c"
+    code: "nw-lb-server-group"
     service: networking/loadbalancer
     requires: [vpc, subnet, lb-health-check]
     create:
@@ -88,7 +88,7 @@ resources:
              steps: [lb-servergroup-create, lb-servergroup-delete]}
 
   lb-listener:
-    code: "001-003-d"
+    code: "nw-lb-listener"
     service: networking/loadbalancer
     requires: [load-balancer, lb-server-group]
     create:
@@ -112,7 +112,7 @@ resources:
              steps: [lb-listener-create, lb-listener-delete]}
 
   lb-member:
-    code: "001-003-e"
+    code: "nw-lb-member"
     service: networking/loadbalancer
     requires: [lb-server-group]
     create:

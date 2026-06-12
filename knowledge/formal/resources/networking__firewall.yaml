@@ -1,11 +1,11 @@
-# Resource-task model — networking/firewall (001-001-l).
+# Resource-task model — networking/firewall (nw-vpc-firewall).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1. The firewall has NO Open API create in
 # data/api_catalog.json — modeled with no_api: true (composer never composes it;
 # it documents the dependency shape until a carrier-capture flow lands in R3).
 version: 1
 resources:
   firewall:
-    code: "001-001-l"
+    code: "nw-vpc-firewall"
     service: networking/firewall
     no_api: true
     requires:

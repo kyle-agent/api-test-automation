@@ -802,7 +802,9 @@ TD_SCHEMA = {
                            "description": "graph node id (cross-service.yaml key style, "
                                           "e.g. 'queue', 'lb-server-group')"},
                     "code": {"type": "string",
-                             "description": "human group code guess like '001-007-a'; '' if unknown"},
+                             "description": "readable code guess, <cat>-<group>-<resource> like "
+                                            "'nw-vpc-subnet' (nw/cp/st/db/sec/mg/ct/ai/da); "
+                                            "'' if unknown"},
                     "requires": {"type": "array", "items": _TD_REQUIRE},
                     "create_endpoint": {"type": "string",
                                         "description": "'METHOD /path' exactly as in the catalog"},

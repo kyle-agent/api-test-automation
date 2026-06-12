@@ -17,7 +17,7 @@ present, well-formed poll/expect_status/capture/cleanup).
 Model schema (§1 of the plan) — per node ("task"):
 
     <node_id>:
-      code: "001-001-a"            # optional, human classification
+      code: "nw-vpc-vpc"           # optional, human classification (<cat>-<group>-<resource>)
       service: networking/vpc      # category/service (step service = last segment)
       heavy: true                  # optional; used for default-branch tie-break
       adopt: vpc                   # optional; stamped on create/delete steps

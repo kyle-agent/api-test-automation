@@ -1,10 +1,16 @@
 # Resource-task model groups (contract C1, docs/RESOURCE-MODEL-PLAN.md §2.5/§3)
-# — service bundles for the Planning UI and bundle composition. A node belongs
-# to the group named by its `group:` field or its code prefix (001-001-a -> 001-001).
+# — service bundles for the Planning UI and bundle composition.
+#
+# Code convention: <cat>-<group>-<resource> (e.g. nw-vpc-subnet). Group keys are
+# the first TWO segments (<cat>-<group>), so a node belongs to the group named
+# by its `group:` field or its code prefix (nw-vpc-subnet -> nw-vpc).
+# Category abbreviations (fixed — reuse on fan-out):
+#   nw=networking  cp=compute  st=storage  db=database  sec=security
+#   mg=management  ct=container  ai=ai-ml  da=data-analytics
 version: 1
 groups:
-  "001-001": {label: "네트워크 — VPC 묶음 (vpc/subnet/gateway/endpoint/peering)", category: networking}
-  "001-002": {label: "네트워크 — Security Group", category: networking}
-  "001-003": {label: "네트워크 — Load Balancer 체인", category: networking}
-  "001-004": {label: "네트워크 — Private DNS", category: networking}
-  "001-005": {label: "네트워크 — Direct Connect", category: networking}
+  "nw-vpc": {label: "네트워크 — VPC 묶음 (vpc/subnet/gateway/endpoint/peering)", category: networking}
+  "nw-sg": {label: "네트워크 — Security Group", category: networking}
+  "nw-lb": {label: "네트워크 — Load Balancer 체인", category: networking}
+  "nw-dns": {label: "네트워크 — Private DNS", category: networking}
+  "nw-dc": {label: "네트워크 — Direct Connect", category: networking}

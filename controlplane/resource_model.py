@@ -93,7 +93,7 @@ def load_model(dir: Path | None = None, with_sources: bool = False):
 
 
 def load_groups(dir: Path | None = None) -> dict:
-    """_groups.yaml -> {"001-001": {label, category}} (부재/깨짐 -> {})."""
+    """_groups.yaml -> {"nw-vpc": {label, category}} (부재/깨짐 -> {})."""
     d = Path(dir) if dir else resources_dir()
     try:
         doc = yaml.safe_load((d / "_groups.yaml").read_text(encoding="utf-8")) or {}
@@ -104,7 +104,7 @@ def load_groups(dir: Path | None = None) -> dict:
 
 
 def group_of(node_id: str, node: dict) -> str:
-    """그룹 키 — 노드의 group 필드 우선, 없으면 code 접두(001-001-a -> 001-001)."""
+    """그룹 키 — 노드의 group 필드 우선, 없으면 code 접두(nw-vpc-subnet -> nw-vpc)."""
     g = str(node.get("group") or "").strip()
     if g:
         return g

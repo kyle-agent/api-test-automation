@@ -54,14 +54,14 @@ RES_DIR = TMP_ROOT / "knowledge" / "formal" / "resources"
 GROUPS_YAML = """\
 version: 1
 groups:
-  "001-001": {label: "네트워크 기본", category: networking}
+  "nw-vpc": {label: "네트워크 기본", category: networking}
 """
 
 VPC_YAML = """\
 version: 1
 resources:
   vpc:
-    code: "001-001-a"
+    code: "nw-vpc-vpc"
     service: networking/vpc
     requires: []
     create:
@@ -76,7 +76,7 @@ resources:
     provenance: VALIDATED
     notes: "역추출 파일럿 — 폼 밖의 키는 저장에서 보존되어야 한다"
   subnet:
-    code: "001-001-b"
+    code: "nw-vpc-subnet"
     service: networking/vpc
     requires: [vpc]
     create:
@@ -86,13 +86,13 @@ resources:
         cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr}
     provenance: VALIDATED
   vpc-peering:
-    code: "001-001-i"
+    code: "nw-vpc-peering"
     service: networking/vpc
     requires:
       - {ref: vpc, count: 2}
     provenance: docs
   vpc-endpoint:
-    code: "001-001-h"
+    code: "nw-vpc-endpoint"
     service: networking/vpc
     requires: [subnet]
     create:
@@ -105,7 +105,7 @@ PRIVATELINK_YAML = """\
 version: 1
 resources:
   privatelink-service:
-    code: "001-001-k"
+    code: "nw-vpc-privatelink-svc"
     service: networking/privatelink
     requires:
       - subnet
@@ -197,14 +197,14 @@ def test_loader_merges_files_and_tolerates_absence():
     assert sources["privatelink-service"] == "networking__privatelink.yaml"
     # _groups.yaml is groups, never a node file
     groups = resource_model.load_groups()
-    assert groups["001-001"]["label"] == "네트워크 기본"
+    assert groups["nw-vpc"]["label"] == "네트워크 기본"
     # absence -> empty model, no raise (R1 미머지 상태)
     empty = Path(tempfile.mkdtemp(prefix="no-resources-"))
     assert resource_model.load_model(dir=empty / "nope") == {}
     assert resource_model.load_groups(dir=empty / "nope") == {}
     # group derivation: explicit field wins, else code prefix
-    assert resource_model.group_of("vpc", {"code": "001-001-a"}) == "001-001"
-    assert resource_model.group_of("x", {"group": "g9", "code": "001-001-a"}) == "g9"
+    assert resource_model.group_of("vpc", {"code": "nw-vpc-vpc"}) == "nw-vpc"
+    assert resource_model.group_of("x", {"group": "g9", "code": "nw-vpc-vpc"}) == "g9"
 
 
 # --- 2. pages render ------------------------------------------------------------------
@@ -212,7 +212,7 @@ def test_loader_merges_files_and_tolerates_absence():
 def test_list_page_renders_groups_and_nodes():
     page = client.get("/planning/resources").text
     assert "네트워크 기본" in page                      # _groups.yaml label
-    assert "001-001-i" in page and "vpc-peering" in page
+    assert "nw-vpc-peering" in page and "vpc-peering" in page
     assert "vpc×2" in page                              # 다중성 요약
     assert "load-balancer | server:ip" in page          # OR-의존 요약
     assert "VALIDATED" in page and "docs" in page       # provenance 배지
@@ -233,7 +233,7 @@ def test_list_page_with_empty_model_still_renders():
 
 def test_form_page_renders_existing_node():
     page = client.get("/planning/resources/vpc-endpoint").text
-    assert 'value="001-001-h"' in page                  # code
+    assert 'value="nw-vpc-endpoint"' in page                  # code
     assert 'value="subnet"' in page                     # requires row
     assert "dns, objectstorage, filestorage, scr" in page  # enum 값
     assert "datalist" in page and 'value="vpc-peering"' in page  # 대상 노드 datalist
@@ -328,7 +328,7 @@ def test_save_roundtrips_through_authoring_pipeline():
     assert saved["create"]["body"]["name"] == "regrvpc{ualpha}"
     assert saved["create"]["options"]["cidr"]["pick"] == "unique-block"
     assert saved["notes"].startswith("역추출 파일럿")   # 폼 밖의 키 보존
-    assert doc["resources"]["subnet"]["code"] == "001-001-b"  # 이웃 노드 무사
+    assert doc["resources"]["subnet"]["code"] == "nw-vpc-subnet"  # 이웃 노드 무사
     # 로컬 git 커밋 (authoring 파이프라인 4단계)
     log = subprocess.run(["git", "-C", str(TMP_ROOT), "log", "-1", "--pretty=%s"],
                          capture_output=True, text=True).stdout.strip()
@@ -337,7 +337,7 @@ def test_save_roundtrips_through_authoring_pipeline():
 
 
 def test_new_node_goes_to_service_derived_file():
-    node = {"code": "001-001-c", "service": "networking/security-group",
+    node = {"code": "nw-sg-sg", "service": "networking/security-group",
             "requires": ["vpc"], "provenance": "docs",
             "create": {"endpoint": "POST /v1/security-groups",
                        "body": {"name": "regrsg{ualpha}"}}}
@@ -478,9 +478,9 @@ def test_compose_save_writes_draft_and_links_run():
         assert "/testing?crud_filter=gen-vpc-endpoint" in r.text
         # 사용자 지정 lifecycle id
         r = client.post("/planning/resources/compose", data=_as_data([
-            ("targets", "vpc"), ("lifecycle_id", "bundle-001-001"),
+            ("targets", "vpc"), ("lifecycle_id", "bundle-nw-vpc"),
             ("action", "save")]))
-        assert (TMP_ROOT / "drafts" / "lifecycle-bundle-001-001.json").exists()
+        assert (TMP_ROOT / "drafts" / "lifecycle-bundle-nw-vpc.json").exists()
 
 
 def test_lifecycle_draft_guards():

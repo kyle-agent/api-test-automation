@@ -360,7 +360,7 @@ def test_model_gap_list_against_temp_resources_dir():
         "    service: application-service/queueservice\n", encoding="utf-8")
     # _groups.yaml is ignored
     (tmp / "_groups.yaml").write_text(
-        "groups: {'001-001': {label: net, category: networking}}\n",
+        "groups: {'nw-vpc': {label: net, category: networking}}\n",
         encoding="utf-8")
     gaps = ai_pipelines.model_gap_services(tmp)
     assert "networking/vpc" not in gaps

@@ -1,4 +1,4 @@
-# Resource-task model — networking/vpc (001-001 family).
+# Resource-task model — networking/vpc (nw-vpc group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validated by knowledge/formal/validate.py
 # · consumed by regression/scenarios/composer.py (R2a).
 #
@@ -9,7 +9,7 @@
 version: 1
 resources:
   vpc:
-    code: "001-001-a"
+    code: "nw-vpc-vpc"
     service: networking/vpc
     adopt: vpc
     requires: []
@@ -28,7 +28,7 @@ resources:
     source: {lifecycle: networking-vpc-subnet, steps: [create-vpc, get-vpc-active, delete-vpc]}
 
   subnet:
-    code: "001-001-b"
+    code: "nw-vpc-subnet"
     service: networking/vpc
     adopt: subnet
     requires: [vpc]
@@ -46,7 +46,7 @@ resources:
     source: {lifecycle: networking-vpc-subnet, steps: [create-subnet, get-subnet-active, delete-subnet]}
 
   port:
-    code: "001-001-c"
+    code: "nw-vpc-port"
     service: networking/vpc
     requires: [subnet]
     create:
@@ -66,7 +66,7 @@ resources:
     notes: "ready until 목록은 heavy-shared-networking port-wait의 validated 관측값"
 
   internet-gateway:
-    code: "001-001-d"
+    code: "nw-vpc-igw"
     service: networking/vpc
     requires: [vpc]
     create:
@@ -84,7 +84,7 @@ resources:
     notes: "firewall_enabled: true로 만들면 firewall이 암묵 생성된다 (firewall 노드 참조)"
 
   nat-gateway:
-    code: "001-001-e"
+    code: "nw-vpc-natgw"
     service: networking/vpc
     requires: [subnet, public-ip]
     create:
@@ -101,7 +101,7 @@ resources:
              steps: [natgw-create, natgw-wait, natgw-delete]}
 
   public-ip:
-    code: "001-001-f"
+    code: "nw-vpc-public-ip"
     service: networking/vpc
     requires: []
     create:
@@ -116,7 +116,7 @@ resources:
     notes: "경로는 /v1/publicips (붙여쓰기) — 모델 노드 id는 cross-service의 public-ip 표기를 따른다"
 
   private-nat:
-    code: "001-001-g"
+    code: "nw-vpc-private-nat"
     service: networking/vpc
     requires:
       - one_of: [direct-connect, transit-gateway]
@@ -137,7 +137,7 @@ resources:
     notes: "§1의 OR-의존 사례 (direct connect OR transit gateway). 소스 lifecycle은 service_resource_id에 {unique} placeholder를 보내 4xx — 실소유 uplink 자원 주입은 이 모델이 처음 제공하므로 body는 UNPROVEN(docs). capture envelope $.private_nat.id UNPROVEN."
 
   vpc-endpoint:
-    code: "001-001-h"
+    code: "nw-vpc-endpoint"
     service: networking/vpc
     requires: [vpc, subnet]
     create:
@@ -160,7 +160,7 @@ resources:
     notes: "resource_key는 실재 대상 서비스 키가 필요해 소스 lifecycle도 {unique}로 4xx — body/capture UNPROVEN(docs)"
 
   vpc-peering:
-    code: "001-001-i"
+    code: "nw-vpc-peering"
     service: networking/vpc
     requires:
       - {ref: vpc, count: 2}
@@ -182,7 +182,7 @@ resources:
     notes: "§1의 다중성 사례 (VPC 2개; composer가 vpc#2 인스턴스 + {vpc_id_2}를 배선). create 202 라이브 관측. 승인 body는 {type: CREATE_APPROVE}로 VALIDATED (구 {action: APPROVE}는 ValidationError로 CREATING 고착 → cap-poisoning 근원). 상태기계: 생성 직후 CREATING에서는 승인/수정/삭제가 400 — 소스 lifecycle은 승인 400 재시도 8회로 통과하므로 verify의 expect_status에 400 허용, 합성본에 재시도 정책을 옮기는 것은 R3 과제. approver_vpc_account_id는 소스에서 capture_soft($.vpc.account_id, envelope UNPROVEN)였고 동일 계정 페어링이라 생략 — 미검증 capture를 vpc 노드에 보태지 않기 위함."
 
   transit-gateway:
-    code: "001-001-j"
+    code: "nw-vpc-tgw"
     service: networking/vpc
     requires: []
     create:

@@ -1,7 +1,7 @@
 """Offline tests for regression/scenarios/composer.py (R2a, contract C2).
 
 Self-contained fixture model (contract C6 — R1's knowledge/formal/resources
-may not exist yet): ~12 nodes mirroring the plan's 001-001 networking bundle,
+may not exist yet): ~12 nodes mirroring the plan's nw-vpc networking bundle,
 including an enum option (vpc-endpoint), count:2 (vpc-peering), a one_of with
 bind/use + an optional ref option (privatelink-service), and a cost-asymmetric
 one_of (nat: igw vs load-balancer).
@@ -25,7 +25,7 @@ FIXTURE_YAML = """
 version: 1
 resources:
   vpc:
-    code: 001-001-a
+    code: nw-vpc-vpc
     service: networking/vpc
     adopt: vpc
     requires: []
@@ -41,7 +41,7 @@ resources:
     provenance: VALIDATED
 
   subnet:
-    code: 001-001-b
+    code: nw-vpc-subnet
     service: networking/vpc
     adopt: subnet
     requires: [vpc]
@@ -57,7 +57,7 @@ resources:
     quota: subnet
 
   security-group:
-    code: 001-001-c
+    code: nw-vpc-sg
     service: networking/security-group
     requires: []
     create:
@@ -69,7 +69,7 @@ resources:
     quota: security-group
 
   public-ip:
-    code: 001-001-d
+    code: nw-vpc-public-ip
     service: networking/vpc
     requires: []
     create:
@@ -80,7 +80,7 @@ resources:
              destructive: true}
 
   igw:
-    code: 001-001-e
+    code: nw-vpc-igw
     service: networking/vpc
     requires: [vpc]
     create:
@@ -92,7 +92,7 @@ resources:
              destructive: true}
 
   port:
-    code: 001-001-f
+    code: nw-vpc-port
     service: networking/vpc
     requires: [subnet]
     create:
@@ -102,7 +102,7 @@ resources:
     delete: {endpoint: "DELETE /v1/ports/{port_id}", destructive: true}
 
   load-balancer:
-    code: 001-001-g
+    code: nw-vpc-lb
     service: networking/loadbalancer
     heavy: true
     requires: [subnet]
@@ -116,7 +116,7 @@ resources:
     quota: lb
 
   server:
-    code: 001-001-h
+    code: nw-vpc-server
     service: compute/virtualserver
     requires: [subnet]
     create:
@@ -128,7 +128,7 @@ resources:
     quota: server
 
   vpc-endpoint:
-    code: 001-001-i
+    code: nw-vpc-endpoint
     service: networking/vpc
     requires: [vpc, subnet]
     create:
@@ -143,7 +143,7 @@ resources:
              destructive: true}
 
   vpc-peering:
-    code: 001-001-j
+    code: nw-vpc-peering
     service: networking/vpc
     requires:
       - {ref: vpc, count: 2}
@@ -158,7 +158,7 @@ resources:
     quota: peering
 
   privatelink-service:
-    code: 001-001-k
+    code: nw-vpc-privatelink-svc
     service: networking/vpc
     requires:
       - subnet
@@ -177,7 +177,7 @@ resources:
              destructive: true}
 
   nat:
-    code: 001-001-l
+    code: nw-vpc-nat
     service: networking/vpc
     requires:
       - one_of: [igw, load-balancer]
@@ -494,7 +494,7 @@ def test_load_model_merges_files_and_rejects_duplicates(tmp_path, model):
     (tmp_path / "networking__vpc.yaml").write_text(yaml.safe_dump(a))
     (tmp_path / "networking__port.yaml").write_text(yaml.safe_dump(b))
     (tmp_path / "_groups.yaml").write_text(
-        yaml.safe_dump({"groups": {"001-001": {"label": "network"}}}))
+        yaml.safe_dump({"groups": {"nw-vpc": {"label": "network"}}}))
     m = composer.load_model(dir=str(tmp_path))
     assert set(m) == {"vpc", "subnet", "port"}
     # a composed lifecycle from the loaded model still validates

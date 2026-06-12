@@ -27,7 +27,7 @@ Layers / checks:
                        core/budgets or dependencies.json (unknown = warning) ·
                        divergence from the cross-service.yaml requires graph
                        is a WARNING (the two co-exist during R1-R3) ·
-                       _groups.yaml = {groups: {"001-001": {label, category}}}
+                       _groups.yaml = {groups: {"nw-vpc": {label, category}}}
 """
 from __future__ import annotations
 
@@ -479,7 +479,7 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
             nodes[nid] = task
             node_file[nid] = rel
 
-    # ---- _groups.yaml (C1: {groups: {"001-001": {label, category}}}) -------
+    # ---- _groups.yaml (C1: {groups: {"nw-vpc": {label, category}}}) --------
     groups: dict = {}
     gpath = RESOURCES_DIR / "_groups.yaml"
     if gpath.exists():

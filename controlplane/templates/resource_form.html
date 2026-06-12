@@ -28,9 +28,9 @@
   <h2>기본 정보</h2>
   <table>
     <tr>
-      <th style="width:140px">code (분류 번호)</th>
+      <th style="width:140px">code (분류 코드)</th>
       <td><input type="text" name="code" value="{{ node.get('code', '') }}"
-                 placeholder="예: 001-001-a" size="14"></td>
+                 placeholder="예: nw-vpc-subnet" size="18"></td>
       <th style="width:140px">service</th>
       <td><input type="text" name="service" value="{{ node.get('service', '') }}"
                  placeholder="category/service" size="24" required></td>
@@ -38,7 +38,7 @@
     <tr>
       <th>group (생략 시 code 접두)</th>
       <td><input type="text" name="group" value="{{ node.get('group', '') }}"
-                 placeholder="예: 001-001" size="14"></td>
+                 placeholder="예: nw-vpc" size="14"></td>
       <th>quota (core/budgets)</th>
       <td><input type="text" name="quota" value="{{ node.get('quota', '') }}"
                  placeholder="예: vpc" size="14"></td>

@@ -1,10 +1,10 @@
-# Resource-task model — networking/dns (001-004, Private DNS).
+# Resource-task model — networking/dns (nw-dns group, Private DNS).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # networking-dns-hosted-zone-private (enabled, live-validated).
 version: 1
 resources:
   private-dns:
-    code: "001-004-a"
+    code: "nw-dns-private-dns"
     service: networking/dns
     heavy: true
     requires: []
@@ -22,7 +22,7 @@ resources:
     notes: "생성/삭제가 매우 느림(시간 단위 관측) — 전용 lane에 격리, 먼저 생성/마지막 삭제 (services/networking__dns.yaml). hosted-zone이 남아 있는 동안 종료 불가. heavy-shared-networking은 별도 activate sub-flow(POST /v1/private-dns/activate)를 끼워 넣지만, 이 소스 lifecycle은 activate 없이 ACTIVE 도달을 검증했다."
 
   hosted-zone:
-    code: "001-004-b"
+    code: "nw-dns-hosted-zone"
     service: networking/dns
     requires: [private-dns]
     create:
