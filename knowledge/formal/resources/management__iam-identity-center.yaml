@@ -1,0 +1,136 @@
+# Resource-task model — management/iam-identity-center (mg-idc group, SSO).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from the idc-* lifecycles
+# (ALL disabled 2026-06-10 — service excluded from the C3 target, waived in
+# coverage_waivers.json — and heavy: SSO structure is account-structural on a
+# shared account) by extract.py, curated by hand: the literal ssoins-12345
+# placeholders became {iam-identity-center.instance_id} wiring, and the
+# account-assignment's all-zero ids became real node references. Everything
+# here is provenance docs (disabled sources, soft captures, UNPROVEN bodies);
+# the model documents the dependency shape for a future dedicated
+# org-management test account (R3+).
+version: 1
+resources:
+  iam-identity-center:
+    code: "mg-idc-instance"
+    service: management/iam-identity-center
+    heavy: true
+    requires: []
+    create:
+      endpoint: "POST /v1/instances"
+      body:
+        name: "regridc{ualpha}"
+        description: "API regression suite SSO instance"
+        identity_store_type: "{opt.identity_store_type}"
+        identity_store_config:
+          bind_credential: password
+          bind_dn: "CN=Administrator,CN=Users,DC=test,DC=add"
+          connection_url: "ldaps://test.subdomain.company.com:123"
+          rdn_ldap_attribute: cn
+          user_object_classes: "person, organizationalPerson, user"
+          username_ldap_attribute: sAMAccountName
+          users_dn: "OU=Employees,OU=Accounts,DC=sub,DC=org"
+      options:
+        identity_store_type: {type: enum,
+                              values: [ACTIVE_DIRECTORY, IDENTITY_CENTER_DIRECTORY],
+                              required: true, default: ACTIVE_DIRECTORY, vary: true,
+                              note: "identity source. ACTIVE_DIRECTORY 분기는 identity_store_config(LDAP) 필요 — 소스 body는 api_bodies createinstance의 doc 샘플 그대로(실 AD 아님). IDENTITY_CENTER_DIRECTORY는 config 불필요 추정. identity source 변경은 기존 사용자/그룹/할당 전체 삭제 (identity-source-change-wipes-everything)"}
+    capture: {instance_id: "$.instance.id"}
+    delete: {endpoint: "DELETE /v1/instances/{instance_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-instance, steps: [create-instance, delete-instance]}
+    notes: "cross-service 노드 키 iam-identity-center. Organization MANAGEMENT 계정만 생성 가능 (Organization 선행 — 엔타이틀먼트 사전조건이라 requires 엣지가 아닌 note로 기록; cross-service requires []와 일치). 단일 region, kr-south3 미지원 — 스모크 400의 원인. BLAST RADIUS: instance는 모든 SSO 사용자/그룹/permission-set의 기반, 삭제는 cascade (delete-cascades). capture envelope $.instance.id는 소스에서 capture_soft 추정 — UNPROVEN."
+
+  idc-user:
+    code: "mg-idc-user"
+    service: management/iam-identity-center
+    heavy: true
+    requires: [iam-identity-center]
+    create:
+      endpoint: "POST /v1/users"
+      body:
+        instance_id: "{iam-identity-center.instance_id}"
+        user_id: "regridc{ualpha}"
+        name: "API Regression User"
+        email: "regr-test@example.com"
+        description: "API regression suite SSO user"
+        department: QA
+        business_unit: Automation
+        manager: "Regression Bot"
+        employee_id: "regr-{unique}"
+        nation_id: "+82"
+        phone_number: "010-1234-5678"
+        temporary_password: true
+        password: ""
+        group_ids: []
+    capture: {user_uuid: "$.user.id"}
+    delete: {endpoint: "DELETE /v1/users/{user_uuid}", destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-user, steps: [create-user, delete-user]}
+    notes: "소스는 instance_id에 docs placeholder(ssoins-12345)를 보냈다 — 실소유 instance 주입은 이 모델이 처음 제공 (private-nat 패턴). body createuser 기반, capture $.user.id capture_soft 추정 — 모두 UNPROVEN. 경로 /v1/users는 iam 계열과 path-root 공유 — per-service host 필수. MFA 필수 정책 주의 (mfa-mandatory)."
+
+  idc-group:
+    code: "mg-idc-group"
+    service: management/iam-identity-center
+    heavy: true
+    requires: [iam-identity-center]
+    create:
+      endpoint: "POST /v1/groups"
+      body:
+        instance_id: "{iam-identity-center.instance_id}"
+        name: "regrgrp{ualpha}"
+        description: "API regression suite SSO group"
+        user_uuids: []
+    capture: {group_id: "$.group.id"}
+    delete: {endpoint: "DELETE /v1/groups/{group_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-group, steps: [create-group, delete-group]}
+    notes: "user_uuids 빈 배열 — 선행 SSO user 불필요 (멤버 추가는 POST /v1/groups/{id}/users 오퍼레이션). 경로 /v1/groups는 mg-iam-group과 path-root 충돌 — per-service host 필수. body/capture UNPROVEN."
+
+  idc-permission-set:
+    code: "mg-idc-permission-set"
+    service: management/iam-identity-center
+    heavy: true
+    requires: [iam-identity-center]
+    create:
+      endpoint: "POST /v1/permission-sets"
+      body:
+        instance_id: "{iam-identity-center.instance_id}"
+        name: "regrps{ualpha}"
+        description: "API regression suite permission set"
+        session_duration: 3600
+        custom_policies: []
+        inline_policies: []
+        managed_policies: []
+    capture: {permission_set_id: "$.permission_set.id"}
+    delete: {endpoint: "DELETE /v1/permission-sets/{permission_set_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-permission-set, steps: [create-permission-set, delete-permission-set]}
+    notes: "정책 배열들 빈 값 — 실 정책 미부착 (정책 부착은 PUT .../policies 오퍼레이션). body createpermissionset 기반, capture UNPROVEN."
+
+  idc-account-assignment:
+    code: "mg-idc-account-assignment"
+    service: management/iam-identity-center
+    heavy: true
+    requires: [iam-identity-center, idc-permission-set, idc-user]
+    create:
+      endpoint: "POST /v1/account-assignments"
+      body:
+        instance_id: "{iam-identity-center.instance_id}"
+        accounts:
+          - {target_account_email: "regr-test@example.com",
+             target_account_id: "00000000000000000000000000000000",
+             target_account_name: "regr-target-account"}
+        permission_sets:
+          - {permission_set_id: "{idc-permission-set.permission_set_id}",
+             permission_set_name: "regr-permission-set",
+             session_duration: 3600, custom_policies: [],
+             inline_policies: [], managed_policies: []}
+        principals:
+          - {principal_id: "{idc-user.user_uuid}", principal_type: USER}
+    capture: {account_assignment_id: "$.account_assignment.id"}
+    delete: {endpoint: "DELETE /v1/account-assignments/{account_assignment_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-account-assignment, steps: [create-account-assignment, delete-account-assignment]}
+    notes: "가장 민감한 SSO write — principal에게 target 계정의 permission-set을 부여 (소스는 절대 실생성하지 않는 coverage-only). permission_set/principal id는 소스의 all-zero placeholder를 노드 참조로 배선(모델의 value-add); target_account_id는 Organization member 계정이 필요해 placeholder 유지 — organization-account 노드와의 배선은 org-master 계정 확보 후 R3 과제. body/capture UNPROVEN."
