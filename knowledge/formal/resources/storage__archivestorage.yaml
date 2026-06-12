@@ -1,0 +1,46 @@
+# Resource-task model — storage/archivestorage (st-as group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from archivestorage-bucket +
+# archivestorage-archiving-policy (both DISABLED 2026-06-10).
+#
+# PERMANENT EXCLUSION: archivestorage needs its OWN console-issued 인증키 (IAM
+# My Info > 인증키 관리) and none will be issued for the test account — every
+# call 401s with platform HMAC creds alone (coverage_waivers.json). Modeled
+# docs-provenance with a {credential: ...} requires per §1 (cloud-ml pattern):
+# the composer must env-skip these nodes unless the credential is flagged
+# present in the environment.
+version: 1
+resources:
+  archive-bucket:
+    code: "st-as-bucket"
+    service: storage/archivestorage
+    requires:
+      - {credential: archivestorage-auth-key,
+         note: "콘솔 발급 전용 인증키 (사용자당 최대 2개, 만료 1-365일/영구) — 만료·사용중지 즉시 401. 이 계정에는 영구 미발급 → 합성기는 env-skip"}
+    create:
+      endpoint: "POST /v1/buckets"
+      body: {name: "regras{unique}", tags: []}
+    capture: {bucket_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/buckets/{bucket_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: archivestorage-bucket, steps: [create-bucket, delete-bucket]}
+    notes: "서비스 영구 제외 (전용 인증키 미발급, C3 waiver) — 그래프 문서화 + credential 게이트 시연용. body는 api_docs BucketCreateRequest, capture $.id (BucketCreateResponse) UNPROVEN. 버킷 이름 규칙: 3-63자, 소문자/숫자/./-, 소문자나 숫자로 시작, IP 형태 금지, 'admin' 금지, Account/Region 유일, 재사용은 1시간 후 (services constraint bucket-name-rule). versioning/encryption은 생성 후 별도 PUT."
+
+  archiving-policy:
+    code: "st-as-archiving-policy"
+    service: storage/archivestorage
+    requires:
+      - {credential: archivestorage-auth-key,
+         note: "archive-bucket과 동일한 콘솔 발급 인증키 게이트"}
+    create:
+      endpoint: "POST /v1/archiving-policies"
+      body:
+        archiving_source_bucket_name: "{opt.source_bucket}"
+        object_lifecycle: "1"
+        object_path: "/"
+      options:
+        source_bucket: {type: string, required: true, default: "obs-bucket-name",
+                        note: "아카이빙 원본 Object Storage 버킷 이름 — 실재 OBS 버킷 필요 (objectstorage 미모델; 기본값은 소스의 문서 placeholder → 4xx). 대상은 한 번 설정하면 영구 불변"}
+    capture: {archiving_policy_id: "$.id"}
+    provenance: docs
+    source: {lifecycle: archivestorage-archiving-policy, steps: [create-archiving-policy]}
+    notes: "DELETE 없음: archiving policy는 수정/비활성만 가능하고 영구 삭제 불가 (services quirk archiving-target-immutable) — teardown은 PUT /v1/archiving-policies/{id}/state {state: INACTIVE}로 비활성화가 최선 (검증기 no-teardown 경고는 의도). object_lifecycle은 문서상 STRING ('1'). 정책은 추가 시각 기준 1일 1회 실행."
