@@ -1,0 +1,52 @@
+# Resource-task model — networking/gslb (nw-gslb group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from networking-gslb-service
+# (light + enabled, but per its _note "NOT runtime-proven … pending live
+# validation" and the capture is capture_soft — so C5 keeps everything docs
+# until a live pass upgrades it; body copied verbatim from the lifecycle).
+version: 1
+resources:
+  gslb:
+    code: "nw-gslb-gslb"
+    service: networking/gslb
+    requires: []
+    create:
+      endpoint: "POST /v1/gslbs"
+      body:
+        algorithm: ROUND_ROBIN
+        description: "API regression suite"
+        env_usage: PUBLIC
+        health_check:
+          health_check_interval: ""
+          health_check_probe_timeout: ""
+          health_check_user_id: ""
+          health_check_user_password: ""
+          protocol: TCP
+          receive_string: ""
+          send_string: ""
+          service_port: "80"
+          timeout: ""
+        name: "regr{ualpha}.gslb.e.samsungsdscloud.com"
+        resources: []
+        tags: []
+    capture: {gslb_id: "$.gslb.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/gslbs/{gslb_id}",
+         expect_status: [200]}
+      - {name: read-resources, endpoint: "GET /v1/gslbs/{gslb_id}/resources",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/gslbs/{gslb_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-gslb-service, steps: [create-gslb, delete-gslb]}
+    notes: "선행 서비스 없음 — 글로벌/계정 스코프, VPC-free (services constraint
+      gslb-no-prereq-services). REGION GATE: kr-west1/kr-east1 전용 (kr-south
+      불가, gslb-region-availability — 엔진에 region-guard가 없어 소스 lifecycle
+      _note에 기록된 운영 게이트). name은 FQDN — 라벨부는 4-40자 소문자+숫자만
+      (gslb-name-rules); health_check는 userguide 규칙 적용형: TCP + service_port
+      '80' (TCP/HTTP(S)에 Service Port 필수, Receive String은 HTTP(S)에서만
+      필수·영숫자만 — TCP라 빈 문자열 유지, gslb-health-check-body-applied).
+      enum 추정치 (UNVALIDATED): algorithm=ROUND_ROBIN, env_usage=PUBLIC.
+      capture는 소스에서 capture_soft($.gslb.id, creategslb response_example의
+      top-level gslb.id — health_check.id는 sub-id) — envelope UNPROVEN이라
+      docs. verify GET 2건이 gslb의 gap_getid 2건(showgslb, listgslbresources)을
+      닫는다. 계정당 도메인 20개 cap, 도메인당 연결 자원 8개 cap —
+      core/budgets에 'gslb' quota kind가 생기면 quota 필드로 승격."
