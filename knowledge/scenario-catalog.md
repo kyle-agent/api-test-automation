@@ -164,23 +164,34 @@ Static ceiling **85.6% → 86.3%** (gap_getid 166 → 156; gap_write 32 = all wa
 ## Composed lifecycles — M5 resource-task model (2026-06-12)
 
 New lifecycles are no longer hand-written: the resource-task model
-(`knowledge/formal/resources/*.yaml`, **127 nodes**) is compiled by
+(`knowledge/formal/resources/*.yaml`, **128 nodes**) is compiled by
 `regression/scenarios/composer.py` into `gen-<node>` / `bundle-<group>`
 lifecycles, kept in `regression/scenarios/lifecycles/generated__*.json`
-(**136 lifecycles total** now pass the scenarios validator). Status of the
-composed set:
+(**146 lifecycles total** now pass the scenarios validator; 18 are
+composed, 13 enabled). Status of the composed set (after waves 1·2 + the
+heavy window, runs 27394211896 … 27421363609):
 
 | Lifecycle | Steps | Status |
 |---|---|---|
-| `gen-pilot-net-basics` (vpc/subnet/port/igw/public-ip) | 20 | **enabled** — 20/20 live, kept as the composer-path canary |
-| `gen-wave-vslight` (server-group, volume-transfer) | 9 | **enabled** — 9/9 in three consecutive runs (27394211896 · 27395331657 · 27396649009) |
-| `gen-wave-apigw` (api→…→api-key/usage-plan/access-control) | 20 | **enabled** — 20/20 twice incl. all deletes |
-| `gen-wave-dashboard` | 3 | **enabled** — create 201 proven; capture fixed to flat `$.id` (rev 4) |
-| `gen-wave-mgmisc` / `gen-wave-devops` / `gen-wave-net-endpoint` | 3/3/9 | disabled — triaged blockers in node notes (product 400s, console-only ids) |
-| `gen-cloudml-chain` | 24 | disabled (gated-ready) — full chain composed, blocked on SCR auth key (console credential) + heavy |
+| `gen-pilot-net-basics` (vpc/subnet/port/igw/public-ip) | 20 | **enabled, green** — 20/20 live, kept as the composer-path canary; re-composed with id-bound GET verifies (wave 2) |
+| `gen-wave-vslight` (server-group, volume-transfer) | 9 | **enabled, green** — 9/9 in three consecutive runs (27394211896 · 27395331657 · 27396649009) |
+| `gen-wave-apigw` (api→…→api-key/usage-plan/access-control) | 20 | **enabled, green** — 20/20 twice incl. all deletes |
+| `gen-wave-dashboard` | 3 | **enabled, green** — create 201 proven; capture `$.id` + delete body `dashboard_ids` (run 27398084089) |
+| `gen-wave2-queue` (queue + attributes) | — | **enabled, green** — required attributes/name query proven (27401527554) |
+| `gen-wave2-sec` (kms-key + secret) | — | **enabled, green** (27401527554) |
+| `gen-wave2-rg` (resource-group) | — | **enabled, green** (27401527554) |
+| `gen-wave2-iam` (iam-group + iam-policy) | — | **enabled, green** (27401527554) |
+| `gen-wave2-volume` (block volume + snapshot) | — | **enabled, green** — delete 500-race retries proven (27417986669) |
+| `gen-wave2-scf` (function + trigger + logs/metrics) | — | **enabled, green** — trigger_type `cron` unmasked (27421363609, PF-11) |
+| `gen-wave2-scr` / `gen-wave2-fs` | — | enabled — recomposed after 27421363609 (private-acl verify removed · fs delete `volume_id` query); next run should green |
+| `gen-heavy-vs-netops` (server closure + port attach/detach + static NAT) | — | **enabled (heavy)** — server chain + attach/detach proven; static NAT `publicip_id` fix in, rev 3 dispatched |
+| `gen-wave-mgmisc` / `gen-wave-devops` / `gen-wave-net-endpoint` / `gen-wave2-cmep` | — | disabled — triaged blockers in node notes (product 400s/500, console-only ids, no monitored VM yet) |
+| `gen-cloudml-chain` | 24 | disabled (gated-ready) — full chain composed, blocked on SCR auth key (console credential — docker-probe experiment running) + heavy |
 
-Live wave findings + blocked classes: `docs/RESOURCE-MODEL-PLAN.md` §6.
-Current static ceiling per `python -m spec.coverage_gap`: **86.6% (1,188/1,372)**;
-latest published run C3 **44.3%**, fail_new 0, 249 waivers. R3 direction:
+Live wave findings + blocked classes: `docs/RESOURCE-MODEL-PLAN.md` §6;
+the consolidated product/API findings ledger is `docs/PRODUCT-FINDINGS.md`
+(12 rows). Current static ceiling per `python -m spec.coverage_gap`:
+**88.1% (1,209/1,372)** (gap_getid 130 · gap_write 33); latest published run
+C3 **44.79%** (cov_op 36.73), fail_new 0, 249 waivers. R3 direction:
 hand-written lifecycles above get replaced by composed equivalents node-by-node
 after live verification — treat this catalog's earlier sections as history.
