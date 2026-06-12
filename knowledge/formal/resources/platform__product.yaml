@@ -26,4 +26,4 @@ resources:
       - {name: read, endpoint: "GET /v1/products/{product_id}",
          expect_status: [200]}
     provenance: VALIDATED  # gen-wave3-product 통과 — run 27447899572 (capture + id-bound read 200)
-    notes: "조회 전용 lookup task — envelope UNPROVEN."
+    notes: "조회 전용 lookup task — products[].product_id 패턴 추론이 라이브로 확정 (run 27447899572)."
