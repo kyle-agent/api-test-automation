@@ -26,16 +26,30 @@ resources:
              steps: [create, delete, wait-gone]}
     notes: "VPC-FREE 컨트롤플레인 자원. 삭제는 비동기 — 소스는 GET 폴링 until_status 404 (300s/15s)로 소거 확인 + DELETE에 409/500 재시도 6회 (ready 스키마는 status-폴링을 표현하지 못해 lifecycle 영역으로 남김). name 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$."
 
-  apigw-resource:
-    code: "ap-apigw-resource"
+  # read-only LOOKUP node (server-type pattern): the api's auto-created root
+  # resource id, needed as the parent of every child resource. Source step
+  # find-root-resource VALIDATED in application-apigateway-api-resource.
+  apigw-root-resource:
+    code: "ap-apigw-root-lookup"
     service: application-service/apigateway
     requires: [apigw-api]
     create:
-      endpoint: "POST /v1/apis/{apigw-api.api_id}/resources/{opt.parent_id}"
+      endpoint: "GET /v1/apis/{apigw-api.api_id}/resources"
+    capture: {root_resource_id: "$.resources[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/apis/{apigw-api.api_id}/resources",
+         expect_status: [200]}
+    provenance: VALIDATED
+    source: {lifecycle: application-apigateway-api-resource,
+             steps: [find-root-resource]}
+
+  apigw-resource:
+    code: "ap-apigw-resource"
+    service: application-service/apigateway
+    requires: [apigw-api, apigw-root-resource]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/resources/{apigw-root-resource.root_resource_id}"
       body: {path_part: "regr{unique}"}
-      options:
-        parent_id: {type: string, required: true,
-                    note: "lookup — 소스 find-root-resource: GET /v1/apis/{api_id}/resources capture $.resources[0].id (root resource; composer가 동일 lookup step을 합성해야 한다)"}
     capture: {resource_id: "$.id"}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/resources/{resource_id}",
              destructive: true}
