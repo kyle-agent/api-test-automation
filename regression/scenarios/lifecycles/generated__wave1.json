@@ -547,7 +547,7 @@
       "id": "gen-wave-dashboard",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "composed verification wave 2 — re-composed with the id-bound GET verify additions (gap_getid lever); targets: dashboard",
+      "_note": "composed wave — delete body fixed to dashboard_ids (DashboardBulkDeleteRequest, run 27398084089 triage)",
       "steps": [
         {
           "name": "create-dashboard",
@@ -606,7 +606,7 @@
             "method": "DELETE",
             "path": "/v1/dashboards",
             "json": {
-              "ids": [
+              "dashboard_ids": [
                 "{dashboard_id}"
               ]
             },
@@ -634,7 +634,7 @@
           ],
           "destructive": true,
           "json": {
-            "ids": [
+            "dashboard_ids": [
               "{dashboard_id}"
             ]
           }

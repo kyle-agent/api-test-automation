@@ -121,7 +121,9 @@ resources:
     capture: {dashboard_id: "$.id"}
     delete:
       endpoint: "DELETE /v1/dashboards"
-      json: {ids: ["{dashboard_id}"]}
+      # DashboardBulkDeleteRequest의 필드는 dashboard_ids — 다른 servicewatch
+      # collection delete들의 ids와 다름 (run 27398084089: ids로 400)
+      json: {dashboard_ids: ["{dashboard_id}"]}
       destructive: true
     provenance: docs
     source: {lifecycle: servicewatch-dashboard, steps: [create-dashboard, delete-dashboard]}
