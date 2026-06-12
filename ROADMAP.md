@@ -15,9 +15,11 @@ so any session can tell where we are.
 > **M0–M3 DONE** (engine groundwork · control-plane MVP · ops/intervention ·
 > authoring + AI pipelines) · **M4 built, cutover deliberately LAST**
 > (`runner/worker.py` + Docker Compose await live/docker verification) ·
-> **M5 resource-task model: R1 done** (127 nodes / 50 files) · **R2 done**
+> **M5 resource-task model: R1 done** (128 nodes / 50 files) · **R2 done**
 > (composer live-proven) · **R3 verification waves IN PROGRESS**
-> (~56 nodes VALIDATED) · **R4 (C4 variants) pending**.
+> (waves 1·2 + heavy window: ~10 composed chains stably green, 56 nodes
+> VALIDATED — findings ledgered in `docs/PRODUCT-FINDINGS.md`) ·
+> **R4 (C4 variants) pending**.
 
 ## Phase 1 — Coverage to 100% (CURRENT)
 
@@ -26,11 +28,12 @@ so any session can tell where we are.
 
 - ✅ Static write-op ceiling reached **85.6%** (every write op reachable by an
   enabled lifecycle — see `knowledge/scenario-catalog.md`, Wave 1–3), since
-  raised to **86.6% (1,188/1,372)** by explicit-GET conversions
-  (`python -m spec.coverage_gap`).
-- Measured (live) coverage as of the latest published run: **C3 44.3%** ·
-  reachable C1 ≈86.7% · **fail_new 0 policy holding** · 249 approved waivers
-  (`data/baselines/coverage_waivers.json`).
+  raised to **88.1% (1,209/1,372)** by explicit-GET conversions and the M5
+  verify-step waves (gap_getid 151 → 130, `docs/COVERAGE-GETID-PLAN.md`;
+  `python -m spec.coverage_gap`).
+- Measured (live) coverage as of the latest published run: **C3 44.79%**
+  (cov_op 36.73) · reachable ceiling 88.1% · **fail_new 0 policy holding** ·
+  249 approved waivers (`data/baselines/coverage_waivers.json`).
 - The residual gap is id-bound GETs discovered at runtime by read-chains and
   CRUD `probe_reads`, plus owner-excluded scopes (archivestorage permanently
   excluded; Parallel File Storage reads-only — writes coverage-waived,
@@ -113,7 +116,7 @@ adjust it.
   — YAML files a human edits, a validator cross-checks against the engine data
   (`python knowledge/formal/validate.py`).
 - ✅ **The "formal files become the source of truth" direction has landed as the
-  M5 resource-task model**: `knowledge/formal/resources/*.yaml` (127 nodes) is
+  M5 resource-task model**: `knowledge/formal/resources/*.yaml` (128 nodes) is
   the formal destination from which `regression/scenarios/composer.py`
   *generates* engine lifecycles. R1 (model + reverse-extraction) and R2
   (composer, live-proven) are done; R3 (replace hand-written lifecycles after
