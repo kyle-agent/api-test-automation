@@ -448,6 +448,7 @@ def plan(targets: list, choices: dict | None = None,
                                                      x, 10 ** 6))},
         "_binds": binds,
         "_assign": assign,
+        "_dependents": {i: sorted(d) for i, d in dependents.items()},
     }
 
 
@@ -818,6 +819,7 @@ def compose(targets: list, choices: dict | None = None,
                 steps.append(vstep)
 
     # ---- teardown: one reverse pass in interval-scheduled order ------------
+    dependents_of = planned.get("_dependents") or {}
     for inst in planned["teardown"]:
         node = inst.partition("#")[0]
         task = model[node]
@@ -833,6 +835,14 @@ def compose(targets: list, choices: dict | None = None,
         dstep.update({"method": dmethod, "path": ctx.sub(inst, dpath),
                       "expect_status": [200, 202, 204],
                       "destructive": True})
+        # A parent's delete can race its children's async (202) deletes and
+        # 409 until they finish — the same conflict-retry semantics every
+        # VALIDATED hand-written lifecycle carries on such deletes (live
+        # lesson: gen-pilot-net-basics delete-vpc 409 after igw/subnet 202s).
+        if dependents_of.get(inst):
+            dstep.update({"expect_status": [200, 202, 204, 409, 404],
+                          "retry_on_status": [409],
+                          "retries": 40, "retry_interval": 30})
         if task.get("adopt") and "#" not in inst:
             dstep["adopt"] = task["adopt"]
         steps.append(dstep)

@@ -237,6 +237,21 @@ def test_single_target_closure_order_teardown(model):
     assert _step(lc, "delete-subnet")["adopt"] == "subnet"
 
 
+def test_teardown_conflict_retry_on_parent_deletes(model):
+    # a parent's delete can race its children's async (202) deletes — nodes
+    # WITH dependents get the hand-written conflict-retry semantics, leaves
+    # keep the plain expectation (live lesson: gen-pilot delete-vpc 409)
+    lc = compose(["port"], model=model)
+    for n in ("delete-vpc", "delete-subnet"):
+        d = _step(lc, n)
+        assert d["expect_status"] == [200, 202, 204, 409, 404]
+        assert d["retry_on_status"] == [409]
+        assert d["retries"] == 40 and d["retry_interval"] == 30
+    leaf = _step(lc, "delete-port")
+    assert leaf["expect_status"] == [200, 202, 204]
+    assert "retry_on_status" not in leaf
+
+
 # ---------------------------------------------------------------------------
 # option substitution: cidr derivation + enum
 

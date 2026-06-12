@@ -1,349 +1,363 @@
 {
- "lifecycles": [
-  {
-   "id": "gen-pilot-net-basics",
-   "service": "networking/vpc",
-   "enabled": true,
-   "_note": "COMPOSED by regression/scenarios/composer.py from knowledge/formal/resources/ (M5 R2 first live verification — 5 VALIDATED light nodes, bundle dedup + interval teardown). If this passes live, the composed path is proven; hand-written equivalents stay authoritative until R3 flips them.",
-   "steps": [
+  "lifecycles": [
     {
-     "name": "create-vpc",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/vpcs",
-     "json": {
-      "name": "regrvpc{unique}",
-      "description": "API regression suite",
-      "cidr": "10.160.0.0/20",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "vpc_id": "$.vpc.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/vpcs/{vpc_id}",
-      "service": "vpc"
-     },
-     "adopt": "vpc"
-    },
-    {
-     "name": "wait-vpc",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.vpc.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 180,
-      "interval": 10
-     }
-    },
-    {
-     "name": "verify-vpc",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "vpc"
-    },
-    {
-     "name": "create-subnet",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/subnets",
-     "json": {
-      "name": "regrsub{unique}",
-      "description": "API regression suite",
-      "cidr": "10.160.8.0/24",
-      "type": "GENERAL",
-      "vpc_id": "{vpc_id}",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "subnet_id": "$.subnet.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/subnets/{subnet_id}",
-      "service": "vpc"
-     },
-     "adopt": "subnet"
-    },
-    {
-     "name": "wait-subnet",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/subnets/{subnet_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.subnet.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 180,
-      "interval": 10
-     }
-    },
-    {
-     "name": "verify-subnet",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/subnets/{subnet_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "subnet"
-    },
-    {
-     "name": "create-port",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/ports",
-     "json": {
-      "name": "regrport{unique}",
-      "description": "API regression suite",
-      "security_groups": [],
-      "subnet_id": "{subnet_id}",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "port_id": "$.port.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/ports/{port_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "wait-port",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/ports/{port_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.port.state",
-      "until": [
-       "ACTIVE",
-       "CREATED",
-       "RUNNING",
-       "DOWN"
-      ],
-      "timeout": 180,
-      "interval": 10
-     }
-    },
-    {
-     "name": "verify-port",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/ports/{port_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "port"
-    },
-    {
-     "name": "create-internet-gateway",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/internet-gateways",
-     "json": {
-      "description": "API regression suite",
-      "firewall_enabled": false,
-      "firewall_loggable": false,
-      "type": "IGW",
-      "vpc_id": "{vpc_id}",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "internet_gateway_id": "$.internet_gateway.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/internet-gateways/{internet_gateway_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "wait-internet-gateway",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/internet-gateways/{internet_gateway_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.internet_gateway.state",
-      "until": [
-       "ACTIVE",
-       "ATTACHED",
-       "CREATED",
-       "RUNNING"
-      ],
-      "timeout": 300,
-      "interval": 15
-     }
-    },
-    {
-     "name": "verify-internet-gateway",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/internet-gateways/{internet_gateway_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "internet-gateway"
-    },
-    {
-     "name": "create-public-ip",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/publicips",
-     "json": {
-      "description": "API regression suite",
-      "type": "IGW",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "publicip_id": "$.publicip.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/publicips/{publicip_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "wait-public-ip",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/publicips/{publicip_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.publicip.state",
-      "until": [
-       "ACTIVE",
-       "CREATED",
-       "RUNNING",
-       "AVAILABLE"
-      ],
-      "timeout": 300,
-      "interval": 15
-     }
-    },
-    {
-     "name": "verify-public-ip",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/publicips/{publicip_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "public-ip"
-    },
-    {
-     "name": "delete-port",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/ports/{port_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
-    },
-    {
-     "name": "delete-subnet",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/subnets/{subnet_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true,
-     "adopt": "subnet"
-    },
-    {
-     "name": "delete-internet-gateway",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/internet-gateways/{internet_gateway_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
-    },
-    {
-     "name": "delete-vpc",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true,
-     "adopt": "vpc"
-    },
-    {
-     "name": "delete-public-ip",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/publicips/{publicip_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
+      "id": "gen-pilot-net-basics",
+      "service": "networking/vpc",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py from knowledge/formal/resources (R2 pilot) — regenerated with conflict-retry teardown after the first live run failed at delete-vpc 409 (raced async child deletes)",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "verify-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "vpc"
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "verify-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "create-port",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/ports",
+          "json": {
+            "name": "regrport{unique}",
+            "description": "API regression suite",
+            "security_groups": [],
+            "subnet_id": "{subnet_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "port_id": "$.port.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/ports/{port_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-port",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.port.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "DOWN"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "verify-port",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "port"
+        },
+        {
+          "name": "create-internet-gateway",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "json": {
+            "description": "API regression suite",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "type": "IGW",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "internet_gateway_id": "$.internet_gateway.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/internet-gateways/{internet_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-internet-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ATTACHED",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "verify-internet-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "internet-gateway"
+        },
+        {
+          "name": "create-public-ip",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "json": {
+            "description": "API regression suite",
+            "type": "IGW",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "publicip_id": "$.publicip.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/publicips/{publicip_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-public-ip",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.publicip.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "verify-public-ip",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "public-ip"
+        },
+        {
+          "name": "delete-port",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-internet-gateway",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-public-ip",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
     }
-   ]
-  }
- ]
+  ]
 }
