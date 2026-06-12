@@ -132,7 +132,7 @@ class FakeClient:
         self.routes = routes
         self.calls: list[tuple[str, str]] = []
 
-    def request(self, method, path, *, json=None, service=None, params=None):
+    def request(self, method, path, *, json=None, service=None, params=None, headers=None):
         self.calls.append((method.upper(), path))
         for (m, pfx), resp in self.routes.items():
             if method.upper() == m and path.startswith(pfx):
