@@ -1,0 +1,78 @@
+# Resource-task model — storage/baremetal-blockstorage (st-bs group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from blockstorage-volume +
+# blockstorage-volume-group (enabled+heavy, but bodies DOCS-ONLY per source
+# _note and the create is KNOWN-BLOCKED on the required attachments field —
+# every node stays docs until a real Bare Metal server exists to attach).
+version: 1
+resources:
+  bm-block-volume:
+    code: "st-bs-volume"
+    service: storage/baremetal-blockstorage
+    heavy: true
+    requires: []
+    create:
+      endpoint: "POST /v1/volumes"
+      body:
+        name: "regrbsvol{unique}"
+        disk_type: SSD
+        size_gb: 10
+        qos: {iops: 5000, throughput: 250}
+        attachments: []
+        tags: []
+    capture: {volume_id: "$.result.id"}
+    ready: {field: "$.result.state", until: [AVAILABLE, available, IN_USE, ACTIVE],
+            timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: blockstorage-volume,
+             steps: [create-volume, wait-volume-available, delete-volume]}
+    notes: "KNOWN-BLOCKED: 연결 서버(attachments)는 REQUIRED create 필드(BM 서버 1..8) — attachments:[]가 400의 원인 (run 27258520218, services/storage__baremetal-blockstorage.yaml prereq-baremetal-server). 이 계정에 BM 서버가 없어 체인 전체(~40 endpoint)가 called-only. 진짜 의존은 baremetal-server 노드인데 compute 카테고리가 아직 미모델 — compute 추출 후 requires: [{ref: baremetal-server, count: 1}] + attachments 주입으로 갱신할 것. capture $.result.id는 VALIDATED 관측(validated-facts)이지만 create 2xx 미달성이라 노드는 docs. 제약: name 3~28자/불변, disk_type SSD|HDD 불변, size_gb 1~16384 불변, qos는 SSD 전용(iops 5000~20000, throughput 250~1000)."
+
+  bm-volume-snapshot:
+    code: "st-bs-snapshot"
+    service: storage/baremetal-blockstorage
+    requires: [bm-block-volume]
+    create:
+      endpoint: "POST /v1/volumes/{bm-block-volume.volume_id}/snapshots"
+      body: {}
+    capture: {snapshot_id: "$.snapshot_id"}
+    delete: {endpoint: "DELETE /v1/volumes/{bm-block-volume.volume_id}/snapshots/{snapshot_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: blockstorage-volume, steps: [create-snapshot, delete-snapshot]}
+    notes: "capture는 FLAT $.snapshot_id (VolumeSnapshotResponse — volume의 $.result.id와 비대칭). 선행조건: 볼륨의 snapshot CAPACITY가 먼저 설정돼 있어야 생성 가능 (PUT /v1/volumes/{id}/snapshot-rates — services constraint snapshot-requires-capacity; 합성기가 capacity-set 스텝을 끼워야 하는 R3 과제). 스냅샷 사용 볼륨은 용량 증설 불가. restore는 모든 attached 서버 unmount 필요 + 복원점 이후 스냅샷 전부 삭제."
+
+  bm-volume-group:
+    code: "st-bs-volume-group"
+    service: storage/baremetal-blockstorage
+    heavy: true
+    requires: [bm-block-volume]
+    create:
+      endpoint: "POST /v1/volume-groups"
+      body:
+        name: "regrbsvg{unique}"
+        volume_ids: ["{bm-block-volume.volume_id}"]
+        tags: []
+    capture: {volume_group_id: "$.result.id"}
+    ready: {field: "$.result.state", until: [AVAILABLE, available, ACTIVE],
+            timeout: 300, interval: 15,
+            endpoint: "GET /v1/volume-groups/{volume_group_id}"}
+    provenance: docs
+    source: {lifecycle: blockstorage-volume-group,
+             steps: [create-volume-group, wait-group-available]}
+    notes: "DELETE 없음: 카탈로그에 DELETE /v1/volume-groups/{id}가 존재하지 않는다 (services quirk no-volume-group-delete) — teardown은 멤버 볼륨 제거/삭제로 암묵 해소되므로 delete를 비워 둔다(검증기 no-teardown 경고는 의도). 멤버 자격: 대상 볼륨 ≤16, 각 볼륨은 snapshot capacity SET + schedule/replication UNUSED 상태여야 함 (constraint volume-group-targets) — 갓 만든 bare volume은 capacity 설정 전엔 부적격. 멤버 추가/제거는 PUT .../members/add|remove {volume_ids:[...]}."
+
+  bm-group-snapshot:
+    code: "st-bs-group-snapshot"
+    service: storage/baremetal-blockstorage
+    requires: [bm-volume-group]
+    create:
+      endpoint: "POST /v1/volume-groups/{bm-volume-group.volume_group_id}/snapshots"
+      body: {}
+    capture: {group_snapshot_id: "$.snapshot_id"}
+    delete: {endpoint: "DELETE /v1/volume-groups/{bm-volume-group.volume_group_id}/snapshots/{group_snapshot_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: blockstorage-volume-group,
+             steps: [create-group-snapshot, delete-group-snapshot]}
+    notes: "그룹 스냅샷은 실제로는 멤버 볼륨들에 저장된다 (services quirk). capture FLAT $.snapshot_id (VolumeGroupSnapshotResponse), UNPROVEN. 삭제는 소스에서 409/500 재시도 4×15s."
