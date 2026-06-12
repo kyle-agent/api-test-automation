@@ -1,0 +1,27 @@
+# Resource-task model — management/network-logging (mg-nl group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# network-logging-storage (enabled, guarded) by extract.py, curated by hand.
+version: 1
+resources:
+  network-logging-storage:
+    code: "mg-nl-storage"
+    service: management/network-logging
+    requires: []
+    create:
+      endpoint: "POST /v1/network-logging/storages"
+      body: {name: "regrnl{unique}", log_type: "{opt.log_type}",
+             object_storage_bucket_name: "{opt.object_storage_bucket_name}",
+             description: "API regression coverage probe"}
+      options:
+        log_type: {type: enum, values: [VPC_FLOW_LOG], required: true,
+                   default: VPC_FLOW_LOG,
+                   note: "소스가 보낸 유일한 값 — 다른 log_type 코드(FW/LB 로그 추정)는 docs JS-rendered라 미확인; 값 목록 확장은 R3 과제"}
+        object_storage_bucket_name: {type: string, required: true,
+                                     default: "regrnl{unique}",
+                                     note: "로그를 받을 Object Storage 버킷명 추정(BEST-GUESS) — 실존 버킷 필요 가능성, object-storage 노드 모델링 후 ref 옵션으로 승격 (R3)"}
+    capture: {network_logging_storage_id: "$.network_logging_storage.id"}
+    delete: {endpoint: "DELETE /v1/network-logging/storages/{network_logging_storage_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: network-logging-storage, steps: [create-storage, delete-storage]}
+    notes: "api_bodies 항목 없음 + docs JS-rendered — create body 필드들과 capture envelope $.network_logging_storage.id 모두 BEST-GUESS UNPROVEN (공유 계정에선 400/403/422가 정상, 라이브 2xx 후 승격)."
