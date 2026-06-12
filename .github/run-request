@@ -1,6 +1,4 @@
-# request: M5 R2 LIVE VERIFICATION — first composed lifecycle
-# gen-pilot-net-basics: composed from the resource model (5 VALIDATED nodes).
-# Pass = the model->composer->engine path is proven live.
-suite=full
-service=networking
+# Re-verify the composed pilot after the composer conflict-retry fix (ee43711)
+mutations=true
+destructive=true
 crud_filter=gen-pilot-net-basics
