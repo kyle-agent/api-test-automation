@@ -73,3 +73,44 @@ def history(limit: int = 30) -> list[dict]:
 def latest_coverage() -> dict | None:
     rows = history(limit=1)
     return rows[-1] if rows else None
+
+
+def conformance_summary(systemic_limit: int = 8) -> dict | None:
+    """conformance.json (published by the conformance axis) -> the Report
+    tab's summary: green/yellow/red counts + top systemic findings."""
+    got = file("conformance.json")
+    if not got:
+        return None
+    try:
+        data = json.loads(got[0].decode(errors="replace"))
+    except ValueError:
+        return None
+    summary = data.get("summary") or {}
+    systemic = sorted((data.get("systemic") or []),
+                      key=lambda s: -(s.get("count") or 0))[:systemic_limit]
+    return {"summary": summary, "systemic": systemic}
+
+
+def category_coverage() -> list[dict]:
+    """Cumulative verified(2xx) per category from endpoint_status.json
+    (key 'category/service/op' -> [status, latency, sha]); ascending = the
+    work backlog. Counts are over OBSERVED endpoints, labelled as such."""
+    got = file("endpoint_status.json")
+    if not got:
+        return []
+    try:
+        status = json.loads(got[0].decode(errors="replace")).get("status") or {}
+    except ValueError:
+        return []
+    totals: dict[str, list[int]] = {}
+    for key, val in status.items():
+        cat = key.split("/", 1)[0]
+        code = val[0] if isinstance(val, (list, tuple)) and val else 0
+        tot = totals.setdefault(cat, [0, 0])
+        tot[1] += 1
+        if isinstance(code, int) and 200 <= code < 300:
+            tot[0] += 1
+    rows = [{"name": cat, "ok": ok, "total": tot,
+             "pct": round(ok * 100 / tot) if tot else 0}
+            for cat, (ok, tot) in totals.items()]
+    return sorted(rows, key=lambda r: r["pct"])

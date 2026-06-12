@@ -57,12 +57,15 @@ app.include_router(resource_routes.router)
 
 
 def _catalog() -> dict:
-    """Suites + profiles for the trigger forms (live from the repo files)."""
+    """Suites + profiles for the trigger forms (live from the repo files).
+    ctx_snapshot feeds the header ctxbar — which published snapshot the
+    numbers on screen come from (best-effort, degrades to None)."""
     return {
         "suites": [s.get("id") for s in core_suites.list_suites()],
         "profiles": [p.get("id") for p in core_profiles.list_profiles()],
         "dispatch_ok": dispatch.configured(),
         "triage_ok": triage.enabled(),
+        "ctx_snapshot": dashdata.latest_coverage(),
     }
 
 
@@ -75,10 +78,14 @@ def _render(request: Request, name: str, active: str, **ctx) -> HTMLResponse:
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
-    runs = db.list_runs(limit=5)
-    running = [r for r in runs if r["status"] == "running"]
+    runs = db.list_runs(limit=50)
+    running = [r for r in runs
+               if r["status"] in ("running", "dispatched")]
+    today = db.now()[:10]
+    runs_today = sum(1 for r in runs
+                     if (r["requested_at"] or "").startswith(today))
     return _render(request, "home.html", "home",
-                   runs=runs, running=running,
+                   runs=runs[:5], running=running, runs_today=runs_today,
                    schedules=db.list_schedules(),
                    coverage=dashdata.latest_coverage(),
                    scenario_stats=_scenario_stats())
@@ -94,9 +101,12 @@ def _scenario_stats() -> dict:
         return {"total": len(ls),
                 "enabled": sum(1 for l in ls if l.get("enabled")),
                 "heavy": sum(1 for l in ls if l.get("heavy")),
+                "enabled_heavy": sum(1 for l in ls
+                                     if l.get("enabled") and l.get("heavy")),
                 "services": len(services)}
     except Exception:
-        return {"total": 0, "enabled": 0, "heavy": 0, "services": 0}
+        return {"total": 0, "enabled": 0, "heavy": 0, "enabled_heavy": 0,
+                "services": 0}
 
 
 # directories the read-only knowledge browser may serve
@@ -117,10 +127,13 @@ def _safe_repo_file(rel: str) -> Path | None:
 
 @app.get("/planning", response_class=HTMLResponse)
 def planning(request: Request):
+    rows = _scenario_rows()
     return _render(request, "planning.html", "planning",
                    profile_list=core_profiles.list_profiles(),
                    suite_list=core_suites.list_suites(),
-                   scenario_stats=_scenario_stats())
+                   scenario_stats=_scenario_stats(),
+                   scenario_rows=rows,
+                   disabled_count=sum(1 for r in rows if not r["enabled"]))
 
 
 def _fragment_rel(source_name: str) -> str:
@@ -132,23 +145,29 @@ def _fragment_rel(source_name: str) -> str:
     return f"regression/scenarios/lifecycles/{source_name}"
 
 
-@app.get("/planning/scenarios", response_class=HTMLResponse)
-def planning_scenarios(request: Request, service: str = ""):
+def _scenario_rows(service: str = "", note_chars: int = 300) -> list[dict]:
+    """Catalog rows for the Plan-area tables (shared by /planning and
+    /planning/scenarios)."""
     from regression.scenarios.loader import load_lifecycles
     lifecycles, sources = load_lifecycles(with_sources=True)
     if service:
         lifecycles = [l for l in lifecycles if service in (l.get("service") or "")]
-    rows = [{
+    return [{
         "id": l.get("id"), "service": l.get("service", ""),
         "enabled": bool(l.get("enabled")), "heavy": bool(l.get("heavy")),
         "adopt": l.get("adopt", ""), "steps": len(l.get("steps") or []),
-        "note": (l.get("_note") or "")[:160],
+        "note": (l.get("_note") or "")[:note_chars],
         "file": _fragment_rel(sources.get(l.get("id"), "scenarios.json")),
     } for l in lifecycles]
+
+
+@app.get("/planning/scenarios", response_class=HTMLResponse)
+def planning_scenarios(request: Request, service: str = ""):
     return _render(request, "scenarios.html", "planning",
-                   rows=rows, service=service)
+                   rows=_scenario_rows(service, note_chars=160), service=service)
 
 
+@app.get("/knowledge", response_class=HTMLResponse)
 @app.get("/planning/knowledge", response_class=HTMLResponse)
 def planning_knowledge(request: Request):
     def listing(pattern: str) -> list[dict]:
@@ -158,7 +177,7 @@ def planning_knowledge(request: Request):
                 rel = p.relative_to(ROOT).as_posix()
                 out.append({"rel": rel, "kb": round(p.stat().st_size / 1024, 1)})
         return out
-    return _render(request, "knowledge.html", "planning",
+    return _render(request, "knowledge.html", "knowledge",
                    narrative=listing("knowledge/*.md"),
                    formal=listing("knowledge/formal/*.yaml")
                           + listing("knowledge/formal/*.md")
@@ -303,6 +322,35 @@ def planning_dependencies(request: Request):
 
 # --- Testing -------------------------------------------------------------------
 
+def _run_preview_data() -> dict:
+    """Per-suite/per-profile facts the RUN 조립 preview renders client-side.
+    All numbers come from the real suite definitions + scenario catalog;
+    durations are coarse buckets and labelled 대략치 in the UI."""
+    stats = _scenario_stats()
+    suites = {}
+    for s in core_suites.list_suites():
+        req = s.get("request") or {}
+        mut, heavy = bool(req.get("mutations")), bool(req.get("heavy"))
+        if not mut:                       # read-only probes sweep the catalog
+            targets = stats["total"]
+        elif heavy:
+            targets = stats["enabled"]
+        else:
+            targets = stats["enabled"] - stats["enabled_heavy"]
+        gates = [k for k in ("mutations", "destructive", "heavy", "conformance")
+                 if req.get(k)]
+        suites[s.get("id")] = {
+            "label": s.get("label", ""), "targets": targets,
+            "heavy": stats["enabled_heavy"] if heavy else 0,
+            "gates": " + ".join(gates) if gates else "read-only",
+            "eta": "~3–4시간" if heavy else ("~1시간" if mut else "~15–20분"),
+        }
+    profiles = {p.get("id"): {"label": p.get("label", ""),
+                              "forbid": list(p.get("forbid") or [])}
+                for p in core_profiles.list_profiles()}
+    return {"suites": suites, "profiles": profiles}
+
+
 @app.get("/testing", response_class=HTMLResponse)
 def testing(request: Request):
     runs = db.list_runs(limit=15)
@@ -313,7 +361,8 @@ def testing(request: Request):
             evs = db.list_events(r["gh_run_id"], kind="milestone", limit=50)
             live.append({"run": r, "milestones": evs})
     return _render(request, "testing.html", "testing",
-                   runs=runs, live=live, schedules=db.list_schedules())
+                   runs=runs, live=live, schedules=db.list_schedules(),
+                   preview=_run_preview_data())
 
 
 @app.get("/partials/runs", response_class=HTMLResponse)
@@ -407,12 +456,43 @@ def add_run_command(gh_run_id: str, action: str = Form(...), target: str = Form(
 
 # --- Reporting -----------------------------------------------------------------
 
+REPORT_TABS = (("summary", "Summary"), ("coverage", "Coverage"),
+               ("conformance", "Conformance"), ("trends", "Runs & Trends"),
+               ("triage", "Triage"))
+
+
+def _spark_paths(hist: list[dict], w: int = 600, h: int = 90) -> dict:
+    """history rows (oldest first) -> SVG path strings for the trend
+    sparkline: pass rate (ok/tested), C3 verified, C1 reachable."""
+    def series(fn):
+        vals = [fn(r) for r in hist]
+        vals = [v for v in vals if v is not None]
+        if len(vals) < 2:
+            return ""
+        n = len(vals)
+        return " ".join(f"{'M' if i == 0 else 'L'}{i / (n - 1) * w:.1f},"
+                        f"{h - (min(max(v, 0), 100) / 100 * h):.1f}"
+                        for i, v in enumerate(vals))
+    def pass_rate(r):
+        tested = r.get("tested") or 0
+        return (r.get("ok") or 0) * 100.0 / tested if tested else None
+    return {"pass": series(pass_rate),
+            "c3": series(lambda r: r.get("cov_c3")),
+            "c1": series(lambda r: r.get("reachable_pct"))}
+
+
 @app.get("/reporting", response_class=HTMLResponse)
-def reporting(request: Request):
-    hist = dashdata.history(limit=10)
+def reporting(request: Request, tab: str = "summary"):
+    if tab not in {t for t, _ in REPORT_TABS}:
+        tab = "summary"
+    hist = dashdata.history(limit=30)
     return _render(request, "reporting.html", "reporting",
+                   tab=tab, tabs=REPORT_TABS,
                    coverage=dashdata.latest_coverage(),
-                   trend=list(reversed(hist)),
+                   trend=list(reversed(hist[-10:])),
+                   spark=_spark_paths(hist), spark_n=len(hist),
+                   conformance=dashdata.conformance_summary(),
+                   catbars=dashdata.category_coverage(),
                    runs=db.list_runs(limit=100),
                    archive=snapshots.archive_index(limit=100))
 
