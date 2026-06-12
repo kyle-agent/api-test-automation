@@ -125,6 +125,20 @@ def _safe_repo_file(rel: str) -> Path | None:
     return path if path.is_file() else None
 
 
+def _model_stats() -> dict:
+    """자원 모델 요약 — Plan 흐름 스트립의 ① 재료 칸."""
+    try:
+        from controlplane import resource_model
+        nodes = resource_model.load_model() or {}
+        groups = resource_model.load_groups() or {}
+        validated = sum(1 for n in nodes.values()
+                        if (n or {}).get("provenance") == "VALIDATED")
+        return {"nodes": len(nodes), "validated": validated,
+                "docs": len(nodes) - validated, "groups": len(groups)}
+    except Exception:
+        return {"nodes": 0, "validated": 0, "docs": 0, "groups": 0}
+
+
 @app.get("/planning", response_class=HTMLResponse)
 def planning(request: Request):
     rows = _scenario_rows()
@@ -133,6 +147,8 @@ def planning(request: Request):
                    suite_list=core_suites.list_suites(),
                    scenario_stats=_scenario_stats(),
                    scenario_rows=rows,
+                   model_stats=_model_stats(),
+                   gen_count=sum(1 for r in rows if r["id"].startswith("gen-")),
                    disabled_count=sum(1 for r in rows if not r["enabled"]))
 
 

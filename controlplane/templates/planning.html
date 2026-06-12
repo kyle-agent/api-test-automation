@@ -2,8 +2,97 @@
 {% block title %}Plan — SCP API Regression{% endblock %}
 {% block content %}
 
-<h2>환경 &amp; 스위트 <span class="hint">어떤 환경에서 · 어떤 강도(스위트)로 돌릴지 (repo 파일이 source of truth ·
-  편집은 검증 통과 시에만 로컬 git 커밋)</span></h2>
+<h2>Plan 구조 <span class="hint">재료 → 실행 단위 → 선별 — 자원 모델에 사실을 채우면 시나리오가 합성되고, 스위트×환경이 RUN에서 무엇을 돌릴지 거른다</span></h2>
+<div class="pipe">
+  <a class="pstage" href="#sec-model">
+    <div class="pl">① 자원 모델 <span style="font-weight:400;color:var(--faint)">재료</span></div>
+    <div class="pv">{{ model_stats.nodes }}</div>
+    <div class="ps">자원별 사실: 의존·생성법·검증·삭제 ·
+      <span style="color:var(--green);font-weight:700">검증 {{ model_stats.validated }}</span> ·
+      문서 {{ model_stats.docs }}</div>
+    <div class="ps" style="color:var(--blue)">합성기가 의존을 따라 시나리오 생성 →</div>
+    <span class="chev">→</span>
+  </a>
+  <a class="pstage" href="#sec-scen">
+    <div class="pl">② 시나리오 <span style="font-weight:400;color:var(--faint)">실행 단위</span></div>
+    <div class="pv">{{ scenario_stats.total }}</div>
+    <div class="ps">생성→검증→역순 정리 스텝 ·
+      합성 <b>{{ gen_count }}</b> · 수작업 {{ scenario_stats.total - gen_count }}</div>
+    <div class="ps" style="color:var(--blue)">속성(mutation·destructive·heavy)이 게이트 통과해야 실행 →</div>
+    <span class="chev">→</span>
+  </a>
+  <a class="pstage" href="#sec-suite">
+    <div class="pl">③ 스위트 × 환경 <span style="font-weight:400;color:var(--faint)">선별·안전</span></div>
+    <div class="pv">{{ suite_list|length }} × {{ profile_list|length }}</div>
+    <div class="ps">스위트 = 실행 강도 프리셋 · 환경 = 어디서 + forbid 안전 게이트</div>
+    <div class="ps" style="color:var(--blue)">RUN 화면에서 이 조합으로 실행 →</div>
+  </a>
+</div>
+
+<h2 id="sec-model">① 자원 모델 <span class="hint">자원당 한 번 기록하는 사실 — 여기 채우면 ②가 자동으로 생긴다</span></h2>
+<div class="grid2">
+  <a class="card pad" href="/planning/resources" style="color:inherit">
+    <b>자원 모델 열기 — 시나리오 만들기</b>
+    <div class="small muted" style="margin-top:4px">{{ model_stats.groups }}개 묶음 ·
+      노드별 전제조건·옵션 입력 / 단독·묶음 합성 →</div>
+  </a>
+  <a class="card pad" href="/planning/dependencies" style="color:inherit">
+    <b>의존 그래프 — 왜 이 순서인가</b>
+    <div class="small muted" style="margin-top:4px">시나리오 간 선후행 관계와
+      VPC 할당량 스케줄 시각화 →</div>
+  </a>
+</div>
+
+<h2 id="sec-scen">② 시나리오 카탈로그 <span class="hint">실행되는 테스트 전체 목록 — ①에서 합성된 gen-* 와 수작업이 함께 (비고 클릭 = 전체 보기)</span></h2>
+<div class="fchips" id="scenChips">
+  <span class="fchip on" data-f="all"><b>{{ scenario_stats.total }}</b> 전체</span>
+  <span class="fchip" data-f="enabled"><b>{{ scenario_stats.enabled }}</b> enabled</span>
+  <span class="fchip" data-f="heavy"><b>{{ scenario_stats.heavy }}</b> heavy(과금성)</span>
+  <span class="fchip" data-f="gen"><b>{{ gen_count }}</b> 합성(gen)</span>
+  <span class="fchip" data-f="disabled"><b>{{ disabled_count }}</b> disabled</span>
+  <input class="search" id="scenSearch" placeholder="서비스·시나리오 검색" style="margin-left:auto">
+</div>
+<div class="card pad" style="padding-top:4px">
+  <table>
+    <thead><tr><th>시나리오</th><th>서비스</th><th>steps</th><th>속성</th><th>비고</th><th></th></tr></thead>
+    <tbody id="scenBody">
+      {% for l in scenario_rows %}
+      <tr data-id="{{ l.id }}" data-service="{{ l.service }}"
+          data-enabled="{{ '1' if l.enabled else '' }}"
+          data-heavy="{{ '1' if l.heavy else '' }}"
+          data-gen="{{ '1' if l.id.startswith('gen-') else '' }}">
+        <td><code>{{ l.id }}</code></td>
+        <td><span class="srv">{{ l.service }}</span></td>
+        <td>{{ l.steps }}</td>
+        <td>
+          {% if l.id.startswith('gen-') %}<span class="tag read" title="자원 모델에서 합성기로 생성된 시나리오">합성</span>{% endif %}
+          {% if l.heavy %}<span class="tag heavy">heavy</span>{% endif %}
+          {% if l.adopt %}<span class="tag read">adopt:{{ l.adopt }}</span>{% endif %}
+          {% if not l.enabled %}<span class="tag disabled">disabled</span>{% endif %}
+        </td>
+        <td>
+          {% if l.note %}
+          <div class="biz" onclick="this.classList.toggle('open')">
+            {%- if l.note|length > 60 -%}
+            {{ l.note[:60] }}… <span class="toggle">더보기</span>
+            <div class="more">{{ l.note }}</div>
+            {%- else -%}{{ l.note }}{%- endif -%}
+          </div>
+          {% else %}<span class="note">—</span>{% endif %}
+        </td>
+        <td style="white-space:nowrap" class="small" title="{{ l.file }}">
+          <a href="/planning/view?path={{ l.file }}">보기</a> ·
+          <a href="/planning/edit?path={{ l.file }}&find={{ l.id }}">편집</a></td>
+      </tr>
+      {% endfor %}
+      <tr id="scenEmpty" style="display:none">
+        <td colspan="6" class="muted" style="padding:20px;text-align:center">결과 없음</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<h2 id="sec-suite" style="margin-top:30px">③ 스위트 × 환경 <span class="hint">스위트 = 게이트 조합(시나리오를 직접 나열하지 않음 — 속성이 통과해야 실행) · 환경 = 어디서 + forbid 안전 게이트</span></h2>
 <div class="grid2">
   {% for p in profile_list %}
   <div class="card envcard">
@@ -56,64 +145,6 @@
   </table>
 </div>
 
-<h2>시나리오 카탈로그 <span class="hint">실행되는 테스트 전체 목록 — 필터·검색으로 탐색
-  (비고 클릭 = 전체 보기)</span></h2>
-<div class="fchips" id="scenChips">
-  <span class="fchip on" data-f="all"><b>{{ scenario_stats.total }}</b> 전체</span>
-  <span class="fchip" data-f="enabled"><b>{{ scenario_stats.enabled }}</b> enabled</span>
-  <span class="fchip" data-f="heavy"><b>{{ scenario_stats.heavy }}</b> heavy(과금성)</span>
-  <span class="fchip" data-f="disabled"><b>{{ disabled_count }}</b> disabled</span>
-  <input class="search" id="scenSearch" placeholder="서비스·시나리오 검색" style="margin-left:auto">
-</div>
-<div class="card pad" style="padding-top:4px">
-  <table>
-    <thead><tr><th>시나리오</th><th>서비스</th><th>steps</th><th>속성</th><th>비고</th><th></th></tr></thead>
-    <tbody id="scenBody">
-      {% for l in scenario_rows %}
-      <tr data-id="{{ l.id }}" data-service="{{ l.service }}"
-          data-enabled="{{ '1' if l.enabled else '' }}"
-          data-heavy="{{ '1' if l.heavy else '' }}">
-        <td><code>{{ l.id }}</code></td>
-        <td><span class="srv">{{ l.service }}</span></td>
-        <td>{{ l.steps }}</td>
-        <td>
-          {% if l.heavy %}<span class="tag heavy">heavy</span>{% endif %}
-          {% if l.adopt %}<span class="tag read">adopt:{{ l.adopt }}</span>{% endif %}
-          {% if not l.enabled %}<span class="tag disabled">disabled</span>{% endif %}
-        </td>
-        <td>
-          {% if l.note %}
-          <div class="biz" onclick="this.classList.toggle('open')">
-            {%- if l.note|length > 60 -%}
-            {{ l.note[:60] }}… <span class="toggle">더보기</span>
-            <div class="more">{{ l.note }}</div>
-            {%- else -%}{{ l.note }}{%- endif -%}
-          </div>
-          {% else %}<span class="note">—</span>{% endif %}
-        </td>
-        <td style="white-space:nowrap" class="small" title="{{ l.file }}">
-          <a href="/planning/view?path={{ l.file }}">보기</a> ·
-          <a href="/planning/edit?path={{ l.file }}&find={{ l.id }}">편집</a></td>
-      </tr>
-      {% endfor %}
-      <tr id="scenEmpty" style="display:none">
-        <td colspan="6" class="muted" style="padding:20px;text-align:center">결과 없음</td></tr>
-    </tbody>
-  </table>
-</div>
-
-<div class="grid2" style="margin-top:13px">
-  <a class="card pad" href="/planning/resources" style="color:inherit">
-    <b>자원 모델 — 시나리오 만들기</b>
-    <div class="small muted" style="margin-top:4px">자원별 전제조건·옵션을 입력하면
-      테스트 시나리오를 자동 합성 (단독/묶음) →</div>
-  </a>
-  <a class="card pad" href="/planning/dependencies" style="color:inherit">
-    <b>의존 그래프 — 왜 이 순서인가</b>
-    <div class="small muted" style="margin-top:4px">시나리오 간 선후행 관계와
-      VPC 할당량 스케줄 시각화 →</div>
-  </a>
-</div>
 
 <script>
 (function(){
@@ -130,6 +161,7 @@
       if (filter === 'enabled' && !tr.dataset.enabled) ok = false;
       if (filter === 'disabled' && tr.dataset.enabled) ok = false;
       if (filter === 'heavy' && !tr.dataset.heavy) ok = false;
+      if (filter === 'gen' && !tr.dataset.gen) ok = false;
       if (ok && q && tr.dataset.id.indexOf(q) < 0 &&
           tr.dataset.service.indexOf(q) < 0) ok = false;
       tr.style.display = ok ? '' : 'none';
