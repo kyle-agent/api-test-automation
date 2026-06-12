@@ -3,6 +3,10 @@
 > 현재의 "엔진 + GitHub Actions" 시스템을 **완결된 플랫폼**으로 승격하는 계획.
 > [ROADMAP.md](../ROADMAP.md)의 Phase 2(스케줄 회귀)·Phase 3(전용 서버)을
 > 포괄하면서, 그 위에 **관리 UI·실행 개입·히스토리 리포팅**을 얹는다.
+>
+> **상태 (2026-06-12): M0~M3 DONE, M4 DONE(live/docker 검증 대기 — 컷오버는
+> 마지막), M5는 R1·R2 DONE / R3 검증 웨이브 진행 중.** §0의 갭 표는 채택
+> 당시 진단으로 보존한다 — 표의 갭 항목은 이후 마일스톤에서 전부 구현됐다.
 
 ---
 
@@ -393,13 +397,38 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
   매핑 · 스테이지 시퀀싱/게이팅 · 실패해도 sweep/dashboard · 마일스톤 기록).
   Docker 빌드/compose 기동은 실 호스트에서 검증 필요.
 
-### M5 — 자원 모델 기반 시나리오 합성 (owner 제안 2026-06-11 채택)
+### M5 — 자원 모델 기반 시나리오 합성 (owner 제안 2026-06-11 채택) — R1·R2 DONE, R3 진행 중
 - 자원 타입별 task 정의(최소 의존조건 + 생성 옵션 + 검증된 body 템플릿)
   → 의존 그래프에서 시나리오를 **조합으로 생성**: 단독 테스트(선행 생성 →
   대상 검증 → 역순 삭제), 전체 회귀(합집합 그래프 + 공통 접두 dedup),
   C4 옵션 변형. 합성기는 기존 lifecycle JSON으로 컴파일 — 엔진 무수정.
 - 설계·스키마·단계(R1 역추출 → R2 합성기 → R3 전환 → R4 변형):
-  **docs/RESOURCE-MODEL-PLAN.md**
+  **docs/RESOURCE-MODEL-PLAN.md** (라이브 결과는 그 문서 §6)
+- [x] **R1 역추출 + 전 카테고리 fan-out 완료** —
+      `knowledge/formal/resources/` **127 노드 / 50 파일 / 48 그룹**(12
+      카테고리, `_groups.yaml`), 코드 체계 `<cat>-<group>-<resource>`
+      (nw-vpc-vpc …). validator에 R1 검사 통합 (`knowledge/formal/validate.py`
+      → "R1 127 resource task(s)"), provenance 집계 VALIDATED 56 / docs 71
+- [x] **R2a 합성기 갭 클로즈** — credential requires(콘솔 발급 자격 →
+      사전조건 체크), 의존자 있는 노드의 충돌-재시도 teardown(409/404 허용 +
+      재시도) 자동 부여, filter-객체 capture, delete body/PUT형 teardown,
+      lookup 노드(image/server-type/k8s-version 등 조회-전용 선행) 지원
+- [x] **R2 라이브 증명** — `gen-pilot-net-basics` 20/20 통과 (합성 경로
+      카나리아로 enabled 유지)
+- [x] **R3 검증 웨이브 1 + triage 루프 가동** — 합성 lifecycle을 scoped run
+      (`crud_filter=gen-wave`)으로 돌리고 실패를 모델에 환류하는 루프가 3회전:
+      run 27394211896(rev 1) → 27395331657(rev 2) → 27396649009(rev 3), rev 4
+      디스패치 완료. 결과: `gen-wave-vslight` 9/9 ×3회, `gen-wave-apigw`
+      20/20(전 delete 포함) ×2회, dashboard capture 수정(rev 4). 제품 결함
+      2건 발견·기록(403 'Action definition is not found', budget POST 500 →
+      known_issues Product Bug 등재), composition-blocked 클래스는 노드
+      notes에 문서화(콘솔-전용 id → M5 Planning 폼 입력 경로)
+- [x] 폼 기반 자원 모델 UI(§3 흐름) — `/planning/resources` 목록 + 노드 폼 +
+      합성 미리보기/draft 저장 (`controlplane/resource_routes.py`), Pages
+      정적 export에 read-only로 포함
+- [ ] **R3 계속** — 다음 웨이브 fan-out(잔여 docs 노드 71), 노드별 VALIDATED
+      승격 → 수작업 lifecycle 점진 교체, 전체 회귀 plan 계산
+- [ ] **R4 C4 변형** — `vary:` 옵션 조합 변형 suite
 
 ### 마일스톤별 가치
 - M0만으로도: 멀티 환경 매트릭스 + run 히스토리가 생김 (서버 없이).
@@ -408,6 +437,16 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - M3로: "저작도구 + AI 상시 파이프라인" 완성.
 - M4로: 호스트 불문 단일 패키지 배포 — 플랫폼 완결. **M0~M3 내내 개발·
   협업·실행은 git + GitHub Actions로 원격에서 계속 가능.**
+- M5로: 시나리오가 손저작물에서 **모델의 컴파일 산출물**로 — 신규 서비스
+  추가 = 자원 task 입력, 커버리지 = 노드 검증 여부로 직접 집계.
+
+### UI 비고 (2026-06-12)
+controlplane UI는 owner 목업에 따라 **Overview → Plan → Run → Report
+(+ Knowledge)** IA로 재설계됐고(설계 시스템·ctxbar·report 탭), 같은 화면들이
+`controlplane/static_export.py`로 Pages `/platform/`에 정적 export된다
+(노드별 read-only 폼 포함 ~198페이지, 모든 메뉴 클릭 가능 — 액션 버튼은
+"서버 전용" 배너). 라이브 관제는 `dashboard/ops.html`이 의존순서 자원
+트리·run 필터·종료 verdict까지 제공한다 (`docs/OPS-DASHBOARD.md`).
 
 ---
 
