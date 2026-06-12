@@ -1,0 +1,16 @@
+# Resource-task model — networking/firewall (001-001-l).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1. The firewall has NO Open API create in
+# data/api_catalog.json — modeled with no_api: true (composer never composes it;
+# it documents the dependency shape until a carrier-capture flow lands in R3).
+version: 1
+resources:
+  firewall:
+    code: "001-001-l"
+    service: networking/firewall
+    no_api: true
+    requires:
+      - one_of: [internet-gateway, transit-gateway, direct-connect, load-balancer]
+        bind: carrier
+    provenance: docs
+    source: {lifecycle: networking-firewall-rule, steps: [createfirewallrule]}
+    notes: "Open API 없음: POST /v1/firewalls는 카탈로그에 존재하지 않는다 — firewall은 carrier 자원(internet gateway, transit gateway uplink, direct connect, load balancer)에 'Firewall 사용'을 켜면 암묵 생성된다 (cross-service.yaml firewall-implicit-on-gateway-resources + networking-firewall-rule lifecycle note). 카탈로그에 있는 것은 규칙/수정 API뿐 (POST /v1/firewalls/rules, PUT /v1/firewalls/{id}). 합성 경로는 R3에서 carrier 생성 시 firewall_enabled: true + firewall_id capture로 열린다 — 그때까지 이 노드는 그래프 문서화 전용이며 composer 대상이 될 수 없다."

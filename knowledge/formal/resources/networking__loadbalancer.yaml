@@ -1,0 +1,138 @@
+# Resource-task model — networking/loadbalancer (001-003, the LB chain).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from heavy-shared-networking
+# (enabled, live-validated bodies/captures) + networking-loadbalancer-members-nat.
+#
+# requires here follow what each VALIDATED body actually consumes (subnet_id +
+# vpc_id fields), which diverges from cross-service.yaml's coarser edges for
+# lb-health-check ([], region-scoped) and lb-server-group ([load-balancer]) —
+# the validator reports those as reconcile-during-R3 warnings by design.
+version: 1
+resources:
+  lb-health-check:
+    code: "001-003-a"
+    service: networking/loadbalancer
+    requires: [vpc, subnet]
+    create:
+      endpoint: "POST /v1/lb-health-checks"
+      body:
+        lb_health_check:
+          name: "regrhc{ualpha}"
+          description: "API regression suite"
+          protocol: TCP
+          health_check_count: 3
+          health_check_interval: 5
+          health_check_port: 80
+          health_check_timeout: 5
+          subnet_id: "{subnet.subnet_id}"
+          vpc_id: "{vpc.vpc_id}"
+          tags: []
+    capture: {lb_health_check_id: "$.lb_health_check.id"}
+    delete: {endpoint: "DELETE /v1/lb-health-checks/{lb_health_check_id}",
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking,
+             steps: [lb-healthcheck-create, lb-healthcheck-delete]}
+    notes: "region 스코프 재사용 자원 — 참조할 server group보다 먼저 생성 (run 27306490231 LbHealthCheckNotFoundError 교훈)"
+
+  load-balancer:
+    code: "001-003-b"
+    service: networking/loadbalancer
+    heavy: true
+    requires: [vpc, subnet]
+    create:
+      endpoint: "POST /v1/loadbalancers"
+      body:
+        loadbalancer:
+          name: "regrlb{ualpha}"
+          description: "API regression suite"
+          layer_type: L4
+          firewall_enabled: false
+          firewall_logging_enabled: false
+          publicip_id: ""
+          service_ip: "{opt.service_ip}"
+          source_nat_ip: ""
+          subnet_id: "{subnet.subnet_id}"
+          vpc_id: "{vpc.vpc_id}"
+          tags: []
+      options:
+        service_ip: {type: string, required: true, default: "10.140.6.100",
+                     note: "서비스 subnet cidr 내부의 빈 IP — 기본값은 소스 lifecycle의 공유 subnet(10.140.6.0/24)에 묶인 값. subnet에서 4개 IP 소비(service+SNAT+HC 2), SNAT/HC IP는 생성 후 불변"}
+    capture: {loadbalancer_id: "$.loadbalancer.id"}
+    ready: {field: "$.loadbalancer.state",
+            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 600, interval: 20}
+    delete: {endpoint: "DELETE /v1/loadbalancers/{loadbalancer_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking, steps: [lb-create, lb-wait, lb-delete]}
+
+  lb-server-group:
+    code: "001-003-c"
+    service: networking/loadbalancer
+    requires: [vpc, subnet, lb-health-check]
+    create:
+      endpoint: "POST /v1/lb-server-groups"
+      body:
+        lb_server_group:
+          name: "regrsg{ualpha}"
+          description: "API regression suite"
+          lb_health_check_id: "{lb-health-check.lb_health_check_id}"
+          lb_method: ROUND_ROBIN
+          protocol: TCP
+          subnet_id: "{subnet.subnet_id}"
+          vpc_id: "{vpc.vpc_id}"
+          tags: []
+    capture: {lb_server_group_id: "$.lb_server_group.id"}
+    delete: {endpoint: "DELETE /v1/lb-server-groups/{lb_server_group_id}",
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking,
+             steps: [lb-servergroup-create, lb-servergroup-delete]}
+
+  lb-listener:
+    code: "001-003-d"
+    service: networking/loadbalancer
+    requires: [load-balancer, lb-server-group]
+    create:
+      endpoint: "POST /v1/lb-listeners"
+      body:
+        listener:
+          name: "regrls{ualpha}"
+          description: "API regression suite"
+          loadbalancer_id: "{load-balancer.loadbalancer_id}"
+          protocol: TCP
+          routing_action: LB_SERVER_GROUP
+          server_group_id: "{lb-server-group.lb_server_group_id}"
+          service_port: "80"
+          session_duration_time: 120
+          support_http2: false
+          tags: []
+    capture: {listener_id: "$.listener.id"}
+    delete: {endpoint: "DELETE /v1/lb-listeners/{listener_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking,
+             steps: [lb-listener-create, lb-listener-delete]}
+
+  lb-member:
+    code: "001-003-e"
+    service: networking/loadbalancer
+    requires: [lb-server-group]
+    create:
+      endpoint: "POST /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members"
+      body:
+        members:
+          - name: regrmember1
+            member_ip: "{opt.member_ip}"
+            member_port: 80
+            member_state: ENABLE
+            member_weight: 100
+            object_id: ""
+            object_type: VM
+      options:
+        member_ip: {type: string, required: true, default: "10.124.0.31",
+                    note: "LB와 같은 VPC의 VS/BM 서버 IP 또는 직접 입력 IP (직접 입력이 테스트 최저비용) — 기본값은 소스의 공유 subnet에 묶인 값"}
+    capture: {member_id: "$.members[0].id"}
+    delete: {endpoint: "DELETE /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members/{member_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-loadbalancer-members-nat,
+             steps: [members-add, members-remove-single]}
+    notes: "capture는 소스에서 capture_soft($.members[0].id, envelope UNPROVEN) — docs 유지"

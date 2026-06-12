@@ -1,0 +1,38 @@
+# Resource-task model — networking/dns (001-004, Private DNS).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# networking-dns-hosted-zone-private (enabled, live-validated).
+version: 1
+resources:
+  private-dns:
+    code: "001-004-a"
+    service: networking/dns
+    heavy: true
+    requires: []
+    create:
+      endpoint: "POST /v1/private-dns"
+      body: {name: "regrpdns{ualpha}", description: "API regression suite",
+             connected_vpc_ids: [], tags: []}
+    capture: {private_dns_id: "$.private_dns.id"}
+    ready: {field: "$.private_dns.state", until: ACTIVE, timeout: 3600, interval: 30}
+    delete: {endpoint: "DELETE /v1/private-dns/{private_dns_id}", destructive: true}
+    quota: private-dns
+    provenance: VALIDATED
+    source: {lifecycle: networking-dns-hosted-zone-private,
+             steps: [create-private-dns, wait-private-dns-active, delete-private-dns]}
+    notes: "생성/삭제가 매우 느림(시간 단위 관측) — 전용 lane에 격리, 먼저 생성/마지막 삭제 (services/networking__dns.yaml). hosted-zone이 남아 있는 동안 종료 불가. heavy-shared-networking은 별도 activate sub-flow(POST /v1/private-dns/activate)를 끼워 넣지만, 이 소스 lifecycle은 activate 없이 ACTIVE 도달을 검증했다."
+
+  hosted-zone:
+    code: "001-004-b"
+    service: networking/dns
+    requires: [private-dns]
+    create:
+      endpoint: "POST /v1/hosted-zones"
+      body: {name: "regr{ualpha}.example.com", description: "API regression suite",
+             private_dns_id: "{private-dns.private_dns_id}", type: private,
+             tags: []}
+    capture: {hosted_zone_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/hosted-zones/{hosted_zone_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-dns-hosted-zone-private,
+             steps: [create-hosted-zone, delete-hosted-zone]}
+    notes: "capture envelope은 이 소스에서 $.id — heavy-shared-networking은 $.hosted_zone.id를 쓴다 (응답 envelope 이력 충돌; R3 라이브 런에서 확정). private hosted zone은 Active 상태의 private-dns에 연결된 VPC를 대상으로 한다; 계정당 20 zone."
