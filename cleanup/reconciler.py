@@ -57,8 +57,20 @@ from core.registry import is_owned, is_expired
 # Ownership / expiry helpers
 # ---------------------------------------------------------------------------
 
+def _extra_names() -> tuple[str, ...]:
+    """SCP_SWEEP_EXTRA_NAMES — comma-separated EXACT resource names the
+    operator wants reclaimed once (e.g. the pre-platform 'selftest' VPC that
+    matches neither the owner tag nor the regr*/zznet* prefixes).  Set per
+    run-request (sweep_extra_names=...), never a standing default."""
+    import os
+    raw = os.environ.get("SCP_SWEEP_EXTRA_NAMES", "")
+    return tuple(n.strip() for n in raw.split(",") if n.strip())
+
+
 def _is_candidate(item: dict, *, name_prefixes: tuple[str, ...] = ()) -> bool:
     """Return True if the resource is owned (by tag or prefix fallback)."""
+    if str(item.get("name") or "") in _extra_names():
+        return True
     return is_owned(item, name_prefixes=name_prefixes)
 
 
@@ -79,6 +91,8 @@ def _is_deletable(item: dict, *, name_prefixes: tuple[str, ...] = ()) -> bool:
     """
     import os
     from core.registry import _tag_value, OWNER_KEY, OWNER, RUN_KEY
+    if str(item.get("name") or "") in _extra_names():
+        return True
     has_tag = _tag_value(item, OWNER_KEY) == OWNER
     if has_tag:
         if os.environ.get("SCP_SWEEP_IGNORE_TTL", "").lower() == "true":
