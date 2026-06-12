@@ -1,0 +1,48 @@
+# Resource-task model — ai-ml/cloud-ml (ai-ml group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from cloud-ml-write-coverage
+# (enabled, heavy, COVERAGE-ONLY — bodies NOT runtime-proven) + owner-provided
+# domain knowledge in knowledge/formal/services/ai-ml__cloud-ml.yaml (2026-06-11).
+#
+# Owner correction encoded here: cloud-ml has NO create-along k8s fork — it only
+# REFERENCES an EXISTING container/ske cluster (contrast aimlops-platform's real
+# existing_or_create fork). It additionally needs a Container Registry AND that
+# registry's console-issued 인증키 — a credential precondition, not a create
+# step, so it is a {credential: scr-auth-key} requires entry (archivestorage
+# pattern: composer env-skips when the credential is not flagged on the env).
+version: 1
+resources:
+  cloud-ml:
+    code: "ai-ml-cloudml"
+    service: ai-ml/cloud-ml
+    heavy: true
+    requires:
+      - {ref: ske-cluster}
+      - container-registry
+      - {credential: scr-auth-key,
+         note: "container registry의 콘솔 발급 인증키 (SCR-push blocker와 동일 클래스) — 환경에 표시돼 있지 않으면 env-skip (services/ai-ml__cloud-ml.yaml cloudml-credential-precondition-class)"}
+    create:
+      endpoint: "POST /v1/cloud-ml"
+      body:
+        cloud_ml_name: "regr-cloudml-{ualpha}"
+        description: "API regression suite"
+        cluster_id: "{ske-cluster.cluster_id}"
+        image_id: "{opt.image_id}"
+        domain_name: "regr-cloudml-{ualpha}"
+        endpoint_type: "{opt.endpoint_type}"
+        use_copilot: false
+        analytics_resource: {cpu: 1, gpu: "", memory: 2}
+        application_resource: {cpu: 1, memory: 2}
+        copilot: {cpu: 0, gpu: "", memory: 0}
+        tags: []
+      options:
+        image_id: {type: string, required: true,
+                   note: "lookup — GET /v1/cloud-ml/images $.images[0].id (소스 lifecycle list-images capture_soft)"}
+        endpoint_type: {type: enum, values: [PUBLIC, PRIVATE], default: PUBLIC,
+                        required: true, vary: true,
+                        note: "소스 lifecycle은 PUBLIC을 보냈다; api_bodies 모델은 문자열 — PRIVATE 변형은 C4/R3 라이브 검증 대상"}
+    capture: {cloud_ml_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/cloud-ml/{cloud_ml_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: cloud-ml-write-coverage,
+             steps: [list-images, create-cloud-ml, update-cloud-ml, delete-cloud-ml]}
+    notes: "GPU 가능 ML 서빙 스택을 EXISTING ske 클러스터 위에 프로비저닝 — billable. 소스 lifecycle은 의도적으로 실생성하지 않는 coverage probe (cloud_ml_id를 존재하지 않는 필드로 capture_soft → 404 보장)라 body/capture 모두 UNPROVEN(docs): create body는 data/api_bodies.json createcloudml 형상에서 doc-sample id를 치환한 것이고, capture envelope $.id와 product_group_id 누락(capture 소스 없음, 소스 lifecycle도 생략 — 4xx 예상 요인)은 R3 라이브 검증 과제. PUT /v1/cloud-ml/{id} update body는 {description} (api_bodies updatecloudml)."
