@@ -4,31 +4,81 @@
 # hand. NOTE the misleading API op names: 'puteventpolicy' is the CREATE
 # (POST); 'getmetricperfdatalist' is a read-shaped POST query (not modeled —
 # operation, no resource).
+#
+# R3 rework: the flat draft body that run 27396649009 rejected (400
+# InvalidInputValue resourceType/productResourceId) was replaced with the
+# docs-grounded nested EventPolicyCreateRequest shape, and a read-only
+# cm-account-resource LOOKUP node now feeds productResourceId. Pending live
+# verification.
 version: 1
 resources:
-  cm-event-policy:
-    code: "mg-cm-event-policy"
+  # read-only LOOKUP node (server-type / apigw-root-resource pattern):
+  # ListAccountResources = getaccountproductlist, GET
+  # /v1/cloudmonitorings/product/v2/accounts/products →
+  # PageResponseAccountProductDto{contents: [AccountProductDto]}, each row
+  # carrying productResourceId (e.g. INSTANCE-c4Hsd27ttDaLw533X4B6Sp).
+  # GET create + capture + verify, no delete by design (the validator's
+  # "create without delete" warning is expected here).
+  cm-account-resource:
+    code: "mg-cm-account-resource"
     service: management/cloudmonitoring
     requires: []
     create:
+      endpoint: "GET /v1/cloudmonitorings/product/v2/accounts/products"
+    capture:
+      product_resource_id:
+        list: "$.contents"
+        where_prefix: {productResourceId: "INSTANCE-"}
+        get: "productResourceId"
+    verify:
+      - {name: read,
+         endpoint: "GET /v1/cloudmonitorings/product/v2/accounts/products",
+         expect_status: [200]}
+    provenance: docs
+    notes: "읽기 전용 LOOKUP 노드 — docs getaccountproductlist(ListAccountResources) 응답 모델 PageResponseAccountProductDto/AccountProductDto에서 파생(UNPROVEN, 라이브 미관측). where_prefix INSTANCE-는 cm-event-policy의 metricKey(system.* — VM 메트릭)와 상품 유형을 맞추기 위한 필터 — 계정에 Running VM이 하나도 없으면 capture가 실패한다(의도적 fail-fast; compute server를 requires로 끌어오면 HEAVY 체인이 되어 배제). 모니터링 등록 지연으로 새 VM이 목록에 늦게 뜰 수 있음도 라이브 검증 대상."
+
+  cm-event-policy:
+    code: "mg-cm-event-policy"
+    service: management/cloudmonitoring
+    requires: [cm-account-resource]
+    create:
       endpoint: "POST /v1/cloudmonitorings/event/v2/event-policies"
-      body: {eventPolicyName: "regrcmep{unique}", productTypeCode: Server,
-             eventLevel: "{opt.eventLevel}", enabled: true,
-             description: "API regression coverage probe"}
+      # REAL nested shape per docs EventPolicyCreateRequest =
+      # {eventPolicyRequest: EventPolicyInfo (req), productResourceId (req),
+      # notificationRecipients? (≤10)} — run 27396649009 proved the old flat
+      # body invalid. EventPolicyInfo required fields: disableYn, eventLevel,
+      # eventThreshold, ftCount, isLogMetric, metricKey; optional fields
+      # (eventMessagePrefix, eventOccurTimeZone, eventPolicyStatistics,
+      # metricName, object*/podObject*) deliberately omitted to minimise the
+      # 400 surface. notificationRecipients omitted (needs recipientKey from
+      # getaccountmembers/getadressbooklist — separate lookup, R3+ task).
+      body:
+        eventPolicyRequest:
+          disableYn: "N"
+          eventLevel: "{opt.eventLevel}"
+          eventThreshold:
+            thresholdType: SINGLE_VALUE
+            singleThreshold: {comparisonOperator: GT, value: 95}
+          ftCount: 3
+          isLogMetric: "N"
+          metricKey: "system.cpu.system.pct"
+        productResourceId: "{cm-account-resource.product_resource_id}"
       options:
         eventLevel: {type: enum, values: [WARNING, CRITICAL], required: true,
                      default: WARNING, vary: true,
-                     note: "이벤트 등급 — WARNING은 create body, CRITICAL은 소스의 modify body에서 관측. 둘 다 라이브 2xx 미확인(UNPROVEN)"}
-    # COMPOSITION-BLOCKED (run 27396649009: 400 InvalidInputValue
-    # resourceType/productResourceId): 실제 EventPolicyCreateRequest는
-    # {eventPolicyRequest: EventPolicyInfo, productResourceId, notificationRecipients?}
-    # 구조다 — 위 평면 body는 문서 초안 형태로 무효. productResourceId는
-    # GET ListAccountResources로 API 발견 가능(lookup 노드 후보,
-    # 예: INSTANCE-...) — EventPolicyInfo 필드 조사 + lookup 배선이 R3 과제.
+                     note: "이벤트 등급 — WARNING은 docs EventPolicyInfo 예시, CRITICAL은 소스 lifecycle modify body에서 관측. docs 이벤트 조회 예시에는 FATAL도 등장 — enum 전체 집합/라이브 2xx 미확인(UNPROVEN)"}
+    # docs-grounded shape (was COMPOSITION-BLOCKED): create body now mirrors
+    # the docs EventPolicyCreateRequest/EventPolicyInfo models verbatim and
+    # productResourceId is wired from the cm-account-resource lookup —
+    # pending live verification (no api_bodies entry; 2xx never observed).
     capture: {eventPolicyId: "$.eventPolicyId"}
+    verify:
+      - {name: read,
+         endpoint: "GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
              destructive: true}
     provenance: docs
     source: {lifecycle: cloudmonitoring-event-policy,
              steps: [create-event-policy, delete-event-policy]}
-    notes: "api_bodies 항목 없음 + docs JS-rendered — body는 BEST-GUESS이며 실제로는 실 productResourceId + addrbook 수신자가 필요할 가능성이 높아 400/422 예상. capture envelope $.eventPolicyId(FLAT, camelCase — path param 미러링)는 추정 UNPROVEN. 필드 네이밍이 플랫폼 표준 snake_case가 아닌 camelCase인 v2 API."
+    notes: "run 27396649009: 평면 body가 400 InvalidInputValue(resourceType/productResourceId) — 실제 요청은 docs eventpolicycreaterequest/eventpolicyinfo 모델의 중첩 구조(이 파일이 반영). create 응답은 EventPolicyDetailResponse — capture $.eventPolicyId(integer, required)는 docs 모델 근거로 격상되었으나 라이브 미관측(UNPROVEN). 임계치는 SINGLE_VALUE(GT 95, CPU 메트릭 system.cpu.system.pct — EventPolicyResponse 예시 키)로 사실상 미발화 probe; comparisonOperator enum은 docs 예시 LT만 관측, GT는 추정. delete 경로는 카탈로그 deleteeventpolicy verbatim. camelCase v2 API(플랫폼 표준 snake_case 아님)."
