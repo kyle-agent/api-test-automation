@@ -1,6 +1,14 @@
 # COVERAGE-GETID-PLAN — the id-bound GET gap, classified and attacked
 
-- Date: 2026-06-12 · Status: **active** (this session's verify additions committed)
+- Date: 2026-06-12 · Status: **active — wave A largely landed: gap_getid
+  151 → 130** (live run history row, sha 1bea554 — matches a local
+  `reachable_ceiling` recompute; ceiling 88.1% = 1209/1372, gap_write 33).
+  The §2 verifies were composed into the wave-2 vpc-free chains
+  (`generated__wave2.json`) and the heavy VS chain; queue/sec/rg/iam/scf/
+  volume green, scr/fs recomposed, heavy rev 3 dispatched — see
+  `docs/RESOURCE-MODEL-PLAN.md` §6. Product findings the waves surfaced
+  are ledgered in `docs/PRODUCT-FINDINGS.md` (e.g. PF-03 filestorage 403,
+  PF-06 scf time-or-period — the §2 run-risk note proved right).
 - Input: reproduction of `dashboard.build.reachable_ceiling` (catalog
   `data/api_catalog.json` + `regression/scenarios/loader.load_lifecycles()`,
   enabled lifecycles only). Snapshot at session start: **gap_getid = 151**
