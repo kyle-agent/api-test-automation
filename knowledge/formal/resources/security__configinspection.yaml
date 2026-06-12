@@ -1,0 +1,44 @@
+# Resource-task model — security/configinspection (sec-ci group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# security-configinspection-diagnosis (enabled, coverage-only guarded) by
+# extract.py, curated by hand. Config Inspection은 클라우드 계정을 진단하는
+# 서비스 — 진단 대상 계정의 실제 인증키가 필요해 credential 사전조건으로
+# 모델링한다 (§1 credential 케이스).
+version: 1
+resources:
+  diagnosis:
+    code: "sec-ci-diagnosis"
+    service: security/configinspection
+    requires:
+      - {credential: inspectable-account-auth-key,
+         note: "진단 대상 계정(SCP 또는 외부 CSP)의 실제 auth_key_id/계정 자격 — 콘솔 발급, API로 생성 불가. 환경에 표시 없으면 env-skip. 진단 실행(request)은 추가로 access_key/secret_key/tenant_id 실값 요구"}
+    create:
+      endpoint: "POST /v1/configinspection/diagnosis/save"
+      body:
+        account_id: "0e3dffc50eb247a1adf4f2e5c82c4f99"
+        auth_key_request:
+          auth_key_id: "9b72a9856e494e67afc69atd3631fe38"
+          diagnosis_id: "DIA-943731CB8E3045C289BAECAEC3532097"
+        csp_type: "{opt.csp_type}"
+        diagnosis_account_id: "0e3dffc50eb247a1adf4f2e5c82c4f99"
+        diagnosis_check_type: BP
+        diagnosis_id: "DIA-943731CB8E3045C289BAECAEC3532097"
+        diagnosis_name: "regr-config-{unique}"
+        diagnosis_type: Console
+        plan_type: STANDARD
+        schedule_request:
+          diagnosis_id: "DIA-943731CB8E3045C289BAECAEC3532097"
+          frequency_type: ONCE
+          use_diagnosis_check_type_bp: "true"
+          use_diagnosis_check_type_ssi: "false"
+        tags: []
+      options:
+        csp_type: {type: enum, values: [SCP, AWS, AZURE], required: true,
+                   default: SCP, vary: true,
+                   note: "진단 대상 CSP. SCP만 소스에서 전송됨(2xx 미확인); 외부 CSP 코드값(AWS/AZURE)은 docs 추정 UNPROVEN — R3 검증 과제"}
+    capture: {diagnosis_id: "$.diagnosis_id"}
+    delete: {endpoint: "DELETE /v1/configinspection/diagnosis/terminate/{diagnosis_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: security-configinspection-diagnosis, steps: [save, terminate]}
+    notes: "body의 account/auth_key/diagnosis id들은 doc-sample 값 — 진단 가능한 throwaway 계정+인증키가 없어 KNOWN-UNSATISFIABLE, create는 4xx 예상 (소스는 coverage-only guarded). capture는 FLAT $.diagnosis_id (configinspectioncreateresponse) — 소스에서 capture_soft, UNPROVEN. diagnosis_name 규칙 ^[a-zA-Z0-9-_]+$. teardown verb는 DELETE .../terminate/{diagnosis_id}. 진단 결과 per-item ERROR는 인증키 권한 부족 신호 (services/security__configinspection.yaml error-status-means-auth)."
