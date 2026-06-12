@@ -1,0 +1,36 @@
+# Resource-task model — storage/parallel-filestorage (st-pfs group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# parallel-filestorage-capacity-restore (enabled+heavy; source _note says
+# bodies are DOCS-ONLY, no live 2xx → all nodes docs until an R3 scoped run).
+version: 1
+resources:
+  pfs-volume:
+    code: "st-pfs-volume"
+    service: storage/parallel-filestorage
+    heavy: true
+    requires: []
+    create:
+      endpoint: "POST /v1/volumes"
+      body: {name: "regrpfs{ualpha}", capacity_tb: 1, tags: []}
+    capture: {volume_id: "$.id"}
+    ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
+            timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: parallel-filestorage-capacity-restore,
+             steps: [create-volume, wait-volume-available, delete-volume]}
+    notes: "capacity_tb 1은 문서상 최소값(min 1 / max 1000), BILLABLE → heavy. capture envelope $.id (Volume.id, filestorage의 flat $.volume_id와 다름) — UNPROVEN. 이름 규칙은 filestorage와 동일 (^[a-z]([a-z0-9_]){2,20}$). 연결(attach)은 Multi-node GPU Cluster에서만 가능 — 풀 lifecycle 검증이 고가의 MNGC에 게이트됨 (services/storage__parallel-filestorage.yaml mngc-prereq). 용량 증설은 PUT /v1/volumes/{volume_id}/capacity (verify 후보, 소스 set-volume-capacity)."
+
+  pfs-snapshot:
+    code: "st-pfs-snapshot"
+    service: storage/parallel-filestorage
+    requires: [pfs-volume]
+    create:
+      endpoint: "POST /v1/snapshots"
+      body: {volume_id: "{pfs-volume.volume_id}"}
+    capture: {snapshot_id: "$.snapshot.id"}
+    delete: {endpoint: "DELETE /v1/snapshots/{snapshot_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: parallel-filestorage-capacity-restore,
+             steps: [create-snapshot, delete-snapshot]}
+    notes: "볼륨당 최대 50 스냅샷. snapshot RESTORE(PUT /v1/snapshots/{snapshot_id}/restore)는 '추후 제공될 예정' — 릴리스 전까지 404/400 가능 (services quirk snapshot-restore-not-released); 오늘의 복구 = 스냅샷에서 새 볼륨 생성. 삭제는 소스에서 409/500 재시도 4×15s."

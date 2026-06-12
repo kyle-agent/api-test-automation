@@ -1,9 +1,12 @@
 # Resource-task model — storage/filestorage (st-fs group).
-# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from filestorage-volume
-# (enabled, live-validated) during the compute/container fan-out: the node is
-# pulled in here because ske-cluster's requires graph consumes it
-# (cross-service ske-volume-is-filestorage). The storage-category agent owns
-# the rest of this category; extend this file rather than duplicating the node.
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validated by knowledge/formal/validate.py
+# · consumed by regression/scenarios/composer.py (R2a).
+#
+# Back-extracted from filestorage-volume (enabled, live-validated — the only
+# proven filestorage create body per knowledge/validated-facts.md) and
+# filestorage-replication-schedule (enabled+heavy, but its snapshot/schedule/
+# replication bodies are DOCS-ONLY per the source _note — those nodes stay docs,
+# C5). Curated by hand from extract.py drafts.
 version: 1
 resources:
   filestorage-volume:
@@ -19,4 +22,59 @@ resources:
     delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: filestorage-volume, steps: [create, wait-available, delete]}
-    notes: "standalone NFS volume, VPC 불필요 (cross-service와 일치). capture envelope은 $.volume_id (FLAT $.id가 아님 — virtualserver block-volume과 다르다, services/compute__virtualserver.yaml captures 참조). 경로 /v1/volumes는 virtualserver 블록 볼륨과 겹치지만 per-service host로 분리된다. container-ske-cluster-nodepool의 create-vol 스텝도 동일 템플릿(name prefix만 regrfsk)으로 라이브 검증."
+    notes: "standalone NFS volume (no vpc) — cross-service.yaml 키와 동일 노드. capture는 FLAT $.volume_id (virtualserver block volume의 $.id와 다름 — validated-facts). protocol NFS + type_name HDD가 유일하게 라이브 검증된 body (CIFS는 Windows용, 문서). 이름 규칙: 소문자 시작, 소문자/숫자/_, 3-21자 (services/storage__filestorage.yaml). 삭제 후 404 도달까지 폴링(소스 wait-gone 300s). ske-cluster의 volume_id 선행자원 (cross-service ske-volume-is-filestorage)."
+
+  fs-snapshot:
+    code: "st-fs-snapshot"
+    service: storage/filestorage
+    requires: [filestorage-volume]
+    create:
+      endpoint: "POST /v1/snapshots"
+      body: {volume_id: "{filestorage-volume.volume_id}"}
+    capture: {snapshot_id: "$.snapshot.id"}
+    delete: {endpoint: "DELETE /v1/snapshots/{snapshot_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: filestorage-replication-schedule,
+             steps: [create-snapshot, delete-snapshot]}
+    notes: "capture envelope $.snapshot.id는 validated-facts에 '(unproven)'으로 분류 — docs 유지, R3 라이브 2xx 후 승격. 볼륨당 최대 800 스냅샷(스케줄 생성분 128). 삭제는 소스에서 409/500 재시도 4×15s. restore는 PUT /v1/snapshots/{snapshot_id}/restore (verify 후보, 소스 restore-snapshot 스텝)."
+
+  fs-snapshot-schedule:
+    code: "st-fs-snapshot-schedule"
+    service: storage/filestorage
+    requires: [filestorage-volume]
+    create:
+      endpoint: "POST /v1/snapshot-schedules"
+      body:
+        volume_id: "{filestorage-volume.volume_id}"
+        snapshot_retention_count: 10
+        snapshot_schedule: {frequency: WEEKLY, day_of_week: MON, hour: "23"}
+    capture: {snapshot_schedule_id: "$.snapshot_schedule.id"}
+    delete: {endpoint: "DELETE /v1/snapshot-schedules/{snapshot_schedule_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: filestorage-replication-schedule,
+             steps: [create-snapshot-schedule, delete-snapshot-schedule]}
+    notes: "KNOWN-HARD capture: SnapshotScheduleCreateResponse는 문서상 id를 안 돌려준다 (services quirk snapshot-schedule-no-id) — 소스도 capture_soft였고 미충전 placeholder로 set/delete를 호출했다. 실사용 시 list에서 id 회수 필요 (R3 과제: 합성기 list-recover 패턴). body는 api_docs SnapshotScheduleCreateRequest, UNPROVEN."
+
+  fs-replication:
+    code: "st-fs-replication"
+    service: storage/filestorage
+    requires: [filestorage-volume]
+    create:
+      endpoint: "POST /v1/replications"
+      body:
+        name: "regrfsrepl{unique}"
+        volume_id: "{filestorage-volume.volume_id}"
+        region: "{opt.region}"
+        replication_frequency: 5min
+        replication_type: replication
+        backup_retention_count: 2
+      options:
+        region: {type: string, required: true, default: "kr-west1",
+                 note: "원격 DR 리전 (문서 예시 kr-west1) — DR/리전 미가용 시 4xx 가능 (소스 _note)"}
+    capture: {replication_id: "$.replication_id"}
+    delete: {endpoint: "DELETE /v1/replications/{replication_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: filestorage-replication-schedule,
+             steps: [create-replication, delete-replication]}
+    notes: "body는 api_docs ReplicationCreateRequest (createvolumereplication은 api_bodies에도 존재), capture $.replication_id는 소스에서 capture_soft (envelope UNPROVEN) — docs 유지."

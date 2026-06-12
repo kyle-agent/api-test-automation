@@ -1,0 +1,67 @@
+# Resource-task model — database/mysql (db-mysql group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from database-mysql-cluster
+# (enabled+heavy; live-proven — cluster reached RUNNING and the unset-backup 401
+# quirk was observed against the real cluster, run 27258520218 / 2026-06-10;
+# cross-service.yaml mysql-cluster is VALIDATED).
+#
+# The vpc/subnet steps of the source lifecycle are NOT re-modeled here — they
+# are the networking__vpc.yaml nodes; the composer wires {subnet.subnet_id}.
+version: 1
+resources:
+  mysql-cluster:
+    code: "db-mysql-cluster"
+    service: database/mysql
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regrdb{ualpha}"
+        instance_name_prefix: regrdb
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        ha_enabled: false
+        nat_enabled: false
+        service_watch_log_collection: true
+        subnet_id: "{subnet.subnet_id}"
+        timezone: Asia/Seoul
+        allowable_ip_addresses: []
+        origin_cluster_id: ""
+        vip_public_ip_id: ""
+        virtual_ip_address: ""
+        tags: []
+        init_config_option:
+          audit_enabled: ""
+          database_case_sensitive: false
+          database_character_set: utf8mb4
+          database_name: regrdb
+          database_port: 2866
+          database_user_name: regruser
+          database_user_password: "Regr1ss!2026Xy"
+          backup_option:
+            archive_frequency_minute: "60"
+            retention_period_day: "7"
+            starting_time_hour: "2"
+        maintenance_option:
+          period_hour: "5"
+          starting_day_of_week: MON
+          starting_time: "0000"
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {role_type: ACTIVE, service_ip_address: "", public_ip_id: ""}
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "LOOKUP — GET /v1/engine-versions $.contents[0].id (mysql 호스트; 소스 find-engine-version 스텝). 합성기가 런타임에 조회해 주입해야 한다 (cross-service ske lookups 패턴)"}
+        server_type: {type: string, required: true,
+                      note: "LOOKUP — GET /v1/server-types $.contents[0].name (id가 아니라 NAME; v1.1 스키마, 소스 find-server-type 스텝)"}
+    capture: {cluster_id: "$.resource.id"}
+    ready: {field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: database-mysql-cluster,
+             steps: [create-cluster, wait-cluster, delete-cluster]}
+    notes: "HEAVY 과금 (~20-40분, 단일노드 ha_enabled:false). service_ip_address는 빈 문자열로 플랫폼 자동 할당(고정 IP는 충돌/예약 위험 — 소스 _note). 소스는 subnet을 adopt: subnet#db로 공유 — 합성기 adopt 최적화 대상. 비동기 쓰기는 AsyncResponse {request_id, resource:{id}}: request_id는 capture_soft로만 (envelope docs-derived; GET /v1/requests/{request_id}의 유일한 키). 삭제는 소스에서 cleanup 등록 + 클러스터 종료가 느림(자식 비동기) — vpc/subnet teardown에 409 재시도 필요. 알려진 quirk: DELETE /v1/clusters/{id}/backups 간헐 401 (백엔드 auth quirk, services/database__mysql.yaml). requires는 body가 소비하는 subnet만 — cross-service [vpc, subnet]과의 발산 경고는 의도(subnet 폐포가 vpc를 데려온다)."

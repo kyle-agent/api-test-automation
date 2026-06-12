@@ -1,0 +1,64 @@
+# Resource-task model — storage/backup (st-backup group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from backup-agent +
+# backup-job (enabled+heavy, bodies DOCS-ONLY per source _notes: they
+# reference docs-example server UUIDs that do not exist on this account, so
+# creates 4xx → both nodes docs until a real target server exists).
+version: 1
+resources:
+  backup-agent:
+    code: "st-backup-agent"
+    service: storage/backup
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/backup-agents"
+      body:
+        server_uuid: "{opt.server_uuid}"
+        subnet_id: "{subnet.subnet_id}"
+        tags: []
+      options:
+        server_uuid: {type: string, required: true,
+                      default: "89f5ef44-1021-4a5c-8e06-fbb289eac366",
+                      note: "Agent를 설치할 실서버(VS/BM)의 UUID — 기본값은 소스의 문서 예시 UUID(이 계정에 미존재 → 4xx). 진짜 의존은 server 노드인데 compute 카테고리 미모델 — compute 추출 후 {server.server_uuid} ref 옵션으로 갱신할 것"}
+    capture: {backup_agent_id: "$.resource.id"}
+    delete: {endpoint: "DELETE /v1/backup-agents/{backup_agent_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: backup-agent, steps: [create-backup-agent, delete-backup-agent]}
+    notes: "BackupAgentCreateRequest1Dot2 (api_bodies createbackupagent). 소스는 subnet_id도 문서 예시 리터럴이었다 — 실소유 subnet 주입은 이 모델이 처음 제공 (private-nat 패턴) → body UNPROVEN 유지. Agent형(Filesystem/BM) 백업은 백업 생성 전에 Agent가 서버에 설치/구성돼 있어야 한다 (services constraint server-prereq)."
+
+  backup-policy:
+    code: "st-backup-policy"
+    service: storage/backup
+    heavy: true
+    requires: []
+    create:
+      endpoint: "POST /v1/backups"
+      body:
+        name: "regrbk{unique}"
+        policy_category: AGENTLESS
+        policy_type: VM_IMAGE
+        server_category: VIRTUAL_SERVER
+        server_guid: "{opt.server_guid}"
+        server_uuid: "{opt.server_uuid}"
+        region: "{region}"
+        retention_period: WEEK_2
+        dr_enabled: false
+        encrypt_enabled: true
+        is_all_filesystem: false
+        filesystem_paths: ["/aaa", "/bbb"]
+        schedules:
+          - {frequency: DAILY, start_day: MON, start_time: "09:00:00",
+             start_week: WEEK_2, type: FULL}
+        tags: []
+      options:
+        server_guid: {type: string, required: true,
+                      default: "9ab33c66-3dbd-46cd-b0af-abccd3eb3170",
+                      note: "백업 대상 서버 GUID — 문서 예시(미존재 → 4xx); compute 모델 후 server ref로 교체"}
+        server_uuid: {type: string, required: true,
+                      default: "89f5ef44-1021-4a5c-8e06-fbb289eac366",
+                      note: "백업 대상 서버 UUID — 문서 예시(미존재 → 4xx)"}
+    capture: {backup_id: "$.resource.id"}
+    delete: {endpoint: "DELETE /v1/backups/{backup_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: backup-job, steps: [create-backup, delete-backup]}
+    notes: "cross-service.yaml의 backup-policy 노드 (requires: [server] — server는 compute 미모델이라 본 모델은 requires:[] + 옵션 placeholder; 의도된 발산 경고). BackupCreateRequest1Dot2 (api_bodies createbackup). 제약(services/storage__backup.yaml): retention은 ENUM(14/31/93/186/365일 = 2주/1/3/6/12개월 — API 코드는 WEEK_2만 관측), 스케줄은 Full 1 + Incremental ≤6, 분은 00/30만; Agentless(VM_IMAGE)는 서버만 있으면 되고 Agent형은 backup-agent 선행. AES-256 암호화는 항상 적용(파라미터 아님). 삭제 후 404 폴링(소스 wait-backup-gone 300s)."

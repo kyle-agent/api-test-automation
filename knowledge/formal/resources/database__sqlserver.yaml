@@ -1,0 +1,64 @@
+# Resource-task model — database/sqlserver (db-sqlserver group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# sqlserver-cluster-subops-guarded (the ONLY source with a sqlserver create —
+# heavy-shared-dbaas EXCLUDES sqlserver because it needs a real license).
+# The guarded source deliberately sends empty ids so its create can only 4xx;
+# this model curates the body to real tokens (subnet/lookup options) but the
+# template has never returned 2xx → docs.
+version: 1
+resources:
+  sqlserver-cluster:
+    code: "db-sqlserver-cluster"
+    service: database/sqlserver
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regrss{ualpha}"
+        instance_name_prefix: regrss
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        ha_enabled: false
+        nat_enabled: false
+        service_watch_log_collection: true
+        subnet_id: "{subnet.subnet_id}"
+        timezone: Asia/Seoul
+        allowable_ip_addresses: []
+        origin_cluster_id: ""
+        vip_public_ip_id: ""
+        virtual_ip_address: ""
+        tags: []
+        init_config_option:
+          audit_enabled: false
+          database_name: regrss
+          database_port: 2866
+          database_user_name: regruser
+          database_user_password: "Regr1ss!2026Xy"
+          backup_option:
+            archive_frequency_minute: "60"
+            retention_period_day: "7"
+            starting_time_hour: "2"
+        maintenance_option:
+          period_hour: "5"
+          starting_day_of_week: MON
+          starting_time: "0000"
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {role_type: ACTIVE, service_ip_address: "", public_ip_id: ""}
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "LOOKUP — GET /v1/engine-versions $.contents[0].id (sqlserver 호스트). 소스는 빈 문자열을 보냈다(guarded 4xx 의도) — 실값 주입은 이 모델이 처음"}
+        server_type: {type: string, required: true,
+                      note: "LOOKUP — GET /v1/server-types $.contents[0].name"}
+    capture: {cluster_id: "$.resource.id"}
+    ready: {field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [create-cluster-guarded, delete-cluster-guarded]}
+    notes: "KNOWN-BLOCKED: SQL Server는 실제 라이선스가 필요해 heavy-shared-dbaas에서 제외 — 라이선스가 준비되기 전까지 create는 4xx 예상 (라이선스 자격은 archivestorage형 credential 게이트 후보, 단 문서에 발급 절차가 안 잡혀 있어 우선 노트로만). body는 guarded 소스의 빈-id 템플릿을 mysql형 relational 표준값으로 보강한 추정 — capture/ready envelope ($.resource.id, $.service_state)는 타 엔진 검증 패턴의 외삽이며 sqlserver에서 UNPROVEN. sqlserver 발산: add-secondary(HA standby, 라이선스 필요)와 databases(add/del) 보유, archive/replicas/promote/other-region/reset-replica/sync-replica-state 없음. 소스의 delete 스텝은 합성 id만 노린다(실클러스터 보호) — 모델 delete는 표준 경로."

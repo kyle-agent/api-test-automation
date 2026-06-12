@@ -1,0 +1,65 @@
+# Resource-task model — database/mariadb (db-mariadb group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from the maria-* leg of
+# heavy-shared-dbaas (enabled+heavy; live-proven — run e3ba190 observed the
+# real mariadb cluster created and then taking ~90min to vanish on delete,
+# which is the recorded basis for the shared lifecycle's slimmed -gone polls).
+# The mariadb-cluster-subops-guarded lifecycle creates nothing (soft-captures
+# an existing cluster) and contributes only notes here.
+version: 1
+resources:
+  mariadb-cluster:
+    code: "db-mariadb-cluster"
+    service: database/mariadb
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regrm{ualpha}"
+        instance_name_prefix: regrm
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        ha_enabled: false
+        nat_enabled: false
+        service_watch_log_collection: true
+        subnet_id: "{subnet.subnet_id}"
+        timezone: Asia/Seoul
+        allowable_ip_addresses: []
+        origin_cluster_id: ""
+        vip_public_ip_id: ""
+        virtual_ip_address: ""
+        tags: []
+        init_config_option:
+          audit_enabled: false
+          database_character_set: utf8
+          database_name: regrmaria
+          database_port: 2866
+          database_user_name: regruser
+          database_user_password: "Regr1ss@2026"
+          backup_option:
+            archive_frequency_minute: "60"
+            retention_period_day: "7"
+            starting_time_hour: "2"
+        maintenance_option:
+          period_hour: "5"
+          starting_day_of_week: MON
+          starting_time: "0000"
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {role_type: ACTIVE, public_ip_id: ""}
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "LOOKUP — GET /v1/engine-versions $.contents[0].id (mariadb 호스트; 소스 maria-find-version 스텝). 합성기 런타임 조회 주입"}
+        server_type: {type: string, required: true,
+                      note: "LOOKUP — GET /v1/server-types $.contents[0].name (소스 maria-find-stype 스텝)"}
+    capture: {cluster_id: "$.resource.id"}
+    ready: {field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-dbaas,
+             steps: [maria-create, maria-wait, maria-delete]}
+    notes: "HEAVY 과금. capture 변수는 소스의 maria_cid를 노드 표준 cluster_id로 개명(공유 lifecycle의 충돌회피 명명 — envelope $.resource.id 동일). 소스 body는 instances에 service_ip_address가 없다(자동 할당; mysql/pg 표준형과의 차이) — verbatim 유지. 삭제가 매우 느림: run e3ba190에서 소멸까지 ~90분 — -gone 폴은 900s에서 캡하고 잔여는 subnet 삭제 409 재시도로 흡수(소스 _note); 합성 teardown도 동일 시맨틱 필요. mariadb 전용 sub-op: audit-log(PUT). 상세 sub-op 면은 mariadb-cluster-subops-guarded (bodies UNPROVEN). MySQL과 마찬가지로 비번 정책/2866 포트; character_set은 utf8 (mysql은 utf8mb4)."
