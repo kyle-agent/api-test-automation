@@ -46,6 +46,8 @@ resources:
     create:
       endpoint: "GET /v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50"
     capture: {image_id: "$.images[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/images/{image_id}", expect_status: [200]}
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-full, steps: [find-image]}
     notes: "읽기 전용 LOOKUP 노드 (cross-service server.lookups의 image) — create가 GET이고 teardown이 없는 것이 의도. 소스 step의 params(status=active, scp_original_image_type=standard, visibility=public, limit=50 — services/compute__virtualserver.yaml image-lookup-params VALIDATED)를 endpoint 쿼리스트링으로 보존했다. capture envelope $.images[0].id verbatim."
@@ -57,6 +59,9 @@ resources:
     create:
       endpoint: "GET /v1/server-types"
     capture: {server_type_id: "$.server_types[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/server-types/{server_type_id}",
+         expect_status: [200, 404]}
     provenance: docs
     source: {lifecycle: compute-virtualserver-full, steps: [find-server-type]}
     notes: "읽기 전용 LOOKUP 노드. 소스 capture는 필터 셀렉터({list: $.server_types, where_prefix: {id: s}, where_not_prefix: {id: g}, get: id} — s-타입만, g-타입 거부, services constraint server-type-prefix-s VALIDATED)인데 모델 capture 스키마는 단일 jsonpath만 지원해 $.server_types[0].id로 단순화 — 첫 항목이 g-타입이면 소비자 create가 4xx난다. composer에 필터 capture 지원이 들어가기 전까지 docs (R3 과제)."

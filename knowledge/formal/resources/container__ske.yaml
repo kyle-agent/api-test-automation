@@ -15,6 +15,9 @@ resources:
     create:
       endpoint: "GET /v1/kubernetes-versions"
     capture: {kube_ver: "$.kubernetes_versions[0].kubernetes_version"}
+    verify:
+      - {name: read, endpoint: "GET /v1/kubernetes-versions",
+         expect_status: [200]}
     provenance: VALIDATED
     source: {lifecycle: container-ske-cluster-nodepool, steps: [find-k8s-version]}
     notes: "읽기 전용 LOOKUP 노드 (cross-service ske-cluster.lookups) — create가 GET, teardown 없음이 의도. capture envelope verbatim (services quirk k8s-version-lookup VALIDATED)."
