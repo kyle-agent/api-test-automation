@@ -1,0 +1,57 @@
+# Resource-task model — database/cachestore (db-cache group, Redis DBaaS).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from the cache-* leg of
+# heavy-shared-dbaas (live-proven: cache-create got 202 in run 27258520218
+# with the engine version captured dynamically — knowledge/validated-facts.md
+# 2026-06-10 + services/database__cachestore.yaml engine-versions constraint).
+version: 1
+resources:
+  cachestore-cluster:
+    code: "db-cache-cluster"
+    service: database/cachestore
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regrc{ualpha}"
+        instance_name_prefix: regrc
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        ha_enabled: false
+        nat_enabled: false
+        replica_count: 0
+        subnet_id: "{subnet.subnet_id}"
+        timezone: Asia/Seoul
+        allowable_ip_addresses: []
+        tags: []
+        init_config_option:
+          database_port: 6378
+          database_user_password: "Regr1ss@2026"
+          sentinel_port: 26378
+          backup_option:
+            retention_period_day: "7"
+            starting_time_hour: "2"
+        maintenance_option:
+          period_hour: "5"
+          starting_day_of_week: MON
+          starting_time: "0000"
+        instance_groups:
+          - role_type: MASTER
+            server_type_name: "{opt.server_type}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+              - {role_type: DATA, size_gb: 56, volume_type: SSD}
+            instances:
+              - {role_type: MASTER, public_ip_id: ""}
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "LOOKUP — GET /v1/engine-versions $.contents[0].id (cachestore 호스트; 소스 cache-find-version 스텝). 동적 조회가 202로 라이브 증명됨 — 버전 추측 금지 (지원 엔진: Redis OSS Sentinel 7.2.11, Valkey Sentinel 8.1.4)"}
+        server_type: {type: string, required: true,
+                      note: "LOOKUP — GET /v1/server-types $.contents[0].name (예: redis1v2m4 = redis1/2vCore/4GB; 소스 cache-find-stype 스텝)"}
+    capture: {cluster_id: "$.resource.id"}
+    ready: {field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-dbaas,
+             steps: [cache-create, cache-wait, cache-delete]}
+    notes: "HEAVY 과금. relational 템플릿과 최대 발산: origin_cluster_id/vip_public_ip_id/virtual_ip_address/service_watch_log_collection 없음, init_config는 port/password/sentinel_port만, role_type MASTER, OS+DATA 두 block_storage_group 필수, replica_count 0이 라이브 검증됨 (문서는 Sentinel 토폴로지 replica 1-2를 말하지만 202 관측 — services constraint sentinel-topology와 충돌, R3 확인 과제). capture 변수는 소스 cache_cid → cluster_id 개명. sub-op 면도 발산: archive/audit/log-export/replicas 없음, 대신 PUT /commands(+sync). 알려진 quirk: PUT backup-histories 401 (유효 HMAC, run 27258520218). point-in-time recovery는 별도 클러스터를 만든다 — 복구 테스트는 2번째 클러스터 teardown 필요."
