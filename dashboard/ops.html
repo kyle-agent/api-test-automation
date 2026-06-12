@@ -166,7 +166,11 @@ async function loadLive(idx){
     const ids=[...new Set(keys.map(k=>k.split("/")[1]))];
     const done=new Set(idx.map(s=>String(s.run_id)));
     const liveIds=ids.filter(i=>!done.has(String(i))).slice(-2);
-    if(!liveIds.length){ $("#liveBody").textContent="진행 중인 런 없음"; return; }
+    window.LIVE_RUNS=new Set(liveIds.map(String));
+    if(!liveIds.length){
+      const last=idx&&idx[0];
+      $("#liveBody").textContent="지금 도는 런 없음"+(last?` — 마지막 런 ${last.run_id} ${String(last.finished||"").replace("T"," ").replace("Z","")} 종료`:"");
+      return; }
     let html="";
     for(const rid of liveIds){
       let man={}; try{ man=await jget(`runs/${rid}/run.json`);}catch(e){}
@@ -276,8 +280,11 @@ function statusOf(r,fin){
 function nodeHtml(r,fin){
   const st=statusOf(r,fin);
   const cls={testing:"st-alive",leaked:"st-leak",failed:"st-fail",deleted:"st-done"}[st];
-  const dur=r.end?fmtDur(r.end-r.start):fmtDur(Date.now()-r.start);
-  const lab={testing:"테스트 중 "+dur,leaked:"잔존 "+dur,failed:"정리 실패",
+  // 종료된 런은 시계를 런 종료 시점에 멈춘다 — 30h+로 자라는 표시는 sweep이
+  // 회수한 자원의 '삭제 이벤트 미기록'일 뿐 실제 잔존이 아님
+  const endAt=r.end||(fin?(window.RUN_FINISH[String(SELECTED_RUN)]||Date.now()):Date.now());
+  const dur=fmtDur(Math.max(1000,endAt-r.start));
+  const lab={testing:"테스트 중 "+dur,leaked:"미정리(이벤트) "+dur,failed:"정리 실패",
              deleted:"수명 "+dur}[st];
   return `<span class="t-node ${cls}" title="${r.name} · ${lab}${r.lifecycle?" · "+r.lifecycle:""}">
     <span class="dot"></span><span class="t-kind">${kindLabel(r)}</span>
@@ -308,7 +315,8 @@ function renderTree(res,lcs){
     v=`<div class="verdict ok"><div class="big">✓</div><div><b>RUN 종료 — 깨끗하게 정리됨.</b> 잔존 0 · 정리실패 0 · 정상 삭제 ${cnt.deleted}건</div></div>`;
   }else{
     v=`<div class="verdict warn"><div class="big">${cnt.leaked+cnt.failed}</div>
-       <div><b>RUN 종료 — 잔존 ${cnt.leaked}건${cnt.failed?` · 정리실패 ${cnt.failed}건`:""}.</b> teardown 안 된 자원이 비용·쿼터를 점유 중입니다 (sweep 대상).</div>
+       <div><b>RUN 종료 — 이벤트상 미정리 ${cnt.leaked}건${cnt.failed?` · 정리실패 ${cnt.failed}건`:""}.</b>
+       대부분 tag-scoped sweep이 회수하지만 reconciler 회수분은 삭제 이벤트가 기록되지 않아 여기 남습니다 — 실제 잔존 여부는 콘솔/다음 런 기준.</div>
        <div class="split"><div><div class="n nleak">${cnt.leaked}</div><div class="l">잔존</div></div>
        <div><div class="n nfail">${cnt.failed}</div><div class="l">정리 실패</div></div>
        <div><div class="n ndel">${cnt.deleted}</div><div class="l">정상 삭제</div></div></div></div>`;
@@ -414,6 +422,8 @@ async function renderRes(rerenderOnly){
   }catch(e){ $("#resBody").textContent="자원 이벤트 조회 실패: "+e.message; }
   finally{ RES_BUSY=false; }
 }
+window.RUN_FINISH=window.RUN_FINISH||{};   // rid -> finished ms (index.json)
+window.LIVE_RUNS=window.LIVE_RUNS||new Set(); // rids with events but no summary, recent
 function fillRunSelect(ids,idx){
   // only runs that actually HAVE resource events, newest first, newest default
   const withRes=[...new Set(RES_KEYS.filter(k=>k.includes("/res/")).map(k=>k.split("/")[1]))];
@@ -422,13 +432,17 @@ function fillRunSelect(ids,idx){
   sel.innerHTML=sorted.map(i=>`<option value="${i}">${i}</option>`).join("");
   sel.value=cur&&sorted.includes(cur)?cur:(sorted[0]||"");
   // clickable run pills (최근 8개): ● 진행 중 pulse / 종료 시각 표시
-  const meta={}; (idx||[]).forEach(s=>meta[String(s.run_id)]=s);
+  const meta={}; (idx||[]).forEach(s=>{meta[String(s.run_id)]=s;
+    if(s.finished) window.RUN_FINISH[String(s.run_id)]=Date.parse(s.finished);});
   $("#runPick").innerHTML=sorted.slice(0,8).map(i=>{
-    const m=meta[String(i)]; const live=!window.DONE_RUNS.has(String(i));
+    const m=meta[String(i)];
+    const live=window.LIVE_RUNS.has(String(i));          // 진짜 in-flight만
+    const noSum=!m&&!live;                               // 옛 런: 요약 없음
     const when=m&&m.finished?m.finished.slice(5,16).replace("T"," "):"";
     return `<span class="runpill${sel.value===String(i)?" on":""}${live?" live":""}" data-run="${i}"
-      title="${live?"진행 중":"종료 "+(m&&m.finished||"")}">
-      <span class="rdot"></span><b>${i}</b>${live?'<span class="run" style="font-size:11px">진행 중</span>':`<span class="rwhen">${when}</span>`}</span>`;
+      title="${live?"진행 중":noSum?"요약 없음(과거 런)":"종료 "+(m&&m.finished||"")}">
+      <span class="rdot"></span><b>${i}</b>${live?'<span class="run" style="font-size:11px">진행 중</span>'
+        :noSum?'<span class="rwhen">요약 없음</span>':`<span class="rwhen">${when}</span>`}</span>`;
   }).join("");
   document.querySelectorAll("#runPick .runpill").forEach(pl=>pl.onclick=()=>{
     sel.value=pl.dataset.run;
