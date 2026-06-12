@@ -2,7 +2,7 @@
 {% block title %}Plan — SCP API Regression{% endblock %}
 {% block content %}
 
-<h2>설정 <span class="hint">작고 안정적 — 환경과 스위트 (repo 파일이 source of truth ·
+<h2>환경 &amp; 스위트 <span class="hint">어떤 환경에서 · 어떤 강도(스위트)로 돌릴지 (repo 파일이 source of truth ·
   편집은 검증 통과 시에만 로컬 git 커밋)</span></h2>
 <div class="grid2">
   {% for p in profile_list %}
@@ -56,7 +56,7 @@
   </table>
 </div>
 
-<h2>시나리오 카탈로그 <span class="hint">크고 탐색적 — 이 화면의 주 테이블
+<h2>시나리오 카탈로그 <span class="hint">실행되는 테스트 전체 목록 — 필터·검색으로 탐색
   (비고 클릭 = 전체 보기)</span></h2>
 <div class="fchips" id="scenChips">
   <span class="fchip on" data-f="all"><b>{{ scenario_stats.total }}</b> 전체</span>
@@ -104,14 +104,14 @@
 
 <div class="grid2" style="margin-top:13px">
   <a class="card pad" href="/planning/resources" style="color:inherit">
-    <b>자원 모델 (M5)</b>
-    <div class="small muted" style="margin-top:4px">서비스별 자원 task —
-      전제조건·옵션 입력 / 단독·묶음 합성 →</div>
+    <b>자원 모델 — 시나리오 만들기</b>
+    <div class="small muted" style="margin-top:4px">자원별 전제조건·옵션을 입력하면
+      테스트 시나리오를 자동 합성 (단독/묶음) →</div>
   </a>
   <a class="card pad" href="/planning/dependencies" style="color:inherit">
-    <b>의존 그래프 · VPC 스케줄</b>
-    <div class="small muted" style="margin-top:4px">시나리오 간 선후행 관계
-      시각화 · 할당량 시뮬레이션 →</div>
+    <b>의존 그래프 — 왜 이 순서인가</b>
+    <div class="small muted" style="margin-top:4px">시나리오 간 선후행 관계와
+      VPC 할당량 스케줄 시각화 →</div>
   </a>
 </div>
 
