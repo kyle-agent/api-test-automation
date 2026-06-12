@@ -1,0 +1,29 @@
+# Resource-task model — security/kms (sec-kms group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from security-kms-key
+# (enabled, live-validated) by knowledge/formal/resources/extract.py, curated by hand.
+#
+# The transit-key CRYPTO ops (encrypt/decrypt/rewrap/datakey/hmac/sign/verify/
+# rotate/rotate-info/state) are per-key OPERATIONS, not resources — they live in
+# the hand-written security-kms-transit-crypto lifecycle and are deliberately
+# NOT modeled as nodes (the extractor's ciphertext/signature draft nodes were
+# dropped: no delete, soft-only captures, ephemeral outputs).
+version: 1
+resources:
+  kms-key:
+    code: "sec-kms-key"
+    service: security/kms
+    requires: []
+    create:
+      endpoint: "POST /v1/kms/transit"
+      body: {auto_rotate: "Y", description: "API regression suite",
+             key_type: advanced, name: "regrkms{unique}",
+             purpose: "{opt.purpose}", rotate_cycle: 7, tags: []}
+      options:
+        purpose: {type: enum, values: [rsa-2048, aes-256], required: true,
+                  default: rsa-2048, vary: true,
+                  note: "키 spec. rsa-2048만 라이브 검증(VALIDATED 기본값). 문서상 AES-256/ECDSA/HMAC/ARIA spec도 존재하나 API purpose 코드 매핑은 R3 라이브 검증 과제 — aes-256은 UNPROVEN 추정값. Secrets Manager가 쓰려면 encrypt-capable spec(AES-256/RSA-2048/ARIA)이어야 한다 (services/security__secretsmanager.yaml kms-key-required)"}
+    capture: {key_id: "$.key.id"}
+    delete: {endpoint: "DELETE /v1/kms/transit/{key_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: security-kms-key, steps: [create, delete]}
+    notes: "선행 없음 — bare account에서 생성 가능 (services/security__kms.yaml no-prereq). region 스코프 (타 region 참조 4xx). DELETE는 해지 스케줄(즉시/72h 예약) — capture envelope $.key.id는 doc+라이브 확인. 키 비활성화는 그 키를 쓰는 소비자(Secrets Manager secret)를 즉시 깨뜨림 → teardown은 소비자 먼저 (disabled-key-blocks-consumers). security-kms-transit-crypto / security-secretsmanager-secret(-writes)도 동일 create body로 생성한다."
