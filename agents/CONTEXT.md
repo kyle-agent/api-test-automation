@@ -155,13 +155,44 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   lifecycle) and the CRUD passes are **A∥B split** — the serial VPC-CRUD class
   runs in its own `regression-vpc-crud` job in parallel with the adopt-class job
   (wall-clock = max(A,B); A's 1 shared VPC + B's worst 2 = the validated 3-VPC cap).
-- **What to advance next:** iterate on bodies that 4xx/500 per the fail_new
-  triage doc (harness query-signing first, then bulk bodies), schedule the
-  guarded DBaaS sub-ops into the heavy clusters' live window, and fix the known
-  corrupt `api_bodies.json` entries (iam saml-provider, vpc tgw
-  firewall-connection). Servicewatch auto-created log groups (15) are NOT
-  reaped by the sweep (no owner tag, `/scp/...` names) — needs a reconciler rule
-  or console cleanup. Ledger: `agents/coordination/ledger.json`.
+- **Platform (2026-06-12): the repo is now the SCP API Regression Test
+  Platform** (`docs/PLATFORM-PLAN.md`). **M0–M3 DONE** — `controlplane/`
+  FastAPI+htmx server (Overview→Plan→Run→Report+Knowledge IA): suite × profile
+  dispatch, cron scheduler, live oplog ingest, **M2 command channel**
+  (abort/skip/stop-polling polled by the engine at step boundaries), resource
+  inventory + single delete, run history/snapshot restore/compare, authoring
+  pipeline (validator-gated saves + local git commit), AI seams
+  (`ai_pipelines.py` — triage/spec-impact/drafts/fact-extraction, draft-only).
+  **M4 built, cutover LAST** — `runner/worker.py` + Docker Compose
+  (`PLATFORM_EXECUTOR=actions|worker`), awaiting live/docker verification.
+  Pages now also carries `ops.html` (dependency-ordered live resource view)
+  and `/platform/` (~198-page static export of the platform UI).
+- **M5 resource-task model (2026-06-12): R1·R2 DONE, R3 waves LIVE.**
+  `knowledge/formal/resources/*.yaml` = **127 nodes / 50 files / 48 groups**
+  (codes `<cat>-<group>-<resource>`); `regression/scenarios/composer.py`
+  compiles them to `gen-*`/`bundle-*` lifecycles (engine unmodified). Live
+  proof: `gen-pilot-net-basics` 20/20; wave 1 (runs 27394211896 → 27395331657
+  → 27396649009, rev 4 dispatched): `gen-wave-vslight` 9/9 ×3,
+  `gen-wave-apigw` 20/20 incl. all deletes ×2 → **56 nodes VALIDATED / 71
+  docs**. Product defects found & recorded: 403 "Action definition is not
+  found" (servicewatch log-streams LIST, apigw api-key per-id GET), budget
+  POST 500 ContactAdminForAssistance (known_issues Product Bug), devops 400
+  with unnamed required fields. Composition-blocked classes in node notes
+  (console-only ids → M5 Planning form; cloud-ml chain composed, gated on SCR
+  auth key + heavy). Wave findings: `docs/RESOURCE-MODEL-PLAN.md` §6.
+- **Coverage now:** static ceiling **86.6%** (1,188/1,372,
+  `python -m spec.coverage_gap`); latest published run **C3 44.3%**, reachable
+  ≈86.7%, **fail_new 0 policy holding**, 249 approved waivers. Owner scope:
+  archivestorage permanently excluded; parallel-filestorage reads-only
+  (`owner-exclusion` waivers); per-profile baselines file-suffixed
+  (`core/baselines.py`); multi-tenancy confirmed required.
+- **What to advance next:** continue R3 verification waves over the 71
+  remaining docs nodes (compose → scoped `crud_filter=gen-wave` run → triage →
+  re-compose), promote VALIDATED nodes and progressively replace hand-written
+  lifecycles, then M4 cutover verification. Earlier backlog (query-signing
+  fix, DBaaS sub-op windows, corrupt `api_bodies.json` entries, servicewatch
+  orphan log groups) remains tracked in `docs/COVERAGE-WAVE-PLAN.md` /
+  `agents/coordination/ledger.json`.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.
