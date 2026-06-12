@@ -4,7 +4,7 @@
       "id": "gen-pilot-net-basics",
       "service": "networking/vpc",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py from knowledge/formal/resources (R2 pilot) — regenerated with conflict-retry teardown after the first live run failed at delete-vpc 409 (raced async child deletes)",
+      "_note": "composed canary — re-composed with id-bound GET verifies (wave 2)",
       "steps": [
         {
           "name": "create-vpc",
@@ -105,10 +105,20 @@
           }
         },
         {
-          "name": "verify-subnet",
+          "name": "verify-subnet-read-vips",
           "service": "vpc",
           "method": "GET",
-          "path": "/v1/subnets/{subnet_id}",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "verify-subnet-read-sap-secondary-subnets",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
           "expect_status": [
             200
           ],

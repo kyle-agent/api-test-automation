@@ -5,7 +5,7 @@
       "id": "gen-wave-vslight",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "composed verification wave 1 (R3, rev 3 after run 27395331657 triage) — targets: server-group, volume-transfer",
+      "_note": "composed verification wave 2 — re-composed with the id-bound GET verify additions (gap_getid lever); targets: server-group, volume-transfer",
       "steps": [
         {
           "name": "create-server-group",
@@ -170,7 +170,7 @@
       "id": "gen-wave-apigw",
       "service": "application-service/apigateway",
       "enabled": true,
-      "_note": "composed verification wave 1 (R3, rev 3 after run 27395331657 triage) — targets: apigw-stage, apigw-usage-plan, apigw-api-key, apigw-access-control",
+      "_note": "composed verification wave 2 — re-composed with the id-bound GET verify additions (gap_getid lever); targets: apigw-stage, apigw-usage-plan, apigw-api-key, apigw-access-control",
       "steps": [
         {
           "name": "create-apigw-api",
@@ -302,10 +302,10 @@
           }
         },
         {
-          "name": "verify-apigw-stage",
+          "name": "verify-apigw-stage-read-list",
           "service": "apigateway",
           "method": "GET",
-          "path": "/v1/apis/{api_id}/stages/stg{unique}",
+          "path": "/v1/apis/{api_id}/stages",
           "expect_status": [
             200
           ],
@@ -341,10 +341,10 @@
           }
         },
         {
-          "name": "verify-apigw-access-control",
+          "name": "verify-apigw-access-control-read-list",
           "service": "apigateway",
           "method": "GET",
-          "path": "/v1/apis/{api_id}/access-controls/{access_control_id}",
+          "path": "/v1/apis/{api_id}/access-controls",
           "expect_status": [
             200
           ],
@@ -376,10 +376,10 @@
           }
         },
         {
-          "name": "verify-apigw-usage-plan",
+          "name": "verify-apigw-usage-plan-read-list",
           "service": "apigateway",
           "method": "GET",
-          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}",
+          "path": "/v1/apis/{api_id}/usage-plans",
           "expect_status": [
             200
           ],
@@ -416,6 +416,16 @@
           "expect_status": [
             200,
             403
+          ],
+          "group": "apigw-api-key"
+        },
+        {
+          "name": "verify-apigw-api-key-read-list",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys",
+          "expect_status": [
+            200
           ],
           "group": "apigw-api-key"
         },
@@ -537,7 +547,7 @@
       "id": "gen-wave-dashboard",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "composed verification wave 1 (rev 4) — dashboard capture fixed to flat $.id per DashboardDetailResponseV1Dot1 (run 27396649009 triage)",
+      "_note": "composed verification wave 2 — re-composed with the id-bound GET verify additions (gap_getid lever); targets: dashboard",
       "steps": [
         {
           "name": "create-dashboard",
