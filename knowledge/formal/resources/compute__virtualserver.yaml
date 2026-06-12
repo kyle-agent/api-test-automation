@@ -320,7 +320,9 @@ resources:
     requires: [server-interface, server, port, public-ip]
     create:
       endpoint: "POST /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats"
-      body: {public_ip_id: "{public-ip.publicip_id}"}
+      # 라이브 ValidationError(run 27421363609)가 필드명을 직접 줌: publicip_id
+      # (소스 probe의 public_ip_id는 항상 400이었던 또 하나의 가려진 오류)
+      body: {publicip_id: "{public-ip.publicip_id}"}
     capture: {nat_id: "$.static_nat.id"}
     delete:
       endpoint: "DELETE /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats/{nat_id}"

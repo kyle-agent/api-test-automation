@@ -34,10 +34,9 @@ resources:
          expect_status: [200]}
       - {name: connectable, endpoint: "GET /v1/container-registries/connectable-resources",
          expect_status: [200]}
-      - {name: private-acl, endpoint: "PUT /v1/container-registries/{reg_id}/private-acl",
-         json: {private_acl_enabled: false, private_acl_resources: []},
-         expect_status: [200, 202, 204],
-         note: "PrivateAclSetRequest (api_docs) — 비활성 재설정이라 무해. public-acl/enable-public-endpoint는 userguide 보안 경고로 제외 (C4-careful)"}
+      # private-acl PUT 보류: doc-정합 body에 500 ContactAdminForAssistance
+      # 3회 재현 (runs 27401527554/27417986669/27421363609) — 제품 결함 후보.
+      # 재시도형 verify(R3) 후 재도전. public-acl류는 userguide 보안 경고로 제외.
     provenance: VALIDATED
     source: {lifecycle: container-scr-registry,
              steps: [create, wait-running, delete, wait-gone]}

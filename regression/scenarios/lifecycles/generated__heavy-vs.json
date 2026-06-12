@@ -5,7 +5,7 @@
       "id": "gen-heavy-vs-netops",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
+      "_note": "recomposed after run 27421363609 (publicip_id field, fs delete volume_id query)",
       "steps": [
         {
           "name": "create-keypair",
@@ -362,7 +362,7 @@
           "method": "POST",
           "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats",
           "json": {
-            "public_ip_id": "{publicip_id}"
+            "publicip_id": "{publicip_id}"
           },
           "expect_status": [
             200,

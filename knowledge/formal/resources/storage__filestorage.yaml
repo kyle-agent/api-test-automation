@@ -44,9 +44,10 @@ resources:
          endpoint: "GET /v1/snapshots?volume_id={filestorage-volume.volume_id}",
          expect_status: [200],
          note: "volume_id 쿼리 필수 (docs + bare list 400 Field required, runs 27401527554/27417986669)"}
-    delete: {endpoint: "DELETE /v1/snapshots/{snapshot_id}",
+    delete: {endpoint: "DELETE /v1/snapshots/{snapshot_id}?volume_id={filestorage-volume.volume_id}",
              retry_on_status: [500, 409], retries: 4, retry_interval: 15,
              destructive: true}
+    # delete도 volume_id 쿼리 필수 (docs + run 27421363609 400 Field required)
     provenance: docs
     source: {lifecycle: filestorage-replication-schedule,
              steps: [create-snapshot, delete-snapshot]}

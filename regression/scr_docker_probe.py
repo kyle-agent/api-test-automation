@@ -47,6 +47,19 @@ def main() -> int:
         print(f"{VERDICT} create -> {resp.status} {str(resp.raw_text)[:300]}")
         body = resp.body or {}
         reg_id = str(body.get("id") or body.get("registry_id") or "")
+        borrowed = False
+        if not reg_id and resp.status == 403 and "quota" in str(resp.raw_text):
+            # NON_VISIBILITY max 1 (userguide fact, live-confirmed run
+            # 27421363609): a concurrent scr lifecycle holds the slot —
+            # borrow an existing Running registry instead of creating one.
+            lst = client.request("GET", "/v1/container-registries", service="scr")
+            for it in (lst.body or {}).get("contents", []) or                       (lst.body if isinstance(lst.body, list) else []):
+                if str(it.get("state", "")).lower() == "running":
+                    reg_id = str(it.get("id") or "")
+                    borrowed = True
+                    print(f"{VERDICT} quota hit — borrowing existing registry "
+                          f"{reg_id} ({it.get('name')})")
+                    break
         if not reg_id:
             print(f"{VERDICT} INCONCLUSIVE — no registry id in create response "
                   f"(keys: {list(body) if isinstance(body, dict) else type(body)})")
@@ -94,7 +107,7 @@ def main() -> int:
     except Exception as exc:  # report, never fail CI
         print(f"{VERDICT} ERROR {type(exc).__name__}: {exc}")
     finally:
-        if reg_id:
+        if reg_id and not locals().get("borrowed"):
             for _ in range(24):  # 500-race retry ~6min (VALIDATED quirk)
                 try:
                     r = client.request("DELETE",

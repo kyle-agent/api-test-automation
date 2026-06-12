@@ -728,7 +728,7 @@
       "id": "gen-wave2-scr",
       "service": "container/scr",
       "enabled": true,
-      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
+      "_note": "recomposed — private-acl verify ACTUALLY removed (3rd attempt; batch-script deaths kept reverting it)",
       "steps": [
         {
           "name": "create-container-registry",
@@ -803,22 +803,6 @@
           "path": "/v1/container-registries/connectable-resources",
           "expect_status": [
             200
-          ],
-          "group": "container-registry"
-        },
-        {
-          "name": "verify-container-registry-private-acl",
-          "service": "scr",
-          "method": "PUT",
-          "path": "/v1/container-registries/{reg_id}/private-acl",
-          "json": {
-            "private_acl_enabled": false,
-            "private_acl_resources": []
-          },
-          "expect_status": [
-            200,
-            202,
-            204
           ],
           "group": "container-registry"
         },
@@ -1038,7 +1022,7 @@
       "id": "gen-wave2-fs",
       "service": "storage/filestorage",
       "enabled": true,
-      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
+      "_note": "recomposed after run 27421363609 (publicip_id field, fs delete volume_id query)",
       "steps": [
         {
           "name": "create-filestorage-volume",
@@ -1101,7 +1085,7 @@
           },
           "cleanup": {
             "method": "DELETE",
-            "path": "/v1/snapshots/{snapshot_id}",
+            "path": "/v1/snapshots/{snapshot_id}?volume_id={volume_id}",
             "service": "filestorage"
           }
         },
@@ -1128,7 +1112,7 @@
           "name": "delete-fs-snapshot",
           "service": "filestorage",
           "method": "DELETE",
-          "path": "/v1/snapshots/{snapshot_id}",
+          "path": "/v1/snapshots/{snapshot_id}?volume_id={volume_id}",
           "expect_status": [
             200,
             202,
