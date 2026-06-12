@@ -122,7 +122,10 @@ resources:
     capture: {vol_id: "$.id"}
     ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
             timeout: 300, interval: 15}
-    delete: {endpoint: "DELETE /v1/volumes/{vol_id}", destructive: true}
+    delete: {endpoint: "DELETE /v1/volumes/{vol_id}",
+             retry_on_status: [500, 409], retries: 8, retry_interval: 15,
+             destructive: true}
+    # 자식(snapshot) 삭제 직후 부모 volume 삭제 500 race (run 27401527554)
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-volume-snapshot,
              steps: [create-volume, wait-volume-available, delete-volume]}

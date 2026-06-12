@@ -53,6 +53,7 @@ resources:
          expect_status: [200, 400],
          note: "logs와 동일 — time 포맷 미문서"}
     delete: {endpoint: "DELETE /v1/cloud-functions/{cloud_function_id}",
+             retry_on_status: [500, 409], retries: 6, retry_interval: 20,
              destructive: true}
     provenance: VALIDATED
     source: {lifecycle: compute-scf-cloud-function-cronjob-trigger,
@@ -71,7 +72,11 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/triggers/{trigger_id}",
          expect_status: [200]}
-    delete: {endpoint: "DELETE /v1/triggers/{trigger_id}", destructive: true}
+    delete:
+      endpoint: "DELETE /v1/triggers/{trigger_id}"
+      json: {cloud_function_id: "{scf-function.cloud_function_id}", trigger_type: "cronjob"}
+      destructive: true
+      # 소스 delete-trigger와 동일 body — body 없이는 400 (run 27401527554)
     provenance: VALIDATED
     source: {lifecycle: compute-scf-cloud-function-cronjob-trigger,
              steps: [create-trigger, delete-trigger]}

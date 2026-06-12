@@ -372,7 +372,7 @@
       "id": "gen-wave2-scf",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
+      "_note": "composed wave 2 rev 3 — run 27401527554 triage fixes",
       "steps": [
         {
           "name": "create-scf-function",
@@ -542,6 +542,10 @@
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/triggers/{trigger_id}",
+            "json": {
+              "cloud_function_id": "{cloud_function_id}",
+              "trigger_type": "cronjob"
+            },
             "service": "scf"
           }
         },
@@ -565,7 +569,11 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "json": {
+            "cloud_function_id": "{cloud_function_id}",
+            "trigger_type": "cronjob"
+          }
         },
         {
           "name": "delete-scf-function",
@@ -581,10 +589,11 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            500,
             409
           ],
-          "retries": 40,
-          "retry_interval": 30
+          "retries": 6,
+          "retry_interval": 20
         }
       ]
     },
@@ -592,7 +601,7 @@
       "id": "gen-wave2-volume",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
+      "_note": "composed wave 2 rev 3 — run 27401527554 triage fixes",
       "steps": [
         {
           "name": "create-block-volume",
@@ -707,10 +716,11 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            500,
             409
           ],
-          "retries": 40,
-          "retry_interval": 30
+          "retries": 8,
+          "retry_interval": 15
         }
       ]
     },
@@ -718,7 +728,7 @@
       "id": "gen-wave2-scr",
       "service": "container/scr",
       "enabled": true,
-      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
+      "_note": "composed wave 2 rev 3 — run 27401527554 triage fixes",
       "steps": [
         {
           "name": "create-container-registry",
@@ -1028,7 +1038,7 @@
       "id": "gen-wave2-fs",
       "service": "storage/filestorage",
       "enabled": true,
-      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
+      "_note": "composed wave 2 rev 3 — run 27401527554 triage fixes",
       "steps": [
         {
           "name": "create-filestorage-volume",
@@ -1156,7 +1166,7 @@
     {
       "id": "gen-wave2-cmep",
       "service": "management/cloudmonitoring",
-      "enabled": true,
+      "enabled": false,
       "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
@@ -1239,7 +1249,8 @@
           ],
           "destructive": true
         }
-      ]
+      ],
+      "_disabled_reason": "X-ResourceType: INSTANCE 헤더는 수용됐으나 404 (run 27401527554) — 계정에 모니터링 등록된 VM이 없는 듯. heavy 윈도우(서버 생성)에서 재시도"
     }
   ]
 }
