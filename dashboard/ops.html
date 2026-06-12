@@ -439,9 +439,11 @@ function fillRunSelect(ids,idx){
     const live=window.LIVE_RUNS.has(String(i));          // 진짜 in-flight만
     const noSum=!m&&!live;                               // 옛 런: 요약 없음
     const when=m&&m.finished?m.finished.slice(5,16).replace("T"," "):"";
+    const sha=m&&(m.sha||(m.history&&m.history.sha))||"";
+    const short="…"+String(i).slice(-5);             // run 번호는 뒤 5자리만
     return `<span class="runpill${sel.value===String(i)?" on":""}${live?" live":""}" data-run="${i}"
-      title="${live?"진행 중":noSum?"요약 없음(과거 런)":"종료 "+(m&&m.finished||"")}">
-      <span class="rdot"></span><b>${i}</b>${live?'<span class="run" style="font-size:11px">진행 중</span>'
+      title="run ${i}${sha?" · "+sha:""}${live?" · 진행 중":noSum?" · 요약 없음(과거 런)":" · 종료 "+(m&&m.finished||"")}">
+      <span class="rdot"></span><b>${short}</b>${sha?`<code style="font-size:10px;color:#57606a">${sha}</code>`:""}${live?'<span class="run" style="font-size:11px">진행 중</span>'
         :noSum?'<span class="rwhen">요약 없음</span>':`<span class="rwhen">${when}</span>`}</span>`;
   }).join("");
   document.querySelectorAll("#runPick .runpill").forEach(pl=>pl.onclick=()=>{
