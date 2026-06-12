@@ -1,0 +1,30 @@
+# Resource-task model — management/cloudcontrol (mg-cc group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# cloudcontrol-landing-zone-guarded (enabled but COVERAGE-ONLY, heavy) by
+# extract.py, curated by hand. Control-Tower-equivalent governance service —
+# provenance docs (no api_bodies entry, docs JS-rendered, expected 403 on this
+# shared non-admin account).
+#
+# NOT modeled as nodes: account-factory account (POST /v1/accounts — BILLABLE
+# + IRREVERSIBLE member-account provisioning, deliberately not chained to any
+# delete, no capture), guardrail bindings (enable/disable operations on
+# pre-existing guardrails), baseline assignments (POST/PUT/DELETE on an
+# EXISTING {assignment_id} — operations, no create-from-nothing).
+version: 1
+resources:
+  cloudcontrol-landing-zone:
+    code: "mg-cc-landing-zone"
+    service: management/cloudcontrol
+    heavy: true
+    requires: [iam-identity-center]
+    create:
+      endpoint: "POST /v1/landing-zones"
+      body: {name: "regrlz{unique}",
+             description: "API regression coverage probe — DO NOT promote to a real landing zone",
+             region: "{region}"}
+    capture: {landing_zone_id: "$.landing_zone.id"}
+    delete: {endpoint: "DELETE /v1/landing-zones/{landing_zone_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: cloudcontrol-landing-zone-guarded,
+             steps: [create-landing-zone, delete-landing-zone]}
+    notes: "cross-service 노드 키 cloudcontrol-landing-zone (requires [iam-identity-center] 일치). 실제 선행 체인은 더 길다: Organization + ID Center + Object Storage + Logging&Audit + management-account 권한 (landing-zone-prereq-chain) — org/obs 엣지는 해당 노드 모델이 갖춰지는 대로 보강. 생성은 실 공유 계정/OU 프로비저닝으로 사실상 IRREVERSIBLE (landing-zone-create-irreversible, organization급 waiver class) — 합성 금지, 그래프 문서화 + coverage 전용. home region 고정 (home-region-fixed). body는 BEST-GUESS(실제로는 org/OU + baseline 설정 필요 추정), capture envelope $.landing_zone.id 추정 — 모두 UNPROVEN, 공유 계정에선 403이 정상."
