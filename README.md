@@ -21,7 +21,7 @@ What started as a catalog-driven test suite is now a full platform with
    entrypoints either way.
 3. **Knowledge & model — [`knowledge/formal/`](knowledge/formal/FORMAT.md)**,
    including the **M5 resource-task model**
-   (`knowledge/formal/resources/*.yaml`, 127 nodes) from which
+   (`knowledge/formal/resources/*.yaml`, 128 nodes) from which
    `regression/scenarios/composer.py` *composes* lifecycles — scenarios are
    increasingly generated from the model rather than hand-written.
 
@@ -70,7 +70,7 @@ environments/ environment profiles (stage/prod × region; credential *references
 tests/        thin pytest entrypoints that drive the regression engines
 agents/       the multi-agent system: roster · shared context · harness · per-agent prompts
 knowledge/    SCP domain knowledge (human-readable, AI-maintained) + formal/ (editable YAML)
-              formal/resources/  ← M5 resource-task model (127 nodes; composer input)
+              formal/resources/  ← M5 resource-task model (128 nodes; composer input)
 drafts/       AI/composer outputs awaiting human review (never auto-enabled)
 data/         api_catalog.json · api_bodies.json · api_docs.json · conformance.json
               baselines/known_issues.json · baselines/coverage_waivers.json (per-profile
@@ -200,15 +200,18 @@ opt a run into CRUD; the result + any teardown is posted as a PR comment.
 Hand-written lifecycles are progressively being replaced by **composed** ones:
 `knowledge/formal/resources/*.yaml` defines per-resource tasks (requires graph
 incl. `one_of`/`count`/credential prerequisites, validated body templates,
-options, capture/ready/delete) — **127 nodes** across 12 categories with
+options, capture/ready/delete) — **128 nodes** across 12 categories with
 human-readable codes (`nw-vpc-vpc`, groups in `_groups.yaml`).
 `regression/scenarios/composer.py` compiles a target set into an ordinary
 lifecycle JSON (`gen-<node>` / `bundle-<group>`): dependency closure →
 topological order + capture wiring → verify steps → reverse teardown (with the
 conflict-retry delete semantics of the hand-written lifecycles). The engine is
 unmodified — composed output is just another lifecycle. Live-proven via the
-R3 verification waves (`regression/scenarios/lifecycles/generated__*.json`);
-see `docs/RESOURCE-MODEL-PLAN.md` §6 for wave results.
+R3 verification waves (`regression/scenarios/lifecycles/generated__*.json` —
+~10 composed chains stably green incl. the full apigw bundle); see
+`docs/RESOURCE-MODEL-PLAN.md` §6 for wave results and
+`docs/PRODUCT-FINDINGS.md` for the ledger of product/API findings the waves
+surfaced.
 
 > **Self-trigger for heavy runs:** a committed `.github/heavy.txt` (first
 > non-comment line = a `crud_filter` expression) lets a push drive which heavy
@@ -258,12 +261,15 @@ Everything is published to the **`dashboard-data`** branch each run (enable via
 
 - `index.html` + `history.jsonl` + per-service pages — the results dashboard.
 - `ops.html` — the **live ops view**: reads the persistent oplog bucket
-  directly and renders a dependency-ordered resource tree per run, with run
-  pills, filters and a run-finished verdict (watch a run without GitHub).
+  directly and renders a dependency-ordered resource tree per run (kind map
+  generated from the resource model by `dashboard/gen_dep_map.py`), with
+  in-flight run pills + history-row selection, filters, a run-finished
+  **cleanup-integrity verdict** (testing/leaked/cleanup-failed/deleted),
+  paginated S3 listing and KST timestamps (watch a run without GitHub).
 - `/platform/` — a **static export of the whole platform UI**
   (`python -m controlplane.static_export`): Overview/Plan/Run/Report tabs,
   knowledge and resource-model pages incl. a read-only page per resource node —
-  ~198 pages, every nav/menu clickable; server-only actions show a banner.
+  ~199 pages, every nav/menu clickable; server-only actions show a banner.
 - Per-run **snapshots** (results JSONL + built dashboard + meta) are archived to
   the oplog bucket under `runs/<run_id>/snapshot/` and restorable from the
   control plane's Report screen.
