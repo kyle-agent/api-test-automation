@@ -4,8 +4,8 @@
     {
       "id": "gen-heavy-vs-netops",
       "service": "compute/virtualserver",
-      "enabled": false,
-      "_note": "composed heavy wave — VS 운영 지식 검증: pre-created port attach/detach + static NAT on attached port; closure: keypair, image, server-type, security-group, vpc, subnet, server, port, server-interface, public-ip, server-static-nat",
+      "enabled": true,
+      "_note": "composed heavy wave — VS 운영 지식 검증: pre-created port attach/detach + static NAT on attached port; closure: keypair, image, server-type, security-group, vpc, subnet, server, port, server-interface, public-ip, server-static-nat — ENABLED for the approved heavy window (owner 2026-06-12)",
       "steps": [
         {
           "name": "create-keypair",
@@ -556,8 +556,7 @@
           "retry_interval": 30
         }
       ],
-      "heavy": true,
-      "_disabled_reason": "heavy window 대기 — server 체인(~15-20분+과금) 포함. owner 승인된 heavy run에서 enable하여 검증: port attach/detach + attached port의 static NAT (owner 지식 2026-06-12)"
+      "heavy": true
     }
   ]
 }

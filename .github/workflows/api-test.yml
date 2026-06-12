@@ -179,6 +179,7 @@ jobs:
       req_category: ${{ steps.req.outputs.category }}
       req_service: ${{ steps.req.outputs.service }}
       req_crud_filter: ${{ steps.req.outputs.crud_filter }}
+      req_docker_probe: ${{ steps.req.outputs.docker_probe }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -222,6 +223,7 @@ jobs:
             echo "category=$(get category)"
             echo "service=$(get service)"
             echo "crud_filter=$(get crud_filter)"
+            echo "docker_probe=$(get docker_probe)"
           } >> "$GITHUB_OUTPUT"
           if [ "${{ github.event_name }}" = "push" ] && [ -f "$f" ]; then
             echo "run-request options:"; grep -E '^[a-z_]+=' "$f" || echo "(none — read-only smoke run)"
@@ -492,6 +494,12 @@ jobs:
           if [ "$rc" = "5" ]; then echo "no lifecycles matched this pass's filter — skipping" | tee -a reports/crud.log; rc=0; fi
           exit "$rc"
 
+      - name: SCR docker-auth probe (run-request docker_probe=true)
+        if: ${{ always() && needs.spec.outputs.req_docker_probe == 'true' }}
+        # owner hypothesis 2026-06-12: docker login with the SCP keys. One-shot
+        # experiment, never fails the job — verdict lines SCR-DOCKER-PROBE: in
+        # the log decide whether image/tag surface + cloud-ml unblock.
+        run: python -m regression.scr_docker_probe || true
       - name: Oplog — adopt-class CRUD milestone
         if: ${{ always() }}
         continue-on-error: true
