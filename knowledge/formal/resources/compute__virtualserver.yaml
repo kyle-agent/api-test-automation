@@ -326,9 +326,14 @@ resources:
       # 라이브 ValidationError(run 27421363609)가 필드명을 직접 줌: publicip_id
       # (소스 probe의 public_ip_id는 항상 400이었던 또 하나의 가려진 오류)
       body: {publicip_id: "{public-ip.publicip_id}"}
-    capture: {nat_id: "$.static_nat.id"}
+    # 라이브 응답(run 27444823109)은 FLAT: {id, publicip_id, external/internal_ip
+    # _address, state: CREATING, subnet_id} — $.static_nat.id 추측은 오류였음
+    capture: {nat_id: "$.id"}
     delete:
       endpoint: "DELETE /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats/{nat_id}"
+      retry_on_status: [409, 500]
+      retries: 8
+      retry_interval: 15
       destructive: true
     provenance: docs
     source: {lifecycle: vs-server-action-coverage,

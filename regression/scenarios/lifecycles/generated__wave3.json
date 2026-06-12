@@ -123,7 +123,7 @@
       "id": "gen-wave3-product",
       "service": "platform/product",
       "enabled": true,
-      "_note": "composed wave 3 rev 1 — lookup-task verification (read-only)",
+      "_note": "recomposed after run 27444823109 — live body: items carry category_id/product_id fields, not id",
       "steps": [
         {
           "name": "create-product-category",
@@ -136,7 +136,7 @@
             202
           ],
           "capture": {
-            "category_id": "$.product_categories[0].id"
+            "category_id": "$.product_categories[0].category_id"
           }
         },
         {
@@ -160,7 +160,7 @@
             202
           ],
           "capture": {
-            "product_id": "$.products[0].id"
+            "product_id": "$.products[0].product_id"
           }
         },
         {

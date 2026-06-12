@@ -38,11 +38,16 @@ def main() -> int:
     reg_id = ""
     try:
         # the model's VALIDATED create body (container-registry node)
+        # public registry on purpose (run 27444823109 lesson): a private one
+        # has empty public_domain, and docker login from a GitHub runner needs
+        # the public endpoint. Bonus: public uses the OTHER quota slot
+        # (visibility max 1 + non-visibility max 1), so the scr chain's
+        # private registry no longer contends with the probe.
         resp = client.request("POST", "/v1/container-registries",
                               json={"name": name, "private_acl_enabled": False,
                                     "private_acl_resources": [],
                                     "public_acl_resources": [],
-                                    "public_visible_enabled": False},
+                                    "public_visible_enabled": True},
                               service="scr")
         print(f"{VERDICT} create -> {resp.status} {str(resp.raw_text)[:300]}")
         body = resp.body or {}
@@ -74,7 +79,16 @@ def main() -> int:
                 b = b["registry"]
             state = str(b.get("state") or b.get("status") or "")
             flat = json.dumps(b)
+            # live keys (run 27444823109): public_domain / private_domain are
+            # the docker endpoints — prefer public (reachable from the runner)
+            for k in ("public_domain", "private_domain"):
+                v = b.get(k) if isinstance(b, dict) else None
+                if isinstance(v, str) and "." in v:
+                    endpoint = v
+                    break
             for k, v in (b.items() if isinstance(b, dict) else []):
+                if endpoint:
+                    break
                 if isinstance(v, str) and ("endpoint" in k or "url" in k) \
                         and "." in v:
                     endpoint = v

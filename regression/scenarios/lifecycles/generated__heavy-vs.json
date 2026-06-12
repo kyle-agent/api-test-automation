@@ -5,7 +5,7 @@
       "id": "gen-heavy-vs-netops",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "recomposed after run 27424991237 — live 400 VirtualServer.InvalidVpcPublicIp: VPC needs an Internet Gateway before Internet NAT attach (undocumented prereq -> internet-gateway added to server-static-nat requires)",
+      "_note": "recomposed after run 27444823109 — static-nat response is FLAT (capture $.id; old $.static_nat.id guess wrong); delete retries 409/500 while state=CREATING settles",
       "steps": [
         {
           "name": "create-keypair",
@@ -417,7 +417,7 @@
             202
           ],
           "capture": {
-            "nat_id": "$.static_nat.id"
+            "nat_id": "$.id"
           },
           "cleanup": {
             "method": "DELETE",
@@ -445,7 +445,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 8,
+          "retry_interval": 15
         },
         {
           "name": "delete-public-ip",
