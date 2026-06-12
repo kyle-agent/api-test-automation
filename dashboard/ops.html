@@ -187,7 +187,10 @@ async function loadLive(idx){
     const keys=await xlist("runs/");
     const ids=[...new Set(keys.map(k=>k.split("/")[1]))];
     const done=new Set(idx.map(s=>String(s.run_id)));
-    const liveIds=ids.filter(i=>!done.has(String(i))).slice(-2);
+    // 숫자 id만 진짜 run — 'oplog-test-*' 같은 개발기 테스트 prefix는 요약이
+    // 없어 영원히 '진행 중'으로 보이므로 제외 (owner 발견 2026-06-12)
+    const liveIds=ids.filter(i=>/^[0-9]+$/.test(String(i))&&!done.has(String(i)))
+      .sort((a,b)=>Number(a)-Number(b)).slice(-2);
     window.LIVE_RUNS=new Set(liveIds.map(String));
     if(!liveIds.length){
       const last=idx&&idx[0];
@@ -448,7 +451,8 @@ window.RUN_FINISH=window.RUN_FINISH||{};   // rid -> finished ms (index.json)
 window.LIVE_RUNS=window.LIVE_RUNS||new Set(); // rids with events but no summary, recent
 function fillRunSelect(ids,idx){
   // only runs that actually HAVE resource events, newest first, newest default
-  const withRes=[...new Set(RES_KEYS.filter(k=>k.includes("/res/")).map(k=>k.split("/")[1]))];
+  const withRes=[...new Set(RES_KEYS.filter(k=>k.includes("/res/")).map(k=>k.split("/")[1]))]
+    .filter(i=>/^[0-9]+$/.test(String(i)));
   const sorted=withRes.sort((a,b)=>String(b).localeCompare(String(a),undefined,{numeric:true}));
   const sel=$("#resRun"); const cur=sel.value;
   sel.innerHTML=sorted.map(i=>`<option value="${i}">${i}</option>`).join("");
