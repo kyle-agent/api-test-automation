@@ -12,7 +12,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/product-categories/{category_id}",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # gen-wave3-product 통과 — run 27447899572 (capture + id-bound read 200)
     notes: "조회 전용 lookup task — category 리스트 envelope 라이브 확인(run 27444823109): product_categories[].category_id."
 
   product:
@@ -25,5 +25,5 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/products/{product_id}",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # gen-wave3-product 통과 — run 27447899572 (capture + id-bound read 200)
     notes: "조회 전용 lookup task — envelope UNPROVEN."

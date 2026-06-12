@@ -43,11 +43,15 @@ def main() -> int:
         # the public endpoint. Bonus: public uses the OTHER quota slot
         # (visibility max 1 + non-visibility max 1), so the scr chain's
         # private registry no longer contends with the probe.
+        # run 27447899572: public_visible_enabled alone still yields only a
+        # .private. domain (runner DNS can't resolve it) — the detail body
+        # exposes a separate public_endpoint_enabled flag; send it too.
         resp = client.request("POST", "/v1/container-registries",
                               json={"name": name, "private_acl_enabled": False,
                                     "private_acl_resources": [],
                                     "public_acl_resources": [],
-                                    "public_visible_enabled": True},
+                                    "public_visible_enabled": True,
+                                    "public_endpoint_enabled": True},
                               service="scr")
         print(f"{VERDICT} create -> {resp.status} {str(resp.raw_text)[:300]}")
         body = resp.body or {}
@@ -105,11 +109,18 @@ def main() -> int:
         r = subprocess.run(["docker", "login", host, "-u", ak,
                             "--password-stdin"],
                            input=sk, capture_output=True, text=True, timeout=60)
+        out = (r.stdout + r.stderr).strip()
         print(f"{VERDICT} docker login({host}, user=access-key) rc={r.returncode} "
-              f"{(r.stdout + r.stderr).strip()[:200]}")
+              f"{out[:200]}")
         if r.returncode != 0:
-            print(f"{VERDICT} LOGIN-FAILED — SCP keys are NOT the docker "
-                  f"credential (separate console auth key still required)")
+            if "dial tcp" in out or "lookup" in out or "no such host" in out:
+                # DNS/dial failure — the endpoint is unreachable from the
+                # runner (e.g. .private. domain), NOT a credential rejection
+                print(f"{VERDICT} NETWORK-UNREACHABLE — endpoint not resolvable "
+                      f"from the runner; credential hypothesis still untested")
+            else:
+                print(f"{VERDICT} LOGIN-FAILED — SCP keys are NOT the docker "
+                      f"credential (separate console auth key still required)")
             return 0
         sh("docker", "pull", "hello-world")
         tag = f"{host}/regrprobe/hello:{suffix}"

@@ -305,6 +305,11 @@ resources:
       # port_id(기존)와 subnet_id(신규)를 같이 보내면 'both new and existing
       # networks' — 기존 port attach는 port_id만 보낸다
       body: {port_id: "{port.port_id}"}
+      # attach 시점 409 VirtualServer.CreateInterface.Conflict (run 27447899572,
+      # rev3~5에선 같은 합성으로 통과) — 서버 ready 직후의 일시 충돌 race
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 15
     delete:
       endpoint: "DELETE /v1/servers/{server.server_id}/interfaces/{port.port_id}"
       destructive: true

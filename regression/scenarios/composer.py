@@ -781,6 +781,13 @@ def compose(targets: list, choices: dict | None = None,
             step["json"] = ctx.sub(inst, body)
         if create.get("headers") is not None:
             step["headers"] = ctx.sub(inst, create["headers"])
+        # explicit create retry semantics (e.g. attach-time 409 races where
+        # the prerequisite is ready but the target briefly conflicts) — same
+        # passthrough the delete side already has
+        if create.get("retry_on_status"):
+            step["retry_on_status"] = list(create["retry_on_status"])
+            step["retries"] = int(create.get("retries", 8))
+            step["retry_interval"] = int(create.get("retry_interval", 15))
         step["expect_status"] = [200, 201, 202]
         caps = ctx.capture_vars(inst)
         if caps:

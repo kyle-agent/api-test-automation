@@ -728,7 +728,7 @@
       "id": "gen-wave2-scr",
       "service": "container/scr",
       "enabled": true,
-      "_note": "recomposed after run 27424991237 — repo check-dup 400 ValidationError ['Field required']: registry_id query param required (repo names are registry-scoped)",
+      "_note": "recomposed after run 27447899572 — lifecycle-policy PUT body uses untagged_rule_duration (untagged_rule_count -> 400 Field required)",
       "steps": [
         {
           "name": "create-container-registry",
@@ -974,7 +974,7 @@
               "outdated_rule_duration": 90,
               "outdated_rule_tag_expression": "*",
               "untagged_rule_enabled": false,
-              "untagged_rule_count": 10
+              "untagged_rule_duration": 90
             }
           },
           "expect_status": [

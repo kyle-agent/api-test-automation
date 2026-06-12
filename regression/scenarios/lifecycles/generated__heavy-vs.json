@@ -5,7 +5,7 @@
       "id": "gen-heavy-vs-netops",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "recomposed after run 27444823109 — static-nat response is FLAT (capture $.id; old $.static_nat.id guess wrong); delete retries 409/500 while state=CREATING settles",
+      "_note": "recomposed after run 27447899572 — attach-time 409 CreateInterface.Conflict race -> create retry 409 x8x15s",
       "steps": [
         {
           "name": "create-keypair",
@@ -291,6 +291,11 @@
           "json": {
             "port_id": "{port_id}"
           },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15,
           "expect_status": [
             200,
             201,

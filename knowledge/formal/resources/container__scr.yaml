@@ -99,10 +99,12 @@ resources:
                               language_excepted: false, scan_policy_enabled: false,
                               secret_excepted: false, severity_limit: "High"}},
          expect_status: [200, 202, 204]}
+      # untagged_rule_duration: untagged_rule_count를 보내면 400 ValidationError
+      # ["Field required"] (run 27447899572) — create에서 증명된 블록과 동일하게
       - {name: lifecycle-policy, endpoint: "PUT /v1/repositories/{repo_id}/lifecycle-policy",
          json: {lifecycle_policy: {lifecycle_policy_enabled: false, outdated_rule_enabled: false,
                                    outdated_rule_duration: 90, outdated_rule_tag_expression: "*",
-                                   untagged_rule_enabled: false, untagged_rule_count: 10}},
+                                   untagged_rule_enabled: false, untagged_rule_duration: 90}},
          expect_status: [200, 202, 204],
          note: "repo-레벨 정책/설명 PUT 7종 — body는 image-레벨 probe 검증 형태 + api_docs DTO (repo-레벨 라이브 미증명; userguide '리포지토리 관리하기' 2026-06-12). 이미지/태그-레벨 ops는 docker push(SCR 인증키) 전까지 불가"}
     provenance: VALIDATED
