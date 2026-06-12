@@ -4,7 +4,16 @@
 version: 1
 service: container/scr
 
-constraints: []
+constraints:
+  - id: scr-registry-max-2-per-account
+    rule: "Container Registry는 Account당 최대 2개 — 가시성 유형별 1개씩 (userguide how-to 2026-06-12). regr 생성 시 기존 잔존 레지스트리가 있으면 quota 충돌 가능."
+    provenance: docs
+  - id: scr-registry-create-options
+    rule: "레지스트리 생성 옵션 (userguide): 이름 영문 소문자 시작, 소문자/숫자 3~25자 · 엔드포인트 타입 프라이빗/프라이빗&퍼블릭 · 가시성 Public(anonymous pull)은 생성 시에만 설정 가능 · 프라이빗/퍼블릭 접근 제어는 미사용 시 같은 리전 전체에 노출(가이드 경고)."
+    provenance: docs
+  - id: scr-registry-states
+    rule: "레지스트리 상태: Creating/Running/Editing/Terminating/Error/Unknown (userguide) — 설정 변경 중 Editing 상태에서 후속 쓰기 409 가능."
+    provenance: docs
 
 captures:
   scr-registry: $.id

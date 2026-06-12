@@ -709,7 +709,7 @@
       "id": "gen-wave2-scr",
       "service": "container/scr",
       "enabled": true,
-      "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: scr-repository",
+      "_note": "composed wave — SCR userguide surface: registry check-dup/connectable/private-acl + repository policy PUT 7종 + empty images list (no docker push needed)",
       "steps": [
         {
           "name": "create-container-registry",
@@ -756,6 +756,16 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "verify-container-registry",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/container-registries/{reg_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "container-registry"
         },
         {
           "name": "create-scr-repository",
@@ -815,7 +825,8 @@
           "path": "/v1/repositories/{repo_id}",
           "expect_status": [
             200
-          ]
+          ],
+          "group": "scr-repository"
         },
         {
           "name": "delete-scr-repository",
