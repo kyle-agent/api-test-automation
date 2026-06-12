@@ -1,0 +1,150 @@
+# Resource-task model — management/servicewatch (mg-sw group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# servicewatch-loggroup-logstream (enabled, live-validated) +
+# servicewatch-alert/-dashboard/-event-rule (enabled, guarded — UNPROVEN
+# envelopes) by extract.py, curated by hand.
+#
+# ALL servicewatch deletes are collection DELETEs with an {ids:[...]} body
+# (services/management__servicewatch.yaml bulk-deletes-take-ids-body) —
+# composer delete-body support is an R3 task. The ingest-only POSTs (custom
+# metrics/meta, metric chart image, custom log-stream collect, OTLP log
+# events) create no addressable resource and are not modeled
+# (servicewatch-custom-ingest stays hand-written).
+version: 1
+resources:
+  log-group:
+    code: "mg-sw-log-group"
+    service: management/servicewatch
+    requires: []
+    create:
+      endpoint: "POST /v1/log-groups"
+      body: {name: "regrlg{unique}", retention_period: 365, tags: []}
+    capture: {log_group_id: "$.log_group.id"}
+    delete:
+      endpoint: "DELETE /v1/log-groups"
+      json: {ids: ["{log_group_id}"]}
+      destructive: true
+    provenance: VALIDATED
+    source: {lifecycle: servicewatch-loggroup-logstream, steps: [create-group, delete-group]}
+    notes: "envelope $.log_group.id doc+라이브 확인. 삭제는 path-id 없는 collection DELETE + {ids:[...]} body. SCP가 자동 생성하는 log group들은 회수 불가 (auto-created-scp-loggroups-unreapable) — 이름 충돌 주의."
+
+  log-stream:
+    code: "mg-sw-log-stream"
+    service: management/servicewatch
+    requires: [log-group]
+    create:
+      endpoint: "POST /v1/log-groups/{log-group.log_group_id}/log-streams"
+      body: {name: "regrls{unique}"}
+    capture: {log_stream_id: "$.log_stream.id"}
+    delete:
+      endpoint: "DELETE /v1/log-groups/{log-group.log_group_id}/log-streams"
+      json: {ids: ["{log_stream_id}"]}
+      destructive: true
+    provenance: VALIDATED
+    source: {lifecycle: servicewatch-loggroup-logstream, steps: [create-stream, delete-stream]}
+    notes: "부모 log-group 하위 child 자원 — delete path가 부모 capture를 쓴다 (validator의 dotted-prereq-token-in-delete 허용 케이스). teardown 역순: stream 먼저, group 나중."
+
+  alert:
+    code: "mg-sw-alert"
+    service: management/servicewatch
+    requires: []
+    create:
+      endpoint: "POST /v1/alerts"
+      body:
+        description: "regr alert {unique}"
+        dimension: {key: InstanceId, value: "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"}
+        dimensions: []
+        evaluation_count: 3
+        individual_items:
+          - {key: VolumeID, value: "45fbde15-cdd2-4891-be31-4a9de75fccda"}
+        level: "{opt.level}"
+        lower_bound: 80.0
+        metric_id: "d91097ac-0387-4e69-adb2-7b8d453b8db5"
+        missing_data_option: BREACHING
+        name: "regralert{unique}"
+        namespace_id: "d583a229-9766-4eb8-96c4-ec389902ba3d"
+        operator: RANGE
+        period: 300
+        recipient_ids: []
+        statistic: AVG
+        tags: []
+        threshold: 80.0
+        upper_bound: 90.0
+        violation_count: 2
+      options:
+        level: {type: enum, values: [HIGH, MEDIUM, LOW], required: true,
+                default: HIGH, vary: true,
+                note: "알람 등급 — HIGH만 소스에서 전송(2xx 미확인); MEDIUM/LOW 코드값은 docs 추정 UNPROVEN"}
+    capture: {alert_id: "$.alert.id"}
+    delete:
+      endpoint: "DELETE /v1/alerts"
+      json: {ids: ["{alert_id}"]}
+      destructive: true
+    provenance: docs
+    source: {lifecycle: servicewatch-alert, steps: [create-alert, delete-alert]}
+    notes: "body는 api_bodies createalert 기반이지만 metric_id/namespace_id/dimension 값들이 doc 샘플 id — 실 namespace/metric id 없이는 4xx 예상 (alert-eventrule-need-real-ids). envelope $.alert.id 추정 UNPROVEN. 실 id 조회(GET namespaces/metrics) 배선은 R3 과제."
+
+  dashboard:
+    code: "mg-sw-dashboard"
+    service: management/servicewatch
+    requires: []
+    create:
+      endpoint: "POST /v1/dashboards"
+      body:
+        name: "regrdash{unique}"
+        widgets:
+          - height: 1
+            order: 1
+            properties:
+              metrics:
+                - color: "#ff7f0e"
+                  dimensions:
+                    - {key: InstanceId, value: "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"}
+                  display_name: "EC2-Prod-CPU"
+                  individual_items:
+                    - {key: BucketId, value: "b-1234567890abcdef0"}
+                  name: CPUUtilization
+                  namespace_name: "Virtual Server"
+                  period: 300
+                  statistic_type: AVG
+              period: 300
+              stacked: false
+              statistic_type: AVG
+              title: "Virtual Server | CPU Utilization"
+              view: line
+            type: metric
+            width: 1
+    capture: {dashboard_id: "$.dashboard.id"}
+    delete:
+      endpoint: "DELETE /v1/dashboards"
+      json: {ids: ["{dashboard_id}"]}
+      destructive: true
+    provenance: docs
+    source: {lifecycle: servicewatch-dashboard, steps: [create-dashboard, delete-dashboard]}
+    notes: "body는 api_bodies createdashboard 기반 (위젯 metric은 실 플랫폼 namespace 'Virtual Server' 참조 — 빈 매칭이어도 생성은 될 가능성). envelope $.dashboard.id 추정 UNPROVEN — 라이브 2xx 후 승격."
+
+  event-rule:
+    code: "mg-sw-event-rule"
+    service: management/servicewatch
+    requires: []
+    create:
+      endpoint: "POST /v1/event-rules"
+      body:
+        description: "regr event rule {unique}"
+        event_ids:
+          - "014cb88ca2a9420e840d5c9ac16cac89"
+          - "28520cbbc8c54a3f86f513a9695e6481"
+        name: "regrevtrule{unique}"
+        recipient_ids: []
+        resource_type_id: "596bf16709e84e27b7df397bf59b877c"
+        service_id: "2778de83d7e247609445bbd570a4eba9"
+        srn_list: []
+        tags: []
+    capture: {event_rule_id: "$.event_rule.id"}
+    delete:
+      endpoint: "DELETE /v1/event-rules"
+      json: {ids: ["{event_rule_id}"]}
+      destructive: true
+    provenance: docs
+    source: {lifecycle: servicewatch-event-rule, steps: [create-event-rule, delete-event-rule]}
+    notes: "event_ids/resource_type_id/service_id가 doc 샘플 id — 이 계정에선 4xx 예상 (alert-eventrule-need-real-ids). envelope $.event_rule.id 추정 UNPROVEN. 실 event/service id 조회 배선은 R3 과제."
