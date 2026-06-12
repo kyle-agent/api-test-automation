@@ -423,11 +423,27 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       2건 발견·기록(403 'Action definition is not found', budget POST 500 →
       known_issues Product Bug 등재), composition-blocked 클래스는 노드
       notes에 문서화(콘솔-전용 id → M5 Planning 폼 입력 경로)
+- [x] **R3 검증 웨이브 2 + heavy 윈도우** (2026-06-12) — vpc-free 체인
+      9종으로 id-bound GET verify 레버 실행(gap_getid 151→130,
+      `docs/COVERAGE-GETID-PLAN.md`): 웨이브 2 3회전(27399448835 →
+      27401527554 → 27417986669) + heavy 2회전(+rev 3 디스패치,
+      27421363609). 합성 roster **안정 green ~10개**(pilot/vslight/apigw/
+      dashboard/queue/sec/rg/iam/scf/volume), heavy VS 체인은 서버 폐포 +
+      port attach/detach까지 증명, static NAT 필드 1개(`publicip_id`) 반영.
+      합성기/엔진 능력 추가: step `headers`, delete retry/json passthrough,
+      lookup 노드 ~7종, lifecycle `credentials` 표면화. 제품 발견은
+      **`docs/PRODUCT-FINDINGS.md` 통합 원장(12건)**으로 이관 — 미문서 필수
+      헤더(X-ResourceType)라는 신규 결함 클래스와 masked-defect 교훈 포함.
+      SCR docker-auth 1-step 실험(`regression/scr_docker_probe.py`,
+      run-request `docker_probe=true`)은 quota 403으로 INCONCLUSIVE →
+      registry-borrow fallback 추가 후 재시도 중
 - [x] 폼 기반 자원 모델 UI(§3 흐름) — `/planning/resources` 목록 + 노드 폼 +
       합성 미리보기/draft 저장 (`controlplane/resource_routes.py`), Pages
       정적 export에 read-only로 포함
-- [ ] **R3 계속** — 다음 웨이브 fan-out(잔여 docs 노드 71), 노드별 VALIDATED
-      승격 → 수작업 lifecycle 점진 교체, 전체 회귀 plan 계산
+- [ ] **R3 계속** — heavy rev 3 결과 확인(static NAT·scr/fs 재합성) →
+      다음 웨이브 fan-out(잔여 docs 노드 72; 모델은 lookup 노드 추가로
+      127→**128**), 노드별 VALIDATED 승격(현재 56) → 수작업 lifecycle 점진
+      교체, 전체 회귀 plan 계산
 - [ ] **R4 C4 변형** — `vary:` 옵션 조합 변형 suite
 
 ### 마일스톤별 가치
@@ -444,9 +460,15 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 controlplane UI는 owner 목업에 따라 **Overview → Plan → Run → Report
 (+ Knowledge)** IA로 재설계됐고(설계 시스템·ctxbar·report 탭), 같은 화면들이
 `controlplane/static_export.py`로 Pages `/platform/`에 정적 export된다
-(노드별 read-only 폼 포함 ~198페이지, 모든 메뉴 클릭 가능 — 액션 버튼은
-"서버 전용" 배너). 라이브 관제는 `dashboard/ops.html`이 의존순서 자원
-트리·run 필터·종료 verdict까지 제공한다 (`docs/OPS-DASHBOARD.md`).
+(노드별 read-only 폼 포함 **~199페이지**, 모든 메뉴 클릭 가능 — 액션 버튼은
+"서버 전용" 배너). Plan 화면은 **모델→시나리오→스위트 흐름 스트립** +
+시나리오 카탈로그의 합성(gen) 필터 칩으로 재구성됐다. 라이브 관제는
+`dashboard/ops.html`이 제공: 모델에서 파생한 의존순서 자원 트리
+(`dashboard/gen_dep_map.py`), run 종료 시 **정리 무결성 verdict**
+(테스트중/잔존/정리실패/삭제), in-flight 전용 run pill + 히스토리 행 선택,
+S3 listing pagination(1000-key 캡 해소), `oplog-test-*` 개발 prefix 필터,
+전 시각 KST 표기(대시보드 헤더 `dashboard/build.py` 포함) —
+`docs/OPS-DASHBOARD.md`.
 
 ---
 
