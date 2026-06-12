@@ -1,8 +1,6 @@
-# request: OVERNIGHT — networking-dns-hosted-zone-private (slow provisioner)
-# private-dns create can take HOURS (VALIDATED); cheap resources, long wall
-# clock. Full chain: private-dns -> connect shared VPC -> hosted zone ->
-# A record -> reverse teardown. Nothing else rides this run on purpose.
+# request: M5 R2 LIVE VERIFICATION — first composed lifecycle
+# gen-pilot-net-basics: composed from the resource model (5 VALIDATED nodes).
+# Pass = the model->composer->engine path is proven live.
 suite=full
-heavy=true
 service=networking
-crud_filter=networking-dns-hosted-zone-private
+crud_filter=gen-pilot-net-basics
