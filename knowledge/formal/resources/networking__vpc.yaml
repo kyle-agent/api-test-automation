@@ -1,0 +1,198 @@
+# Resource-task model — networking/vpc (001-001 family).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validated by knowledge/formal/validate.py
+# · consumed by regression/scenarios/composer.py (R2a).
+#
+# Back-extracted from live lifecycles by knowledge/formal/resources/extract.py
+# and curated by hand: literal cidrs became {opt.cidr} pick schemes, captured-var
+# wiring became {<node>.<cap>} tokens, provenance follows C5 (VALIDATED only when
+# the source body/capture is runtime-proven; UNPROVEN bodies stay docs).
+version: 1
+resources:
+  vpc:
+    code: "001-001-a"
+    service: networking/vpc
+    adopt: vpc
+    requires: []
+    create:
+      endpoint: "POST /v1/vpcs"
+      body: {name: "regrvpc{unique}", description: "API regression suite",
+             cidr: "{opt.cidr}", tags: []}
+      options:
+        cidr: {type: cidr, required: true, pick: unique-block,
+               note: "live VPC들과 비겹침 (docs/domain-constraints 블록 할당; composer가 10.<160+k>.0.0/20을 할당)"}
+    capture: {vpc_id: "$.vpc.id"}
+    ready: {field: "$.vpc.state", until: ACTIVE, timeout: 180, interval: 10}
+    delete: {endpoint: "DELETE /v1/vpcs/{vpc_id}", destructive: true}
+    quota: vpc
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-subnet, steps: [create-vpc, get-vpc-active, delete-vpc]}
+
+  subnet:
+    code: "001-001-b"
+    service: networking/vpc
+    adopt: subnet
+    requires: [vpc]
+    create:
+      endpoint: "POST /v1/subnets"
+      body: {name: "regrsub{unique}", description: "API regression suite",
+             cidr: "{opt.cidr}", type: GENERAL, vpc_id: "{vpc.vpc_id}", tags: []}
+      options:
+        cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr,
+               note: "VPC cidr의 하위 /24 (composer가 부모 블록에서 8+j번째 /24를 절단)"}
+    capture: {subnet_id: "$.subnet.id"}
+    ready: {field: "$.subnet.state", until: ACTIVE, timeout: 180, interval: 10}
+    delete: {endpoint: "DELETE /v1/subnets/{subnet_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-subnet, steps: [create-subnet, get-subnet-active, delete-subnet]}
+
+  port:
+    code: "001-001-c"
+    service: networking/vpc
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/ports"
+      body: {name: "regrport{unique}", description: "API regression suite",
+             security_groups: ["{opt.security_group}"],
+             subnet_id: "{subnet.subnet_id}", tags: []}
+      options:
+        security_group: {type: ref, target: security-group, required: false,
+                         note: "선택 시 composer가 security-group 노드를 선행 생성해 id를 주입; 미선택 시 security_groups: [] (validated 형태)"}
+    capture: {port_id: "$.port.id"}
+    ready: {field: "$.port.state", until: [ACTIVE, CREATED, RUNNING, DOWN],
+            timeout: 180, interval: 10}
+    delete: {endpoint: "DELETE /v1/ports/{port_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-subnet, steps: [create-port, delete-port]}
+    notes: "ready until 목록은 heavy-shared-networking port-wait의 validated 관측값"
+
+  internet-gateway:
+    code: "001-001-d"
+    service: networking/vpc
+    requires: [vpc]
+    create:
+      endpoint: "POST /v1/internet-gateways"
+      body: {description: "API regression suite", firewall_enabled: false,
+             firewall_loggable: false, type: IGW, vpc_id: "{vpc.vpc_id}", tags: []}
+    capture: {internet_gateway_id: "$.internet_gateway.id"}
+    ready: {field: "$.internet_gateway.state",
+            until: [ACTIVE, ATTACHED, CREATED, RUNNING], timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/internet-gateways/{internet_gateway_id}",
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-internet-gateway,
+             steps: [create-igw, wait-igw-active, delete-igw]}
+    notes: "firewall_enabled: true로 만들면 firewall이 암묵 생성된다 (firewall 노드 참조)"
+
+  nat-gateway:
+    code: "001-001-e"
+    service: networking/vpc
+    requires: [subnet, public-ip]
+    create:
+      endpoint: "POST /v1/nat-gateways"
+      body: {description: "API regression suite",
+             publicip_id: "{public-ip.publicip_id}",
+             subnet_id: "{subnet.subnet_id}", tags: []}
+    capture: {nat_gateway_id: "$.nat_gateway.id"}
+    ready: {field: "$.nat_gateway.state",
+            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/nat-gateways/{nat_gateway_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking,
+             steps: [natgw-create, natgw-wait, natgw-delete]}
+
+  public-ip:
+    code: "001-001-f"
+    service: networking/vpc
+    requires: []
+    create:
+      endpoint: "POST /v1/publicips"
+      body: {description: "API regression suite", type: IGW, tags: []}
+    capture: {publicip_id: "$.publicip.id"}
+    ready: {field: "$.publicip.state",
+            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/publicips/{publicip_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-publicip, steps: [create, delete]}
+    notes: "경로는 /v1/publicips (붙여쓰기) — 모델 노드 id는 cross-service의 public-ip 표기를 따른다"
+
+  private-nat:
+    code: "001-001-g"
+    service: networking/vpc
+    requires:
+      - one_of: [direct-connect, transit-gateway]
+        bind: uplink
+    create:
+      endpoint: "POST /v1/private-nats"
+      body: {name: "regrpnat{unique}", description: "API regression private-nat",
+             cidr: "192.167.0.0/24", service_resource_id: "{dep.uplink}",
+             service_type: "{opt.service_type}", tags: []}
+      options:
+        service_type: {type: enum, values: [TRANSIT_GATEWAY, DIRECT_CONNECT],
+                       required: true,
+                       note: "one_of 분기와 일치해야 한다 (기본 분기 = transit-gateway = 첫 enum 값; direct-connect 분기 선택 시 DIRECT_CONNECT로 지정)"}
+    capture: {private_nat_id: "$.private_nat.id"}
+    delete: {endpoint: "DELETE /v1/private-nats/{private_nat_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: vpc-private-nat, steps: [create-private-nat, delete-private-nat]}
+    notes: "§1의 OR-의존 사례 (direct connect OR transit gateway). 소스 lifecycle은 service_resource_id에 {unique} placeholder를 보내 4xx — 실소유 uplink 자원 주입은 이 모델이 처음 제공하므로 body는 UNPROVEN(docs). capture envelope $.private_nat.id UNPROVEN."
+
+  vpc-endpoint:
+    code: "001-001-h"
+    service: networking/vpc
+    requires: [vpc, subnet]
+    create:
+      endpoint: "POST /v1/vpc-endpoints"
+      body: {name: "regrvpce{unique}", description: "API regression vpc endpoint",
+             endpoint_ip_address: "{opt.endpoint_ip_address}",
+             resource_info: "x.samsungsdscloud.com(Registry)",
+             resource_key: "{unique}", resource_type: "{opt.target}",
+             subnet_id: "{subnet.subnet_id}", vpc_id: "{vpc.vpc_id}", tags: []}
+      options:
+        target: {type: enum, values: [FS, dns, objectstorage, filestorage, scr],
+                 required: true, vary: true,
+                 note: "C4 변형 대상 (§1 예시의 대상 등록 enum). 소스 lifecycle은 FS를 보냈고(2xx 미확인), 문서 대상군 dns/objectstorage/filestorage/scr과의 API 코드 매핑은 R3 라이브 검증 과제"}
+        endpoint_ip_address: {type: string, required: true, default: "10.124.0.20",
+                              note: "선택한 subnet cidr 내부의 빈 IP여야 한다 — 기본값은 소스 lifecycle의 공유 subnet에 묶인 값"}
+    capture: {vpc_endpoint_id: "$.vpc_endpoint.id"}
+    delete: {endpoint: "DELETE /v1/vpc-endpoints/{vpc_endpoint_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: vpc-endpoint, steps: [create-vpc-endpoint, delete-vpc-endpoint]}
+    notes: "resource_key는 실재 대상 서비스 키가 필요해 소스 lifecycle도 {unique}로 4xx — body/capture UNPROVEN(docs)"
+
+  vpc-peering:
+    code: "001-001-i"
+    service: networking/vpc
+    requires:
+      - {ref: vpc, count: 2}
+    create:
+      endpoint: "POST /v1/vpc-peerings"
+      body: {name: "regrpeer{unique}", description: "API regression vpc peering",
+             requester_vpc_id: "{vpc.vpc_id}", approver_vpc_id: "{vpc.2.vpc_id}",
+             tags: []}
+    capture: {vpc_peering_id: "$.vpc_peering.id"}
+    verify:
+      - {name: approve,
+         endpoint: "PUT /v1/vpc-peerings/{vpc_peering_id}/approval",
+         json: {type: CREATE_APPROVE},
+         expect_status: [200, 201, 202, 400]}
+    delete: {endpoint: "DELETE /v1/vpc-peerings/{vpc_peering_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: vpc-peering,
+             steps: [create-vpc-peering, approve-vpc-peering, delete-vpc-peering]}
+    notes: "§1의 다중성 사례 (VPC 2개; composer가 vpc#2 인스턴스 + {vpc_id_2}를 배선). create 202 라이브 관측. 승인 body는 {type: CREATE_APPROVE}로 VALIDATED (구 {action: APPROVE}는 ValidationError로 CREATING 고착 → cap-poisoning 근원). 상태기계: 생성 직후 CREATING에서는 승인/수정/삭제가 400 — 소스 lifecycle은 승인 400 재시도 8회로 통과하므로 verify의 expect_status에 400 허용, 합성본에 재시도 정책을 옮기는 것은 R3 과제. approver_vpc_account_id는 소스에서 capture_soft($.vpc.account_id, envelope UNPROVEN)였고 동일 계정 페어링이라 생략 — 미검증 capture를 vpc 노드에 보태지 않기 위함."
+
+  transit-gateway:
+    code: "001-001-j"
+    service: networking/vpc
+    requires: []
+    create:
+      endpoint: "POST /v1/transit-gateways"
+      body: {name: "regrtgw{ualpha}", description: "API regression transit gateway",
+             tags: []}
+    capture: {transit_gateway_id: "$.transit_gateway.id"}
+    ready: {field: "$.transit_gateway.state",
+            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/transit-gateways/{transit_gateway_id}",
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking, steps: [tgw-create, tgw-wait, tgw-delete]}

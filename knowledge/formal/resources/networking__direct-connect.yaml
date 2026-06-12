@@ -1,0 +1,21 @@
+# Resource-task model — networking/direct-connect (001-005).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# networking-direct-connect-routing by knowledge/formal/resources/extract.py.
+version: 1
+resources:
+  direct-connect:
+    code: "001-005-a"
+    service: networking/direct-connect
+    requires: [vpc]
+    create:
+      endpoint: "POST /v1/direct-connects"
+      body: {name: "regrdc{ualpha}", description: "API regression suite",
+             bandwidth: 1, firewall_enabled: false, firewall_loggable: false,
+             tags: [], vpc_id: "{vpc.vpc_id}"}
+    capture: {direct_connect_id: "$.direct_connect.id"}
+    delete: {endpoint: "DELETE /v1/direct-connects/{direct_connect_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-direct-connect-routing,
+             steps: [create-direct-connect, delete-direct-connect]}
+    notes: "서비스존당 VPC와 1:1 (공유 VPC 위 중복 생성은 4xx — cross-service dc-prereq 참조); 이름은 3-20 영숫자만. capture는 소스에서 capture_soft($.direct_connect.id) — envelope UNPROVEN이라 docs. firewall_enabled: true는 firewall을 암묵 생성한다 (firewall 노드 참조; 소스는 true로 보냈으나 표준 생성형은 false 유지)."

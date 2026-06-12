@@ -1,0 +1,33 @@
+# Resource-task model — networking/security-group (001-002).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from networking-security-group
+# (enabled, live-validated) by knowledge/formal/resources/extract.py, curated by hand.
+version: 1
+resources:
+  security-group:
+    code: "001-002-a"
+    service: networking/security-group
+    requires: []
+    create:
+      endpoint: "POST /v1/security-groups"
+      body: {name: "regrsg{unique}", description: "API regression suite",
+             loggable: false, tags: []}
+    capture: {sg_id: "$.security_group.id"}
+    delete: {endpoint: "DELETE /v1/security-groups/{sg_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-security-group, steps: [create-sg, delete-sg]}
+    notes: "account/region 스코프 — VPC 불필요 (cross-service와 일치)"
+
+  security-group-rule:
+    code: "001-002-b"
+    service: networking/security-group
+    requires: [security-group]
+    create:
+      endpoint: "POST /v1/security-group-rules"
+      body: {security_group_id: "{security-group.sg_id}", direction: ingress,
+             ethertype: IPv4, protocol: tcp, port_range_min: "22",
+             port_range_max: "22", remote_ip_prefix: "0.0.0.0/0",
+             description: "API regression suite"}
+    capture: {rule_id: "$.security_group_rule.id"}
+    delete: {endpoint: "DELETE /v1/security-group-rules/{rule_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-security-group, steps: [create-rule, delete-rule]}

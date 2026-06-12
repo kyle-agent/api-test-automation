@@ -1,0 +1,10 @@
+# Resource-task model groups (contract C1, docs/RESOURCE-MODEL-PLAN.md §2.5/§3)
+# — service bundles for the Planning UI and bundle composition. A node belongs
+# to the group named by its `group:` field or its code prefix (001-001-a -> 001-001).
+version: 1
+groups:
+  "001-001": {label: "네트워크 — VPC 묶음 (vpc/subnet/gateway/endpoint/peering)", category: networking}
+  "001-002": {label: "네트워크 — Security Group", category: networking}
+  "001-003": {label: "네트워크 — Load Balancer 체인", category: networking}
+  "001-004": {label: "네트워크 — Private DNS", category: networking}
+  "001-005": {label: "네트워크 — Direct Connect", category: networking}
