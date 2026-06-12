@@ -315,9 +315,9 @@ OPTION_KEYS = {"type", "required", "vary", "default", "pick", "of", "target",
 CIDR_PICKS = {"unique-block", "sub-block-of"}
 REQUIRES_MODES = {"existing_or_create"}
 TASK_KEYS = {"code", "service", "group", "requires", "create", "capture",
-             "ready", "verify", "delete", "quota", "provenance", "adopt",
-             "heavy", "no_api", "needs_cert_material", "notes", "note",
-             "source", "_note"}
+             "capture_soft", "ready", "verify", "delete", "quota",
+             "provenance", "adopt", "heavy", "no_api", "needs_cert_material",
+             "notes", "note", "source", "_note"}
 _TOKEN_RE_SRC = r"\{([A-Za-z0-9_][A-Za-z0-9_.\-]*)\}"
 
 

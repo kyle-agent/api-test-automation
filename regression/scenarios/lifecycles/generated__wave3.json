@@ -5,7 +5,7 @@
       "id": "gen-wave3-quota",
       "service": "management/quota",
       "enabled": true,
-      "_note": "composed wave 3 rev 1 — lookup-task verification (read-only)",
+      "_note": "recomposed after run 27428457582 — account-quota PROVEN (capture+read 200); quota-requests list empty in env -> capture_soft + optional verify",
       "steps": [
         {
           "name": "create-account-quota",
@@ -41,7 +41,7 @@
             201,
             202
           ],
-          "capture": {
+          "capture_soft": {
             "request_id": "$.quota_requests[0].id"
           }
         },
@@ -54,7 +54,8 @@
             200,
             404
           ],
-          "group": "quota-request"
+          "group": "quota-request",
+          "optional": true
         }
       ]
     },
@@ -62,7 +63,7 @@
       "id": "gen-wave3-support",
       "service": "management/support",
       "enabled": true,
-      "_note": "composed wave 3 rev 1 — lookup-task verification (read-only)",
+      "_note": "recomposed after run 27428457582 — inquiries/service-requests lists empty in env -> capture_soft + optional verify",
       "steps": [
         {
           "name": "create-support-inquiry",
@@ -74,7 +75,7 @@
             201,
             202
           ],
-          "capture": {
+          "capture_soft": {
             "inquiry_id": "$.inquiries[0].id"
           }
         },
@@ -87,7 +88,8 @@
             200,
             404
           ],
-          "group": "support-inquiry"
+          "group": "support-inquiry",
+          "optional": true
         },
         {
           "name": "create-support-service-request",
@@ -99,7 +101,7 @@
             201,
             202
           ],
-          "capture": {
+          "capture_soft": {
             "service_request_id": "$.service_requests[0].id"
           }
         },
@@ -112,7 +114,8 @@
             200,
             404
           ],
-          "group": "support-service-request"
+          "group": "support-service-request",
+          "optional": true
         }
       ]
     },

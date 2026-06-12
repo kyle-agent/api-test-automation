@@ -724,6 +724,25 @@ def compose(targets: list, choices: dict | None = None,
     planned = plan(targets, choices=choices, options=options, model=model)
     ctx = _Ctx(model, planned, options)
 
+    # capture_soft nodes may end up with unfilled capture vars — they cannot
+    # be prerequisites of other planned nodes (those would inherit a literal
+    # "{var}" in their bodies/paths).
+    for inst in planned["order"]:
+        node = inst.partition("#")[0]
+        if not (model[node] or {}).get("capture_soft"):
+            continue
+        for other_inst in planned["order"]:
+            other = other_inst.partition("#")[0]
+            if other == node:
+                continue
+            and_deps, one_ofs, _ = _norm_requires(model[other] or {})
+            dep_nodes = [d["ref"] for d in and_deps] + \
+                [b["ref"] for grp in one_ofs for b in grp["branches"]]
+            if node in dep_nodes:
+                raise ComposeError(
+                    f"node '{other}' requires capture_soft node '{node}' — "
+                    f"soft lookups cannot feed other nodes")
+
     target_set = set(targets)
     if lifecycle_id is None:
         lifecycle_id = (f"gen-{targets[0]}" if len(targets) == 1
@@ -766,7 +785,13 @@ def compose(targets: list, choices: dict | None = None,
         caps = ctx.capture_vars(inst)
         if caps:
             model_caps = task.get("capture") or {}
-            step["capture"] = {caps[k]: model_caps[k] for k in model_caps}
+            # capture_soft: true (lookup nodes whose source list can be
+            # legitimately empty — e.g. quota-requests/inquiries): the engine
+            # fills the var only when present, and the node's verify steps are
+            # emitted optional so an unfilled {var} skips the group instead of
+            # failing the lifecycle. Such a node must not feed other nodes.
+            ck = "capture_soft" if task.get("capture_soft") else "capture"
+            step[ck] = {caps[k]: model_caps[k] for k in model_caps}
         delete = task.get("delete") or {}
         if delete.get("endpoint"):
             dmethod, dpath = _split_endpoint(delete["endpoint"])
@@ -818,6 +843,9 @@ def compose(targets: list, choices: dict | None = None,
                     vstep["expect_status"] = v.get("expect_status") or [200]
                     if len(target_set) > 1:
                         vstep["group"] = node
+                    if task.get("capture_soft"):
+                        vstep["optional"] = True
+                        vstep.setdefault("group", node)
                     steps.append(vstep)
             else:
                 rmethod, rpath = _read_endpoint(task)
@@ -829,6 +857,9 @@ def compose(targets: list, choices: dict | None = None,
                               "expect_status": [200]})
                 if len(target_set) > 1:
                     vstep["group"] = node
+                if task.get("capture_soft"):
+                    vstep["optional"] = True
+                    vstep.setdefault("group", node)
                 steps.append(vstep)
 
     # ---- teardown: one reverse pass in interval-scheduled order ------------

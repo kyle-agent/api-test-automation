@@ -24,9 +24,10 @@ resources:
     create:
       endpoint: "GET /v1/quota-requests"
     capture: {request_id: "$.quota_requests[0].id"}
+    capture_soft: true  # 빈 리스트 정상 (run 27428457582에서 capture 실패) — verify는 optional로 스킵
     verify:
       - {name: read, endpoint: "GET /v1/quota-requests/{request_id}",
          expect_status: [200, 404]}
-    provenance: VALIDATED
+    provenance: docs  # 소스 quota/support-reads는 capture_soft였고 리스트가 비어 있어 envelope 미증명 (run 27428457582)
     source: {lifecycle: quota-reads, steps: [list-quota-requests]}
     notes: "조회 전용 lookup task — 요청 이력이 없는 계정이면 capture 실패 가능 (env 의존)."

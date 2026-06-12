@@ -807,7 +807,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             for var, expr in step.get("capture", {}).items():
                 val = _capture(resp.body, expr)
                 assert val is not None, (
-                    f"could not capture '{var}' via {expr!r} from {step['name']} response")
+                    f"could not capture '{var}' via {expr!r} from {step['name']} "
+                    f"response\n{resp.raw_text[:500]}")
                 ctx[var] = str(val)
 
             for var, expr in step.get("capture_soft", {}).items():

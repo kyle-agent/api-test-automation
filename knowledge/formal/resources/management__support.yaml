@@ -9,10 +9,11 @@ resources:
     create:
       endpoint: "GET /v1/inquiries"
     capture: {inquiry_id: "$.inquiries[0].id"}
+    capture_soft: true  # 문의 이력 없으면 빈 리스트 (run 27428457582) — verify는 optional로 스킵
     verify:
       - {name: read, endpoint: "GET /v1/inquiries/{inquiry_id}",
          expect_status: [200, 404]}
-    provenance: VALIDATED
+    provenance: docs  # 소스 quota/support-reads는 capture_soft였고 리스트가 비어 있어 envelope 미증명 (run 27428457582)
     source: {lifecycle: support-reads, steps: [list-inquiries]}
     notes: "조회 전용 lookup task — 문의 이력 없으면 capture 실패(env 의존, 소스도 SOFT 처리)."
 
@@ -23,9 +24,10 @@ resources:
     create:
       endpoint: "GET /v1/service-requests"
     capture: {service_request_id: "$.service_requests[0].id"}
+    capture_soft: true  # 서비스 요청 이력 없으면 빈 리스트 — verify는 optional로 스킵
     verify:
       - {name: read, endpoint: "GET /v1/service-requests/{service_request_id}",
          expect_status: [200, 404]}
-    provenance: VALIDATED
+    provenance: docs  # 소스 quota/support-reads는 capture_soft였고 리스트가 비어 있어 envelope 미증명 (run 27428457582)
     source: {lifecycle: support-reads, steps: [list-service-requests]}
     notes: "조회 전용 lookup task — 이력 env 의존."

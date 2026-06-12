@@ -69,6 +69,9 @@ def main() -> int:
             r = client.request("GET", f"/v1/container-registries/{reg_id}",
                                service="scr")
             b = r.body or {}
+            if isinstance(b.get("registry"), dict):
+                # live envelope (run 27428457582): detail is {"registry": {...}}
+                b = b["registry"]
             state = str(b.get("state") or b.get("status") or "")
             flat = json.dumps(b)
             for k, v in (b.items() if isinstance(b, dict) else []):
@@ -78,7 +81,7 @@ def main() -> int:
             if state.lower() == "running" and endpoint:
                 break
             time.sleep(10)
-        print(f"{VERDICT} registry {reg_id} state ready, endpoint={endpoint!r}")
+        print(f"{VERDICT} registry {reg_id} state={state!r}, endpoint={endpoint!r}")
         if not endpoint:
             print(f"{VERDICT} INCONCLUSIVE — no endpoint field on the registry "
                   f"(detail keys: {sorted(b) if isinstance(b, dict) else '?'})")
