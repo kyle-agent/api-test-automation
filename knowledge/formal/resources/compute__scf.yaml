@@ -16,6 +16,42 @@ resources:
     capture: {cloud_function_id: "$.id"}
     ready: {field: "$.cloud_function.state",
             until: [READY, RUNNING, ACTIVE, Running], timeout: 300, interval: 10}
+    verify:
+      # 함수 하위 read family — 모두 READ-ONLY (Deploying 뒤집기 없음), 함수
+      # id만으로 주소화된다. gap_getid 일괄 폐쇄 (id-bound GET coverage).
+      - {name: read-codes,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/codes",
+         expect_status: [200]}
+      - {name: read-configurations,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/configurations",
+         expect_status: [200]}
+      - {name: read-config,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/configurations/config",
+         expect_status: [200]}
+      - {name: read-environment-variables,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/configurations/environment-variables",
+         expect_status: [200]}
+      - {name: read-privatelink-endpoints,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints",
+         expect_status: [200]}
+      - {name: read-privatelink-services,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
+         expect_status: [200],
+         note: "READ는 안전 — Creating 고착을 일으키는 것은 PUT enable뿐 (노드 노트)"}
+      - {name: read-resource-policies,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/configurations/resource-policies",
+         expect_status: [200]}
+      - {name: read-url,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/configurations/url",
+         expect_status: [200]}
+      - {name: read-logs,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/logs",
+         expect_status: [200],
+         note: "기간 query param이 필요할 수 있음 — 라이브 런에서 400이면 param 보강 (R3)"}
+      - {name: read-metrics,
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/metrics",
+         expect_status: [200],
+         note: "기간 query param이 필요할 수 있음 — 라이브 런에서 400이면 param 보강 (R3)"}
     delete: {endpoint: "DELETE /v1/cloud-functions/{cloud_function_id}",
              destructive: true}
     provenance: VALIDATED
@@ -32,6 +68,9 @@ resources:
       body: {cloud_function_id: "{scf-function.cloud_function_id}",
              schedule: "0 0 * * 0", timezone: "Asia/Seoul"}
     capture: {trigger_id: "$.triggers[0].trigger_id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/triggers/{trigger_id}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/triggers/{trigger_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: compute-scf-cloud-function-cronjob-trigger,

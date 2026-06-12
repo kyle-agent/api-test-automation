@@ -20,6 +20,16 @@ resources:
       body: {name: "regrapi{unique}", description: "API regression suite",
              endpoint_type: REGION, tags: []}
     capture: {api_id: "$.id"}
+    verify:
+      - {name: read-connected-endpoints,
+         endpoint: "GET /v1/apis/{api_id}/connected-endpoints",
+         expect_status: [200]}
+      - {name: read-reports, endpoint: "GET /v1/apis/{api_id}/reports",
+         expect_status: [200],
+         note: "기간 query param이 필요할 수 있음 (docs에 모델 없음) — 라이브 런에서 400이면 param 보강 (R3)"}
+      - {name: read-resource-policies,
+         endpoint: "GET /v1/apis/{api_id}/resource-policies",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/apis/{api_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: application-apigateway-api-resource,
@@ -51,6 +61,10 @@ resources:
       endpoint: "POST /v1/apis/{apigw-api.api_id}/resources/{apigw-root-resource.root_resource_id}"
       body: {path_part: "regr{unique}"}
     capture: {resource_id: "$.id"}
+    verify:
+      - {name: read,
+         endpoint: "GET /v1/apis/{apigw-api.api_id}/resources/{resource_id}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/resources/{resource_id}",
              destructive: true}
     provenance: VALIDATED
@@ -73,6 +87,13 @@ resources:
         query_strings: {}
         request_headers: {}
     capture: {method_type: "$.methods[0].method_type"}
+    verify:
+      - {name: read-list,
+         endpoint: "GET /v1/apis/{apigw-api.api_id}/resources/{apigw-resource.resource_id}/methods",
+         expect_status: [200]}
+      - {name: read,
+         endpoint: "GET /v1/apis/{apigw-api.api_id}/resources/{apigw-resource.resource_id}/methods/{method_type}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/resources/{apigw-resource.resource_id}/methods/{method_type}",
              destructive: true}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
@@ -89,6 +110,9 @@ resources:
       body: {description: "API regression deployment", stage_name: dev,
              stage_type: new}
     capture: {deployment_id: "$.deployment_id"}
+    verify:
+      - {name: read-list, endpoint: "GET /v1/apis/{apigw-api.api_id}/deployments",
+         expect_status: [200]}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage, steps: [create-deployment]}
     notes: "deployment DELETE 엔드포인트는 카탈로그에 없다(불변 리비전 — api 삭제로 회수) → 의도적으로 delete 없음. createapideployment(api_bodies): stage_type=new가 같은 호출에서 stage `dev`까지 생성하고 $.deployment_id를 반환. 메서드 ≥1개 선행 필요(NoMethodsExist) → requires에 apigw-method."
@@ -101,6 +125,9 @@ resources:
       endpoint: "POST /v1/apis/{apigw-api.api_id}/stages"
       body: {stage_name: "stg{unique}", description: "API regression stage",
              deployment_id: "{apigw-deployment.deployment_id}"}
+    verify:
+      - {name: read-list, endpoint: "GET /v1/apis/{apigw-api.api_id}/stages",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/stages/stg{unique}",
              destructive: true}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
@@ -131,6 +158,10 @@ resources:
       body: {name: "regracl{ualpha}", allowed_ip_addr: ["10.0.0.0/24"],
              connected_stages: [dev], description: "API regression access control"}
     capture: {access_control_id: "$.id"}
+    verify:
+      - {name: read-list,
+         endpoint: "GET /v1/apis/{apigw-api.api_id}/access-controls",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/access-controls/{access_control_id}",
              destructive: true}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
@@ -147,6 +178,9 @@ resources:
       body: {name: "regrup{ualpha}", limit: 100, rate: day,
              description: "API regression usage plan"}
     capture: {usage_plan_id: "$.usage_plan.id"}
+    verify:
+      - {name: read-list, endpoint: "GET /v1/apis/{apigw-api.api_id}/usage-plans",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/usage-plans/{usage_plan_id}",
              destructive: true}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
@@ -166,6 +200,9 @@ resources:
       - {name: read, endpoint: "GET /v1/apis/{apigw-api.api_id}/usage-plans/{apigw-usage-plan.usage_plan_id}/api-keys/{api_key_id}",
          expect_status: [200, 403],
          note: "per-id GET이 403 'Action definition is not found' (IAM action 미정의 — 제품 결함 후보, run 27394211896). 결함 추적용으로 403 허용"}
+      - {name: read-list,
+         endpoint: "GET /v1/apis/{apigw-api.api_id}/usage-plans/{apigw-usage-plan.usage_plan_id}/api-keys",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/usage-plans/{apigw-usage-plan.usage_plan_id}/api-keys/{api_key_id}",
              destructive: true}
     provenance: VALIDATED
