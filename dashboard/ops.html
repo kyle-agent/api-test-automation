@@ -135,11 +135,22 @@ async function jget(key){
   return r.json();
 }
 async function xlist(prefix){
-  // S3 ListObjectsV2 (public): ?list-type=2&prefix=...
-  const r=await fetch(base()+"/?list-type=2&prefix="+encodeURIComponent(prefix),{cache:"no-store"});
-  if(!r.ok) throw new Error(r.status+" list "+prefix);
-  const xml=new DOMParser().parseFromString(await r.text(),"text/xml");
-  return [...xml.querySelectorAll("Contents>Key")].map(k=>k.textContent);
+  // S3 ListObjectsV2 (public) WITH pagination — a single page caps at 1000
+  // keys, which silently hid all but a few runs from the picker.
+  const keys=[]; let token="";
+  for(let page=0; page<30; page++){
+    const url=base()+"/?list-type=2&prefix="+encodeURIComponent(prefix)
+      +(token?"&continuation-token="+encodeURIComponent(token):"");
+    const r=await fetch(url,{cache:"no-store"});
+    if(!r.ok) throw new Error(r.status+" list "+prefix);
+    const xml=new DOMParser().parseFromString(await r.text(),"text/xml");
+    for(const k of xml.querySelectorAll("Contents>Key")) keys.push(k.textContent);
+    const trunc=xml.querySelector("IsTruncated");
+    const next=xml.querySelector("NextContinuationToken");
+    if(!trunc||trunc.textContent!=="true"||!next){ break; }
+    token=next.textContent;
+  }
+  return keys;
 }
 function fmtRow(s){
   const h=s.history||{};
@@ -434,7 +445,7 @@ function fillRunSelect(ids,idx){
   // clickable run pills (최근 8개): ● 진행 중 pulse / 종료 시각 표시
   const meta={}; (idx||[]).forEach(s=>{meta[String(s.run_id)]=s;
     if(s.finished) window.RUN_FINISH[String(s.run_id)]=Date.parse(s.finished);});
-  $("#runPick").innerHTML=sorted.slice(0,8).map(i=>{
+  $("#runPick").innerHTML=sorted.slice(0,12).map(i=>{
     const m=meta[String(i)];
     const live=window.LIVE_RUNS.has(String(i));          // 진짜 in-flight만
     const noSum=!m&&!live;                               // 옛 런: 요약 없음
