@@ -21,13 +21,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# route -> output file (also used to rewrite internal links)
+# route -> output file (also used to rewrite internal links).
+# /knowledge and /planning/knowledge render the same page; exporting both
+# routes to the same file keeps every internal link rewritable.
 PAGES = {
     "/": "index.html",
     "/planning": "planning.html",
     "/planning/scenarios": "scenarios.html",
     "/planning/dependencies": "dependencies.html",
     "/planning/knowledge": "knowledge.html",
+    "/knowledge": "knowledge.html",
 }
 
 BANNER = (
@@ -39,7 +42,7 @@ BANNER = (
 
 # dynamic routes that make no sense on Pages — neutralize their links
 _DEAD_PREFIXES = ("/testing", "/reporting", "/runs", "/ai", "/planning/edit",
-                  "/schedules", "/partials")
+                  "/planning/resources", "/schedules", "/partials")
 
 
 def _file_views() -> dict[str, str]:
