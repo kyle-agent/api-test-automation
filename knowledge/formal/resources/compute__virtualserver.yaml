@@ -298,10 +298,13 @@ resources:
   server-interface:
     code: "cp-vs-interface"
     service: compute/virtualserver
-    requires: [server, port, subnet]
+    requires: [server, port]
     create:
       endpoint: "POST /v1/servers/{server.server_id}/interfaces"
-      body: {port_id: "{port.port_id}", subnet_id: "{subnet.subnet_id}"}
+      # 라이브 400 VirtualServer.CreateInterface.Duplicated (run 27417986669):
+      # port_id(기존)와 subnet_id(신규)를 같이 보내면 'both new and existing
+      # networks' — 기존 port attach는 port_id만 보낸다
+      body: {port_id: "{port.port_id}"}
     delete:
       endpoint: "DELETE /v1/servers/{server.server_id}/interfaces/{port.port_id}"
       destructive: true

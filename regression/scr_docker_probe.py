@@ -28,11 +28,11 @@ def sh(*cmd: str, timeout: int = 120) -> tuple[int, str]:
 
 
 def main() -> int:
-    from core.config import load_config
-    from core.http_client import Client
+    from core.config import Settings
+    from core.http_client import ApiClient
 
-    cfg = load_config()
-    client = Client(cfg)
+    cfg = Settings()
+    client = ApiClient(cfg)
     suffix = uuid.uuid4().hex[:8]
     name = f"regrdkr{suffix}"
     reg_id = ""

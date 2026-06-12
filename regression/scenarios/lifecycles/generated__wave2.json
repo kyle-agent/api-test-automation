@@ -372,7 +372,7 @@
       "id": "gen-wave2-scf",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "composed wave 2 rev 3 — run 27401527554 triage fixes",
+      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
       "steps": [
         {
           "name": "create-scf-function",
@@ -544,7 +544,7 @@
             "path": "/v1/triggers/{trigger_id}",
             "json": {
               "cloud_function_id": "{cloud_function_id}",
-              "trigger_type": "cronjob"
+              "trigger_type": "cron"
             },
             "service": "scf"
           }
@@ -572,7 +572,7 @@
           "destructive": true,
           "json": {
             "cloud_function_id": "{cloud_function_id}",
-            "trigger_type": "cronjob"
+            "trigger_type": "cron"
           }
         },
         {
@@ -728,7 +728,7 @@
       "id": "gen-wave2-scr",
       "service": "container/scr",
       "enabled": true,
-      "_note": "composed wave 2 rev 3 — run 27401527554 triage fixes",
+      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
       "steps": [
         {
           "name": "create-container-registry",
@@ -1038,7 +1038,7 @@
       "id": "gen-wave2-fs",
       "service": "storage/filestorage",
       "enabled": true,
-      "_note": "composed wave 2 rev 3 — run 27401527554 triage fixes",
+      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
       "steps": [
         {
           "name": "create-filestorage-volume",
@@ -1119,7 +1119,7 @@
           "name": "verify-fs-snapshot-list",
           "service": "filestorage",
           "method": "GET",
-          "path": "/v1/snapshots",
+          "path": "/v1/snapshots?volume_id={volume_id}",
           "expect_status": [
             200
           ]

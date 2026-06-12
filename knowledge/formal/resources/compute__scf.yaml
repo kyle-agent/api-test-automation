@@ -74,7 +74,10 @@ resources:
          expect_status: [200]}
     delete:
       endpoint: "DELETE /v1/triggers/{trigger_id}"
-      json: {cloud_function_id: "{scf-function.cloud_function_id}", trigger_type: "cronjob"}
+      # 라이브 400 (run 27417986669): "Trigger type must be 'apigateway' or
+      # 'cron'" — 수작업본의 'cronjob'은 관대한 expect([..,400])에 가려 조용히
+      # 400나고 있었음 (관대한 expect가 결함을 숨긴 사례)
+      json: {cloud_function_id: "{scf-function.cloud_function_id}", trigger_type: "cron"}
       destructive: true
       # 소스 delete-trigger와 동일 body — body 없이는 400 (run 27401527554)
     provenance: VALIDATED

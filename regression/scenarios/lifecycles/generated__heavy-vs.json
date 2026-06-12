@@ -5,7 +5,7 @@
       "id": "gen-heavy-vs-netops",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "composed heavy wave — VS 운영 지식 검증: pre-created port attach/detach + static NAT on attached port; closure: keypair, image, server-type, security-group, vpc, subnet, server, port, server-interface, public-ip, server-static-nat — ENABLED for the approved heavy window (owner 2026-06-12)",
+      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
       "steps": [
         {
           "name": "create-keypair",
@@ -289,8 +289,7 @@
           "method": "POST",
           "path": "/v1/servers/{server_id}/interfaces",
           "json": {
-            "port_id": "{port_id}",
-            "subnet_id": "{subnet_id}"
+            "port_id": "{port_id}"
           },
           "expect_status": [
             200,
