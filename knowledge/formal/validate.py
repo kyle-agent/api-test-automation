@@ -677,12 +677,14 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
                     isinstance(x, int) for x in es)):
                 err(f"{where}: verify expect_status must be a list of ints")
 
-        # template tokens (mirror composer._Ctx token rules) -------------------
-        templated = [create.get("body")]
+        # template tokens (mirror composer._Ctx token rules; delete/ready
+        # paths use the node's own dot-less capture vars, and child resources
+        # may use dotted prerequisite tokens there too) ------------------------
+        templated = [create.get("body"), delete.get("endpoint"),
+                     (ready or {}).get("endpoint") if isinstance(ready, dict)
+                     else None]
         for v in verify or []:
             templated += [v.get("endpoint"), v.get("json")]
-        own_path_objs = [delete.get("endpoint"),
-                         (ready or {}).get("endpoint") if ready else None]
         for token in sorted(_tokens_in(templated)):
             parts = token.split(".")
             if len(parts) == 1:
@@ -727,14 +729,6 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
                     err(f"{where}: '{dep}' has no capture '{cap_key}'")
             else:
                 err(f"{where}: unresolvable template token '{{{token}}}'")
-        # delete/ready paths reference the node's OWN capture vars dot-less
-        for token in sorted(_tokens_in(own_path_objs)):
-            if "." in token:
-                err(f"{where}: delete/ready endpoints must use the node's "
-                    f"own dot-less capture vars (got '{{{token}}}')")
-            elif token not in caps and token not in builtins_:
-                err(f"{where}: delete/ready endpoint var '{{{token}}}' is "
-                    "not an own capture var")
 
         # quota kinds (unknown = warning, per plan: budgets grows with model)
         q = task.get("quota")
