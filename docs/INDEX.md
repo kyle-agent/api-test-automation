@@ -18,7 +18,9 @@ work-in-progress notes.
 |-----|-------|--------|
 | [`PLATFORM-PLAN.md`](PLATFORM-PLAN.md) | The platform upgrade plan: control plane + execution plane, milestones M0–M5 | **adopted** — M0–M3 done, M4 built (cutover last), M5 R3 in progress |
 | [`RESOURCE-MODEL-PLAN.md`](RESOURCE-MODEL-PLAN.md) | M5 resource-task model → composer (scenarios generated from the model); §6 = live wave findings | **adopted** — R1·R2 done, R3 waves live |
+| [`PRODUCT-FINDINGS.md`](PRODUCT-FINDINGS.md) | **Consolidated product/API findings ledger** — one row per finding (id · endpoint · symptom · evidence run · class · status); masked-defect lesson | **active** — append-only, 12 rows (PF-01…PF-12) |
 | [`COVERAGE-CRITERIA.md`](COVERAGE-CRITERIA.md) | The C0–C4 coverage ladder + waiver mechanism — what "100%" means | **adopted** (2026-06-09) |
+| [`COVERAGE-GETID-PLAN.md`](COVERAGE-GETID-PLAN.md) | The id-bound GET gap classified (A/B/C/D buckets) + verify-step wave plan | active — gap_getid 151 → **130** via waves 2/heavy |
 | [`DEPLOY.md`](DEPLOY.md) | Operations runbook: Docker Compose bundle, executor switch, host migration (M4) | **adopted** — awaiting live/docker verification |
 | [`OPS-DASHBOARD.md`](OPS-DASHBOARD.md) | 영구 oplog 버킷 + 정적 ops 뷰어 (의존순서 라이브 자원 트리 · run 필터 · verdict) | active |
 | [`PARALLEL-EXECUTION-PLAN.md`](PARALLEL-EXECUTION-PLAN.md) | Staged foundations + per-VPC lanes — cut wall-clock to max(lane) instead of sum | **draft** (현 구현 A∥B split + shared adopt가 부분 반영; 전면 일반화는 미승인) |
