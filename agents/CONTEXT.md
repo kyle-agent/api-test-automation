@@ -180,7 +180,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   full rounds (KMS/Secrets deletion is SCHEDULED: pending-deletion items
   stay listed, PF-09).
 - **M5 resource-task model (2026-06-12): R1·R2 DONE, R3 waves LIVE.**
-  `knowledge/formal/resources/*.yaml` = **128 nodes / 50 files / 48 groups**
+  `knowledge/formal/resources/*.yaml` = **132 nodes / 53 files / 51 groups**
   (codes `<cat>-<group>-<resource>`; lookup-node pattern now ~7: image,
   server-type, kubernetes-version, apigw-root-resource, cm-account-resource,
   cloudml-image + fs replication-regions candidate);
