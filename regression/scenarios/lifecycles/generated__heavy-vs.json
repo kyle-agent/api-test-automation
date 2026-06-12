@@ -1,0 +1,563 @@
+{
+  "_comment": "Composed heavy verification wave — VS interface/static-NAT (owner domain knowledge 2026-06-12). Enable in an approved heavy window.",
+  "lifecycles": [
+    {
+      "id": "gen-heavy-vs-netops",
+      "service": "compute/virtualserver",
+      "enabled": false,
+      "_note": "composed heavy wave — VS 운영 지식 검증: pre-created port attach/detach + static NAT on attached port; closure: keypair, image, server-type, security-group, vpc, subnet, server, port, server-interface, public-ip, server-static-nat",
+      "steps": [
+        {
+          "name": "create-keypair",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "create-image",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "create-server-type",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_type_id": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": "g"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-security-group",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-server",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers",
+          "json": {
+            "name": "regrsrv{unique}",
+            "image_id": "{image_id}",
+            "server_type_id": "{server_type_id}",
+            "keypair_name": "regrkey{unique}",
+            "product_category": "compute",
+            "product_offering": "virtual_server",
+            "networks": [
+              {
+                "subnet_id": "{subnet_id}"
+              }
+            ],
+            "security_groups": [
+              "{sg_id}"
+            ],
+            "volumes": [
+              {
+                "boot_index": 0,
+                "size": 104,
+                "type": "SSD",
+                "delete_on_termination": true
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_id": "$.servers[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "wait-server",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 600,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-port",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/ports",
+          "json": {
+            "name": "regrport{unique}",
+            "description": "API regression suite",
+            "security_groups": [],
+            "subnet_id": "{subnet_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "port_id": "$.port.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/ports/{port_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-port",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.port.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "DOWN"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-server-interface",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/interfaces",
+          "json": {
+            "port_id": "{port_id}",
+            "subnet_id": "{subnet_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}/interfaces/{port_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-server-interface",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "server-interface"
+        },
+        {
+          "name": "create-public-ip",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "json": {
+            "description": "API regression suite",
+            "type": "IGW",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "publicip_id": "$.publicip.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/publicips/{publicip_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-public-ip",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.publicip.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-server-static-nat",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats",
+          "json": {
+            "public_ip_id": "{publicip_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "nat_id": "$.static_nat.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats/{nat_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-server-static-nat",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats/{nat_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "server-static-nat"
+        },
+        {
+          "name": "delete-server-static-nat",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats/{nat_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-public-ip",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-server-interface",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}/interfaces/{port_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-port",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/ports/{port_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-server",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-security-group",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-keypair",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "heavy window 대기 — server 체인(~15-20분+과금) 포함. owner 승인된 heavy run에서 enable하여 검증: port attach/detach + attached port의 static NAT (owner 지식 2026-06-12)"
+    }
+  ]
+}
