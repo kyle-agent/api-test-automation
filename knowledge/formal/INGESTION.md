@@ -15,6 +15,14 @@
    edges go to `cross-service.yaml`.
 3. `python knowledge/formal/validate.py` → commit → flip status here.
 
+> **M5 이후의 최종 목적지 (2026-06-12):** 형식화의 종착 레이어는
+> **`knowledge/formal/resources/<category>__<service>.yaml`의 자원 task
+> 모델**이다 (127 노드 — 의존조건·검증된 body 템플릿·옵션; 합성기가 여기서
+> lifecycle을 생성한다, `docs/RESOURCE-MODEL-PLAN.md`). 신규 ingest에서
+> 생성 전제조건/옵션/한도 같은 *자원 단위* 지식은 해당 resources 파일의
+> `requires`/`options`/`notes`로 넣고, 서비스 전역 제약(네이밍 규칙 등)은
+> 종전대로 `services/` Layer-1에 넣는다. 둘 다 같은 validator가 검사한다.
+
 Priorities: **P1** = needed for coverage 100% (an enabled lifecycle's writes
 are pending live validation, or smoke shows 4xx that naming-rule/prereq
 knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
@@ -35,20 +43,20 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/networking/firewall/overview/ | networking/firewall |
 | ✅ | P1 | /userguide/networking/gslb/overview/ | networking/gslb |
 | ✅ | P1 | /userguide/networking/global_cdn/overview/ | networking/cdn |
-| — | P1 | /userguide/database/mysql/overview/ | database/mysql |
+| ✅ | P1 | /userguide/database/mysql/overview/ | database/mysql |
 | — | P1 | /userguide/database/mariadb/overview/ | database/mariadb |
-| — | P1 | /userguide/database/postgresql/overview/ | database/postgresql |
+| ✅ | P1 | /userguide/database/postgresql/overview/ | database/postgresql |
 | — | P1 | /userguide/database/epas/overview/ | database/epas |
 | — | P1 | /userguide/database/mssql/overview/ | database/sqlserver |
-| — | P1 | /userguide/database/cachestore/overview/ | database/cachestore |
+| ✅ | P1 | /userguide/database/cachestore/overview/ | database/cachestore |
 | ✅ | P1 | /userguide/compute/baremetal_server/overview/ | compute/baremetal |
 | — | P1 | /userguide/compute/block_storage_vm/overview/ | compute/virtualserver (volumes) |
 | ✅ | P1 | /userguide/compute/cloud_functions/overview/ | compute/scf |
 | — | P1 | /userguide/compute/mngc/overview/ | compute/multinodegpucluster |
-| ✅ | P1 | /userguide/storage/archive_storage/overview/ | storage/archivestorage (smoke 401s!) |
+| ✅ | P1 | /userguide/storage/archive_storage/overview/ | storage/archivestorage — **대상 영구 제외** (owner 2026-06-11: 전용 인증키 미발급, waiver 25/25; 다시 끌어올리지 말 것) |
 | ✅ | P1 | /userguide/storage/backup/overview/ | storage/backup |
 | ✅ | P1 | /userguide/storage/block_storage_bm/overview/ | storage/baremetal-blockstorage |
-| ✅ | P1 | /userguide/storage/parallel_file_storage/overview/ | storage/parallel-filestorage |
+| ✅ | P1 | /userguide/storage/parallel_file_storage/overview/ | storage/parallel-filestorage — **reads-only 범위** (owner 2026-06-12: writes는 owner-exclusion waiver, 복구 lifecycle disabled) |
 | ✅ | P1 | /userguide/security/kms/overview/ | security/kms |
 | ✅ | P1 | /userguide/security/secrets_manager/overview/ | security/secretsmanager |
 | ✅ | P1 | /userguide/security/secret_vault/overview/ | security/secretvault |
@@ -60,19 +68,19 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/management/cloud_control/overview/ | management/cloudcontrol (smoke 403s) |
 | — | P1 | /userguide/management/cloud_monitoring/overview/ | management/cloudmonitoring (smoke 400s) |
 | — | P1 | /userguide/management/logging_audit/overview/ | management/loggingaudit |
-| — | P1 | /userguide/management/service_watch/overview/ | management/servicewatch |
+| ✅ | P1 | /userguide/management/service_watch/overview/ | management/servicewatch |
 | — | P1 | /userguide/management/resource_groups/overview/ | management/resourcemanager |
-| — | P1 | /userguide/management/quota/overview/ | management/quota (verify the VPC 3-vs-5!) |
+| ✅ | P1 | /userguide/management/quota/overview/ | management/quota (verify the VPC 3-vs-5!) |
 | — | P1 | /userguide/application/api_gateway/overview/ | application-service/apigateway |
 | — | P1 | /userguide/application/queue_service/overview/ | application-service/queueservice |
 | — | P1 | /userguide/analytics/data_flow/overview/ | data-analytics/data-flow |
 | — | P1 | /userguide/analytics/data_ops/overview/ | data-analytics/data-ops |
-| — | P1 | /userguide/analytics/event_streams/overview/ | data-analytics/eventstreams (smoke 400s) |
+| ✅ | P1 | /userguide/analytics/event_streams/overview/ | data-analytics/eventstreams (smoke 400s) |
 | — | P1 | /userguide/analytics/quick_query/overview/ | data-analytics/quick-query (smoke 400s) |
 | — | P1 | /userguide/analytics/search_engine/overview/ | data-analytics/searchengine |
 | — | P1 | /userguide/analytics/vertica/overview/ | data-analytics/vertica |
-| — | P1 | /userguide/ai_ml/ai_ml_ops_platform/overview/ | ai-ml/aimlops-platform (smoke 400s) |
-| — | P1 | /userguide/ai_ml/cloud_ml/overview/ | ai-ml/cloud-ml (smoke 404s) |
+| ✅ | P1 | /userguide/ai_ml/ai_ml_ops_platform/overview/ | ai-ml/aimlops-platform (smoke 400s) |
+| ✅ | P1 | /userguide/ai_ml/cloud_ml/overview/ | ai-ml/cloud-ml (smoke 404s) |
 | — | P1 | /userguide/devopstools/devops_service/overview/ | devops-tools/devopsservice |
 | — | P1 | /userguide/financial_management/planned_compute/overview/ | financial-management/billingplan (smoke 500!) |
 | — | P1 | /userguide/financial_management/cost_management/overview/ | financial-management/budget·costexplorer |
