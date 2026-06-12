@@ -5,13 +5,19 @@
 > `agents/CONTEXT.md` → 작업에 해당하는 `agents/<agent>.md` 순서로 읽고
 > 시작하세요. 도메인 지식은 `knowledge/` 에 누적됩니다.
 
-This repository tests the **Samsung Cloud Platform (SCP) Open APIs**
+This repository is the **SCP API Regression Test Platform**: it tests the
+**Samsung Cloud Platform (SCP) Open APIs**
 (15 categories / ~60 services / **1,372 endpoints**) along two axes —
 **regression** ("does it work?") and **conformance** ("is it well designed &
-AI-usable?"). The engineering is done by **a team of AI agents** (this is a
-*multi-agent* project) whose roles, prompts, context and execution harness are
-documented under [`agents/`](agents/), and whose shared **SCP domain knowledge**
-is accumulated under [`knowledge/`](knowledge/).
+AI-usable?") — and wraps them in a **control plane**
+([`controlplane/`](controlplane/README.md): dispatch, schedule, live tracking,
+intervention, history/compare, AI seams) plus the **M5 resource-task model**
+([`knowledge/formal/resources/`](knowledge/formal/), 127 nodes) from which
+scenarios are *composed* (`regression/scenarios/composer.py`). The engineering
+is done by **a team of AI agents** (this is a *multi-agent* project) whose
+roles, prompts, context and execution harness are documented under
+[`agents/`](agents/), and whose shared **SCP domain knowledge** is accumulated
+under [`knowledge/`](knowledge/).
 
 ## Mission (the two axes)
 
@@ -67,12 +73,17 @@ not duplicate them.
 | Path | What |
 |------|------|
 | `agents/` | The multi-agent system: roster, shared context, harness, per-agent prompts |
-| `knowledge/` | Accumulated SCP domain knowledge (human-readable, AI-maintained) |
-| `core/` | Shared kernel: config·auth·http_client·catalog·registry·results·budgets |
+| `knowledge/` | Accumulated SCP domain knowledge (human-readable, AI-maintained); `formal/resources/` = the M5 resource-task model (composer input) |
+| `core/` | Shared kernel: config·auth·http_client·catalog·registry·results·budgets·suites·profiles·oplog·snapshot·commands·baselines |
 | `spec/` | Extract the API spec from the docs + diff versions |
-| `regression/` | AXIS 1 — smoke · read_chains · scenarios (declarative CRUD engine + data) |
+| `regression/` | AXIS 1 — smoke · read_chains · scenarios (declarative CRUD engine + composer + data) |
 | `conformance/` | AXIS 2 — static · runtime · baseline · pluggable `rules/` |
-| `dashboard/` | Build the unified HTML dashboard from the results store |
+| `dashboard/` | Build the unified HTML dashboard from the results store + `ops.html` live ops viewer |
+| `controlplane/` | The platform server (FastAPI+htmx): dispatch · scheduler · live runs · intervention · authoring · AI pipelines · static export (Pages `/platform/`) |
+| `runner/` | `worker.py` — same-host executor for the M4 deployment cutover |
+| `suites/` · `environments/` | Named suites + environment profiles (run = suite × profile) |
+| `drafts/` | Composer/AI draft outputs awaiting human review (never auto-enabled) |
 | `cleanup/` | Tag-scoped reconciler (guaranteed teardown) |
-| `data/` | Catalog, request bodies, docs, baselines |
+| `data/` | Catalog, request bodies, docs, baselines (incl. `coverage_waivers.json`; per-profile suffixed siblings) |
 | `reports/` | Per-run output (gitignored): `results/*.jsonl`, dashboard, junit |
+| `docs/` | Plans (PLATFORM-PLAN · RESOURCE-MODEL-PLAN · DEPLOY) + handoffs — see `docs/INDEX.md` |

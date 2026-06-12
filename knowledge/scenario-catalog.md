@@ -160,3 +160,27 @@ No new lifecycles; existing ones extended (see `docs/COVERAGE-WAVE-PLAN.md`):
   DBaaS-family services).
 
 Static ceiling **85.6% → 86.3%** (gap_getid 166 → 156; gap_write 32 = all waived).
+
+## Composed lifecycles — M5 resource-task model (2026-06-12)
+
+New lifecycles are no longer hand-written: the resource-task model
+(`knowledge/formal/resources/*.yaml`, **127 nodes**) is compiled by
+`regression/scenarios/composer.py` into `gen-<node>` / `bundle-<group>`
+lifecycles, kept in `regression/scenarios/lifecycles/generated__*.json`
+(**136 lifecycles total** now pass the scenarios validator). Status of the
+composed set:
+
+| Lifecycle | Steps | Status |
+|---|---|---|
+| `gen-pilot-net-basics` (vpc/subnet/port/igw/public-ip) | 20 | **enabled** — 20/20 live, kept as the composer-path canary |
+| `gen-wave-vslight` (server-group, volume-transfer) | 9 | **enabled** — 9/9 in three consecutive runs (27394211896 · 27395331657 · 27396649009) |
+| `gen-wave-apigw` (api→…→api-key/usage-plan/access-control) | 20 | **enabled** — 20/20 twice incl. all deletes |
+| `gen-wave-dashboard` | 3 | **enabled** — create 201 proven; capture fixed to flat `$.id` (rev 4) |
+| `gen-wave-mgmisc` / `gen-wave-devops` / `gen-wave-net-endpoint` | 3/3/9 | disabled — triaged blockers in node notes (product 400s, console-only ids) |
+| `gen-cloudml-chain` | 24 | disabled (gated-ready) — full chain composed, blocked on SCR auth key (console credential) + heavy |
+
+Live wave findings + blocked classes: `docs/RESOURCE-MODEL-PLAN.md` §6.
+Current static ceiling per `python -m spec.coverage_gap`: **86.6% (1,188/1,372)**;
+latest published run C3 **44.3%**, fail_new 0, 249 waivers. R3 direction:
+hand-written lifecycles above get replaced by composed equivalents node-by-node
+after live verification — treat this catalog's earlier sections as history.

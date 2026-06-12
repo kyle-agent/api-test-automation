@@ -1,15 +1,37 @@
-# SCP API Test Automation
+# SCP API Regression Test Platform
 
-Automated testing for the Samsung Cloud Platform (SCP) Open APIs documented at
-<https://docs.e.samsungsdscloud.com/apireference/>
+Automated testing **platform** for the Samsung Cloud Platform (SCP) Open APIs
+documented at <https://docs.e.samsungsdscloud.com/apireference/>
 (**15 categories / ~60 services / ~1,372 endpoints**).
 
-The suite is **catalog-driven** (the API Reference is parsed once into a
+What started as a catalog-driven test suite is now a full platform with
+**three areas**:
+
+1. **Control plane — [`controlplane/`](controlplane/README.md)** · a FastAPI +
+   htmx + SQLite server (Overview → Plan → Run → Report + Knowledge IA) that
+   dispatches runs (suite × environment profile), schedules them (cron), tracks
+   them live (oplog event ingest + milestone timeline), lets you intervene
+   mid-run (abort / skip-scenario / stop-polling via the M2 command channel,
+   single-resource delete), restores any past run's dashboard from its
+   snapshot, and hosts the AI seams (`ai_pipelines.py`: triage, spec-impact,
+   scenario/task drafts, fact extraction — all draft-only, never on the hot path).
+2. **Execution plane — the two-axis engine**, today run by GitHub Actions
+   (`.github/workflows/api-test.yml`), at deployment cutover (M4) by the
+   same-host [`runner/worker.py`](runner/worker.py). Same `python -m …`
+   entrypoints either way.
+3. **Knowledge & model — [`knowledge/formal/`](knowledge/formal/FORMAT.md)**,
+   including the **M5 resource-task model**
+   (`knowledge/formal/resources/*.yaml`, 127 nodes) from which
+   `regression/scenarios/composer.py` *composes* lifecycles — scenarios are
+   increasingly generated from the model rather than hand-written.
+
+The suite remains **catalog-driven** (the API Reference is parsed once into a
 machine-readable inventory; tests are generated from it) and organised around
 **two axes** on a shared kernel. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the
-full blueprint, [`ROADMAP.md`](ROADMAP.md) for the phase plan (coverage 100% →
-scheduled regression → dedicated-server runs), and [`agents/`](agents/README.md)
-for the multi-agent team that does the engineering.
+full blueprint, [`ROADMAP.md`](ROADMAP.md) for the phase plan,
+[`docs/PLATFORM-PLAN.md`](docs/PLATFORM-PLAN.md) for the platform milestones
+(M0–M5), and [`agents/`](agents/README.md) for the multi-agent team that does
+the engineering.
 
 ```
                          core/  (shared kernel)
@@ -33,30 +55,61 @@ for the multi-agent team that does the engineering.
 ## Layout
 
 ```
-core/         config·auth·http_client·catalog  +  registry·results·budgets
-spec/         extract_catalog · extract_bodies · summary · diff
-regression/   smoke · read_chains · scenarios/{engine, scenarios.json, dependencies.json}
+core/         config·auth·http_client·catalog  +  registry·results·budgets·suites·profiles·oplog·snapshot·commands·baselines
+spec/         extract_catalog · extract_bodies · summary · diff · coverage_gap
+regression/   smoke · read_chains · scenarios/{engine, composer, loader, scenarios.json,
+              lifecycles/*.json (per-service fragments + generated__*), dependencies.json}
 conformance/  static · runtime · baseline · rules/  (pluggable Rule lens)
 cleanup/      reconciler   (tag-ownership sweep; legacy name-prefix fallback)
-dashboard/    build        (reads the unified results store; legacy fallback)
+dashboard/    build (redesigned index + per-service drilldowns) · ops.html (live ops view)
+controlplane/ the platform server: app · dispatch · scheduler · authoring · triage ·
+              ai_pipelines/ai_routes · resource_routes · snapshots · compare · static_export
+runner/       worker.py — same-host executor for the M4 cutover (queue consume → same stages)
+suites/       named suites (smoke/full/full-heavy/conformance) — run = suite × profile
+environments/ environment profiles (stage/prod × region; credential *references* only)
 tests/        thin pytest entrypoints that drive the regression engines
 agents/       the multi-agent system: roster · shared context · harness · per-agent prompts
 knowledge/    SCP domain knowledge (human-readable, AI-maintained) + formal/ (editable YAML)
+              formal/resources/  ← M5 resource-task model (127 nodes; composer input)
+drafts/       AI/composer outputs awaiting human review (never auto-enabled)
 data/         api_catalog.json · api_bodies.json · api_docs.json · conformance.json
-              baselines/known_issues.json
-docs/         session handoff notes (see docs/INDEX.md)
+              baselines/known_issues.json · baselines/coverage_waivers.json (per-profile
+              suffixed siblings supported: known_issues.<profile>.json)
+docs/         plans + session handoff notes (see docs/INDEX.md)
 reports/      per-run output (gitignored): results/*.jsonl, registry/*.jsonl, dashboard/
-.github/workflows/api-test.yml   one orchestrator (spec → regression → sweep + conformance → dashboard)
+.github/workflows/api-test.yml   one orchestrator (spec → regression → sweep + conformance → dashboard → snapshot)
 ```
 
 ## Setup
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt    # engine deps
 cp .env.example .env               # fill in SCP_REGION + credentials
 python -m spec.extract_catalog     # build/refresh data/api_catalog.json (resumable)
 python -m spec.summary             # coverage summary of the catalog
 ```
+
+Requirements are split so each piece installs only what it needs:
+`requirements.txt` (engine) · `controlplane/requirements.txt` (platform server —
+FastAPI/uvicorn/jinja2/croniter, dependency-light by design) ·
+`controlplane/requirements-ai.txt` (optional: `anthropic` for the AI features;
+the server runs fully without it, AI sections show 비활성).
+
+## Platform server (control plane)
+
+```bash
+pip install -r requirements.txt -r controlplane/requirements.txt
+uvicorn controlplane.app:app --host 0.0.0.0 --port 8800   # run from the repo root
+```
+
+The UI follows the **Overview → Plan → Run → Report (+ Knowledge)** IA: trigger
+suite × profile runs, watch them live, queue abort/skip commands the engine
+polls at step boundaries, browse/edit suites · profiles · scenarios · knowledge
+(validator-gated saves, local git commits), view the resource inventory, compare
+two runs, and restore any past run's dashboard from its snapshot. See
+[`controlplane/README.md`](controlplane/README.md) for env vars and the command
+channel API, and [`docs/DEPLOY.md`](docs/DEPLOY.md) for the Docker Compose
+deployment bundle (M4 server + worker).
 
 `spec.extract_catalog` uses HTTP Range requests (only each page `<head>` is
 needed), retries the gateway's intermittent 503s with backoff, and is resumable.
@@ -142,6 +195,21 @@ dispatch `crud_filter` input. In CI, set repo variable **`SCP_RUN_CRUD=true`** t
 opt a run into CRUD; the result + any teardown is posted as a PR comment.
 `dependencies.json` maps the seven VPC-creating scenarios to their quota kinds.
 
+### Composed scenarios (M5 resource-task model)
+
+Hand-written lifecycles are progressively being replaced by **composed** ones:
+`knowledge/formal/resources/*.yaml` defines per-resource tasks (requires graph
+incl. `one_of`/`count`/credential prerequisites, validated body templates,
+options, capture/ready/delete) — **127 nodes** across 12 categories with
+human-readable codes (`nw-vpc-vpc`, groups in `_groups.yaml`).
+`regression/scenarios/composer.py` compiles a target set into an ordinary
+lifecycle JSON (`gen-<node>` / `bundle-<group>`): dependency closure →
+topological order + capture wiring → verify steps → reverse teardown (with the
+conflict-retry delete semantics of the hand-written lifecycles). The engine is
+unmodified — composed output is just another lifecycle. Live-proven via the
+R3 verification waves (`regression/scenarios/lifecycles/generated__*.json`);
+see `docs/RESOURCE-MODEL-PLAN.md` §6 for wave results.
+
 > **Self-trigger for heavy runs:** a committed `.github/heavy.txt` (first
 > non-comment line = a `crud_filter` expression) lets a push drive which heavy
 > lifecycle runs next — used to chain heavy validations one per run. Empty file
@@ -174,34 +242,63 @@ names configurable via env (`SCP_HMAC_*`). Confirm against a real `200`; on
 `401/403`, adjust `HmacSigner.signing_string` / the header env vars.
 `SCP_AUTH_SCHEME=bearer|none` is also supported.
 
-## Dashboard
+## Dashboards & Pages
 
-`python -m dashboard.build` renders a self-contained HTML dashboard. It reads the
-unified results store (`reports/results/observations.jsonl` + `findings.jsonl`)
-first, falling back to legacy flat files (`reports/smoke_status.tsv`,
-`data/conformance.json`, `reports/junit-crud.xml`) so nothing regresses mid-migration.
-It shows health (new vs known regressions, pass rate, coverage), per-service
+`python -m dashboard.build` renders a self-contained HTML dashboard
+(**redesigned 2026-06 to the owner's mockups**: verdict header, coverage-ladder
+cards, per-service drilldown pages). It reads the unified results store
+(`reports/results/observations.jsonl` + `findings.jsonl`) first, falling back to
+legacy flat files so nothing regresses mid-migration. It shows health (new vs
+known regressions, pass rate, the C1/C2/C3 coverage ladder), per-service
 drill-down with **status + response time** and **design/behavior defect** columns,
-the CRUD grid, and trends. The `index.html` + `history.jsonl` are published to the
-**`dashboard-data`** branch each run; publish via **Settings → Pages → Deploy from
-a branch → `dashboard-data` / `(root)`**. Mute a tracked backend bug by adding it
-to `data/baselines/known_issues.json` so only genuinely new breakage alarms.
+the CRUD grid, and trends.
 
-## CI (GitHub Actions)
+Everything is published to the **`dashboard-data`** branch each run (enable via
+**Settings → Pages → Deploy from a branch → `dashboard-data` / `(root)`**):
+
+- `index.html` + `history.jsonl` + per-service pages — the results dashboard.
+- `ops.html` — the **live ops view**: reads the persistent oplog bucket
+  directly and renders a dependency-ordered resource tree per run, with run
+  pills, filters and a run-finished verdict (watch a run without GitHub).
+- `/platform/` — a **static export of the whole platform UI**
+  (`python -m controlplane.static_export`): Overview/Plan/Run/Report tabs,
+  knowledge and resource-model pages incl. a read-only page per resource node —
+  ~198 pages, every nav/menu clickable; server-only actions show a banner.
+- Per-run **snapshots** (results JSONL + built dashboard + meta) are archived to
+  the oplog bucket under `runs/<run_id>/snapshot/` and restorable from the
+  control plane's Report screen.
+
+Mute a tracked backend bug by adding it to `data/baselines/known_issues.json`
+so only genuinely new breakage alarms (per-environment baselines: a
+profile-suffixed sibling like `known_issues.<profile>.json` takes precedence).
+
+## How runs are triggered (CI · GitHub Actions)
 
 `.github/workflows/api-test.yml` is a single orchestrator:
-**spec** (refresh catalog) → **regression** (smoke + read-chains, opt-in CRUD) →
-**sweep** (`cleanup.reconciler`) and **conformance** (static + runtime + baseline)
-→ **dashboard** (build + publish).
+**spec** (refresh catalog + resolve suite/profile/run-request options) →
+**regression** (smoke + read-chains, opt-in CRUD; the adopt-class and serial
+VPC-CRUD passes run as parallel A∥B jobs) → **sweep** (`cleanup.reconciler`)
+and **conformance** (static + runtime + baseline) → **dashboard** (build +
+publish + `/platform/` static export) → **snapshot** (per-run archive).
 
 **Triggers are on-demand only** (live runs are expensive — no cron, no per-push
-runs): touch **`.github/run-request`** and push (runs on that branch; this is
-how a chat session starts a run), or use **workflow_dispatch**. File-triggered
-runs read `KEY=VALUE` options from the run-request file itself —
-`mutations/destructive/heavy/conformance/category/service/crud_filter` — so
-every dispatch capability is chat-controllable. Ordinary pushes/PRs run only
-the cheap offline gate `validate.yml` (scenario + knowledge validation, no
-credentials).
+runs). Three equivalent ways to start a run:
+
+1. **Run-request file**: touch **`.github/run-request`** and push (runs on that
+   branch; this is how a chat session starts a run). The file carries `KEY=VALUE`
+   options — `suite/profile/mutations/destructive/heavy/conformance/category/
+   service/crud_filter` — so every dispatch capability is chat-controllable.
+   Owner sequencing rule: never push a run-request commit while a previous run
+   (including its sweep) is still in progress.
+2. **workflow_dispatch** with the same inputs (named `suite` from `suites/*.yaml`
+   and `profile` from `environments/*.yaml` expand to gate defaults; explicit
+   inputs override).
+3. **The control plane UI** (`controlplane/`) — manual trigger or cron schedule;
+   dispatches via the Actions API today, or queues for `runner/worker.py` when
+   `PLATFORM_EXECUTOR=worker` (M4).
+
+Ordinary pushes/PRs run only the cheap offline gate `validate.yml`
+(scenario + knowledge validation, no credentials).
 **Conformance** is further gated: it runs only when the spec actually changed
 (catalog refresh diff), on `claude/run-conformance`/`run-schema-live` pushes,
 with dispatch `run_conformance=true`, or repo var `SCP_RUN_CONFORMANCE=true` —
