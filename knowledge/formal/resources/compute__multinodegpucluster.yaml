@@ -1,0 +1,36 @@
+# Resource-task model — compute/multinodegpucluster (cp-gpu group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# mngc-gpu-node-coverage (enabled+heavy but COVERAGE-ONLY: docs-derived
+# bodies, synthetic ids, no real GPU node ever provisioned -> provenance docs).
+version: 1
+resources:
+  gpu-node:
+    code: "cp-gpu-node"
+    service: compute/multinodegpucluster
+    heavy: true
+    requires: [vpc, subnet]
+    create:
+      endpoint: "POST /v1/gpu-nodes"
+      body:
+        vpc_id: "{vpc.vpc_id}"
+        subnet_id: "{subnet.subnet_id}"
+        image_id: "IMAGE-regrCoverageProbe000000"
+        region_id: "{region}"
+        os_user_id: regruser
+        os_user_password: "RegrCoverageProbe!1"
+        lock_enabled: false
+        cluster_fabric_details:
+          cluster_fabric_id: "00000000000000000000000000000000"
+          cluster_fabric_name: "regrcf{unique}"
+          node_pool_id: "POOL-regrCoverageProbe00"
+        server_details:
+          - {gpu_node_name: "regrgpu{unique}",
+             server_type_id: "00000000000000000000000000000000",
+             nat_enabled: false}
+        tags:
+          - {key: regr_coverage, value: probe}
+    delete: {endpoint: "DELETE /v1/gpu-nodes", destructive: true}
+    provenance: docs
+    source: {lifecycle: mngc-gpu-node-coverage,
+             steps: [create-gpu-nodes, delete-gpu-nodes]}
+    notes: "UNPROVEN 전체 (api_bodies 엔트리 없음; 소스는 synthetic id 4xx 보장 커버리지 전용 — response envelope 미관측이라 capture 없음). vpc/subnet은 이 모델이 처음 배선; image/server-type/cluster-fabric/node-pool id는 lookup 경로 미확인으로 synthetic literal 유지 (cluster-fabric은 GPU 노드 생성에 끼워 만들어지는 동반 자원으로 보이며 독립 create가 카탈로그에 없다 — R3 확인). 삭제는 path-id 없는 BULK DELETE (body gpu_node_ids — 모델 delete 스키마 한계, baremetal-server와 동일). public NAT 해제는 단수 경로 /public-nat-ip (baremetal의 복수형과 다름). HEAVY: billable + slow."

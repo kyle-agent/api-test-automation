@@ -7,6 +7,7 @@
 # Category abbreviations (fixed — reuse on fan-out):
 #   nw=networking  cp=compute  st=storage  db=database  sec=security
 #   mg=management  ct=container  ai=ai-ml  da=data-analytics
+#   ap=application-service  dt=devops-tools  fm=financial-management
 version: 1
 groups:
   "nw-vpc": {label: "네트워크 — VPC 묶음 (vpc/subnet/gateway/endpoint/peering)", category: networking}
@@ -14,6 +15,13 @@ groups:
   "nw-lb": {label: "네트워크 — Load Balancer 체인", category: networking}
   "nw-dns": {label: "네트워크 — Private DNS", category: networking}
   "nw-dc": {label: "네트워크 — Direct Connect", category: networking}
+  "cp-vs": {label: "컴퓨트 — Virtual Server 묶음 (keypair/server/volume/image/asg)", category: compute}
+  "cp-scf": {label: "컴퓨트 — Cloud Functions", category: compute}
+  "cp-bm": {label: "컴퓨트 — Bare Metal Server", category: compute}
+  "cp-gpu": {label: "컴퓨트 — Multi-node GPU Cluster", category: compute}
+  "ct-ske": {label: "컨테이너 — Kubernetes Engine (cluster/nodepool)", category: container}
+  "ct-scr": {label: "컨테이너 — Container Registry (registry/repository/image/tag)", category: container}
+  "st-fs": {label: "스토리지 — File Storage", category: storage}
   "sec-kms": {label: "보안 — KMS (transit key)", category: security}
   "sec-cert": {label: "보안 — Certificate Manager", category: security}
   "sec-sm": {label: "보안 — Secrets Manager", category: security}

@@ -1,0 +1,56 @@
+# Resource-task model — compute/scf (cp-scf group, Cloud Functions).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# compute-scf-cloud-function-cronjob-trigger (enabled, live-validated spine)
+# and scf-privatelink-apigateway-coverage (coverage-only -> docs).
+version: 1
+resources:
+  scf-function:
+    code: "cp-scf-function"
+    service: compute/scf
+    requires: []
+    create:
+      endpoint: "POST /v1/cloud-functions"
+      body: {name: "regrscf{unique}", runtime: "Node.js:20",
+             content: "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
+             tags: []}
+    capture: {cloud_function_id: "$.id"}
+    ready: {field: "$.cloud_function.state",
+            until: [READY, RUNNING, ACTIVE, Running], timeout: 300, interval: 10}
+    delete: {endpoint: "DELETE /v1/cloud-functions/{cloud_function_id}",
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-scf-cloud-function-cronjob-trigger,
+             steps: [create, wait-ready, delete, wait-gone]}
+    notes: "VPC-FREE standalone (선행 서비스 없음 — services constraint prereq-optional-only). kr-west1/kr-east1 전용 — 남부 리전 4xx는 entitlement (region-availability). 모든 config/code/trigger write가 상태를 Deploying으로 뒤집는다 — write 사이마다 READY 재폴링 필수 (소스는 그룹마다 wait-ready 전치; deploying-after-every-change quirk). privatelink-service를 켜면 Creating 고착으로 삭제가 CloudFunctionNotDeletableError 400 — teardown 전 PL enable 금지 (소스 run #5 교훈). 삭제는 409/500 재시도 6×20s + 404 폴링."
+
+  scf-cronjob-trigger:
+    code: "cp-scf-cronjob-trigger"
+    service: compute/scf
+    requires: [scf-function]
+    create:
+      endpoint: "POST /v1/triggers/cronjob"
+      body: {cloud_function_id: "{scf-function.cloud_function_id}",
+             schedule: "0 0 * * 0", timezone: "Asia/Seoul"}
+    capture: {trigger_id: "$.triggers[0].trigger_id"}
+    delete: {endpoint: "DELETE /v1/triggers/{trigger_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-scf-cloud-function-cronjob-trigger,
+             steps: [create-trigger, delete-trigger]}
+    notes: "CRONJOB 트리거 — apigateway/VPC 의존 없음 (apigateway 트리거는 실 apigateway 자원이 필요해 미모델, scf-privatelink-apigateway-coverage가 커버). capture envelope $.triggers[0].trigger_id (ARRAY). schedule은 5-field cron, timezone은 tz name. 소스의 delete는 body {cloud_function_id, trigger_type: cronjob}를 best-guess로 보내며 400 허용 + 409/500 재시도 — 모델 delete 스키마는 body를 못 싣는다 (R3에서 합성기 동치 비교 시 확인). 함수가 Deploying이면 트리거 write 4xx — scf-function 노트의 READY 재폴링 시맨틱 적용."
+
+  scf-privatelink-endpoint:
+    code: "cp-scf-privatelink-endpoint"
+    service: compute/scf
+    requires: [scf-function, subnet]
+    create:
+      endpoint: "POST /v1/cloud-functions/{scf-function.cloud_function_id}/configurations/privatelink-endpoints"
+      body: {subnet_id: "{subnet.subnet_id}",
+             endpoint_service_id: "00000000000000000000000000000000",
+             name: "regrple{unique}"}
+    capture: {endpoint_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/cloud-functions/{scf-function.cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: scf-privatelink-apigateway-coverage,
+             steps: [create-privatelink-endpoint, delete-privatelink-endpoint]}
+    notes: "UNPROVEN (소스는 COVERAGE-ONLY: literal 함수 id로 404 보장). endpoint_service_id는 실 privatelink-service id가 필요한데 networking 모델에 privatelink-service 노드가 아직 없어 synthetic literal 유지 — 노드가 생기면 ref로 배선 (R3). 경고: 함수의 privatelink-SERVICE를 enable하는 경로(PUT .../privatelink-services)는 함수를 Creating에 고착시켜 teardown을 막는다 — 이 노드는 endpoint family만 모델링하고 service enable은 의도적으로 제외."

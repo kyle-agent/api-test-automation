@@ -1,0 +1,22 @@
+# Resource-task model — storage/filestorage (st-fs group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from filestorage-volume
+# (enabled, live-validated) during the compute/container fan-out: the node is
+# pulled in here because ske-cluster's requires graph consumes it
+# (cross-service ske-volume-is-filestorage). The storage-category agent owns
+# the rest of this category; extend this file rather than duplicating the node.
+version: 1
+resources:
+  filestorage-volume:
+    code: "st-fs-volume"
+    service: storage/filestorage
+    requires: []
+    create:
+      endpoint: "POST /v1/volumes"
+      body: {name: "regrfs{unique}", protocol: NFS, type_name: HDD}
+    capture: {volume_id: "$.volume_id"}
+    ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
+            timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: filestorage-volume, steps: [create, wait-available, delete]}
+    notes: "standalone NFS volume, VPC 불필요 (cross-service와 일치). capture envelope은 $.volume_id (FLAT $.id가 아님 — virtualserver block-volume과 다르다, services/compute__virtualserver.yaml captures 참조). 경로 /v1/volumes는 virtualserver 블록 볼륨과 겹치지만 per-service host로 분리된다. container-ske-cluster-nodepool의 create-vol 스텝도 동일 템플릿(name prefix만 regrfsk)으로 라이브 검증."
