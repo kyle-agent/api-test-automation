@@ -197,9 +197,23 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
     return picked
 
 
+# KMS/Secrets deletion is SCHEDULED (pending-deletion stays in lists for the
+# whole window — service quirk, run 27401527554): a re-delete of something we
+# already 2xx-deleted this sweep is not progress, or the round loop never
+# reaches its fixed point and burns ~10 minutes re-deleting the same 40.
+_DELETED_THIS_SWEEP: set = set()
+
+
 def _delete(client, service, path, json=None):
+    key = (service, path, str(sorted((json or {}).items())))
     try:
         r = client.delete(path, service=service, json=json)
+        if r.status and 200 <= r.status < 300:
+            if key in _DELETED_THIS_SWEEP:
+                # already 2xx-deleted this sweep — pending-deletion listing,
+                # not progress (falsy return so no caller counts it)
+                return None
+            _DELETED_THIS_SWEEP.add(key)
         return r.status
     except core.MutationBlocked as exc:
         print(f"  blocked: {exc}")
