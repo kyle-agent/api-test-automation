@@ -165,33 +165,61 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   (`ai_pipelines.py` — triage/spec-impact/drafts/fact-extraction, draft-only).
   **M4 built, cutover LAST** — `runner/worker.py` + Docker Compose
   (`PLATFORM_EXECUTOR=actions|worker`), awaiting live/docker verification.
-  Pages now also carries `ops.html` (dependency-ordered live resource view)
-  and `/platform/` (~198-page static export of the platform UI).
+  Pages now also carries `ops.html` (dependency-ordered live resource view
+  from the model via `dashboard/gen_dep_map.py`; run-finished
+  cleanup-integrity verdict 테스트중/잔존/정리실패/삭제; in-flight-only run
+  pills + history-row selection; paginated S3 listing; `oplog-test-*`
+  dev-prefix filter; KST timestamps everywhere incl. the
+  `dashboard/build.py` header) and `/platform/` (~199-page static export of
+  the platform UI, all nav clickable; Plan screen carries the
+  model→scenario→suite flow strip with a 합성(gen) filter).
+  Sweep/reconciler: `SCP_SWEEP_EXTRA_NAMES` one-shot reclaim for named
+  orphans (used for the pre-platform 'selftest' VPC), dashboards bulk
+  delete keyed on `dashboard_ids`, and scheduled-deletion re-deletes no
+  longer count as progress — a sweep converges in ~2–3 min instead of 5
+  full rounds (KMS/Secrets deletion is SCHEDULED: pending-deletion items
+  stay listed, PF-09).
 - **M5 resource-task model (2026-06-12): R1·R2 DONE, R3 waves LIVE.**
-  `knowledge/formal/resources/*.yaml` = **127 nodes / 50 files / 48 groups**
-  (codes `<cat>-<group>-<resource>`); `regression/scenarios/composer.py`
-  compiles them to `gen-*`/`bundle-*` lifecycles (engine unmodified). Live
-  proof: `gen-pilot-net-basics` 20/20; wave 1 (runs 27394211896 → 27395331657
-  → 27396649009, rev 4 dispatched): `gen-wave-vslight` 9/9 ×3,
-  `gen-wave-apigw` 20/20 incl. all deletes ×2 → **56 nodes VALIDATED / 71
-  docs**. Product defects found & recorded: 403 "Action definition is not
-  found" (servicewatch log-streams LIST, apigw api-key per-id GET), budget
-  POST 500 ContactAdminForAssistance (known_issues Product Bug), devops 400
-  with unnamed required fields. Composition-blocked classes in node notes
-  (console-only ids → M5 Planning form; cloud-ml chain composed, gated on SCR
-  auth key + heavy). Wave findings: `docs/RESOURCE-MODEL-PLAN.md` §6.
-- **Coverage now:** static ceiling **86.6%** (1,188/1,372,
-  `python -m spec.coverage_gap`); latest published run **C3 44.3%**, reachable
-  ≈86.7%, **fail_new 0 policy holding**, 249 approved waivers. Owner scope:
-  archivestorage permanently excluded; parallel-filestorage reads-only
-  (`owner-exclusion` waivers); per-profile baselines file-suffixed
-  (`core/baselines.py`); multi-tenancy confirmed required.
-- **What to advance next:** continue R3 verification waves over the 71
-  remaining docs nodes (compose → scoped `crud_filter=gen-wave` run → triage →
-  re-compose), promote VALIDATED nodes and progressively replace hand-written
-  lifecycles, then M4 cutover verification. Earlier backlog (query-signing
-  fix, DBaaS sub-op windows, corrupt `api_bodies.json` entries, servicewatch
-  orphan log groups) remains tracked in `docs/COVERAGE-WAVE-PLAN.md` /
+  `knowledge/formal/resources/*.yaml` = **128 nodes / 50 files / 48 groups**
+  (codes `<cat>-<group>-<resource>`; lookup-node pattern now ~7: image,
+  server-type, kubernetes-version, apigw-root-resource, cm-account-resource,
+  cloudml-image + fs replication-regions candidate);
+  `regression/scenarios/composer.py` compiles them to `gen-*`/`bundle-*`
+  lifecycles (engine unmodified; new passthroughs: step `headers`, delete
+  `retry_on_status/retries/retry_interval`, delete `json`/non-DELETE
+  teardown, lifecycle `credentials` surfacing). Waves 1·2 + heavy window
+  (runs 27394211896 … 27421363609): composed roster **~10 stable greens**
+  (pilot, vslight 9/9 ×3, apigw 20/20 incl. all deletes, dashboard, queue,
+  sec=kms+secret, rg, iam, scf, volume-snapshot; scr/fs recomposed, next run
+  should green) → **56 nodes VALIDATED / 72 docs**. Heavy VS chain proven
+  through server creation + port attach/detach; static NAT one field from
+  done (`publicip_id`, live-derived — rev 3 dispatched). Product findings
+  now live in the **consolidated ledger `docs/PRODUCT-FINDINGS.md`** (12
+  rows: 3× 403 missing-IAM-action-definition, budget 500 baselined, devops
+  unnamed-fields 400, scf time-or-period, undocumented header
+  X-ResourceType, scr private-acl 500 ×3, KMS/Secrets scheduled deletion,
+  SCR quota 1EA/visibility confirmed, 2 masked-defect lessons).
+  Composition-blocked classes in node notes (console-only ids → M5 Planning
+  form; cloud-ml chain composed, gated on SCR auth key + heavy — the
+  `regression/scr_docker_probe.py` experiment tests whether SCP keys
+  satisfy it; first verdict INCONCLUSIVE on quota-403, registry-borrow
+  fallback added). Wave narrative: `docs/RESOURCE-MODEL-PLAN.md` §6.
+- **Coverage now:** static ceiling **88.1%** (1,209/1,372,
+  `python -m spec.coverage_gap`; gap_getid 151→**130**, gap_write 33 —
+  `docs/COVERAGE-GETID-PLAN.md`); latest published run **C3 44.79%**
+  (cov_op 36.73), **fail_new 0 policy holding**, 249 approved waivers
+  (incl. 7 PFS `owner-exclusion`). Owner scope: archivestorage permanently
+  excluded; parallel-filestorage reads-only (`owner-exclusion` waivers);
+  per-profile baselines file-suffixed (`core/baselines.py`); multi-tenancy
+  confirmed required.
+- **What to advance next:** confirm heavy rev 3 (static-NAT `publicip_id`,
+  scr/fs recompose, docker-probe borrow), then continue R3 verification
+  waves over the 72 remaining docs nodes (compose → scoped
+  `crud_filter=gen-*` run → triage → re-compose), promote VALIDATED nodes
+  and progressively replace hand-written lifecycles, then M4 cutover
+  verification. Earlier backlog (query-signing fix, DBaaS sub-op windows,
+  corrupt `api_bodies.json` entries, servicewatch orphan log groups)
+  remains tracked in `docs/COVERAGE-WAVE-PLAN.md` /
   `agents/coordination/ledger.json`.
 
 > When you finish a unit of work that changes any of the above, update this
