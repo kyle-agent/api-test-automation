@@ -1,0 +1,39 @@
+# Resource-task model — security/certificatemanager (sec-cert group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# security-certificatemanager-selfsign (enabled, live-validated) and
+# security-certificatemanager-import (disabled, needs_cert_material) by
+# extract.py, curated by hand.
+version: 1
+resources:
+  certificate:
+    code: "sec-cert-cert"
+    service: security/certificatemanager
+    requires: []
+    create:
+      endpoint: "POST /v1/certificatemanager/self-sign"
+      body: {cn: "regr{unique}.example.com", name: "regrcert{unique}",
+             not_before_dt: "{today}", not_after_dt: "{today_plus_5y}",
+             organization: regression, recipients: [], region: "{region}",
+             tags: [], timezone: "Asia/Seoul"}
+    capture: {cert_id: "$.certificate.id"}
+    delete: {endpoint: "DELETE /v1/certificatemanager/{cert_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: security-certificatemanager-selfsign, steps: [create, delete]}
+    notes: "자체 발급(self-sign) 변형 — CA 자료 없이 자동화 가능한 유일한 경로, 동기 생성. 이름 규칙 3-30자 (letters/digits/-_.), 기존 인증서와 unique (소스는 create 전 check-duplication을 호출). LB HTTPS listener에 연결된 동안 해지 불가 — teardown은 listener detach 먼저 (services/security__certificatemanager.yaml). region당 self-signed 100개 quota."
+
+  certificate-import:
+    code: "sec-cert-import"
+    service: security/certificatemanager
+    needs_cert_material: true
+    requires: []
+    create:
+      endpoint: "POST /v1/certificatemanager"
+      body: {name: "regrimport{unique}", cert_body: "{cert_body}",
+             cert_chain: "{cert_chain}", private_key: "{private_key}",
+             recipients: [], region: "{region}", tags: [],
+             timezone: "Asia/Seoul"}
+    capture: {cert_id: "$.certificate.id"}
+    delete: {endpoint: "DELETE /v1/certificatemanager/{cert_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: security-certificatemanager-import, steps: [create, delete]}
+    notes: "외부 인증서 IMPORT — needs_cert_material: {cert_body}/{private_key}/{cert_chain}은 엔진이 openssl로 런타임 발급하는 cert-material builtin (openssl 없으면 env-skip). 단, 이 계정에선 KNOWN-UNSATISFIABLE: SCP check-validation/import가 런타임 발급 self-signed keypair를 PEM 인코딩과 무관하게 거부('This private key is not a PEM format')하고 CI에 실제 CA-signed cert가 없다 — 소스 lifecycle은 disabled, 활성 sibling(security-certificatemanager-import-cover)은 정적 placeholder로 endpoint CALL만 기록. body/capture는 라이브 2xx 미확인(docs). PEM 규칙: 복호화된 RSA key + 단일 cert body + Intermediate→Root 체인 순서. 합성 대상이 되려면 실제 CA-signed 자료의 credential 주입 경로가 필요하다 (R3+)."
