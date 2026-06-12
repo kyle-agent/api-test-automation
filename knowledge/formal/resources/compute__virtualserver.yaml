@@ -1,0 +1,261 @@
+# Resource-task model — compute/virtualserver (cp-vs group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validated by knowledge/formal/validate.py
+# · consumed by regression/scenarios/composer.py (R2a).
+#
+# Back-extracted from the hand-written lifecycles (extract.py draft, curated):
+#   compute-virtualserver-full (enabled, HEAVY, core spine live-validated ~17min VM)
+#   virtualserver-keypair / compute-virtualserver-volume-snapshot (enabled, light)
+#   vs-autoscaling-coverage / vs-image-write-coverage / vs-volume-transfer-coverage
+#   (enabled but COVERAGE-ONLY — bodies UNPROVEN -> provenance docs, C5)
+# image / server-type are read-only LOOKUP nodes (cross-service `lookups:`):
+# create is a GET + capture, no teardown by design (the validator's
+# "create without delete" warning is expected there).
+version: 1
+resources:
+  keypair:
+    code: "cp-vs-keypair"
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: "POST /v1/keypairs"
+      body: {name: "regrkey{unique}", tags: []}
+    delete: {endpoint: "DELETE /v1/keypairs/regrkey{unique}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: virtualserver-keypair, steps: [create, get, delete]}
+    notes: "keypair는 id가 아니라 NAME으로 주소된다 — capture 없음, 소비자(server/ske-nodepool 등)는 같은 {unique} 값으로 keypair_name: regrkey{unique}를 보낸다 (소스 lifecycle들과 동일한 run-스코프 {unique} 공유 시맨틱). public_key 생략 시 SCP가 생성(zero-cost, 동기). 409 KeypairNameUsed = 동명 orphan 존재 — 이름 주소라 재사용 안전 (compute-virtualserver-full create-keypair는 409 허용)."
+
+  server-group:
+    code: "cp-vs-server-group"
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: "POST /v1/server-groups"
+      body: {name: "regrsgrp{unique}", policy: anti-affinity, tags: []}
+    capture: {server_group_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/server-groups/{server_group_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: compute-virtualserver-full,
+             steps: [create-server-group, delete-server-group]}
+    notes: "compute-virtualserver-full의 COVERAGE EXPANSION 항목 (a) — optional group이며 아직 dispatch-검증 전이라 docs. 자원 자체는 standalone/zero-cost (소스 lifecycle의 heavy는 VM 때문이지 server-group 때문이 아님)."
+
+  image:
+    code: "cp-vs-image-lookup"
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: "GET /v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50"
+    capture: {image_id: "$.images[0].id"}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-full, steps: [find-image]}
+    notes: "읽기 전용 LOOKUP 노드 (cross-service server.lookups의 image) — create가 GET이고 teardown이 없는 것이 의도. 소스 step의 params(status=active, scp_original_image_type=standard, visibility=public, limit=50 — services/compute__virtualserver.yaml image-lookup-params VALIDATED)를 endpoint 쿼리스트링으로 보존했다. capture envelope $.images[0].id verbatim."
+
+  server-type:
+    code: "cp-vs-server-type"
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: "GET /v1/server-types"
+    capture: {server_type_id: "$.server_types[0].id"}
+    provenance: docs
+    source: {lifecycle: compute-virtualserver-full, steps: [find-server-type]}
+    notes: "읽기 전용 LOOKUP 노드. 소스 capture는 필터 셀렉터({list: $.server_types, where_prefix: {id: s}, where_not_prefix: {id: g}, get: id} — s-타입만, g-타입 거부, services constraint server-type-prefix-s VALIDATED)인데 모델 capture 스키마는 단일 jsonpath만 지원해 $.server_types[0].id로 단순화 — 첫 항목이 g-타입이면 소비자 create가 4xx난다. composer에 필터 capture 지원이 들어가기 전까지 docs (R3 과제)."
+
+  server:
+    code: "cp-vs-server"
+    service: compute/virtualserver
+    heavy: true
+    requires: [vpc, subnet, security-group, keypair, image, server-type]
+    create:
+      endpoint: "POST /v1/servers"
+      body:
+        name: "regrsrv{unique}"
+        image_id: "{image.image_id}"
+        server_type_id: "{server-type.server_type_id}"
+        keypair_name: "regrkey{unique}"
+        product_category: compute
+        product_offering: virtual_server
+        networks:
+          - {subnet_id: "{subnet.subnet_id}"}
+        security_groups: ["{security-group.sg_id}"]
+        volumes:
+          - {boot_index: 0, size: 104, type: SSD, delete_on_termination: true}
+    capture: {server_id: "$.servers[0].id"}
+    ready: {field: "$.server.state", until: ACTIVE, timeout: 600, interval: 15}
+    delete: {endpoint: "DELETE /v1/servers/{server_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-full,
+             steps: [create-server, wait-server-active, delete-server, wait-server-gone]}
+    notes: "HEAVY (~17분, 과금). capture envelope은 ARRAY $.servers[0].id ($.server.id 아님). 필수 필드: product_category/product_offering/networks/security_groups (services quirk create-server-required). inline boot volume은 type: SSD (standalone 볼륨의 volume_type과 다름) + delete_on_termination: true — 실패 run은 태그 없는 orphan 볼륨을 남긴다 (boot-volume-untagged-orphan). 소스는 삭제 후 wait-gone 404 폴링 600/15. lock/unlock은 billable VM 고착 위험으로 소스가 의도적으로 제외."
+
+  block-volume:
+    code: "cp-vs-block-volume"
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: "POST /v1/volumes"
+      body: {name: "regrvol{unique}", description: "API regression suite",
+             size: 104, volume_type: SSD_Provisioned, max_iops: 10000,
+             max_throughput: 500, tags: []}
+    capture: {vol_id: "$.id"}
+    ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
+            timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/volumes/{vol_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-volume-snapshot,
+             steps: [create-volume, wait-volume-available, delete-volume]}
+    notes: "standalone (VPC 불필요). 필드는 volume_type이지 type이 아니다 (services quirk volume-field-name); capture는 FLAT $.id (filestorage의 $.volume_id와 다름). SSD_Provisioned는 max_iops/max_throughput 필수. 삭제는 409/500 재시도 6×20s + wait-gone 404 (소스 시맨틱)."
+
+  volume-snapshot:
+    code: "cp-vs-volume-snapshot"
+    service: compute/virtualserver
+    requires: [block-volume]
+    create:
+      endpoint: "POST /v1/snapshots"
+      body: {name: "regrsnap{unique}", description: "API regression suite",
+             force: true, volume_id: "{block-volume.vol_id}"}
+    capture: {snap_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/snapshots/{snap_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-volume-snapshot,
+             steps: [create-snapshot, delete-snapshot, wait-snapshot-gone]}
+    notes: "스냅샷을 지운 뒤(409/500 재시도 + 404 폴링) 볼륨을 지워야 한다 — 역순 teardown이 자연 보장. PUT /v1/snapshots/{id} rename은 vs-volume-transfer-coverage에서 UNPROVEN."
+
+  custom-image:
+    code: "cp-vs-custom-image"
+    service: compute/virtualserver
+    heavy: true
+    requires: [server]
+    create:
+      endpoint: "POST /v1/servers/{server.server_id}/images"
+      body: {image_name: "regrimg{ualpha}"}
+    capture: {custom_image_id: "$.image_id"}
+    delete: {endpoint: "DELETE /v1/images/{custom_image_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-full,
+             steps: [image-create, image-wait, image-delete]}
+    notes: "서버 스냅샷 이미지 — 서버가 STOPPED 상태여야 한다 (소스는 stop-server → image-create → start-server 순서; 합성기는 아직 이 상태 전이를 모르므로 단독 합성은 R3 과제). capture envelope $.image_id (services captures custom-image). 삭제는 409 재시도. POST /v1/images (외부 소스 등록)는 별도 image-registration 노드."
+
+  image-registration:
+    code: "cp-vs-image-reg"
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: "POST /v1/images"
+      body: {name: "regrimg{ualpha}", os_type: linux, disk_format: qcow2,
+             min_disk: 100, min_ram: 0, visibility: private, tags: []}
+    capture: {image_id: "$.image_id"}
+    delete: {endpoint: "DELETE /v1/images/{image_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-image-write-coverage, steps: [create-image]}
+    notes: "외부 소스로부터의 이미지 등록 (서버 스냅샷 custom-image와 다른 경로). 소스는 COVERAGE-ONLY — 실소스 없이 4xx 예상 body라 UNPROVEN(docs); capture envelope $.image_id도 미관측. import/share/members 하위 write들은 합성 대상이 아니라 소스 lifecycle에 남는다."
+
+  volume-transfer:
+    code: "cp-vs-volume-transfer"
+    service: compute/virtualserver
+    requires: [block-volume]
+    create:
+      endpoint: "POST /v1/volume-transfer"
+      body: {name: "regrvt{unique}", volume_id: "{block-volume.vol_id}"}
+    capture: {transfer_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/volume-transfer/{transfer_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-volume-transfer-coverage,
+             steps: [create-volume-transfer, delete-volume-transfer]}
+    notes: "body는 data/api_bodies.json createvolumetransfer(name+volume_id)에 근거하지만 소스는 soft-seed 볼륨으로 4xx — 실볼륨 주입은 이 모델이 처음 제공, 2xx/capture envelope UNPROVEN(docs). accept는 create가 발급하는 auth_key가 필요(미모델). transfer는 소유권 이전이라 수락 전 삭제가 안전한 teardown."
+
+  launch-configuration:
+    code: "cp-vs-launch-config"
+    service: compute/virtualserver
+    requires: [image, server-type, keypair]
+    create:
+      endpoint: "POST /v1/launch-configurations"
+      body:
+        name: "regrlc{unique}"
+        image_id: "{image.image_id}"
+        server_type_id: "{server-type.server_type_id}"
+        keypair_name: "regrkey{unique}"
+        volumes:
+          - {boot_index: 0, size: 100, type: SSD, delete_on_termination: true}
+        tags: []
+    capture: {launch_configuration_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/launch-configurations/{launch_configuration_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-launch-configuration, delete-launch-configuration]}
+    notes: "소스는 synthetic image/keypair id로 4xx 예상 (api_bodies 엔트리 없음, UNPROVEN) — 실자원 배선(image/server-type lookup + keypair)은 이 모델이 처음 제공. capture envelope $.id 미관측."
+
+  auto-scaling-group:
+    code: "cp-vs-asg"
+    service: compute/virtualserver
+    requires: [launch-configuration, subnet, security-group]
+    create:
+      endpoint: "POST /v1/auto-scaling-groups"
+      body:
+        name: "regrasg{unique}"
+        launch_configuration_id: "{launch-configuration.launch_configuration_id}"
+        desired_server_count: 1
+        min_server_count: 1
+        max_server_count: 2
+        subnet_id: "{subnet.subnet_id}"
+        security_groups: ["{security-group.sg_id}"]
+        tags: []
+    capture: {auto_scaling_group_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto_scaling_group_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-auto-scaling-group, delete-auto-scaling-group]}
+    notes: "비용 경고: ASG는 REAL billable VM을 관리한다 — desired 1이 성공하면 VM 1대가 켜진다 (소스는 그래서 synthetic id로 4xx 보장). body/capture UNPROVEN(docs); 라이브 검증 전 합성 run은 비용·잔존 VM 리스크를 명시 승인해야 한다."
+
+  asg-policy:
+    code: "cp-vs-asg-policy"
+    service: compute/virtualserver
+    requires: [auto-scaling-group]
+    create:
+      endpoint: "POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies"
+      body: {name: "regrpol{unique}", policy_type: SCALE_OUT,
+             adjustment_type: CHANGE_IN_CAPACITY, adjustment_value: 1,
+             cooldown: 300}
+    capture: {policy_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-asg-policy, delete-asg-policy]}
+    notes: "UNPROVEN body/capture (소스는 literal-seed ASG에 4xx). 정책 자체는 무자원이지만 부모 ASG가 billable — auto-scaling-group 노트 참조."
+
+  asg-schedule:
+    code: "cp-vs-asg-schedule"
+    service: compute/virtualserver
+    requires: [auto-scaling-group]
+    create:
+      endpoint: "POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules"
+      body: {name: "regrsch{unique}", desired_server_count: 2,
+             min_server_count: 1, max_server_count: 3,
+             start_time: "{today_plus_5y}T00:00:00Z"}
+    capture: {schedule_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-asg-schedule, delete-asg-schedule]}
+    notes: "UNPROVEN. start_time은 {today_plus_5y} builtin으로 원샷 스케줄을 먼 미래에 묶는다 (소스 verbatim — 실제로 스케일이 발화하지 않게 하는 안전장치)."
+
+  asg-notification:
+    code: "cp-vs-asg-notification"
+    service: compute/virtualserver
+    requires: [auto-scaling-group]
+    create:
+      endpoint: "POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications"
+      body: {name: "regrntf{unique}", notification_type: EMAIL,
+             recipients: ["regression-coverage@example.com"]}
+    capture: {notification_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-asg-notification, delete-asg-notification]}
+    notes: "UNPROVEN body/capture (소스는 literal-seed ASG에 4xx)."
