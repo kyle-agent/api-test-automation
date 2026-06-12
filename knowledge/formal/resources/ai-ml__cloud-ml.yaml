@@ -11,6 +11,20 @@
 # pattern: composer env-skips when the credential is not flagged on the env).
 version: 1
 resources:
+  # read-only LOOKUP node (server-type pattern): cloud-ml base image id.
+  cloudml-image:
+    code: "ai-ml-image-lookup"
+    service: ai-ml/cloud-ml
+    requires: []
+    create:
+      endpoint: "GET /v1/cloud-ml/images"
+    capture: {image_id: "$.images[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/cloud-ml/images", expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: cloud-ml-write-coverage, steps: [list-images]}
+    notes: "소스 list-images는 capture_soft probe — envelope $.images[0].id UNPROVEN, 라이브 200 후 승격."
+
   cloud-ml:
     code: "ai-ml-cloudml"
     service: ai-ml/cloud-ml
@@ -18,6 +32,7 @@ resources:
     requires:
       - {ref: ske-cluster}
       - container-registry
+      - cloudml-image
       - {credential: scr-auth-key,
          note: "container registry의 콘솔 발급 인증키 (SCR-push blocker와 동일 클래스) — 환경에 표시돼 있지 않으면 env-skip (services/ai-ml__cloud-ml.yaml cloudml-credential-precondition-class)"}
     create:
@@ -26,7 +41,7 @@ resources:
         cloud_ml_name: "regr-cloudml-{ualpha}"
         description: "API regression suite"
         cluster_id: "{ske-cluster.cluster_id}"
-        image_id: "{opt.image_id}"
+        image_id: "{cloudml-image.image_id}"
         domain_name: "regr-cloudml-{ualpha}"
         endpoint_type: "{opt.endpoint_type}"
         use_copilot: false
@@ -35,8 +50,6 @@ resources:
         copilot: {cpu: 0, gpu: "", memory: 0}
         tags: []
       options:
-        image_id: {type: string, required: true,
-                   note: "lookup — GET /v1/cloud-ml/images $.images[0].id (소스 lifecycle list-images capture_soft)"}
         endpoint_type: {type: enum, values: [PUBLIC, PRIVATE], default: PUBLIC,
                         required: true, vary: true,
                         note: "소스 lifecycle은 PUBLIC을 보냈다; api_bodies 모델은 문자열 — PRIVATE 변형은 C4/R3 라이브 검증 대상"}

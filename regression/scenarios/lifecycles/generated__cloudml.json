@@ -1,0 +1,520 @@
+{
+  "_comment": "Composed cloud-ml verification chain (owner domain knowledge 2026-06-11) — enable when the SCR auth key is configured.",
+  "lifecycles": [
+    {
+      "id": "gen-cloudml-chain",
+      "service": "ai-ml/cloud-ml",
+      "enabled": false,
+      "_note": "composed cloud-ml full chain — 9-node closure: keypair/registry/k8s-version/sg/vpc/subnet/filestorage -> ske-cluster -> cloud-ml; needs credentials: scr-auth-key",
+      "steps": [
+        {
+          "name": "create-cloudml-image",
+          "service": "cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml/images",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "create-keypair",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "create-container-registry",
+          "service": "scr",
+          "method": "POST",
+          "path": "/v1/container-registries",
+          "json": {
+            "name": "regrscr{unique}",
+            "private_acl_enabled": false,
+            "private_acl_resources": [],
+            "public_acl_resources": [],
+            "public_visible_enabled": false
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "reg_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/container-registries/{reg_id}",
+            "service": "scr"
+          }
+        },
+        {
+          "name": "wait-container-registry",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/container-registries/{reg_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "Running",
+              "RUNNING",
+              "active",
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-kubernetes-version",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/kubernetes-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "kube_ver": "$.kubernetes_versions[0].kubernetes_version"
+          }
+        },
+        {
+          "name": "create-security-group",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-filestorage-volume",
+          "service": "filestorage",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrfs{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "volume_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-filestorage-volume",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-ske-cluster",
+          "service": "ske",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrske{unique}",
+            "kubernetes_version": "{kube_ver}",
+            "cloud_logging_enabled": "false",
+            "vpc_id": "{vpc_id}",
+            "subnet_id": "{subnet_id}",
+            "security_group_id_list": [
+              "{sg_id}"
+            ],
+            "private_endpoint_access_control_resources": [],
+            "tags": [],
+            "volume_id": "{volume_id}",
+            "public_endpoint_access_control_ip": "0.0.0.0/0",
+            "service_watch_logging_enabled": "true"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "ske"
+          }
+        },
+        {
+          "name": "wait-ske-cluster",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "create-cloud-ml",
+          "service": "cloud-ml",
+          "method": "POST",
+          "path": "/v1/cloud-ml",
+          "json": {
+            "cloud_ml_name": "regr-cloudml-{ualpha}",
+            "description": "API regression suite",
+            "cluster_id": "{cluster_id}",
+            "image_id": "{image_id}",
+            "domain_name": "regr-cloudml-{ualpha}",
+            "endpoint_type": "PUBLIC",
+            "use_copilot": false,
+            "analytics_resource": {
+              "cpu": 1,
+              "gpu": "",
+              "memory": 2
+            },
+            "application_resource": {
+              "cpu": 1,
+              "memory": 2
+            },
+            "copilot": {
+              "cpu": 0,
+              "gpu": "",
+              "memory": 0
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cloud_ml_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cloud-ml/{cloud_ml_id}",
+            "service": "cloud-ml"
+          }
+        },
+        {
+          "name": "verify-cloud-ml",
+          "service": "cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml/{cloud_ml_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-cloud-ml",
+          "service": "cloud-ml",
+          "method": "DELETE",
+          "path": "/v1/cloud-ml/{cloud_ml_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-ske-cluster",
+          "service": "ske",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-filestorage-volume",
+          "service": "filestorage",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-security-group",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-container-registry",
+          "service": "scr",
+          "method": "DELETE",
+          "path": "/v1/container-registries/{reg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-keypair",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ],
+      "credentials": [
+        "scr-auth-key"
+      ],
+      "heavy": true,
+      "_disabled_reason": "READY but gated: (1) SCR 인증키(scr-auth-key)가 테스트 계정에 미설정 — 소유자 콘솔 발급 대기, 없으면 cloud-ml create가 registry-credential 단계에서 실패(소유자 지식); (2) heavy chain — ske-cluster 포함 ~40-60분+과금. 인증키 설정 후 heavy=true scoped run으로 검증"
+    }
+  ]
+}
