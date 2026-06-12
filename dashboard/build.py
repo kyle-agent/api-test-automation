@@ -1573,7 +1573,8 @@ def build(
 
     meta = {
         "branch": branch,
-        "when": time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()),
+        "when": time.strftime("%Y-%m-%d %H:%M KST",
+                              time.gmtime(time.time() + 9 * 3600)),
         "run_type": run_type,
         "conf": conf,
     }

@@ -598,7 +598,12 @@ def run_sweep(client) -> int:
         for it in _select(c, "servicewatch", path, name_prefixes=(prefix,)):
             if not it.get("id"):
                 continue
-            st = _delete(c, "servicewatch", path, json={"ids": [it["id"]]})
+            # dashboards' bulk body is dashboard_ids (DashboardBulkDeleteRequest
+            # — live-confirmed runs 27398084089/27421363609); alerts/event-rules
+            # keep ids with the alternate-key fallback below.
+            primary = ({"dashboard_ids": [it["id"]]} if "dashboards" in path
+                       else {"ids": [it["id"]]})
+            st = _delete(c, "servicewatch", path, json=primary)
             if st and (200 <= st < 300 or st == 404):
                 deleted += 1
                 continue

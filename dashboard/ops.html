@@ -111,7 +111,7 @@
 
 <div class="panel"><b>런 이력</b> <span class="mut">(최신순 · 행 클릭 = 그 런의 자원 상태 보기)</span>
 <table id="hist"><thead><tr>
-  <th>run</th><th>sha</th><th>종료(UTC)</th><th>형태</th><th>ok</th><th>soft</th>
+  <th>run</th><th>sha</th><th>종료(KST)</th><th>형태</th><th>ok</th><th>soft</th>
   <th>fail<sub>new</sub></th><th>cov_op</th><th>C3</th><th>tested</th>
 </tr></thead><tbody></tbody></table></div>
 
@@ -121,6 +121,13 @@
 </div>
 <script>
 const $=s=>document.querySelector(s);
+function kst(iso){ // ISO(UTC) -> 'MM-DD HH:MM KST'
+  if(!iso)return"";
+  const d=new Date(iso); if(isNaN(d))return String(iso);
+  const p=n=>String(n).padStart(2,"0");
+  const k=new Date(d.getTime()+9*3600*1000);
+  return `${p(k.getUTCMonth()+1)}-${p(k.getUTCDate())} ${p(k.getUTCHours())}:${p(k.getUTCMinutes())} KST`;
+}
 const DEFAULT_BASE="https://object-store.kr-west1.e.samsungsdscloud.com/ec11538abf8f46d2953539521f745366:apitest-oplog-permanent";  // live-verified 2026-06-11 (anon GET 200 + CORS)
 function base(){
   // URL PREFIX that object keys append to (RGW tenant syntax account:bucket)
@@ -156,7 +163,7 @@ function fmtRow(s){
   const h=s.history||{};
   return `<tr class="histrow" data-run="${s.run_id}" style="cursor:pointer"
     title="클릭 → 이 런의 자원 상태 보기"><td><a href="${s.url||'#'}" target="_blank">${s.run_id}</a></td>
-   <td><code>${s.sha||h.sha||""}</code></td><td>${(s.finished||"").replace("T"," ").replace("Z","")}</td>
+   <td><code>${s.sha||h.sha||""}</code></td><td>${kst(s.finished)}</td>
    <td>${h.crud_ran?"CRUD":"read-only"}</td><td class="ok">${h.ok??""}</td><td>${h.soft??""}</td>
    <td class="${(h.fail_new||0)>0?'bad':'ok'}">${h.fail_new??""}</td>
    <td>${h.cov_op??""}%</td><td>${h.cov_c3??""}%</td><td>${h.tested??""}</td></tr>`;
@@ -194,7 +201,7 @@ async function loadLive(idx){
     window.LIVE_RUNS=new Set(liveIds.map(String));
     if(!liveIds.length){
       const last=idx&&idx[0];
-      $("#liveBody").textContent="지금 도는 런 없음"+(last?` — 마지막 런 ${last.run_id} ${String(last.finished||"").replace("T"," ").replace("Z","")} 종료`:"");
+      $("#liveBody").textContent="지금 도는 런 없음"+(last?` — 마지막 런 ${last.run_id} ${kst(last.finished)} 종료`:"");
       return; }
     let html="";
     for(const rid of liveIds){
@@ -204,7 +211,7 @@ async function loadLive(idx){
       html+=`<div class="job">run <a href="${man.url||'#'}" target="_blank">${rid}</a>
         <code>${man.sha||""}</code> <span class="pill run">in flight</span></div>`;
       html+=evs.filter(Boolean).map(e=>
-        `<div class="ev"><time>${(e.ts||"").slice(11,19)}</time>
+        `<div class="ev"><time>${kst(e.ts).slice(6)}</time>
          <span class="pill">${e.job||"?"}</span> <b>${e.stage}</b>
          <span class="${e.status==='done'?'ok':e.status==='fail'?'bad':'run'}">${e.status}</span>
          <span class="mut">${(e.detail||"").slice(0,140)}</span></div>`).join("");
