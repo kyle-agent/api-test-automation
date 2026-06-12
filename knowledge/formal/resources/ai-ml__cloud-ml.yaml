@@ -33,6 +33,9 @@ resources:
       - {ref: ske-cluster}
       - container-registry
       - cloudml-image
+      # owner 힌트(2026-06-12): 이 credential이 기존 SCP access/secret key로
+      # 충족될 가능성 — container__scr.yaml quirk scr-auth-may-be-scp-keys.
+      # docker login 실험으로 확인되면 게이트 해제.
       - {credential: scr-auth-key,
          note: "container registry의 콘솔 발급 인증키 (SCR-push blocker와 동일 클래스) — 환경에 표시돼 있지 않으면 env-skip (services/ai-ml__cloud-ml.yaml cloudml-credential-precondition-class)"}
     create:

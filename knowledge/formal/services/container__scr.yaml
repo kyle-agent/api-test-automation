@@ -23,6 +23,9 @@ states:
   scr-registry: {field: $.state, ready: [Running, RUNNING, active, ACTIVE]}
 
 quirks:
+  - id: scr-auth-may-be-scp-keys
+    note: "owner 2026-06-12: SCR docker 로그인 인증이 별도 콘솔 발급 키가 아니라 기존 SCP access/secret key 그대로일 가능성 — 검증되면 scr-auth-key credential이 현재 env로 충족되어 docker push(이미지/태그 면적)와 cloud-ml 체인이 함께 풀린다. 검증 방법: CI 러너에서 docker login <registry-endpoint> -u <access_key> -p <secret_key> 후 hello-world push (워크플로 1-step 실험)."
+    provenance: docs
   - id: registry-delete-500-race
     note: "registry DELETE returns 500 for a few minutes right after creation (provisioning race), then succeeds — retry the delete on 500 for ~6 min; repository delete retries 409/500"
     provenance: VALIDATED
