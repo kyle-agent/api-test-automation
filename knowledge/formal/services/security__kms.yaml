@@ -25,6 +25,9 @@ states:
   kms-key: {field: $.status, ready: [Active]}   # Active / Stop (disabled) / To be terminated / Creating (docs; field name guessed)
 
 quirks:
+  - id: deletion-is-scheduled
+    note: "삭제가 즉시가 아니라 스케줄로 보임 — rev2 sweep(run 27401527554)에서 같은 regr kms 20개가 매 라운드 'deleted 2xx' 후에도 list에 계속 남음 (5라운드 반복). pending-deletion 상태가 리스트에 노출되는 듯 — reconciler가 해당 상태를 스킵하도록 개선 필요, 실제 소멸 시점은 콘솔 확인."
+    provenance: docs
   - id: delete-is-deferred
     note: "키 해지 offers 즉시 해지 (immediate) or 예약 해지 (permanent deletion after 72h, cancellable — cancelled keys come back DISABLED and need explicit re-activation). Teardown should use immediate; a key stuck in Creating allows only immediate termination"
     provenance: docs
