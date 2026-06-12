@@ -20,6 +20,12 @@ resources:
       body: {name: "regrgrp{ualpha}", description: "API regression suite",
              policy_ids: [], user_ids: [], tags: []}
     capture: {group_id: "$.group.id"}
+    verify:
+      - {name: read-members, endpoint: "GET /v1/groups/{group_id}/members",
+         expect_status: [200]}
+      - {name: read-policy-bindings,
+         endpoint: "GET /v1/groups/{group_id}/policy-bindings",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/groups/{group_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: iam-group, steps: [create, delete]}
@@ -46,6 +52,9 @@ resources:
                  Resource: ["*"], Principal: null}
         tags: []
     capture: {policy_id: "$.id"}
+    verify:
+      - {name: read-bindings, endpoint: "GET /v1/policies/{policy_id}/bindings",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/policies/{policy_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: iam-policy, steps: [create, delete]}

@@ -92,6 +92,18 @@ resources:
           - {boot_index: 0, size: 104, type: SSD, delete_on_termination: true}
     capture: {server_id: "$.servers[0].id"}  # post-create ops 가능(owner): dump/lock/unlock/password — services vs-postcreate-ops, C4 verify 후보
     ready: {field: "$.server.state", until: ACTIVE, timeout: 600, interval: 15}
+    verify:
+      - {name: read-ips, endpoint: "GET /v1/servers/{server_id}/ips",
+         expect_status: [200]}
+      - {name: read-ips-by-subnet,
+         endpoint: "GET /v1/servers/{server_id}/ips/{subnet.subnet_id}",
+         expect_status: [200]}
+      - {name: read-security-groups,
+         endpoint: "GET /v1/servers/{server_id}/security-groups",
+         expect_status: [200]}
+      - {name: read-console-log,
+         endpoint: "GET /v1/servers/{server_id}/console-log",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/servers/{server_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-full,
@@ -140,6 +152,11 @@ resources:
       endpoint: "POST /v1/servers/{server.server_id}/images"
       body: {image_name: "regrimg{ualpha}"}
     capture: {custom_image_id: "$.image_id"}
+    verify:
+      - {name: read-members,
+         endpoint: "GET /v1/images/{custom_image_id}/members",
+         expect_status: [200],
+         note: "공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)"}
     delete: {endpoint: "DELETE /v1/images/{custom_image_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-full,

@@ -23,6 +23,9 @@ resources:
                   default: rsa-2048, vary: true,
                   note: "키 spec. rsa-2048만 라이브 검증(VALIDATED 기본값). 문서상 AES-256/ECDSA/HMAC/ARIA spec도 존재하나 API purpose 코드 매핑은 R3 라이브 검증 과제 — aes-256은 UNPROVEN 추정값. Secrets Manager가 쓰려면 encrypt-capable spec(AES-256/RSA-2048/ARIA)이어야 한다 (services/security__secretsmanager.yaml kms-key-required)"}
     capture: {key_id: "$.key.id"}
+    verify:
+      - {name: read-users, endpoint: "GET /v1/kms/transit/{key_id}/users",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/kms/transit/{key_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: security-kms-key, steps: [create, delete]}

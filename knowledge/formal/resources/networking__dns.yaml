@@ -31,6 +31,12 @@ resources:
              private_dns_id: "{private-dns.private_dns_id}", type: private,
              tags: []}
     capture: {hosted_zone_id: "$.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/hosted-zones/{hosted_zone_id}",
+         expect_status: [200]}
+      - {name: read-records,
+         endpoint: "GET /v1/hosted-zones/{hosted_zone_id}/records",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/hosted-zones/{hosted_zone_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: networking-dns-hosted-zone-private,

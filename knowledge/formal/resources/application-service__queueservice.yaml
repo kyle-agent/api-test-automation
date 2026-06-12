@@ -15,6 +15,9 @@ resources:
              message_size: 256, data_key_reuse_period: 40,
              data_key_reuse_period_unit: minute, tags: []}
     capture: {queue_id: "$.id"}
+    verify:
+      - {name: read-attributes, endpoint: "GET /v1/queues/{queue_id}/attributes",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/queues/{queue_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: application-queueservice-queue, steps: [create, get, delete]}

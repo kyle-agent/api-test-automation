@@ -41,6 +41,12 @@ resources:
                note: "VPC cidr의 하위 /24 (composer가 부모 블록에서 8+j번째 /24를 절단)"}
     capture: {subnet_id: "$.subnet.id"}
     ready: {field: "$.subnet.state", until: ACTIVE, timeout: 180, interval: 10}
+    verify:
+      - {name: read-vips, endpoint: "GET /v1/subnets/{subnet_id}/vips",
+         expect_status: [200]}
+      - {name: read-sap-secondary-subnets,
+         endpoint: "GET /v1/subnets/{subnet_id}/sap-secondary-subnets",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/subnets/{subnet_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: networking-vpc-subnet, steps: [create-subnet, get-subnet-active, delete-subnet]}
@@ -180,6 +186,9 @@ resources:
          endpoint: "PUT /v1/vpc-peerings/{vpc_peering_id}/approval",
          json: {type: CREATE_APPROVE},
          expect_status: [200, 201, 202, 400]}
+      - {name: read-routing-rules,
+         endpoint: "GET /v1/vpc-peerings/{vpc_peering_id}/routing-rules",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/vpc-peerings/{vpc_peering_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: vpc-peering,
@@ -197,6 +206,13 @@ resources:
     capture: {transit_gateway_id: "$.transit_gateway.id"}
     ready: {field: "$.transit_gateway.state",
             until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
+    verify:
+      - {name: read-routing-rules,
+         endpoint: "GET /v1/transit-gateways/{transit_gateway_id}/routing-rules",
+         expect_status: [200]}
+      - {name: read-vpc-connections,
+         endpoint: "GET /v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/transit-gateways/{transit_gateway_id}",
              destructive: true}
     provenance: VALIDATED
