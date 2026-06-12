@@ -1,0 +1,67 @@
+# Resource-task model — database/postgresql (db-postgresql group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# database-postgresql-cluster (enabled+heavy; live-proven — the backup-histories
+# /unset-backup 401 quirk was observed against a real RUNNING cluster, run
+# 27258520218; cross-service.yaml postgresql-cluster is VALIDATED).
+#
+# PG body shape diverges from MySQL: database_encoding/database_locale instead
+# of character_set/case_sensitive, audit_enabled is a BOOLEAN, and there is no
+# service_watch_log_collection field (source body, kept verbatim).
+version: 1
+resources:
+  postgresql-cluster:
+    code: "db-postgresql-cluster"
+    service: database/postgresql
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regrpg{ualpha}"
+        instance_name_prefix: regrpg
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        ha_enabled: false
+        nat_enabled: false
+        subnet_id: "{subnet.subnet_id}"
+        timezone: Asia/Seoul
+        allowable_ip_addresses: []
+        origin_cluster_id: ""
+        vip_public_ip_id: ""
+        virtual_ip_address: ""
+        tags: []
+        init_config_option:
+          audit_enabled: false
+          database_encoding: UTF-8
+          database_locale: C
+          database_name: regrpg
+          database_port: 2866
+          database_user_name: regruser
+          database_user_password: "Regr1ss!2026Xy"
+          backup_option:
+            archive_frequency_minute: "60"
+            retention_period_day: "7"
+            starting_time_hour: "2"
+        maintenance_option:
+          period_hour: "5"
+          starting_day_of_week: MON
+          starting_time: "0000"
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {role_type: ACTIVE, service_ip_address: "", public_ip_id: ""}
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "LOOKUP — GET /v1/engine-versions $.contents[0].id (postgresql 호스트; 소스 find-engine-version 스텝). 합성기 런타임 조회 주입"}
+        server_type: {type: string, required: true,
+                      note: "LOOKUP — GET /v1/server-types $.contents[0].name (NAME, id 아님; 소스 find-server-type 스텝)"}
+    capture: {cluster_id: "$.resource.id"}
+    ready: {field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: database-postgresql-cluster,
+             steps: [create-cluster, wait-cluster, delete-cluster]}
+    notes: "HEAVY 과금 (~30-50분). 소스는 subnet adopt: subnet#db 공유. PG 전용 sub-op 면: archive(PUT/sync/DELETE), audit-log(PUT), 그 외 maintenance/backup/parameters — flat setter body (MySQL과 다름). 알려진 quirk: PUT backup-histories / DELETE backups 401 family (백엔드 auth quirk, services/database__postgresql.yaml). 비동기 쓰기 AsyncResponse {request_id, resource:{id}} — request_id는 생성 응답에서만. requires는 body 소비 기준 subnet만(cross-service 발산 경고 의도)."
