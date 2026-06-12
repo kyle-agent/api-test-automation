@@ -1,0 +1,36 @@
+# Resource-task model — ai-ml/aimlops-platform (ai-ml group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# aimlops-platform-release-write-coverage (enabled, heavy, COVERAGE-ONLY —
+# bodies NOT runtime-proven) + owner-provided domain knowledge in
+# knowledge/formal/services/ai-ml__aimlops-platform.yaml (2026-06-11).
+#
+# Owner fact encoded here: the ske-cluster prerequisite has a REAL
+# existing-or-create fork (§1's existing_or_create case) — branch ① references
+# an existing cluster, branch ② provisions a NEW cluster inside the aimlops
+# create and carries SKE's full closure + cost. Both branches are C4 targets.
+version: 1
+resources:
+  aimlops-platform:
+    code: "ai-ml-aimlops"
+    service: ai-ml/aimlops-platform
+    heavy: true
+    requires:
+      - {ref: ske-cluster, mode: existing_or_create}
+    create:
+      endpoint: "POST /v1/aimlops-platform"
+      body:
+        release_name: "regr-aimlops-{unique}"
+        cluster_id: "{ske-cluster.cluster_id}"
+        image_id: "{opt.image_id}"
+        namespace: "regr-aimlops-{ualpha}"
+        description: "API regression suite"
+      options:
+        image_id: {type: string, required: true,
+                   note: "lookup — GET /v1/aimlops-platform/images $.images[0].id (소스 lifecycle list-images capture_soft)"}
+    capture: {release_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/aimlops-platform/{release_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: aimlops-platform-release-write-coverage,
+             steps: [list-images, release-aimlops-platform, update-aimlops-platform,
+                     delete-aimlops-platform]}
+    notes: "'release' = AI/ML-Ops 플랫폼을 ske 클러스터 위에 프로비저닝 — billable·느림. 이 body 템플릿은 분기 ①(기존/선행 생성 클러스터 참조) 형상이다; 분기 ②(신규 클러스터를 aimlops create 안에서 함께 생성)의 body 형상은 미문서(docs JS-rendered, api_bodies 없음) — R3 라이브/콘솔 파생 과제이며 두 분기 모두 C4 변형 대상 (services/ai-ml__aimlops-platform.yaml aimlops-fork-is-c4-variation). 소스 lifecycle은 의도적으로 실생성하지 않는 coverage probe (release_id를 존재하지 않는 필드로 capture_soft → 404 보장)라 body(release_name/cluster_id/image_id/namespace 필드 세트 best-effort)/capture envelope $.id 모두 UNPROVEN(docs)."

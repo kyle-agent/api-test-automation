@@ -1,0 +1,62 @@
+# Resource-task model — data-analytics/data-ops (da-do group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# data-ops-service-and-ops-guarded (enabled, heavy, COVERAGE-ONLY — bodies
+# mirror data-flow which mirrors the dbaas shape, UNPROVEN -> docs).
+version: 1
+resources:
+  data-ops-service:
+    code: "da-do-service"
+    service: data-analytics/data-ops
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/data-ops-services"
+      body:
+        name: "regrdosvc{ualpha}"
+        description: "API regression suite"
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        subnet_id: "{subnet.subnet_id}"
+        nat_enabled: false
+        instance_name_prefix: "regrdo"
+        timezone: "Asia/Seoul"
+        allowable_ip_addresses: []
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type_name}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {role_type: ACTIVE, service_ip_address: "192.168.10.10/32"}
+        tags: []
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다(4xx 예상 coverage probe); 실값 출처는 R3 과제"}
+        server_type_name: {type: string, required: true,
+                           note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다; POST .../validate-resources가 콘솔의 dry-run preflight"}
+    capture: {data_ops_service_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/data-ops-services/{data_ops_service_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: data-ops-service-and-ops-guarded,
+             steps: [create-data-ops-service, update-data-ops-service,
+                     delete-data-ops-service]}
+    notes: "billable analytics cluster + service 프로비저닝 — 소스 lifecycle은 실생성하지 않는 coverage probe(기존 id를 list에서 capture_soft). body는 data-flow와 동일한 UNPROVEN(docs) 템플릿, capture envelope $.id는 list 관례 추론. 콘솔은 create 전에 POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources를 호출한다."
+
+  data-ops:
+    code: "da-do-ops"
+    service: data-analytics/data-ops
+    heavy: true
+    requires: [data-ops-service]
+    create:
+      endpoint: "POST /v1/data-ops"
+      body:
+        name: "regrdo{ualpha}"
+        description: "API regression suite"
+        data_ops_service_id: "{data-ops-service.data_ops_service_id}"
+        tags: []
+    capture: {data_ops_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/data-ops/{data_ops_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: data-ops-service-and-ops-guarded,
+             steps: [create-data-ops, update-data-ops, delete-data-ops]}
+    notes: "ops는 data-ops-service 위의 논리 자원. body는 소스 lifecycle 그대로(UNPROVEN — coverage probe), capture envelope $.id는 read-coverage list 관례에서 추론. GET /v1/data-ops/{name}/check-duplication으로 이름 중복 사전 점검 가능."

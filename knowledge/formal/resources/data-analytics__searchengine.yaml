@@ -1,0 +1,57 @@
+# Resource-task model — data-analytics/searchengine (da-se group, OpenSearch
+# DBaaS). Schema: docs/RESOURCE-MODEL-PLAN.md §1.
+#
+# The hand-written lifecycles (searchengine-cluster-subops-guarded /
+# searchengine-read-coverage) are COVERAGE-ONLY: they adopt an existing cluster
+# and never create one, so the create below comes from data/api_bodies.json
+# searchenginecreatecluster (docs provenance, UNPROVEN).
+version: 1
+resources:
+  searchengine-cluster:
+    code: "da-se-cluster"
+    service: data-analytics/searchengine
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regrse{ualpha}"
+        allowable_ip_addresses: []
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        init_config_option:
+          backup_option: {retention_period_day: "7", starting_time_hour: "2"}
+          database_port: 9200
+          database_user_name: "{opt.db_user_name}"
+          database_user_password: "{opt.db_user_password}"
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type_name}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {public_ip_id: "", role_type: ACTIVE,
+                 service_ip_address: "192.168.10.10/32"}
+        instance_name_prefix: "regrse"
+        is_combined: false
+        license: ""
+        maintenance_option: {period_hour: "5", starting_day_of_week: MON,
+                             starting_time: "0000"}
+        nat_enabled: false
+        subnet_id: "{subnet.subnet_id}"
+        tags: []
+        timezone: "Asia/Seoul"
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "lookup — GET /v1/engine-versions $.contents[0].id (searchengine-read-coverage capture)"}
+        server_type_name: {type: string, required: true,
+                           note: "lookup — DBaaS server-type 목록; api_bodies sample은 빈 문자열"}
+        db_user_name: {type: string, required: true,
+                       note: "OpenSearch 관리자 계정명 — 정책 미문서, R3 라이브 검증"}
+        db_user_password: {type: string, required: true,
+                           note: "OpenSearch 관리자 비밀번호 — 정책 미문서, R3 라이브 검증"}
+    capture: {cluster_id: "$.resource.id"}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: searchengine-cluster-subops-guarded,
+             steps: [list-clusters, capture-subop-ids, add-instances]}
+    notes: "소스 lifecycle은 기존 cluster adopt형 coverage probe — create body는 api_bodies searchenginecreatecluster 형상의 UNPROVEN(docs) 템플릿 (role_type ACTIVE는 doc sample 그대로; subops의 add-instances도 ACTIVE를 보냈다). backup_option 값은 se-backup 스텝의 값(7일/02시)을 재사용. capture envelope $.resource.id는 DBaaS AsyncResponse 패턴 추론(eventstreams quirk와 동일 프레임워크) — UNPROVEN. 대시보드 재시작 등 sub-op은 task가 아닌 lifecycle 영역."

@@ -1,0 +1,59 @@
+# Resource-task model — data-analytics/vertica (da-vt group, analytics DB
+# DBaaS). Schema: docs/RESOURCE-MODEL-PLAN.md §1.
+#
+# The hand-written lifecycles (vertica-cluster-subops-guarded /
+# vertica-read-coverage) are COVERAGE-ONLY: they adopt an existing cluster and
+# never create one, so the create below comes from data/api_bodies.json
+# verticacreatecluster (docs provenance, UNPROVEN).
+version: 1
+resources:
+  vertica-cluster:
+    code: "da-vt-cluster"
+    service: data-analytics/vertica
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regrvt{ualpha}"
+        allowable_ip_addresses: []
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        init_config_option:
+          backup_option: {retention_period_day: "7", starting_time_hour: "2"}
+          database_locale: "ko_KR.utf8"
+          database_name: "{opt.database_name}"
+          database_user_name: "{opt.db_user_name}"
+          database_user_password: "{opt.db_user_password}"
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type_name}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {public_ip_id: "", role_type: ACTIVE,
+                 service_ip_address: "192.168.10.10/32"}
+        instance_name_prefix: "regrvt"
+        license: ""
+        maintenance_option: {period_hour: "5", starting_day_of_week: MON,
+                             starting_time: "0000"}
+        nat_enabled: false
+        subnet_id: "{subnet.subnet_id}"
+        tags: []
+        timezone: "Asia/Seoul"
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "lookup — GET /v1/engine-versions $.contents[0].id (vertica-read-coverage capture)"}
+        server_type_name: {type: string, required: true,
+                           note: "lookup — DBaaS server-type 목록; api_bodies sample은 빈 문자열"}
+        database_name: {type: string, required: true,
+                        note: "Vertica DB 이름 — 정책 미문서, R3 라이브 검증"}
+        db_user_name: {type: string, required: true,
+                       note: "DB 관리자 계정명 — 정책 미문서, R3 라이브 검증"}
+        db_user_password: {type: string, required: true,
+                           note: "DB 관리자 비밀번호 — 정책 미문서, R3 라이브 검증"}
+    capture: {cluster_id: "$.resource.id"}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: vertica-cluster-subops-guarded,
+             steps: [list-clusters, capture-subop-ids]}
+    notes: "소스 lifecycle은 기존 cluster adopt형 coverage probe — create body는 api_bodies verticacreatecluster 형상의 UNPROVEN(docs) 템플릿. license는 doc sample 그대로 빈 문자열(BYOL 여부 미문서). capture envelope $.resource.id는 DBaaS AsyncResponse 패턴 추론 — UNPROVEN. 라이선스/restore/backup sub-op은 task가 아닌 lifecycle 영역."

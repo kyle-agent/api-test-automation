@@ -1,0 +1,67 @@
+# Resource-task model — data-analytics/eventstreams (da-es group, Kafka DBaaS).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1.
+#
+# The hand-written lifecycles (eventstreams-cluster-subops-guarded /
+# eventstreams-read-coverage) are COVERAGE-ONLY: they adopt an existing cluster
+# from the list and never create one, so there is NO validated create to
+# extract. The create below is assembled from data/api_bodies.json
+# eventstreamscreatecluster + knowledge/formal/services/data-analytics__
+# eventstreams.yaml (docs provenance) — and it is KNOWN-BLOCKED: the live
+# attempt failed with an undocumented topology value_error (kafka-topology-roles),
+# which is why eventstreams stayed out of heavy-shared-dbaas.
+version: 1
+resources:
+  eventstreams-cluster:
+    code: "da-es-cluster"
+    service: data-analytics/eventstreams
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regres{ualpha}"
+        akhq_enabled: false
+        allowable_ip_addresses: []
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        init_config_option:
+          akhq_id: ""
+          akhq_password: ""
+          broker_port: 9091
+          broker_sasl_id: "regrsasl"
+          broker_sasl_password: "{opt.sasl_password}"
+          zookeeper_port: 2180
+          zookeeper_sasl_id: "regrsasl"
+          zookeeper_sasl_password: "{opt.sasl_password}"
+        instance_groups:
+          - role_type: "{opt.role_type}"
+            server_type_name: "{opt.server_type_name}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {public_ip_id: "", role_type: "{opt.role_type}",
+                 service_ip_address: "192.168.10.10/32"}
+        instance_name_prefix: "regres"
+        is_combined: false
+        maintenance_option: {period_hour: "5", starting_day_of_week: MON,
+                             starting_time: "0000"}
+        nat_enabled: false
+        service_watch_log_collection: true
+        subnet_id: "{subnet.subnet_id}"
+        tags: []
+        timezone: "Asia/Seoul"
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "lookup — GET /v1/engine-versions $.contents[0].id (read-coverage lifecycle의 dbaas_engine_version_id capture)"}
+        server_type_name: {type: string, required: true,
+                           note: "lookup — DBaaS server-type 목록; api_bodies sample은 빈 문자열"}
+        sasl_password: {type: string, required: true,
+                        note: "broker/zookeeper SASL 비밀번호 (생성 시 필수, 정책 미문서) — R3 라이브 검증 과제"}
+        role_type: {type: enum, required: true, vary: true,
+                    values: [ZOOKEEPER_BROKER, BROKER, ZOOKEEPER, AKHQ, CONSOLE],
+                    note: "Kafka 엔진의 InstanceGroupRequest enum (doc sample의 'ACTIVE'는 타 엔진용). 유효한 role 조합 토폴로지는 미문서 — 라이브 시도는 undocumented topology value_error로 실패 (services yaml kafka-topology-roles); 콘솔 파생 토폴로지 확정 전까지 이 노드는 합성 비대상"}
+    capture: {cluster_id: "$.resource.id"}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: eventstreams-cluster-subops-guarded,
+             steps: [list-clusters, capture-subop-ids]}
+    notes: "소스 lifecycle은 create 없이 기존 cluster를 adopt(capture_soft $.contents[0].id)하는 coverage probe — create body는 api_bodies eventstreamscreatecluster + services yaml 제약(create-cluster-required-init-config: sasl id pattern ^[a-z]+$ 2-20, name ^[a-zA-Z]*$ 3-20, prefix ^[a-z][a-zA-Z0-9\\-]*$ 3-13)에서 조립한 UNPROVEN(docs) 템플릿. capture envelope $.resource.id는 AsyncResponse {request_id, resource:{id}} quirk(request-id-only-from-async-writes)에서 추론 — UNPROVEN. 토폴로지 미확정으로 KNOWN-BLOCKED."
