@@ -1,0 +1,25 @@
+# Resource-task model — management/loggingaudit (mg-la group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from loggingaudit-trail
+# (enabled, guarded) by extract.py, curated by hand. start/stop trail and
+# downloadlogs are operations on the trail, not resources — they stay in the
+# hand-written lifecycle.
+version: 1
+resources:
+  trail:
+    code: "mg-la-trail"
+    service: management/loggingaudit
+    requires: []
+    create:
+      endpoint: "POST /v1/trails"
+      body: {name: "regrtrail{unique}", description: "API regression coverage probe",
+             object_storage_bucket_name: "{opt.object_storage_bucket_name}",
+             is_multi_region: false, tags: []}
+      options:
+        object_storage_bucket_name: {type: string, required: true,
+                                     default: "regrtrail{unique}",
+                                     note: "감사 로그를 받을 Object Storage 버킷명 — createtrail은 실존 버킷이 필요할 가능성이 높다(기본값은 미존재 버킷명 추정이라 400/403/422 예상). object-storage 버킷 노드가 모델에 생기면 ref 옵션으로 승격할 것 (R3)"}
+    capture: {trail_id: "$.trail.id"}
+    delete: {endpoint: "DELETE /v1/trails/{trail_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: loggingaudit-trail, steps: [create-trail, delete-trail]}
+    notes: "CloudTrail-equivalent 감사 trail. api_bodies 항목 없음 + docs JS-rendered — body(버킷 + log selector 추정)와 capture envelope $.trail.id 모두 BEST-GUESS UNPROVEN, 라이브 2xx 후 승격. start/stop은 body 없는 POST /v1/trails/{trail_id}/start|stop 오퍼레이션. Landing Zone 선행 체인의 구성 요소이기도 하다 (cloudcontrol-landing-zone notes)."
