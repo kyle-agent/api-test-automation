@@ -1,7 +1,7 @@
-# HEAVY rev 4: IGW prereq for static NAT (PF-13) + wave3 read-only first pass.
-# scr chain EXCLUDED so the docker probe can create its own registry
-# (rev 3 probe 403'd: the wave2-scr chain held the NON_VISIBILITY 1EA slot
-# and its registry was already deleting when the probe ran).
+# HEAVY rev 5: capture envelopes (static-nat / product) self-identify via the
+# new capture-failure body print; soft lookups (quota-request/support) skip
+# empty lists; probe retries with the registry-envelope unwrap.
+# scr chain still EXCLUDED so the probe owns the NON_VISIBILITY quota slot.
 mutations=true
 destructive=true
 heavy=true
