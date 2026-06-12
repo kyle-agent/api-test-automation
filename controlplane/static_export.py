@@ -31,6 +31,14 @@ PAGES = {
     "/planning/dependencies": "dependencies.html",
     "/planning/knowledge": "knowledge.html",
     "/knowledge": "knowledge.html",
+    "/testing": "testing.html",
+    "/reporting": "reporting.html",
+    "/reporting?tab=coverage": "reporting-coverage.html",
+    "/reporting?tab=conformance": "reporting-conformance.html",
+    "/reporting?tab=trends": "reporting-trends.html",
+    "/reporting?tab=triage": "reporting-triage.html",
+    "/planning/resources": "resources.html",
+    "/planning/resources/compose": "resource-compose.html",
 }
 
 BANNER = (
@@ -41,8 +49,7 @@ BANNER = (
     '<a href="../ops.html">ops 뷰어</a></div>')
 
 # dynamic routes that make no sense on Pages — neutralize their links
-_DEAD_PREFIXES = ("/testing", "/reporting", "/runs", "/ai", "/planning/edit",
-                  "/planning/resources", "/schedules", "/partials")
+_DEAD_PREFIXES = ("/runs", "/ai", "/planning/edit", "/schedules", "/partials")
 
 
 def _file_views() -> dict[str, str]:
@@ -69,6 +76,22 @@ def _rewrite(html: str, views: dict[str, str], depth: int = 0) -> str:
     # scenario service filter (query forms/links) — drop to the full list
     html = re.sub(r'href="/planning/scenarios\?[^"]*"',
                   f'href="{up}scenarios.html"', html)
+    # reporting sub-tabs -> per-tab static files (summary = reporting.html)
+    def tab_sub(m):
+        tab = m.group(1)
+        return (f'href="{up}reporting.html"' if tab == "summary"
+                else f'href="{up}reporting-{tab}.html"')
+    html = re.sub(r'href="/reporting\?tab=([a-z]+)"', tab_sub, html)
+    # resource-model node pages (exported per node)
+    # compose-with-targets / compare / testing-resources -> nearest static page
+    html = re.sub(r'href="/planning/resources/compose\?[^"]*"',
+                  f'href="{up}resource-compose.html"', html)
+    html = html.replace('href="/reporting/compare"', f'href="{up}reporting-trends.html"')
+    html = html.replace('href="/testing/resources"', f'href="{up}resources.html"')
+    html = re.sub(r'href="/planning/resources/([a-z0-9_-]+)"',
+                  lambda m: (f'href="{up}resource-compose.html"'
+                             if m.group(1) == "compose"
+                             else f'href="{up}resource__{m.group(1)}.html"'), html)
     for route, fname in sorted(PAGES.items(), key=lambda kv: -len(kv[0])):
         html = html.replace(f'href="{route}"', f'href="{up}{fname}"')
     # the in-platform dashboard proxy -> the Pages root copies
@@ -97,6 +120,18 @@ def export(out_dir: str) -> int:
                 continue
             (out / fname).write_text(_rewrite(resp.text, views), encoding="utf-8")
             written += 1
+        # per-node resource form pages (read-only on Pages)
+        try:
+            from controlplane import resource_model
+            for nid in sorted(resource_model.load_model() or {}):
+                resp = client.get(f"/planning/resources/{nid}")
+                if resp.status_code != 200:
+                    continue
+                (out / f"resource__{nid}.html").write_text(
+                    _rewrite(resp.text, views), encoding="utf-8")
+                written += 1
+        except Exception as exc:  # resource pages are best-effort
+            print(f"[static-export] resource pages skipped: {exc}")
         for rel, fname in views.items():
             resp = client.get("/planning/view", params={"path": rel})
             if resp.status_code != 200:
