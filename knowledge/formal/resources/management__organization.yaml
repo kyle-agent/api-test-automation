@@ -1,0 +1,124 @@
+# Resource-task model — management/organization (mg-org group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from the org-*-guarded
+# lifecycles (enabled but COVERAGE-ONLY: every mutating call is optional/
+# guarded and expected to 403 on this shared non-master account) by extract.py,
+# curated by hand. HIGHEST BLAST RADIUS in the platform — all nodes heavy
+# (SCP_RUN_HEAVY gate, prompt/owner rule: org-* is heavy) and provenance docs
+# (no validated bodies exist; services/management__organization.yaml
+# no-validated-bodies). The source lifecycles never capture from create on
+# purpose (they must not build real org structure); the capture envelopes
+# below are UNPROVEN guesses recorded so teardown semantics are modeled —
+# promote only after a real 2xx on a dedicated org-master test account (R3+).
+#
+# NOT modeled as nodes: policy-binding attach/remove (operation that ACTIVATES
+# an SCP on a target — never composed), leave-membership, accept/decline
+# invitation, move-account-parent (operations).
+version: 1
+resources:
+  organization:
+    code: "mg-org-org"
+    service: management/organization
+    heavy: true
+    requires: []
+    create:
+      endpoint: "POST /v1/organizations"
+      body: {name: "regr-org-{unique}",
+             description: "API regression coverage probe — DO NOT promote to real org"}
+    capture: {organization_id: "$.organization.id"}
+    delete: {endpoint: "DELETE /v1/organizations/{organization_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: org-organizations-guarded, steps: [create-organization, delete-organization]}
+    notes: "계정 계층의 root — 생성/삭제/탈퇴는 공유 계정 트리를 재구성/단절시키며 대부분 IRREVERSIBLE. 비-master 계정에선 403 (소스는 의도적으로 create를 delete에 체이닝하지 않음). capture envelope $.organization.id는 추정 — 소스는 read-only list($.contents[0].id)에서만 soft-capture. body UNPROVEN."
+
+  organization-unit:
+    code: "mg-org-unit"
+    service: management/organization
+    heavy: true
+    requires: [organization]
+    create:
+      endpoint: "POST /v1/organization-units"
+      body: {name: "regr-ou-{unique}", description: "API regression coverage probe"}
+    capture: {unit_id: "$.organization_unit.id"}
+    delete:
+      endpoint: "DELETE /v1/organization-units"
+      json: {ids: ["{unit_id}"]}
+      destructive: true
+    provenance: docs
+    source: {lifecycle: org-units-guarded, steps: [create-organization-unit, delete-organization-units]}
+    notes: "OU는 계정 계층을 분할 — 생성/삭제/account 이동이 실구조를 재편. 삭제는 path-id 없는 collection DELETE + body {ids:[...]} (shape UNPROVEN) — composer의 delete-body 지원은 R3 과제. capture envelope 추정(UNPROVEN). OU 이름 규칙은 services/management__cloudcontrol.yaml org-unit-name-rule 참조."
+
+  organization-account:
+    code: "mg-org-account"
+    service: management/organization
+    heavy: true
+    requires: [organization]
+    create:
+      endpoint: "POST /v1/organization-accounts"
+      body: {name: "regr-acct-{unique}", email: "kchoic.ai+regr{unique}@gmail.com"}
+    capture: {account_id: "$.organization_account.id"}
+    delete: {endpoint: "DELETE /v1/organization-accounts/{account_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: org-accounts-guarded, steps: [create-organization-account, delete-organization-account]}
+    notes: "member 계정 생성은 BILLABLE + 실 인프라 프로비저닝, 삭제/제거는 실계정 폐쇄/분리로 IRREVERSIBLE — 절대 자동 합성 대상이 아님 (소스도 create를 delete에 체이닝하지 않는 coverage-only). 비-master 계정 403 예상. body(name/email)/capture UNPROVEN. bulk 제거는 DELETE /v1/organization-accounts + body {ids:[...]} (별도 오퍼레이션)."
+
+  service-control-policy:
+    code: "mg-org-scp"
+    service: management/organization
+    heavy: true
+    requires: [organization]
+    create:
+      endpoint: "POST /v1/service-control-policies"
+      body:
+        name: "regr-scp-{unique}"
+        description: "API regression coverage probe — DENY-only, never attached"
+        policy_document:
+          Version: "2024-07-01"
+          Statement:
+            - {Sid: RegrProbeNoOp, Effect: Deny,
+               Action: ["organization:DeleteOrganization"], Resource: ["*"]}
+    capture: {scp_id: "$.service_control_policy.id"}
+    delete:
+      endpoint: "DELETE /v1/service-control-policies"
+      json: {ids: ["{scp_id}"]}
+      destructive: true
+    provenance: docs
+    source: {lifecycle: org-service-control-policies-guarded,
+             steps: [create-service-control-policy, delete-service-control-policies]}
+    notes: "플랫폼에서 가장 위험한 자원 — org/OU root에 부착된 SCP는 계층 전체(관리자 포함)를 잠글 수 있다. 미부착 생성 자체는 무해(enforcement는 attach 시점) — attach(POST /v1/assignments/policy-bindings)는 절대 모델/합성하지 않는다. policy_document는 IAM USER_DEFINED shape 미러링 추정. 삭제는 collection DELETE + {ids:[...]} body. body/capture UNPROVEN."
+
+  delegation-policy:
+    code: "mg-org-delegation"
+    service: management/organization
+    heavy: true
+    requires: [organization]
+    create:
+      endpoint: "POST /v1/delegation-policies"
+      body:
+        policy_document:
+          Version: "2024-07-01"
+          Statement:
+            - {Sid: RegrProbe, Effect: Allow,
+               Action: ["organization:ListAccounts"], Resource: ["*"]}
+    delete: {endpoint: "DELETE /v1/delegation-policies", destructive: true}
+    provenance: docs
+    source: {lifecycle: org-policy-bindings-and-delegation-guarded,
+             steps: [create-delegation-policy, delete-delegation-policy]}
+    notes: "org당 단일(싱글톤) 추정 — create/PUT/DELETE 모두 path-id 없음, capture 불필요. member 계정에 org 자원에 대한 위임 관리자를 부여 — 고위험, 비-master 계정 403 예상. body UNPROVEN."
+
+  org-invitation:
+    code: "mg-org-invitation"
+    service: management/organization
+    heavy: true
+    requires: [organization]
+    create:
+      endpoint: "POST /v1/invitations"
+      body: {email: "kchoic.ai+orginvite{unique}@gmail.com",
+             message: "API regression coverage probe"}
+    capture: {invitation_id: "$.invitation.id"}
+    delete:
+      endpoint: "PUT /v1/invitations/cancel"
+      json: {ids: ["{invitation_id}"]}
+      destructive: true
+    provenance: docs
+    source: {lifecycle: org-invitations-guarded, steps: [create-invitation, cancel-invitations]}
+    notes: "외부 계정을 org로 초대 (실제 메일 발송 가능) — 비-master 403 예상, accept에 체이닝 금지(실 멤버십 변경). teardown verb는 하드 DELETE가 아닌 PUT /v1/invitations/cancel + {ids:[...]} body — composer의 비-DELETE teardown 지원은 R3 과제. capture envelope 추정 — 소스는 organization-invitations/account-invitations list에서만 soft-capture. body UNPROVEN."
