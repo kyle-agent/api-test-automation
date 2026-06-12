@@ -1,0 +1,91 @@
+# Resource-task model — management/iam (mg-iam group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from iam-group / iam-policy
+# (enabled, live-validated) + iam-role-full / iam-credentials-heavy by
+# extract.py, curated by hand.
+#
+# NOT modeled as nodes (operation/coverage-only steps that need no or
+# unsatisfiable creates): user/group/role policy-bindings + members (operations
+# on the nodes below), bulk deletes, saml-provider (corrupt api_bodies entry,
+# no proven capture), account-user (needs a real {account_id} this caller does
+# not own), resource-policy (attaches to an existing SRN — operation), and
+# access-key send-otp (real notification trigger).
+version: 1
+resources:
+  iam-group:
+    code: "mg-iam-group"
+    service: management/iam
+    requires: []
+    create:
+      endpoint: "POST /v1/groups"
+      body: {name: "regrgrp{ualpha}", description: "API regression suite",
+             policy_ids: [], user_ids: [], tags: []}
+    capture: {group_id: "$.group.id"}
+    delete: {endpoint: "DELETE /v1/groups/{group_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: iam-group, steps: [create, delete]}
+    notes: "policy_ids/user_ids 빈 배열 — 선행 principal 불필요. envelope $.group.id doc 201 + 라이브 확인. {ualpha} = 문자 전용 토큰 (그룹명 규칙). 경로 /v1/groups는 iam-identity-center SSO group과 path-root가 겹친다 — per-service host 필수 (shared-path-roots 계열). 정책은 사용자/그룹에 바인딩 (policies-attach-to-groups-not-users)."
+
+  iam-policy:
+    code: "mg-iam-policy"
+    service: management/iam
+    requires: []
+    create:
+      endpoint: "POST /v1/policies"
+      body:
+        policy_name: "regrpol{ualpha}"
+        description: "API regression suite"
+        policy_category: IDENTITY_BASED
+        policy_type: USER_DEFINED
+        service_type: scp-iam
+        policy_version:
+          policy_version_name: "PolicyVersion-1"
+          policy_document:
+            Version: "2024-07-01"
+            Statement:
+              - {Sid: Statement1, Effect: Allow, Action: ["iam:*"],
+                 Resource: ["*"], Principal: null}
+        tags: []
+    capture: {policy_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/policies/{policy_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: iam-policy, steps: [create, delete]}
+    notes: "USER_DEFINED IDENTITY_BASED 정책. create envelope은 FLAT $.id (doc 201 확인 — $.policy.id 아님). 서버 할당 id 필드(default_version_id, policy_version.policy_id/policy_version_id)는 create에서 생략."
+
+  iam-role:
+    code: "mg-iam-role"
+    service: management/iam
+    requires: []
+    create:
+      endpoint: "POST /v1/roles"
+      body:
+        name: "regrrole{ualpha}"
+        description: "API regression suite"
+        role_type: USER_DEFINED
+        max_session_duration: 3600
+        assume_role_policy_document:
+          Version: "2024-07-01"
+          Statement:
+            - {Sid: statement1, Effect: Allow, Action: ["sts:AssumeRole"],
+               Condition: {}, Resource: []}
+        policy_ids: []
+        principals: []
+        tags: []
+    capture: {role_id: "$.role.id"}
+    delete: {endpoint: "DELETE /v1/roles/{role_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: iam-role-full, steps: [create-role, delete-role]}
+    notes: "body는 api_bodies createrole 기반, envelope $.role.id는 doc 202 예제 — 그러나 라이브 미증명: 이전 iam-role lifecycle이 POST /v1/roles에서 500 ContactAdminForAssistance를 봤고 현 소스도 'create may 500 on this account' RISK를 명시 (create가 optional). 라이브 2xx 후 VALIDATED 승격(R3). trust policy는 빈 Resource + principal 없음으로 실 SRN 의존 제거. roles는 가상 엔티티 (roles-are-virtual)."
+
+  iam-access-key:
+    code: "mg-iam-access-key"
+    service: management/iam
+    heavy: true
+    requires: []
+    create:
+      endpoint: "POST /v1/access-keys"
+      body: {access_key_type: PERMANENT, description: "API regression suite"}
+    capture: {access_key_id: "$.access_key_id"}
+    delete: {endpoint: "DELETE /v1/access-keys/{access_key_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: iam-credentials-heavy, steps: [create-access-key, delete-access-key]}
+    notes: "HEAVY — 실제 자격증명(영구 access key) 생성이라 SCP_RUN_HEAVY 게이트 (소스 lifecycle heavy:true). 공유 계정에선 403/400 예상 (소스는 coverage-only optional). capture는 소스에서 capture_soft($.access_key_id, FLAT 추정) — UNPROVEN. parent_access_key_id/passcode는 계정 특이 필드라 생략. 인증키 수 제한 + 임시키 모드 등 보안설정은 services/management__iam.yaml auth-key-limits 참조."
