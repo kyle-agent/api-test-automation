@@ -17,6 +17,9 @@ resources:
     delete: {endpoint: "DELETE /v1/devops-services/{devops_service_id}",
              destructive: true}
     provenance: docs
+    # live 400 (run 27394211896): ValidationError detail ["Field required"]x3
+    # WITHOUT field names — the API hides which fields are missing (itself an
+    # error-schema defect). Needs userguide research before the next attempt.
     source: {lifecycle: devopsservice-write-coverage,
              steps: [check-name-duplication, create-devops-service,
                      delete-devops-service]}

@@ -148,9 +148,9 @@ resources:
              resource_key: "{unique}", resource_type: "{opt.target}",
              subnet_id: "{subnet.subnet_id}", vpc_id: "{vpc.vpc_id}", tags: []}
       options:
-        target: {type: enum, values: [FS, dns, objectstorage, filestorage, scr],
+        target: {type: enum, values: [FS, OBS, SCR], default: FS,
                  required: true, vary: true,
-                 note: "C4 변형 대상 (§1 예시의 대상 등록 enum). 소스 lifecycle은 FS를 보냈고(2xx 미확인), 문서 대상군 dns/objectstorage/filestorage/scr과의 API 코드 매핑은 R3 라이브 검증 과제"}
+                 note: "유효 enum은 라이브 ValidationError가 직접 알려줌(run 27394211896): 'VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)' — dns는 유효 타입이 아님 (VALIDATED enum)"}
         endpoint_ip_address: {type: string, required: true, default: "10.124.0.20",
                               note: "선택한 subnet cidr 내부의 빈 IP여야 한다 — 기본값은 소스 lifecycle의 공유 subnet에 묶인 값"}
     capture: {vpc_endpoint_id: "$.vpc_endpoint.id"}

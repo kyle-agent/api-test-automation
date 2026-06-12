@@ -75,7 +75,7 @@ resources:
     capture: {method_type: "$.methods[0].method_type"}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/resources/{apigw-resource.resource_id}/methods/{method_type}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage,
              steps: [create-method, delete-method]}
     notes: "method는 id가 아니라 method_type으로 주소화된다 (createmethod 응답 $.methods[]에 id 없음). MethodCreateRequestV1Dot3 — body는 docs 모델 파생, NOT runtime-proven."
@@ -89,7 +89,7 @@ resources:
       body: {description: "API regression deployment", stage_name: dev,
              stage_type: new}
     capture: {deployment_id: "$.deployment_id"}
-    provenance: docs
+    provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage, steps: [create-deployment]}
     notes: "deployment DELETE 엔드포인트는 카탈로그에 없다(불변 리비전 — api 삭제로 회수) → 의도적으로 delete 없음. createapideployment(api_bodies): stage_type=new가 같은 호출에서 stage `dev`까지 생성하고 $.deployment_id를 반환. 메서드 ≥1개 선행 필요(NoMethodsExist) → requires에 apigw-method."
 
@@ -103,7 +103,7 @@ resources:
              deployment_id: "{apigw-deployment.deployment_id}"}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/stages/stg{unique}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage,
              steps: [create-stage, delete-stage]}
     notes: "stage는 id가 아니라 stage_name으로 주소화된다 — capture 없음; delete 경로의 stg{unique}는 create body와 동일 {unique} 전개(런 내 상수)에 의존한다. stage_name 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$ (≥3자). config/active-deployment PUT setter는 lifecycle 영역."
@@ -133,7 +133,7 @@ resources:
     capture: {access_control_id: "$.id"}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/access-controls/{access_control_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage,
              steps: [create-access-control, delete-access-control]}
     notes: "createaccesscontrols는 $.id를 직접 반환 (docs 모델). connected_stages [dev] → requires에 apigw-deployment."
@@ -149,7 +149,7 @@ resources:
     capture: {usage_plan_id: "$.usage_plan.id"}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/usage-plans/{usage_plan_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage,
              steps: [create-usage-plan, delete-usage-plan]}
     notes: "rate enum hour|day|month, limit 1..2000000000 (docs 모델). description/quota PUT setter는 lifecycle 영역."
@@ -162,11 +162,16 @@ resources:
       endpoint: "POST /v1/apis/{apigw-api.api_id}/usage-plans/{apigw-usage-plan.usage_plan_id}/api-keys"
       body: {name: "regrkey{ualpha}", description: "API regression api key"}
     capture: {api_key_id: "$.api_key.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/apis/{apigw-api.api_id}/usage-plans/{apigw-usage-plan.usage_plan_id}/api-keys/{api_key_id}",
+         expect_status: [200, 403],
+         note: "per-id GET이 403 'Action definition is not found' (IAM action 미정의 — 제품 결함 후보, run 27394211896). 결함 추적용으로 403 허용"}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/usage-plans/{apigw-usage-plan.usage_plan_id}/api-keys/{api_key_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: apigateway-api-write-coverage,
-             steps: [create-api-key, delete-api-key]}
+             steps: [create-api-key, delete-api-key],
+             live: "create 200 — run 27394211896 (gen-wave-apigw)"}
 
   apigw-privatelink-endpoint:
     code: "ap-apigw-ple"

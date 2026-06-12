@@ -12,7 +12,9 @@ resources:
       endpoint: "POST /v1/budgets/account"
       body:
         name: "regr-budget-{unique}"
-        budget_amount: 1000000
+        # live 400 "Amount is required." while sending budget_amount
+        # (run 27394211896) -> the field name is `amount`
+        amount: 1000000
         currency: KRW
         period_type: MONTHLY
         notifications:

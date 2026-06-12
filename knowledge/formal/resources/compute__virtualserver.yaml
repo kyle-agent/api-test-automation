@@ -34,7 +34,7 @@ resources:
     capture: {server_group_id: "$.id"}
     delete: {endpoint: "DELETE /v1/server-groups/{server_group_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # full pass incl. teardown — run 27394211896 (gen-wave-vslight)
     source: {lifecycle: compute-virtualserver-full,
              steps: [create-server-group, delete-server-group]}
     notes: "compute-virtualserver-full의 COVERAGE EXPANSION 항목 (a) — optional group이며 아직 dispatch-검증 전이라 docs. 자원 자체는 standalone/zero-cost (소스 lifecycle의 heavy는 VM 때문이지 server-group 때문이 아님)."
@@ -170,7 +170,7 @@ resources:
     capture: {transfer_id: "$.id"}
     delete: {endpoint: "DELETE /v1/volume-transfer/{transfer_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # full pass incl. teardown — run 27394211896 (gen-wave-vslight)
     source: {lifecycle: vs-volume-transfer-coverage,
              steps: [create-volume-transfer, delete-volume-transfer]}
     notes: "body는 data/api_bodies.json createvolumetransfer(name+volume_id)에 근거하지만 소스는 soft-seed 볼륨으로 4xx — 실볼륨 주입은 이 모델이 처음 제공, 2xx/capture envelope UNPROVEN(docs). accept는 create가 발급하는 auth_key가 필요(미모델). transfer는 소유권 이전이라 수락 전 삭제가 안전한 teardown."

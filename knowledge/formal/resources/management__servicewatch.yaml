@@ -36,13 +36,16 @@ resources:
       endpoint: "POST /v1/log-groups/{log-group.log_group_id}/log-streams"
       body: {name: "regrls{unique}"}
     capture: {log_stream_id: "$.log_stream.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/log-groups/{log-group.log_group_id}/log-streams/{log_stream_id}",
+         expect_status: [200]}
     delete:
       endpoint: "DELETE /v1/log-groups/{log-group.log_group_id}/log-streams"
       json: {ids: ["{log_stream_id}"]}
       destructive: true
     provenance: VALIDATED
     source: {lifecycle: servicewatch-loggroup-logstream, steps: [create-stream, delete-stream]}
-    notes: "부모 log-group 하위 child 자원 — delete path가 부모 capture를 쓴다 (validator의 dotted-prereq-token-in-delete 허용 케이스). teardown 역순: stream 먼저, group 나중."
+    notes: "부모 log-group 하위 child 자원 — delete path가 부모 capture를 쓴다 (validator의 dotted-prereq-token-in-delete 허용 케이스). teardown 역순: stream 먼저, group 나중. 주의: log-streams LIST GET은 403 'Action definition is not found' (IAM action 미정의 — 제품 결함 후보, run 27394211896) → verify는 per-id GET 사용."
 
   alert:
     code: "mg-sw-alert"
