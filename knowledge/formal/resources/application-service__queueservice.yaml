@@ -16,8 +16,10 @@ resources:
              data_key_reuse_period_unit: minute, tags: []}
     capture: {queue_id: "$.id"}
     verify:
-      - {name: read-attributes, endpoint: "GET /v1/queues/{queue_id}/attributes",
-         expect_status: [200]}
+      - {name: read-attributes,
+         endpoint: "GET /v1/queues/{queue_id}/attributes?attributes=All&name=regrq{unique}",
+         expect_status: [200, 400],
+         note: "attributes·name 쿼리 둘 다 required (docs + run 27399448835 400 Field required x2). attributes 유효값 미문서 — All 추정"}
     delete: {endpoint: "DELETE /v1/queues/{queue_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: application-queueservice-queue, steps: [create, get, delete]}

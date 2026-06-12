@@ -33,7 +33,7 @@ _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 
 LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps", "credentials",
                   "needs_cert_material", "_note", "_comment", "_disabled_reason"}
-STEP_KEYS = {"name", "method", "path", "service", "json", "params",
+STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
              "expect_status", "capture", "capture_soft", "cleanup", "poll",
              "wait", "retries", "retry_interval", "retry_on_status",
              "group", "optional", "destructive", "adopt", "probe_reads",

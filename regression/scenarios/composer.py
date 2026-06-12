@@ -760,6 +760,8 @@ def compose(targets: list, choices: dict | None = None,
         body = create.get("body")
         if body is not None:
             step["json"] = ctx.sub(inst, body)
+        if create.get("headers") is not None:
+            step["headers"] = ctx.sub(inst, create["headers"])
         step["expect_status"] = [200, 201, 202]
         caps = ctx.capture_vars(inst)
         if caps:
@@ -811,6 +813,8 @@ def compose(targets: list, choices: dict | None = None,
                     vstep["path"] = ctx.sub(inst, vpath)
                     if v.get("json") is not None:
                         vstep["json"] = ctx.sub(inst, v["json"])
+                    if v.get("headers") is not None:
+                        vstep["headers"] = ctx.sub(inst, v["headers"])
                     vstep["expect_status"] = v.get("expect_status") or [200]
                     if len(target_set) > 1:
                         vstep["group"] = node
@@ -857,6 +861,11 @@ def compose(targets: list, choices: dict | None = None,
         # an explicit model expectation wins over both defaults
         if delete.get("expect_status"):
             dstep["expect_status"] = list(delete["expect_status"])
+        # explicit retry semantics (e.g. provisioning-race 500s) also win
+        if delete.get("retry_on_status"):
+            dstep["retry_on_status"] = list(delete["retry_on_status"])
+            dstep["retries"] = int(delete.get("retries", 8))
+            dstep["retry_interval"] = int(delete.get("retry_interval", 15))
         if task.get("adopt") and "#" not in inst:
             dstep["adopt"] = task["adopt"]
         steps.append(dstep)

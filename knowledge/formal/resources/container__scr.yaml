@@ -23,7 +23,10 @@ resources:
     ready: {field: "$.state", until: [Running, RUNNING, active, ACTIVE],
             timeout: 180, interval: 10}
     delete: {endpoint: "DELETE /v1/container-registries/{reg_id}",
+             retry_on_status: [500, 409], retries: 24, retry_interval: 15,
              destructive: true}
+    # registry-delete-500-race (services quirk VALIDATED): 생성 직후 수분간
+    # DELETE가 500 — run 27399448835에서 합성본도 재현, 재시도로 흡수
     verify:
       - {name: read, endpoint: "GET /v1/container-registries/{reg_id}",
          expect_status: [200]}

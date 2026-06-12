@@ -36,7 +36,14 @@ resources:
       endpoint: "POST /v1/snapshots"
       body: {volume_id: "{filestorage-volume.volume_id}"}
     capture: {snapshot_id: "$.snapshot.id"}
-    delete: {endpoint: "DELETE /v1/snapshots/{snapshot_id}", destructive: true}
+    verify:
+      - {name: read, endpoint: "GET /v1/snapshots/{snapshot_id}",
+         expect_status: [200, 403],
+         note: "403 'Action definition is not found' (run 27399448835) — IAM action 미정의 제품 결함 클래스 3번째 사례 (log-streams LIST·api-key per-id GET과 동일)"}
+      - {name: list, endpoint: "GET /v1/snapshots", expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/snapshots/{snapshot_id}",
+             retry_on_status: [500, 409], retries: 4, retry_interval: 15,
+             destructive: true}
     provenance: docs
     source: {lifecycle: filestorage-replication-schedule,
              steps: [create-snapshot, delete-snapshot]}

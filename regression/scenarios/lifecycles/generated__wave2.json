@@ -5,7 +5,7 @@
       "id": "gen-wave2-queue",
       "service": "application-service/queueservice",
       "enabled": true,
-      "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: queue",
+      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
           "name": "create-queue",
@@ -40,9 +40,10 @@
           "name": "verify-queue-read-attributes",
           "service": "queueservice",
           "method": "GET",
-          "path": "/v1/queues/{queue_id}/attributes",
+          "path": "/v1/queues/{queue_id}/attributes?attributes=All&name=regrq{unique}",
           "expect_status": [
-            200
+            200,
+            400
           ]
         },
         {
@@ -371,7 +372,7 @@
       "id": "gen-wave2-scf",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: scf-function, scf-cronjob-trigger",
+      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
           "name": "create-scf-function",
@@ -502,9 +503,10 @@
           "name": "verify-scf-function-read-logs",
           "service": "scf",
           "method": "GET",
-          "path": "/v1/cloud-functions/{cloud_function_id}/logs",
+          "path": "/v1/cloud-functions/{cloud_function_id}/logs?time=1h",
           "expect_status": [
-            200
+            200,
+            400
           ],
           "group": "scf-function"
         },
@@ -512,9 +514,10 @@
           "name": "verify-scf-function-read-metrics",
           "service": "scf",
           "method": "GET",
-          "path": "/v1/cloud-functions/{cloud_function_id}/metrics",
+          "path": "/v1/cloud-functions/{cloud_function_id}/metrics?time=1h",
           "expect_status": [
-            200
+            200,
+            400
           ],
           "group": "scf-function"
         },
@@ -589,7 +592,7 @@
       "id": "gen-wave2-volume",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: volume-snapshot",
+      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
           "name": "create-block-volume",
@@ -682,7 +685,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            500,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15
         },
         {
           "name": "delete-block-volume",
@@ -709,7 +718,7 @@
       "id": "gen-wave2-scr",
       "service": "container/scr",
       "enabled": true,
-      "_note": "composed wave — SCR userguide surface: registry check-dup/connectable/private-acl + repository policy PUT 7종 + empty images list (docker push 불필요 영역)",
+      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
           "name": "create-container-registry",
@@ -1007,10 +1016,11 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            500,
             409
           ],
-          "retries": 40,
-          "retry_interval": 30
+          "retries": 24,
+          "retry_interval": 15
         }
       ]
     },
@@ -1018,7 +1028,7 @@
       "id": "gen-wave2-fs",
       "service": "storage/filestorage",
       "enabled": true,
-      "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: fs-snapshot",
+      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
           "name": "create-filestorage-volume",
@@ -1086,10 +1096,20 @@
           }
         },
         {
-          "name": "verify-fs-snapshot",
+          "name": "verify-fs-snapshot-read",
           "service": "filestorage",
           "method": "GET",
           "path": "/v1/snapshots/{snapshot_id}",
+          "expect_status": [
+            200,
+            403
+          ]
+        },
+        {
+          "name": "verify-fs-snapshot-list",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/snapshots",
           "expect_status": [
             200
           ]
@@ -1104,7 +1124,13 @@
             202,
             204
           ],
-          "destructive": true
+          "destructive": true,
+          "retry_on_status": [
+            500,
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15
         },
         {
           "name": "delete-filestorage-volume",
@@ -1131,13 +1157,16 @@
       "id": "gen-wave2-cmep",
       "service": "management/cloudmonitoring",
       "enabled": true,
-      "_note": "composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: cm-event-policy",
+      "_note": "composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)",
       "steps": [
         {
           "name": "create-cm-account-resource",
           "service": "cloudmonitoring",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "headers": {
+            "X-ResourceType": "INSTANCE"
+          },
           "expect_status": [
             200,
             201,

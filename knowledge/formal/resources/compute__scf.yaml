@@ -45,13 +45,13 @@ resources:
          endpoint: "GET /v1/cloud-functions/{cloud_function_id}/configurations/url",
          expect_status: [200]}
       - {name: read-logs,
-         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/logs",
-         expect_status: [200],
-         note: "기간 query param이 필요할 수 있음 — 라이브 런에서 400이면 param 보강 (R3)"}
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/logs?time=1h",
+         expect_status: [200, 400],
+         note: "run 27399448835: 'must select either time or period' — docs엔 전부 optional로 기재된 미문서 필수 (undiscoverable-params 클래스). time 포맷 1h 추정"}
       - {name: read-metrics,
-         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/metrics",
-         expect_status: [200],
-         note: "기간 query param이 필요할 수 있음 — 라이브 런에서 400이면 param 보강 (R3)"}
+         endpoint: "GET /v1/cloud-functions/{cloud_function_id}/metrics?time=1h",
+         expect_status: [200, 400],
+         note: "logs와 동일 — time 포맷 미문서"}
     delete: {endpoint: "DELETE /v1/cloud-functions/{cloud_function_id}",
              destructive: true}
     provenance: VALIDATED

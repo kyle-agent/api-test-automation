@@ -365,7 +365,8 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     platform command channel target this step's poll loop (stop_polling)."""
     params = step.get("params")
     try:
-        resp = client.request(step["method"], path, json=body, service=service, params=params)
+        resp = client.request(step["method"], path, json=body, service=service, params=params,
+                          headers=step.get("headers"))
     except Exception as exc:
         # One retry on a transport timeout (field case: iam PUT hit the 20s
         # read timeout once and failed the whole lifecycle). Slow-but-alive
@@ -374,14 +375,16 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
             raise
         print(f"  step '{step.get('name')}' transport timeout — retrying once ({exc})")
         time.sleep(5)
-        resp = client.request(step["method"], path, json=body, service=service, params=params)
+        resp = client.request(step["method"], path, json=body, service=service, params=params,
+                          headers=step.get("headers"))
     ros = step.get("retry_on_status")
     if ros:
         attempts = int(step.get("retries", 4))
         interval = float(step.get("retry_interval", 15))
         while resp.status in ros and attempts > 0:
             time.sleep(interval)
-            resp = client.request(step["method"], path, json=body, service=service, params=params)
+            resp = client.request(step["method"], path, json=body, service=service, params=params,
+                          headers=step.get("headers"))
             attempts -= 1
     poll = step.get("poll")
     if not poll:
@@ -426,7 +429,8 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
                   f"— abandoning wait (handled like a poll timeout)")
             break
         time.sleep(interval)
-        resp = client.request(step["method"], path, json=body, service=service, params=params)
+        resp = client.request(step["method"], path, json=body, service=service, params=params,
+                          headers=step.get("headers"))
     return resp
 
 

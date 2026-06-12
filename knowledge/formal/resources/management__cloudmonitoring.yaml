@@ -25,6 +25,9 @@ resources:
     requires: []
     create:
       endpoint: "GET /v1/cloudmonitorings/product/v2/accounts/products"
+      headers: {X-ResourceType: "INSTANCE"}
+      # run 27399448835: 400 InvalidHeaderValue 'X-ResourceType' — docs에 없는
+      # 필수 헤더(undiscoverable-params 결함 후보). INSTANCE는 추정값
     capture:
       product_resource_id:
         list: "$.contents"
