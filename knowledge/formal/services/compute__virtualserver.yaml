@@ -5,6 +5,15 @@ version: 1
 service: compute/virtualserver
 
 constraints:
+  - id: vs-port-attach-detach
+    rule: "A PRE-CREATED networking port can be attached to and detached from a virtual server repeatedly (owner 2026-06-12): POST /v1/servers/{id}/interfaces {port_id, subnet_id} / DELETE /v1/servers/{id}/interfaces/{port_id}. Source steps attach-port-to-server/detach-port-from-server in compute-virtualserver-full."
+    provenance: docs
+  - id: vs-static-nat-on-attached-port
+    rule: "Static NAT can be attached to / detached from a port that is ATTACHED to a server (owner 2026-06-12): POST /v1/servers/{id}/interfaces/{port_id}/static-nats {public_ip_id} needs a public-ip; DELETE removes it."
+    provenance: docs
+  - id: vs-postcreate-ops
+    rule: "After a server is created the following ops are possible (owner 2026-06-12): dump 생성(POST /dump), lock/unlock(POST /lock·/unlock), 패스워드 조회(POST /password — read-by-POST, the known method-verb defect). C4 verify candidates on the server node."
+    provenance: docs
   - id: server-type-prefix-s
     rule: "server_type_id must be chosen with prefix filter: id starts with 's', NOT 'g' (g-types rejected). Lookup from /v1/server-types"
     provenance: VALIDATED

@@ -537,7 +537,7 @@
       "id": "gen-wave-dashboard",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "composed verification wave 1 (R3, rev 3 after run 27395331657 triage) — targets: dashboard",
+      "_note": "composed verification wave 1 (rev 4) — dashboard capture fixed to flat $.id per DashboardDetailResponseV1Dot1 (run 27396649009 triage)",
       "steps": [
         {
           "name": "create-dashboard",
@@ -590,7 +590,7 @@
             202
           ],
           "capture": {
-            "dashboard_id": "$.dashboard.id"
+            "dashboard_id": "$.id"
           },
           "cleanup": {
             "method": "DELETE",
@@ -634,7 +634,7 @@
     {
       "id": "gen-wave-mgmisc",
       "service": "management/cloudmonitoring",
-      "enabled": true,
+      "enabled": false,
       "_note": "composed verification wave 1 (R3, rev 3 after run 27395331657 triage) — targets: cm-event-policy",
       "steps": [
         {
@@ -684,7 +684,8 @@
           ],
           "destructive": true
         }
-      ]
+      ],
+      "_disabled_reason": "cm-event-policy request shape was wrong — real EventPolicyCreateRequest = {eventPolicyRequest, productResourceId(ListAccountResources lookup)}; needs EventPolicyInfo research (run 27396649009)"
     },
     {
       "id": "gen-wave-devops",

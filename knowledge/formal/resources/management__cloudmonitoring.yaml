@@ -19,6 +19,12 @@ resources:
         eventLevel: {type: enum, values: [WARNING, CRITICAL], required: true,
                      default: WARNING, vary: true,
                      note: "이벤트 등급 — WARNING은 create body, CRITICAL은 소스의 modify body에서 관측. 둘 다 라이브 2xx 미확인(UNPROVEN)"}
+    # COMPOSITION-BLOCKED (run 27396649009: 400 InvalidInputValue
+    # resourceType/productResourceId): 실제 EventPolicyCreateRequest는
+    # {eventPolicyRequest: EventPolicyInfo, productResourceId, notificationRecipients?}
+    # 구조다 — 위 평면 body는 문서 초안 형태로 무효. productResourceId는
+    # GET ListAccountResources로 API 발견 가능(lookup 노드 후보,
+    # 예: INSTANCE-...) — EventPolicyInfo 필드 조사 + lookup 배선이 R3 과제.
     capture: {eventPolicyId: "$.eventPolicyId"}
     delete: {endpoint: "DELETE /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
              destructive: true}

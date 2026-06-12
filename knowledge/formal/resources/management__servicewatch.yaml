@@ -118,14 +118,14 @@ resources:
               view: line
             type: metric
             width: 1
-    capture: {dashboard_id: "$.dashboard.id"}
+    capture: {dashboard_id: "$.id"}
     delete:
       endpoint: "DELETE /v1/dashboards"
       json: {ids: ["{dashboard_id}"]}
       destructive: true
     provenance: docs
     source: {lifecycle: servicewatch-dashboard, steps: [create-dashboard, delete-dashboard]}
-    notes: "body는 api_bodies createdashboard 기반 (위젯 metric은 실 플랫폼 namespace 'Virtual Server' 참조 — 빈 매칭이어도 생성은 될 가능성). envelope $.dashboard.id 추정 UNPROVEN — 라이브 2xx 후 승격."
+    notes: "body는 api_bodies createdashboard 기반. create 201 라이브 확인(run 27396649009) — 응답은 DashboardDetailResponseV1Dot1, id가 FLAT 최상위($.id; 초기 추정 $.dashboard.id는 오류). 당시 캡처 실패로 dashboard 1건 누수 가능(레지스트리 sweep 대상)."
 
   event-rule:
     code: "mg-sw-event-rule"
