@@ -1,0 +1,32 @@
+# Resource-task model — management/quota (mg-quota group).
+# 조회 전용 서비스의 task화 (owner 정책 2026-06-12: 모든 서비스는 task 정의,
+# 시나리오는 task 합성) — lookup-node 패턴: create=list GET, 삭제 없음.
+version: 1
+resources:
+  account-quota:
+    code: "mg-quota-account"
+    service: management/quota
+    requires: []
+    create:
+      endpoint: "GET /v1/account-quotas"
+    capture: {account_quota_id: "$.account_quotas[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/account-quotas/{account_quota_id}",
+         expect_status: [200]}
+    provenance: VALIDATED
+    source: {lifecycle: quota-reads, steps: [list-account-quotas]}
+    notes: "조회 전용 lookup task — capture는 quota-reads에서 라이브 검증된 envelope verbatim. 계정에 quota 항목이 항상 존재(빈 리스트면 capture 실패로 표면화)."
+
+  quota-request:
+    code: "mg-quota-request"
+    service: management/quota
+    requires: []
+    create:
+      endpoint: "GET /v1/quota-requests"
+    capture: {request_id: "$.quota_requests[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/quota-requests/{request_id}",
+         expect_status: [200, 404]}
+    provenance: VALIDATED
+    source: {lifecycle: quota-reads, steps: [list-quota-requests]}
+    notes: "조회 전용 lookup task — 요청 이력이 없는 계정이면 capture 실패 가능 (env 의존)."

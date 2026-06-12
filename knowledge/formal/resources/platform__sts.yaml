@@ -1,0 +1,24 @@
+# Resource-task model — platform/sts (pf-sts group).
+# 토큰 발급 ops (owner 정책 2026-06-12: 모든 서비스 task화). 토큰은 만료형이라
+# delete 없음(no_api 아님 — create는 실재). role_indicator는 실 role SRN이
+# 필요해 기본값 없는 required 옵션 — Planning 폼(M5) 입력 전까지 합성기가
+# 거부하는 것이 의도된 게이트 (iam-role 생성은 PF-ledger의 500 차단 상태).
+version: 1
+resources:
+  sts-token:
+    code: "pf-sts-assume-role"
+    service: platform/sts
+    requires: []
+    create:
+      endpoint: "POST /v1/assume-role"
+      body:
+        role_indicator: "{opt.role_indicator}"
+        role_session_name: "regrsts{unique}"
+        duration_seconds: 900
+      options:
+        role_indicator: {type: string, required: true,
+                         note: "assume할 role의 SRN — 실값 필요 (소스 probe는 placeholder로 4xx). iam-role 생성이 라이브 500이라 콘솔 발급 role을 폼으로 입력"}
+    capture: {access_key: "$.credentials.access_key"}
+    provenance: docs
+    source: {lifecycle: sts-token-issuance-coverage, steps: [assume-role]}
+    notes: "응답 envelope $.credentials.* UNPROVEN. assume-role-with-saml(SAML 어설션 필요)·object-store-authorization은 별도 자격 전제가 커서 task화 보류 — coverage probe lifecycle이 C2 유지."

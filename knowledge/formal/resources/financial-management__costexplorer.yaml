@@ -1,0 +1,16 @@
+# Resource-task model — financial-management/costexplorer (fm-cost group).
+# 조회 전용 task (owner 정책 2026-06-12) — 서비스 단위 reads 묶음 노드.
+version: 1
+resources:
+  cost-reads:
+    code: "fm-cost-reads"
+    service: financial-management/costexplorer
+    requires: []
+    create:
+      endpoint: "GET /v1/bills"
+    verify:
+      - {name: usages, endpoint: "GET /v1/usages", expect_status: [200]}
+      - {name: payments-monthly, endpoint: "GET /v1/payments/monthly",
+         expect_status: [200]}
+    provenance: docs
+    notes: "조회 전용 reads 묶음 — 쿼리 전부 optional(docs). smoke가 3/3 200 관측 이력 → 라이브 합성 통과 시 승격. capture 불필요(자원 id 없음)."

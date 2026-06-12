@@ -1,0 +1,31 @@
+# Resource-task model — management/support (mg-support group).
+# 조회 전용 task (owner 정책 2026-06-12). 레코드 존재가 env 의존.
+version: 1
+resources:
+  support-inquiry:
+    code: "mg-support-inquiry"
+    service: management/support
+    requires: []
+    create:
+      endpoint: "GET /v1/inquiries"
+    capture: {inquiry_id: "$.inquiries[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/inquiries/{inquiry_id}",
+         expect_status: [200, 404]}
+    provenance: VALIDATED
+    source: {lifecycle: support-reads, steps: [list-inquiries]}
+    notes: "조회 전용 lookup task — 문의 이력 없으면 capture 실패(env 의존, 소스도 SOFT 처리)."
+
+  support-service-request:
+    code: "mg-support-sr"
+    service: management/support
+    requires: []
+    create:
+      endpoint: "GET /v1/service-requests"
+    capture: {service_request_id: "$.service_requests[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/service-requests/{service_request_id}",
+         expect_status: [200, 404]}
+    provenance: VALIDATED
+    source: {lifecycle: support-reads, steps: [list-service-requests]}
+    notes: "조회 전용 lookup task — 이력 env 의존."

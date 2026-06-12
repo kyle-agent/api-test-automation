@@ -1,0 +1,29 @@
+# Resource-task model — platform/product (pf-product group).
+# 조회 전용 task (owner 정책 2026-06-12). envelope은 docs 추정 — 라이브 후 승격.
+version: 1
+resources:
+  product-category:
+    code: "pf-product-category"
+    service: platform/product
+    requires: []
+    create:
+      endpoint: "GET /v1/product-categories"
+    capture: {category_id: "$.product_categories[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/product-categories/{category_id}",
+         expect_status: [200]}
+    provenance: docs
+    notes: "조회 전용 lookup task — capture envelope $.product_categories[0].id UNPROVEN (smoke가 list 200 확인, per-id·envelope은 라이브 검증 대상)."
+
+  product:
+    code: "pf-product-product"
+    service: platform/product
+    requires: []
+    create:
+      endpoint: "GET /v1/products"
+    capture: {product_id: "$.products[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/products/{product_id}",
+         expect_status: [200]}
+    provenance: docs
+    notes: "조회 전용 lookup task — envelope UNPROVEN."

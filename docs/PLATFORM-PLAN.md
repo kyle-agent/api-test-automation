@@ -440,6 +440,13 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - [x] 폼 기반 자원 모델 UI(§3 흐름) — `/planning/resources` 목록 + 노드 폼 +
       합성 미리보기/draft 저장 (`controlplane/resource_routes.py`), Pages
       정적 export에 read-only로 포함
+- [x] **전 서비스 task 정의** (owner 정책 2026-06-12: "조회 전용도 task로
+      정리 — 이후 모든 서비스는 task 정의, 시나리오는 task 합성") — 조회
+      전용 6개 서비스(quota/support/product/sts/costexplorer/pricing)를
+      lookup-task 패턴으로 모델링, 카탈로그 **59개 서비스 전부**가 모델
+      노드 보유(141 노드/59 파일). 신규 시나리오는 합성(`gen-*`)으로만
+      추가하고 수작업 lifecycle은 동치 검증 후 대체되는 레거시
+      (docs/RESOURCE-MODEL-PLAN.md §0 표준 정책)
 - [ ] **R3 계속** — heavy rev 3 결과 확인(static NAT·scr/fs 재합성) →
       다음 웨이브 fan-out(잔여 docs 노드 72; 모델은 lookup 노드 추가로
       127→**128**), 노드별 VALIDATED 승격(현재 56) → 수작업 lifecycle 점진

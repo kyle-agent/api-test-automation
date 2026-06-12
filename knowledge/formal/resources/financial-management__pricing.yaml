@@ -1,0 +1,16 @@
+# Resource-task model — financial-management/pricing (fm-pricing group).
+# 조회 전용 task (owner 정책 2026-06-12).
+version: 1
+resources:
+  pricing-reads:
+    code: "fm-pricing-reads"
+    service: financial-management/pricing
+    requires: []
+    create:
+      endpoint: "GET /v1/reports/offerings"
+    verify:
+      - {name: billing-item-ids, endpoint: "GET /v1/reports/billing-item-ids",
+         expect_status: [200]}
+      - {name: prices, endpoint: "GET /v1/reports/prices", expect_status: [200]}
+    provenance: docs
+    notes: "조회 전용 reads 묶음 — 쿼리 전부 optional(docs)."

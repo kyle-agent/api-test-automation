@@ -29,6 +29,19 @@
 **검증된 body 템플릿을 그대로 보유**하게 하고(역추출), 합성 결과는 노드별로
 기존 수작업 lifecycle과 **동치 비교 + 라이브 검증을 통과한 뒤에만** 교체한다.
 
+### 표준 정책 (owner, 2026-06-12)
+
+> **조회 전용 서비스도 task로 정리한다. 이후 모든 서비스는 task 정의,
+> 시나리오는 task 합성.**
+
+- **모든 서비스 = task 정의**: 자원형 53개 서비스에 더해 조회 전용 6개
+  (quota·support·product·sts·costexplorer·pricing)도 lookup-task 패턴
+  (create=GET + capture + verify, delete 없음)으로 모델링한다. 카탈로그의
+  59개 서비스 전부가 `knowledge/formal/resources/`에 노드를 갖는다.
+- **모든 시나리오 = task 합성**: 신규 시나리오는 합성기(`gen-*`)로만
+  추가한다. 손으로 쓴 lifecycle은 레거시 — 동치 검증을 통과한 합성본이
+  순차 대체한다 (§4 단계 계획의 교체 트랙).
+
 ## 1. 자원 task 스키마
 
 위치: `knowledge/formal/resources/<category>__<service>.yaml` (formal 3층
