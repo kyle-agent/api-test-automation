@@ -1,0 +1,28 @@
+# Resource-task model — management/cloudmonitoring (mg-cm group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# cloudmonitoring-event-policy (enabled, guarded) by extract.py, curated by
+# hand. NOTE the misleading API op names: 'puteventpolicy' is the CREATE
+# (POST); 'getmetricperfdatalist' is a read-shaped POST query (not modeled —
+# operation, no resource).
+version: 1
+resources:
+  cm-event-policy:
+    code: "mg-cm-event-policy"
+    service: management/cloudmonitoring
+    requires: []
+    create:
+      endpoint: "POST /v1/cloudmonitorings/event/v2/event-policies"
+      body: {eventPolicyName: "regrcmep{unique}", productTypeCode: Server,
+             eventLevel: "{opt.eventLevel}", enabled: true,
+             description: "API regression coverage probe"}
+      options:
+        eventLevel: {type: enum, values: [WARNING, CRITICAL], required: true,
+                     default: WARNING, vary: true,
+                     note: "이벤트 등급 — WARNING은 create body, CRITICAL은 소스의 modify body에서 관측. 둘 다 라이브 2xx 미확인(UNPROVEN)"}
+    capture: {eventPolicyId: "$.eventPolicyId"}
+    delete: {endpoint: "DELETE /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: cloudmonitoring-event-policy,
+             steps: [create-event-policy, delete-event-policy]}
+    notes: "api_bodies 항목 없음 + docs JS-rendered — body는 BEST-GUESS이며 실제로는 실 productResourceId + addrbook 수신자가 필요할 가능성이 높아 400/422 예상. capture envelope $.eventPolicyId(FLAT, camelCase — path param 미러링)는 추정 UNPROVEN. 필드 네이밍이 플랫폼 표준 snake_case가 아닌 camelCase인 v2 API."
