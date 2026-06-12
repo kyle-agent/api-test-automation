@@ -266,7 +266,11 @@ def check_combos(ids: set[str], services: set[str]) -> int:
     return len(combos)
 
 
-WAIVER_CLASSES = {"blast-radius", "entitlement", "unsatisfiable-flow", "billing-prohibitive"}
+WAIVER_CLASSES = {"blast-radius", "entitlement", "unsatisfiable-flow",
+                  "billing-prohibitive",
+                  # owner-decided scope exclusion (e.g. PFS reads-only,
+                  # owner 2026-06-12) — not an account/entitlement limit
+                  "owner-exclusion"}
 
 
 def check_waivers() -> int:
