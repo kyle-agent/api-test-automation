@@ -1,0 +1,62 @@
+# Resource-task model — data-analytics/data-flow (da-df group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# data-flow-service-and-flow-guarded (enabled, heavy, COVERAGE-ONLY — bodies
+# best-effort from the shared SCP analytics-console shape, UNPROVEN -> docs).
+version: 1
+resources:
+  data-flow-service:
+    code: "da-df-service"
+    service: data-analytics/data-flow
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/data-flow-services"
+      body:
+        name: "regrdfsvc{ualpha}"
+        description: "API regression suite"
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        subnet_id: "{subnet.subnet_id}"
+        nat_enabled: false
+        instance_name_prefix: "regrdf"
+        timezone: "Asia/Seoul"
+        allowable_ip_addresses: []
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type_name}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {role_type: ACTIVE, service_ip_address: "192.168.10.10/32"}
+        tags: []
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다(4xx 예상 coverage probe); 실값 출처는 R3 과제"}
+        server_type_name: {type: string, required: true,
+                           note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다; POST .../validate-resources가 콘솔의 dry-run preflight"}
+    capture: {data_flow_service_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/data-flow-services/{data_flow_service_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: data-flow-service-and-flow-guarded,
+             steps: [create-data-flow-service, update-data-flow-service,
+                     delete-data-flow-service]}
+    notes: "billable analytics cluster + service 프로비저닝 — 소스 lifecycle은 실생성하지 않는 coverage probe(기존 id를 list에서 capture_soft). body는 dbaas instance_groups 형상을 미러링한 UNPROVEN(docs) 템플릿, capture envelope $.id는 list($.contents[0].id) 관례에서 추론한 UNPROVEN 값. 콘솔은 create 전에 POST /v1/data-flow-services/clusters/{cluster_id}/validate-resources를 호출한다(dry-run preflight)."
+
+  data-flow:
+    code: "da-df-flow"
+    service: data-analytics/data-flow
+    heavy: true
+    requires: [data-flow-service]
+    create:
+      endpoint: "POST /v1/data-flows"
+      body:
+        name: "regrdf{ualpha}"
+        description: "API regression suite"
+        data_flow_service_id: "{data-flow-service.data_flow_service_id}"
+        tags: []
+    capture: {data_flow_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/data-flows/{data_flow_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: data-flow-service-and-flow-guarded,
+             steps: [create-data-flow, update-data-flow, delete-data-flow]}
+    notes: "flow는 data-flow-service 위의 논리 자원. body는 소스 lifecycle 그대로(UNPROVEN — coverage probe), capture envelope $.id는 read-coverage list($.contents[0].id) 관례에서 추론. GET /v1/data-flows/{name}/check-duplication으로 이름 중복 사전 점검 가능."

@@ -1,0 +1,42 @@
+# Resource-task model — data-analytics/quick-query (da-qq group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# quick-query-lifecycle-guarded (enabled, heavy, COVERAGE-ONLY — body
+# best-effort from the shared SCP analytics shape, UNPROVEN -> docs).
+version: 1
+resources:
+  quick-query:
+    code: "da-qq-query"
+    service: data-analytics/quick-query
+    heavy: true
+    requires: [subnet]
+    create:
+      endpoint: "POST /v1/quick-query"
+      body:
+        name: "regrqq{ualpha}"
+        description: "API regression suite"
+        dbaas_engine_version_id: "{opt.engine_version_id}"
+        subnet_id: "{subnet.subnet_id}"
+        nat_enabled: false
+        instance_name_prefix: "regrqq"
+        timezone: "Asia/Seoul"
+        allowable_ip_addresses: []
+        instance_groups:
+          - role_type: ACTIVE
+            server_type_name: "{opt.server_type_name}"
+            block_storage_groups:
+              - {role_type: OS, size_gb: 104, volume_type: SSD}
+            instances:
+              - {role_type: ACTIVE, service_ip_address: "192.168.10.10/32"}
+        tags: []
+      options:
+        engine_version_id: {type: string, required: true,
+                            note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다(4xx 예상 coverage probe); 실값 출처는 R3 과제"}
+        server_type_name: {type: string, required: true,
+                           note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다; POST /v1/quick-query/validate-resources가 dry-run preflight, PUT .../engine이 사후 변경"}
+    capture: {quick_query_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/quick-query/{quick_query_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: quick-query-lifecycle-guarded,
+             steps: [validate-resources, create-quick-query, delete-quick-query]}
+    notes: "billable query engine — 소스 lifecycle은 실생성하지 않는 coverage probe(기존 id를 list에서 capture_soft). body는 analytics-console 공유 형상의 UNPROVEN(docs) 템플릿, capture envelope $.id는 list($.contents[0].id) 관례에서 추론. description/domain/dsc-domain/engine/host-alias의 5개 in-place PUT setter는 task가 아닌 lifecycle/verify 영역 (domain/dsc-domain은 실 DSC 값 필요)."
