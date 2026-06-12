@@ -19,6 +19,10 @@ resources:
     capture: {volume_id: "$.volume_id"}
     ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
             timeout: 300, interval: 15}
+    verify:
+      - {name: read-access-rules,
+         endpoint: "GET /v1/volumes/{volume_id}/access-rules",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: filestorage-volume, steps: [create, wait-available, delete]}

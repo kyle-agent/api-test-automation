@@ -15,6 +15,10 @@ resources:
       endpoint: "POST /v1/resource-groups"
       body: {name: "regr-rg-{unique}", description: "created by API regression suite"}
     capture: {rg_id: "$.resource_group.id"}
+    verify:
+      - {name: read-resources,
+         endpoint: "GET /v1/resource-groups/{rg_id}/resources",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/resource-groups/{rg_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: resourcemanager-resource-group, steps: [create, delete]}
