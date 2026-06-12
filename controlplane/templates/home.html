@@ -1,58 +1,91 @@
 {% extends "base.html" %}
+{% block title %}Overview — SCP API Regression{% endblock %}
 {% block content %}
 
 {% if coverage %}
-<section>
-  <h2>현재 커버리지 (최근 발행 대시보드 기준 · {{ coverage.get('ts','') }})</h2>
-  <div class="cards">
-    <div class="card"><div class="num">{{ coverage.get('cov_op','-') }}%</div>
-      <div class="lbl">write-op 커버리지 (cov_op)</div></div>
-    <div class="card"><div class="num">{{ coverage.get('cov_get','-') }}%</div>
-      <div class="lbl">GET 커버리지 (cov_get)</div></div>
-    <div class="card"><div class="num">{{ coverage.get('cov_c3','-') }}%</div>
-      <div class="lbl">누적 C3 커버리지</div></div>
-    <div class="card"><div class="num">{{ coverage.get('reachable_pct','-') }}%</div>
-      <div class="lbl">static reachable</div></div>
-    <div class="card"><div class="num">{{ coverage.get('tested','-') }}/{{ coverage.get('total','-') }}</div>
-      <div class="lbl">이번 run 호출 endpoints</div></div>
-    <div class="card"><div class="num">{{ coverage.get('fail_new','-') }}</div>
-      <div class="lbl">신규 fail</div></div>
+  {% set fail_new = coverage.get('fail_new') or 0 %}
+  {% set fail_known = coverage.get('fail_known') or 0 %}
+  <div class="verdict {{ 'bad' if fail_new else '' }}">
+    <span class="pip"></span>
+    <div>
+      {% if fail_new %}
+      <b>REGRESSIONS — 신규 fail {{ fail_new }}건.</b>
+      마지막 스냅샷에서 새로 깨진 5xx/auth가 있습니다 — Report › Triage에서 분류를 확인하세요.
+      {% else %}
+      <b>HEALTHY — 신규 회귀 0건.</b>
+      마지막 스냅샷에서 새로 깨진 5xx/auth 없음, known-red {{ fail_known }}.
+      다음 레버: 쓰기 커버리지(cov_op {{ coverage.get('cov_op','-') }}%).
+      {% endif %}
+    </div>
   </div>
-  <p><a href="/dashboard/index.html">📊 현재 전체 대시보드 열기</a></p>
-</section>
+
+  <div class="tiles">
+    <div class="card tile">
+      <div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
+      <div class="k">write-op 커버리지 (cov_op)</div>
+      <div class="bar"><i style="width:{{ coverage.get('cov_op',0) }}%;background:var(--amber)"></i></div>
+      <div class="goal">목표 100%</div>
+    </div>
+    <div class="card tile">
+      <div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
+      <div class="k">GET 커버리지 (cov_get)</div>
+      <div class="bar"><i style="width:{{ coverage.get('cov_get',0) }}%;background:var(--green)"></i></div>
+      <div class="goal">목표 100%</div>
+    </div>
+    <div class="card tile">
+      <div class="v">{{ coverage.get('cov_c3','-') }}%</div>
+      <div class="k">누적 C3 검증</div>
+      <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--blue)"></i></div>
+      <div class="goal">목표 100%</div>
+    </div>
+    <div class="card tile">
+      <div class="v">{{ coverage.get('reachable_pct','-') }}%</div>
+      <div class="k">C1 static reachable</div>
+      <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
+      <div class="goal">전체 {{ coverage.get('total','-') }} API</div>
+    </div>
+    <div class="card tile">
+      <div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
+      <div class="k">신규 fail</div>
+      <div class="goal" style="margin-top:8px">{{ '회귀 발생 — Triage 확인' if fail_new else '회귀 없음' }}</div>
+    </div>
+  </div>
 {% else %}
-<section>
-  <h2>현재 커버리지</h2>
-  <p class="muted">dashboard-data 브랜치를 읽을 수 없습니다 — git 원격 접근을 확인하세요.</p>
-</section>
+  <div class="verdict none"><span class="pip"></span>
+    <div><b>스냅샷 없음</b> — dashboard-data 브랜치를 읽을 수 없습니다.
+      git 원격 접근을 확인하세요.</div></div>
 {% endif %}
 
-<section>
-  <h2>플랫폼 영역</h2>
-  <div class="cards">
-    <div class="card">
-      <div class="num"><a href="/planning">Planning</a></div>
-      <div class="lbl">환경 {{ profiles|length }} · 스위트 {{ suites|length }} ·
-        시나리오 {{ scenario_stats.total }}개({{ scenario_stats.services }}개 서비스) ·
-        knowledge</div>
-    </div>
-    <div class="card">
-      <div class="num"><a href="/testing">Testing</a></div>
-      <div class="lbl">수동 실행 · 스케줄 {{ schedules|length }}건 ·
-        진행 중 run {{ running|length }}건</div>
-    </div>
-    <div class="card">
-      <div class="num"><a href="/reporting">Reporting</a></div>
-      <div class="lbl">커버리지 · run 히스토리 · 스냅샷 대시보드 · AI triage</div>
-    </div>
-  </div>
-</section>
+<h2>파이프라인 <span class="hint">단계별 현황 — 클릭하면 해당 영역으로</span></h2>
+<div class="pipe">
+  <a class="pstage" href="/planning">
+    <div class="pl">Plan</div>
+    <div class="pv">{{ scenario_stats.total }}</div>
+    <div class="ps">시나리오 ({{ scenario_stats.enabled }} enabled ·
+      {{ scenario_stats.services }} 서비스)</div>
+    <span class="chev">→</span>
+  </a>
+  <a class="pstage" href="/testing">
+    <div class="pl">Run</div>
+    <div class="pv">{{ running|length }}
+      <span style="font-size:12px;font-weight:500;color:var(--muted)">진행 중</span></div>
+    <div class="ps">스케줄 {{ schedules|length }} · 오늘 실행 {{ runs_today }}</div>
+    <span class="chev">→</span>
+  </a>
+  <a class="pstage" href="/reporting">
+    <div class="pl">Report</div>
+    <div class="pv">{{ coverage.get('cov_c3','-') if coverage else '-' }}%</div>
+    <div class="ps">C3 검증 · 신규 회귀 {{ (coverage.get('fail_new') or 0) if coverage else '-' }}</div>
+  </a>
+</div>
 
-<section>
-  <h2>최근 run</h2>
+<h2>최근 RUN <span class="hint">control plane 기록 — 15초마다 갱신</span></h2>
+<div class="card pad" style="padding-top:4px">
   <div hx-get="/partials/runs?limit=5" hx-trigger="every 15s" hx-swap="innerHTML">
     {% include "_runs_table.html" %}
   </div>
-</section>
+  <p class="small" style="margin-bottom:6px"><a href="/reporting?tab=trends">전체 히스토리 — Report ›
+    Runs &amp; Trends →</a> · <a href="/dashboard/index.html">📊 현재 전체 대시보드</a></p>
+</div>
 
 {% endblock %}

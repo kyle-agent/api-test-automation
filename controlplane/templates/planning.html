@@ -1,75 +1,152 @@
 {% extends "base.html" %}
-{% block title %}Planning{% endblock %}
+{% block title %}Plan — SCP API Regression{% endblock %}
 {% block content %}
 
-<section>
-  <h2>Planning — Global 설정 · 시나리오 · Knowledge</h2>
-  <p class="muted">repo 파일이 source of truth입니다 — 편집은 검증 통과 시에만
-    반영되고 로컬 git 커밋으로 이력이 남습니다 (push는 운영자 수동,
-    docs/PLATFORM-PLAN.md §3.1).</p>
-</section>
-
-<section>
-  <h2>환경 프로파일 (regression 대상)</h2>
-  <table>
-    <tr><th>id</th><th>label</th><th>region/env</th><th>안전 게이트(forbid)</th>
-        <th>quota override</th><th></th></tr>
-    {% for p in profile_list %}
-    <tr>
-      <td><code>{{ p.get('id') }}</code></td>
-      <td>{{ p.get('label','') }}</td>
-      <td>{{ p.get('env',{}).get('SCP_REGION','-') }} /
-          {{ p.get('env',{}).get('SCP_ENV','-') }}</td>
-      <td>{% if p.get('forbid') %}<span class="warn">{{ p['forbid']|join(', ') }} 금지</span>
-          {% else %}<span class="muted">없음</span>{% endif %}</td>
-      <td class="muted">{{ p.get('quota_overrides',{}) or '-' }}</td>
-      <td><a href="/planning/view?path=environments/{{ p.get('id') }}.yaml">원본</a> ·
-          <a href="/planning/edit?path=environments/{{ p.get('id') }}.yaml">편집</a></td>
-    </tr>
-    {% endfor %}
-  </table>
-</section>
-
-<section>
-  <h2>스위트 (run 형태)</h2>
-  <table>
-    <tr><th>id</th><th>label</th><th>옵션</th><th></th></tr>
-    {% for s in suite_list %}
-    <tr>
-      <td><code>{{ s.get('id') }}</code></td>
-      <td>{{ s.get('label','') }}</td>
-      <td class="muted">{% for k, v in (s.get('request') or {}).items() %}{{ k }}={{ v }} {% endfor %}</td>
-      <td><a href="/planning/view?path=suites/{{ s.get('id') }}.yaml">원본</a> ·
-          <a href="/planning/edit?path=suites/{{ s.get('id') }}.yaml">편집</a></td>
-    </tr>
-    {% endfor %}
-  </table>
-</section>
-
-<section>
-  <h2>시나리오 카탈로그</h2>
-  <div class="cards">
-    <div class="card"><div class="num">{{ scenario_stats.total }}</div>
-      <div class="lbl">전체 lifecycle</div></div>
-    <div class="card"><div class="num">{{ scenario_stats.enabled }}</div>
-      <div class="lbl">enabled</div></div>
-    <div class="card"><div class="num">{{ scenario_stats.heavy }}</div>
-      <div class="lbl">heavy (과금성)</div></div>
-    <div class="card"><div class="num">{{ scenario_stats.services }}</div>
-      <div class="lbl">서비스</div></div>
+<h2>설정 <span class="hint">작고 안정적 — 환경과 스위트 (repo 파일이 source of truth ·
+  편집은 검증 통과 시에만 로컬 git 커밋)</span></h2>
+<div class="grid2">
+  {% for p in profile_list %}
+  <div class="card envcard">
+    <div class="eh">
+      <span class="en">{{ p.get('id') }}</span>
+      <span class="srvonly">편집 서버 전용</span>
+      <span class="er">{{ p.get('env',{}).get('SCP_REGION','-') }} /
+        {{ p.get('env',{}).get('SCP_ENV','-') }}</span>
+    </div>
+    <div class="meta">{{ p.get('label','') }}
+      {% if p.get('quota_overrides') %} · quota override
+      <code>{% for k, v in p['quota_overrides'].items() %}{{ k }}:{{ v }}{{ ' · ' if not loop.last }}{% endfor %}</code>
+      {% endif %}</div>
+    <div class="gate">
+      <span class="lbl">안전 게이트:</span>
+      {% for f in p.get('forbid') or [] %}
+      <span class="forbid">{{ f }} 금지</span>
+      {% else %}
+      <span class="allow">제한 없음</span>
+      {% endfor %}
+    </div>
+    <div class="small" style="margin-top:8px">
+      <a href="/planning/view?path=environments/{{ p.get('id') }}.yaml">원본</a> ·
+      <a href="/planning/edit?path=environments/{{ p.get('id') }}.yaml">편집</a>
+    </div>
   </div>
-  <p><a href="/planning/scenarios">시나리오 목록 (보기/편집) →</a> ·
-     <a href="/planning/dependencies">의존 그래프 · VPC 스케줄 →</a></p>
-</section>
+  {% endfor %}
+</div>
 
-<section>
-  <h2>자원 모델 (M5)</h2>
-  <p><a href="/planning/resources">서비스별 자원 task — 전제조건·옵션 입력 / 단독·묶음 합성 →</a></p>
-</section>
+<div class="card pad" style="margin-top:13px">
+  <div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:9px">스위트 (RUN 형태)</div>
+  <table>
+    <thead><tr><th>id</th><th>설명</th><th>mut</th><th>destr</th><th>heavy</th><th>conf</th><th></th></tr></thead>
+    <tbody>
+      {% for s in suite_list %}
+      {% set req = s.get('request') or {} %}
+      <tr>
+        <td><code>{{ s.get('id') }}</code></td>
+        <td>{{ s.get('label','') }}</td>
+        <td>{% if req.get('mutations') %}<span class="tag mutation">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if req.get('destructive') %}<span class="tag destructive">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if req.get('heavy') %}<span class="tag heavy">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if req.get('conformance') %}<span class="tag read">✓</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td style="white-space:nowrap" class="small">
+          <a href="/planning/view?path=suites/{{ s.get('id') }}.yaml">원본</a> ·
+          <a href="/planning/edit?path=suites/{{ s.get('id') }}.yaml">편집</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
-<section>
-  <h2>Knowledge</h2>
-  <p><a href="/planning/knowledge">서비스별 제약 · validated facts · formal YAML 브라우저 →</a></p>
-</section>
+<h2>시나리오 카탈로그 <span class="hint">크고 탐색적 — 이 화면의 주 테이블
+  (비고 클릭 = 전체 보기)</span></h2>
+<div class="fchips" id="scenChips">
+  <span class="fchip on" data-f="all"><b>{{ scenario_stats.total }}</b> 전체</span>
+  <span class="fchip" data-f="enabled"><b>{{ scenario_stats.enabled }}</b> enabled</span>
+  <span class="fchip" data-f="heavy"><b>{{ scenario_stats.heavy }}</b> heavy(과금성)</span>
+  <span class="fchip" data-f="disabled"><b>{{ disabled_count }}</b> disabled</span>
+  <input class="search" id="scenSearch" placeholder="서비스·시나리오 검색" style="margin-left:auto">
+</div>
+<div class="card pad" style="padding-top:4px">
+  <table>
+    <thead><tr><th>시나리오</th><th>서비스</th><th>steps</th><th>속성</th><th>비고</th><th></th></tr></thead>
+    <tbody id="scenBody">
+      {% for l in scenario_rows %}
+      <tr data-id="{{ l.id }}" data-service="{{ l.service }}"
+          data-enabled="{{ '1' if l.enabled else '' }}"
+          data-heavy="{{ '1' if l.heavy else '' }}">
+        <td><code>{{ l.id }}</code></td>
+        <td><span class="srv">{{ l.service }}</span></td>
+        <td>{{ l.steps }}</td>
+        <td>
+          {% if l.heavy %}<span class="tag heavy">heavy</span>{% endif %}
+          {% if l.adopt %}<span class="tag read">adopt:{{ l.adopt }}</span>{% endif %}
+          {% if not l.enabled %}<span class="tag disabled">disabled</span>{% endif %}
+        </td>
+        <td>
+          {% if l.note %}
+          <div class="biz" onclick="this.classList.toggle('open')">
+            {%- if l.note|length > 60 -%}
+            {{ l.note[:60] }}… <span class="toggle">더보기</span>
+            <div class="more">{{ l.note }}</div>
+            {%- else -%}{{ l.note }}{%- endif -%}
+          </div>
+          {% else %}<span class="note">—</span>{% endif %}
+        </td>
+        <td style="white-space:nowrap" class="small" title="{{ l.file }}">
+          <a href="/planning/view?path={{ l.file }}">보기</a> ·
+          <a href="/planning/edit?path={{ l.file }}&find={{ l.id }}">편집</a></td>
+      </tr>
+      {% endfor %}
+      <tr id="scenEmpty" style="display:none">
+        <td colspan="6" class="muted" style="padding:20px;text-align:center">결과 없음</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="grid2" style="margin-top:13px">
+  <a class="card pad" href="/planning/resources" style="color:inherit">
+    <b>자원 모델 (M5)</b>
+    <div class="small muted" style="margin-top:4px">서비스별 자원 task —
+      전제조건·옵션 입력 / 단독·묶음 합성 →</div>
+  </a>
+  <a class="card pad" href="/planning/dependencies" style="color:inherit">
+    <b>의존 그래프 · VPC 스케줄</b>
+    <div class="small muted" style="margin-top:4px">시나리오 간 선후행 관계
+      시각화 · 할당량 시뮬레이션 →</div>
+  </a>
+</div>
+
+<script>
+(function(){
+  var filter = 'all';
+  var rows = Array.prototype.slice.call(
+    document.querySelectorAll('#scenBody tr[data-id]'));
+  var empty = document.getElementById('scenEmpty');
+  var search = document.getElementById('scenSearch');
+  function apply(){
+    var q = (search.value || '').toLowerCase();
+    var shown = 0;
+    rows.forEach(function(tr){
+      var ok = true;
+      if (filter === 'enabled' && !tr.dataset.enabled) ok = false;
+      if (filter === 'disabled' && tr.dataset.enabled) ok = false;
+      if (filter === 'heavy' && !tr.dataset.heavy) ok = false;
+      if (ok && q && tr.dataset.id.indexOf(q) < 0 &&
+          tr.dataset.service.indexOf(q) < 0) ok = false;
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    empty.style.display = shown ? 'none' : '';
+  }
+  document.querySelectorAll('#scenChips .fchip').forEach(function(c){
+    c.onclick = function(){
+      filter = c.dataset.f;
+      document.querySelectorAll('#scenChips .fchip').forEach(function(x){
+        x.classList.toggle('on', x === c); });
+      apply();
+    };
+  });
+  search.oninput = apply;
+})();
+</script>
 
 {% endblock %}

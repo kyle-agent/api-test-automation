@@ -1,82 +1,226 @@
 {% extends "base.html" %}
-{% block title %}Reporting{% endblock %}
+{% block title %}Report — SCP API Regression{% endblock %}
 {% block content %}
 
-{% if coverage %}
-<section>
-  <h2>현재 커버리지 ({{ coverage.get('ts','') }} · sha {{ coverage.get('sha','') }})</h2>
-  <div class="cards">
-    <div class="card"><div class="num">{{ coverage.get('cov_op','-') }}%</div>
-      <div class="lbl">write-op (cov_op)</div></div>
-    <div class="card"><div class="num">{{ coverage.get('cov_get','-') }}%</div>
-      <div class="lbl">GET (cov_get)</div></div>
-    <div class="card"><div class="num">{{ coverage.get('cov_c3','-') }}%</div>
-      <div class="lbl">누적 C3</div></div>
-    <div class="card"><div class="num">{{ coverage.get('reachable_pct','-') }}%</div>
-      <div class="lbl">static reachable</div></div>
-    <div class="card"><div class="num">{{ coverage.get('ok','-') }}/{{ coverage.get('tested','-') }}</div>
-      <div class="lbl">ok / 호출 (전체 {{ coverage.get('total','-') }})</div></div>
-    <div class="card"><div class="num">{{ coverage.get('fail_new','-') }}</div>
-      <div class="lbl">신규 fail</div></div>
-  </div>
-  <p><a href="/dashboard/index.html">📊 현재 전체 대시보드 (서비스별 드릴다운 포함)</a>
-     · <a href="/dashboard/ops.html">🔭 ops 라이브 뷰어</a></p>
-</section>
+<div class="subtabs">
+  {% for key, label in tabs %}
+  <a href="/reporting?tab={{ key }}" class="{{ 'active' if tab == key else '' }}">{{ label }}</a>
+  {% endfor %}
+</div>
 
-<section>
-  <h2>커버리지 추이 (최근 {{ trend|length }}개 run)</h2>
-  <table>
-    <tr><th>ts</th><th>sha</th><th>cov_op</th><th>cov_get</th><th>C3</th>
-        <th>ok</th><th>soft</th><th>신규 fail</th><th>호출</th></tr>
-    {% for h in trend %}
-    <tr>
-      <td class="muted">{{ h.get('ts','') }}</td>
-      <td class="muted">{{ h.get('sha','') }}</td>
-      <td>{{ h.get('cov_op','-') }}%</td>
-      <td>{{ h.get('cov_get','-') }}%</td>
-      <td>{{ h.get('cov_c3','-') }}%</td>
-      <td>{{ h.get('ok','-') }}</td>
-      <td>{{ h.get('soft','-') }}</td>
-      <td>{% if h.get('fail_new') %}<b>{{ h['fail_new'] }}</b>{% else %}0{% endif %}</td>
-      <td class="muted">{{ h.get('tested','-') }}/{{ h.get('total','-') }}</td>
-    </tr>
+{# ===================== Summary ===================== #}
+{% if tab == 'summary' %}
+  {% if coverage %}
+  {% set fail_new = coverage.get('fail_new') or 0 %}
+  <div class="verdict {{ 'bad' if fail_new else '' }}">
+    <span class="pip"></span>
+    <div>
+      {% if fail_new %}<b>REGRESSIONS — 신규 fail {{ fail_new }}건.</b>
+      {% else %}<b>HEALTHY — 신규 회귀 0.</b>{% endif %}
+      {{ coverage.get('ok','-') }} ok · soft {{ coverage.get('soft','-') }} ·
+      known-red {{ coverage.get('fail_known') or 0 }}
+      ({{ coverage.get('tested','-') }} calls · sha {{ coverage.get('sha','') }})
+    </div>
+  </div>
+
+  <h2>커버리지 사다리 <span class="hint">C1 도달 → C2 호출 → C3 검증</span></h2>
+  <div class="card pad">
+    <div class="lad"><span class="lv">C3</span>
+      <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--green)"></i></div>
+      <span class="pct" style="color:var(--green)">{{ coverage.get('cov_c3','-') }}%</span>
+      <span class="desc">검증됨 · 누적 — 동작 확인</span></div>
+    {% set total = coverage.get('total') or 0 %}
+    {% set tested = coverage.get('tested') or 0 %}
+    {% set c2pct = (tested * 100 / total)|round(1) if total else 0 %}
+    <div class="lad"><span class="lv">C2</span>
+      <div class="bar"><i style="width:{{ c2pct }}%;background:var(--amber)"></i></div>
+      <span class="pct" style="color:var(--amber)">{{ c2pct }}%</span>
+      <span class="desc">호출됨 · 이번 run {{ tested }}/{{ total }}</span></div>
+    <div class="lad"><span class="lv">C1</span>
+      <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
+      <span class="pct" style="color:var(--blue)">{{ coverage.get('reachable_pct','-') }}%</span>
+      <span class="desc">도달가능 · static reachable / {{ total }} API</span></div>
+  </div>
+
+  <h2>이번 스냅샷 <span class="hint">{{ coverage.get('ts','') }}</span></h2>
+  <div class="tiles" style="margin-top:6px">
+    <div class="card tile"><div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
+      <div class="k">write-op (cov_op)</div></div>
+    <div class="card tile"><div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
+      <div class="k">GET (cov_get)</div></div>
+    <div class="card tile"><div class="v">{{ coverage.get('ok','-') }}/{{ coverage.get('tested','-') }}</div>
+      <div class="k">ok / 호출</div></div>
+    <div class="card tile"><div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
+      <div class="k">신규 fail</div></div>
+  </div>
+  {% else %}
+  <div class="verdict none"><span class="pip"></span>
+    <div><b>스냅샷 없음</b> — dashboard-data 브랜치를 읽을 수 없습니다.</div></div>
+  {% endif %}
+
+{# ===================== Coverage ===================== #}
+{% elif tab == 'coverage' %}
+  {% if catbars %}
+  <h2>카테고리별 검증(2xx) <span class="hint">누적 관측 endpoint 기준 ·
+    낮은 순 = 작업 백로그</span></h2>
+  <div class="card pad">
+    {% for c in catbars %}
+    <div class="catrow">
+      <div class="cn">{{ c.name }}</div>
+      <div class="cb"><i style="width:{{ c.pct }}%;background:var({{ '--red' if c.pct < 25 else ('--amber' if c.pct < 55 else '--green') }})"></i></div>
+      <div class="cp">{{ c.pct }}% <span class="muted" style="font-weight:400;font-size:11px">{{ c.ok }}/{{ c.total }}</span></div>
+    </div>
     {% endfor %}
-  </table>
-</section>
-{% else %}
-<section>
-  <h2>현재 커버리지</h2>
-  <p class="muted">dashboard-data 브랜치를 읽을 수 없습니다 — git 원격 접근을 확인하세요.</p>
-</section>
-{% endif %}
-
-<section>
-  <h2>분석 도구</h2>
-  <p><a href="/reporting/compare">⚖️ Run 비교 (A vs B) — 무엇이 새로 깨졌나/고쳐졌나</a></p>
-</section>
-
-<section>
-  <h2>Run 히스토리 (control plane 기록)</h2>
-  <div hx-get="/partials/runs?limit=100" hx-trigger="every 15s" hx-swap="innerHTML">
-    {% include "_runs_table.html" %}
   </div>
-</section>
+  {% else %}
+  <div class="card pad"><span class="muted small">endpoint_status.json을 읽을 수
+    없습니다 — dashboard-data 브랜치 접근을 확인하세요.</span></div>
+  {% endif %}
+  <p class="small muted" style="margin-top:10px">서비스 → 엔드포인트 상세는 발행
+    대시보드의 드릴다운으로:
+    <a href="/dashboard/index.html">📊 전체 대시보드 (서비스별 드릴다운 포함)</a> ·
+    <a href="/dashboard/ops.html">🔭 ops 라이브 뷰어</a></p>
 
-<section>
-  <h2>아카이브 (oplog 버킷 index — control plane 이전 run 포함)</h2>
-  <table>
-    <tr><th>run</th><th>sha</th><th>finished</th></tr>
-    {% for row in archive %}
-    <tr>
-      <td><a href="/runs/{{ row['run_id'] }}">{{ row['run_id'] }}</a></td>
-      <td class="muted">{{ row.get('sha', '') }}</td>
-      <td class="muted">{{ row.get('finished', '') }}</td>
-    </tr>
+{# ===================== Conformance ===================== #}
+{% elif tab == 'conformance' %}
+  <h2>설계/동작 정합성 <span class="hint">회귀와 별개 · 정적+런타임 점검</span></h2>
+  {% if conformance %}
+  {% set cs = conformance.summary %}
+  <div class="card pad">
+    <div style="display:flex;gap:24px;flex-wrap:wrap;padding-bottom:11px;border-bottom:1px solid var(--border)">
+      <div><span style="font-size:22px;font-weight:800;color:var(--red)">{{ cs.get('red',0) }}</span>
+        <span class="muted small">결함(계약 위반)</span></div>
+      <div><span style="font-size:22px;font-weight:800;color:var(--amber)">{{ cs.get('yellow',0) }}</span>
+        <span class="muted small">개선(설계/문서)</span></div>
+      <div><span style="font-size:22px;font-weight:800;color:var(--green)">{{ cs.get('green',0) }}</span>
+        <span class="muted small">정상</span></div>
+      <div style="margin-left:auto" class="muted small">총 {{ cs.get('total','-') }} API</div>
+    </div>
+    <table style="margin-top:6px">
+      <tbody>
+      {% for s in conformance.systemic %}
+      <tr>
+        <td style="white-space:nowrap"><span class="chip s-reached">개선 {{ s.get('count','') }}</span></td>
+        <td><code>{{ s.get('type','') }}</code>
+          <span class="muted small">{{ s.get('detail','') }}</span>
+          <span class="note">(#{{ s.get('issue','') }} · {{ s.get('scope','') }})</span></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card pad"><span class="muted small">conformance.json을 읽을 수
+    없습니다 — conformance suite를 한 번 실행하면 발행됩니다.</span></div>
+  {% endif %}
+
+{# ===================== Runs & Trends ===================== #}
+{% elif tab == 'trends' %}
+  <h2>추세 <span class="hint">{{ spark_n }} run 누적</span></h2>
+  <div class="card pad">
+    {% if spark.c3 or spark.pass %}
+    <svg class="spark" viewBox="0 0 600 90" preserveAspectRatio="none">
+      {% if spark.c1 %}<path d="{{ spark.c1 }}" fill="none" stroke="#9aa3ad" stroke-width="2"/>{% endif %}
+      {% if spark.pass %}<path d="{{ spark.pass }}" fill="none" stroke="#15924f" stroke-width="2"/>{% endif %}
+      {% if spark.c3 %}<path d="{{ spark.c3 }}" fill="none" stroke="#2563c9" stroke-width="2"/>{% endif %}
+    </svg>
+    <div class="legend"><span><i style="background:var(--green)"></i>pass율</span>
+      <span><i style="background:var(--blue)"></i>C3 검증</span>
+      <span><i style="background:var(--faint)"></i>C1 도달</span></div>
     {% else %}
-    <tr><td colspan="3" class="muted">버킷 index를 읽을 수 없습니다
-        (credential 미설정이거나 아직 run이 없음).</td></tr>
-    {% endfor %}
-  </table>
-</section>
+    <span class="muted small">추세를 그릴 history가 부족합니다.</span>
+    {% endif %}
+  </div>
+
+  <h2>커버리지 추이 <span class="hint">최근 {{ trend|length }}개 발행</span></h2>
+  <div class="card pad" style="padding-top:4px">
+    <table>
+      <thead><tr><th>ts</th><th>sha</th><th>cov_op</th><th>cov_get</th><th>C3</th>
+        <th>ok</th><th>soft</th><th>신규 fail</th><th>호출</th></tr></thead>
+      <tbody>
+      {% for h in trend %}
+      <tr>
+        <td class="muted">{{ h.get('ts','') }}</td>
+        <td class="muted">{{ h.get('sha','') }}</td>
+        <td>{{ h.get('cov_op','-') }}%</td>
+        <td>{{ h.get('cov_get','-') }}%</td>
+        <td>{{ h.get('cov_c3','-') }}%</td>
+        <td>{{ h.get('ok','-') }}</td>
+        <td>{{ h.get('soft','-') }}</td>
+        <td>{% if h.get('fail_new') %}<span class="chip s-regress">{{ h['fail_new'] }}</span>
+            {% else %}<span class="chip s-verified">0</span>{% endif %}</td>
+        <td class="muted">{{ h.get('tested','-') }}/{{ h.get('total','-') }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <h2>분석 도구</h2>
+  <div class="card pad">
+    <a href="/reporting/compare">⚖️ Run 비교 (A vs B) — 무엇이 새로 깨졌나/고쳐졌나 →</a>
+  </div>
+
+  <h2>RUN 히스토리 <span class="hint">control plane 기록 — 15초마다 갱신</span></h2>
+  <div class="card pad" style="padding-top:4px">
+    <div hx-get="/partials/runs?limit=100" hx-trigger="every 15s" hx-swap="innerHTML">
+      {% include "_runs_table.html" %}
+    </div>
+  </div>
+
+  <h2>아카이브 <span class="hint">oplog 버킷 index — control plane 이전 run 포함</span></h2>
+  <div class="card pad" style="padding-top:4px">
+    <table>
+      <thead><tr><th>run</th><th>sha</th><th>finished</th></tr></thead>
+      <tbody>
+      {% for row in archive %}
+      <tr>
+        <td><a href="/runs/{{ row['run_id'] }}">{{ row['run_id'] }}</a></td>
+        <td class="muted">{{ row.get('sha', '') }}</td>
+        <td class="muted">{{ row.get('finished', '') }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">버킷 index를 읽을 수 없습니다
+          (credential 미설정이거나 아직 run이 없음).</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{# ===================== Triage ===================== #}
+{% elif tab == 'triage' %}
+  <h2>실패 분류 <span class="hint">최신 발행 스냅샷 기준 — run별 AI triage는
+    run 상세에서</span></h2>
+  {% if coverage %}
+  <div class="card pad" style="padding-top:4px">
+    <table>
+      <thead><tr><th>분류</th><th>수</th><th>의미</th></tr></thead>
+      <tbody>
+        <tr><td><span class="chip s-verified">검증(2xx)</span></td>
+          <td><b>{{ coverage.get('ok','-') }}</b></td>
+          <td class="muted">실제 동작 확인 = covered</td></tr>
+        <tr><td><span class="chip s-reached">soft 4xx</span></td>
+          <td><b>{{ coverage.get('soft','-') }}</b></td>
+          <td class="muted">파라미터/권한/엔타이틀먼트 한계</td></tr>
+        <tr><td><span class="chip s-unobs">미검증 write gap</span></td>
+          <td><b>{{ coverage.get('gap_write','-') }}</b></td>
+          <td class="muted">생성/삭제 미발생 write endpoints</td></tr>
+        <tr><td><span class="chip s-regress">new regression</span></td>
+          <td><b>{{ coverage.get('fail_new') or 0 }}</b></td>
+          <td class="muted">새로 깨진 5xx/auth — 알림 대상</td></tr>
+        <tr><td><span class="chip s-known">known-red</span></td>
+          <td><b>{{ coverage.get('fail_known') or 0 }}</b></td>
+          <td class="muted">등록된 백엔드 버그</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card pad"><span class="muted small">스냅샷이 없어 분류를 표시할 수
+    없습니다.</span></div>
+  {% endif %}
+  <p class="small muted" style="margin-top:10px">개별 run의 AI triage(분류·원인·조치)는
+    RUN 히스토리에서 run을 열어 실행/확인합니다 —
+    <a href="/reporting?tab=trends">Runs &amp; Trends →</a></p>
+{% endif %}
 
 {% endblock %}

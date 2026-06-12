@@ -1,62 +1,84 @@
 {% extends "base.html" %}
-{% block title %}Testing{% endblock %}
+{% block title %}Run — SCP API Regression{% endblock %}
 {% block content %}
 
-<section>
-  <h2>수동 실행 — suite × 환경 프로파일</h2>
-  {% if not dispatch_ok %}
-  <p class="warn">GitHub dispatch 미설정 (PLATFORM_GITHUB_TOKEN / PLATFORM_GITHUB_REPO)
-     — 실행 요청은 기록만 됩니다.</p>
-  {% endif %}
-  <form class="inline" method="post" action="/runs/trigger">
-    <label>suite
-      <select name="suite">
-        {% for s in suites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
-      </select>
-    </label>
-    <label>profile
-      <select name="profile">
-        <option value="">(repo vars 기본)</option>
+<h2>RUN 조립 <span class="hint">환경 × 스위트 → 무엇을 할지 미리보기</span></h2>
+<div class="card pad">
+  <div class="compose">
+    <form class="picker" method="post" action="/runs/trigger">
+      <label>환경 (프로파일)</label>
+      <select name="profile" id="runEnv">
+        <option value="">(repo vars 기본 — stage)</option>
         {% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
       </select>
-    </label>
-    <input type="text" name="service" placeholder="service (선택 — smoke 범위)" size="18">
-    <input type="text" name="crud_filter" placeholder="crud_filter (선택 — lifecycle -k)" size="22">
-    <button type="submit">실행</button>
-  </form>
-  <p class="muted">특정 서비스만 검증: suite=full + service/crud_filter에 서비스명 —
-    해당 lifecycle만 도는 몇 분짜리 run이 됩니다.</p>
-</section>
+      <label style="margin-top:12px">스위트</label>
+      <select name="suite" id="runSuite">
+        {% for s in suites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+      </select>
+      <label style="margin-top:12px">범위 좁히기 (선택)</label>
+      <input type="text" name="service" placeholder="service (smoke 범위)"
+             style="margin-bottom:6px">
+      <input type="text" name="crud_filter" placeholder="crud_filter (lifecycle -k)">
+      <div style="margin-top:16px;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+        <button class="btn primary" type="submit">RUN 실행</button>
+        {% if not dispatch_ok %}
+        <span class="srvonly">서버 전용 — dispatch 미설정</span>
+        {% endif %}
+      </div>
+      {% if not dispatch_ok %}
+      <p class="warn" style="margin-bottom:0">GitHub dispatch 미설정
+        (PLATFORM_GITHUB_TOKEN / PLATFORM_GITHUB_REPO) — 실행 요청은 기록만 됩니다.</p>
+      {% endif %}
+      <p class="muted small" style="margin-bottom:0">특정 서비스만 검증:
+        suite=full + service/crud_filter에 서비스명 — 해당 lifecycle만 도는
+        몇 분짜리 run이 됩니다.</p>
+    </form>
+    <div class="preview" id="runPreview"></div>
+  </div>
+</div>
 
 {% if live %}
-<section>
-  <h2>진행 중 run — 라이브</h2>
-  {% for item in live %}
-  <p><a href="/runs/{{ item.run['gh_run_id'] }}"><b>run {{ item.run['gh_run_id'] }}</b></a>
-     · {{ item.run['suite'] or '-' }} × {{ item.run['profile'] or '-' }}
-     · <span class="status {{ item.run['status'] }}">{{ item.run['status'] }}</span></p>
-  <table>
-    <tr><th>ts</th><th>job</th><th>stage</th><th>status</th></tr>
+<h2>진행 중 RUN <span class="hint">라이브 — 개입(중단/skip)은 run 상세에서</span></h2>
+{% for item in live %}
+<div class="card pad" style="margin-bottom:13px">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <a href="/runs/{{ item.run['gh_run_id'] }}"><code>run {{ item.run['gh_run_id'] }}</code></a>
+    <span class="status {{ item.run['status'] }}">{{ item.run['status'] }}</span>
+    <span class="muted small">{{ item.run['suite'] or '-' }} ·
+      {{ item.run['profile'] or '(기본)' }}</span>
+    <a class="small" href="/runs/{{ item.run['gh_run_id'] }}"
+       style="margin-left:auto">개입 — 중단 · 시나리오 skip →</a>
+  </div>
+  <table style="margin-top:8px">
+    <thead><tr><th>ts</th><th>job</th><th>stage</th><th>status</th></tr></thead>
+    <tbody>
     {% for e in item.milestones %}
     <tr><td class="muted">{{ e['ts'] }}</td><td>{{ e['job'] }}</td>
         <td>{{ e['stage'] }}</td><td>{{ e['status'] }}</td></tr>
     {% endfor %}
+    </tbody>
   </table>
-  {% endfor %}
-</section>
+</div>
+{% endfor %}
+{% else %}
+<h2>진행 중 RUN</h2>
+<div class="card pad"><span class="muted small">진행 중인 run이 없습니다 —
+  위에서 조립해 실행하거나 스케줄을 등록하세요.</span></div>
 {% endif %}
 
-<section>
-  <h2>스케줄 (cron, UTC)</h2>
+<h2>스케줄 <span class="hint">자동 실행 규칙 (cron, UTC)</span></h2>
+<div class="card pad" style="padding-top:4px">
   <table>
-    <tr><th>cron</th><th>suite</th><th>profile</th><th>상태</th><th>최근 실행</th>
-        <th>메모</th><th></th></tr>
+    <thead><tr><th>cron</th><th>suite</th><th>profile</th><th>상태</th>
+      <th>최근 실행</th><th>메모</th><th></th></tr></thead>
+    <tbody>
     {% for s in schedules %}
     <tr>
       <td><code>{{ s['cron'] }}</code></td>
       <td>{{ s['suite'] }}</td>
       <td>{{ s['profile'] or '-' }}</td>
-      <td>{{ '활성' if s['enabled'] else '중지' }}</td>
+      <td><span class="chip {{ 's-verified' if s['enabled'] else 's-unobs' }}">{{
+          '활성' if s['enabled'] else '중지' }}</span></td>
       <td class="muted">{{ s['last_fired'] or '-' }}</td>
       <td class="muted">{{ s['note'] }}</td>
       <td style="white-space:nowrap">
@@ -70,10 +92,12 @@
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="7" class="muted">등록된 스케줄이 없습니다.</td></tr>
+    <tr><td colspan="7" class="muted">등록된 스케줄이 없습니다 —
+        예: 매일 02:00 stage-kr-west1 · full.</td></tr>
     {% endfor %}
+    </tbody>
   </table>
-  <form class="inline" method="post" action="/schedules" style="margin-top:10px">
+  <form class="inline" method="post" action="/schedules" style="margin:10px 0 8px">
     <input type="text" name="cron" placeholder="0 2 * * *" required size="12">
     <select name="suite">
       {% for s in suites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
@@ -84,20 +108,58 @@
     </select>
     <input type="text" name="note" placeholder="메모" size="20">
     <button type="submit">스케줄 추가</button>
+    {% if not dispatch_ok %}<span class="srvonly">실행은 서버 전용</span>{% endif %}
   </form>
-</section>
+</div>
 
-<section>
-  <h2>관제</h2>
-  <p><a href="/testing/resources">🧹 리소스 인벤토리 — 살아있는 테스트 리소스 조회/삭제</a></p>
-</section>
+<h2>관제</h2>
+<div class="card pad">
+  <a href="/testing/resources">🧹 리소스 인벤토리 — 살아있는 테스트 리소스 조회/삭제 →</a>
+</div>
 
-<section>
-  <h2>최근 run</h2>
+<h2>최근 RUN <span class="hint">10초마다 갱신</span></h2>
+<div class="card pad" style="padding-top:4px">
   <div hx-get="/partials/runs" hx-trigger="every 10s" hx-swap="innerHTML">
     {% include "_runs_table.html" %}
   </div>
-  <p><a href="/reporting">전체 히스토리는 Reporting →</a></p>
-</section>
+  <p class="small" style="margin-bottom:6px">
+    <a href="/reporting?tab=trends">전체 히스토리는 Report →</a></p>
+</div>
+
+<script id="previewData" type="application/json">{{ preview | tojson }}</script>
+<script>
+(function(){
+  var data = JSON.parse(document.getElementById('previewData').textContent);
+  var envSel = document.getElementById('runEnv');
+  var suiteSel = document.getElementById('runSuite');
+  var box = document.getElementById('runPreview');
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function render(){
+    var s = data.suites[suiteSel.value];
+    if (!s){ box.innerHTML = '<span class="muted small">스위트 정의를 읽을 수 없습니다.</span>'; return; }
+    var p = data.profiles[envSel.value] || null;
+    var forbid = p ? p.forbid : [];
+    var rows =
+      '<div class="row"><span>대상 시나리오</span><b>' + s.targets + '개</b></div>' +
+      '<div class="row"><span>heavy(과금성)</span>' +
+        (s.heavy ? '<b style="color:var(--purple)">' + s.heavy + '건</b>' : '<b>0</b>') + '</div>' +
+      '<div class="row"><span>적용 게이트</span><b>' + esc(s.gates) + '</b></div>' +
+      '<div class="row"><span>예상 소요 <span class="muted">(대략치)</span></span><b>' +
+        esc(s.eta) + '</b></div>';
+    if (forbid.length){
+      rows += '<div class="row"><span>안전 게이트</span>' +
+        '<b style="color:var(--red)">' + esc(envSel.value) + ' — ' +
+        esc(forbid.join('/')) + ' 차단됨</b></div>';
+    }
+    rows += '<div class="row"><span>스위트</span>' +
+      '<b class="muted" style="font-weight:500">' + esc(s.label) + '</b></div>';
+    box.innerHTML = rows;
+  }
+  envSel.onchange = render;
+  suiteSel.onchange = render;
+  render();
+})();
+</script>
 
 {% endblock %}

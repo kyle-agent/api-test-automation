@@ -1,43 +1,70 @@
 {% extends "base.html" %}
-{% block title %}Knowledge{% endblock %}
+{% block title %}Knowledge — SCP API Regression{% endblock %}
 {% block content %}
 
-<section>
-  <h2>Knowledge — 서비스별 제약 · validated facts</h2>
-  <p class="muted">편집은 검증 게이트(knowledge/formal/validate.py 등) 통과 시에만
-    저장 + 로컬 git 커밋됩니다.</p>
-  <table>
-    <tr><th>문서 (narrative)</th><th>크기</th><th></th></tr>
-    {% for f in narrative %}
-    <tr><td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
-        <td class="muted">{{ f.kb }} KB</td>
-        <td><a href="/planning/edit?path={{ f.rel }}">편집</a></td></tr>
-    {% endfor %}
-  </table>
-</section>
+<h2>KNOWLEDGE <span class="hint">계획을 받치는 참조층 — 서비스별 제약 ·
+  validated facts · formal YAML</span></h2>
+<div class="fchips">
+  <input class="search" id="kSearch" placeholder="파일·서비스 검색">
+  <span class="muted small">편집은 검증 게이트(knowledge/formal/validate.py 등)
+    통과 시에만 저장 + 로컬 git 커밋됩니다.</span>
+</div>
 
-<section>
-  <h2>Formal (머신 가독 YAML — source of truth 후보)</h2>
-  <table>
-    <tr><th>파일</th><th>크기</th><th></th></tr>
-    {% for f in formal %}
-    <tr><td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
+<div class="card pad" style="padding-top:4px">
+  <table id="kTable">
+    <thead><tr><th>구분</th><th>파일</th><th>크기</th><th></th></tr></thead>
+    <tbody>
+      {% for f in narrative %}
+      <tr data-rel="{{ f.rel }}">
+        <td><span class="tag read">narrative</span>
+          {% if 'validated-facts' in f.rel %}<span class="chip s-verified">facts</span>{% endif %}</td>
+        <td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
         <td class="muted">{{ f.kb }} KB</td>
-        <td><a href="/planning/edit?path={{ f.rel }}">편집</a></td></tr>
-    {% endfor %}
+        <td class="small"><a href="/planning/edit?path={{ f.rel }}">편집</a></td>
+      </tr>
+      {% endfor %}
+      {% for f in formal %}
+      <tr data-rel="{{ f.rel }}">
+        <td><span class="tag mutation">formal</span></td>
+        <td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
+        <td class="muted">{{ f.kb }} KB</td>
+        <td class="small"><a href="/planning/edit?path={{ f.rel }}">편집</a></td>
+      </tr>
+      {% endfor %}
+      {% for f in suite_files + env_files %}
+      <tr data-rel="{{ f.rel }}">
+        <td><span class="tag">설정</span></td>
+        <td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
+        <td class="muted">{{ f.kb }} KB</td>
+        <td class="small"><a href="/planning/edit?path={{ f.rel }}">편집</a></td>
+      </tr>
+      {% endfor %}
+      <tr id="kEmpty" style="display:none">
+        <td colspan="4" class="muted" style="padding:20px;text-align:center">결과 없음</td></tr>
+    </tbody>
   </table>
-</section>
+</div>
 
-<section>
-  <h2>스위트 · 환경 정의 파일</h2>
-  <table>
-    <tr><th>파일</th><th>크기</th><th></th></tr>
-    {% for f in suite_files + env_files %}
-    <tr><td><a href="/planning/view?path={{ f.rel }}">{{ f.rel }}</a></td>
-        <td class="muted">{{ f.kb }} KB</td>
-        <td><a href="/planning/edit?path={{ f.rel }}">편집</a></td></tr>
-    {% endfor %}
-  </table>
-</section>
+<p class="small muted" style="margin-top:9px">런타임으로 확인된 서비스별 제약은
+  <a href="/planning/view?path=knowledge/validated-facts.md">validated-facts.md</a>에
+  모여 있습니다 — 각 fact는 그것이 제약하는 시나리오의 <code>_note</code>와
+  동기화됩니다.</p>
+
+<script>
+(function(){
+  var rows = Array.prototype.slice.call(
+    document.querySelectorAll('#kTable tbody tr[data-rel]'));
+  var empty = document.getElementById('kEmpty');
+  document.getElementById('kSearch').oninput = function(){
+    var q = this.value.toLowerCase(), shown = 0;
+    rows.forEach(function(tr){
+      var ok = !q || tr.dataset.rel.toLowerCase().indexOf(q) >= 0;
+      tr.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    empty.style.display = shown ? 'none' : '';
+  };
+})();
+</script>
 
 {% endblock %}

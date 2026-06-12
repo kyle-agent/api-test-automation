@@ -1,9 +1,10 @@
 <table>
-  <tr><th>run</th><th>suite</th><th>profile</th><th>trigger</th><th>status</th>
-      <th>requested</th><th>finished</th></tr>
+  <thead><tr><th>run</th><th>suite</th><th>profile</th><th>trigger</th><th>status</th>
+      <th>requested</th><th>finished</th></tr></thead>
+  <tbody>
   {% for r in runs %}
   <tr>
-    <td>{% if r['gh_run_id'] %}<a href="/runs/{{ r['gh_run_id'] }}">{{ r['gh_run_id'] }}</a>
+    <td>{% if r['gh_run_id'] %}<a href="/runs/{{ r['gh_run_id'] }}"><code>{{ r['gh_run_id'] }}</code></a>
         {% else %}<span class="muted">#{{ r['id'] }} (대기)</span>{% endif %}</td>
     <td>{{ r['suite'] or '-' }}</td>
     <td>{{ r['profile'] or '-' }}</td>
@@ -15,4 +16,5 @@
   {% else %}
   <tr><td colspan="7" class="muted">아직 run이 없습니다.</td></tr>
   {% endfor %}
+  </tbody>
 </table>
