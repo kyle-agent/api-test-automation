@@ -1,0 +1,28 @@
+# Resource-task model — container/scr (ct-scr group) — PREREQUISITE STUB.
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from container-scr-registry
+# (enabled, live-validated).
+#
+# NOTE (R1 fan-out, ai-ml batch): only the registry node is modeled here because
+# cloud-ml requires it (owner 2026-06-11). Node id follows cross-service.yaml's
+# `container-registry` key (the key cloud-ml's requires edge uses there;
+# cross-service also carries a legacy `scr-registry` alias for the same
+# service). The container-category fan-out agent owns the full scr family
+# (repository etc.) — extend or supersede this file there.
+version: 1
+resources:
+  container-registry:
+    code: "ct-scr-registry"
+    service: container/scr
+    requires: []
+    create:
+      endpoint: "POST /v1/container-registries"
+      body: {name: "regrscr{unique}", private_acl_enabled: false,
+             private_acl_resources: [], public_acl_resources: [],
+             public_visible_enabled: false}
+    capture: {reg_id: "$.id"}
+    ready: {field: "$.state", until: [Running, RUNNING, active, ACTIVE],
+            timeout: 180, interval: 10}
+    delete: {endpoint: "DELETE /v1/container-registries/{reg_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: container-scr-registry, steps: [create, wait-running, delete]}
+    notes: "registry 자체는 API 생성 가능; 푸시/풀에 쓰는 인증키는 콘솔 발급 credential 클래스(scr-auth-key — ai-ml__cloud-ml.yaml, SCR-push blocker). DELETE는 수 분간 500 race — 재시도 필요 (cross-service note)."

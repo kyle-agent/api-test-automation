@@ -1,0 +1,47 @@
+# Resource-task model — container/ske (ct-ske group) — PREREQUISITE STUB.
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# container-ske-cluster-nodepool (enabled, heavy, live-validated).
+#
+# NOTE (R1 fan-out, ai-ml batch): only the ske-cluster node is modeled here
+# because cloud-ml/aimlops-platform require it (owner 2026-06-11). The
+# container-category fan-out agent owns the full ske family (nodepool etc.) —
+# extend or supersede this file there; keep the node id `ske-cluster`
+# (cross-service.yaml key).
+#
+# requires follow what the VALIDATED create body actually consumes (vpc_id +
+# subnet_id + security_group_id_list + volume_id) — cross-service.yaml's edge
+# additionally lists keypair, which the cluster create does NOT take (keypair
+# is a NODEPOOL-create input, keypair_name); the validator reports that as a
+# reconcile-during-R3 divergence warning by design.
+version: 1
+resources:
+  ske-cluster:
+    code: "ct-ske-cluster"
+    service: container/ske
+    heavy: true
+    requires: [vpc, subnet, security-group, filestorage-volume]
+    create:
+      endpoint: "POST /v1/clusters"
+      body:
+        name: "regrske{unique}"
+        kubernetes_version: "{opt.kubernetes_version}"
+        cloud_logging_enabled: "false"
+        vpc_id: "{vpc.vpc_id}"
+        subnet_id: "{subnet.subnet_id}"
+        security_group_id_list: ["{security-group.sg_id}"]
+        private_endpoint_access_control_resources: []
+        tags: []
+        volume_id: "{filestorage-volume.volume_id}"
+        public_endpoint_access_control_ip: "0.0.0.0/0"
+        service_watch_logging_enabled: "true"
+      options:
+        kubernetes_version: {type: string, required: true,
+                             note: "lookup — 소스 lifecycle find-k8s-version: GET /v1/kubernetes-versions capture $.kubernetes_versions[0].kubernetes_version (composer가 동일 lookup step을 합성해야 한다)"}
+    capture: {cluster_id: "$.resource_id"}
+    ready: {field: "$.cluster.status", until: [RUNNING, ACTIVE, Running],
+            timeout: 1800, interval: 30, endpoint: "GET /v1/clusters/{cluster_id}"}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: container-ske-cluster-nodepool,
+             steps: [find-k8s-version, create-cluster, wait-cluster, delete-cluster]}
+    notes: "heavy (~27분, billable — cross-service note). ai-ml 양 노드의 선행자원: cloud-ml은 EXISTING 참조만(분기 없음), aimlops-platform은 existing_or_create 분기 (owner 2026-06-11)."

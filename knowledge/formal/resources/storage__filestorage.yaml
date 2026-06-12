@@ -1,0 +1,26 @@
+# Resource-task model — storage/filestorage (st-fs group) — PREREQUISITE STUB.
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from the filestorage-volume
+# lifecycle (enabled, live-validated).
+#
+# NOTE (R1 fan-out, ai-ml batch): only the filestorage-volume node is modeled
+# here because ske-cluster's VALIDATED create body consumes it (volume_id) and
+# the ai-ml nodes require ske-cluster. The storage-category fan-out agent owns
+# the full filestorage family (snapshot/snapshot-schedule/replication) — extend
+# or supersede this file there; keep the node id `filestorage-volume`
+# (cross-service.yaml key).
+version: 1
+resources:
+  filestorage-volume:
+    code: "st-fs-volume"
+    service: storage/filestorage
+    requires: []
+    create:
+      endpoint: "POST /v1/volumes"
+      body: {name: "regrfs{unique}", protocol: NFS, type_name: HDD}
+    capture: {volume_id: "$.volume_id"}
+    ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
+            timeout: 300, interval: 15}
+    delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: filestorage-volume, steps: [create, wait-available, delete]}
+    notes: "standalone NFS volume — VPC 불필요 (cross-service와 일치). container-ske-cluster-nodepool도 동일 body로 생성(VALIDATED 이중 출처)."

@@ -7,6 +7,7 @@
 # Category abbreviations (fixed — reuse on fan-out):
 #   nw=networking  cp=compute  st=storage  db=database  sec=security
 #   mg=management  ct=container  ai=ai-ml  da=data-analytics
+#   ap=application-service  dt=devops-tools  fm=financial-management
 version: 1
 groups:
   "nw-vpc": {label: "네트워크 — VPC 묶음 (vpc/subnet/gateway/endpoint/peering)", category: networking}
@@ -14,3 +15,18 @@ groups:
   "nw-lb": {label: "네트워크 — Load Balancer 체인", category: networking}
   "nw-dns": {label: "네트워크 — Private DNS", category: networking}
   "nw-dc": {label: "네트워크 — Direct Connect", category: networking}
+  "ct-ske": {label: "컨테이너 — Kubernetes Engine (ske-cluster 선행자원 스텁)", category: container}
+  "ct-scr": {label: "컨테이너 — Container Registry (선행자원 스텁)", category: container}
+  "st-fs": {label: "스토리지 — File Storage (선행자원 스텁)", category: storage}
+  "ai-ml": {label: "AI/ML — Cloud ML + AIMLOps Platform", category: ai-ml}
+  "da-es": {label: "데이터분석 — EventStreams (Kafka DBaaS)", category: data-analytics}
+  "da-se": {label: "데이터분석 — Search Engine (OpenSearch DBaaS)", category: data-analytics}
+  "da-vt": {label: "데이터분석 — Vertica (분석 DB DBaaS)", category: data-analytics}
+  "da-df": {label: "데이터분석 — Data Flow (서비스 + 플로우)", category: data-analytics}
+  "da-do": {label: "데이터분석 — Data Ops (서비스 + 옵스)", category: data-analytics}
+  "da-qq": {label: "데이터분석 — Quick Query", category: data-analytics}
+  "ap-apigw": {label: "애플리케이션 — API Gateway (api/stage/auth/usage-plan 묶음)", category: application-service}
+  "ap-queue": {label: "애플리케이션 — Queue Service", category: application-service}
+  "dt-devops": {label: "DevOps — DevOps Service (CI/CD 워크스페이스)", category: devops-tools}
+  "fm-billing": {label: "재무 — Billing Plan (planned computes)", category: financial-management}
+  "fm-budget": {label: "재무 — Budget (계정 예산 알림)", category: financial-management}
