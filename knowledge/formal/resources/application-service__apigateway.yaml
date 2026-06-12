@@ -1,0 +1,174 @@
+# Resource-task model — application-service/apigateway (ap-apigw group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted by extract.py from
+# application-apigateway-api-resource (enabled, live-validated — api/resource)
+# and apigateway-api-write-coverage / apigateway-privatelink-endpoint (enabled
+# but docs-grounded "NOT runtime-proven" per their own _note — every node from
+# those sources stays provenance docs per C5), curated by hand.
+#
+# Key apigateway facts carried over from the write-coverage lifecycle notes:
+# a deployment requires >=1 method (NoMethodsExist), createapideployment with
+# stage_type=new also creates stage `dev`, stages are addressed by NAME, and
+# createauth returns only $.access_token (no id).
+version: 1
+resources:
+  apigw-api:
+    code: "ap-apigw-api"
+    service: application-service/apigateway
+    requires: []
+    create:
+      endpoint: "POST /v1/apis"
+      body: {name: "regrapi{unique}", description: "API regression suite",
+             endpoint_type: REGION, tags: []}
+    capture: {api_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/apis/{api_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: application-apigateway-api-resource,
+             steps: [create, delete, wait-gone]}
+    notes: "VPC-FREE 컨트롤플레인 자원. 삭제는 비동기 — 소스는 GET 폴링 until_status 404 (300s/15s)로 소거 확인 + DELETE에 409/500 재시도 6회 (ready 스키마는 status-폴링을 표현하지 못해 lifecycle 영역으로 남김). name 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$."
+
+  apigw-resource:
+    code: "ap-apigw-resource"
+    service: application-service/apigateway
+    requires: [apigw-api]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/resources/{opt.parent_id}"
+      body: {path_part: "regr{unique}"}
+      options:
+        parent_id: {type: string, required: true,
+                    note: "lookup — 소스 find-root-resource: GET /v1/apis/{api_id}/resources capture $.resources[0].id (root resource; composer가 동일 lookup step을 합성해야 한다)"}
+    capture: {resource_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/resources/{resource_id}",
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: application-apigateway-api-resource,
+             steps: [find-root-resource, create-resource, delete-resource]}
+    notes: "삭제는 409/500 재시도 5회/15s (소스 lifecycle)"
+
+  apigw-method:
+    code: "ap-apigw-method"
+    service: application-service/apigateway
+    requires: [apigw-api, apigw-resource]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/resources/{apigw-resource.resource_id}/methods"
+      body:
+        method_type: GET
+        integration_type: HTTP
+        endpoint_url: "https://example.com"
+        api_key_required: false
+        iam_enabled: false
+        query_strings: {}
+        request_headers: {}
+    capture: {method_type: "$.methods[0].method_type"}
+    delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/resources/{apigw-resource.resource_id}/methods/{method_type}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: apigateway-api-write-coverage,
+             steps: [create-method, delete-method]}
+    notes: "method는 id가 아니라 method_type으로 주소화된다 (createmethod 응답 $.methods[]에 id 없음). MethodCreateRequestV1Dot3 — body는 docs 모델 파생, NOT runtime-proven."
+
+  apigw-deployment:
+    code: "ap-apigw-deploy"
+    service: application-service/apigateway
+    requires: [apigw-api, apigw-method]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/deployments"
+      body: {description: "API regression deployment", stage_name: dev,
+             stage_type: new}
+    capture: {deployment_id: "$.deployment_id"}
+    provenance: docs
+    source: {lifecycle: apigateway-api-write-coverage, steps: [create-deployment]}
+    notes: "deployment DELETE 엔드포인트는 카탈로그에 없다(불변 리비전 — api 삭제로 회수) → 의도적으로 delete 없음. createapideployment(api_bodies): stage_type=new가 같은 호출에서 stage `dev`까지 생성하고 $.deployment_id를 반환. 메서드 ≥1개 선행 필요(NoMethodsExist) → requires에 apigw-method."
+
+  apigw-stage:
+    code: "ap-apigw-stage"
+    service: application-service/apigateway
+    requires: [apigw-api, apigw-deployment]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/stages"
+      body: {stage_name: "stg{unique}", description: "API regression stage",
+             deployment_id: "{apigw-deployment.deployment_id}"}
+    delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/stages/stg{unique}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: apigateway-api-write-coverage,
+             steps: [create-stage, delete-stage]}
+    notes: "stage는 id가 아니라 stage_name으로 주소화된다 — capture 없음; delete 경로의 stg{unique}는 create body와 동일 {unique} 전개(런 내 상수)에 의존한다. stage_name 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$ (≥3자). config/active-deployment PUT setter는 lifecycle 영역."
+
+  apigw-auth:
+    code: "ap-apigw-auth"
+    service: application-service/apigateway
+    requires: [apigw-api, apigw-deployment]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/auths"
+      body: {name: "regrauth{ualpha}", connected_stages: [dev],
+             expiration_period: 90}
+    capture: {access_token: "$.access_token"}
+    provenance: docs
+    source: {lifecycle: apigateway-api-write-coverage,
+             steps: [create-auth, find-auth-id, delete-auth]}
+    notes: "createauth 응답에는 id가 없고 $.access_token뿐 — auth_id는 listauths(GET .../auths $.auths[0].id)로 회수해야 DELETE /v1/apis/{api_id}/auths/{auth_id}가 가능하다. 후속-GET capture는 §1 task 스키마가 표현하지 못해 delete 없음(teardown은 R3에서 list-capture sub-step으로). connected_stages [dev]는 apigw-deployment(stage_type=new)가 만든 stage를 참조 → requires에 포함. expiration_period 단위는 일."
+
+  apigw-access-control:
+    code: "ap-apigw-acl"
+    service: application-service/apigateway
+    requires: [apigw-api, apigw-deployment]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/access-controls"
+      body: {name: "regracl{ualpha}", allowed_ip_addr: ["10.0.0.0/24"],
+             connected_stages: [dev], description: "API regression access control"}
+    capture: {access_control_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/access-controls/{access_control_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: apigateway-api-write-coverage,
+             steps: [create-access-control, delete-access-control]}
+    notes: "createaccesscontrols는 $.id를 직접 반환 (docs 모델). connected_stages [dev] → requires에 apigw-deployment."
+
+  apigw-usage-plan:
+    code: "ap-apigw-usage-plan"
+    service: application-service/apigateway
+    requires: [apigw-api]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/usage-plans"
+      body: {name: "regrup{ualpha}", limit: 100, rate: day,
+             description: "API regression usage plan"}
+    capture: {usage_plan_id: "$.usage_plan.id"}
+    delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/usage-plans/{usage_plan_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: apigateway-api-write-coverage,
+             steps: [create-usage-plan, delete-usage-plan]}
+    notes: "rate enum hour|day|month, limit 1..2000000000 (docs 모델). description/quota PUT setter는 lifecycle 영역."
+
+  apigw-api-key:
+    code: "ap-apigw-api-key"
+    service: application-service/apigateway
+    requires: [apigw-api, apigw-usage-plan]
+    create:
+      endpoint: "POST /v1/apis/{apigw-api.api_id}/usage-plans/{apigw-usage-plan.usage_plan_id}/api-keys"
+      body: {name: "regrkey{ualpha}", description: "API regression api key"}
+    capture: {api_key_id: "$.api_key.id"}
+    delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/usage-plans/{apigw-usage-plan.usage_plan_id}/api-keys/{api_key_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: apigateway-api-write-coverage,
+             steps: [create-api-key, delete-api-key]}
+
+  apigw-privatelink-endpoint:
+    code: "ap-apigw-ple"
+    service: application-service/apigateway
+    requires: []
+    create:
+      endpoint: "POST /v1/privatelink-endpoints"
+      body: {name: "regrple{ualpha}", privatelink_service_id: "{opt.privatelink_service_id}",
+             description: "API regression privatelink endpoint"}
+      options:
+        privatelink_service_id: {type: string, required: true,
+                                 note: "실재 PrivateLink service id 필요 — networking privatelink-service 노드가 모델에 없어 ref 옵션으로 승격하지 못함(R3 과제). 소스 lifecycle은 합성 id 0000...을 보내 4xx coverage probe"}
+    capture: {privatelink_endpoint_id: "$.privatelink_endpoint.id"}
+    delete: {endpoint: "DELETE /v1/privatelink-endpoints/{privatelink_endpoint_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: apigateway-privatelink-endpoint,
+             steps: [create-privatelink-endpoint, delete-privatelink-endpoint-synthetic]}
+    notes: "컨트롤플레인 객체(시간당 과금 없음, 소스는 light). set/request(CANCEL|RE_REQUEST)/connection/approval PUT은 lifecycle 영역; connect/approval 요청 모델은 docs 덤프에 없음. capture envelope $.privatelink_endpoint.id는 docs 파생 — UNPROVEN."

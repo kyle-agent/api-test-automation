@@ -1,0 +1,21 @@
+# Resource-task model — application-service/queueservice (ap-queue group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# application-queueservice-queue (enabled, live-validated) by extract.py,
+# curated by hand. Node id `queue` = cross-service.yaml key.
+version: 1
+resources:
+  queue:
+    code: "ap-queue-queue"
+    service: application-service/queueservice
+    requires: []
+    create:
+      endpoint: "POST /v1/queues"
+      body: {name: "regrq{unique}", description: "API regression suite",
+             message_retention_period: 40, message_retention_period_unit: minute,
+             message_size: 256, data_key_reuse_period: 40,
+             data_key_reuse_period_unit: minute, tags: []}
+    capture: {queue_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/queues/{queue_id}", destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: application-queueservice-queue, steps: [create, get, delete]}
+    notes: "선행조건 없음 (cross-service와 일치) — 폴링 불필요(create 즉시 사용 가능, 소스에 ready 폴링 없음). config/dedup/acl setter는 lifecycle 영역."
