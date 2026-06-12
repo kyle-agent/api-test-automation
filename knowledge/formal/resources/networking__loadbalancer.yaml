@@ -27,6 +27,9 @@ resources:
           vpc_id: "{vpc.vpc_id}"
           tags: []
     capture: {lb_health_check_id: "$.lb_health_check.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/lb-health-checks/{lb_health_check_id}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/lb-health-checks/{lb_health_check_id}",
              destructive: true}
     provenance: VALIDATED
@@ -60,6 +63,13 @@ resources:
     capture: {loadbalancer_id: "$.loadbalancer.id"}
     ready: {field: "$.loadbalancer.state",
             until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 600, interval: 20}
+    verify:
+      - {name: read-static-nats,
+         endpoint: "GET /v1/loadbalancers/{loadbalancer_id}/static-nats",
+         expect_status: [200]}
+      - {name: read-private-static-nats,
+         endpoint: "GET /v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/loadbalancers/{loadbalancer_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: heavy-shared-networking, steps: [lb-create, lb-wait, lb-delete]}
@@ -81,6 +91,12 @@ resources:
           vpc_id: "{vpc.vpc_id}"
           tags: []
     capture: {lb_server_group_id: "$.lb_server_group.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/lb-server-groups/{lb_server_group_id}",
+         expect_status: [200]}
+      - {name: read-members,
+         endpoint: "GET /v1/lb-server-groups/{lb_server_group_id}/members",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/lb-server-groups/{lb_server_group_id}",
              destructive: true}
     provenance: VALIDATED
@@ -106,6 +122,9 @@ resources:
           support_http2: false
           tags: []
     capture: {listener_id: "$.listener.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/lb-listeners/{listener_id}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/lb-listeners/{listener_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: heavy-shared-networking,
