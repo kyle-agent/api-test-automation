@@ -109,7 +109,7 @@
   <div class="t-grp" style="margin-top:14px">Lifecycle 수행시간 <span class="mut" style="font-weight:400">— 느린 순 · ≥5분 <span style="color:#cf222e;font-weight:700">빨강</span> · ≥1분 <span style="color:#b5740b;font-weight:700">주황</span></span></div>
   <table id="lcTbl" style="display:none"><thead><tr><th>Lifecycle</th><th style="width:90px;text-align:right">수행시간</th><th></th></tr></thead><tbody id="lcBody"></tbody></table></div>
 
-<div class="panel"><b>런 이력</b> <span class="mut">(index.json, 최신순)</span>
+<div class="panel"><b>런 이력</b> <span class="mut">(최신순 · 행 클릭 = 그 런의 자원 상태 보기)</span>
 <table id="hist"><thead><tr>
   <th>run</th><th>sha</th><th>종료(UTC)</th><th>형태</th><th>ok</th><th>soft</th>
   <th>fail<sub>new</sub></th><th>cov_op</th><th>C3</th><th>tested</th>
@@ -154,7 +154,8 @@ async function xlist(prefix){
 }
 function fmtRow(s){
   const h=s.history||{};
-  return `<tr><td><a href="${s.url||'#'}" target="_blank">${s.run_id}</a></td>
+  return `<tr class="histrow" data-run="${s.run_id}" style="cursor:pointer"
+    title="클릭 → 이 런의 자원 상태 보기"><td><a href="${s.url||'#'}" target="_blank">${s.run_id}</a></td>
    <td><code>${s.sha||h.sha||""}</code></td><td>${(s.finished||"").replace("T"," ").replace("Z","")}</td>
    <td>${h.crud_ran?"CRUD":"read-only"}</td><td class="ok">${h.ok??""}</td><td>${h.soft??""}</td>
    <td class="${(h.fail_new||0)>0?'bad':'ok'}">${h.fail_new??""}</td>
@@ -164,6 +165,16 @@ async function loadHistory(){
   try{
     const idx=await jget("index.json");
     $("#hist tbody").innerHTML=idx.map(fmtRow).join("");
+    document.querySelectorAll("#hist .histrow").forEach(tr=>tr.onclick=e=>{
+      if(e.target.tagName==="A")return;          // 링크 클릭은 그대로 통과
+      const sel=$("#resRun");
+      if([...sel.options].some(o=>o.value===tr.dataset.run)){
+        sel.value=tr.dataset.run; renderRes();
+        document.getElementById("res").scrollIntoView({behavior:"smooth"});
+      } else {
+        $("#resBody").textContent="이 런에는 자원 이벤트가 없습니다 (read-only 런)";
+      }
+    });
     return idx;
   }catch(e){ $("#hist tbody").innerHTML=
     `<tr><td colspan="10" class="mut">index.json 읽기 실패 (${e.message}) — 엔드포인트/공개권한 확인</td></tr>`;
@@ -442,25 +453,16 @@ function fillRunSelect(ids,idx){
   const sel=$("#resRun"); const cur=sel.value;
   sel.innerHTML=sorted.map(i=>`<option value="${i}">${i}</option>`).join("");
   sel.value=cur&&sorted.includes(cur)?cur:(sorted[0]||"");
-  // clickable run pills (최근 8개): ● 진행 중 pulse / 종료 시각 표시
-  const meta={}; (idx||[]).forEach(s=>{meta[String(s.run_id)]=s;
-    if(s.finished) window.RUN_FINISH[String(s.run_id)]=Date.parse(s.finished);});
-  $("#runPick").innerHTML=sorted.slice(0,12).map(i=>{
-    const m=meta[String(i)];
-    const live=window.LIVE_RUNS.has(String(i));          // 진짜 in-flight만
-    const noSum=!m&&!live;                               // 옛 런: 요약 없음
-    const when=m&&m.finished?m.finished.slice(5,16).replace("T"," "):"";
-    const sha=m&&(m.sha||(m.history&&m.history.sha))||"";
-    const short="…"+String(i).slice(-5);             // run 번호는 뒤 5자리만
-    return `<span class="runpill${sel.value===String(i)?" on":""}${live?" live":""}" data-run="${i}"
-      title="run ${i}${sha?" · "+sha:""}${live?" · 진행 중":noSum?" · 요약 없음(과거 런)":" · 종료 "+(m&&m.finished||"")}">
-      <span class="rdot"></span><b>${short}</b>${sha?`<code style="font-size:10px;color:#57606a">${sha}</code>`:""}${live?'<span class="run" style="font-size:11px">진행 중</span>'
-        :noSum?'<span class="rwhen">요약 없음</span>':`<span class="rwhen">${when}</span>`}</span>`;
-  }).join("");
+  // 알약 = 진행 중인 런만 (동시성은 1이 정상 — 시퀀싱 규칙). 과거 런은
+  // 아래 '런 이력' 행 클릭으로 선택한다.
+  const live=[...window.LIVE_RUNS].filter(i=>sorted.includes(String(i)));
+  $("#runPick").innerHTML = live.length
+    ? live.map(i=>`<span class="runpill live${sel.value===String(i)?" on":""}" data-run="${i}"
+        title="run ${i} · 진행 중"><span class="rdot"></span><b>…${String(i).slice(-5)}</b>
+        <span class="run" style="font-size:11px">진행 중</span></span>`).join("")
+    : `<span class="mut" style="font-size:12px">지금 도는 런 없음 — 아래 런 이력에서 행을 클릭하면 그 런의 자원 상태를 봅니다</span>`;
   document.querySelectorAll("#runPick .runpill").forEach(pl=>pl.onclick=()=>{
-    sel.value=pl.dataset.run;
-    document.querySelectorAll("#runPick .runpill").forEach(x=>x.classList.toggle("on",x===pl));
-    renderRes();
+    sel.value=pl.dataset.run; renderRes();
   });
 }
 async function tick(){
