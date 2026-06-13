@@ -36,6 +36,7 @@ CLI:
   python -m core.oplog ensure                      # create bucket + CORS + ACL
   python -m core.oplog emit --stage smoke --status done [--detail '...']
   python -m core.oplog finalize --history dashboard/history.jsonl
+  python -m core.oplog plan-manifest               # build+emit runs/<id>/plan.json
 """
 from __future__ import annotations
 
@@ -338,6 +339,118 @@ def finalize(history_path: str = "dashboard/history.jsonl") -> bool:
     return _put(c, cfg, "index.json", index[:200])
 
 
+# ---------------------------------------------------------------------------
+# Plan-manifest (M6d) — the INTENDED dependency chain, uploaded ONCE at run
+# start as runs/<run_id>/plan.json (parallel to runs/<id>/res/*.json). The ops
+# viewer pre-draws plan.order as grey placeholders and lights them up as the
+# matching `created` resource events arrive (docs/M6-DESIGN.md §C).
+# ---------------------------------------------------------------------------
+import re as _re
+
+
+def _plan_kind_of(endpoint: str) -> str:
+    """First path segment after /v1 of a 'METHOD /path' endpoint — same logic
+    as dashboard/gen_dep_map.py kind_of (replicated to avoid a dashboard import
+    from core)."""
+    path = (endpoint or "").partition(" ")[2]
+    segs = [s for s in path.split("?")[0].split("/") if s]
+    return segs[1] if len(segs) > 1 else (segs[0] if segs else "")
+
+
+def _recover_targets(lifecycle: dict, model: dict) -> list:
+    """Recover the original compose targets from a composed lifecycle's steps.
+
+    The loader hands us lifecycle JSON (steps), not the compose targets. A
+    create-<node> step names a node; strip the prefix and keep it if it is a
+    real model node. Some node names legitimately end in a digit
+    (``epas-engine-version-16``), so try the full name first and only strip a
+    trailing ``-<N>`` instance suffix if the full name is not a model node.
+    Sub-resource steps that resolve to neither (apigateway ``create-method``)
+    are dropped — plan()'s closure rebuilds everything else."""
+    out: list = []
+    seen: set = set()
+    for s in lifecycle.get("steps") or []:
+        name = s.get("name", "")
+        if not name.startswith("create-"):
+            continue
+        node = name[len("create-"):]
+        cand = None
+        if node in model:
+            cand = node
+        else:
+            stripped = _re.sub(r"-\d+$", "", node)
+            if stripped in model:
+                cand = stripped
+        if cand and cand not in seen:
+            seen.add(cand)
+            out.append(cand)
+    return out
+
+
+def build_plan_manifest() -> dict:
+    """Serialize composer.plan() for every ENABLED composed lifecycle.
+
+    Composed lifecycles are those whose id starts with ``gen-`` or ``bundle-``
+    (loader.load_lifecycles()). For each we recover the compose targets from
+    the create-<node> steps and call plan(). A lifecycle that yields no
+    recoverable target or whose plan() raises is recorded as ``{id, error}``
+    — never fatal. Returns a serializable dict (no S3 dependency)."""
+    from regression.scenarios.loader import load_lifecycles
+    from regression.scenarios import composer
+
+    model = composer.load_model()
+    entries: list = []
+    for lc in load_lifecycles():
+        lid = str(lc.get("id", ""))
+        if not (lid.startswith("gen-") or lid.startswith("bundle-")):
+            continue
+        if not lc.get("enabled"):
+            continue
+        targets = _recover_targets(lc, model)
+        if not targets:
+            entries.append({"id": lid, "error": "no recoverable compose targets"})
+            continue
+        try:
+            p = composer.plan(targets, model=model)
+        except Exception as exc:                      # gated/invalid — skip
+            entries.append({"id": lid, "error": f"{type(exc).__name__}: {exc}"})
+            continue
+        kinds = {}
+        for node in p.get("order", []):
+            base = node.partition("#")[0]             # drop #N instance suffix
+            ep = ((model.get(base) or {}).get("create") or {}).get("endpoint") or ""
+            k = _plan_kind_of(ep)
+            if k:
+                kinds[node] = k
+        entries.append({
+            "id": lid,
+            "service": lc.get("service", ""),
+            "order": p.get("order", []),
+            "teardown": p.get("teardown", []),
+            "dedup": p.get("dedup", {}),
+            "peak_quota": p.get("peak_quota", {}),
+            "kinds": kinds,
+        })
+    return {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "lifecycles": entries}
+
+
+def emit_plan(plan_doc: dict) -> bool:
+    """PUT the plan-manifest to runs/<run_id>/plan.json (single object, not
+    batched), public-read, best-effort. Also mirrors to the platform control
+    plane on a "plan" channel when APITEST_PLATFORM_URL is set. Never raises;
+    returns False when the oplog is disabled (no creds) or the PUT fails."""
+    try:
+        # platform mirror is independent of the S3 oplog being configured
+        _post_platform("plan", {"plan": plan_doc})
+        c, cfg = _client()
+        if not c:
+            return False
+        return _put(c, cfg, f"runs/{_run_id()}/plan.json", plan_doc)
+    except Exception:
+        return False
+
+
 def main(argv=None) -> int:
     import argparse
     ap = argparse.ArgumentParser(description="workflow oplog -> object storage")
@@ -351,6 +464,7 @@ def main(argv=None) -> int:
     em.add_argument("--job", default="")
     fin = sub.add_parser("finalize")
     fin.add_argument("--history", default="dashboard/history.jsonl")
+    sub.add_parser("plan-manifest")
     a = ap.parse_args(argv)
     if a.cmd == "ensure":
         ensure_bucket()
@@ -360,6 +474,18 @@ def main(argv=None) -> int:
         emit(a.stage, a.status, a.detail, a.job)
     elif a.cmd == "finalize":
         finalize(a.history)
+    elif a.cmd == "plan-manifest":
+        doc = build_plan_manifest()
+        ok = emit_plan(doc)
+        n = len(doc.get("lifecycles", []))
+        if ok:
+            print(f"[oplog] plan-manifest emitted runs/{_run_id()}/plan.json "
+                  f"({n} lifecycles)")
+        else:
+            # disabled-or-failed: still print the manifest so a local/dry run
+            # is useful (oplog already printed its '[oplog] disabled' notice)
+            print(f"[oplog] plan-manifest NOT uploaded ({n} lifecycles built)")
+            print(json.dumps(doc, ensure_ascii=False, indent=2))
     return 0  # never fail the calling step
 
 
