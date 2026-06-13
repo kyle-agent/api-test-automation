@@ -453,6 +453,40 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       교체, 전체 회귀 plan 계산
 - [ ] **R4 C4 변형** — `vary:` 옵션 조합 변형 suite
 
+### M6 — 셀프서비스 온보딩 + 조합 실행 + 관제 통합 (owner 비전 2026-06-13)
+
+> 신규 서비스가 추가되면 **담당자가 task 정의만 작성하면 테스트된다.**
+> 서비스/서비스군/전체/theme(예: CRUD 없는 조회 전용) 조합으로 스케줄을
+> 걸 수 있다. task 정의는 YAML 또는 UI로 최대한 심플하게. 특정 서비스를
+> 실행하면 **의존 서비스의 task가 연쇄적으로 자동 포함**되고, 실행 중에는
+> 그 연관관계가 그대로 보인다. 전체 대시보드와 실행 ops는 분리되어 있지
+> 않고 플랫폼 안에 통합된다. 이후 계속 추가되는 서비스로 확장 가능한
+> 완성형이 목표.
+
+- [ ] **M6a 온보딩 키트** — 신규 서비스 = resources/*.yaml 1파일:
+      스키마 최소 서브셋 가이드(ONBOARDING.md) + 템플릿 생성기
+      (`tools/new_service.py`: 카탈로그에서 endpoint 후보 + DTO 골격
+      자동 추출) + validator가 게이트. 작성 즉시 합성·스케줄 대상이 됨
+- [ ] **M6b 조합 실행** — 실행 단위 선언: service(=그 서비스 노드 전체의
+      의존 폐포 bundle), group(_groups.yaml), all, theme(read-only /
+      crud / heavy / vary). run-request·workflow_dispatch에
+      `target=` 파라미터, 스케줄 매트릭스(cron)와 결합
+- [ ] **M6c 의존 연쇄 실행** — `compose_service(svc)`: 서비스의 모든
+      노드를 타겟으로 한 bundle 합성(§2.5) = "특정 서비스 실행 시 의존
+      서비스 task 자동 포함"의 구현체. Plan 화면에서 미리보기(연쇄 트리)
+- [ ] **M6d 실행 중 연관관계 가시화** — ops 자원 트리에 lifecycle별
+      의존 체인 오버레이(지금 무엇이 누구의 선행으로 생성됐고 어느
+      단계인지), 진행 중 스텝 하이라이트
+- [ ] **M6e 관제 통합** — coverage 대시보드(index/서비스 드릴다운)와
+      실행 ops(ops.html)를 /platform/ IA(Overview·Plan·Run·Report)
+      안으로 통합 — Run 탭=ops 라이브, Report 탭=커버리지, 동일 셸/네비
+- [ ] **M6f 운영 모델: 3-tier agent 루프** —
+      ① **Planner**(기획·고민): 산출물을 계속 검토하고 개선계획 수립
+      ② **Coordinator**(세부 실행계획 수립·분배) ③ **Executors**(세부
+      실행). Planner는 각 윈도우/머지 후 결과물 리뷰 → 개선 backlog 갱신.
+      (2026-06-13 현재 이미 사실상 이 구조로 운영 중 — 명문화 + Planner
+      상설화)
+
 ### 마일스톤별 가치
 - M0만으로도: 멀티 환경 매트릭스 + run 히스토리가 생김 (서버 없이).
 - M1로: "스케줄에 따라 수행 + 히스토리 리포팅" 요구 충족.
