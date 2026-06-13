@@ -81,6 +81,18 @@
     <a href="/dashboard/index.html">📊 전체 대시보드 (서비스별 드릴다운 포함)</a> ·
     <a href="/dashboard/ops.html">🔭 ops 라이브 뷰어</a></p>
 
+  <h2>커버리지 대시보드 <span class="hint">build.py 산출 — C1/C2/C3 사다리 ·
+    서비스 nav (untestable 회색) · 클릭 → 서비스별 드릴다운</span></h2>
+  <div class="card pad" style="padding:0;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
+      <span class="muted small">아래는 발행된 커버리지 인덱스입니다 — 서비스 카드를
+        클릭하면 엔드포인트 드릴다운으로 이동합니다.</span>
+      <a class="small" style="margin-left:auto" href="/dashboard/index.html" target="_blank">전체 화면으로 열기 →</a>
+    </div>
+    <iframe src="/dashboard/index.html" title="커버리지 대시보드"
+            style="width:100%;height:680px;border:0;display:block"></iframe>
+  </div>
+
 {# ===================== Conformance ===================== #}
 {% elif tab == 'conformance' %}
   <h2>설계/동작 정합성 <span class="hint">회귀와 별개 · 정적+런타임 점검</span></h2>

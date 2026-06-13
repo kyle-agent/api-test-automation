@@ -94,9 +94,15 @@ def _rewrite(html: str, views: dict[str, str], depth: int = 0) -> str:
                              else f'href="{up}resource__{m.group(1)}.html"'), html)
     for route, fname in sorted(PAGES.items(), key=lambda kv: -len(kv[0])):
         html = html.replace(f'href="{route}"', f'href="{up}{fname}"')
-    # the in-platform dashboard proxy -> the Pages root copies
-    html = html.replace('href="/dashboard/index.html"', f'href="{up}../index.html"')
-    html = html.replace('href="/dashboard/ops.html"', f'href="{up}../ops.html"')
+    # the in-platform dashboard proxy -> the Pages root copies.
+    # On the published site the platform pages live under platform/ while the
+    # coverage index + ops viewer sit at the Pages root, so a platform page
+    # (depth 0) links up one level (../index.html); a view page (depth 1)
+    # links up two (../../index.html). Both href= (links) and src= (the Run
+    # ops iframe + the Report coverage iframe) need the same rewrite.
+    for attr in ("href", "src"):
+        html = html.replace(f'{attr}="/dashboard/index.html"', f'{attr}="{up}../index.html"')
+        html = html.replace(f'{attr}="/dashboard/ops.html"', f'{attr}="{up}../ops.html"')
     for prefix in _DEAD_PREFIXES:
         html = re.sub(r'href="' + re.escape(prefix) + r'[^"]*"', 'href="#"', html)
     # banner after the header

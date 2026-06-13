@@ -112,6 +112,17 @@
   </form>
 </div>
 
+<h2>라이브 운영 뷰 <span class="hint">ops — res-event 트리·간트 + T5 의도 vs 실제 오버레이</span></h2>
+<div class="card pad" style="padding:0;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
+    <span class="muted small">실행 중 리소스 라이프사이클이 아래에 실시간으로 표시됩니다
+      (S3 oplog 직접 fetch).</span>
+    <a class="small" style="margin-left:auto" href="/dashboard/ops.html" target="_blank">전체 화면으로 열기 →</a>
+  </div>
+  <iframe src="/dashboard/ops.html" title="ops 라이브 뷰어"
+          style="width:100%;height:560px;border:0;display:block"></iframe>
+</div>
+
 <h2>관제</h2>
 <div class="card pad">
   <a href="/testing/resources">🧹 리소스 인벤토리 — 살아있는 테스트 리소스 조회/삭제 →</a>
