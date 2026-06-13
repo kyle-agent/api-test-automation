@@ -442,7 +442,7 @@ resources:
              destructive: true,
              retry_on_status: [400, 401, 409, 500, 503],
              retries: 20, retry_interval: 60}
-    provenance: docs
+    provenance: VALIDATED  # replica family live-proven — run 27481666055 (family-only chain PASSED)
     source: {lifecycle: mariadb-cluster-subops-guarded, steps: [create-replica]}
     notes: "HEAVY — 두 번째 과금 클러스터, mariadb delete drain ~90분이 둘 다 적용될 수 있음 (run e3ba190) — teardown은 replica 먼저, 잔여 drain은 subnet 409 재시도 + cleanup 패스 백스톱. ReplicasCreateRequest verbatim (api_docs — PG와 동일 DTO). instances에 service_ip_address 없음 = mariadb 검증 본체 instance 형 미러. 응답 AsyncResponse $.resource.id = replica cluster id. PG userguide 확정 준용: 동일 리전·동일 subnet, DB당 최대 5개. create 409 재시도는 직전 async setter verify reconcile 경합 대비 (mariadb는 폴딩 setter가 가장 많음 — 예산 부족 시 라이브 정제). delete 재시도 스택은 PG verbatim 승계 (401 quirk family)."
 
@@ -463,7 +463,7 @@ resources:
       - {name: replicas-list,
          endpoint: "GET /v1/clusters/{mariadb-cluster.cluster_id}/replicas",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # replica family live-proven — run 27481666055 (family-only chain PASSED)
     source: {lifecycle: mariadb-cluster-subops-guarded,
              steps: [sync-replica-state]}
     notes: "path param은 ORIGIN cluster id (api_docs). body 없음, 202 AsyncResponse. listreplicas verify로 replica_state 노출 확인 (PG와 동일 DTO)."
@@ -499,7 +499,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{mariadb-replica.replica_cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # replica family live-proven — run 27481666055 (family-only chain PASSED)
     source: {lifecycle: mariadb-cluster-subops-guarded, steps: [reset-replica]}
     notes: "Replica 재구성 — path param replica_cluster_id = REPLICA role 클러스터 (api_docs). 전체 재복제라 ready 1800s. body 없음, 202."
 
@@ -517,7 +517,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{mariadb-replica.replica_cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # replica family live-proven — run 27481666055 (family-only chain PASSED)
     source: {lifecycle: mariadb-cluster-subops-guarded, steps: [promote-replica]}
     notes: "IRREVERSIBLE — 승격 시 기존 Master와 동기화 중단 (PG userguide 준용). requires로 reset-replica 이후 '마지막' 보장; teardown은 replica delete가 origin delete보다 먼저."
 
