@@ -1,6 +1,6 @@
-# PG replica rev3 — replica create now retries 400 InvalidServiceState while
-# the cluster settles after RUNNING (rev2 proved cluster+sg-rules; this should
-# finally land create -> sync-replica-state -> reset-replica -> promote).
+# PG replica rev4 — replica block storage role_type now DATA (rev3 proved the
+# settling-retry rides past InvalidServiceState). create -> sync-replica-state
+# -> reset-replica -> promote should land now.
 mutations=true
 destructive=true
 heavy=true
