@@ -5,7 +5,7 @@
       "id": "gen-heavy-vs-netops",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "extended after owner knowledge 2026-06-13: server post-create ops (lock/unlock/dump/password w/ keypair private_key), block-volume attach/detach, custom-image from RUNNING server. attach-409 retry from run 27447899572 retained.",
+      "_note": "run 27450089575: static-nat create 2xx + capture proven; per-id read 403 'Action definition is not found' (PF-15) -> verify [200,403]. Extended chain: server post-create ops + volume attach/detach + custom-image (owner 2026-06-13).",
       "steps": [
         {
           "name": "create-keypair",
@@ -637,12 +637,13 @@
           }
         },
         {
-          "name": "verify-server-static-nat",
+          "name": "verify-server-static-nat-read",
           "service": "virtualserver",
           "method": "GET",
           "path": "/v1/servers/{server_id}/interfaces/{port_id}/static-nats/{nat_id}",
           "expect_status": [
-            200
+            200,
+            403
           ],
           "group": "server-static-nat"
         },

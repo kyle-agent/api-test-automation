@@ -62,6 +62,6 @@ resources:
          expect_status: [200],
          note: "DeduplicationScopeSetRequest: enum (Queue, MessageGroup). create Queue -> MessageGroup 토글"}
     delete: {endpoint: "DELETE /v1/queues/{queue_id}", destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # gen-wave3-qfifo 전 단계 2xx — run 27450089575 (attributes 200 + dedup PUT 2종)
     source: {lifecycle: application-queueservice-queue, steps: [create, delete]}
     notes: "owner 도메인 지식(2026-06-13) + api_docs DTO 추출. 폴링 불필요(표준 queue와 동일). 표준 queue에는 dedup PUT가 400/유효성 거부일 것으로 예상 — C4 음성 변형 후보."

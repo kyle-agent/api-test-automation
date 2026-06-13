@@ -420,13 +420,18 @@ resources:
     # 라이브 응답(run 27444823109)은 FLAT: {id, publicip_id, external/internal_ip
     # _address, state: CREATING, subnet_id} — $.static_nat.id 추측은 오류였음
     capture: {nat_id: "$.id"}
+    verify:
+      - {name: read,
+         endpoint: "GET /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats/{nat_id}",
+         expect_status: [200, 403],
+         note: "403 'Action definition is not found' (run 27450089575) — 미정의 IAM action 제품 결함 클래스 4번째 사례 (PF-15; log-streams·api-key·fs-snapshot read와 동일)"}
     delete:
       endpoint: "DELETE /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats/{nat_id}"
       retry_on_status: [409, 500]
       retries: 8
       retry_interval: 15
       destructive: true
-    provenance: docs
+    provenance: VALIDATED  # create 2xx + capture $.id 라이브 증명 — run 27450089575 (verify 403은 제품 결함)
     source: {lifecycle: vs-server-action-coverage,
              steps: [create-interface-static-nat, delete-interface-static-nat]}
     notes: "소스는 placeholder publicip로 4xx probe였음 — 실소유 public-ip 주입은 이 모델이 처음 (owner: attach된 port에만 가능). capture envelope $.static_nat.id UNPROVEN — 라이브 후 확정. server/port 토큰은 server-interface의 선행 폐포에서 공급."

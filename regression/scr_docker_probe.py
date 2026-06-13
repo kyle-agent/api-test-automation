@@ -120,6 +120,19 @@ def main() -> int:
                   f"(detail keys: {sorted(b) if isinstance(b, dict) else '?'})")
             return 0
         host = endpoint.replace("https://", "").replace("http://", "").rstrip("/")
+        # run 27450089575: the .scr.public. domain existed but the runner's
+        # resolver had no record yet — newly minted subdomains may lag. Wait
+        # for DNS up to ~4 min before concluding NETWORK-UNREACHABLE.
+        import socket
+        dns_ok = False
+        for _ in range(16):
+            try:
+                socket.getaddrinfo(host, 443)
+                dns_ok = True
+                break
+            except OSError:
+                time.sleep(15)
+        print(f"{VERDICT} dns({host}) resolvable={dns_ok}")
         ak, sk = os.environ["SCP_ACCESS_KEY"], os.environ["SCP_SECRET_KEY"]
         r = subprocess.run(["docker", "login", host, "-u", ak,
                             "--password-stdin"],
