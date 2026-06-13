@@ -24,3 +24,44 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: application-queueservice-queue, steps: [create, get, delete]}
     notes: "선행조건 없음 (cross-service와 일치) — 폴링 불필요(create 즉시 사용 가능, 소스에 ready 폴링 없음). config/dedup/acl setter는 lifecycle 영역."
+
+  # owner 2026-06-13: queue 잔여 3종 (attributes GET / dedup PUT / dedup-scope
+  # PUT). 유저가이드: 중복 제거는 FIFO 유형에서만 설정 가능 — FIFO는 별도 type
+  # 필드가 아니라 name 접미사 `.fifo`로 지정 (api_docs name 패턴
+  # ^[a-z][a-z0-9-]*\.fifo$, V1_2 create가 dedup 필드 수용).
+  queue-fifo:
+    code: "ap-queue-fifo"
+    service: application-service/queueservice
+    requires: []
+    create:
+      endpoint: "POST /v1/queues"
+      body: {name: "regrqf{unique}.fifo", description: "API regression suite (FIFO)",
+             message_retention_period: 40, message_retention_period_unit: minute,
+             message_size: 256, data_key_reuse_period: 40,
+             data_key_reuse_period_unit: minute,
+             deduplication_scope: "{opt.deduplication_scope}",
+             content_based_deduplication: false, tags: []}
+      options:
+        deduplication_scope: {type: enum, values: [Queue, MessageGroup],
+                              default: Queue, vary: true,
+                              note: "유저가이드: 대기열 내(Queue) vs 그룹 단위(MessageGroup), FIFO 전용"}
+    capture: {queue_id: "$.id"}
+    verify:
+      - {name: read-attributes,
+         endpoint: "GET /v1/queues/{queue_id}/attributes?attributes=All&name=regrqf{unique}.fifo",
+         expect_status: [200],
+         note: "표준 queue 노드의 [200,400] 관용은 가림 위험 — FIFO 노드는 200 강제, 400이면 본문이 attributes 유효값을 알려줄 것"}
+      - {name: dedup-content,
+         endpoint: "PUT /v1/queues/{queue_id}/deduplication",
+         json: {content_based_deduplication: true},
+         expect_status: [200],
+         note: "DeduplicationSetRequest: content_based_deduplication bool required (api_docs). FIFO 전용 — create false -> true 토글"}
+      - {name: dedup-scope,
+         endpoint: "PUT /v1/queues/{queue_id}/deduplication-scope",
+         json: {deduplication_scope: MessageGroup},
+         expect_status: [200],
+         note: "DeduplicationScopeSetRequest: enum (Queue, MessageGroup). create Queue -> MessageGroup 토글"}
+    delete: {endpoint: "DELETE /v1/queues/{queue_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: application-queueservice-queue, steps: [create, delete]}
+    notes: "owner 도메인 지식(2026-06-13) + api_docs DTO 추출. 폴링 불필요(표준 queue와 동일). 표준 queue에는 dedup PUT가 400/유효성 거부일 것으로 예상 — C4 음성 변형 후보."

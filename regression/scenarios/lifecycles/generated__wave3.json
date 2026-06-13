@@ -248,6 +248,90 @@
           ]
         }
       ]
+    },
+    {
+      "id": "gen-wave3-qfifo",
+      "service": "application-service/queueservice",
+      "enabled": true,
+      "_note": "owner domain knowledge 2026-06-13 — FIFO queue (name .fifo suffix) covers the 3 remaining queueservice ops: attributes GET + deduplication/-scope PUTs (FIFO-only per userguide)",
+      "steps": [
+        {
+          "name": "create-queue-fifo",
+          "service": "queueservice",
+          "method": "POST",
+          "path": "/v1/queues",
+          "json": {
+            "name": "regrqf{unique}.fifo",
+            "description": "API regression suite (FIFO)",
+            "message_retention_period": 40,
+            "message_retention_period_unit": "minute",
+            "message_size": 256,
+            "data_key_reuse_period": 40,
+            "data_key_reuse_period_unit": "minute",
+            "deduplication_scope": "Queue",
+            "content_based_deduplication": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "queue_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/queues/{queue_id}",
+            "service": "queueservice"
+          }
+        },
+        {
+          "name": "verify-queue-fifo-read-attributes",
+          "service": "queueservice",
+          "method": "GET",
+          "path": "/v1/queues/{queue_id}/attributes?attributes=All&name=regrqf{unique}.fifo",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-queue-fifo-dedup-content",
+          "service": "queueservice",
+          "method": "PUT",
+          "path": "/v1/queues/{queue_id}/deduplication",
+          "json": {
+            "content_based_deduplication": true
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-queue-fifo-dedup-scope",
+          "service": "queueservice",
+          "method": "PUT",
+          "path": "/v1/queues/{queue_id}/deduplication-scope",
+          "json": {
+            "deduplication_scope": "MessageGroup"
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-queue-fifo",
+          "service": "queueservice",
+          "method": "DELETE",
+          "path": "/v1/queues/{queue_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
     }
   ]
 }
