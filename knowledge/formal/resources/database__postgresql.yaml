@@ -351,7 +351,7 @@ resources:
              destructive: true,
              retry_on_status: [400, 401, 409, 500, 503],
              retries: 20, retry_interval: 60}
-    provenance: docs
+    provenance: VALIDATED  # replica family live-proven — run 27472090705 (create/sync/reset/promote/teardown all green)
     source: {lifecycle: postgresql-cluster-subops-guarded,
              steps: [create-replica]}
     notes: "HEAVY — 두 번째 과금 클러스터. ReplicasCreateRequest verbatim (api_docs): allowable_ip_addresses REQ(nullable), replica_count REQ int, replicas REQ [{name REQ ^[a-z][a-z0-9\\-]*[a-z0-9]$ 3-20, instance_groups REQ}], maintenance_option/tags opt. replicas[].name = 복제 클러스터 이름이라 {ualpha}(소문자 a-p)로 패턴 충족. role_type ACTIVE는 probe 초안 승계 — 거부되면 REPLICA enum이 차순위 후보 (InstanceGroupRequest/InstanceRequest enum에 둘 다 존재). 응답 AsyncResponse $.resource.id = replica cluster id (ReplicaItem에는 id가 없어 create 응답이 유일한 출처). userguide 확정 (2026-06-13): 표준 Replica는 동일 리전·동일 subnet (입력 필드 없음 — origin 상속; cross-region은 replicas/other-region 별도), \"하나의 Database당 최대 5개\", storage 유형은 \"원본 DB에서 설정한 Storage 유형에 따라 동일하게 적용. 용량 설정은 불가\" — block_storage_groups가 무시되거나 OS 104GB 일치 필요 가능성 (라이브 정제). create 409 재시도는 직전 async 쓰기(sg-rules verify 등) reconcile 경합 대비."
@@ -373,7 +373,7 @@ resources:
       - {name: replicas-list,
          endpoint: "GET /v1/clusters/{postgresql-cluster.cluster_id}/replicas",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # replica family live-proven — run 27472090705 (create/sync/reset/promote/teardown all green)
     source: {lifecycle: postgresql-cluster-subops-guarded,
              steps: [sync-replica-state]}
     notes: "path param은 ORIGIN cluster id ({origin_cluster_id}, api_docs). body 없음, 202 AsyncResponse. listreplicas verify로 replica_state 노출 확인 (ReplicaItem {name, replica_state, synced_at})."
@@ -413,7 +413,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{pg-replica.replica_cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # replica family live-proven — run 27472090705 (create/sync/reset/promote/teardown all green)
     source: {lifecycle: postgresql-cluster-subops-guarded,
              steps: [reset-replica]}
     notes: "Replica 재구성 — userguide: \"네트워크 장애 혹은 Master Cluster와의 Replication 지연이 발생하는 경우, Replica 재구성 기능을 통해 Master Cluster의 데이터를 다시 복제할 수 있습니다\" (콘솔에서 replica 자원 선택 후 수행). path param replica_cluster_id = REPLICA role 클러스터 (api_docs/CLI 확정). 건강한 replica에 대한 재구성은 전체 재복제라 ready 재폴링 1800s. body 없음, 202."
@@ -433,7 +433,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{pg-replica.replica_cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # replica family live-proven — run 27472090705 (create/sync/reset/promote/teardown all green)
     source: {lifecycle: postgresql-cluster-subops-guarded,
              steps: [promote-replica]}
     notes: "IRREVERSIBLE — userguide: \"Master 승격 시, 기존 Master Cluster와 동기화가 중단됩니다\" (재접속 경로 없음, 새 replica 생성만 가능). 1회용 합성 클러스터에서만; requires로 reset-replica 이후 '마지막' 보장. 승격 뒤 origin과 (전)replica 둘 다 teardown으로 삭제 (interval-scheduled: replica delete가 origin delete보다 먼저). CLI promotereplicacluster의 param cluster_id = replica id."
