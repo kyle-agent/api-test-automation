@@ -258,6 +258,20 @@ def endpoint_verdicts(cat, tsv_rows):
             for k, cs in obs.items()}
 
 
+def _load_untestable():
+    """owner 2026-06-13: 라이선스/물리자원 부재 서비스 — 기능 테스트 제외,
+    접근성(smoke)만. 대시보드에서 회색 + 사유 배지로 구분."""
+    try:
+        with open(Path(__file__).parent.parent / "data" / "baselines"
+                  / "untestable_services.json") as f:
+            return json.load(f).get("services", {})
+    except Exception:
+        return {}
+
+
+_UNTESTABLE = _load_untestable()
+
+
 def per_service(cat, tsv_rows, prior_verified=None, prior_status=None, sha=""):
     """prior_status: cumulative key -> [status, elapsed_ms, run_sha] from past
     runs (endpoint_status.json on dashboard-data). The cumulative-verified
@@ -312,9 +326,11 @@ def per_service(cat, tsv_rows, prior_verified=None, prior_status=None, sha=""):
                     st_el = (None, None)
             rows.append((e["method"], e["http_path"], e.get("name", ""),
                          bool(covered), st_el[0], st_el[1], v or "", src))
+        unt_reason = _UNTESTABLE.get(f"{category}/{service}")
         services.append({
             "category": category, "service": service, "slug": slug(category, service),
             "total": len(ents), "covered": covn, "reached": reachn,
+            "untestable": unt_reason,
             "gtot": gtot, "gcov": gcov, "wtot": wtot, "wcov": wcov, "rows": rows})
     services.sort(key=lambda s: (s["category"], s["covered"] / (s["total"] or 1), s["service"]))
     return services, merged_status
@@ -540,6 +556,15 @@ def render_services_nav(services):
         cards = []
         for s in svs:
             pct = s["covered"] / s["total"] * 100 if s["total"] else 0
+            if s.get("untestable"):
+                cards.append(
+                    f'<a class="svc unt" href="services/{s["slug"]}.html" '
+                    f'title="{html.escape(s["untestable"])}">'
+                    f'<div class="svc-n">{html.escape(s["service"])}'
+                    f' <span class="unt-badge">접근성만</span></div>'
+                    f'<div class="svc-bar"><div style="width:100%;background:#d0d7de"></div></div>'
+                    f'<div class="svc-m">기능 테스트 제외 — {html.escape(s["untestable"])}</div></a>')
+                continue
             cards.append(
                 f'<a class="svc" href="services/{s["slug"]}.html">'
                 f'<div class="svc-n">{html.escape(s["service"])}</div>'
@@ -654,6 +679,36 @@ def render_service_page(s, meta):
         rows.append({"m": method, "p": path, "api": title or "", "c": c,
                      "s": st, "t": round(el / 1000, 1) if el is not None else None,
                      "src": src, "d": items})
+
+    # ---- untestable service: reachability-only framing ------------------
+    if s.get("untestable"):
+        n_reachable = sum(1 for r in rows if r["s"] is not None)
+        action = (f"<b>기능 테스트 제외 서비스</b> — {html.escape(s['untestable'])} "
+                  f"(owner 2026-06-13). smoke가 각 API의 <b>접근성만</b> 확인한다: "
+                  f"{n_reachable}/{s['total']}개 엔드포인트가 응답(4xx 포함 = 도달). "
+                  "커버리지 분모에서는 waiver로 제외되어 있다.")
+        out = SVC_TEMPLATE
+        for k, v in {
+            "@@SVC@@": html.escape(s["service"]),
+            "@@CAT@@": html.escape(s["category"]),
+            "@@RINGPCT@@": "—", "@@RINGCOL@@": "#d0d7de",
+            "@@COV@@": str(s["covered"]), "@@TOT@@": str(s["total"]),
+            "@@REACHED@@": str(s["reached"]),
+            "@@GETPCT@@": "—", "@@GCOV@@": str(s["gcov"]), "@@GTOT@@": str(s["gtot"]),
+            "@@WPCT@@": "—", "@@WCOV@@": str(s["wcov"]), "@@WTOT@@": str(s["wtot"]),
+            "@@GETCOL@@": "#d0d7de", "@@WCOL@@": "#d0d7de",
+            "@@NDEF@@": "0", "@@NRED@@": "0",
+            "@@ACTION@@": action,
+            "@@ROWSJSON@@": json.dumps(rows, ensure_ascii=False),
+            "@@WHEN@@": str(meta["when"]), "@@BRANCH@@": html.escape(meta["branch"]),
+        }.items():
+            out = out.replace(k, v)
+        # h1만 회색 (title 태그는 평문 유지) + 사유 태그
+        out = out.replace(
+            f"<h1>{html.escape(s['service'])} <span class=\"tag\">",
+            f"<h1><span style='color:#8b949e'>{html.escape(s['service'])}</span> "
+            f"<span class=\"tag\">기능 테스트 제외</span> <span class=\"tag\">")
+        return out
 
     # ---- auto action banner: weakest axis + dominant defect types ----
     bits = []
@@ -1226,6 +1281,9 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
 .svc-controls input{width:200px}
 .svcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
 .svc{display:block;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);transition:.12s}
+.svc.unt .svc-n{color:#8b949e}
+.svc.unt{background:#fafbfc;border-style:dashed}
+.unt-badge{display:inline-block;font-size:10px;color:#8b949e;border:1px solid #d0d7de;border-radius:8px;padding:0 6px;vertical-align:1px}
 .svc:hover{border-color:var(--blue);text-decoration:none;transform:translateY(-1px)}
 .svc .sh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .svc .sn{font-weight:700;font-size:13px;color:var(--text)}
