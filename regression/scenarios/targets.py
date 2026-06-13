@@ -30,6 +30,7 @@ id list (one per line) for operator sanity / dispatch wiring.
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from regression.scenarios import composer
@@ -172,10 +173,68 @@ def compose_selection(spec: str, **kw):
     design — ``expand_targets`` is where the work is.
 
     NOTE: per-selector convenience helpers ``compose_service``/
-    ``compose_group``/``compose_theme`` are ticket T3 (not built here).
+    Prefer ``compose_service``/``compose_group``/``compose_theme`` for the
+    common single-selector cases — they pick a readable lifecycle id.
     """
     targets = expand_targets(spec)
     return composer.compose(targets, **kw)
+
+
+# ---------------------------------------------------------------------------
+# T3 — single-selector convenience wrappers (readable lifecycle ids).
+# Each resolves its selector then hands the node list to composer.compose();
+# the dependency closure / dedup / ordering stay in plan()/compose().
+
+def _slugify(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+def compose_service(service: str, *, model=None, **kw) -> dict:
+    """Compose a bundle covering every node of ``service`` (closure auto).
+
+    ``service`` is ``<category>/<service>``; the lifecycle id is
+    ``gen-svc-<service>`` (last path segment)."""
+    targets = expand_targets(f"service:{service}", model=model)
+    kw.setdefault("lifecycle_id", f"gen-svc-{_slugify(service.split('/')[-1])}")
+    return composer.compose(targets, model=model, **kw)
+
+
+def compose_group(code: str, *, model=None, **kw) -> dict:
+    """Compose a bundle covering every node in group ``code``
+    (lifecycle id ``gen-grp-<code>``)."""
+    targets = expand_targets(f"group:{code}", model=model)
+    kw.setdefault("lifecycle_id", f"gen-grp-{_slugify(code)}")
+    return composer.compose(targets, model=model, **kw)
+
+
+def compose_theme(theme: str, *, model=None, **kw) -> list[dict]:
+    """Compose a theme (``read-only|crud|heavy|vary``) as a LIST of
+    per-service bundles — NOT one giant lifecycle.
+
+    A theme cuts across every service with no shared dependency closure, so
+    a single ``compose()`` of all its nodes is wrong (and breaks on lookup
+    nodes that have no read path to graft a verify onto). We group the
+    theme's nodes by service and compose one bundle per service
+    (``gen-theme-<theme>-<service>``), so each bundle has a coherent closure.
+    Callers dispatch the list and the VPC-peak scheduler (T3c) lanes them."""
+    if model is None:
+        model = composer.load_model()
+    nodes = expand_targets(f"theme:{theme}", model=model)
+    by_service: dict[str, list[str]] = {}
+    for n in nodes:
+        svc = (model[n].get("service") or "").split("/")[-1] or "misc"
+        by_service.setdefault(svc, []).append(n)
+    out = []
+    for svc, svc_nodes in sorted(by_service.items()):
+        lid = f"gen-theme-{_slugify(theme)}-{_slugify(svc)}"
+        try:
+            out.append(composer.compose(svc_nodes, model=model,
+                                        lifecycle_id=lid, **kw))
+        except composer.ComposeError:
+            # gated/unbuildable subset (required option w/o default, no read
+            # path) — skip; the per-service composition stays best-effort
+            continue
+    return out
 
 
 # ---------------------------------------------------------------------------

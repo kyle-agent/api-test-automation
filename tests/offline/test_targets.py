@@ -142,3 +142,16 @@ def test_multi_clause_union_sorted_deduped(model):
 def test_result_is_sorted_and_deduped(model):
     got = expand_targets("group:nw-vpc, service:networking/vpc", model=model)
     assert got == sorted(set(got))
+
+
+def test_compose_helpers_t3():
+    from regression.scenarios.targets import (
+        compose_service, compose_group, compose_theme)
+    svc = compose_service("networking/security-group")
+    assert svc["id"] == "gen-svc-security-group" and svc["steps"]
+    grp = compose_group("nw-sg")
+    assert grp["id"] == "gen-grp-nw-sg" and grp["steps"]
+    # theme returns a LIST of per-service bundles, not one giant lifecycle
+    themed = compose_theme("read-only")
+    assert isinstance(themed, list) and themed
+    assert all(lc["id"].startswith("gen-theme-read-only-") for lc in themed)
