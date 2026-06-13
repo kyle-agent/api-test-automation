@@ -1,8 +1,7 @@
-# PG replica dedicated heavy window — first live test of the replica family
-# (gen-heavy-pg-replica, 27 steps): cluster v16 -> replica create -> sync-
-# replica-state -> reset-replica -> promote (irreversible, last) -> teardown
-# (replica deleted before origin). Owner-approved same-region replica flow
-# (2026-06-13). Self-contained (own VPC + 2 PG clusters); ~30-50min billable.
+# PG replica re-run (rev 2) — setsecuritygrouprules body fixed (non-empty
+# add_ip_addresses); the cluster spine already proved live (run 27468351624).
+# This run should finally exercise the replica family: create -> sync-
+# replica-state -> reset-replica -> promote -> teardown (replica before origin).
 mutations=true
 destructive=true
 heavy=true
