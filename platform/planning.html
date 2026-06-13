@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-13T21:53:43Z · <b>sha fc75a92</b>
+    2026-06-13T22:45:40Z · <b>sha dbc3c3d</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -2122,7 +2122,7 @@
           data-gen="1">
         <td><code>gen-heavy-mysql-replica</code></td>
         <td><span class="srv">database/mysql</span></td>
-        <td>36</td>
+        <td>24</td>
         <td>
           <span class="tag read" title="자원 모델에서 합성기로 생성된 시나리오">합성</span>
           <span class="tag heavy">heavy</span>
@@ -2131,8 +2131,8 @@
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">PG owner-approved replica flow transferred (2026-06-13, same… <span class="toggle">더보기</span>
-            <div class="more">PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -&gt; replica -&gt; sync-replica-state -&gt; reset-replica -&gt; promote (IRREVERSIBLE, last) -&gt; teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the h</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">replica-family-only target (run 27480571112): cluster as PRE… <span class="toggle">더보기</span>
+            <div class="more">replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance) move to a separate setter chain. PG/epas pattern.</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
@@ -2146,7 +2146,7 @@
           data-gen="1">
         <td><code>gen-heavy-mariadb-replica</code></td>
         <td><span class="srv">database/mariadb</span></td>
-        <td>40</td>
+        <td>24</td>
         <td>
           <span class="tag read" title="자원 모델에서 합성기로 생성된 시나리오">합성</span>
           <span class="tag heavy">heavy</span>
@@ -2155,8 +2155,8 @@
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">mariadb delete drain is ~90min (run e3ba190) and applies to … <span class="toggle">더보기</span>
-            <div class="more">mariadb delete drain is ~90min (run e3ba190) and applies to BOTH clusters — teardown deletes replica then origin; residual drain is absorbed by the composer&#39;s dependent-delete 409 retries (40x30s) and the engine cleanup pass as backstop. PG owner-approved replica flow transferred (2026-06-13, same-r</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">replica-family-only target (run 27480571112): cluster as PRE… <span class="toggle">더보기</span>
+            <div class="more">replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance) move to a separate setter chain. PG/epas pattern.</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">

@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-13T21:53:43Z · <b>sha fc75a92</b>
+    2026-06-13T22:45:40Z · <b>sha dbc3c3d</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -1400,13 +1400,13 @@
     <tr>
       <td><code>gen-heavy-mysql-replica</code></td>
       <td>database/mysql</td>
-      <td>36</td>
+      <td>24</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -&gt; replica -&gt; sync-replica-state -&gt; reset-replica -&gt; promote (IRREVERSIBLE, last) </td>
+      <td class="muted">replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance)</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -1415,13 +1415,13 @@
     <tr>
       <td><code>gen-heavy-mariadb-replica</code></td>
       <td>database/mariadb</td>
-      <td>40</td>
+      <td>24</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">mariadb delete drain is ~90min (run e3ba190) and applies to BOTH clusters — teardown deletes replica then origin; residual drain is absorbed by the composer&#39;s d</td>
+      <td class="muted">replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance)</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
