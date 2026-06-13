@@ -170,6 +170,38 @@ resources:
     source: {lifecycle: vpc-endpoint, steps: [create-vpc-endpoint, delete-vpc-endpoint]}
     notes: "resource_key는 실재 대상 서비스 키가 필요해 소스 lifecycle도 {unique}로 4xx — body/capture UNPROVEN(docs)"
 
+  privatelink-service:
+    code: "nw-vpc-privatelink-service"
+    service: networking/vpc
+    requires: [vpc, subnet]
+    create:
+      endpoint: "POST /v1/privatelink-services"
+      body: {name: "regrpls{ualpha}", description: "API regression suite",
+             approval_type: AUTO, connected_resource_type: IP,
+             connected_resource_ip_address: "{opt.connected_resource_ip}",
+             service_ip_address: "{opt.service_ip}",
+             subnet_id: "{subnet.subnet_id}", tags: []}
+      options:
+        service_ip: {type: string, required: true, default: "10.163.8.5",
+                     note: "선택한 subnet cidr 내부의 빈 IP여야 한다 (PrivateLinkServiceCreateRequest.service_ip_address required) — 기본값은 gen-wave5 privatelink 체인의 subnet 10.163.8.0/24에 묶인 값"}
+        connected_resource_ip: {type: string, required: false, default: "10.163.8.10",
+                                note: "connected_resource_type=IP일 때의 대상 자원 IP — docs상 optional이나 IP 타입이면 사실상 필수로 추정 (UNPROVEN). LB 타입은 connected_resource_id(LB)가 필요해 의도적으로 IP 고정"}
+    capture: {privatelink_service_id: "$.privatelink_service.id"}
+    ready: {field: "$.privatelink_service.state", until: [ACTIVE],
+            timeout: 300, interval: 10}
+    verify:
+      - {name: read, endpoint: "GET /v1/privatelink-services/{privatelink_service_id}",
+         expect_status: [200]}
+      - {name: read-list, endpoint: "GET /v1/privatelink-services",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/privatelink-services/{privatelink_service_id}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: generated__wave5-appsvc,
+             steps: [create-privatelink-service, wait-privatelink-service,
+                     delete-privatelink-service]}
+    notes: "UNPROVEN (docs DTO PrivateLinkServiceCreateRequest 그대로 — 라이브 2xx 미관측, R3 과제였던 privatelink-service 노드 신설). approval_type AUTO + connected_resource_type IP 조합이 LB/실서버 없이 자기완결로 만들 수 있는 최소 형태 — 엔드포인트 요청이 자동 승인되어 apigw/scf privatelink-endpoint 패밀리의 2xx 확률을 높인다. state enum CREATING/ACTIVE/DELETING/DELETED/ERROR (PrivateLinkServiceDetail). 과금 여부 미확인 — 라이프사이클 내 생성·즉시 삭제 전제."
+
   vpc-peering:
     code: "nw-vpc-peering"
     service: networking/vpc

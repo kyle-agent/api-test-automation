@@ -213,18 +213,25 @@ resources:
   apigw-privatelink-endpoint:
     code: "ap-apigw-ple"
     service: application-service/apigateway
-    requires: []
+    requires: [privatelink-service]
     create:
       endpoint: "POST /v1/privatelink-endpoints"
-      body: {name: "regrple{ualpha}", privatelink_service_id: "{opt.privatelink_service_id}",
+      body: {name: "regrple{ualpha}",
+             privatelink_service_id: "{privatelink-service.privatelink_service_id}",
              description: "API regression privatelink endpoint"}
-      options:
-        privatelink_service_id: {type: string, required: true,
-                                 note: "실재 PrivateLink service id 필요 — networking privatelink-service 노드가 모델에 없어 ref 옵션으로 승격하지 못함(R3 과제). 소스 lifecycle은 합성 id 0000...을 보내 4xx coverage probe"}
     capture: {privatelink_endpoint_id: "$.privatelink_endpoint.id"}
+    verify:
+      - {name: read,
+         endpoint: "GET /v1/privatelink-endpoints/{privatelink_endpoint_id}",
+         expect_status: [200]}
+      - {name: set-description,
+         endpoint: "PUT /v1/privatelink-endpoints/{privatelink_endpoint_id}",
+         json: {description: "API regression privatelink endpoint (updated)"},
+         expect_status: [200, 202]}
     delete: {endpoint: "DELETE /v1/privatelink-endpoints/{privatelink_endpoint_id}",
              destructive: true}
     provenance: docs
-    source: {lifecycle: apigateway-privatelink-endpoint,
-             steps: [create-privatelink-endpoint, delete-privatelink-endpoint-synthetic]}
-    notes: "컨트롤플레인 객체(시간당 과금 없음, 소스는 light). set/request(CANCEL|RE_REQUEST)/connection/approval PUT은 lifecycle 영역; connect/approval 요청 모델은 docs 덤프에 없음. capture envelope $.privatelink_endpoint.id는 docs 파생 — UNPROVEN."
+    source: {lifecycle: generated__wave5-appsvc,
+             steps: [create-apigw-privatelink-endpoint, show-apigw-privatelink-endpoint,
+                     set-apigw-privatelink-endpoint, delete-apigw-privatelink-endpoint]}
+    notes: "컨트롤플레인 객체(시간당 과금 없음). R3 해소: networking privatelink-service 노드(AUTO 승인, IP 타입)가 생겨 합성 id 대신 cross-file ref로 배선 — name 패턴 ^[a-zA-Z0-9]*$ 3..20 (하이픈 불가). request(CANCEL|RE_REQUEST)/connection(api_id+DISCONNECT|RECONNECT)/approval(api_id+APPROVE|REJECT) PUT은 상태기계 의존이라 lifecycle 영역(gen-wave5의 gated probe) — DTO는 PrivateLinkEndpoint{Request,Connection,Approval}Request. capture envelope $.privatelink_endpoint.id는 docs 파생 — UNPROVEN."

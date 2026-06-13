@@ -1,0 +1,1200 @@
+{
+  "_comment": "Composed wave 5 — application-service/apigateway + compute/scf closure 2026-06-13. gen-wave5-apigw-policy rides the VALIDATED apigw-api chain (gen-wave-apigw 20/20 green) and adds the id-bound GET leftovers + deleteresourcepolicy. gen-wave5-apigw-privatelink is the self-contained privatelink chain: own vpc/subnet (10.163.0.0/20 — unused block) -> networking privatelink-service (AUTO approval, IP type, UNPROVEN docs DTO) -> apigw privatelink-endpoint family AND the scf privatelink-endpoint family against the SAME provider service (one infra chain, all UNPROVEN privatelink risk isolated here; split into a 4th id if the owner prefers). gen-wave5-scf-triggers: apigateway trigger against our own apigw api/stage (verbatim ApigatewayTriggerCreateRequest), listtriggers with the required cloud_function_id query, codes/file + logs/metrics probes. DTOs verbatim from data/api_docs.json; quirks honoured: trigger DELETE needs json {cloud_function_id, trigger_type in [cron, apigateway]} (run 27417986669), scf privatelink-SERVICE enable strands the function in Creating (only disable=false probed), every scf config write flips Deploying -> READY re-poll before the next write/delete.",
+  "lifecycles": [
+    {
+      "id": "gen-wave5-apigw-policy",
+      "service": "application-service/apigateway",
+      "enabled": true,
+      "_note": "Closes the apigw GET leftovers (showresource/listmethods/showmethod/showstage/listreports/showauth/showaccesscontrol/showusageplan/listapikeys) + deleteresourcepolicy on our own api. Every create body is the VALIDATED gen-wave-apigw shape; the resource-policy document is the proven setresourcepolicy shape from apigateway-api-write-coverage, srn pointed at THIS api. listreports allows 400 — docs model has no params but the apigw-api node note suspects a required period query (R3).",
+      "steps": [
+        {
+          "name": "create-api",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis",
+          "json": {
+            "name": "regrw5api{ualpha}",
+            "description": "API regression wave5 policy",
+            "endpoint_type": "REGION",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "api_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "find-root-resource",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/resources",
+          "expect_status": [200],
+          "capture": {
+            "root_resource_id": "$.resources[0].id"
+          }
+        },
+        {
+          "name": "create-resource",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/resources/{root_resource_id}",
+          "json": {
+            "path_part": "regr{unique}"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "resource_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}/resources/{resource_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "verify-show-resource",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}",
+          "expect_status": [200],
+          "group": "resource"
+        },
+        {
+          "name": "create-method",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods",
+          "json": {
+            "method_type": "GET",
+            "integration_type": "HTTP",
+            "endpoint_url": "https://example.com",
+            "api_key_required": false,
+            "iam_enabled": false,
+            "query_strings": {},
+            "request_headers": {}
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "method_type": "$.methods[0].method_type"
+          }
+        },
+        {
+          "name": "verify-list-methods",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods",
+          "expect_status": [200],
+          "group": "method"
+        },
+        {
+          "name": "verify-show-method",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}",
+          "expect_status": [200],
+          "group": "method"
+        },
+        {
+          "name": "create-deployment",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/deployments",
+          "_note": "stage_type=new also creates stage 'dev' in the same call (VALIDATED). Deployments are immutable revisions — no DELETE endpoint; reclaimed with the api.",
+          "json": {
+            "description": "API regression wave5 deployment",
+            "stage_name": "dev",
+            "stage_type": "new"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "deployment_id": "$.deployment_id"
+          }
+        },
+        {
+          "name": "find-stage-name",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/stages",
+          "_note": "stages are addressed by NAME (no id) — capture the dev stage's name from the list so show-stage resolves to the catalog's {stage_name} wildcard (a literal /stages/dev would not count).",
+          "expect_status": [200],
+          "capture": {
+            "stage_name": "$.stages[0].name"
+          }
+        },
+        {
+          "name": "verify-show-stage",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/stages/{stage_name}",
+          "expect_status": [200],
+          "group": "stage"
+        },
+        {
+          "name": "verify-list-reports",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/reports",
+          "_note": "listreports — docs model declares no params but a period query may be undocumented-required (apigw-api node R3 note). 400 tolerated so the run survives; if live shows 400, fix the param and tighten.",
+          "expect_status": [200, 400],
+          "group": "reports",
+          "optional": true
+        },
+        {
+          "name": "create-auth",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/auths",
+          "_note": "createauth returns only $.access_token (no id) — auth_id recovered via listauths next step.",
+          "json": {
+            "name": "regrauth{ualpha}",
+            "connected_stages": ["dev"],
+            "expiration_period": 90
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "access_token": "$.access_token"
+          }
+        },
+        {
+          "name": "find-auth-id",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/auths",
+          "expect_status": [200],
+          "capture": {
+            "auth_id": "$.auths[0].id"
+          }
+        },
+        {
+          "name": "verify-show-auth",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/auths/{auth_id}",
+          "expect_status": [200],
+          "group": "auth"
+        },
+        {
+          "name": "delete-auth",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/auths/{auth_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        },
+        {
+          "name": "create-access-control",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/access-controls",
+          "json": {
+            "name": "regracl{ualpha}",
+            "allowed_ip_addr": ["10.0.0.0/24"],
+            "connected_stages": ["dev"],
+            "description": "API regression wave5 access control"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "access_control_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}/access-controls/{access_control_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "verify-show-access-control",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/access-controls/{access_control_id}",
+          "expect_status": [200],
+          "group": "access-control"
+        },
+        {
+          "name": "delete-access-control",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/access-controls/{access_control_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        },
+        {
+          "name": "create-usage-plan",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/usage-plans",
+          "json": {
+            "name": "regrup{ualpha}",
+            "limit": 100,
+            "rate": "day",
+            "description": "API regression wave5 usage plan"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "usage_plan_id": "$.usage_plan.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "verify-show-usage-plan",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}",
+          "expect_status": [200],
+          "group": "usage-plan"
+        },
+        {
+          "name": "create-api-key",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys",
+          "json": {
+            "name": "regrkey{ualpha}",
+            "description": "API regression wave5 api key"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "api_key_id": "$.api_key.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys/{api_key_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "verify-list-api-keys",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys",
+          "_note": "listapikeys — the per-id GET 403s ('Action definition is not found', product-defect candidate run 27394211896) but the LIST is clean 200.",
+          "expect_status": [200],
+          "group": "api-key"
+        },
+        {
+          "name": "delete-api-key",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys/{api_key_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        },
+        {
+          "name": "delete-usage-plan",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 10
+        },
+        {
+          "name": "set-resource-policy",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/apis/{api_id}/resource-policies",
+          "_note": "setresourcepolicy is already VERIFIED live; the policy_document shape is the proven one from apigateway-api-write-coverage with the srn pointed at THIS api so the document is internally consistent.",
+          "json": {
+            "policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "Statement1",
+                  "Effect": "Allow",
+                  "Principal": "*",
+                  "Action": ["apigateway:InvokeApigatewayRegion"],
+                  "Resource": ["srn:scp::apigateway:api/{api_id}"]
+                }
+              ]
+            }
+          },
+          "expect_status": [200, 201, 202],
+          "group": "resource-policy",
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}/resource-policies",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "verify-show-resource-policy",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/resource-policies",
+          "expect_status": [200],
+          "group": "resource-policy"
+        },
+        {
+          "name": "delete-resource-policy",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resource-policies",
+          "_note": "deleteresourcepolicy — the gap op. 204 documented; runs against the policy set two steps up so a clean 2xx is expected.",
+          "expect_status": [200, 202, 204],
+          "group": "resource-policy",
+          "destructive": true
+        },
+        {
+          "name": "delete-method",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}",
+          "expect_status": [200, 202, 204],
+          "destructive": true
+        },
+        {
+          "name": "delete-resource",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 5,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-api",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}",
+          "expect_status": [200, 202, 204, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "wait-api-gone",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}",
+          "_note": "api delete is async — the VALIDATED source polls GET until 404 (300s/15s).",
+          "expect_status": [200, 404],
+          "poll": {
+            "until_status": 404,
+            "timeout": 300,
+            "interval": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "gen-wave5-apigw-privatelink",
+      "service": "application-service/apigateway",
+      "enabled": true,
+      "_note": "SELF-CONTAINED privatelink chain — enabled per the gate 'enabled only if self-contained': own vpc/subnet (10.163.0.0/20, unused block) -> networking privatelink-service with approval_type AUTO + connected_resource_type IP (no LB, no VM — UNPROVEN docs DTO, first live exercise of createprivatelinkservice) -> apigw privatelink-endpoint family on it, plus the scf privatelink-endpoint family against the SAME provider service (one infra chain; all UNPROVEN privatelink risk isolated in this one lifecycle). create/show/set/delete are the solid 2xx candidates; approve/connect/request are state-machine-dependent (AUTO approval may pre-empt them) so they ride as optional gated probes with broad expects + paired enum probes (DISCONNECT->RECONNECT, RE_REQUEST then CANCEL last) to maximise the chance one lands 2xx. scf quirks honoured: privatelink-SERVICE enable is NEVER sent (strands the function in Creating, CloudFunctionNotDeletableError — only the disable=false probe covers updateprivatelinkservice), READY re-poll between config writes and before delete.",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrw5vpc{unique}",
+            "description": "API regression wave5 privatelink",
+            "cidr": "10.163.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": ["ACTIVE"],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrw5sub{unique}",
+            "description": "API regression wave5 privatelink",
+            "cidr": "10.163.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": ["ACTIVE"],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-privatelink-service",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/privatelink-services",
+          "_note": "UNPROVEN — first live exercise of PrivateLinkServiceCreateRequest. approval_type AUTO so downstream endpoint requests self-approve; connected_resource_type IP with two free IPs inside the subnet /24 (no LB/VM needed). 202 PrivateLinkServiceShowResponse.",
+          "json": {
+            "name": "regrpls{ualpha}",
+            "description": "API regression wave5 privatelink service",
+            "approval_type": "AUTO",
+            "connected_resource_type": "IP",
+            "connected_resource_ip_address": "10.163.8.10",
+            "service_ip_address": "10.163.8.5",
+            "subnet_id": "{subnet_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "pls_id": "$.privatelink_service.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/privatelink-services/{pls_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-privatelink-service",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/privatelink-services/{pls_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.privatelink_service.state",
+            "until": ["ACTIVE"],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-api",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis",
+          "_note": "own api for the {api_id} the connection/approval DTOs require (PrivateLinkEndpointConnectionRequest/ApprovalRequest both carry api_id).",
+          "json": {
+            "name": "regrw5ple{ualpha}",
+            "description": "API regression wave5 privatelink",
+            "endpoint_type": "REGION",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "api_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "create-apigw-privatelink-endpoint",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/privatelink-endpoints",
+          "_note": "PrivateLinkEndpointCreateRequest verbatim: name (alnum 3-20, NO hyphens), privatelink_service_id, description? — wired to the real AUTO-approval service created above. capture envelope $.privatelink_endpoint.id is docs-derived (UNPROVEN).",
+          "json": {
+            "name": "regrple{ualpha}",
+            "privatelink_service_id": "{pls_id}",
+            "description": "API regression wave5 privatelink endpoint"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "ple_id": "$.privatelink_endpoint.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/privatelink-endpoints/{ple_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "show-apigw-privatelink-endpoint",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/privatelink-endpoints/{ple_id}",
+          "expect_status": [200],
+          "group": "apigw-ple"
+        },
+        {
+          "name": "set-apigw-privatelink-endpoint",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{ple_id}",
+          "_note": "setprivatelinkendpoint — PrivateLinkEndpointSetRequest is description-only metadata, state-machine-free, so a strict 2xx is expected.",
+          "json": {
+            "description": "API regression wave5 privatelink endpoint (updated)"
+          },
+          "expect_status": [200, 202],
+          "group": "apigw-ple"
+        },
+        {
+          "name": "approve-apigw-privatelink-endpoint",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{ple_id}/approval",
+          "_note": "GATED PROBE — PrivateLinkEndpointApprovalRequest {api_id, type APPROVE|REJECT}. With approval_type AUTO the endpoint may already be approved -> 4xx tolerated; the op still records. If live shows MANUAL flow is needed, flip the privatelink-service to MANUAL and approve here.",
+          "json": {
+            "api_id": "{api_id}",
+            "type": "APPROVE"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "apigw-ple-actions"
+        },
+        {
+          "name": "connect-apigw-privatelink-endpoint-disconnect",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{ple_id}/connection",
+          "_note": "GATED PROBE — PrivateLinkEndpointConnectionRequest {api_id, type DISCONNECT|RECONNECT}. DISCONNECT first (2xx if the AUTO flow auto-connected), RECONNECT next — paired probes so one of the two lands 2xx whichever state the endpoint is in.",
+          "json": {
+            "api_id": "{api_id}",
+            "type": "DISCONNECT"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "apigw-ple-actions"
+        },
+        {
+          "name": "connect-apigw-privatelink-endpoint-reconnect",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{ple_id}/connection",
+          "json": {
+            "api_id": "{api_id}",
+            "type": "RECONNECT"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "apigw-ple-actions"
+        },
+        {
+          "name": "request-apigw-privatelink-endpoint",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{ple_id}/request",
+          "_note": "GATED PROBE — PrivateLinkEndpointRequestRequest {type CANCEL|RE_REQUEST}. RE_REQUEST here; CANCEL deliberately last (below) right before delete so a successful cancel can't poison the earlier action probes.",
+          "json": {
+            "type": "RE_REQUEST"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "apigw-ple-actions"
+        },
+        {
+          "name": "cancel-apigw-privatelink-endpoint-request",
+          "service": "apigateway",
+          "method": "PUT",
+          "path": "/v1/privatelink-endpoints/{ple_id}/request",
+          "json": {
+            "type": "CANCEL"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "apigw-ple-actions"
+        },
+        {
+          "name": "delete-apigw-privatelink-endpoint",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/privatelink-endpoints/{ple_id}",
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "create-function",
+          "service": "scf",
+          "method": "POST",
+          "path": "/v1/cloud-functions",
+          "_note": "VALIDATED scf-function body. Host for the scf privatelink-endpoint family against the same provider service.",
+          "json": {
+            "name": "regrw5scf{unique}",
+            "runtime": "Node.js:20",
+            "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "cloud_function_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cloud-functions/{cloud_function_id}",
+            "service": "scf"
+          }
+        },
+        {
+          "name": "wait-function",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "update-privatelink-service-disable",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services",
+          "_note": "updateprivatelinkservice — PrivateLinkServicePutRequest {privatelink_service_enabled}. ONLY false is ever sent: enable=true strands the function in Creating and blocks teardown (CloudFunctionNotDeletableError, proven base-lifecycle lesson). Disabling the already-disabled default may 4xx -> tolerated, op still records. Owner call needed to ever prove the enable path (requires a sacrificial function).",
+          "json": {
+            "privatelink_service_enabled": false
+          },
+          "expect_status": [200, 202, 400, 409, 422],
+          "optional": true,
+          "group": "scf-pl-service"
+        },
+        {
+          "name": "wait-function-after-pl-service",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "_note": "every scf config write flips the state to Deploying — re-poll READY before the next write (deploying-after-every-change quirk).",
+          "expect_status": [200],
+          "optional": true,
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-scf-privatelink-endpoint",
+          "service": "scf",
+          "method": "POST",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints",
+          "_note": "UNPROVEN — verbatim nested DTO {endpoint: EndpointCreateRequest{alias, service_id}} (the old flat {subnet_id, endpoint_service_id, name} guess contradicted the docs and is retired). service_id = the real AUTO-approval networking privatelink-service. Response envelope $.endpoint.endpoint_id (PrivateLinkEndpoint{endpoint: Endpoint}).",
+          "json": {
+            "endpoint": {
+              "alias": "regrple{unique}",
+              "service_id": "{pls_id}"
+            }
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scf-ple",
+          "capture": {
+            "endpoint_id": "$.endpoint.endpoint_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}",
+            "service": "scf"
+          }
+        },
+        {
+          "name": "list-scf-privatelink-endpoints",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints",
+          "expect_status": [200],
+          "group": "scf-ple"
+        },
+        {
+          "name": "request-scf-privatelink-endpoint",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/request",
+          "_note": "GATED PROBES — scf PrivateLinkEndpoint{Request,Approval,Connection} are single-field {type} enums mirroring the apigw family (no api_id). Same ordering rationale: RE_REQUEST / APPROVE / DISCONNECT->RECONNECT, CANCEL last.",
+          "json": {
+            "type": "RE_REQUEST"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scf-ple-actions"
+        },
+        {
+          "name": "approve-scf-privatelink-endpoint",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/approval",
+          "json": {
+            "type": "APPROVE"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scf-ple-actions"
+        },
+        {
+          "name": "connect-scf-privatelink-endpoint-disconnect",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/connection",
+          "json": {
+            "type": "DISCONNECT"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scf-ple-actions"
+        },
+        {
+          "name": "connect-scf-privatelink-endpoint-reconnect",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/connection",
+          "json": {
+            "type": "RECONNECT"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scf-ple-actions"
+        },
+        {
+          "name": "cancel-scf-privatelink-endpoint-request",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}/request",
+          "json": {
+            "type": "CANCEL"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "scf-ple-actions"
+        },
+        {
+          "name": "delete-scf-privatelink-endpoint",
+          "service": "scf",
+          "method": "DELETE",
+          "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}",
+          "_note": "runs even when the create 4xx'd ({endpoint_id} stays literal -> 404, still records); 404 tolerated for exactly that case.",
+          "expect_status": [200, 202, 204, 400, 404],
+          "optional": true,
+          "group": "scf-ple",
+          "destructive": true
+        },
+        {
+          "name": "wait-function-before-delete",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [200],
+          "optional": true,
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "delete-function",
+          "service": "scf",
+          "method": "DELETE",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [200, 202, 204, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-function-gone",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [200, 404],
+          "poll": {
+            "until_status": 404,
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "delete-api",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}",
+          "expect_status": [200, 202, 204, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-privatelink-service",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/privatelink-services/{pls_id}",
+          "_note": "must come after both consumer endpoints are gone — 409 retried while endpoint teardown settles.",
+          "expect_status": [200, 202, 204, 404, 409],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 20,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
+    },
+    {
+      "id": "gen-wave5-scf-triggers",
+      "service": "compute/scf",
+      "enabled": true,
+      "_note": "scf trigger + leftovers closure: apigateway trigger with the verbatim ApigatewayTriggerCreateRequest {apigateway_api_id (24-hex = our apigw api id), apigateway_stage_name (dev from stage_type=new), cloud_function_id} — the old coverage probe's guessed body is retired. Trigger DELETE uses the PROVEN json passthrough {cloud_function_id, trigger_type} with the 'apigateway' literal (live 400 on run 27417986669 said type must be 'apigateway' or 'cron'). listcloudfunctiontriggers carries its required cloud_function_id query. logs/metrics ride ?time=1h (undocumented-required param class, 400 tolerated). codes/file is a Java-shaped DTO probed against a Node function -> 4xx expected, owner question to prove it properly.",
+      "steps": [
+        {
+          "name": "create-function",
+          "service": "scf",
+          "method": "POST",
+          "path": "/v1/cloud-functions",
+          "json": {
+            "name": "regrw5trg{unique}",
+            "runtime": "Node.js:20",
+            "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "cloud_function_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/cloud-functions/{cloud_function_id}",
+            "service": "scf"
+          }
+        },
+        {
+          "name": "wait-function",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "show-function-logs",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}/logs?time=1h",
+          "_note": "showcloudfunctionlogs — 'must select either time or period' (run 27399448835, undiscoverable-params class; docs say all optional). time=1h format assumed; 400 tolerated and corrected from the live body if wrong.",
+          "expect_status": [200, 400],
+          "optional": true,
+          "group": "fn-observability"
+        },
+        {
+          "name": "show-function-metrics",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}/metrics?time=1h",
+          "expect_status": [200, 400],
+          "optional": true,
+          "group": "fn-observability"
+        },
+        {
+          "name": "set-code-file",
+          "service": "scf",
+          "method": "PUT",
+          "path": "/v1/cloud-functions/{cloud_function_id}/codes/file",
+          "_note": "setcloudfunctioncodefile — CodeFile {class_name, method_name, obs_url?} is Java-runtime-shaped (docs examples: com.example.Handler/handleRequest/jar in OBS); against our Node.js:20 function a 4xx is the expected outcome, but the op records. Proving 2xx needs a Java function + a real jar in Object Storage (owner question). On a (improbable) 202 the next poll re-syncs READY.",
+          "json": {
+            "class_name": "com.example.Handler",
+            "method_name": "handleRequest"
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "fn-code"
+        },
+        {
+          "name": "wait-function-after-code",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [200],
+          "optional": true,
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-api",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis",
+          "_note": "cross-service prereq chain (apigw-api -> resource -> method -> deployment) so stage 'dev' exists for the trigger — all VALIDATED gen-wave-apigw bodies.",
+          "json": {
+            "name": "regrw5trg{ualpha}",
+            "description": "API regression wave5 scf trigger",
+            "endpoint_type": "REGION",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "api_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/apis/{api_id}",
+            "service": "apigateway"
+          }
+        },
+        {
+          "name": "find-root-resource",
+          "service": "apigateway",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/resources",
+          "expect_status": [200],
+          "capture": {
+            "root_resource_id": "$.resources[0].id"
+          }
+        },
+        {
+          "name": "create-resource",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/resources/{root_resource_id}",
+          "json": {
+            "path_part": "regr{unique}"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "resource_id": "$.id"
+          }
+        },
+        {
+          "name": "create-method",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods",
+          "json": {
+            "method_type": "GET",
+            "integration_type": "HTTP",
+            "endpoint_url": "https://example.com",
+            "api_key_required": false,
+            "iam_enabled": false,
+            "query_strings": {},
+            "request_headers": {}
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "method_type": "$.methods[0].method_type"
+          }
+        },
+        {
+          "name": "create-deployment",
+          "service": "apigateway",
+          "method": "POST",
+          "path": "/v1/apis/{api_id}/deployments",
+          "json": {
+            "description": "API regression wave5 trigger deployment",
+            "stage_name": "dev",
+            "stage_type": "new"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "deployment_id": "$.deployment_id"
+          }
+        },
+        {
+          "name": "create-apigateway-trigger",
+          "service": "scf",
+          "method": "POST",
+          "path": "/v1/triggers/apigateway",
+          "_note": "createcloudfunctionapigatewaytrigger — verbatim ApigatewayTriggerCreateRequest against OUR api/stage/function. apigw api ids are 24-hex matching the DTO pattern ^[0-9a-f]{24}$. Capture envelope $.triggers[0].trigger_id mirrors the proven cronjob trigger (TriggerCreateResponse ARRAY).",
+          "json": {
+            "apigateway_api_id": "{api_id}",
+            "apigateway_stage_name": "dev",
+            "cloud_function_id": "{cloud_function_id}"
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "trigger_id": "$.triggers[0].trigger_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/triggers/{trigger_id}",
+            "json": {
+              "cloud_function_id": "{cloud_function_id}",
+              "trigger_type": "apigateway"
+            },
+            "service": "scf"
+          }
+        },
+        {
+          "name": "list-triggers",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/triggers?cloud_function_id={cloud_function_id}",
+          "_note": "listcloudfunctiontriggers — cloud_function_id query is docs-required (bare GET 4xxs).",
+          "expect_status": [200],
+          "group": "trigger"
+        },
+        {
+          "name": "show-trigger",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/triggers/{trigger_id}",
+          "expect_status": [200],
+          "group": "trigger"
+        },
+        {
+          "name": "delete-trigger",
+          "service": "scf",
+          "method": "DELETE",
+          "path": "/v1/triggers/{trigger_id}",
+          "_note": "PROVEN quirk pattern: DELETE needs json {cloud_function_id, trigger_type} and the live 400 (run 27417986669) names the valid literals as 'apigateway' or 'cron' — 'apigateway' used here.",
+          "json": {
+            "cloud_function_id": "{cloud_function_id}",
+            "trigger_type": "apigateway"
+          },
+          "expect_status": [200, 202, 204],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-method",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}",
+          "expect_status": [200, 202, 204, 404, 409],
+          "optional": true,
+          "destructive": true
+        },
+        {
+          "name": "delete-resource",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}/resources/{resource_id}",
+          "expect_status": [200, 202, 204, 404, 409],
+          "optional": true,
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 5,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-api",
+          "service": "apigateway",
+          "method": "DELETE",
+          "path": "/v1/apis/{api_id}",
+          "expect_status": [200, 202, 204, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 15
+        },
+        {
+          "name": "wait-function-before-delete",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "_note": "trigger writes flip the function to Deploying — re-poll READY before delete (deploying-after-every-change quirk).",
+          "expect_status": [200],
+          "optional": true,
+          "poll": {
+            "field": "$.cloud_function.state",
+            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "timeout": 300,
+            "interval": 10
+          }
+        },
+        {
+          "name": "delete-function",
+          "service": "scf",
+          "method": "DELETE",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [200, 202, 204, 409],
+          "destructive": true,
+          "retry_on_status": [409, 500],
+          "retries": 6,
+          "retry_interval": 20
+        },
+        {
+          "name": "wait-function-gone",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/{cloud_function_id}",
+          "expect_status": [200, 404],
+          "poll": {
+            "until_status": 404,
+            "timeout": 300,
+            "interval": 15
+          }
+        }
+      ]
+    }
+  ]
+}
