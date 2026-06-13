@@ -1,0 +1,4494 @@
+{
+  "_comment": "Composed HEAVY DBaaS sibling-engine windows (mysql / mariadb / epas) — PG reference patterns (database__postgresql.yaml, owner approvals 2026-06-13) mirrored per engine. PRIORITY: gen-heavy-epas-replica first — epas create has never had a live 2xx; run it in the next heavy window to prove the epas create path. Each gen-heavy-<engine>-replica is a dedicated window (2 billable clusters + VPC; crud_filter=gen-heavy-<engine>); do NOT mix engines in one window. Setter sub-ops (mysql/mariadb: archive PUT+sync, sync-state; mariadb: +setbackup/setauditlog/setmaintenance+unset) are folded into the cluster nodes' verifies and ride along. gen-heavy-*-restore disabled (backup-timing gate, as PG). gen-heavy-*-upgrade disabled: owner가 콘솔에서 엔진 구버전 유무 확인 대기 (old versions confirmed for PG only). sqlserver intentionally absent (license-gated); cachestore/eventstreams/searchengine/vertica are different topologies.",
+  "lifecycles": [
+    {
+      "id": "gen-heavy-epas-replica",
+      "service": "database/epas",
+      "enabled": true,
+      "_note": "PRIORITY heavy chain — epas-create has NO recorded live 2xx anywhere (heavy-shared-dbaas epas leg was optional-grouped); this chain is the first proof opportunity for the epas create path — on success promote epas-cluster/lookups docs->VALIDATED (C5). PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the heavy cluster), so this chain also exercises them right after cluster-ready. switchover is deliberately ABSENT (HA Active<->Standby flip; proven body is ha_enabled:false — HA-gated node stays modeled only). Two billable clusters, ~60-90min; dedicated heavy window (crud_filter=gen-heavy-epas). composed by regression/scenarios/composer.py — targets: epas-cluster, epas-promote, epas-replica, epas-reset-replica, epas-sync-replica-state",
+      "steps": [
+        {
+          "name": "create-epas-engine-version",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-epas-server-type",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-epas-cluster",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regre{ualpha}",
+            "instance_name_prefix": "regre",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C",
+              "database_name": "regrepas",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss@2026",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "epas"
+          }
+        },
+        {
+          "name": "wait-epas-cluster",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-epas-cluster-read",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "verify-epas-cluster-setsecuritygrouprules",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "verify-epas-cluster-read-after-sg",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "create-epas-replica",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "json": {
+            "allowable_ip_addresses": [],
+            "replica_count": 1,
+            "replicas": [
+              {
+                "name": "regrerep{ualpha}",
+                "instance_groups": [
+                  {
+                    "role_type": "ACTIVE",
+                    "server_type_name": "{db_server_type}",
+                    "block_storage_groups": [
+                      {
+                        "role_type": "OS",
+                        "size_gb": 104,
+                        "volume_type": "SSD"
+                      }
+                    ],
+                    "instances": [
+                      {
+                        "role_type": "ACTIVE",
+                        "public_ip_id": ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "tags": []
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "replica_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{replica_cluster_id}",
+            "service": "epas"
+          }
+        },
+        {
+          "name": "wait-epas-replica",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-epas-replica",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-replica"
+        },
+        {
+          "name": "create-epas-sync-replica-state",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-replica-state",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-epas-sync-replica-state",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-epas-sync-replica-state-replicas-list",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-sync-replica-state"
+        },
+        {
+          "name": "create-epas-reset-replica",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/reset-replica",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-epas-reset-replica",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-epas-reset-replica",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-reset-replica"
+        },
+        {
+          "name": "create-epas-promote",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/promote",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-epas-promote",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-epas-promote",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-promote"
+        },
+        {
+          "name": "delete-epas-replica",
+          "service": "epas",
+          "method": "DELETE",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-epas-cluster",
+          "service": "epas",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true
+    },
+    {
+      "id": "gen-heavy-mysql-replica",
+      "service": "database/mysql",
+      "enabled": true,
+      "_note": "PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the heavy cluster), so this chain also exercises them right after cluster-ready. switchover is deliberately ABSENT (HA Active<->Standby flip; proven body is ha_enabled:false — HA-gated node stays modeled only). Two billable clusters, ~60-90min; dedicated heavy window (crud_filter=gen-heavy-mysql). composed by regression/scenarios/composer.py — targets: mysql-cluster, mysql-promote, mysql-replica, mysql-reset-replica, mysql-sync-replica-state",
+      "steps": [
+        {
+          "name": "create-mysql-engine-version",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-mysql-server-type",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-mysql-cluster",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrdb{ualpha}",
+            "instance_name_prefix": "regrdb",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": "",
+              "database_case_sensitive": false,
+              "database_character_set": "utf8mb4",
+              "database_name": "regrdb",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "mysql"
+          }
+        },
+        {
+          "name": "wait-mysql-cluster",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mysql-cluster-read",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-setsecuritygrouprules",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-read-after-sg",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-showarchiveconfig",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-setarchiveconfig",
+          "service": "mysql",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-syncarchiveconfig",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            202,
+            409
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-syncclusterstate",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "create-mysql-replica",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "json": {
+            "allowable_ip_addresses": [],
+            "replica_count": 1,
+            "replicas": [
+              {
+                "name": "regrdbrep{ualpha}",
+                "instance_groups": [
+                  {
+                    "role_type": "ACTIVE",
+                    "server_type_name": "{db_server_type}",
+                    "block_storage_groups": [
+                      {
+                        "role_type": "OS",
+                        "size_gb": 104,
+                        "volume_type": "SSD"
+                      }
+                    ],
+                    "instances": [
+                      {
+                        "role_type": "ACTIVE",
+                        "service_ip_address": "",
+                        "public_ip_id": ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "tags": []
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "replica_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{replica_cluster_id}",
+            "service": "mysql"
+          }
+        },
+        {
+          "name": "wait-mysql-replica",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mysql-replica",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-replica"
+        },
+        {
+          "name": "create-mysql-sync-replica-state",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-replica-state",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-mysql-sync-replica-state",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mysql-sync-replica-state-replicas-list",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-sync-replica-state"
+        },
+        {
+          "name": "create-mysql-reset-replica",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/reset-replica",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-mysql-reset-replica",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mysql-reset-replica",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-reset-replica"
+        },
+        {
+          "name": "create-mysql-promote",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/promote",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-mysql-promote",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mysql-promote",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-promote"
+        },
+        {
+          "name": "delete-mysql-replica",
+          "service": "mysql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-mysql-cluster",
+          "service": "mysql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true
+    },
+    {
+      "id": "gen-heavy-mariadb-replica",
+      "service": "database/mariadb",
+      "enabled": true,
+      "_note": "mariadb delete drain is ~90min (run e3ba190) and applies to BOTH clusters — teardown deletes replica then origin; residual drain is absorbed by the composer's dependent-delete 409 retries (40x30s) and the engine cleanup pass as backstop. PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the heavy cluster), so this chain also exercises them right after cluster-ready. switchover is deliberately ABSENT (HA Active<->Standby flip; proven body is ha_enabled:false — HA-gated node stays modeled only). Two billable clusters, ~60-90min; dedicated heavy window (crud_filter=gen-heavy-mariadb). composed by regression/scenarios/composer.py — targets: mariadb-cluster, mariadb-promote, mariadb-replica, mariadb-reset-replica, mariadb-sync-replica-state",
+      "steps": [
+        {
+          "name": "create-mariadb-engine-version",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-mariadb-server-type",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-mariadb-cluster",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrm{ualpha}",
+            "instance_name_prefix": "regrm",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_character_set": "utf8",
+              "database_name": "regrmaria",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss@2026",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "mariadb"
+          }
+        },
+        {
+          "name": "wait-mariadb-cluster",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mariadb-cluster-read",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setsecuritygrouprules",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-read-after-sg",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-showarchiveconfig",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setarchiveconfig",
+          "service": "mariadb",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-syncarchiveconfig",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            202,
+            409
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setbackup",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {
+            "archive_frequency_minute": "30",
+            "retention_period_day": "8",
+            "starting_time_hour": "3"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setauditlog",
+          "service": "mariadb",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/audit-log",
+          "json": {
+            "use_audit_log": true
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setmaintenance",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-unsetmaintenance",
+          "service": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-syncclusterstate",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "create-mariadb-replica",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "json": {
+            "allowable_ip_addresses": [],
+            "replica_count": 1,
+            "replicas": [
+              {
+                "name": "regrmrep{ualpha}",
+                "instance_groups": [
+                  {
+                    "role_type": "ACTIVE",
+                    "server_type_name": "{db_server_type}",
+                    "block_storage_groups": [
+                      {
+                        "role_type": "OS",
+                        "size_gb": 104,
+                        "volume_type": "SSD"
+                      }
+                    ],
+                    "instances": [
+                      {
+                        "role_type": "ACTIVE",
+                        "public_ip_id": ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "tags": []
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "replica_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{replica_cluster_id}",
+            "service": "mariadb"
+          }
+        },
+        {
+          "name": "wait-mariadb-replica",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mariadb-replica",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-replica"
+        },
+        {
+          "name": "create-mariadb-sync-replica-state",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-replica-state",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-mariadb-sync-replica-state",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mariadb-sync-replica-state-replicas-list",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-sync-replica-state"
+        },
+        {
+          "name": "create-mariadb-reset-replica",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/reset-replica",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-mariadb-reset-replica",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mariadb-reset-replica",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-reset-replica"
+        },
+        {
+          "name": "create-mariadb-promote",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/promote",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-mariadb-promote",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mariadb-promote",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-promote"
+        },
+        {
+          "name": "delete-mariadb-replica",
+          "service": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-mariadb-cluster",
+          "service": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true
+    },
+    {
+      "id": "gen-heavy-epas-restore",
+      "service": "database/epas",
+      "enabled": false,
+      "_note": "composed-but-disabled restore chain (PG mirror). composed by regression/scenarios/composer.py — targets: epas-cluster, epas-restore",
+      "steps": [
+        {
+          "name": "create-epas-engine-version",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-epas-server-type",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-epas-cluster",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regre{ualpha}",
+            "instance_name_prefix": "regre",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C",
+              "database_name": "regrepas",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss@2026",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "epas"
+          }
+        },
+        {
+          "name": "wait-epas-cluster",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-epas-cluster-read",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "verify-epas-cluster-setsecuritygrouprules",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "verify-epas-cluster-read-after-sg",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "create-epas-restore",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {
+            "name": "regrerst{ualpha}",
+            "instance_name_prefix": "regrerst",
+            "server_type_name": "{db_server_type}",
+            "allowable_ip_addresses": [],
+            "tags": []
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "restore_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{restore_cluster_id}",
+            "service": "epas"
+          }
+        },
+        {
+          "name": "wait-epas-restore",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-epas-restore",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-restore"
+        },
+        {
+          "name": "delete-epas-restore",
+          "service": "epas",
+          "method": "DELETE",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-epas-cluster",
+          "service": "epas",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour)."
+    },
+    {
+      "id": "gen-heavy-mysql-restore",
+      "service": "database/mysql",
+      "enabled": false,
+      "_note": "composed-but-disabled restore chain (PG mirror). composed by regression/scenarios/composer.py — targets: mysql-cluster, mysql-restore",
+      "steps": [
+        {
+          "name": "create-mysql-engine-version",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-mysql-server-type",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-mysql-cluster",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrdb{ualpha}",
+            "instance_name_prefix": "regrdb",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": "",
+              "database_case_sensitive": false,
+              "database_character_set": "utf8mb4",
+              "database_name": "regrdb",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "mysql"
+          }
+        },
+        {
+          "name": "wait-mysql-cluster",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mysql-cluster-read",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-setsecuritygrouprules",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-read-after-sg",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-showarchiveconfig",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-setarchiveconfig",
+          "service": "mysql",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-syncarchiveconfig",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            202,
+            409
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-syncclusterstate",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "create-mysql-restore",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {
+            "name": "regrdbrst{ualpha}",
+            "instance_name_prefix": "regrdbrst",
+            "server_type_name": "{db_server_type}",
+            "allowable_ip_addresses": [],
+            "tags": []
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "restore_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{restore_cluster_id}",
+            "service": "mysql"
+          }
+        },
+        {
+          "name": "wait-mysql-restore",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mysql-restore",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-restore"
+        },
+        {
+          "name": "delete-mysql-restore",
+          "service": "mysql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-mysql-cluster",
+          "service": "mysql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour)."
+    },
+    {
+      "id": "gen-heavy-mariadb-restore",
+      "service": "database/mariadb",
+      "enabled": false,
+      "_note": "composed-but-disabled restore chain (PG mirror). composed by regression/scenarios/composer.py — targets: mariadb-cluster, mariadb-restore",
+      "steps": [
+        {
+          "name": "create-mariadb-engine-version",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-mariadb-server-type",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-mariadb-cluster",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrm{ualpha}",
+            "instance_name_prefix": "regrm",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_character_set": "utf8",
+              "database_name": "regrmaria",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss@2026",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "mariadb"
+          }
+        },
+        {
+          "name": "wait-mariadb-cluster",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mariadb-cluster-read",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setsecuritygrouprules",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-read-after-sg",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-showarchiveconfig",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setarchiveconfig",
+          "service": "mariadb",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-syncarchiveconfig",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            202,
+            409
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setbackup",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {
+            "archive_frequency_minute": "30",
+            "retention_period_day": "8",
+            "starting_time_hour": "3"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setauditlog",
+          "service": "mariadb",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/audit-log",
+          "json": {
+            "use_audit_log": true
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setmaintenance",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-unsetmaintenance",
+          "service": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-syncclusterstate",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "create-mariadb-restore",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {
+            "name": "regrmrst{ualpha}",
+            "instance_name_prefix": "regrmrst",
+            "server_type_name": "{db_server_type}",
+            "allowable_ip_addresses": [],
+            "tags": []
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "restore_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{restore_cluster_id}",
+            "service": "mariadb"
+          }
+        },
+        {
+          "name": "wait-mariadb-restore",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mariadb-restore",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-restore"
+        },
+        {
+          "name": "delete-mariadb-restore",
+          "service": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-mariadb-cluster",
+          "service": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour)."
+    },
+    {
+      "id": "gen-heavy-epas-upgrade",
+      "service": "database/epas",
+      "enabled": false,
+      "_note": "old-major create -> kernel-upgrade chain (PG gen-heavy-pg-upgrade mirror). DOUBLE-GATED: (1) the owner has confirmed old engine versions in the console only for PG so far — the where_prefix major filter on epas-engine-version-16 is a docs-level guess and must be re-checked against the live catalog before enabling; (2) kernel-upgrade additionally requires is_kernel_patchable=true on the cluster detail (PG gate). composed by regression/scenarios/composer.py — targets: epas-cluster, epas-kernel-upgrade",
+      "steps": [
+        {
+          "name": "create-epas-engine-version",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-epas-engine-version-16",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id_16": {
+              "list": "$.contents",
+              "where_prefix": {
+                "major_version": "16"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-epas-server-type",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-epas-cluster",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regre{ualpha}",
+            "instance_name_prefix": "regre",
+            "dbaas_engine_version_id": "{engine_version_id_16}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C",
+              "database_name": "regrepas",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss@2026",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "epas"
+          }
+        },
+        {
+          "name": "wait-epas-cluster",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-epas-cluster-read",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "verify-epas-cluster-setsecuritygrouprules",
+          "service": "epas",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "verify-epas-cluster-read-after-sg",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-cluster"
+        },
+        {
+          "name": "create-epas-kernel-upgrade",
+          "service": "epas",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-epas-kernel-upgrade",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          }
+        },
+        {
+          "name": "verify-epas-kernel-upgrade",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-kernel-upgrade"
+        },
+        {
+          "name": "delete-epas-cluster",
+          "service": "epas",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "owner가 콘솔에서 엔진 구버전 유무 확인 대기"
+    },
+    {
+      "id": "gen-heavy-mysql-upgrade",
+      "service": "database/mysql",
+      "enabled": false,
+      "_note": "old-major create -> kernel-upgrade chain (PG gen-heavy-pg-upgrade mirror). DOUBLE-GATED: (1) the owner has confirmed old engine versions in the console only for PG so far — the where_prefix major filter on mysql-engine-version-8 is a docs-level guess and must be re-checked against the live catalog before enabling; (2) kernel-upgrade additionally requires is_kernel_patchable=true on the cluster detail (PG gate). composed by regression/scenarios/composer.py — targets: mysql-cluster, mysql-kernel-upgrade",
+      "steps": [
+        {
+          "name": "create-mysql-engine-version",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-mysql-engine-version-8",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id_8": {
+              "list": "$.contents",
+              "where_prefix": {
+                "major_version": "8.0"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-mysql-server-type",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-mysql-cluster",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrdb{ualpha}",
+            "instance_name_prefix": "regrdb",
+            "dbaas_engine_version_id": "{engine_version_id_8}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": "",
+              "database_case_sensitive": false,
+              "database_character_set": "utf8mb4",
+              "database_name": "regrdb",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "mysql"
+          }
+        },
+        {
+          "name": "wait-mysql-cluster",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mysql-cluster-read",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-setsecuritygrouprules",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-read-after-sg",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-showarchiveconfig",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-setarchiveconfig",
+          "service": "mysql",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-syncarchiveconfig",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            202,
+            409
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "verify-mysql-cluster-syncclusterstate",
+          "service": "mysql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "group": "mysql-cluster"
+        },
+        {
+          "name": "create-mysql-kernel-upgrade",
+          "service": "mysql",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-mysql-kernel-upgrade",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          }
+        },
+        {
+          "name": "verify-mysql-kernel-upgrade",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-kernel-upgrade"
+        },
+        {
+          "name": "delete-mysql-cluster",
+          "service": "mysql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "owner가 콘솔에서 엔진 구버전 유무 확인 대기"
+    },
+    {
+      "id": "gen-heavy-mariadb-upgrade",
+      "service": "database/mariadb",
+      "enabled": false,
+      "_note": "old-major create -> kernel-upgrade chain (PG gen-heavy-pg-upgrade mirror). DOUBLE-GATED: (1) the owner has confirmed old engine versions in the console only for PG so far — the where_prefix major filter on mariadb-engine-version-10 is a docs-level guess and must be re-checked against the live catalog before enabling; (2) kernel-upgrade additionally requires is_kernel_patchable=true on the cluster detail (PG gate). composed by regression/scenarios/composer.py — targets: mariadb-cluster, mariadb-kernel-upgrade",
+      "steps": [
+        {
+          "name": "create-mariadb-engine-version",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-mariadb-engine-version-10",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id_10": {
+              "list": "$.contents",
+              "where_prefix": {
+                "major_version": "10"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-mariadb-server-type",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-mariadb-cluster",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrm{ualpha}",
+            "instance_name_prefix": "regrm",
+            "dbaas_engine_version_id": "{engine_version_id_10}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "service_watch_log_collection": true,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_character_set": "utf8",
+              "database_name": "regrmaria",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss@2026",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "mariadb"
+          }
+        },
+        {
+          "name": "wait-mariadb-cluster",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-mariadb-cluster-read",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setsecuritygrouprules",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-read-after-sg",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-showarchiveconfig",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setarchiveconfig",
+          "service": "mariadb",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/archive",
+          "json": {
+            "archive_enabled": true,
+            "retention_period_day": 1
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-syncarchiveconfig",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/archive/sync",
+          "expect_status": [
+            200,
+            202,
+            409
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setbackup",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/backups",
+          "json": {
+            "archive_frequency_minute": "30",
+            "retention_period_day": "8",
+            "starting_time_hour": "3"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setauditlog",
+          "service": "mariadb",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/audit-log",
+          "json": {
+            "use_audit_log": true
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-setmaintenance",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "json": {
+            "start_day_of_week": "SUN",
+            "start_minute": "00",
+            "start_time": "03",
+            "term_hour": "4"
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-unsetmaintenance",
+          "service": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}/maintenance",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "verify-mariadb-cluster-syncclusterstate",
+          "service": "mariadb",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-state",
+          "expect_status": [
+            200,
+            201,
+            202,
+            409
+          ],
+          "group": "mariadb-cluster"
+        },
+        {
+          "name": "create-mariadb-kernel-upgrade",
+          "service": "mariadb",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-mariadb-kernel-upgrade",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          }
+        },
+        {
+          "name": "verify-mariadb-kernel-upgrade",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-kernel-upgrade"
+        },
+        {
+          "name": "delete-mariadb-cluster",
+          "service": "mariadb",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "owner가 콘솔에서 엔진 구버전 유무 확인 대기"
+    }
+  ]
+}

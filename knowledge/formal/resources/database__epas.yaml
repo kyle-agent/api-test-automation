@@ -3,13 +3,69 @@
 # heavy-shared-dbaas. Unlike the maria (run e3ba190 delete timing) and cache
 # (run 27258520218 202) legs, NO live 2xx is recorded anywhere for epas-create
 # — the node stays docs until an R3 scoped run proves it (C5).
+#
+# 2026-06-13 확장 — database__postgresql.yaml 레퍼런스 패턴 미러링 (replica
+# 체인 · restore · patch/kernel-upgrade · parameter/sg-rules/storage sub-op ·
+# lookup 노드들; PG owner 승인 2026-06-13이 replica/restore에 이전 적용).
+# epas 카탈로그는 PG와 op-set이 동일(47개) — mysql/mariadb식 추가 폴딩 없음.
+# ** gen-heavy-epas-replica가 우선 체인: epas-create 라이브 2xx가 한 번도
+# ** 기록된 적 없어 이 체인이 epas 생성 경로의 첫 증명 기회다 (C5 승격 트리거).
 version: 1
 resources:
+  # 읽기 전용 LOOKUP — 소스 epas-find-version 스텝 verbatim (contents[0]).
+  epas-engine-version:
+    code: "db-epas-engine-version"
+    service: database/epas
+    requires: []
+    create:
+      endpoint: "GET /v1/engine-versions"
+    capture:
+      engine_version_id: {list: "$.contents", get: "id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/engine-versions", expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: heavy-shared-dbaas, steps: [epas-find-version]}
+    notes: "EngineListResponse $.contents[] (api_docs — PG와 동일 DTO). 소스 스텝은 optional group이라 epas 레그의 2xx 기록이 없음 — 클러스터와 함께 R3 run에서 승격. 구버전 고정 업그레이드 체인은 epas-engine-version-16 분리 노드 (PG -16 패턴)."
+
+  # 구버전 전용 LOOKUP — PG pg-engine-version-16 미러. epas 라이브 구버전
+  # 유무 owner 미확인 → 이 노드를 쓰는 체인은 합성만 해두고 비활성.
+  epas-engine-version-16:
+    code: "db-epas-engine-version-16"
+    service: database/epas
+    requires: []
+    create:
+      endpoint: "GET /v1/engine-versions"
+    capture:
+      engine_version_id_16:
+        list: "$.contents"
+        where_prefix: {major_version: "16"}
+        get: "id"
+    verify:
+      - {name: read, endpoint: "GET /v1/engine-versions?eos_included=false",
+         expect_status: [200]}
+    provenance: docs
+    notes: "Engine.major_version prefix '16' 필터 — EPAS는 PG 메이저 트래킹 추정 (PG 라이브 17.6/16.10 owner 확인을 유추 적용; epas 자체 카탈로그는 미확인). 16.x 부재 시 capture None → 엔진 assert로 gen-heavy-epas-upgrade만 hard-fail (의도된 폭발 반경). owner 콘솔 확인 후 prefix 재조정."
+
+  # 읽기 전용 LOOKUP — 소스 epas-find-stype verbatim: NAME 캡처 (id 아님).
+  epas-server-type:
+    code: "db-epas-server-type"
+    service: database/epas
+    requires: []
+    create:
+      endpoint: "GET /v1/server-types"
+    capture:
+      db_server_type: {list: "$.contents", get: "name"}
+    verify:
+      - {name: read, endpoint: "GET /v1/server-types", expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: heavy-shared-dbaas, steps: [epas-find-stype]}
+    notes: "epas 호스트의 /v1/server-types — DBaaS 전용 타입 목록, NAME으로 소비. contents[0] 선택은 소스와 동일. epas 레그 2xx 미기록 → docs."
+
   epas-cluster:
     code: "db-epas-cluster"
     service: database/epas
     heavy: true
-    requires: [subnet]
+    requires: [subnet, epas-engine-version, epas-server-type]
     create:
       endpoint: "POST /v1/clusters"
       body:
@@ -50,14 +106,373 @@ resources:
               - {role_type: ACTIVE, public_ip_id: ""}
       options:
         engine_version_id: {type: string, required: true,
-                            note: "LOOKUP — GET /v1/engine-versions $.contents[0].id (epas 호스트; 소스 epas-find-version 스텝). 합성기 런타임 조회 주입"}
+                            default: "{epas-engine-version.engine_version_id}",
+                            note: "기본 = lookup contents[0] (소스 epas-find-version 패턴). 업그레이드 체인은 {epas-engine-version-16.engine_version_id_16}로 override + engine_version_16 ref 옵션 활성화 (PG 전략 미러; owner 구버전 확인 대기)"}
         server_type: {type: string, required: true,
-                      note: "LOOKUP — GET /v1/server-types $.contents[0].name (소스 epas-find-stype 스텝)"}
+                      default: "{epas-server-type.db_server_type}",
+                      note: "기본 = lookup contents[0] NAME (id 아님; 소스 epas-find-stype 스텝)"}
+        engine_version_16: {type: ref, target: epas-engine-version-16,
+                            required: false,
+                            note: "body 미사용 closure-puller — 값을 아무거나 주면 epas-engine-version-16 lookup이 선행 생성되어 engine_version_id override 토큰이 배선된다 (PG engine_version_16 패턴)"}
     capture: {cluster_id: "$.resource.id"}
     ready: {field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 2400, interval: 30}
+    verify:
+      - {name: read, endpoint: "GET /v1/clusters/{cluster_id}",
+         expect_status: [200]}
+      # setsecuritygrouprules — add/del 둘 다 optional array (api_docs, PG와
+      # 동일 DTO). 빈 목록 = 무변경 no-op.
+      - {name: setsecuritygrouprules,
+         endpoint: "POST /v1/clusters/{cluster_id}/security-group-rules",
+         json: {add_ip_addresses: [], del_ip_addresses: []},
+         expect_status: [200, 202]}
+      - {name: read-after-sg, endpoint: "GET /v1/clusters/{cluster_id}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
     provenance: docs
     source: {lifecycle: heavy-shared-dbaas,
              steps: [epas-create, epas-wait, epas-delete]}
-    notes: "HEAVY 과금. body는 PG형 relational 템플릿 (database_encoding/locale, audit_enabled boolean, service_watch_log_collection 없음) — heavy-shared-dbaas verbatim이지만 epas 레그 자체의 2xx 기록이 없어 docs (옆자리 maria/cache 레그는 라이브 증명됨; 같은 run에 포함됐으나 optional group이라 성공이 기록으로 안 남음 — R3 scoped run에서 승격). capture 변수는 소스 epas_cid → cluster_id 개명. epas 전용 sub-op: audit-log(PUT) + DELETE /archive. 주의: epas/mariadb guarded sub-op는 placeholder cluster_id에 500을 던진다(cachestore는 400 soft — HANDOFF-fail-new-triage §B 비대칭)."
+    notes: "HEAVY 과금. body는 PG형 relational 템플릿 (database_encoding/locale, audit_enabled boolean, service_watch_log_collection 없음, instances에 service_ip_address 없음) — heavy-shared-dbaas verbatim이지만 epas 레그 자체의 2xx 기록이 없어 docs (같은 run에 포함됐으나 optional group이라 성공이 기록으로 안 남음 — R3 scoped run에서 승격). ** gen-heavy-epas-replica가 우선 체인: 이 노드의 첫 라이브 증명 기회 — 성공 시 provenance 승격 + cross-service epas-cluster 승격 트리거. capture 변수는 소스 epas_cid → cluster_id 개명. 주의: epas/mariadb guarded sub-op는 placeholder cluster_id에 500을 던진다(cachestore는 400 soft — HANDOFF-fail-new-triage §B 비대칭). dbaas_parameter_group_id는 cluster detail DTO에 없음 — epas-parameter-group lookup에서만 발견 가능. requires는 body 소비 기준 subnet + lookup 2종 (cross-service 발산 경고 의도)."
+
+  # detail-LOOKUP — 클러스터 상세에서 instance_group/block_storage_group id
+  # 캡처 (lookup-on-detail 패턴). PG pg-instance-group 미러.
+  epas-instance-group:
+    code: "db-epas-instance-group"
+    service: database/epas
+    requires: [epas-cluster]
+    create:
+      endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}"
+    capture:
+      instance_group_id: "$.instance_groups[0].id"
+      block_storage_group_id: "$.instance_groups[0].block_storage_groups[0].id"
+    verify:
+      - {name: detail-read,
+         endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
+         expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded,
+             steps: [capture-subop-ids]}
+    notes: "InstanceGroupResponse {id, block_storage_groups[].id, ...} (api_docs show DTO — PG run 27258520218 라이브 캡처와 동일 envelope; epas 자체는 미검증). addblockstorages/setblockstoragesize/setservertype 액션 노드들이 여기 매달린다."
+
+  # 읽기 전용 LOOKUP — listparametergroups + listparameters 커버리지.
+  epas-parameter-group:
+    code: "db-epas-parameter-group"
+    service: database/epas
+    requires: []
+    create:
+      endpoint: "GET /v1/parameter-groups"
+    capture:
+      dbaas_parameter_group_id: {list: "$.contents", get: "id"}
+    verify:
+      # listparameters — dbaas_parameter_group_id는 REQUIRED query (api_docs)
+      - {name: listparameters,
+         endpoint: "GET /v1/parameters?dbaas_parameter_group_id={dbaas_parameter_group_id}&size=20&page=0",
+         expect_status: [200]}
+    provenance: docs
+    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...} (api_docs — PG와 동일 DTO). dbaas_parameter_group_id는 cluster detail DTO에 없어 여기서만 발견 가능 (PG와 동일). guarded probe에 동등 스텝이 없어 source 생략."
+
+  # detail-LOOKUP — 수정 가능한 첫 파라미터의 id+applied_value 캡처 → 같은
+  # 값으로 set (safe no-op write). PG pg-parameter 미러.
+  epas-parameter:
+    code: "db-epas-parameter"
+    service: database/epas
+    requires: [epas-cluster]
+    create:
+      endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}/parameters"
+    capture:
+      param_id:
+        list: "$.contents"
+        where_prefix: {is_modifiable: "True"}
+        get: "id"
+      param_value:
+        list: "$.contents"
+        where_prefix: {is_modifiable: "True"}
+        get: "applied_value"
+    verify:
+      # ParametersRequest {parameters: [ParameterRequest {id, new_value,
+      #  old_value} 전부 REQUIRED]} (api_docs verbatim). 같은-값 set = no-op.
+      - {name: setparametervalues,
+         endpoint: "PUT /v1/clusters/{epas-cluster.cluster_id}/parameters",
+         json: {parameters: [{id: "{param_id}", new_value: "{param_value}",
+                              old_value: "{param_value}"}]},
+         expect_status: [200, 202]}
+      - {name: syncparametervalues,
+         endpoint: "POST /v1/clusters/{epas-cluster.cluster_id}/parameters/sync",
+         expect_status: [200, 202, 409]}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded,
+             steps: [set-parameters, sync-parameters]}
+    notes: "create=GET listparametervalues — ParametersResponse $.contents[] {id, applied_value, is_modifiable, ...} (PG와 동일 DTO). where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭. applied_value 빈 문자열 첫 매치 시 set 400 가능 — 라이브 정제 예상 (PG와 동일 주의)."
+
+  # ---- 액션 노드들 (SKE 패턴: create=호출, ready=재폴링) — PG 미러 ---------
+  epas-add-block-storage:
+    code: "db-epas-add-block-storage"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster, epas-instance-group]
+    create:
+      endpoint: "POST /v1/instance-groups/{epas-instance-group.instance_group_id}/block-storage-groups"
+      body: {role_type: DATA, size_gb: 104, volume_type: SSD}
+    ready: {endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded,
+             steps: [add-block-storages]}
+    notes: "AddBlockStoragesRequest {role_type REQ enum(OS,DATA,ARCHIVE,TEMP,BACKUP), size_gb REQ 16-5120, volume_type opt default SSD} (api_docs verbatim — PG와 동일 DTO). DATA 볼륨 추가 비가역 — 1회용 클러스터 전용."
+
+  epas-resize-block-storage:
+    code: "db-epas-resize-block-storage"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster, epas-instance-group]
+    create:
+      endpoint: "POST /v1/block-storage-groups/{epas-instance-group.block_storage_group_id}/resize"
+      body: {size_gb: 112}
+    ready: {endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded,
+             steps: [resize-block-storage]}
+    notes: "ResizeBlockStorageGroupRequest {size_gb REQ} (api_docs — PG와 동일 DTO). 104→112 GB 증설 — 축소 불가(비가역), 1회용 클러스터 전용."
+
+  epas-resize-server-type:
+    code: "db-epas-resize-server-type"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster, epas-instance-group, epas-server-type]
+    create:
+      endpoint: "POST /v1/instance-groups/{epas-instance-group.instance_group_id}/resize"
+      body: {server_type_name: "{opt.server_type}"}
+      options:
+        server_type: {type: string, required: true,
+                      default: "{epas-server-type.db_server_type}",
+                      note: "기본 = lookup contents[0] = 생성 시 타입과 동일 가능 — same-type resize 400이면 합성 시 다른 NAME으로 override (라이브 정제 예상; PG와 동일 주의)"}
+    ready: {endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded,
+             steps: [resize-instance-group]}
+    notes: "InstanceGroupResizeRequest {server_type_name REQ} (api_docs verbatim — PG와 동일 DTO). composer create expect [200,201,202] 고정 — same-type 400은 의도된 hard."
+
+  # log-export — 계정 자격 게이트. PG pg-log-export-config 미러.
+  epas-log-export-config:
+    code: "db-epas-log-export-config"
+    service: database/epas
+    requires: [epas-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{epas-cluster.cluster_id}/log-export-configs"
+      body:
+        access_key: "{opt.access_key}"
+        bucket_name: "{opt.bucket_name}"
+        delete_on_export: false
+        log_type: "{opt.log_type}"
+        schedule_day_of_month: "28"
+        schedule_day_of_week: MON
+        schedule_frequency_type: DAY
+        schedule_hour: "12"
+        secret_key: "{opt.secret_key}"
+      options:
+        access_key: {type: string, required: true,
+                     note: "OBS 접근 access key — 계정 자격, 기본값 없음(의도된 게이트)"}
+        secret_key: {type: string, required: true,
+                     note: "OBS 접근 secret key — 계정 자격, 기본값 없음(의도된 게이트)"}
+        bucket_name: {type: string, default: "apitest-logsink",
+                      note: "공유 OBS 싱크 (워크플로 보장; trails/network-logging과 동일 — owner). 엔진별 버킷 요건 다르면 라이브 정제"}
+        log_type: {type: string, default: "general",
+                   note: "DTO Example은 'alert'; PG 수작업 probe는 'general' — string 자유형 (enum 아님, api_docs)"}
+    delete: {endpoint: "DELETE /v1/clusters/{epas-cluster.cluster_id}/log-export-configs/{opt.log_type}",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded,
+             steps: [register-log-export-config]}
+    notes: "LogExportConfigCreateRequest 9필드 전부 REQUIRED (nullable이어도 키 필수, api_docs verbatim — PG와 동일 DTO). PG userguide 확정 준용: Object Storage Bucket 대상, 인증키 만료 시 적재 중단. teardown = unregisterlogexportconfig DELETE .../log-export-configs/{log_type}."
+
+  # ---- replica 체인 (PG owner 승인 2026-06-13 이전 적용, 동일 리전) --------
+  # ** 우선 체인: epas-create의 첫 라이브 증명 기회 (헤더 참조) **
+  epas-replica:
+    code: "db-epas-replica"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster, epas-server-type]
+    create:
+      endpoint: "POST /v1/clusters/{epas-cluster.cluster_id}/replicas"
+      body:
+        allowable_ip_addresses: []
+        replica_count: 1
+        replicas:
+          - name: "regrerep{ualpha}"
+            instance_groups:
+              - role_type: ACTIVE
+                server_type_name: "{opt.server_type}"
+                block_storage_groups:
+                  - {role_type: OS, size_gb: 104, volume_type: SSD}
+                instances:
+                  - {role_type: ACTIVE, public_ip_id: ""}
+        tags: []
+      options:
+        server_type: {type: string, required: true,
+                      default: "{epas-server-type.db_server_type}",
+                      note: "replica 인스턴스 그룹 타입 — origin과 동일 기본"}
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    capture: {replica_cluster_id: "$.resource.id"}
+    ready: {endpoint: "GET /v1/clusters/{replica_cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{replica_cluster_id}",
+             destructive: true,
+             retry_on_status: [400, 401, 409, 500, 503],
+             retries: 20, retry_interval: 60}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded, steps: [create-replica]}
+    notes: "HEAVY — 두 번째 과금 클러스터. ReplicasCreateRequest verbatim (api_docs — PG와 동일 DTO). instances에 service_ip_address 없음 = epas 본체 instance 형 미러. 응답 AsyncResponse $.resource.id = replica cluster id. PG userguide 확정 준용: 동일 리전·동일 subnet, DB당 최대 5개, storage 유형 원본 강제. create 409 재시도는 직전 async 쓰기 reconcile 경합 대비. delete 재시도 스택은 PG verbatim 승계 (401 quirk family)."
+
+  epas-sync-replica-state:
+    code: "db-epas-sync-replica-state"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster, epas-replica]
+    create:
+      endpoint: "POST /v1/clusters/{epas-cluster.cluster_id}/sync-replica-state"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 900, interval: 30}
+    verify:
+      - {name: replicas-list,
+         endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}/replicas",
+         expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded,
+             steps: [sync-replica-state]}
+    notes: "path param은 ORIGIN cluster id (api_docs). body 없음, 202 AsyncResponse. listreplicas verify로 replica_state 노출 확인 (PG와 동일 DTO)."
+
+  # HA 전용 — replica 체인 제외 (PG userguide 확정 준용: HA Active↔Standby 전환).
+  epas-switchover:
+    code: "db-epas-switchover"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{epas-cluster.cluster_id}/switchover"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded, steps: [switchover-cluster]}
+    notes: "ha_enabled:false 본체에서는 4xx 예상 — HA 변형 클러스터가 모델링될 때까지 합성 제외 게이트 (PG pg-switchover와 동일 처리)."
+
+  epas-reset-replica:
+    code: "db-epas-reset-replica"
+    service: database/epas
+    heavy: true
+    requires: [epas-replica, epas-sync-replica-state]
+    create:
+      endpoint: "POST /v1/clusters/{epas-replica.replica_cluster_id}/reset-replica"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{epas-replica.replica_cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded, steps: [reset-replica]}
+    notes: "Replica 재구성 — path param replica_cluster_id = REPLICA role 클러스터 (api_docs). 전체 재복제라 ready 1800s. body 없음, 202."
+
+  # 비가역 — 체인 '마지막' 강제. 승격 후 둘 다 삭제.
+  epas-promote:
+    code: "db-epas-promote"
+    service: database/epas
+    heavy: true
+    requires: [epas-replica, epas-reset-replica]
+    create:
+      endpoint: "POST /v1/clusters/{epas-replica.replica_cluster_id}/promote"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{epas-replica.replica_cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded, steps: [promote-replica]}
+    notes: "IRREVERSIBLE — 승격 시 기존 Master와 동기화 중단 (PG userguide 준용). requires로 reset-replica 이후 '마지막' 보장; teardown은 replica delete가 origin delete보다 먼저."
+
+  # restore — backup-timing 게이트로 비활성 합성 (PG와 동일).
+  epas-restore:
+    code: "db-epas-restore"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster, epas-server-type]
+    create:
+      endpoint: "POST /v1/clusters/{epas-cluster.cluster_id}/restore"
+      body:
+        name: "regrerst{ualpha}"
+        instance_name_prefix: regrerst
+        server_type_name: "{opt.server_type}"
+        allowable_ip_addresses: []
+        tags: []
+      options:
+        server_type: {type: string, required: true,
+                      default: "{epas-server-type.db_server_type}",
+                      note: "ClusterRestoreRequest.server_type_name REQUIRED — origin과 동일 기본"}
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    capture: {restore_cluster_id: "$.resource.id"}
+    ready: {endpoint: "GET /v1/clusters/{restore_cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{restore_cluster_id}",
+             destructive: true,
+             retry_on_status: [400, 401, 409, 500, 503],
+             retries: 20, retry_interval: 60}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded, steps: [create-restore]}
+    notes: "HEAVY — 백업 기반 새 과금 클러스터. ClusterRestoreRequest verbatim (api_docs — PG와 동일 DTO): name REQ ^[a-zA-Z]*$ 3-20. PG userguide 확정 준용: 백업은 예약 수행 — 생성 직후 restore 실패 예상 (gen-heavy-epas-restore enabled:false 게이트). 응답 AsyncResponse $.resource.id = 신규 클러스터 id."
+
+  # ---- patch / kernel-upgrade — 합성 체인은 owner 구버전 확인 대기 게이트 --
+  epas-patch:
+    code: "db-epas-patch"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster]
+    create:
+      endpoint: "PUT /v1/clusters/{epas-cluster.cluster_id}/patch"
+      body:
+        backup_before_upgrade: false
+        software_version: "{opt.target_software_version}"
+      options:
+        target_software_version: {type: string, required: true,
+                                  note: "패치 대상 마이너 버전 — 기본값 없음(의도된 게이트): 현재 마이너보다 높아야 함. 합성 시 명시"}
+    ready: {endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 3600, interval: 60}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded, steps: [patch-minor-version]}
+    notes: "MinorPatchRequest {backup_before_upgrade REQ bool, software_version REQ string} (api_docs verbatim — PG와 동일 DTO). PG userguide 준용: 동일 메이저 내 마이너만; replica 먼저 패치. backup_before_upgrade=false: 1회용 + 완료 백업 미존재 리스크 회피. IRREVERSIBLE."
+
+  epas-kernel-upgrade:
+    code: "db-epas-kernel-upgrade"
+    service: database/epas
+    heavy: true
+    requires: [epas-cluster]
+    create:
+      endpoint: "PUT /v1/clusters/{epas-cluster.cluster_id}/kernel-upgrade"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 3600, interval: 60}
+    provenance: docs
+    source: {lifecycle: epas-cluster-subops-guarded, steps: [upgrade-kernel]}
+    notes: "body 없음 (api_docs — upgradekernel). PG userguide 준용: 진행 중 서비스 중단, 실패 시 원복, 성공 시 IRREVERSIBLE. 전제 is_kernel_patchable=true. epas 구버전 라이브 유무 owner 미확인 → gen-heavy-epas-upgrade는 'owner가 콘솔에서 엔진 구버전 유무 확인 대기'로 비활성. 참고: epas 전용 deletearchivelog(DELETE /archive)는 PG 미러 범위 밖 — 미모델 (guarded probe delete-archive 잔존 커버리지)."
