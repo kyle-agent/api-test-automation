@@ -1,14 +1,22 @@
 # Resource-task model — management/iam (mg-iam group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from iam-group / iam-policy
 # (enabled, live-validated) + iam-role-full / iam-credentials-heavy by
-# extract.py, curated by hand.
+# extract.py, curated by hand. Wave-5 expansion (2026-06-13): binding nodes
+# (group/role/policy), saml-provider, and gated nodes for member/user/
+# resource-policy ops — DTOs verbatim from data/api_docs.json management/iam/*.
 #
-# NOT modeled as nodes (operation/coverage-only steps that need no or
-# unsatisfiable creates): user/group/role policy-bindings + members (operations
-# on the nodes below), bulk deletes, saml-provider (corrupt api_bodies entry,
-# no proven capture), account-user (needs a real {account_id} this caller does
-# not own), resource-policy (attaches to an existing SRN — operation), and
-# access-key send-otp (real notification trigger).
+# NOT modeled as nodes: bulk deletes (accesskeydeletebulk, deletebulkiamuser,
+# deletebulkrole, deletepolicies — delete-mode variants of existing nodes, not
+# resource types; EXCEPTION: deletesamlproviders is the ONLY saml delete, so
+# the saml node uses it as its teardown) and access-key send-otp (real
+# notification trigger; live-verified already).
+# GATED nodes (required no-default option = intended form-input gate, the
+# asg-notification pattern): iam-group-member / iam-user-policy-binding
+# (need a real user_id — users are NOT discoverable without an account_id:
+# listiamuser is GET /v1/accounts/{account_id}/users, so no ungated lookup
+# node is possible), iam-user (needs an owner-approved account_id; creates a
+# real login principal), iam-resource-policy (attaches to an existing SRN —
+# owner must supply a DISPOSABLE resource).
 version: 1
 resources:
   iam-group:
@@ -63,7 +71,7 @@ resources:
   iam-role:
     code: "mg-iam-role"
     service: management/iam
-    requires: []
+    requires: [iam-policy]
     create:
       endpoint: "POST /v1/roles"
       body:
@@ -76,14 +84,32 @@ resources:
           Statement:
             - {Sid: statement1, Effect: Allow, Action: ["sts:AssumeRole"],
                Condition: {}, Resource: []}
-        policy_ids: []
+        policy_ids: ["{iam-policy.policy_id}"]
         principals: []
         tags: []
     capture: {role_id: "$.role.id"}
+    verify:
+      - {name: set, endpoint: "PUT /v1/roles/{role_id}",
+         json: {description: "updated by API regression suite",
+                max_session_duration: 3600},
+         expect_status: [200, 202]}
+      - name: set-trust-policy
+        endpoint: "PUT /v1/roles/{role_id}/trust-policy"
+        json:
+          assume_role_policy_document:
+            Version: "2024-07-01"
+            Statement:
+              - {Sid: statement1, Effect: Allow, Action: ["sts:AssumeRole"],
+                 Condition: {}, Resource: []}
+        expect_status: [200, 202]
+      - {name: unbind-bulk,
+         endpoint: "DELETE /v1/roles/{role_id}/policy-bindings",
+         json: {policy_ids: ["{iam-policy.policy_id}"]},
+         expect_status: [200, 204]}
     delete: {endpoint: "DELETE /v1/roles/{role_id}", destructive: true}
     provenance: docs
     source: {lifecycle: iam-role-full, steps: [create-role, delete-role]}
-    notes: "body는 api_bodies createrole 기반, envelope $.role.id는 doc 202 예제 — 그러나 라이브 미증명: 이전 iam-role lifecycle이 POST /v1/roles에서 500 ContactAdminForAssistance를 봤고 현 소스도 'create may 500 on this account' RISK를 명시 (create가 optional). 라이브 2xx 후 VALIDATED 승격(R3). trust policy는 빈 Resource + principal 없음으로 실 SRN 의존 제거. roles는 가상 엔티티 (roles-are-virtual)."
+    notes: "body는 api_bodies createrole 기반, envelope $.role.id는 doc 202 예제. 이전 라이브 500 ContactAdminForAssistance는 policy_ids: [] 로 보냈을 때 — DTO rolecreaterequestv1dot3는 policy_ids가 REQUIRED(비어있지 않은 정책 연결 기대)라 빈 배열이 validation 미표면화(500)의 유력 원인 → wave5에서 자체 iam-policy를 연결해 재시도. verify가 setrole(RoleSetRequest: description+max_session_duration만)·setroletrustpolicy(roletrustpolicyrequest: assume_role_policy_document 필수, create와 동일 문서 재설정)·removebulkrolepolicybindings(create-시점 바인딩을 body {policy_ids}로 일괄 해제 — 자체 정책만)를 커버. trust policy는 빈 Resource + principal 없음으로 실 SRN 의존 제거. 라이브 2xx 후 VALIDATED 승격(R3). roles는 가상 엔티티 (roles-are-virtual)."
 
   iam-access-key:
     code: "mg-iam-access-key"
@@ -93,8 +119,206 @@ resources:
     create:
       endpoint: "POST /v1/access-keys"
       body: {access_key_type: PERMANENT, description: "API regression suite"}
-    capture: {access_key_id: "$.access_key_id"}
-    delete: {endpoint: "DELETE /v1/access-keys/{access_key_id}", destructive: true}
+    capture: {access_key_id: "$.access_key.id"}
+    verify:
+      - {name: set-disable, endpoint: "PUT /v1/access-keys/{access_key_id}",
+         json: {is_enabled: false}, expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/access-keys/{access_key_id}",
+             destructive: true}
     provenance: docs
     source: {lifecycle: iam-credentials-heavy, steps: [create-access-key, delete-access-key]}
-    notes: "HEAVY — 실제 자격증명(영구 access key) 생성이라 SCP_RUN_HEAVY 게이트 (소스 lifecycle heavy:true). 공유 계정에선 403/400 예상 (소스는 coverage-only optional). capture는 소스에서 capture_soft($.access_key_id, FLAT 추정) — UNPROVEN. parent_access_key_id/passcode는 계정 특이 필드라 생략. 인증키 수 제한 + 임시키 모드 등 보안설정은 services/management__iam.yaml auth-key-limits 참조."
+    notes: "HEAVY — 실제 자격증명(영구 access key) 생성이라 SCP_RUN_HEAVY 게이트 (소스 lifecycle heavy:true). 공유 계정에선 403/400 예상 (소스는 coverage-only optional). capture를 doc 201 예제로 교정: envelope $.access_key.id (이전 FLAT $.access_key_id 추정은 doc과 불일치 — accesskeyresponse = {access_key: AccessKey}, 경로 파라미터 access_key_id = AccessKey.id). SAFETY: 이 노드는 자신이 생성·capture한 키 id에만 set/delete를 보낸다 — runner의 기존 자격증명 키는 어떤 step에도 등장하지 않으므로 잠금 위험 없음. verify set-disable(accesskeyset {is_enabled:false})은 새 키를 비활성화한 뒤 삭제하는 가장 안전한 순서. parent_access_key_id/passcode는 임시키 전용 필드라 생략. 인증키 수 제한 + 임시키 모드 등 보안설정은 services/management__iam.yaml auth-key-limits 참조. accesskeydeletebulk는 bulk-delete 클래스로 미모델."
+
+  # --- wave5: 바인딩 노드들 (자체 group/policy/role만 사용 — enabled-safe) ---
+
+  iam-group-policy-binding:
+    code: "mg-iam-group-policy-binding"
+    service: management/iam
+    requires: [iam-group, iam-policy]
+    create:
+      endpoint: "POST /v1/groups/{iam-group.group_id}/policy-bindings"
+      body: {policy_ids: ["{iam-policy.policy_id}"]}
+    verify:
+      - {name: list,
+         endpoint: "GET /v1/groups/{iam-group.group_id}/policy-bindings",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/groups/{iam-group.group_id}/policy-bindings/{iam-policy.policy_id}",
+             destructive: true}
+    provenance: docs
+    source: {docs: "management/iam/addgrouppolicybinding (grouppolicybindingrequest: policy_ids REQUIRED) + removegrouppolicybinding"}
+    notes: "그룹↔정책 바인딩 — 자체 iam-group/iam-policy만 사용 (policies-attach-to-groups-not-users). create 응답은 {policies:[...]} 목록이라 capture 불필요 — delete 경로가 prereq 토큰을 그대로 쓴다 (dotted-prereq-token-in-delete, server-interface 패턴). removegrouppolicybinding은 라이브 검증 이력 있음(verified set) — add 쪽이 wave5의 신규 커버."
+
+  iam-policy-binding-set:
+    code: "mg-iam-policy-binding-set"
+    service: management/iam
+    requires: [iam-group, {ref: iam-policy, count: 2}]
+    create:
+      endpoint: "PUT /v1/policies/{iam-policy.2.policy_id}/bindings"
+      body: {identity_type: GROUP, add_ids: ["{iam-group.group_id}"],
+             remove_ids: []}
+    verify:
+      - {name: list,
+         endpoint: "GET /v1/policies/{iam-policy.2.policy_id}/bindings",
+         expect_status: [200]}
+    delete: {endpoint: "PUT /v1/policies/{iam-policy.2.policy_id}/bindings",
+             json: {identity_type: GROUP, add_ids: [],
+                    remove_ids: ["{iam-group.group_id}"]},
+             expect_status: [200], destructive: true}
+    provenance: docs
+    source: {docs: "management/iam/setpolicygroupbinding (policybindingsetrequest: identity_type REQUIRED, add_ids/remove_ids optional)"}
+    notes: "정책 쪽에서 본 바인딩 설정 (PUT add_ids/remove_ids) — create=PUT add, teardown=같은 PUT의 remove_ids (비-DELETE teardown passthrough). iam-policy.2 (두 번째 인스턴스)를 쓰는 이유: 묶음 합성 시 iam-group-policy-binding이 policy#1을 같은 그룹에 이미 바인딩하므로 중복 바인딩 충돌을 피한다. 응답은 group 페이지 목록 — capture 불필요."
+
+  iam-role-policy-binding:
+    code: "mg-iam-role-policy-binding"
+    service: management/iam
+    requires: [iam-role, {ref: iam-policy, count: 2}]
+    create:
+      endpoint: "POST /v1/roles/{iam-role.role_id}/policy-bindings"
+      body: {policy_ids: ["{iam-policy.2.policy_id}"]}
+    verify:
+      - {name: list,
+         endpoint: "GET /v1/roles/{iam-role.role_id}/policy-bindings",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/roles/{iam-role.role_id}/policy-bindings/{iam-policy.2.policy_id}",
+             destructive: true}
+    provenance: docs
+    source: {docs: "management/iam/addrolepolicybindings (rolepolicybindingrequest: policy_ids REQUIRED) + removerolepolicybinding"}
+    notes: "역할↔정책 바인딩 — iam-role이 create 시점에 policy#1을 연결하므로(필수 policy_ids) 이 노드는 policy#2를 추가 바인딩/단건 해제한다. removebulkrolepolicybindings(동일 경로 DELETE+body)는 iam-role의 unbind-bulk verify가 커버. 응답 {policies:[...]} — capture 불필요."
+
+  iam-saml-provider:
+    code: "mg-iam-saml-provider"
+    service: management/iam
+    requires: []
+    create:
+      endpoint: "POST /v1/saml-providers"
+      body: {federation_type: SAML, saml_provider_name: "regrsaml{ualpha}",
+             description: "API regression suite"}
+    capture: {saml_provider_id: "$.id"}
+    verify:
+      - {name: show, endpoint: "GET /v1/saml-providers/{saml_provider_id}",
+         expect_status: [200]}
+      - {name: set, endpoint: "PUT /v1/saml-providers/{saml_provider_id}",
+         json: {description: "updated by API regression suite"},
+         expect_status: [200, 202]}
+    delete: {endpoint: "DELETE /v1/saml-providers/bulk",
+             json: {ids: ["{saml_provider_id}"]}, destructive: true}
+    provenance: docs
+    source: {docs: "management/iam/createsamlprovider (samlprovidercreaterequest: federation_type+saml_provider_name REQUIRED, file optional) + setsamlprovider + deletesamlproviders"}
+    notes: "RISK(콘텐츠 타입): doc request 예제는 multipart/form-data (file= IdP 메타데이터 XML, DTO상 optional). 엔진은 JSON 전송만 지원 — file 없이 JSON으로 시도하는 라이브 실험이며, 게이트웨이가 multipart를 강제하면 400/415 → 그 경우 disable + 엔진 multipart 지원 필요로 재분류. create envelope FLAT $.id (doc 201 예제). 합성 메타데이터 없이 만든 provider는 federation 불가(아무도 이 IdP로 로그인 못 함) — 계정 인증에 영향 없음(safe). 단건 delete가 카탈로그에 없어 deletesamlproviders(bulk, body {ids})가 유일한 teardown."
+
+  # --- wave5: 게이트 노드들 (required no-default 옵션 = 폼-입력 게이트,
+  #     asg-notification 패턴 — 합성기는 옵션 미제공 시 ComposeError) ---
+
+  iam-group-member:
+    code: "mg-iam-group-member"
+    service: management/iam
+    requires: [iam-group]
+    create:
+      endpoint: "POST /v1/groups/{iam-group.group_id}/members"
+      body: {user_id: "{opt.user_id}"}
+      options:
+        user_id: {type: string, required: true,
+                  note: "그룹에 넣을 실제 사용자 ID — API로 발견 불가 (listiamuser가 {account_id} 경로 필수라 ungated lookup 노드 불가). owner가 콘솔에서 확인해 제공 (기본값 없음 = 의도된 게이트)"}
+    verify:
+      - {name: list, endpoint: "GET /v1/groups/{iam-group.group_id}/members",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/groups/{iam-group.group_id}/members/{opt.user_id}",
+             destructive: true}
+    provenance: docs
+    source: {docs: "management/iam/addgroupmember (groupmembercreaterequest: user_id REQUIRED) + removegroupmember"}
+    notes: "자체 그룹에 owner 제공 user_id를 추가/제거 — 그룹은 우리가 만들고 지우므로 사용자 권한에 미치는 순효과 0 (멤버십은 teardown에서 제거, 그룹 자체도 삭제). 응답 $.group_member.user_id — capture 불필요 (경로가 opt 토큰 재사용)."
+
+  iam-user:
+    code: "mg-iam-user"
+    service: management/iam
+    requires: []
+    create:
+      endpoint: "POST /v1/accounts/{opt.account_id}/users"
+      body: {user_name: "regrusr{ualpha}", password: "Regr9x!{ualpha}",
+             temporary_password: true, description: "API regression suite",
+             group_ids: [], policy_ids: [], tags: []}
+      options:
+        account_id: {type: string, required: true,
+                     note: "사용자를 만들 어카운트 ID — 실 로그인 principal 생성이라 owner 승인 + owner 소유 account 필수 (기본값 없음 = 의도된 게이트). 이 계정의 account_id는 API로 자가 발견 경로가 카탈로그에 없음"}
+    capture: {user_id: "$.id"}
+    verify:
+      - {name: show,
+         endpoint: "GET /v1/accounts/{opt.account_id}/users/{user_id}",
+         expect_status: [200]}
+      - {name: list, endpoint: "GET /v1/accounts/{opt.account_id}/users",
+         expect_status: [200]}
+      - {name: set,
+         endpoint: "PUT /v1/accounts/{opt.account_id}/users/{user_id}",
+         json: {description: "updated by API regression suite",
+                password_reuse_count: 0},
+         expect_status: [200, 202]}
+      - {name: set-password,
+         endpoint: "PUT /v1/accounts/{opt.account_id}/users/{user_id}/password",
+         json: {password: "Regr8y!{ualpha}", temporary_password: true},
+         expect_status: [200, 202]}
+    delete: {endpoint: "DELETE /v1/accounts/{opt.account_id}/users/{user_id}",
+             destructive: true}
+    provenance: docs
+    source: {docs: "management/iam/createiamuser (iamusercreaterequest: user_name+password+temporary_password REQUIRED) + getiamuser/listiamuser/updateiamuser/updateiamuserpassword/deleteiamuser"}
+    notes: "실 로그인 가능 principal을 만드는 노드라 게이트 (runner 인증에는 영향 없으나 테넌트-침습적). password는 합성 1회용 + temporary_password:true(첫 로그인 시 변경 강제) + group_ids/policy_ids 빈 배열 = 권한 0인 사용자 → 생성 직후 verify 후 삭제. updateiamuser(iamuserupdaterequest)는 password_reuse_count가 REQUIRED인 특이 DTO — 0 사용 (Maximum 24). create envelope FLAT $.id (iamcreateuserresponse). deletebulkiamuser는 bulk-delete 클래스로 미모델."
+
+  iam-user-policy-binding:
+    code: "mg-iam-user-policy-binding"
+    service: management/iam
+    requires: [iam-policy]
+    create:
+      endpoint: "POST /v1/users/{opt.user_id}/policy-bindings"
+      body: {policy_ids: ["{iam-policy.policy_id}"]}
+      options:
+        user_id: {type: string, required: true,
+                  note: "정책을 연결할 실제 사용자 ID — owner가 콘솔에서 확인해 제공 (기본값 없음 = 의도된 게이트). 권한이 0인 자체 iam-policy(USER_DEFINED)만 연결하지만, 실 사용자의 권한 표면을 건드리므로 owner 결정 필요"}
+    verify:
+      - {name: list, endpoint: "GET /v1/users/{opt.user_id}/policy-bindings",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/users/{opt.user_id}/policy-bindings/{iam-policy.policy_id}",
+             destructive: true}
+    provenance: docs
+    source: {docs: "management/iam/adduserpolicybinding (userpolicyrequest: policy_ids) + removeuserpolicybinding + listuserpolicybindings"}
+    notes: "자체 iam-policy를 owner 제공 사용자에 바인딩/해제 — teardown이 우리가 추가한 바인딩만 제거하므로 사용자의 기존 권한은 불변. 정책 내용은 iam:* Allow지만 USER_DEFINED 신규 정책이라 기존 거동과 무관하며 체인 종료 시 정책 자체가 삭제된다. owner가 account_id를 제공하면 iam-user 노드 capture(user_id)를 ref 옵션으로 배선하는 무게이트 변형도 가능 (R4 후보)."
+
+  iam-resource-policy:
+    code: "mg-iam-resource-policy"
+    service: management/iam
+    requires: []
+    create:
+      endpoint: "PUT /v1/resource-policies/{opt.srn}"
+      body:
+        policy_version:
+          policy_version_name: "PolicyVersion-1"
+          policy_document:
+            Version: "2024-07-01"
+            Statement:
+              - {Sid: Statement1, Effect: Deny,
+                 Action: ["virtualserver:ShowVirtualServer"],
+                 Resource: ["*"], Principal: "*"}
+      options:
+        srn: {type: string, required: true,
+              note: "대상 자원의 SRN (doc 예제 형태의 URL-safe/인코딩된 경로 표현) — 자원 정책은 기존 자원에 부착되는 operation이라 owner가 '버려도 되는' 자원의 SRN을 제공해야 한다 (기본값 없음 = 의도된 게이트)"}
+    verify:
+      - {name: show, endpoint: "GET /v1/resource-policies/{opt.srn}",
+         expect_status: [200]}
+      - {name: add-statement,
+         endpoint: "POST /v1/resource-policies/{opt.srn}/statements",
+         json: {Sid: Statement2, Effect: Deny,
+                Action: ["virtualserver:ShowVirtualServer"],
+                Resource: ["*"], Principal: "*"},
+         expect_status: [200, 201]}
+      - {name: set-statement,
+         endpoint: "PUT /v1/resource-policies/{opt.srn}/statements/Statement2",
+         json: {Sid: Statement2, Effect: Deny,
+                Action: ["virtualserver:ShowVirtualServer"],
+                Resource: ["*"], Principal: "*"},
+         expect_status: [200]}
+      - {name: remove-statement,
+         endpoint: "DELETE /v1/resource-policies/{opt.srn}/statements/Statement2",
+         expect_status: [200, 204]}
+    delete: {endpoint: "DELETE /v1/resource-policies/{opt.srn}",
+             destructive: true}
+    provenance: docs
+    source: {docs: "management/iam/setresourcepolicy (resourcepolicysetrequest: policy_version REQUIRED → resourcepolicyversioncreaterequest: policy_document REQUIRED) + showresourcepolicy/deleteresourcepolicy + addpermission/setpermission/removepermission (statementcreaterequest: Effect REQUIRED, Sid 경로 파라미터)"}
+    notes: "SAFETY(정책 내용): Statement는 의도적으로 Deny + 좁은 단일 액션(virtualserver:ShowVirtualServer) — Principal '*' + Allow로 자원 접근을 '여는' 정책은 절대 쓰지 않는다. Deny라도 대상 자원의 해당 읽기를 막으므로 owner는 버려도 되는 자원만 제공할 것; teardown이 정책 전체를 제거해 원상복구. create가 PUT(set)인 upsert형 — capture 불필요 (경로가 opt 토큰 재사용). statements의 {sid}는 body Sid와 동일 리터럴 Statement2 사용."
