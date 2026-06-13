@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>knowledge/formal/INGESTION.md</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  /* ---- design tokens (owner IA mockup — shared with the static dashboard) ---- */
+  :root{
+    --bg:#fbfcfd; --surface:#fff; --surface2:#f5f7f9; --border:#e4e7eb;
+    --text:#1d2530; --muted:#6b7480; --faint:#9aa3ad;
+    --green:#15924f; --green-bg:#e7f6ed; --amber:#b5740b; --amber-bg:#fdf3e2;
+    --red:#c63434; --red-bg:#fbe9e9; --blue:#2563c9; --blue-bg:#e8f0fd;
+    --grey:#7a838d; --grey-bg:#eef1f4; --purple:#7a45c2; --purple-bg:#f1e9fb;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04);
+    /* legacy aliases (older templates reference these directly) */
+    --fg:#1d2530; --line:#e4e7eb; --accent:#2563c9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+  /* ---- app shell ---- */
+  header.shell{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border)}
+  .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
+  .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .nav{display:flex;gap:3px;align-items:center}
+  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a:hover{background:var(--surface2);text-decoration:none}
+  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .ctx select{border:1px solid var(--border);border-radius:7px;background:var(--surface);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit}
+  .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .ctxbar b{color:var(--text)}
+  .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .ctxbar .pip.off{background:var(--faint)}
+
+  main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+  h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  h2:first-child{margin-top:6px}
+  h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  .pad{padding:15px 17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+
+  /* status vocabulary (shared everywhere) */
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .s-verified{background:var(--green-bg);color:var(--green)}
+  .s-reached{background:var(--amber-bg);color:var(--amber)}
+  .s-unobs{background:var(--grey-bg);color:var(--grey)}
+  .s-regress{background:var(--red-bg);color:var(--red)}
+  .s-known{background:#3a1212;color:#ffb3b3}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .tag.heavy{background:var(--purple-bg);color:var(--purple)}
+  .tag.destructive{background:var(--red-bg);color:var(--red)}
+  .tag.mutation{background:var(--amber-bg);color:var(--amber)}
+  .tag.read{background:var(--blue-bg);color:var(--blue)}
+  .tag.disabled{background:#eceef0;color:var(--faint)}
+  .srv{font-size:10px;font-weight:700;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+  /* health verdict banner */
+  .verdict{display:flex;align-items:center;gap:11px;background:var(--green-bg);border:1px solid #c2e6d0;
+    border-radius:12px;padding:12px 16px;font-size:13.5px}
+  .verdict .pip{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .verdict b{color:#0d6e3a}
+  .verdict.bad{background:var(--red-bg);border-color:#ecc4c4}
+  .verdict.bad .pip{background:var(--red)}
+  .verdict.bad b{color:var(--red)}
+  .verdict.none{background:var(--grey-bg);border-color:var(--border)}
+  .verdict.none .pip{background:var(--faint)}
+  .verdict.none b{color:var(--muted)}
+
+  /* metric tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:13px}
+  .tile{padding:13px 14px}
+  .tile .v{font-size:24px;font-weight:800;letter-spacing:-.6px}
+  .tile .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tile .bar{height:5px;border-radius:3px;background:var(--grey-bg);overflow:hidden;margin-top:8px}
+  .tile .bar i{display:block;height:100%;border-radius:3px}
+  .tile .goal{font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* pipeline strip */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:6px}
+  .pstage{flex:1;border:1px solid var(--border);background:var(--surface);padding:13px 15px;position:relative;color:var(--text)}
+  .pstage:first-child{border-radius:11px 0 0 11px}
+  .pstage:last-child{border-radius:0 11px 11px 0}
+  .pstage:not(:last-child){border-right:0}
+  a.pstage:hover{background:var(--surface2);text-decoration:none}
+  .pstage .pl{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+  .pstage .pv{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-top:4px}
+  .pstage .ps{font-size:11.5px;color:var(--muted)}
+  .pstage .chev{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;
+    width:18px;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;color:var(--faint);font-size:10px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:7px 11px;
+    border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  td{padding:8px 11px;border-bottom:1px solid #eef1f3;vertical-align:top;font-size:13px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#fafbfc}
+  td code{font-size:11.5px}
+
+  /* environment / suite cards */
+  .envcard{padding:13px 15px}
+  .envcard .eh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .envcard .en{font-weight:700;font-family:ui-monospace,monospace;font-size:13px}
+  .envcard .er{font-size:11px;color:var(--muted);margin-left:auto}
+  .envcard .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .gate{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .gate .lbl{font-size:11px;color:var(--faint)}
+  .forbid{font-size:10.5px;font-weight:700;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:6px}
+  .allow{font-size:10.5px;font-weight:700;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:6px}
+
+  /* filter chips */
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+  .fchip{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 12px;font-size:12px;
+    font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .fchip b{color:var(--text)} .fchip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+  .fchip.on b{color:var(--blue)}
+  input.search{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-family:inherit;width:230px}
+
+  .note{font-size:11.5px;color:var(--faint);font-style:normal}
+  .biz{cursor:pointer} .biz .more{display:none;color:var(--muted);font-size:12px;margin-top:3px}
+  .biz.open .more{display:block} .biz .toggle{color:var(--blue);font-size:11px}
+
+  /* server-only badge */
+  .srvonly{font-size:10px;font-weight:700;color:var(--grey);background:var(--grey-bg);border-radius:5px;padding:1px 7px;border:1px dashed #c8cdd3;white-space:nowrap}
+  .btn{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.disabled{opacity:.5;cursor:not-allowed}
+
+  /* run compose */
+  .compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .picker label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .picker select,.picker input[type=text]{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  .preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .preview .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #e9edf0;font-size:12.5px}
+  .preview .row:last-child{border:0} .preview .row b{font-weight:700;text-align:right}
+
+  /* report sub-tabs */
+  .subtabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .subtabs a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subtabs a:hover{text-decoration:none;color:var(--text)}
+  .subtabs a.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* coverage ladder */
+  .lad{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:26px}
+  .lad .bar{flex:1;height:20px;border-radius:6px;background:var(--grey-bg);overflow:hidden}
+  .lad .bar i{display:block;height:100%;border-radius:6px}
+  .lad .pct{width:54px;text-align:right;font-weight:700}
+  .lad .desc{width:300px;font-size:12px;color:var(--muted)}
+
+  /* category bars */
+  .catrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #eef1f3}
+  .catrow:last-child{border:0}
+  .catrow .cn{width:170px;font-size:12.5px;font-weight:600}
+  .catrow .cb{flex:1;height:14px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+  .catrow .cb i{display:block;height:100%;border-radius:5px}
+  .catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+
+  /* sparkline */
+  .spark{width:100%;height:90px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{width:18px;height:3px;display:inline-block;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+  .banner{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;padding:9px 13px;font-size:12px;margin-bottom:16px}
+
+  /* ---- legacy components (older templates keep working untouched) ---- */
+  section{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+  section h2{margin:0 0 10px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap}
+  .cards .card{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:10px;box-shadow:none;padding:10px 14px}
+  .cards .card .num{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .cards .card .lbl{font-size:12px;color:var(--muted)}
+  .status{padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;white-space:nowrap}
+  .status.dispatched{background:var(--amber-bg);color:var(--amber)}
+  .status.running   {background:var(--blue-bg);color:var(--blue)}
+  .status.done      {background:var(--green-bg);color:var(--green)}
+  .status.failed    {background:var(--red-bg);color:var(--red)}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=text]{padding:5px 8px;border:1px solid var(--border);border-radius:7px;
+                          font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  button{padding:6px 14px;border:1px solid var(--blue);border-radius:8px;background:var(--blue);
+         color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .warn{color:#9a3412;font-size:12px}
+  pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
+      overflow-x:auto;font-size:12px}
+  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .cat.real_regression{background:var(--red-bg);color:var(--red)}
+  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  .cat.environment    {background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="shell">
+  <div class="navrow">
+    <a class="brand" href="../index.html">SCP API Regression</a>
+    <nav class="nav">
+      <a href="../index.html" class="">Overview</a>
+      <span class="arrow">→</span>
+      <a href="../planning.html" class="active">Plan</a>
+      <span class="arrow">→</span>
+      <a href="../testing.html" class="">Run</a>
+      <span class="arrow">→</span>
+      <a href="../reporting.html" class="">Report</a>
+      <a href="../knowledge.html" style="margin-left:10px"
+         class="">Knowledge</a>
+    </nav>
+    <div class="ctx">
+      환경
+      <select title="환경 프로파일 (environments/*.yaml) — RUN 조립에서 선택 적용">
+        <option>prod-kr-west1</option><option>stage-kr-west1</option>
+      </select>
+      스위트
+      <select title="스위트 (suites/*.yaml) — RUN 조립에서 선택 적용">
+        <option>conformance</option><option>full-heavy</option><option>full</option><option>smoke</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctxbar">
+    
+    
+    <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
+    2026-06-13T02:06:00Z · <b>sha 3a27edc</b>
+    (push) · 모든 수치는 이 스냅샷 기준
+    
+  </div>
+</header><div style="background:#fff3cd;border-bottom:1px solid #e8d9a0;padding:6px 24px;font-size:13px">📄 <b>정적 뷰</b> — GitHub Pages 발행본입니다. 실행·편집·개입 버튼은 플랫폼 서버(uvicorn)에서만 동작합니다. <a href="../index.html">현재 대시보드</a> · <a href="../ops.html">ops 뷰어</a></div>
+<main>
+
+
+<section>
+  <h2>knowledge/formal/INGESTION.md
+    <a href="#">편집 →</a>
+    </h2>
+  <pre># Userguide ingestion backlog (짬짬이 내부 지식화 추적표)
+
+&gt; **최종 목표:** userguide 전체를 읽고 ① 서비스별 테스트 시나리오, ② 여러
+&gt; 서비스를 엮은 조합 시나리오, ③ 옵션 항목 변형(C4 parameter coverage)까지
+&gt; 만든다. **당장은** 커버리지 100%(C3)에 필요한 문서부터 — 이 표가 그
+&gt; 우선순위와 진행 상태의 단일 추적표다. 아무 세션이나 P1부터 집어
+&gt; `services/&lt;category&gt;__&lt;service&gt;.yaml`로 지식화하고 status를 갱신할 것.
+
+**How to ingest one service** (any session, ~5 min each):
+
+1. WebFetch `https://docs.e.samsungsdscloud.com&lt;path&gt;` — extract 제약 사항
+   (constraints/limits/naming rules) + 선행 서비스 (prerequisites).
+2. Write/update `knowledge/formal/services/&lt;api-category&gt;__&lt;api-service&gt;.yaml`
+   (`provenance: docs`; schema in `FORMAT.md`). Prerequisites that add graph
+   edges go to `cross-service.yaml`.
+3. `python knowledge/formal/validate.py` → commit → flip status here.
+
+&gt; **M5 이후의 최종 목적지 (2026-06-12):** 형식화의 종착 레이어는
+&gt; **`knowledge/formal/resources/&lt;category&gt;__&lt;service&gt;.yaml`의 자원 task
+&gt; 모델**이다 (127 노드 — 의존조건·검증된 body 템플릿·옵션; 합성기가 여기서
+&gt; lifecycle을 생성한다, `docs/RESOURCE-MODEL-PLAN.md`). 신규 ingest에서
+&gt; 생성 전제조건/옵션/한도 같은 *자원 단위* 지식은 해당 resources 파일의
+&gt; `requires`/`options`/`notes`로 넣고, 서비스 전역 제약(네이밍 규칙 등)은
+&gt; 종전대로 `services/` Layer-1에 넣는다. 둘 다 같은 validator가 검사한다.
+
+Priorities: **P1** = needed for coverage 100% (an enabled lifecycle&#39;s writes
+are pending live validation, or smoke shows 4xx that naming-rule/prereq
+knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
+**P3** = no Open API in the catalog (console-only; context for AI-evaluator).
+
+| St | Pri | Userguide page | API service |
+|----|-----|---------------|-------------|
+| ✅ | P1 | /userguide/networking/vpc/overview/ | networking/vpc |
+| ✅ | P1 | /userguide/networking/security_group/overview/ | networking/security-group |
+| ✅ | P1 | /userguide/compute/virtual_server/overview/ | compute/virtualserver |
+| ✅ | P1 | /userguide/container/k8s_engine/overview/ | container/ske |
+| ✅ | P1 | /userguide/container/container_registry/overview/ | container/scr |
+| ✅ | P1 | /userguide/storage/file_storage/overview/ | storage/filestorage |
+| ✅ | P1 | /userguide/networking/load_balancer/overview/ | networking/loadbalancer |
+| ✅ | P1 | /userguide/networking/dns/overview/ | networking/dns |
+| ✅ | P1 | /userguide/networking/vpn/overview/ | networking/vpn |
+| ✅ | P1 | /userguide/networking/direct_connect/overview/ | networking/direct-connect |
+| ✅ | P1 | /userguide/networking/firewall/overview/ | networking/firewall |
+| ✅ | P1 | /userguide/networking/gslb/overview/ | networking/gslb |
+| ✅ | P1 | /userguide/networking/global_cdn/overview/ | networking/cdn |
+| ✅ | P1 | /userguide/database/mysql/overview/ | database/mysql |
+| — | P1 | /userguide/database/mariadb/overview/ | database/mariadb |
+| ✅ | P1 | /userguide/database/postgresql/overview/ | database/postgresql |
+| — | P1 | /userguide/database/epas/overview/ | database/epas |
+| — | P1 | /userguide/database/mssql/overview/ | database/sqlserver |
+| ✅ | P1 | /userguide/database/cachestore/overview/ | database/cachestore |
+| ✅ | P1 | /userguide/compute/baremetal_server/overview/ | compute/baremetal |
+| — | P1 | /userguide/compute/block_storage_vm/overview/ | compute/virtualserver (volumes) |
+| ✅ | P1 | /userguide/compute/cloud_functions/overview/ | compute/scf |
+| — | P1 | /userguide/compute/mngc/overview/ | compute/multinodegpucluster |
+| ✅ | P1 | /userguide/storage/archive_storage/overview/ | storage/archivestorage — **대상 영구 제외** (owner 2026-06-11: 전용 인증키 미발급, waiver 25/25; 다시 끌어올리지 말 것) |
+| ✅ | P1 | /userguide/storage/backup/overview/ | storage/backup |
+| ✅ | P1 | /userguide/storage/block_storage_bm/overview/ | storage/baremetal-blockstorage |
+| ✅ | P1 | /userguide/storage/parallel_file_storage/overview/ | storage/parallel-filestorage — **reads-only 범위** (owner 2026-06-12: writes는 owner-exclusion waiver, 복구 lifecycle disabled) |
+| ✅ | P1 | /userguide/security/kms/overview/ | security/kms |
+| ✅ | P1 | /userguide/security/secrets_manager/overview/ | security/secretsmanager |
+| ✅ | P1 | /userguide/security/secret_vault/overview/ | security/secretvault |
+| ✅ | P1 | /userguide/security/certificate_manager/overview/ | security/certificatemanager |
+| ✅ | P1 | /userguide/security/config_inspection_enterprise/overview/ | security/configinspection |
+| ✅ | P1 | /userguide/management/iam/overview/ | management/iam |
+| ✅ | P1 | /userguide/management/id_center/overview/ | management/iam-identity-center (smoke 400s) |
+| ✅ | P1 | /userguide/management/organization/overview/ | management/organization (waiver class) |
+| ✅ | P1 | /userguide/management/cloud_control/overview/ | management/cloudcontrol (smoke 403s) |
+| — | P1 | /userguide/management/cloud_monitoring/overview/ | management/cloudmonitoring (smoke 400s) |
+| — | P1 | /userguide/management/logging_audit/overview/ | management/loggingaudit |
+| ✅ | P1 | /userguide/management/service_watch/overview/ | management/servicewatch |
+| — | P1 | /userguide/management/resource_groups/overview/ | management/resourcemanager |
+| ✅ | P1 | /userguide/management/quota/overview/ | management/quota (verify the VPC 3-vs-5!) |
+| — | P1 | /userguide/application/api_gateway/overview/ | application-service/apigateway |
+| — | P1 | /userguide/application/queue_service/overview/ | application-service/queueservice |
+| — | P1 | /userguide/analytics/data_flow/overview/ | data-analytics/data-flow |
+| — | P1 | /userguide/analytics/data_ops/overview/ | data-analytics/data-ops |
+| ✅ | P1 | /userguide/analytics/event_streams/overview/ | data-analytics/eventstreams (smoke 400s) |
+| — | P1 | /userguide/analytics/quick_query/overview/ | data-analytics/quick-query (smoke 400s) |
+| — | P1 | /userguide/analytics/search_engine/overview/ | data-analytics/searchengine |
+| — | P1 | /userguide/analytics/vertica/overview/ | data-analytics/vertica |
+| ✅ | P1 | /userguide/ai_ml/ai_ml_ops_platform/overview/ | ai-ml/aimlops-platform (smoke 400s) |
+| ✅ | P1 | /userguide/ai_ml/cloud_ml/overview/ | ai-ml/cloud-ml (smoke 404s) |
+| — | P1 | /userguide/devopstools/devops_service/overview/ | devops-tools/devopsservice |
+| — | P1 | /userguide/financial_management/planned_compute/overview/ | financial-management/billingplan (smoke 500!) |
+| — | P1 | /userguide/financial_management/cost_management/overview/ | financial-management/budget·costexplorer |
+| — | P2 | /userguide/compute/gpu_server/overview/ | compute (gpu types) |
+| — | P2 | /userguide/compute/auto_scaling/overview/ | compute/auto-scaling |
+| — | P2 | /userguide/compute/virtual_server_dr/overview/ | compute (DR) |
+| — | P2 | /userguide/storage/object_storage/overview/ | storage/objectstorage |
+| — | P2 | /userguide/management/notification_manager/overview/ | management/notification |
+| — | P2 | /userguide/management/resource_explorer/overview/ | management (explorer) |
+| — | P2 | /userguide/management/support_center/overview/ | management/support |
+| — | P2 | /userguide/management/architecture_diagram/overview/ | management (diagram) |
+| — | P2 | /userguide/financial_management/marketplace/overview/ | financial-management (marketplace) |
+| — | P2 | /userguide/security/webfirewall/overview/ | security (WAF) |
+| — | P2 | /userguide/security/ddosprotection/overview/ | security (DDoS) |
+| — | P2 | /userguide/platform... (sts 등 catalog 잔여) | platform/sts |
+| — | P3 | /userguide/networking/{sase,private_5g_cloud,cloud_wan,lan_campus_enterprise,lan_datacenter,cloud_last_mile,cloud_virtual_circuit}/overview/ | (console-only) |
+| — | P3 | /userguide/security/{ess,fpms,ips,log_transmission,secured_firewall,secured_vpn,single_id}/overview/ | (console-only) |
+| — | P3 | /userguide/hybrid_cloud/{edge_server,oracle_services}/overview/ | (console-only) |
+| — | P3 | /userguide/developers_tools/mcp_server_enterprise/overview/ | (console-only) |
+| — | P3 | /userguide/scp_common/overview/ | (platform common) |
+
+&gt; 표는 userguide TOC(2026-06-09 수집) 기준. 카테고리/서비스 추가 발견 시 행을
+&gt; 추가. P1 완료 기준: constraints/prereqs가 Layer-1 yaml에 들어가고 validate
+&gt; 통과. **beyond-overview**(how_to_guides 등 하위 페이지)는 옵션 변형(C4)
+&gt; 단계에서 서비스별로 내려받는다.
+</pre>
+</section>
+
+
+</main>
+</body>
+</html>

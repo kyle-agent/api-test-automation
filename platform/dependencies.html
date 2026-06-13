@@ -1,0 +1,1153 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>의존 그래프</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  /* ---- design tokens (owner IA mockup — shared with the static dashboard) ---- */
+  :root{
+    --bg:#fbfcfd; --surface:#fff; --surface2:#f5f7f9; --border:#e4e7eb;
+    --text:#1d2530; --muted:#6b7480; --faint:#9aa3ad;
+    --green:#15924f; --green-bg:#e7f6ed; --amber:#b5740b; --amber-bg:#fdf3e2;
+    --red:#c63434; --red-bg:#fbe9e9; --blue:#2563c9; --blue-bg:#e8f0fd;
+    --grey:#7a838d; --grey-bg:#eef1f4; --purple:#7a45c2; --purple-bg:#f1e9fb;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04);
+    /* legacy aliases (older templates reference these directly) */
+    --fg:#1d2530; --line:#e4e7eb; --accent:#2563c9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+  /* ---- app shell ---- */
+  header.shell{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border)}
+  .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
+  .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .nav{display:flex;gap:3px;align-items:center}
+  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a:hover{background:var(--surface2);text-decoration:none}
+  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .ctx select{border:1px solid var(--border);border-radius:7px;background:var(--surface);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit}
+  .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .ctxbar b{color:var(--text)}
+  .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .ctxbar .pip.off{background:var(--faint)}
+
+  main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+  h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  h2:first-child{margin-top:6px}
+  h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  .pad{padding:15px 17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+
+  /* status vocabulary (shared everywhere) */
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .s-verified{background:var(--green-bg);color:var(--green)}
+  .s-reached{background:var(--amber-bg);color:var(--amber)}
+  .s-unobs{background:var(--grey-bg);color:var(--grey)}
+  .s-regress{background:var(--red-bg);color:var(--red)}
+  .s-known{background:#3a1212;color:#ffb3b3}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .tag.heavy{background:var(--purple-bg);color:var(--purple)}
+  .tag.destructive{background:var(--red-bg);color:var(--red)}
+  .tag.mutation{background:var(--amber-bg);color:var(--amber)}
+  .tag.read{background:var(--blue-bg);color:var(--blue)}
+  .tag.disabled{background:#eceef0;color:var(--faint)}
+  .srv{font-size:10px;font-weight:700;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+  /* health verdict banner */
+  .verdict{display:flex;align-items:center;gap:11px;background:var(--green-bg);border:1px solid #c2e6d0;
+    border-radius:12px;padding:12px 16px;font-size:13.5px}
+  .verdict .pip{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .verdict b{color:#0d6e3a}
+  .verdict.bad{background:var(--red-bg);border-color:#ecc4c4}
+  .verdict.bad .pip{background:var(--red)}
+  .verdict.bad b{color:var(--red)}
+  .verdict.none{background:var(--grey-bg);border-color:var(--border)}
+  .verdict.none .pip{background:var(--faint)}
+  .verdict.none b{color:var(--muted)}
+
+  /* metric tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:13px}
+  .tile{padding:13px 14px}
+  .tile .v{font-size:24px;font-weight:800;letter-spacing:-.6px}
+  .tile .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tile .bar{height:5px;border-radius:3px;background:var(--grey-bg);overflow:hidden;margin-top:8px}
+  .tile .bar i{display:block;height:100%;border-radius:3px}
+  .tile .goal{font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* pipeline strip */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:6px}
+  .pstage{flex:1;border:1px solid var(--border);background:var(--surface);padding:13px 15px;position:relative;color:var(--text)}
+  .pstage:first-child{border-radius:11px 0 0 11px}
+  .pstage:last-child{border-radius:0 11px 11px 0}
+  .pstage:not(:last-child){border-right:0}
+  a.pstage:hover{background:var(--surface2);text-decoration:none}
+  .pstage .pl{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+  .pstage .pv{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-top:4px}
+  .pstage .ps{font-size:11.5px;color:var(--muted)}
+  .pstage .chev{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;
+    width:18px;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;color:var(--faint);font-size:10px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:7px 11px;
+    border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  td{padding:8px 11px;border-bottom:1px solid #eef1f3;vertical-align:top;font-size:13px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#fafbfc}
+  td code{font-size:11.5px}
+
+  /* environment / suite cards */
+  .envcard{padding:13px 15px}
+  .envcard .eh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .envcard .en{font-weight:700;font-family:ui-monospace,monospace;font-size:13px}
+  .envcard .er{font-size:11px;color:var(--muted);margin-left:auto}
+  .envcard .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .gate{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .gate .lbl{font-size:11px;color:var(--faint)}
+  .forbid{font-size:10.5px;font-weight:700;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:6px}
+  .allow{font-size:10.5px;font-weight:700;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:6px}
+
+  /* filter chips */
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+  .fchip{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 12px;font-size:12px;
+    font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .fchip b{color:var(--text)} .fchip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+  .fchip.on b{color:var(--blue)}
+  input.search{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-family:inherit;width:230px}
+
+  .note{font-size:11.5px;color:var(--faint);font-style:normal}
+  .biz{cursor:pointer} .biz .more{display:none;color:var(--muted);font-size:12px;margin-top:3px}
+  .biz.open .more{display:block} .biz .toggle{color:var(--blue);font-size:11px}
+
+  /* server-only badge */
+  .srvonly{font-size:10px;font-weight:700;color:var(--grey);background:var(--grey-bg);border-radius:5px;padding:1px 7px;border:1px dashed #c8cdd3;white-space:nowrap}
+  .btn{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.disabled{opacity:.5;cursor:not-allowed}
+
+  /* run compose */
+  .compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .picker label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .picker select,.picker input[type=text]{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  .preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .preview .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #e9edf0;font-size:12.5px}
+  .preview .row:last-child{border:0} .preview .row b{font-weight:700;text-align:right}
+
+  /* report sub-tabs */
+  .subtabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .subtabs a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subtabs a:hover{text-decoration:none;color:var(--text)}
+  .subtabs a.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* coverage ladder */
+  .lad{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:26px}
+  .lad .bar{flex:1;height:20px;border-radius:6px;background:var(--grey-bg);overflow:hidden}
+  .lad .bar i{display:block;height:100%;border-radius:6px}
+  .lad .pct{width:54px;text-align:right;font-weight:700}
+  .lad .desc{width:300px;font-size:12px;color:var(--muted)}
+
+  /* category bars */
+  .catrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #eef1f3}
+  .catrow:last-child{border:0}
+  .catrow .cn{width:170px;font-size:12.5px;font-weight:600}
+  .catrow .cb{flex:1;height:14px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+  .catrow .cb i{display:block;height:100%;border-radius:5px}
+  .catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+
+  /* sparkline */
+  .spark{width:100%;height:90px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{width:18px;height:3px;display:inline-block;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+  .banner{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;padding:9px 13px;font-size:12px;margin-bottom:16px}
+
+  /* ---- legacy components (older templates keep working untouched) ---- */
+  section{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+  section h2{margin:0 0 10px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap}
+  .cards .card{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:10px;box-shadow:none;padding:10px 14px}
+  .cards .card .num{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .cards .card .lbl{font-size:12px;color:var(--muted)}
+  .status{padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;white-space:nowrap}
+  .status.dispatched{background:var(--amber-bg);color:var(--amber)}
+  .status.running   {background:var(--blue-bg);color:var(--blue)}
+  .status.done      {background:var(--green-bg);color:var(--green)}
+  .status.failed    {background:var(--red-bg);color:var(--red)}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=text]{padding:5px 8px;border:1px solid var(--border);border-radius:7px;
+                          font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  button{padding:6px 14px;border:1px solid var(--blue);border-radius:8px;background:var(--blue);
+         color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .warn{color:#9a3412;font-size:12px}
+  pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
+      overflow-x:auto;font-size:12px}
+  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .cat.real_regression{background:var(--red-bg);color:var(--red)}
+  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  .cat.environment    {background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="shell">
+  <div class="navrow">
+    <a class="brand" href="index.html">SCP API Regression</a>
+    <nav class="nav">
+      <a href="index.html" class="">Overview</a>
+      <span class="arrow">→</span>
+      <a href="planning.html" class="active">Plan</a>
+      <span class="arrow">→</span>
+      <a href="testing.html" class="">Run</a>
+      <span class="arrow">→</span>
+      <a href="reporting.html" class="">Report</a>
+      <a href="knowledge.html" style="margin-left:10px"
+         class="">Knowledge</a>
+    </nav>
+    <div class="ctx">
+      환경
+      <select title="환경 프로파일 (environments/*.yaml) — RUN 조립에서 선택 적용">
+        <option>prod-kr-west1</option><option>stage-kr-west1</option>
+      </select>
+      스위트
+      <select title="스위트 (suites/*.yaml) — RUN 조립에서 선택 적용">
+        <option>conformance</option><option>full-heavy</option><option>full</option><option>smoke</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctxbar">
+    
+    
+    <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
+    2026-06-13T02:06:00Z · <b>sha 3a27edc</b>
+    (push) · 모든 수치는 이 스냅샷 기준
+    
+  </div>
+</header><div style="background:#fff3cd;border-bottom:1px solid #e8d9a0;padding:6px 24px;font-size:13px">📄 <b>정적 뷰</b> — GitHub Pages 발행본입니다. 실행·편집·개입 버튼은 플랫폼 서버(uvicorn)에서만 동작합니다. <a href="../index.html">현재 대시보드</a> · <a href="../ops.html">ops 뷰어</a></div>
+<main>
+
+
+<section>
+  <h2>의존 그래프 — dependencies.json × cross-service.yaml (read-only 시각화)</h2>
+  <p class="muted">시나리오 스케줄 전략(공유 VPC adopt vs 직렬 vpc-crud)과
+    서비스 간 리소스 의존을 한눈에. 편집은 원본 파일 편집기로 —
+    <a href="#">dependencies.json 편집</a> ·
+    <a href="#">cross-service.yaml 편집</a></p>
+  
+</section>
+
+<section>
+  <h2>할당량 + 시뮬레이션 (core/budgets.py × vpc_schedule)</h2>
+  <div class="cards">
+    <div class="card"><div class="num">5</div>
+      <div class="lbl">계정 VPC 한도</div></div>
+    <div class="card"><div class="num">3</div>
+      <div class="lbl">private-dns 한도</div></div>
+    <div class="card"><div class="num">4</div>
+      <div class="lbl">per-run VPC cap</div></div>
+    <div class="card"><div class="num">2</div>
+      <div class="lbl">시뮬레이션 peak 동시 VPC (공유 1 + 직렬 최악
+        1 · networking-vpc-subnet)</div></div>
+  </div>
+  <p class="muted" style="margin-bottom:0">peak가 한도 이내입니다 —
+    저장 시에도 같은 시뮬레이션이 자동으로 돕니다.</p>
+</section>
+
+<section>
+  <h2>vpc_schedule — 공유 VPC adopt (병렬) vs 직렬 vpc-crud</h2>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:stretch">
+    <div style="flex:1;min-width:280px;border:1px solid #198754;border-radius:8px;padding:12px">
+      <strong>ADOPT — 병렬 (xdist)</strong>
+      <div class="muted" style="margin:4px 0 8px">세션 공유 VPC <b>1개</b>
+        (10.124.0.0/24)를 adopt — 자체 VPC 생성 없음</div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>container-ske-cluster-nodepool</code>
+          
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>compute-virtualserver-full</code>
+          
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>database-mysql-cluster</code>
+          
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>database-postgresql-cluster</code>
+          
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>heavy-shared-dbaas</code>
+          
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>vpc-privatelink-service</code>
+          <span class="cat environment"
+            title="{&#39;service_ip_address&#39;: &#39;10.124.0.5&#39;, &#39;connected_resource_ip_address&#39;: &#39;10.124.0.6&#39;}">fixed-ip</span>
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>vpc-endpoint</code>
+          <span class="cat environment"
+            title="{&#39;endpoint_ip_address&#39;: &#39;10.124.0.20&#39;}">fixed-ip</span>
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>networking-loadbalancer-members-nat</code>
+          <span class="cat environment"
+            title="{&#39;service_ip&#39;: &#39;10.124.0.30&#39;, &#39;member_ip&#39;: &#39;10.124.0.31&#39;}">fixed-ip</span>
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>networking-vpn-gateway-tunnel</code>
+          
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>networking-direct-connect-routing</code>
+          
+        </div>
+      
+        <div style="background:#f1f6fb;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>networking-dns-hosted-zone-private</code>
+          
+        </div>
+      
+    </div>
+    <div style="display:flex;align-items:center" class="muted">→ 공유 VPC 해체 후 →</div>
+    <div style="flex:1;min-width:280px;border:1px solid #9a3412;border-radius:8px;padding:12px">
+      <strong>VPC-CRUD — 직렬 (-n0)</strong>
+      <div class="muted" style="margin:4px 0 8px">자체 VPC를 생성/변형 —
+        한 번에 한 lifecycle만</div>
+      
+        <div style="background:#fdf3ee;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>networking-vpc-subnet</code>
+          <span class="muted">self-create VPC 1개</span>
+          <span class="cat">vpc</span>
+        </div>
+      
+        <div style="background:#fdf3ee;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>networking-vpc-internet-gateway</code>
+          <span class="muted">self-create VPC 1개</span>
+          <span class="cat">vpc</span>
+        </div>
+      
+        <div style="background:#fdf3ee;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>vpc-peering</code>
+          <span class="muted">self-create VPC 1개</span>
+          <span class="cat">vpc</span>
+        </div>
+      
+        <div style="background:#fdf3ee;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>vpc-transit-gateway-children</code>
+          <span class="muted">self-create VPC 0개</span>
+          <span class="cat">vpc</span>
+        </div>
+      
+        <div style="background:#fdf3ee;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>heavy-shared-networking</code>
+          <span class="muted">self-create VPC 1개</span>
+          <span class="cat">vpc</span><span class="cat">private-dns</span>
+        </div>
+      
+        <div style="background:#fdf3ee;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>vpc-cidr-secondary</code>
+          <span class="muted">self-create VPC 0개</span>
+          <span class="cat">vpc</span>
+        </div>
+      
+        <div style="background:#fdf3ee;border-radius:6px;padding:3px 8px;margin:3px 0">
+          <code>vpc-subnet-vip-nat</code>
+          <span class="muted">self-create VPC 1개</span>
+          <span class="cat">vpc</span>
+        </div>
+      
+    </div>
+  </div>
+</section>
+
+
+<section>
+  <h2>lanes (cross-run 분할)</h2>
+  <table>
+    <tr><th>lane</th><th>run_heavy</th><th>crud_filter</th><th>vpc lifecycles</th><th>peak VPC</th></tr>
+    
+    <tr>
+      <td><code>L0-light</code></td>
+      <td>False</td>
+      <td class="muted">(전체)</td>
+      <td><code>networking-vpc-subnet</code> <code>networking-vpc-internet-gateway</code> </td>
+      <td>2</td>
+    </tr>
+    
+    <tr>
+      <td><code>L1-compute</code></td>
+      <td>True</td>
+      <td class="muted">container-ske-cluster-nodepool or compute-virtualserver-full</td>
+      <td><code>container-ske-cluster-nodepool</code> <code>compute-virtualserver-full</code> </td>
+      <td>2</td>
+    </tr>
+    
+    <tr>
+      <td><code>L2-database</code></td>
+      <td>True</td>
+      <td class="muted">database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas</td>
+      <td><code>database-mysql-cluster</code> <code>database-postgresql-cluster</code> <code>heavy-shared-dbaas</code> </td>
+      <td>2</td>
+    </tr>
+    
+    <tr>
+      <td><code>L3-networking</code></td>
+      <td>True</td>
+      <td class="muted">heavy-shared-networking</td>
+      <td><code>heavy-shared-networking</code> </td>
+      <td>1</td>
+    </tr>
+    
+  </table>
+  <p class="muted">budget_paths: 
+    <code>/v1/vpcs</code>→vpc 
+    <code>/v1/private-dns</code>→private-dns </p>
+</section>
+
+
+<section>
+  <h2>cross-service 리소스 그래프 (requires →)</h2>
+  <p class="muted">초록 테두리 = VALIDATED · 주황 = docs 출처 ·
+    배지 = quota kind. 화살표는 "먼저 있어야 함"을 가리킵니다.</p>
+  <div style="overflow-x:auto">
+  <svg width="1284" height="1074" font-family="ui-monospace,Consolas,monospace">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3"
+              orient="auto" markerUnits="strokeWidth">
+        <path d="M0,0 L7,3 L0,6 z" fill="#9aa7b5"/>
+      </marker>
+    </defs>
+    
+    <path d="M202,731 C238,731 228,381 264,381"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,381 C490,381 480,281 516,281"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 228,331 264,331"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 480,231 516,231"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,381 C490,381 480,231 516,231"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M706,231 C742,231 732,181 768,181"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M958,181 C994,181 984,31 1020,31"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,481 C238,481 228,281 264,281"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 228,431 264,431"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,681 C238,681 228,431 264,431"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,431 C490,431 480,331 516,331"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 228,231 264,231"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 480,31 516,31"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,381 C490,381 480,31 516,31"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,631 C238,631 480,31 516,31"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,181 C238,181 480,31 516,31"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,131 C238,131 228,81 264,81"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 480,81 516,81"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,381 C490,381 480,81 516,81"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,631 C238,631 480,81 516,81"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,181 C238,181 480,81 516,81"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,1031 C238,1031 480,81 516,81"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M706,81 C742,81 732,131 768,131"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,281 C238,281 228,131 264,131"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 480,131 516,131"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,381 C490,381 480,131 516,131"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 480,181 516,181"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,381 C490,381 480,181 516,181"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M706,31 C742,31 732,231 768,231"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,831 C238,831 228,481 264,481"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,331 C238,331 228,181 264,181"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 228,31 264,31"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M706,81 C742,81 732,81 768,81"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,231 C238,231 732,81 768,81"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M706,81 C742,81 732,31 768,31"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    
+    <g>
+      <title>queue (application-service/queueservice)</title>
+      <rect x="12" y="12" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="28" font-size="12" font-weight="600"
+            fill="#1c2733">queue</text>
+      <text x="20" y="43" font-size="10"
+            fill="#6b7a8d">application-service/queueservice</text>
+    </g>
+    
+    <g>
+      <title>scf-function (compute/scf) — kr-west1/kr-east1 only; every config/code change flips status to Deploying (poll before next write); Java runtime additionally needs Object Storage + auth key</title>
+      <rect x="12" y="62" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="78" font-size="12" font-weight="600"
+            fill="#1c2733">scf-function</text>
+      <text x="20" y="93" font-size="10"
+            fill="#6b7a8d">compute/scf</text>
+    </g>
+    
+    <g>
+      <title>block-volume (compute/virtualserver) — standalone (no vpc)</title>
+      <rect x="12" y="112" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="128" font-size="12" font-weight="600"
+            fill="#1c2733">block-volume</text>
+      <text x="20" y="143" font-size="10"
+            fill="#6b7a8d">compute/virtualserver</text>
+    </g>
+    
+    <g>
+      <title>keypair (compute/virtualserver) — standalone, zero-cost</title>
+      <rect x="12" y="162" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="178" font-size="12" font-weight="600"
+            fill="#1c2733">keypair</text>
+      <text x="20" y="193" font-size="10"
+            fill="#6b7a8d">compute/virtualserver</text>
+    </g>
+    
+    <g>
+      <title>container-registry (container/scr) — registry itself is API-creatable; its 인증키 is console-issued (credential class — see ai-ml__cloud-ml.yaml / SCR-push blocker)</title>
+      <rect x="12" y="212" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="228" font-size="12" font-weight="600"
+            fill="#1c2733">container-registry</text>
+      <text x="20" y="243" font-size="10"
+            fill="#6b7a8d">container/scr</text>
+    </g>
+    
+    <g>
+      <title>scr-registry (container/scr) — poll $.state == Running; DELETE 500-races for minutes — retry</title>
+      <rect x="12" y="262" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="278" font-size="12" font-weight="600"
+            fill="#1c2733">scr-registry</text>
+      <text x="20" y="293" font-size="10"
+            fill="#6b7a8d">container/scr</text>
+    </g>
+    
+    <g>
+      <title>iam-identity-center (management/iam-identity-center) — only the Organization MANAGEMENT account can create (Organization prereq); single region; not in kr-south3 — explains smoke 400s (entitlement, not body)</title>
+      <rect x="12" y="312" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="328" font-size="12" font-weight="600"
+            fill="#1c2733">iam-identity-center</text>
+      <text x="20" y="343" font-size="10"
+            fill="#6b7a8d">management/iam-identity-center</text>
+    </g>
+    
+    <g>
+      <title>resource-group (management/resourcemanager) — global (account-scoped) service — no region segment in host</title>
+      <rect x="12" y="362" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="378" font-size="12" font-weight="600"
+            fill="#1c2733">resource-group</text>
+      <text x="20" y="393" font-size="10"
+            fill="#6b7a8d">management/resourcemanager</text>
+    </g>
+    
+    <g>
+      <title>cdn (networking/cdn) — account-scoped, no prereqs; kr-west1/east1 only; Akamai-backed async workflow; max 20 domains/account</title>
+      <rect x="12" y="412" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="428" font-size="12" font-weight="600"
+            fill="#1c2733">cdn</text>
+      <text x="20" y="443" font-size="10"
+            fill="#6b7a8d">networking/cdn</text>
+    </g>
+    
+    <g>
+      <title>private-dns (networking/dns) — needs an activate sub-flow before hosted-zone use. CREATE/DELETE are VERY slow (hours observed) — isolate on its own lane/VPC, create-first/delete-last (see services/networking__dns.yaml)</title>
+      <rect x="12" y="462" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="478" font-size="12" font-weight="600"
+            fill="#1c2733">private-dns ⛔private-dns</text>
+      <text x="20" y="493" font-size="10"
+            fill="#6b7a8d">networking/dns</text>
+    </g>
+    
+    <g>
+      <title>gslb (networking/gslb) — account-scoped, no prereqs; kr-west1/east1 only; domain label 4-40 lowercase+digits; max 20 domains/account, 8 targets/domain</title>
+      <rect x="12" y="512" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="528" font-size="12" font-weight="600"
+            fill="#1c2733">gslb</text>
+      <text x="20" y="543" font-size="10"
+            fill="#6b7a8d">networking/gslb</text>
+    </g>
+    
+    <g>
+      <title>lb-health-check (networking/loadbalancer) — region-scoped (quota 500/region); reusable across server groups — create BEFORE the server group that references it (run 27306490231 LbHealthCheckNotFoundError was an ordering/capture miss)</title>
+      <rect x="12" y="562" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="578" font-size="12" font-weight="600"
+            fill="#1c2733">lb-health-check</text>
+      <text x="20" y="593" font-size="10"
+            fill="#6b7a8d">networking/loadbalancer</text>
+    </g>
+    
+    <g>
+      <title>security-group (networking/security-group) — account/region-scoped — NO vpc needed</title>
+      <rect x="12" y="612" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="628" font-size="12" font-weight="600"
+            fill="#1c2733">security-group</text>
+      <text x="20" y="643" font-size="10"
+            fill="#6b7a8d">networking/security-group</text>
+    </g>
+    
+    <g>
+      <title>public-ip (networking/vpc) — type IGW; standalone</title>
+      <rect x="12" y="662" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="678" font-size="12" font-weight="600"
+            fill="#1c2733">public-ip</text>
+      <text x="20" y="693" font-size="10"
+            fill="#6b7a8d">networking/vpc</text>
+    </g>
+    
+    <g>
+      <title>vpc (networking/vpc) — cidr e.g. 10.x.0.0/20; poll $.vpc.state == ACTIVE; CIDRs must not overlap across live VPCs</title>
+      <rect x="12" y="712" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="728" font-size="12" font-weight="600"
+            fill="#1c2733">vpc ⛔vpc</text>
+      <text x="20" y="743" font-size="10"
+            fill="#6b7a8d">networking/vpc</text>
+    </g>
+    
+    <g>
+      <title>certificate (security/certificatemanager) — PEM validated at create (decrypted RSA key, single body cert, Intermediate-&gt;Root chain order); delete blocked while attached to LB listeners</title>
+      <rect x="12" y="762" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="778" font-size="12" font-weight="600"
+            fill="#1c2733">certificate</text>
+      <text x="20" y="793" font-size="10"
+            fill="#6b7a8d">security/certificatemanager</text>
+    </g>
+    
+    <g>
+      <title>kms-key (security/kms)</title>
+      <rect x="12" y="812" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="828" font-size="12" font-weight="600"
+            fill="#1c2733">kms-key</text>
+      <text x="20" y="843" font-size="10"
+            fill="#6b7a8d">security/kms</text>
+    </g>
+    
+    <g>
+      <title>secret (security/secretsmanager)</title>
+      <rect x="12" y="862" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="878" font-size="12" font-weight="600"
+            fill="#1c2733">secret</text>
+      <text x="20" y="893" font-size="10"
+            fill="#6b7a8d">security/secretsmanager</text>
+    </g>
+    
+    <g>
+      <title>secretvault-vault (security/secretvault) — needs a pre-existing IAM auth key in 임시키 mode (not expired, &gt;=30d left); 1 key per vault; vault blocks deletion of its auth key</title>
+      <rect x="12" y="912" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="928" font-size="12" font-weight="600"
+            fill="#1c2733">secretvault-vault</text>
+      <text x="20" y="943" font-size="10"
+            fill="#6b7a8d">security/secretvault</text>
+    </g>
+    
+    <g>
+      <title>archive-storage-account (storage/archivestorage) — needs its OWN 인증키 (IAM My Info &gt; 인증키 관리) — platform HMAC creds alone 401; key expiry/suspension revokes access</title>
+      <rect x="12" y="962" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="20" y="978" font-size="12" font-weight="600"
+            fill="#1c2733">archive-storage-account</text>
+      <text x="20" y="993" font-size="10"
+            fill="#6b7a8d">storage/archivestorage</text>
+    </g>
+    
+    <g>
+      <title>filestorage-volume (storage/filestorage) — standalone NFS volume (no vpc)</title>
+      <rect x="12" y="1012" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="20" y="1028" font-size="12" font-weight="600"
+            fill="#1c2733">filestorage-volume</text>
+      <text x="20" y="1043" font-size="10"
+            fill="#6b7a8d">storage/filestorage</text>
+    </g>
+    
+    <g>
+      <title>baremetal-server (compute/baremetal) — ONE BM management op per account at a time (parallel lifecycles collide); no Security Groups (Firewall+TGW only); single-server delete orphans attached Block Storage(BM)</title>
+      <rect x="264" y="12" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="272" y="28" font-size="12" font-weight="600"
+            fill="#1c2733">baremetal-server</text>
+      <text x="272" y="43" font-size="10"
+            fill="#6b7a8d">compute/baremetal</text>
+    </g>
+    
+    <g>
+      <title>volume-snapshot (compute/virtualserver)</title>
+      <rect x="264" y="62" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="272" y="78" font-size="12" font-weight="600"
+            fill="#1c2733">volume-snapshot</text>
+      <text x="272" y="93" font-size="10"
+            fill="#6b7a8d">compute/virtualserver</text>
+    </g>
+    
+    <g>
+      <title>scr-repository (container/scr)</title>
+      <rect x="264" y="112" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="272" y="128" font-size="12" font-weight="600"
+            fill="#1c2733">scr-repository</text>
+      <text x="272" y="143" font-size="10"
+            fill="#6b7a8d">container/scr</text>
+    </g>
+    
+    <g>
+      <title>cloudcontrol-landing-zone (management/cloudcontrol) — needs Organization + ID Center + Object Storage + Logging&amp;Audit and management-account privileges; provisions real shared accounts/OUs — waiver class like organization; explains smoke 403s</title>
+      <rect x="264" y="162" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="272" y="178" font-size="12" font-weight="600"
+            fill="#1c2733">cloudcontrol-landing-zone</text>
+      <text x="272" y="193" font-size="10"
+            fill="#6b7a8d">management/cloudcontrol</text>
+    </g>
+    
+    <g>
+      <title>direct-connect (networking/direct-connect) — 1:1 per VPC in a service zone (second create on the shared VPC must fail); max 5/account; name 3-20 alnum only; uplink 1G|10G required</title>
+      <rect x="264" y="212" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="272" y="228" font-size="12" font-weight="600"
+            fill="#1c2733">direct-connect</text>
+      <text x="272" y="243" font-size="10"
+            fill="#6b7a8d">networking/direct-connect</text>
+    </g>
+    
+    <g>
+      <title>hosted-zone (networking/dns) — private hosted zone targets VPCs connected to the (Active) private-dns; max 20 zones/account, 100 records/zone; private-dns cannot be terminated while a hosted-zone exists (delete zone first)</title>
+      <rect x="264" y="262" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="272" y="278" font-size="12" font-weight="600"
+            fill="#1c2733">hosted-zone</text>
+      <text x="272" y="293" font-size="10"
+            fill="#6b7a8d">networking/dns</text>
+    </g>
+    
+    <g>
+      <title>internet-gateway (networking/vpc)</title>
+      <rect x="264" y="312" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="272" y="328" font-size="12" font-weight="600"
+            fill="#1c2733">internet-gateway</text>
+      <text x="272" y="343" font-size="10"
+            fill="#6b7a8d">networking/vpc</text>
+    </g>
+    
+    <g>
+      <title>subnet (networking/vpc) — type GENERAL; CIDR must be a sub-range of the VPC CIDR; poll $.subnet.state == ACTIVE</title>
+      <rect x="264" y="362" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="272" y="378" font-size="12" font-weight="600"
+            fill="#1c2733">subnet</text>
+      <text x="272" y="393" font-size="10"
+            fill="#6b7a8d">networking/vpc</text>
+    </g>
+    
+    <g>
+      <title>vpn-gateway (networking/vpn) — create needs name (3-20 ALNUM ONLY) + vpc + public ip; max 3/account; kr-west1/east1/south3 only; cannot delete while tunnels exist or state is Creating/Editing</title>
+      <rect x="264" y="412" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="272" y="428" font-size="12" font-weight="600"
+            fill="#1c2733">vpn-gateway</text>
+      <text x="272" y="443" font-size="10"
+            fill="#6b7a8d">networking/vpn</text>
+    </g>
+    
+    <g>
+      <title>secretsmanager-secret (security/secretsmanager) — encrypt-capable KMS key required; 퍼블릭 접근 제어 IP list is a REQUIRED create field; delete enters 7-30 day waiting period</title>
+      <rect x="264" y="462" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="272" y="478" font-size="12" font-weight="600"
+            fill="#1c2733">secretsmanager-secret</text>
+      <text x="272" y="493" font-size="10"
+            fill="#6b7a8d">security/secretsmanager</text>
+    </g>
+    
+    <g>
+      <title>server (compute/virtualserver) — heavy (~17 min, billable)</title>
+      <rect x="516" y="12" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="524" y="28" font-size="12" font-weight="600"
+            fill="#1c2733">server</text>
+      <text x="524" y="43" font-size="10"
+            fill="#6b7a8d">compute/virtualserver</text>
+    </g>
+    
+    <g>
+      <title>ske-cluster (container/ske) — heavy (~27 min, billable)</title>
+      <rect x="516" y="62" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="524" y="78" font-size="12" font-weight="600"
+            fill="#1c2733">ske-cluster</text>
+      <text x="524" y="93" font-size="10"
+            fill="#6b7a8d">container/ske</text>
+    </g>
+    
+    <g>
+      <title>mysql-cluster (database/mysql) — heavy, billable</title>
+      <rect x="516" y="112" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="524" y="128" font-size="12" font-weight="600"
+            fill="#1c2733">mysql-cluster</text>
+      <text x="524" y="143" font-size="10"
+            fill="#6b7a8d">database/mysql</text>
+    </g>
+    
+    <g>
+      <title>postgresql-cluster (database/postgresql) — heavy, billable</title>
+      <rect x="516" y="162" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="524" y="178" font-size="12" font-weight="600"
+            fill="#1c2733">postgresql-cluster</text>
+      <text x="524" y="193" font-size="10"
+            fill="#6b7a8d">database/postgresql</text>
+    </g>
+    
+    <g>
+      <title>load-balancer (networking/loadbalancer) — consumes 4 IPs from the service subnet (service + SNAT + 2 health-check); SNAT/HC IPs immutable after create; public NAT additionally needs an internet-gateway on the VPC</title>
+      <rect x="516" y="212" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="524" y="228" font-size="12" font-weight="600"
+            fill="#1c2733">load-balancer</text>
+      <text x="524" y="243" font-size="10"
+            fill="#6b7a8d">networking/loadbalancer</text>
+    </g>
+    
+    <g>
+      <title>port (networking/vpc) — security_groups: [] is accepted</title>
+      <rect x="516" y="262" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="524" y="278" font-size="12" font-weight="600"
+            fill="#1c2733">port</text>
+      <text x="524" y="293" font-size="10"
+            fill="#6b7a8d">networking/vpc</text>
+    </g>
+    
+    <g>
+      <title>vpn-tunnel (networking/vpn) — max 5 per gateway; needs peer GW IP + remote subnet CIDR(s, max 10) + PSK(8-64) + IKE/IPSec/DPD blocks</title>
+      <rect x="516" y="312" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="524" y="328" font-size="12" font-weight="600"
+            fill="#1c2733">vpn-tunnel</text>
+      <text x="524" y="343" font-size="10"
+            fill="#6b7a8d">networking/vpn</text>
+    </g>
+    
+    <g>
+      <title>aimlops-platform (ai-ml/aimlops-platform) — owner 2026-06-11: ske-cluster prerequisite has a REAL existing-or-create fork — reference an existing cluster OR provision a new one inside the aimlops create (branch carries SKE&#39;s full closure + cost</title>
+      <rect x="768" y="12" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="776" y="28" font-size="12" font-weight="600"
+            fill="#1c2733">aimlops-platform</text>
+      <text x="776" y="43" font-size="10"
+            fill="#6b7a8d">ai-ml/aimlops-platform</text>
+    </g>
+    
+    <g>
+      <title>cloud-ml (ai-ml/cloud-ml) — owner 2026-06-11: references an EXISTING ske cluster (no create-along fork — corrected) + needs the container registry&#39;s console-issued 인증키 (credential precondition, not a create step)</title>
+      <rect x="768" y="62" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="776" y="78" font-size="12" font-weight="600"
+            fill="#1c2733">cloud-ml</text>
+      <text x="776" y="93" font-size="10"
+            fill="#6b7a8d">ai-ml/cloud-ml</text>
+    </g>
+    
+    <g>
+      <title>ske-nodepool (container/ske)</title>
+      <rect x="768" y="112" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="776" y="128" font-size="12" font-weight="600"
+            fill="#1c2733">ske-nodepool</text>
+      <text x="776" y="143" font-size="10"
+            fill="#6b7a8d">container/ske</text>
+    </g>
+    
+    <g>
+      <title>lb-server-group (networking/loadbalancer) — attaches to exactly ONE load balancer; selects a default or pre-created lb-health-check</title>
+      <rect x="768" y="162" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="776" y="178" font-size="12" font-weight="600"
+            fill="#1c2733">lb-server-group</text>
+      <text x="776" y="193" font-size="10"
+            fill="#6b7a8d">networking/loadbalancer</text>
+    </g>
+    
+    <g>
+      <title>backup-policy (storage/backup) — agent-type backups need a Backup Agent installed on the target server first; retention enum 14/31/93/186/365 days</title>
+      <rect x="768" y="212" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="776" y="228" font-size="12" font-weight="600"
+            fill="#1c2733">backup-policy</text>
+      <text x="776" y="243" font-size="10"
+            fill="#6b7a8d">storage/backup</text>
+    </g>
+    
+    <g>
+      <title>lb-member (networking/loadbalancer) — must be a VS/BM server in the SAME VPC as the LB, or a directly entered IP (cheapest for tests)</title>
+      <rect x="1020" y="12" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#d97706"
+            stroke-width="1.4"/>
+      <text x="1028" y="28" font-size="12" font-weight="600"
+            fill="#1c2733">lb-member</text>
+      <text x="1028" y="43" font-size="10"
+            fill="#6b7a8d">networking/loadbalancer</text>
+    </g>
+    
+  </svg>
+  </div>
+</section>
+
+
+<section>
+  <h2>cross_constraints (서비스 간 제약)</h2>
+  <table>
+    <tr><th>id</th><th>services</th><th>rule</th><th>출처</th></tr>
+    
+    <tr>
+      <td><code>ske-volume-is-filestorage</code></td>
+      <td><span class="cat">container/ske</span> <span class="cat">storage/filestorage</span> </td>
+      <td class="muted">an SKE cluster&#39;s volume_id must be a storage/filestorage volume id (created first; torn down after the cluster)</td>
+      <td><span class="cat environment">VALIDATED</span>
+          </td>
+    </tr>
+    
+    <tr>
+      <td><code>server-needs-networking-bundle</code></td>
+      <td><span class="cat">compute/virtualserver</span> <span class="cat">networking/vpc</span> <span class="cat">networking/security-group</span> </td>
+      <td class="muted">a VM create needs live vpc + subnet (networking/vpc) and a security-group (networking/security-group) plus keypair/image/server-type lookups from its own service</td>
+      <td><span class="cat environment">VALIDATED</span>
+          </td>
+    </tr>
+    
+    <tr>
+      <td><code>shared-path-roots-need-per-service-hosts</code></td>
+      <td><span class="cat">container/ske</span> <span class="cat">database/mysql</span> <span class="cat">database/mariadb</span> <span class="cat">database/postgresql</span> <span class="cat">database/epas</span> <span class="cat">database/sqlserver</span> <span class="cat">database/cachestore</span> </td>
+      <td class="muted">path roots collide across services (/v1/clusters, /v1/parameters are used by ske + every DBaaS engine) — every call MUST target its own per-service host; coverage matching by (method, path) alone over-counts (each engine needs its own lifecycle)</td>
+      <td><span class="cat environment">VALIDATED</span>
+          </td>
+    </tr>
+    
+    <tr>
+      <td><code>shared-subnet-fixed-ip-no-collision</code></td>
+      <td><span class="cat">networking/vpc</span> <span class="cat">networking/loadbalancer</span> </td>
+      <td class="muted">lifecycles adopting the ONE shared subnet must pin fixed host IPs at DISTINCT addresses (dependencies.json vpc_schedule.fixed_ip_map; .1 reserved for gateway) so parallel adopters never claim the same IP</td>
+      <td><span class="cat environment">VALIDATED</span>
+          </td>
+    </tr>
+    
+    <tr>
+      <td><code>firewall-implicit-on-gateway-resources</code></td>
+      <td><span class="cat">networking/firewall</span> <span class="cat">networking/vpc</span> <span class="cat">networking/direct-connect</span> <span class="cat">networking/loadbalancer</span> </td>
+      <td class="muted">a Firewall is never created standalone — it is minted by enabling &#39;Firewall 사용&#39; on an Internet Gateway, Transit Gateway (Uplink Firewall), Direct Connect or Load Balancer (userguide firewall how_to). Firewall-rule scenarios must first create one of those carriers and capture its firewall_id</td>
+      <td><span class="cat test_bug">docs</span></td>
+    </tr>
+    
+    <tr>
+      <td><code>gslb-monitoring-needs-target-allowlist</code></td>
+      <td><span class="cat">networking/gslb</span> <span class="cat">networking/firewall</span> <span class="cat">networking/security-group</span> </td>
+      <td class="muted">GSLB health monitoring only reaches a connection target if the target&#39;s Firewall AND Security Group allow the GSLB monitor traffic (userguide) — combo scenarios pairing GSLB with LB/VM targets need allow rules on both layers</td>
+      <td><span class="cat test_bug">docs</span></td>
+    </tr>
+    
+    <tr>
+      <td><code>dc-prereq-security-group</code></td>
+      <td><span class="cat">networking/direct-connect</span> <span class="cat">networking/security-group</span> </td>
+      <td class="muted">Security Group is a documented 선행 서비스 of Direct Connect (userguide) — the DC create body itself only needs the VPC, but workloads behind the DC are expected to be SG-protected; keep an SG in DC combo scenarios</td>
+      <td><span class="cat test_bug">docs</span></td>
+    </tr>
+    
+  </table>
+</section>
+
+
+
+</main>
+</body>
+</html>

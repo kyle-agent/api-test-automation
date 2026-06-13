@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>knowledge/vpc-scheduling-strategy.md</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  /* ---- design tokens (owner IA mockup — shared with the static dashboard) ---- */
+  :root{
+    --bg:#fbfcfd; --surface:#fff; --surface2:#f5f7f9; --border:#e4e7eb;
+    --text:#1d2530; --muted:#6b7480; --faint:#9aa3ad;
+    --green:#15924f; --green-bg:#e7f6ed; --amber:#b5740b; --amber-bg:#fdf3e2;
+    --red:#c63434; --red-bg:#fbe9e9; --blue:#2563c9; --blue-bg:#e8f0fd;
+    --grey:#7a838d; --grey-bg:#eef1f4; --purple:#7a45c2; --purple-bg:#f1e9fb;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04);
+    /* legacy aliases (older templates reference these directly) */
+    --fg:#1d2530; --line:#e4e7eb; --accent:#2563c9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+  /* ---- app shell ---- */
+  header.shell{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border)}
+  .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
+  .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .nav{display:flex;gap:3px;align-items:center}
+  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a:hover{background:var(--surface2);text-decoration:none}
+  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .ctx select{border:1px solid var(--border);border-radius:7px;background:var(--surface);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit}
+  .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .ctxbar b{color:var(--text)}
+  .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .ctxbar .pip.off{background:var(--faint)}
+
+  main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+  h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  h2:first-child{margin-top:6px}
+  h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  .pad{padding:15px 17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+
+  /* status vocabulary (shared everywhere) */
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .s-verified{background:var(--green-bg);color:var(--green)}
+  .s-reached{background:var(--amber-bg);color:var(--amber)}
+  .s-unobs{background:var(--grey-bg);color:var(--grey)}
+  .s-regress{background:var(--red-bg);color:var(--red)}
+  .s-known{background:#3a1212;color:#ffb3b3}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .tag.heavy{background:var(--purple-bg);color:var(--purple)}
+  .tag.destructive{background:var(--red-bg);color:var(--red)}
+  .tag.mutation{background:var(--amber-bg);color:var(--amber)}
+  .tag.read{background:var(--blue-bg);color:var(--blue)}
+  .tag.disabled{background:#eceef0;color:var(--faint)}
+  .srv{font-size:10px;font-weight:700;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+  /* health verdict banner */
+  .verdict{display:flex;align-items:center;gap:11px;background:var(--green-bg);border:1px solid #c2e6d0;
+    border-radius:12px;padding:12px 16px;font-size:13.5px}
+  .verdict .pip{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .verdict b{color:#0d6e3a}
+  .verdict.bad{background:var(--red-bg);border-color:#ecc4c4}
+  .verdict.bad .pip{background:var(--red)}
+  .verdict.bad b{color:var(--red)}
+  .verdict.none{background:var(--grey-bg);border-color:var(--border)}
+  .verdict.none .pip{background:var(--faint)}
+  .verdict.none b{color:var(--muted)}
+
+  /* metric tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:13px}
+  .tile{padding:13px 14px}
+  .tile .v{font-size:24px;font-weight:800;letter-spacing:-.6px}
+  .tile .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tile .bar{height:5px;border-radius:3px;background:var(--grey-bg);overflow:hidden;margin-top:8px}
+  .tile .bar i{display:block;height:100%;border-radius:3px}
+  .tile .goal{font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* pipeline strip */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:6px}
+  .pstage{flex:1;border:1px solid var(--border);background:var(--surface);padding:13px 15px;position:relative;color:var(--text)}
+  .pstage:first-child{border-radius:11px 0 0 11px}
+  .pstage:last-child{border-radius:0 11px 11px 0}
+  .pstage:not(:last-child){border-right:0}
+  a.pstage:hover{background:var(--surface2);text-decoration:none}
+  .pstage .pl{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+  .pstage .pv{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-top:4px}
+  .pstage .ps{font-size:11.5px;color:var(--muted)}
+  .pstage .chev{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;
+    width:18px;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;color:var(--faint);font-size:10px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:7px 11px;
+    border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  td{padding:8px 11px;border-bottom:1px solid #eef1f3;vertical-align:top;font-size:13px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#fafbfc}
+  td code{font-size:11.5px}
+
+  /* environment / suite cards */
+  .envcard{padding:13px 15px}
+  .envcard .eh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .envcard .en{font-weight:700;font-family:ui-monospace,monospace;font-size:13px}
+  .envcard .er{font-size:11px;color:var(--muted);margin-left:auto}
+  .envcard .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .gate{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .gate .lbl{font-size:11px;color:var(--faint)}
+  .forbid{font-size:10.5px;font-weight:700;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:6px}
+  .allow{font-size:10.5px;font-weight:700;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:6px}
+
+  /* filter chips */
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+  .fchip{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 12px;font-size:12px;
+    font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .fchip b{color:var(--text)} .fchip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+  .fchip.on b{color:var(--blue)}
+  input.search{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-family:inherit;width:230px}
+
+  .note{font-size:11.5px;color:var(--faint);font-style:normal}
+  .biz{cursor:pointer} .biz .more{display:none;color:var(--muted);font-size:12px;margin-top:3px}
+  .biz.open .more{display:block} .biz .toggle{color:var(--blue);font-size:11px}
+
+  /* server-only badge */
+  .srvonly{font-size:10px;font-weight:700;color:var(--grey);background:var(--grey-bg);border-radius:5px;padding:1px 7px;border:1px dashed #c8cdd3;white-space:nowrap}
+  .btn{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.disabled{opacity:.5;cursor:not-allowed}
+
+  /* run compose */
+  .compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .picker label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .picker select,.picker input[type=text]{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  .preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .preview .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #e9edf0;font-size:12.5px}
+  .preview .row:last-child{border:0} .preview .row b{font-weight:700;text-align:right}
+
+  /* report sub-tabs */
+  .subtabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .subtabs a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subtabs a:hover{text-decoration:none;color:var(--text)}
+  .subtabs a.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* coverage ladder */
+  .lad{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:26px}
+  .lad .bar{flex:1;height:20px;border-radius:6px;background:var(--grey-bg);overflow:hidden}
+  .lad .bar i{display:block;height:100%;border-radius:6px}
+  .lad .pct{width:54px;text-align:right;font-weight:700}
+  .lad .desc{width:300px;font-size:12px;color:var(--muted)}
+
+  /* category bars */
+  .catrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #eef1f3}
+  .catrow:last-child{border:0}
+  .catrow .cn{width:170px;font-size:12.5px;font-weight:600}
+  .catrow .cb{flex:1;height:14px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+  .catrow .cb i{display:block;height:100%;border-radius:5px}
+  .catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+
+  /* sparkline */
+  .spark{width:100%;height:90px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{width:18px;height:3px;display:inline-block;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+  .banner{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;padding:9px 13px;font-size:12px;margin-bottom:16px}
+
+  /* ---- legacy components (older templates keep working untouched) ---- */
+  section{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+  section h2{margin:0 0 10px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap}
+  .cards .card{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:10px;box-shadow:none;padding:10px 14px}
+  .cards .card .num{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .cards .card .lbl{font-size:12px;color:var(--muted)}
+  .status{padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;white-space:nowrap}
+  .status.dispatched{background:var(--amber-bg);color:var(--amber)}
+  .status.running   {background:var(--blue-bg);color:var(--blue)}
+  .status.done      {background:var(--green-bg);color:var(--green)}
+  .status.failed    {background:var(--red-bg);color:var(--red)}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=text]{padding:5px 8px;border:1px solid var(--border);border-radius:7px;
+                          font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  button{padding:6px 14px;border:1px solid var(--blue);border-radius:8px;background:var(--blue);
+         color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .warn{color:#9a3412;font-size:12px}
+  pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
+      overflow-x:auto;font-size:12px}
+  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .cat.real_regression{background:var(--red-bg);color:var(--red)}
+  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  .cat.environment    {background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="shell">
+  <div class="navrow">
+    <a class="brand" href="../index.html">SCP API Regression</a>
+    <nav class="nav">
+      <a href="../index.html" class="">Overview</a>
+      <span class="arrow">→</span>
+      <a href="../planning.html" class="active">Plan</a>
+      <span class="arrow">→</span>
+      <a href="../testing.html" class="">Run</a>
+      <span class="arrow">→</span>
+      <a href="../reporting.html" class="">Report</a>
+      <a href="../knowledge.html" style="margin-left:10px"
+         class="">Knowledge</a>
+    </nav>
+    <div class="ctx">
+      환경
+      <select title="환경 프로파일 (environments/*.yaml) — RUN 조립에서 선택 적용">
+        <option>prod-kr-west1</option><option>stage-kr-west1</option>
+      </select>
+      스위트
+      <select title="스위트 (suites/*.yaml) — RUN 조립에서 선택 적용">
+        <option>conformance</option><option>full-heavy</option><option>full</option><option>smoke</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctxbar">
+    
+    
+    <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
+    2026-06-13T02:06:00Z · <b>sha 3a27edc</b>
+    (push) · 모든 수치는 이 스냅샷 기준
+    
+  </div>
+</header><div style="background:#fff3cd;border-bottom:1px solid #e8d9a0;padding:6px 24px;font-size:13px">📄 <b>정적 뷰</b> — GitHub Pages 발행본입니다. 실행·편집·개입 버튼은 플랫폼 서버(uvicorn)에서만 동작합니다. <a href="../index.html">현재 대시보드</a> · <a href="../ops.html">ops 뷰어</a></div>
+<main>
+
+
+<section>
+  <h2>knowledge/vpc-scheduling-strategy.md
+    <a href="#">편집 →</a>
+    </h2>
+  <pre># VPC scheduling strategy — never let runs collide on the 5-VPC cap
+
+&gt; **Why this file exists.** The account caps VPCs at **5**
+&gt; (`scp-network.vpc.exceed-max-count`) and private-dns at **3**
+&gt; (`scp-network.private-dns.max-count-exceed`). Eight CRUD lifecycles each stand
+&gt; up their own VPC. Without a plan they trip the cap — both *within* one run and
+&gt; *across* concurrent runs — which silently **skips** later VPC lifecycles
+&gt; (notably `heavy-shared-networking`, which has therefore never been validated).
+&gt; This file is the durable strategy to **divide the 5 VPCs so runs don&#39;t
+&gt; overlap**, and a playbook to execute it on the next run.
+&gt;
+&gt; Source data lives in `regression/scenarios/dependencies.json`
+&gt; (`quota_kinds`, `budget_paths`, and the new `vpc_schedule` block). This doc is
+&gt; the human-readable rationale + playbook; the JSON is the machine-readable
+&gt; schedule.
+
+## The constraint &amp; the eight VPC consumers
+
+`core/budgets.py` → `DEFAULT_LIMITS = {vpc: 5, private-dns: 3}`. Each enabled
+lifecycle below creates **exactly one** VPC inline (and tears it down at the
+end); `heavy-shared-networking` additionally consumes one `private-dns`:
+
+| Lifecycle | Class | Consumes | Order in scenarios.json |
+|-----------|-------|----------|--------------------------|
+| `networking-vpc-subnet` | light | vpc | 3 |
+| `networking-vpc-internet-gateway` | light | vpc | 13 |
+| `container-ske-cluster-nodepool` | heavy | vpc | 14 |
+| `compute-virtualserver-full` | heavy | vpc | 15 |
+| `database-mysql-cluster` | heavy | vpc | 16 |
+| `database-postgresql-cluster` | heavy | vpc | 17 |
+| `heavy-shared-dbaas` | heavy | vpc | 18 |
+| `heavy-shared-networking` | heavy | **vpc + private-dns** | 24 |
+
+(Source of truth: `dependencies.json:quota_kinds`. Keep this table in sync.)
+
+## Why collisions happen today (root causes)
+
+1. **The budget is never reconciled with reality.** `tests/crud/test_crud_lifecycle.py`
+   calls `engine.run_lifecycle(...)` **once per parametrized test with no shared
+   `Budget`**, so each lifecycle gets a fresh `Budget(used={})`. `run_all()` does
+   share one Budget, but pytest doesn&#39;t use `run_all()`. Worse, **nobody ever
+   calls `Budget.sync(&#39;vpc&#39;, live_count)`** from a real VPC list call. Net effect:
+   `Budget.available(&#39;vpc&#39;)` is *always* 5, so the reserve/skip gate only ever
+   guards the single VPC the current lifecycle is about to make — it provides
+   **zero** protection against (a) sibling lifecycles&#39; VPCs still alive, (b) VPCs
+   whose async delete is still draining, or (c) other concurrent runs.
+2. **Async VPC deletes linger.** A lifecycle&#39;s teardown issues `DELETE /v1/vpcs`
+   and moves on; the VPC keeps occupying a slot for a while. The next VPC-creating
+   lifecycle starts before the slot frees → live count climbs past 5.
+3. **Ordering starves `heavy-shared-networking`.** It is the **last** VPC consumer
+   (pos 24), running after five heavy VPC lifecycles. By then the lingering deletes
+   have saturated the cap, so its `create-vpc` returns `exceed-max-count` and the
+   engine **environmentally skips** it (status=`skipped`, not a CI failure — so the
+   gap is silent).
+4. **No cross-run mutual exclusion.** `concurrency.group` in
+   `.github/workflows/api-test.yml` is keyed on `${{ github.ref }}-${{ github.run_id }}`
+   with `cancel-in-progress: false` → **every run is its own group**, so a PR run,
+   a scheduled run, and a dispatch run can all hold VPCs simultaneously.
+
+A non-2xx `create-vpc` is *not* a regression — the engine classifies quota caps
+as environmental skips (engine.py ~L522-530). So collisions cost **coverage**,
+not red CI. That is exactly why they went unnoticed.
+
+## The strategy — partition the 5 VPCs into non-overlapping lanes
+
+Two independent rules. Apply both.
+
+### Rule A — intra-run: serialize VPC lifecycles in small lanes, ≤ `per_run_vpc_cap`
+
+Keep each run&#39;s *concurrent live VPC count* at or below **3** (headroom of 2 for
+lingering deletes and any stray account VPC). Because pytest runs the suite
+sequentially, the practical lever is **which lifecycles a run includes** (via
+`crud_filter`) and **their order**. Recommended lanes (`dependencies.json:vpc_schedule.lanes`):
+
+| Lane | `crud_filter` (-k) | VPC lifecycles | Peak VPCs |
+|------|--------------------|----------------|-----------|
+| **L0 light** | *(blank, `run_heavy=false`)* | vpc-subnet, vpc-internet-gateway (sequential) | 1–2 |
+| **L1 compute** | `container-ske-cluster-nodepool or compute-virtualserver-full` | ske, virtualserver-full | 1–2 |
+| **L2 database** | `database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas` | mysql, postgresql, dbaas | 1–2 |
+| **L3 networking** | `heavy-shared-networking` | heavy-shared-networking (alone → guaranteed vpc + private-dns) | 1 |
+
+Run the lanes **as separate dispatches that do not overlap** (see Rule B). Each
+lane creates ≤1 VPC at a time and tears it down before the next, so even with
+delete-linger a lane peaks well under 5. `heavy-shared-networking` running
+**alone** is the fix for its chronic starvation.
+
+&gt; `crud_filter` is fed to `pytest -k`. Multi-lifecycle filters need the value
+&gt; quoted in the workflow (`-k &#34;$FILTER&#34;`) — that quoting fix is included in this
+&gt; change (workflow ~L311). A blank filter (full run) is unaffected.
+
+### Rule B — cross-run: never let two VPC-mutating runs overlap
+
+Pick one (in order of robustness):
+
+1. **Single concurrency group for mutating runs** *(recommended, not yet applied
+   to avoid disturbing an in-flight baseline)*: change `concurrency.group` to a
+   constant for runs that mutate (e.g. `scp-api-test-mutating`) with
+   `cancel-in-progress: false`, so mutating runs **queue** instead of overlapping.
+   Trade-off: serializes the two daily cron slots + PR runs; acceptable because
+   they share one account.
+2. **Manual spacing**: only ever trigger one VPC-consuming run at a time; wait for
+   the previous run&#39;s **regression job to complete** (that&#39;s the &#34;VPCs no longer
+   being created&#34; signal — the run stays `in_progress` through
+   conformance/dashboard long after its VPCs are swept) before starting the next.
+3. **Per-run VPC lane budget**: cap each run to ≤2 of the 5 VPCs and only allow two
+   such runs at once. Needs the live-sync engine work below to be enforceable.
+
+## IMPLEMENTED: shared-VPC adoption for heavy lifecycles
+
+&gt; Status: built (offline-tested), **pending live validation on the next heavy
+&gt; run**. See `tests/crud/test_shared_vpc_adopt.py`.
+
+The six **heavy** VPC lifecycles no longer each create their own VPC. A
+session-scoped pytest fixture (`shared_vpc` in `conftest.py`) provisions **one**
+VPC (`10.124.0.0/20`, owner/run/ttl-tagged) via `engine.provision_shared_vpc`,
+and each heavy lifecycle&#39;s `create-vpc`/`delete-vpc` steps carry
+`{&#34;adopt&#34;: &#34;vpc&#34;}`: the engine seeds `vpc_id` from the shared VPC and **skips
+both the create and the delete** (the fixture tears the VPC down once at session
+end; the tag-scoped sweep is the backstop). Net: **6 heavy VPC creates → 1.**
+
+- **Scope decision:** heavy-only. The two *light* networking lifecycles
+  (`networking-vpc-subnet`, `networking-vpc-internet-gateway`) keep self-creating
+  so the VPC create/delete endpoints stay exercised for coverage.
+- **Share VPC only (not the subnet):** each heavy lifecycle still creates its
+  *own* subnet **under** the shared VPC, re-homed into the shared `/20`
+  (`10.124.1.0/24` … `10.124.6.0/24`), preserving each service&#39;s known-good
+  subnet config. (`heavy-shared-networking`&#39;s in-subnet host IPs were moved to
+  `10.124.6.100/200` to match.) This avoids the risk of one shared subnet not
+  satisfying every service.
+- **Safety / no-regression:** adoption is a **no-op when no shared VPC exists**
+  (mutations off, or provisioning failed) — the lifecycle then self-creates
+  exactly as before. So the fixture failing can&#39;t redden heavy CRUD.
+- **Effect on the cap:** heavy runs now hold **1** shared VPC + at most the light
+  lifecycles&#39; own, instead of up to 6 — `heavy-shared-networking` no longer gets
+  starved. The lane sharding below is still useful for *cross-run* isolation but
+  is no longer required to fit the heavy suite intra-run.
+
+## Other durable fixes (still recommended)
+
+The lane sharding above is executable **today** with zero code change. To make a
+single, un-sharded `run_heavy=true` run safe (no manual sharding), also close the
+remaining accounting gap:
+
+1. **Share one `Budget` for the whole pytest session and seed it from reality.**
+   In a `tests/crud` fixture (module/session scope), build one `Budget`, call
+   `budget.sync(&#39;vpc&#39;, &lt;live count from GET /v1/vpcs&gt;)` and
+   `budget.sync(&#39;private-dns&#39;, &lt;live count&gt;)`, and pass it into every
+   `run_lifecycle(...)`. Then `reserve`/`available` reflect the true account state
+   and the existing environmental-skip gate (engine.py ~L470-491) actually works.
+2. **Drain-wait after a VPC teardown.** After releasing a `vpc` budget slot, poll
+   `GET /v1/vpcs` until the deleted VPC is gone (or a timeout) before the next
+   VPC-creating lifecycle proceeds — removes the async-linger overshoot.
+3. **Reorder so `heavy-shared-networking` is not last.** Move it ahead of the
+   VPC-hungry db/compute lifecycles in `scenarios.json` (or rely on (1)+(2) so
+   order stops mattering). *Deliberately not reordered here* so this change does
+   not alter the pending baseline run.
+4. **Best long-term: adopt a shared VPC.** Rework the heavy lifecycles to *reuse*
+   one VPC+subnet created once per run instead of each calling `create-vpc`
+   (handoff rec 2a). Collapses 6 VPC creates → 1 and makes the cap a non-issue.
+
+## Next-run playbook (copy-paste)
+
+Run these as **separate, non-overlapping** `workflow_dispatch` runs of
+`api-test.yml` on the working branch. All set `allow_mutations=true`,
+`allow_destructive=true`. Wait for each run&#39;s **regression job** to finish before
+starting the next.
+
+```
+# Lane L0 — all light lifecycles (no heavy, minimal VPC pressure)
+run_heavy=false   crud_filter=(blank)
+
+# Lane L1 — heavy compute
+run_heavy=true    crud_filter=container-ske-cluster-nodepool or compute-virtualserver-full
+
+# Lane L2 — heavy database
+run_heavy=true    crud_filter=database-mysql-cluster or database-postgresql-cluster or heavy-shared-dbaas
+
+# Lane L3 — heavy shared networking (runs alone → its vpc + private-dns are free)
+run_heavy=true    crud_filter=heavy-shared-networking
+```
+
+Conformance/dashboard rebuild on each run; the tag-scoped sweep reclaims each
+run&#39;s own VPCs. Because the lanes don&#39;t overlap and each peaks ≤2 VPCs, the
+5-VPC cap is never tripped and `heavy-shared-networking` finally gets exercised.
+
+&gt; Once the durable fix (engine live-sync + drain-wait, or shared-VPC adoption) is
+&gt; implemented and validated, a single full `run_heavy=true` run becomes safe and
+&gt; the lane sharding is no longer required — update this file when that lands.
+</pre>
+</section>
+
+
+</main>
+</body>
+</html>

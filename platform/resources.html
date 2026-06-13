@@ -1,0 +1,3477 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자원 모델</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  /* ---- design tokens (owner IA mockup — shared with the static dashboard) ---- */
+  :root{
+    --bg:#fbfcfd; --surface:#fff; --surface2:#f5f7f9; --border:#e4e7eb;
+    --text:#1d2530; --muted:#6b7480; --faint:#9aa3ad;
+    --green:#15924f; --green-bg:#e7f6ed; --amber:#b5740b; --amber-bg:#fdf3e2;
+    --red:#c63434; --red-bg:#fbe9e9; --blue:#2563c9; --blue-bg:#e8f0fd;
+    --grey:#7a838d; --grey-bg:#eef1f4; --purple:#7a45c2; --purple-bg:#f1e9fb;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04);
+    /* legacy aliases (older templates reference these directly) */
+    --fg:#1d2530; --line:#e4e7eb; --accent:#2563c9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+  /* ---- app shell ---- */
+  header.shell{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border)}
+  .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
+  .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .nav{display:flex;gap:3px;align-items:center}
+  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a:hover{background:var(--surface2);text-decoration:none}
+  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .ctx select{border:1px solid var(--border);border-radius:7px;background:var(--surface);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit}
+  .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .ctxbar b{color:var(--text)}
+  .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .ctxbar .pip.off{background:var(--faint)}
+
+  main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+  h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  h2:first-child{margin-top:6px}
+  h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  .pad{padding:15px 17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+
+  /* status vocabulary (shared everywhere) */
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .s-verified{background:var(--green-bg);color:var(--green)}
+  .s-reached{background:var(--amber-bg);color:var(--amber)}
+  .s-unobs{background:var(--grey-bg);color:var(--grey)}
+  .s-regress{background:var(--red-bg);color:var(--red)}
+  .s-known{background:#3a1212;color:#ffb3b3}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .tag.heavy{background:var(--purple-bg);color:var(--purple)}
+  .tag.destructive{background:var(--red-bg);color:var(--red)}
+  .tag.mutation{background:var(--amber-bg);color:var(--amber)}
+  .tag.read{background:var(--blue-bg);color:var(--blue)}
+  .tag.disabled{background:#eceef0;color:var(--faint)}
+  .srv{font-size:10px;font-weight:700;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+  /* health verdict banner */
+  .verdict{display:flex;align-items:center;gap:11px;background:var(--green-bg);border:1px solid #c2e6d0;
+    border-radius:12px;padding:12px 16px;font-size:13.5px}
+  .verdict .pip{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .verdict b{color:#0d6e3a}
+  .verdict.bad{background:var(--red-bg);border-color:#ecc4c4}
+  .verdict.bad .pip{background:var(--red)}
+  .verdict.bad b{color:var(--red)}
+  .verdict.none{background:var(--grey-bg);border-color:var(--border)}
+  .verdict.none .pip{background:var(--faint)}
+  .verdict.none b{color:var(--muted)}
+
+  /* metric tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:13px}
+  .tile{padding:13px 14px}
+  .tile .v{font-size:24px;font-weight:800;letter-spacing:-.6px}
+  .tile .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tile .bar{height:5px;border-radius:3px;background:var(--grey-bg);overflow:hidden;margin-top:8px}
+  .tile .bar i{display:block;height:100%;border-radius:3px}
+  .tile .goal{font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* pipeline strip */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:6px}
+  .pstage{flex:1;border:1px solid var(--border);background:var(--surface);padding:13px 15px;position:relative;color:var(--text)}
+  .pstage:first-child{border-radius:11px 0 0 11px}
+  .pstage:last-child{border-radius:0 11px 11px 0}
+  .pstage:not(:last-child){border-right:0}
+  a.pstage:hover{background:var(--surface2);text-decoration:none}
+  .pstage .pl{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+  .pstage .pv{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-top:4px}
+  .pstage .ps{font-size:11.5px;color:var(--muted)}
+  .pstage .chev{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;
+    width:18px;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;color:var(--faint);font-size:10px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:7px 11px;
+    border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  td{padding:8px 11px;border-bottom:1px solid #eef1f3;vertical-align:top;font-size:13px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#fafbfc}
+  td code{font-size:11.5px}
+
+  /* environment / suite cards */
+  .envcard{padding:13px 15px}
+  .envcard .eh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .envcard .en{font-weight:700;font-family:ui-monospace,monospace;font-size:13px}
+  .envcard .er{font-size:11px;color:var(--muted);margin-left:auto}
+  .envcard .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .gate{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .gate .lbl{font-size:11px;color:var(--faint)}
+  .forbid{font-size:10.5px;font-weight:700;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:6px}
+  .allow{font-size:10.5px;font-weight:700;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:6px}
+
+  /* filter chips */
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+  .fchip{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 12px;font-size:12px;
+    font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .fchip b{color:var(--text)} .fchip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+  .fchip.on b{color:var(--blue)}
+  input.search{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-family:inherit;width:230px}
+
+  .note{font-size:11.5px;color:var(--faint);font-style:normal}
+  .biz{cursor:pointer} .biz .more{display:none;color:var(--muted);font-size:12px;margin-top:3px}
+  .biz.open .more{display:block} .biz .toggle{color:var(--blue);font-size:11px}
+
+  /* server-only badge */
+  .srvonly{font-size:10px;font-weight:700;color:var(--grey);background:var(--grey-bg);border-radius:5px;padding:1px 7px;border:1px dashed #c8cdd3;white-space:nowrap}
+  .btn{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.disabled{opacity:.5;cursor:not-allowed}
+
+  /* run compose */
+  .compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .picker label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .picker select,.picker input[type=text]{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  .preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .preview .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #e9edf0;font-size:12.5px}
+  .preview .row:last-child{border:0} .preview .row b{font-weight:700;text-align:right}
+
+  /* report sub-tabs */
+  .subtabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .subtabs a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subtabs a:hover{text-decoration:none;color:var(--text)}
+  .subtabs a.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* coverage ladder */
+  .lad{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:26px}
+  .lad .bar{flex:1;height:20px;border-radius:6px;background:var(--grey-bg);overflow:hidden}
+  .lad .bar i{display:block;height:100%;border-radius:6px}
+  .lad .pct{width:54px;text-align:right;font-weight:700}
+  .lad .desc{width:300px;font-size:12px;color:var(--muted)}
+
+  /* category bars */
+  .catrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #eef1f3}
+  .catrow:last-child{border:0}
+  .catrow .cn{width:170px;font-size:12.5px;font-weight:600}
+  .catrow .cb{flex:1;height:14px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+  .catrow .cb i{display:block;height:100%;border-radius:5px}
+  .catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+
+  /* sparkline */
+  .spark{width:100%;height:90px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{width:18px;height:3px;display:inline-block;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+  .banner{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;padding:9px 13px;font-size:12px;margin-bottom:16px}
+
+  /* ---- legacy components (older templates keep working untouched) ---- */
+  section{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+  section h2{margin:0 0 10px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap}
+  .cards .card{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:10px;box-shadow:none;padding:10px 14px}
+  .cards .card .num{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .cards .card .lbl{font-size:12px;color:var(--muted)}
+  .status{padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;white-space:nowrap}
+  .status.dispatched{background:var(--amber-bg);color:var(--amber)}
+  .status.running   {background:var(--blue-bg);color:var(--blue)}
+  .status.done      {background:var(--green-bg);color:var(--green)}
+  .status.failed    {background:var(--red-bg);color:var(--red)}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=text]{padding:5px 8px;border:1px solid var(--border);border-radius:7px;
+                          font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  button{padding:6px 14px;border:1px solid var(--blue);border-radius:8px;background:var(--blue);
+         color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .warn{color:#9a3412;font-size:12px}
+  pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
+      overflow-x:auto;font-size:12px}
+  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .cat.real_regression{background:var(--red-bg);color:var(--red)}
+  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  .cat.environment    {background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="shell">
+  <div class="navrow">
+    <a class="brand" href="index.html">SCP API Regression</a>
+    <nav class="nav">
+      <a href="index.html" class="">Overview</a>
+      <span class="arrow">→</span>
+      <a href="planning.html" class="active">Plan</a>
+      <span class="arrow">→</span>
+      <a href="testing.html" class="">Run</a>
+      <span class="arrow">→</span>
+      <a href="reporting.html" class="">Report</a>
+      <a href="knowledge.html" style="margin-left:10px"
+         class="">Knowledge</a>
+    </nav>
+    <div class="ctx">
+      환경
+      <select title="환경 프로파일 (environments/*.yaml) — RUN 조립에서 선택 적용">
+        <option>prod-kr-west1</option><option>stage-kr-west1</option>
+      </select>
+      스위트
+      <select title="스위트 (suites/*.yaml) — RUN 조립에서 선택 적용">
+        <option>conformance</option><option>full-heavy</option><option>full</option><option>smoke</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctxbar">
+    
+    
+    <span class="pip off"></span> 발행 스냅샷 정보 없음 — dashboard-data 브랜치를
+    읽을 수 없거나 아직 발행된 run이 없습니다
+    
+  </div>
+</header><div style="background:#fff3cd;border-bottom:1px solid #e8d9a0;padding:6px 24px;font-size:13px">📄 <b>정적 뷰</b> — GitHub Pages 발행본입니다. 실행·편집·개입 버튼은 플랫폼 서버(uvicorn)에서만 동작합니다. <a href="../index.html">현재 대시보드</a> · <a href="../ops.html">ops 뷰어</a></div>
+<main>
+
+
+<section>
+  <h2>Planning › 자원 모델 (resource task model)</h2>
+  <p class="muted">서비스별 자원 노드의 <b>최소 의존조건 + 생성 옵션</b>을 폼으로
+    입력하면 시나리오는 합성기가 조합으로 만든다
+    (docs/RESOURCE-MODEL-PLAN.md). 저장은 기존 authoring 파이프라인
+    (검증 → 쓰기 → 로컬 git 커밋)을 그대로 탄다.</p>
+  <div class="cards">
+    <div class="card"><div class="num">245</div><div class="lbl">노드</div></div>
+    <div class="card"><div class="num">70</div>
+      <div class="lbl">VALIDATED (역추출 검증)</div></div>
+    <div class="card"><div class="num">57</div><div class="lbl">그룹</div></div>
+    <div class="card"><div class="num">59</div>
+      <div class="lbl">모델 파일 (knowledge/formal/resources/)</div></div>
+  </div>
+  <p>
+    <a href="resource-compose.html"><button>합성 — 단독/묶음/상품 시나리오 →</button></a>
+    
+  </p>
+</section>
+
+<section>
+  <h2>새 노드</h2>
+  <form class="inline" onsubmit="event.preventDefault();
+      var id=this.node_id.value.trim(), svc=this.service.value.trim();
+      if(id) location='/planning/resources/'+encodeURIComponent(id)
+             +'?service='+encodeURIComponent(svc);">
+    <input type="text" name="node_id" placeholder="노드 id (예: vpc-endpoint)" size="22" required>
+    <input type="text" name="service" placeholder="service (예: networking/vpc)" size="22">
+    <button type="submit">폼 열기</button>
+    <span class="muted">신규 노드는 service에서 유도된
+      <code>&lt;category&gt;__&lt;service&gt;.yaml</code>에 저장됩니다.</span>
+  </form>
+</section>
+
+
+
+
+<section>
+  <h2>ai-ml — AI/ML — Cloud ML + AIMLOps Platform
+    <span class="cat">ai-ml</span>
+    <span class="muted">(3 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">ai-ml-aimlops</td>
+      <td><a href="resource__aimlops-platform.html"><code>aimlops-platform</code></a></td>
+      <td class="muted">ai-ml/aimlops-platform</td>
+      <td class="muted">ske-cluster×2</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ai-ml-cloudml</td>
+      <td><a href="resource__cloud-ml.html"><code>cloud-ml</code></a></td>
+      <td class="muted">ai-ml/cloud-ml</td>
+      <td class="muted">ske-cluster×2, container-registry, cloudml-image</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ai-ml-image-lookup</td>
+      <td><a href="resource__cloudml-image.html"><code>cloudml-image</code></a></td>
+      <td class="muted">ai-ml/cloud-ml</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>ap-apigw — 애플리케이션 — API Gateway (api/stage/auth/usage-plan 묶음)
+    <span class="cat">application-service</span>
+    <span class="muted">(11 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-acl</td>
+      <td><a href="resource__apigw-access-control.html"><code>apigw-access-control</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api, apigw-deployment</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-api</td>
+      <td><a href="resource__apigw-api.html"><code>apigw-api</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-api-key</td>
+      <td><a href="resource__apigw-api-key.html"><code>apigw-api-key</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api, apigw-usage-plan</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-auth</td>
+      <td><a href="resource__apigw-auth.html"><code>apigw-auth</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api, apigw-deployment</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-deploy</td>
+      <td><a href="resource__apigw-deployment.html"><code>apigw-deployment</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api, apigw-method</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-method</td>
+      <td><a href="resource__apigw-method.html"><code>apigw-method</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api, apigw-resource</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-ple</td>
+      <td><a href="resource__apigw-privatelink-endpoint.html"><code>apigw-privatelink-endpoint</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">privatelink-service</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-resource</td>
+      <td><a href="resource__apigw-resource.html"><code>apigw-resource</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api, apigw-root-resource</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-root-lookup</td>
+      <td><a href="resource__apigw-root-resource.html"><code>apigw-root-resource</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-stage</td>
+      <td><a href="resource__apigw-stage.html"><code>apigw-stage</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api, apigw-deployment</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-apigw-usage-plan</td>
+      <td><a href="resource__apigw-usage-plan.html"><code>apigw-usage-plan</code></a></td>
+      <td class="muted">application-service/apigateway</td>
+      <td class="muted">apigw-api</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>ap-queue — 애플리케이션 — Queue Service
+    <span class="cat">application-service</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">ap-queue-fifo</td>
+      <td><a href="resource__queue-fifo.html"><code>queue-fifo</code></a></td>
+      <td class="muted">application-service/queueservice</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ap-queue-queue</td>
+      <td><a href="resource__queue.html"><code>queue</code></a></td>
+      <td class="muted">application-service/queueservice</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>cp-bm — 컴퓨트 — Bare Metal Server
+    <span class="cat">compute</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">cp-bm-server</td>
+      <td><a href="resource__baremetal-server.html"><code>baremetal-server</code></a></td>
+      <td class="muted">compute/baremetal</td>
+      <td class="muted">vpc, subnet</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>cp-gpu — 컴퓨트 — Multi-node GPU Cluster
+    <span class="cat">compute</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">cp-gpu-node</td>
+      <td><a href="resource__gpu-node.html"><code>gpu-node</code></a></td>
+      <td class="muted">compute/multinodegpucluster</td>
+      <td class="muted">vpc, subnet</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>cp-scf — 컴퓨트 — Cloud Functions
+    <span class="cat">compute</span>
+    <span class="muted">(4 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">cp-scf-apigateway-trigger</td>
+      <td><a href="resource__scf-apigateway-trigger.html"><code>scf-apigateway-trigger</code></a></td>
+      <td class="muted">compute/scf</td>
+      <td class="muted">scf-function, apigw-api, apigw-deployment</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-scf-cronjob-trigger</td>
+      <td><a href="resource__scf-cronjob-trigger.html"><code>scf-cronjob-trigger</code></a></td>
+      <td class="muted">compute/scf</td>
+      <td class="muted">scf-function</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-scf-function</td>
+      <td><a href="resource__scf-function.html"><code>scf-function</code></a></td>
+      <td class="muted">compute/scf</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-scf-privatelink-endpoint</td>
+      <td><a href="resource__scf-privatelink-endpoint.html"><code>scf-privatelink-endpoint</code></a></td>
+      <td class="muted">compute/scf</td>
+      <td class="muted">scf-function, privatelink-service</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>cp-vs — 컴퓨트 — Virtual Server 묶음 (keypair/server/volume/image/asg)
+    <span class="cat">compute</span>
+    <span class="muted">(18 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">cp-vs-asg</td>
+      <td><a href="resource__auto-scaling-group.html"><code>auto-scaling-group</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">launch-configuration, subnet, security-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-asg-notification</td>
+      <td><a href="resource__asg-notification.html"><code>asg-notification</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">auto-scaling-group</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-asg-policy</td>
+      <td><a href="resource__asg-policy.html"><code>asg-policy</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">auto-scaling-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-asg-schedule</td>
+      <td><a href="resource__asg-schedule.html"><code>asg-schedule</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">auto-scaling-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-block-volume</td>
+      <td><a href="resource__block-volume.html"><code>block-volume</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-custom-image</td>
+      <td><a href="resource__custom-image.html"><code>custom-image</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">server</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-image-lookup</td>
+      <td><a href="resource__image.html"><code>image</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-image-reg</td>
+      <td><a href="resource__image-registration.html"><code>image-registration</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-interface</td>
+      <td><a href="resource__server-interface.html"><code>server-interface</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">server, port</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-keypair</td>
+      <td><a href="resource__keypair.html"><code>keypair</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-launch-config</td>
+      <td><a href="resource__launch-configuration.html"><code>launch-configuration</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">image, server-type, keypair</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-server</td>
+      <td><a href="resource__server.html"><code>server</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">vpc, subnet, security-group, keypair, image, server-type</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-server-group</td>
+      <td><a href="resource__server-group.html"><code>server-group</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-server-type</td>
+      <td><a href="resource__server-type.html"><code>server-type</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-static-nat</td>
+      <td><a href="resource__server-static-nat.html"><code>server-static-nat</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">server-interface, server, port, public-ip, internet-gateway</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-volume-attach</td>
+      <td><a href="resource__volume-attachment.html"><code>volume-attachment</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">server, block-volume</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-volume-snapshot</td>
+      <td><a href="resource__volume-snapshot.html"><code>volume-snapshot</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">block-volume</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-vs-volume-transfer</td>
+      <td><a href="resource__volume-transfer.html"><code>volume-transfer</code></a></td>
+      <td class="muted">compute/virtualserver</td>
+      <td class="muted">block-volume</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>ct-scr — 컨테이너 — Container Registry (registry/repository/image/tag)
+    <span class="cat">container</span>
+    <span class="muted">(4 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">ct-scr-image</td>
+      <td><a href="resource__scr-image.html"><code>scr-image</code></a></td>
+      <td class="muted">container/scr</td>
+      <td class="muted">scr-repository</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ct-scr-registry</td>
+      <td><a href="resource__container-registry.html"><code>container-registry</code></a></td>
+      <td class="muted">container/scr</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ct-scr-repository</td>
+      <td><a href="resource__scr-repository.html"><code>scr-repository</code></a></td>
+      <td class="muted">container/scr</td>
+      <td class="muted">container-registry</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ct-scr-tag</td>
+      <td><a href="resource__scr-tag.html"><code>scr-tag</code></a></td>
+      <td class="muted">container/scr</td>
+      <td class="muted">scr-image</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>ct-ske — 컨테이너 — Kubernetes Engine (cluster/nodepool)
+    <span class="cat">container</span>
+    <span class="muted">(6 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">ct-ske-cluster</td>
+      <td><a href="resource__ske-cluster.html"><code>ske-cluster</code></a></td>
+      <td class="muted">container/ske</td>
+      <td class="muted">vpc, subnet, security-group, keypair, filestorage-volume, kubernetes-version</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ct-ske-cluster-upgrade</td>
+      <td><a href="resource__ske-cluster-upgrade.html"><code>ske-cluster-upgrade</code></a></td>
+      <td class="muted">container/ske</td>
+      <td class="muted">ske-cluster</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ct-ske-image</td>
+      <td><a href="resource__ske-image.html"><code>ske-image</code></a></td>
+      <td class="muted">container/ske</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ct-ske-nodepool</td>
+      <td><a href="resource__ske-nodepool.html"><code>ske-nodepool</code></a></td>
+      <td class="muted">container/ske</td>
+      <td class="muted">ske-cluster, kubernetes-version, server-type, keypair</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ct-ske-nodepool-upgrade</td>
+      <td><a href="resource__ske-nodepool-upgrade.html"><code>ske-nodepool-upgrade</code></a></td>
+      <td class="muted">container/ske</td>
+      <td class="muted">ske-nodepool, ske-cluster-upgrade</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">ct-ske-version</td>
+      <td><a href="resource__kubernetes-version.html"><code>kubernetes-version</code></a></td>
+      <td class="muted">container/ske</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>da-df — 데이터분석 — Data Flow (서비스 + 플로우)
+    <span class="cat">data-analytics</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">da-df-flow</td>
+      <td><a href="resource__data-flow.html"><code>data-flow</code></a></td>
+      <td class="muted">data-analytics/data-flow</td>
+      <td class="muted">data-flow-service</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">da-df-service</td>
+      <td><a href="resource__data-flow-service.html"><code>data-flow-service</code></a></td>
+      <td class="muted">data-analytics/data-flow</td>
+      <td class="muted">subnet</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>da-do — 데이터분석 — Data Ops (서비스 + 옵스)
+    <span class="cat">data-analytics</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">da-do-ops</td>
+      <td><a href="resource__data-ops.html"><code>data-ops</code></a></td>
+      <td class="muted">data-analytics/data-ops</td>
+      <td class="muted">data-ops-service</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">da-do-service</td>
+      <td><a href="resource__data-ops-service.html"><code>data-ops-service</code></a></td>
+      <td class="muted">data-analytics/data-ops</td>
+      <td class="muted">subnet</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>da-es — 데이터분석 — EventStreams (Kafka DBaaS)
+    <span class="cat">data-analytics</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">da-es-cluster</td>
+      <td><a href="resource__eventstreams-cluster.html"><code>eventstreams-cluster</code></a></td>
+      <td class="muted">data-analytics/eventstreams</td>
+      <td class="muted">subnet</td>
+      <td>4</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>da-qq — 데이터분석 — Quick Query
+    <span class="cat">data-analytics</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">da-qq-query</td>
+      <td><a href="resource__quick-query.html"><code>quick-query</code></a></td>
+      <td class="muted">data-analytics/quick-query</td>
+      <td class="muted">subnet</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>da-se — 데이터분석 — Search Engine (OpenSearch DBaaS)
+    <span class="cat">data-analytics</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">da-se-cluster</td>
+      <td><a href="resource__searchengine-cluster.html"><code>searchengine-cluster</code></a></td>
+      <td class="muted">data-analytics/searchengine</td>
+      <td class="muted">subnet</td>
+      <td>4</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>da-vt — 데이터분석 — Vertica (분석 DB DBaaS)
+    <span class="cat">data-analytics</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">da-vt-cluster</td>
+      <td><a href="resource__vertica-cluster.html"><code>vertica-cluster</code></a></td>
+      <td class="muted">data-analytics/vertica</td>
+      <td class="muted">subnet</td>
+      <td>5</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>db-cache — 데이터베이스 — CacheStore (Redis) DBaaS 클러스터
+    <span class="cat">database</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">db-cache-cluster</td>
+      <td><a href="resource__cachestore-cluster.html"><code>cachestore-cluster</code></a></td>
+      <td class="muted">database/cachestore</td>
+      <td class="muted">subnet</td>
+      <td>2</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>db-epas — 데이터베이스 — EPAS DBaaS 클러스터
+    <span class="cat">database</span>
+    <span class="muted">(19 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">db-epas-add-block-storage</td>
+      <td><a href="resource__epas-add-block-storage.html"><code>epas-add-block-storage</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster, epas-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-cluster</td>
+      <td><a href="resource__epas-cluster.html"><code>epas-cluster</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">subnet, epas-engine-version, epas-server-type</td>
+      <td>3</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-engine-version</td>
+      <td><a href="resource__epas-engine-version.html"><code>epas-engine-version</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-engine-version-16</td>
+      <td><a href="resource__epas-engine-version-16.html"><code>epas-engine-version-16</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-instance-group</td>
+      <td><a href="resource__epas-instance-group.html"><code>epas-instance-group</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-kernel-upgrade</td>
+      <td><a href="resource__epas-kernel-upgrade.html"><code>epas-kernel-upgrade</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-log-export-config</td>
+      <td><a href="resource__epas-log-export-config.html"><code>epas-log-export-config</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster</td>
+      <td>4</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-parameter</td>
+      <td><a href="resource__epas-parameter.html"><code>epas-parameter</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-parameter-group</td>
+      <td><a href="resource__epas-parameter-group.html"><code>epas-parameter-group</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-patch</td>
+      <td><a href="resource__epas-patch.html"><code>epas-patch</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-promote</td>
+      <td><a href="resource__epas-promote.html"><code>epas-promote</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-replica, epas-reset-replica</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-replica</td>
+      <td><a href="resource__epas-replica.html"><code>epas-replica</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster, epas-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-reset-replica</td>
+      <td><a href="resource__epas-reset-replica.html"><code>epas-reset-replica</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-replica, epas-sync-replica-state</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-resize-block-storage</td>
+      <td><a href="resource__epas-resize-block-storage.html"><code>epas-resize-block-storage</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster, epas-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-resize-server-type</td>
+      <td><a href="resource__epas-resize-server-type.html"><code>epas-resize-server-type</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster, epas-instance-group, epas-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-restore</td>
+      <td><a href="resource__epas-restore.html"><code>epas-restore</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster, epas-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-server-type</td>
+      <td><a href="resource__epas-server-type.html"><code>epas-server-type</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-switchover</td>
+      <td><a href="resource__epas-switchover.html"><code>epas-switchover</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-epas-sync-replica-state</td>
+      <td><a href="resource__epas-sync-replica-state.html"><code>epas-sync-replica-state</code></a></td>
+      <td class="muted">database/epas</td>
+      <td class="muted">epas-cluster, epas-replica</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>db-mariadb — 데이터베이스 — MariaDB DBaaS 클러스터
+    <span class="cat">database</span>
+    <span class="muted">(22 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-add-block-storage</td>
+      <td><a href="resource__mariadb-add-block-storage.html"><code>mariadb-add-block-storage</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster, mariadb-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-cluster</td>
+      <td><a href="resource__mariadb-cluster.html"><code>mariadb-cluster</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">subnet, mariadb-engine-version, mariadb-server-type</td>
+      <td>3</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-engine-version</td>
+      <td><a href="resource__mariadb-engine-version.html"><code>mariadb-engine-version</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-engine-version-10</td>
+      <td><a href="resource__mariadb-engine-version-10.html"><code>mariadb-engine-version-10</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-instance-group</td>
+      <td><a href="resource__mariadb-instance-group.html"><code>mariadb-instance-group</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-kernel-upgrade</td>
+      <td><a href="resource__mariadb-kernel-upgrade.html"><code>mariadb-kernel-upgrade</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-log-export-config</td>
+      <td><a href="resource__mariadb-log-export-config.html"><code>mariadb-log-export-config</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster</td>
+      <td>4</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-parameter</td>
+      <td><a href="resource__mariadb-parameter.html"><code>mariadb-parameter</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-parameter-group</td>
+      <td><a href="resource__mariadb-parameter-group.html"><code>mariadb-parameter-group</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-patch</td>
+      <td><a href="resource__mariadb-patch.html"><code>mariadb-patch</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-promote</td>
+      <td><a href="resource__mariadb-promote.html"><code>mariadb-promote</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-replica, mariadb-reset-replica</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-replica</td>
+      <td><a href="resource__mariadb-replica.html"><code>mariadb-replica</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster, mariadb-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-reset-replica</td>
+      <td><a href="resource__mariadb-reset-replica.html"><code>mariadb-reset-replica</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-replica, mariadb-sync-replica-state</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-resize-block-storage</td>
+      <td><a href="resource__mariadb-resize-block-storage.html"><code>mariadb-resize-block-storage</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster, mariadb-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-resize-server-type</td>
+      <td><a href="resource__mariadb-resize-server-type.html"><code>mariadb-resize-server-type</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster, mariadb-instance-group, mariadb-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-restart</td>
+      <td><a href="resource__mariadb-restart.html"><code>mariadb-restart</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster, mariadb-start</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-restore</td>
+      <td><a href="resource__mariadb-restore.html"><code>mariadb-restore</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster, mariadb-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-server-type</td>
+      <td><a href="resource__mariadb-server-type.html"><code>mariadb-server-type</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-start</td>
+      <td><a href="resource__mariadb-start.html"><code>mariadb-start</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster, mariadb-stop</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-stop</td>
+      <td><a href="resource__mariadb-stop.html"><code>mariadb-stop</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-switchover</td>
+      <td><a href="resource__mariadb-switchover.html"><code>mariadb-switchover</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mariadb-sync-replica-state</td>
+      <td><a href="resource__mariadb-sync-replica-state.html"><code>mariadb-sync-replica-state</code></a></td>
+      <td class="muted">database/mariadb</td>
+      <td class="muted">mariadb-cluster, mariadb-replica</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>db-mysql — 데이터베이스 — MySQL DBaaS 클러스터
+    <span class="cat">database</span>
+    <span class="muted">(22 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">db-mysql-add-block-storage</td>
+      <td><a href="resource__mysql-add-block-storage.html"><code>mysql-add-block-storage</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster, mysql-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-cluster</td>
+      <td><a href="resource__mysql-cluster.html"><code>mysql-cluster</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">subnet, mysql-engine-version, mysql-server-type</td>
+      <td>3</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-engine-version</td>
+      <td><a href="resource__mysql-engine-version.html"><code>mysql-engine-version</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-engine-version-8</td>
+      <td><a href="resource__mysql-engine-version-8.html"><code>mysql-engine-version-8</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-instance-group</td>
+      <td><a href="resource__mysql-instance-group.html"><code>mysql-instance-group</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-kernel-upgrade</td>
+      <td><a href="resource__mysql-kernel-upgrade.html"><code>mysql-kernel-upgrade</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-log-export-config</td>
+      <td><a href="resource__mysql-log-export-config.html"><code>mysql-log-export-config</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster</td>
+      <td>4</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-parameter</td>
+      <td><a href="resource__mysql-parameter.html"><code>mysql-parameter</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-parameter-group</td>
+      <td><a href="resource__mysql-parameter-group.html"><code>mysql-parameter-group</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-patch</td>
+      <td><a href="resource__mysql-patch.html"><code>mysql-patch</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-promote</td>
+      <td><a href="resource__mysql-promote.html"><code>mysql-promote</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-replica, mysql-reset-replica</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-replica</td>
+      <td><a href="resource__mysql-replica.html"><code>mysql-replica</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster, mysql-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-reset-replica</td>
+      <td><a href="resource__mysql-reset-replica.html"><code>mysql-reset-replica</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-replica, mysql-sync-replica-state</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-resize-block-storage</td>
+      <td><a href="resource__mysql-resize-block-storage.html"><code>mysql-resize-block-storage</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster, mysql-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-resize-server-type</td>
+      <td><a href="resource__mysql-resize-server-type.html"><code>mysql-resize-server-type</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster, mysql-instance-group, mysql-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-restart</td>
+      <td><a href="resource__mysql-restart.html"><code>mysql-restart</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster, mysql-start</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-restore</td>
+      <td><a href="resource__mysql-restore.html"><code>mysql-restore</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster, mysql-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-server-type</td>
+      <td><a href="resource__mysql-server-type.html"><code>mysql-server-type</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-start</td>
+      <td><a href="resource__mysql-start.html"><code>mysql-start</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster, mysql-stop</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-stop</td>
+      <td><a href="resource__mysql-stop.html"><code>mysql-stop</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-switchover</td>
+      <td><a href="resource__mysql-switchover.html"><code>mysql-switchover</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-mysql-sync-replica-state</td>
+      <td><a href="resource__mysql-sync-replica-state.html"><code>mysql-sync-replica-state</code></a></td>
+      <td class="muted">database/mysql</td>
+      <td class="muted">mysql-cluster, mysql-replica</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>db-postgresql — 데이터베이스 — PostgreSQL DBaaS 클러스터
+    <span class="cat">database</span>
+    <span class="muted">(19 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-add-block-storage</td>
+      <td><a href="resource__pg-add-block-storage.html"><code>pg-add-block-storage</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster, pg-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-cluster</td>
+      <td><a href="resource__postgresql-cluster.html"><code>postgresql-cluster</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">subnet, pg-engine-version, pg-server-type</td>
+      <td>3</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-engine-version</td>
+      <td><a href="resource__pg-engine-version.html"><code>pg-engine-version</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-engine-version-16</td>
+      <td><a href="resource__pg-engine-version-16.html"><code>pg-engine-version-16</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-instance-group</td>
+      <td><a href="resource__pg-instance-group.html"><code>pg-instance-group</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-kernel-upgrade</td>
+      <td><a href="resource__pg-kernel-upgrade.html"><code>pg-kernel-upgrade</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-log-export-config</td>
+      <td><a href="resource__pg-log-export-config.html"><code>pg-log-export-config</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster</td>
+      <td>4</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-parameter</td>
+      <td><a href="resource__pg-parameter.html"><code>pg-parameter</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-parameter-group</td>
+      <td><a href="resource__pg-parameter-group.html"><code>pg-parameter-group</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-patch</td>
+      <td><a href="resource__pg-patch.html"><code>pg-patch</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-promote</td>
+      <td><a href="resource__pg-promote.html"><code>pg-promote</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">pg-replica, pg-reset-replica</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-replica</td>
+      <td><a href="resource__pg-replica.html"><code>pg-replica</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster, pg-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-reset-replica</td>
+      <td><a href="resource__pg-reset-replica.html"><code>pg-reset-replica</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">pg-replica, pg-sync-replica-state</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-resize-block-storage</td>
+      <td><a href="resource__pg-resize-block-storage.html"><code>pg-resize-block-storage</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster, pg-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-resize-server-type</td>
+      <td><a href="resource__pg-resize-server-type.html"><code>pg-resize-server-type</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster, pg-instance-group, pg-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-restore</td>
+      <td><a href="resource__pg-restore.html"><code>pg-restore</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster, pg-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-server-type</td>
+      <td><a href="resource__pg-server-type.html"><code>pg-server-type</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-switchover</td>
+      <td><a href="resource__pg-switchover.html"><code>pg-switchover</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-postgresql-sync-replica-state</td>
+      <td><a href="resource__pg-sync-replica-state.html"><code>pg-sync-replica-state</code></a></td>
+      <td class="muted">database/postgresql</td>
+      <td class="muted">postgresql-cluster, pg-replica</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>db-sqlserver — 데이터베이스 — SQL Server DBaaS 클러스터 (라이선스 필요)
+    <span class="cat">database</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-cluster</td>
+      <td><a href="resource__sqlserver-cluster.html"><code>sqlserver-cluster</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">subnet</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>dt-devops — DevOps — DevOps Service (CI/CD 워크스페이스)
+    <span class="cat">devops-tools</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">dt-devops-service</td>
+      <td><a href="resource__devops-service.html"><code>devops-service</code></a></td>
+      <td class="muted">devops-tools/devopsservice</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>fm-billing — 재무 — Billing Plan (planned computes)
+    <span class="cat">financial-management</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">fm-billing-planned-compute</td>
+      <td><a href="resource__planned-compute.html"><code>planned-compute</code></a></td>
+      <td class="muted">financial-management/billingplan</td>
+      <td class="muted">(없음)</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>fm-budget — 재무 — Budget (계정 예산 알림)
+    <span class="cat">financial-management</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">fm-budget-account</td>
+      <td><a href="resource__account-budget.html"><code>account-budget</code></a></td>
+      <td class="muted">financial-management/budget</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>fm-cost — 재무 — Cost Explorer (조회 전용)
+    <span class="cat">financial-management</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">fm-cost-reads</td>
+      <td><a href="resource__cost-reads.html"><code>cost-reads</code></a></td>
+      <td class="muted">financial-management/costexplorer</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>fm-pricing — 재무 — Pricing (조회 전용)
+    <span class="cat">financial-management</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">fm-pricing-reads</td>
+      <td><a href="resource__pricing-reads.html"><code>pricing-reads</code></a></td>
+      <td class="muted">financial-management/pricing</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-cc — 관리 — Cloud Control (landing zone)
+    <span class="cat">management</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-cc-landing-zone</td>
+      <td><a href="resource__cloudcontrol-landing-zone.html"><code>cloudcontrol-landing-zone</code></a></td>
+      <td class="muted">management/cloudcontrol</td>
+      <td class="muted">iam-identity-center</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-cm — 관리 — Cloud Monitoring
+    <span class="cat">management</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-cm-account-resource</td>
+      <td><a href="resource__cm-account-resource.html"><code>cm-account-resource</code></a></td>
+      <td class="muted">management/cloudmonitoring</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-cm-event-policy</td>
+      <td><a href="resource__cm-event-policy.html"><code>cm-event-policy</code></a></td>
+      <td class="muted">management/cloudmonitoring</td>
+      <td class="muted">cm-account-resource</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-iam — 관리 — IAM (group/policy/role/credentials)
+    <span class="cat">management</span>
+    <span class="muted">(12 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-iam-access-key</td>
+      <td><a href="resource__iam-access-key.html"><code>iam-access-key</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-group</td>
+      <td><a href="resource__iam-group.html"><code>iam-group</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-group-member</td>
+      <td><a href="resource__iam-group-member.html"><code>iam-group-member</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">iam-group</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-group-policy-binding</td>
+      <td><a href="resource__iam-group-policy-binding.html"><code>iam-group-policy-binding</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">iam-group, iam-policy</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-policy</td>
+      <td><a href="resource__iam-policy.html"><code>iam-policy</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-policy-binding-set</td>
+      <td><a href="resource__iam-policy-binding-set.html"><code>iam-policy-binding-set</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">iam-group, iam-policy×2</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-resource-policy</td>
+      <td><a href="resource__iam-resource-policy.html"><code>iam-resource-policy</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-role</td>
+      <td><a href="resource__iam-role.html"><code>iam-role</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">iam-policy</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-role-policy-binding</td>
+      <td><a href="resource__iam-role-policy-binding.html"><code>iam-role-policy-binding</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">iam-role, iam-policy×2</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-saml-provider</td>
+      <td><a href="resource__iam-saml-provider.html"><code>iam-saml-provider</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-user</td>
+      <td><a href="resource__iam-user.html"><code>iam-user</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-iam-user-policy-binding</td>
+      <td><a href="resource__iam-user-policy-binding.html"><code>iam-user-policy-binding</code></a></td>
+      <td class="muted">management/iam</td>
+      <td class="muted">iam-policy</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-idc — 관리 — IAM Identity Center (SSO)
+    <span class="cat">management</span>
+    <span class="muted">(5 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-idc-account-assignment</td>
+      <td><a href="resource__idc-account-assignment.html"><code>idc-account-assignment</code></a></td>
+      <td class="muted">management/iam-identity-center</td>
+      <td class="muted">iam-identity-center, idc-permission-set, idc-user</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-idc-group</td>
+      <td><a href="resource__idc-group.html"><code>idc-group</code></a></td>
+      <td class="muted">management/iam-identity-center</td>
+      <td class="muted">iam-identity-center</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-idc-instance</td>
+      <td><a href="resource__iam-identity-center.html"><code>iam-identity-center</code></a></td>
+      <td class="muted">management/iam-identity-center</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-idc-permission-set</td>
+      <td><a href="resource__idc-permission-set.html"><code>idc-permission-set</code></a></td>
+      <td class="muted">management/iam-identity-center</td>
+      <td class="muted">iam-identity-center</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-idc-user</td>
+      <td><a href="resource__idc-user.html"><code>idc-user</code></a></td>
+      <td class="muted">management/iam-identity-center</td>
+      <td class="muted">iam-identity-center</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-la — 관리 — Logging &amp; Audit (trail)
+    <span class="cat">management</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-la-trail</td>
+      <td><a href="resource__trail.html"><code>trail</code></a></td>
+      <td class="muted">management/loggingaudit</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-nl — 관리 — Network Logging
+    <span class="cat">management</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-nl-storage</td>
+      <td><a href="resource__network-logging-storage.html"><code>network-logging-storage</code></a></td>
+      <td class="muted">management/network-logging</td>
+      <td class="muted">(없음)</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-org — 관리 — Organization (계정 계층)
+    <span class="cat">management</span>
+    <span class="muted">(6 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-org-account</td>
+      <td><a href="resource__organization-account.html"><code>organization-account</code></a></td>
+      <td class="muted">management/organization</td>
+      <td class="muted">organization</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-org-delegation</td>
+      <td><a href="resource__delegation-policy.html"><code>delegation-policy</code></a></td>
+      <td class="muted">management/organization</td>
+      <td class="muted">organization</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-org-invitation</td>
+      <td><a href="resource__org-invitation.html"><code>org-invitation</code></a></td>
+      <td class="muted">management/organization</td>
+      <td class="muted">organization</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-org-org</td>
+      <td><a href="resource__organization.html"><code>organization</code></a></td>
+      <td class="muted">management/organization</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-org-scp</td>
+      <td><a href="resource__service-control-policy.html"><code>service-control-policy</code></a></td>
+      <td class="muted">management/organization</td>
+      <td class="muted">organization</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-org-unit</td>
+      <td><a href="resource__organization-unit.html"><code>organization-unit</code></a></td>
+      <td class="muted">management/organization</td>
+      <td class="muted">organization</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-quota — 관리 — Quota (조회 전용)
+    <span class="cat">management</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-quota-account</td>
+      <td><a href="resource__account-quota.html"><code>account-quota</code></a></td>
+      <td class="muted">management/quota</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-quota-request</td>
+      <td><a href="resource__quota-request.html"><code>quota-request</code></a></td>
+      <td class="muted">management/quota</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-rm — 관리 — Resource Manager
+    <span class="cat">management</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-rm-resource-group</td>
+      <td><a href="resource__resource-group.html"><code>resource-group</code></a></td>
+      <td class="muted">management/resourcemanager</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-rm-rg-bulk</td>
+      <td><a href="resource__resource-group-bulk.html"><code>resource-group-bulk</code></a></td>
+      <td class="muted">management/resourcemanager</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-support — 관리 — Support (조회 전용)
+    <span class="cat">management</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-support-inquiry</td>
+      <td><a href="resource__support-inquiry.html"><code>support-inquiry</code></a></td>
+      <td class="muted">management/support</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-support-sr</td>
+      <td><a href="resource__support-service-request.html"><code>support-service-request</code></a></td>
+      <td class="muted">management/support</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>mg-sw — 관리 — ServiceWatch (logs/alerts/dashboards)
+    <span class="cat">management</span>
+    <span class="muted">(8 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">mg-sw-alert</td>
+      <td><a href="resource__alert.html"><code>alert</code></a></td>
+      <td class="muted">management/servicewatch</td>
+      <td class="muted">sw-metric-catalog</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-sw-custom-log-collect</td>
+      <td><a href="resource__sw-custom-log-collect.html"><code>sw-custom-log-collect</code></a></td>
+      <td class="muted">management/servicewatch</td>
+      <td class="muted">log-stream</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-sw-custom-metric-meta</td>
+      <td><a href="resource__sw-custom-metric-meta.html"><code>sw-custom-metric-meta</code></a></td>
+      <td class="muted">management/servicewatch</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-sw-dashboard</td>
+      <td><a href="resource__dashboard.html"><code>dashboard</code></a></td>
+      <td class="muted">management/servicewatch</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-sw-event-rule</td>
+      <td><a href="resource__event-rule.html"><code>event-rule</code></a></td>
+      <td class="muted">management/servicewatch</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-sw-log-group</td>
+      <td><a href="resource__log-group.html"><code>log-group</code></a></td>
+      <td class="muted">management/servicewatch</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-sw-log-stream</td>
+      <td><a href="resource__log-stream.html"><code>log-stream</code></a></td>
+      <td class="muted">management/servicewatch</td>
+      <td class="muted">log-group</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">mg-sw-metric-catalog</td>
+      <td><a href="resource__sw-metric-catalog.html"><code>sw-metric-catalog</code></a></td>
+      <td class="muted">management/servicewatch</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>nw-cdn — 네트워크 — Global CDN
+    <span class="cat">networking</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">nw-cdn-cdn</td>
+      <td><a href="resource__cdn.html"><code>cdn</code></a></td>
+      <td class="muted">networking/cdn</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>nw-dc — 네트워크 — Direct Connect
+    <span class="cat">networking</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">nw-dc-dc</td>
+      <td><a href="resource__direct-connect.html"><code>direct-connect</code></a></td>
+      <td class="muted">networking/direct-connect</td>
+      <td class="muted">vpc</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>nw-dns — 네트워크 — Private DNS
+    <span class="cat">networking</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">nw-dns-hosted-zone</td>
+      <td><a href="resource__hosted-zone.html"><code>hosted-zone</code></a></td>
+      <td class="muted">networking/dns</td>
+      <td class="muted">private-dns</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-dns-private-dns</td>
+      <td><a href="resource__private-dns.html"><code>private-dns</code></a></td>
+      <td class="muted">networking/dns</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>nw-gslb — 네트워크 — GSLB (글로벌 DNS 부하분산)
+    <span class="cat">networking</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">nw-gslb-gslb</td>
+      <td><a href="resource__gslb.html"><code>gslb</code></a></td>
+      <td class="muted">networking/gslb</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>nw-lb — 네트워크 — Load Balancer 체인
+    <span class="cat">networking</span>
+    <span class="muted">(7 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">nw-lb-health-check</td>
+      <td><a href="resource__lb-health-check.html"><code>lb-health-check</code></a></td>
+      <td class="muted">networking/loadbalancer</td>
+      <td class="muted">vpc, subnet</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-lb-lb</td>
+      <td><a href="resource__load-balancer.html"><code>load-balancer</code></a></td>
+      <td class="muted">networking/loadbalancer</td>
+      <td class="muted">vpc, subnet</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-lb-listener</td>
+      <td><a href="resource__lb-listener.html"><code>lb-listener</code></a></td>
+      <td class="muted">networking/loadbalancer</td>
+      <td class="muted">load-balancer, lb-server-group</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-lb-member</td>
+      <td><a href="resource__lb-member.html"><code>lb-member</code></a></td>
+      <td class="muted">networking/loadbalancer</td>
+      <td class="muted">lb-server-group</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-lb-member-bulk</td>
+      <td><a href="resource__lb-member-bulk.html"><code>lb-member-bulk</code></a></td>
+      <td class="muted">networking/loadbalancer</td>
+      <td class="muted">lb-server-group</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-lb-server-group</td>
+      <td><a href="resource__lb-server-group.html"><code>lb-server-group</code></a></td>
+      <td class="muted">networking/loadbalancer</td>
+      <td class="muted">vpc, subnet, lb-health-check</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-lb-static-nat</td>
+      <td><a href="resource__lb-static-nat.html"><code>lb-static-nat</code></a></td>
+      <td class="muted">networking/loadbalancer</td>
+      <td class="muted">load-balancer, public-ip, internet-gateway</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>nw-sg — 네트워크 — Security Group
+    <span class="cat">networking</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">nw-sg-rule</td>
+      <td><a href="resource__security-group-rule.html"><code>security-group-rule</code></a></td>
+      <td class="muted">networking/security-group</td>
+      <td class="muted">security-group</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-sg-sg</td>
+      <td><a href="resource__security-group.html"><code>security-group</code></a></td>
+      <td class="muted">networking/security-group</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>nw-vpc — 네트워크 — VPC 묶음 (vpc/subnet/gateway/endpoint/peering)
+    <span class="cat">networking</span>
+    <span class="muted">(13 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-endpoint</td>
+      <td><a href="resource__vpc-endpoint.html"><code>vpc-endpoint</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">vpc, subnet, filestorage-volume</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-firewall</td>
+      <td><a href="resource__firewall.html"><code>firewall</code></a></td>
+      <td class="muted">networking/firewall</td>
+      <td class="muted">internet-gateway</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-firewall-rule</td>
+      <td><a href="resource__firewall-rule.html"><code>firewall-rule</code></a></td>
+      <td class="muted">networking/firewall</td>
+      <td class="muted">firewall</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-igw</td>
+      <td><a href="resource__internet-gateway.html"><code>internet-gateway</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">vpc</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-natgw</td>
+      <td><a href="resource__nat-gateway.html"><code>nat-gateway</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">subnet, public-ip</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-peering</td>
+      <td><a href="resource__vpc-peering.html"><code>vpc-peering</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">vpc×2</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-port</td>
+      <td><a href="resource__port.html"><code>port</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">subnet</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-private-nat</td>
+      <td><a href="resource__private-nat.html"><code>private-nat</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">direct-connect | transit-gateway</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-privatelink-service</td>
+      <td><a href="resource__privatelink-service.html"><code>privatelink-service</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">vpc, subnet</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-public-ip</td>
+      <td><a href="resource__public-ip.html"><code>public-ip</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-subnet</td>
+      <td><a href="resource__subnet.html"><code>subnet</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">vpc</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-tgw</td>
+      <td><a href="resource__transit-gateway.html"><code>transit-gateway</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-vpc</td>
+      <td><a href="resource__vpc.html"><code>vpc</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">(없음)</td>
+      <td>2</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>nw-vpn — 네트워크 — VPN (gateway/tunnel 체인)
+    <span class="cat">networking</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">nw-vpn-gw</td>
+      <td><a href="resource__vpn-gateway.html"><code>vpn-gateway</code></a></td>
+      <td class="muted">networking/vpn</td>
+      <td class="muted">vpc, public-ip</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpn-tunnel</td>
+      <td><a href="resource__vpn-tunnel.html"><code>vpn-tunnel</code></a></td>
+      <td class="muted">networking/vpn</td>
+      <td class="muted">vpn-gateway</td>
+      <td>3</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>pf-product — 플랫폼 — Product 카탈로그 (조회 전용)
+    <span class="cat">platform</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">pf-product-category</td>
+      <td><a href="resource__product-category.html"><code>product-category</code></a></td>
+      <td class="muted">platform/product</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">pf-product-product</td>
+      <td><a href="resource__product.html"><code>product</code></a></td>
+      <td class="muted">platform/product</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>pf-sts — 플랫폼 — STS 토큰 발급
+    <span class="cat">platform</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">pf-sts-assume-role</td>
+      <td><a href="resource__sts-token.html"><code>sts-token</code></a></td>
+      <td class="muted">platform/sts</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>sec-cert — 보안 — Certificate Manager
+    <span class="cat">security</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">sec-cert-cert</td>
+      <td><a href="resource__certificate.html"><code>certificate</code></a></td>
+      <td class="muted">security/certificatemanager</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">sec-cert-import</td>
+      <td><a href="resource__certificate-import.html"><code>certificate-import</code></a></td>
+      <td class="muted">security/certificatemanager</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>sec-ci — 보안 — Config Inspection
+    <span class="cat">security</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">sec-ci-diagnosis</td>
+      <td><a href="resource__diagnosis.html"><code>diagnosis</code></a></td>
+      <td class="muted">security/configinspection</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>sec-kms — 보안 — KMS (transit key)
+    <span class="cat">security</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">sec-kms-key</td>
+      <td><a href="resource__kms-key.html"><code>kms-key</code></a></td>
+      <td class="muted">security/kms</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>sec-sm — 보안 — Secrets Manager
+    <span class="cat">security</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">sec-sm-secret</td>
+      <td><a href="resource__secret.html"><code>secret</code></a></td>
+      <td class="muted">security/secretsmanager</td>
+      <td class="muted">kms-key</td>
+      <td>1</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>sec-sv — 보안 — Secret Vault
+    <span class="cat">security</span>
+    <span class="muted">(1 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">sec-sv-vault</td>
+      <td><a href="resource__secretvault-vault.html"><code>secretvault-vault</code></a></td>
+      <td class="muted">security/secretvault</td>
+      <td class="muted">(없음)</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>st-as — 스토리지 — Archive Storage (영구 제외: 전용 인증키 미발급)
+    <span class="cat">storage</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">st-as-archiving-policy</td>
+      <td><a href="resource__archiving-policy.html"><code>archiving-policy</code></a></td>
+      <td class="muted">storage/archivestorage</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-as-bucket</td>
+      <td><a href="resource__archive-bucket.html"><code>archive-bucket</code></a></td>
+      <td class="muted">storage/archivestorage</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>st-backup — 스토리지 — Backup (agent/policy)
+    <span class="cat">storage</span>
+    <span class="muted">(6 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">st-backup-agent</td>
+      <td><a href="resource__backup-agent.html"><code>backup-agent</code></a></td>
+      <td class="muted">storage/backup</td>
+      <td class="muted">subnet</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-backup-manual</td>
+      <td><a href="resource__backup-manual.html"><code>backup-manual</code></a></td>
+      <td class="muted">storage/backup</td>
+      <td class="muted">backup-policy</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-backup-policy</td>
+      <td><a href="resource__backup-policy.html"><code>backup-policy</code></a></td>
+      <td class="muted">storage/backup</td>
+      <td class="muted">server, backup-target</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-backup-restore</td>
+      <td><a href="resource__backup-restore.html"><code>backup-restore</code></a></td>
+      <td class="muted">storage/backup</td>
+      <td class="muted">backup-policy, backup-restore-target, subnet, security-group, server-type</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-backup-restore-target</td>
+      <td><a href="resource__backup-restore-target.html"><code>backup-restore-target</code></a></td>
+      <td class="muted">storage/backup</td>
+      <td class="muted">backup-policy, backup-manual</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-backup-target</td>
+      <td><a href="resource__backup-target.html"><code>backup-target</code></a></td>
+      <td class="muted">storage/backup</td>
+      <td class="muted">server</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>st-bs — 스토리지 — Baremetal Block Storage (volume/group/snapshot)
+    <span class="cat">storage</span>
+    <span class="muted">(4 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">st-bs-group-snapshot</td>
+      <td><a href="resource__bm-group-snapshot.html"><code>bm-group-snapshot</code></a></td>
+      <td class="muted">storage/baremetal-blockstorage</td>
+      <td class="muted">bm-volume-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-bs-snapshot</td>
+      <td><a href="resource__bm-volume-snapshot.html"><code>bm-volume-snapshot</code></a></td>
+      <td class="muted">storage/baremetal-blockstorage</td>
+      <td class="muted">bm-block-volume</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-bs-volume</td>
+      <td><a href="resource__bm-block-volume.html"><code>bm-block-volume</code></a></td>
+      <td class="muted">storage/baremetal-blockstorage</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-bs-volume-group</td>
+      <td><a href="resource__bm-volume-group.html"><code>bm-volume-group</code></a></td>
+      <td class="muted">storage/baremetal-blockstorage</td>
+      <td class="muted">bm-block-volume</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>st-fs — 스토리지 — File Storage (volume/snapshot/schedule/replication)
+    <span class="cat">storage</span>
+    <span class="muted">(4 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">st-fs-replication</td>
+      <td><a href="resource__fs-replication.html"><code>fs-replication</code></a></td>
+      <td class="muted">storage/filestorage</td>
+      <td class="muted">filestorage-volume</td>
+      <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-fs-snapshot</td>
+      <td><a href="resource__fs-snapshot.html"><code>fs-snapshot</code></a></td>
+      <td class="muted">storage/filestorage</td>
+      <td class="muted">filestorage-volume</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-fs-snapshot-schedule</td>
+      <td><a href="resource__fs-snapshot-schedule.html"><code>fs-snapshot-schedule</code></a></td>
+      <td class="muted">storage/filestorage</td>
+      <td class="muted">filestorage-volume</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-fs-volume</td>
+      <td><a href="resource__filestorage-volume.html"><code>filestorage-volume</code></a></td>
+      <td class="muted">storage/filestorage</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+<section>
+  <h2>st-pfs — 스토리지 — Parallel File Storage (volume/snapshot)
+    <span class="cat">storage</span>
+    <span class="muted">(2 노드)</span></h2>
+  
+  <table>
+    <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
+        <th>옵션</th><th>검증상태</th></tr>
+    
+    <tr>
+      <td class="muted">st-pfs-snapshot</td>
+      <td><a href="resource__pfs-snapshot.html"><code>pfs-snapshot</code></a></td>
+      <td class="muted">storage/parallel-filestorage</td>
+      <td class="muted">pfs-volume</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">st-pfs-volume</td>
+      <td><a href="resource__pfs-volume.html"><code>pfs-volume</code></a></td>
+      <td class="muted">storage/parallel-filestorage</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+  </table>
+  
+</section>
+
+
+
+</main>
+</body>
+</html>

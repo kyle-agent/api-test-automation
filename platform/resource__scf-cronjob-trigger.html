@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자원 노드 — scf-cronjob-trigger</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  /* ---- design tokens (owner IA mockup — shared with the static dashboard) ---- */
+  :root{
+    --bg:#fbfcfd; --surface:#fff; --surface2:#f5f7f9; --border:#e4e7eb;
+    --text:#1d2530; --muted:#6b7480; --faint:#9aa3ad;
+    --green:#15924f; --green-bg:#e7f6ed; --amber:#b5740b; --amber-bg:#fdf3e2;
+    --red:#c63434; --red-bg:#fbe9e9; --blue:#2563c9; --blue-bg:#e8f0fd;
+    --grey:#7a838d; --grey-bg:#eef1f4; --purple:#7a45c2; --purple-bg:#f1e9fb;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04);
+    /* legacy aliases (older templates reference these directly) */
+    --fg:#1d2530; --line:#e4e7eb; --accent:#2563c9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+  /* ---- app shell ---- */
+  header.shell{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border)}
+  .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
+  .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .nav{display:flex;gap:3px;align-items:center}
+  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a:hover{background:var(--surface2);text-decoration:none}
+  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .ctx select{border:1px solid var(--border);border-radius:7px;background:var(--surface);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit}
+  .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .ctxbar b{color:var(--text)}
+  .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .ctxbar .pip.off{background:var(--faint)}
+
+  main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+  h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  h2:first-child{margin-top:6px}
+  h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  .pad{padding:15px 17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+
+  /* status vocabulary (shared everywhere) */
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .s-verified{background:var(--green-bg);color:var(--green)}
+  .s-reached{background:var(--amber-bg);color:var(--amber)}
+  .s-unobs{background:var(--grey-bg);color:var(--grey)}
+  .s-regress{background:var(--red-bg);color:var(--red)}
+  .s-known{background:#3a1212;color:#ffb3b3}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .tag.heavy{background:var(--purple-bg);color:var(--purple)}
+  .tag.destructive{background:var(--red-bg);color:var(--red)}
+  .tag.mutation{background:var(--amber-bg);color:var(--amber)}
+  .tag.read{background:var(--blue-bg);color:var(--blue)}
+  .tag.disabled{background:#eceef0;color:var(--faint)}
+  .srv{font-size:10px;font-weight:700;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+  /* health verdict banner */
+  .verdict{display:flex;align-items:center;gap:11px;background:var(--green-bg);border:1px solid #c2e6d0;
+    border-radius:12px;padding:12px 16px;font-size:13.5px}
+  .verdict .pip{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .verdict b{color:#0d6e3a}
+  .verdict.bad{background:var(--red-bg);border-color:#ecc4c4}
+  .verdict.bad .pip{background:var(--red)}
+  .verdict.bad b{color:var(--red)}
+  .verdict.none{background:var(--grey-bg);border-color:var(--border)}
+  .verdict.none .pip{background:var(--faint)}
+  .verdict.none b{color:var(--muted)}
+
+  /* metric tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:13px}
+  .tile{padding:13px 14px}
+  .tile .v{font-size:24px;font-weight:800;letter-spacing:-.6px}
+  .tile .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tile .bar{height:5px;border-radius:3px;background:var(--grey-bg);overflow:hidden;margin-top:8px}
+  .tile .bar i{display:block;height:100%;border-radius:3px}
+  .tile .goal{font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* pipeline strip */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:6px}
+  .pstage{flex:1;border:1px solid var(--border);background:var(--surface);padding:13px 15px;position:relative;color:var(--text)}
+  .pstage:first-child{border-radius:11px 0 0 11px}
+  .pstage:last-child{border-radius:0 11px 11px 0}
+  .pstage:not(:last-child){border-right:0}
+  a.pstage:hover{background:var(--surface2);text-decoration:none}
+  .pstage .pl{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+  .pstage .pv{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-top:4px}
+  .pstage .ps{font-size:11.5px;color:var(--muted)}
+  .pstage .chev{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;
+    width:18px;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;color:var(--faint);font-size:10px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:7px 11px;
+    border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  td{padding:8px 11px;border-bottom:1px solid #eef1f3;vertical-align:top;font-size:13px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#fafbfc}
+  td code{font-size:11.5px}
+
+  /* environment / suite cards */
+  .envcard{padding:13px 15px}
+  .envcard .eh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .envcard .en{font-weight:700;font-family:ui-monospace,monospace;font-size:13px}
+  .envcard .er{font-size:11px;color:var(--muted);margin-left:auto}
+  .envcard .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .gate{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .gate .lbl{font-size:11px;color:var(--faint)}
+  .forbid{font-size:10.5px;font-weight:700;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:6px}
+  .allow{font-size:10.5px;font-weight:700;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:6px}
+
+  /* filter chips */
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+  .fchip{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 12px;font-size:12px;
+    font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .fchip b{color:var(--text)} .fchip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+  .fchip.on b{color:var(--blue)}
+  input.search{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-family:inherit;width:230px}
+
+  .note{font-size:11.5px;color:var(--faint);font-style:normal}
+  .biz{cursor:pointer} .biz .more{display:none;color:var(--muted);font-size:12px;margin-top:3px}
+  .biz.open .more{display:block} .biz .toggle{color:var(--blue);font-size:11px}
+
+  /* server-only badge */
+  .srvonly{font-size:10px;font-weight:700;color:var(--grey);background:var(--grey-bg);border-radius:5px;padding:1px 7px;border:1px dashed #c8cdd3;white-space:nowrap}
+  .btn{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.disabled{opacity:.5;cursor:not-allowed}
+
+  /* run compose */
+  .compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .picker label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .picker select,.picker input[type=text]{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  .preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .preview .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #e9edf0;font-size:12.5px}
+  .preview .row:last-child{border:0} .preview .row b{font-weight:700;text-align:right}
+
+  /* report sub-tabs */
+  .subtabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .subtabs a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subtabs a:hover{text-decoration:none;color:var(--text)}
+  .subtabs a.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* coverage ladder */
+  .lad{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:26px}
+  .lad .bar{flex:1;height:20px;border-radius:6px;background:var(--grey-bg);overflow:hidden}
+  .lad .bar i{display:block;height:100%;border-radius:6px}
+  .lad .pct{width:54px;text-align:right;font-weight:700}
+  .lad .desc{width:300px;font-size:12px;color:var(--muted)}
+
+  /* category bars */
+  .catrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #eef1f3}
+  .catrow:last-child{border:0}
+  .catrow .cn{width:170px;font-size:12.5px;font-weight:600}
+  .catrow .cb{flex:1;height:14px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+  .catrow .cb i{display:block;height:100%;border-radius:5px}
+  .catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+
+  /* sparkline */
+  .spark{width:100%;height:90px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{width:18px;height:3px;display:inline-block;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+  .banner{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;padding:9px 13px;font-size:12px;margin-bottom:16px}
+
+  /* ---- legacy components (older templates keep working untouched) ---- */
+  section{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+  section h2{margin:0 0 10px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap}
+  .cards .card{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:10px;box-shadow:none;padding:10px 14px}
+  .cards .card .num{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .cards .card .lbl{font-size:12px;color:var(--muted)}
+  .status{padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;white-space:nowrap}
+  .status.dispatched{background:var(--amber-bg);color:var(--amber)}
+  .status.running   {background:var(--blue-bg);color:var(--blue)}
+  .status.done      {background:var(--green-bg);color:var(--green)}
+  .status.failed    {background:var(--red-bg);color:var(--red)}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=text]{padding:5px 8px;border:1px solid var(--border);border-radius:7px;
+                          font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  button{padding:6px 14px;border:1px solid var(--blue);border-radius:8px;background:var(--blue);
+         color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .warn{color:#9a3412;font-size:12px}
+  pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
+      overflow-x:auto;font-size:12px}
+  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .cat.real_regression{background:var(--red-bg);color:var(--red)}
+  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  .cat.environment    {background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="shell">
+  <div class="navrow">
+    <a class="brand" href="index.html">SCP API Regression</a>
+    <nav class="nav">
+      <a href="index.html" class="">Overview</a>
+      <span class="arrow">→</span>
+      <a href="planning.html" class="active">Plan</a>
+      <span class="arrow">→</span>
+      <a href="testing.html" class="">Run</a>
+      <span class="arrow">→</span>
+      <a href="reporting.html" class="">Report</a>
+      <a href="knowledge.html" style="margin-left:10px"
+         class="">Knowledge</a>
+    </nav>
+    <div class="ctx">
+      환경
+      <select title="환경 프로파일 (environments/*.yaml) — RUN 조립에서 선택 적용">
+        <option>prod-kr-west1</option><option>stage-kr-west1</option>
+      </select>
+      스위트
+      <select title="스위트 (suites/*.yaml) — RUN 조립에서 선택 적용">
+        <option>conformance</option><option>full-heavy</option><option>full</option><option>smoke</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctxbar">
+    
+    
+    <span class="pip off"></span> 발행 스냅샷 정보 없음 — dashboard-data 브랜치를
+    읽을 수 없거나 아직 발행된 run이 없습니다
+    
+  </div>
+</header><div style="background:#fff3cd;border-bottom:1px solid #e8d9a0;padding:6px 24px;font-size:13px">📄 <b>정적 뷰</b> — GitHub Pages 발행본입니다. 실행·편집·개입 버튼은 플랫폼 서버(uvicorn)에서만 동작합니다. <a href="../index.html">현재 대시보드</a> · <a href="../ops.html">ops 뷰어</a></div>
+<main>
+
+
+<section>
+  <h2><a href="resources.html">자원 모델</a> › <code>scf-cronjob-trigger</code>
+    <span class="status done">VALIDATED</span>
+  </h2>
+  <p class="muted">raw YAML이 아닌 폼 — 내부적으로 §1 스키마의 yaml을 생성해
+    <code>knowledge/formal/resources/compute__scf.yaml</code>에
+    저장합니다 (authoring 파이프라인: 검증 통과 시에만 반영 + 로컬 git 커밋).
+    고급 사용자용 raw 편집:
+    <a href="#">원본 YAML 편집기</a></p>
+</section>
+
+<datalist id="node-ids">
+  <option value="account-budget"><option value="account-quota"><option value="aimlops-platform"><option value="alert"><option value="apigw-access-control"><option value="apigw-api"><option value="apigw-api-key"><option value="apigw-auth"><option value="apigw-deployment"><option value="apigw-method"><option value="apigw-privatelink-endpoint"><option value="apigw-resource"><option value="apigw-root-resource"><option value="apigw-stage"><option value="apigw-usage-plan"><option value="archive-bucket"><option value="archiving-policy"><option value="asg-notification"><option value="asg-policy"><option value="asg-schedule"><option value="auto-scaling-group"><option value="backup-agent"><option value="backup-manual"><option value="backup-policy"><option value="backup-restore"><option value="backup-restore-target"><option value="backup-target"><option value="baremetal-server"><option value="block-volume"><option value="bm-block-volume"><option value="bm-group-snapshot"><option value="bm-volume-group"><option value="bm-volume-snapshot"><option value="cachestore-cluster"><option value="cdn"><option value="certificate"><option value="certificate-import"><option value="cloud-ml"><option value="cloudcontrol-landing-zone"><option value="cloudml-image"><option value="cm-account-resource"><option value="cm-event-policy"><option value="container-registry"><option value="cost-reads"><option value="custom-image"><option value="dashboard"><option value="data-flow"><option value="data-flow-service"><option value="data-ops"><option value="data-ops-service"><option value="delegation-policy"><option value="devops-service"><option value="diagnosis"><option value="direct-connect"><option value="epas-add-block-storage"><option value="epas-cluster"><option value="epas-engine-version"><option value="epas-engine-version-16"><option value="epas-instance-group"><option value="epas-kernel-upgrade"><option value="epas-log-export-config"><option value="epas-parameter"><option value="epas-parameter-group"><option value="epas-patch"><option value="epas-promote"><option value="epas-replica"><option value="epas-reset-replica"><option value="epas-resize-block-storage"><option value="epas-resize-server-type"><option value="epas-restore"><option value="epas-server-type"><option value="epas-switchover"><option value="epas-sync-replica-state"><option value="event-rule"><option value="eventstreams-cluster"><option value="filestorage-volume"><option value="firewall"><option value="firewall-rule"><option value="fs-replication"><option value="fs-snapshot"><option value="fs-snapshot-schedule"><option value="gpu-node"><option value="gslb"><option value="hosted-zone"><option value="iam-access-key"><option value="iam-group"><option value="iam-group-member"><option value="iam-group-policy-binding"><option value="iam-identity-center"><option value="iam-policy"><option value="iam-policy-binding-set"><option value="iam-resource-policy"><option value="iam-role"><option value="iam-role-policy-binding"><option value="iam-saml-provider"><option value="iam-user"><option value="iam-user-policy-binding"><option value="idc-account-assignment"><option value="idc-group"><option value="idc-permission-set"><option value="idc-user"><option value="image"><option value="image-registration"><option value="internet-gateway"><option value="keypair"><option value="kms-key"><option value="kubernetes-version"><option value="launch-configuration"><option value="lb-health-check"><option value="lb-listener"><option value="lb-member"><option value="lb-member-bulk"><option value="lb-server-group"><option value="lb-static-nat"><option value="load-balancer"><option value="log-group"><option value="log-stream"><option value="mariadb-add-block-storage"><option value="mariadb-cluster"><option value="mariadb-engine-version"><option value="mariadb-engine-version-10"><option value="mariadb-instance-group"><option value="mariadb-kernel-upgrade"><option value="mariadb-log-export-config"><option value="mariadb-parameter"><option value="mariadb-parameter-group"><option value="mariadb-patch"><option value="mariadb-promote"><option value="mariadb-replica"><option value="mariadb-reset-replica"><option value="mariadb-resize-block-storage"><option value="mariadb-resize-server-type"><option value="mariadb-restart"><option value="mariadb-restore"><option value="mariadb-server-type"><option value="mariadb-start"><option value="mariadb-stop"><option value="mariadb-switchover"><option value="mariadb-sync-replica-state"><option value="mysql-add-block-storage"><option value="mysql-cluster"><option value="mysql-engine-version"><option value="mysql-engine-version-8"><option value="mysql-instance-group"><option value="mysql-kernel-upgrade"><option value="mysql-log-export-config"><option value="mysql-parameter"><option value="mysql-parameter-group"><option value="mysql-patch"><option value="mysql-promote"><option value="mysql-replica"><option value="mysql-reset-replica"><option value="mysql-resize-block-storage"><option value="mysql-resize-server-type"><option value="mysql-restart"><option value="mysql-restore"><option value="mysql-server-type"><option value="mysql-start"><option value="mysql-stop"><option value="mysql-switchover"><option value="mysql-sync-replica-state"><option value="nat-gateway"><option value="network-logging-storage"><option value="org-invitation"><option value="organization"><option value="organization-account"><option value="organization-unit"><option value="pfs-snapshot"><option value="pfs-volume"><option value="pg-add-block-storage"><option value="pg-engine-version"><option value="pg-engine-version-16"><option value="pg-instance-group"><option value="pg-kernel-upgrade"><option value="pg-log-export-config"><option value="pg-parameter"><option value="pg-parameter-group"><option value="pg-patch"><option value="pg-promote"><option value="pg-replica"><option value="pg-reset-replica"><option value="pg-resize-block-storage"><option value="pg-resize-server-type"><option value="pg-restore"><option value="pg-server-type"><option value="pg-switchover"><option value="pg-sync-replica-state"><option value="planned-compute"><option value="port"><option value="postgresql-cluster"><option value="pricing-reads"><option value="private-dns"><option value="private-nat"><option value="privatelink-service"><option value="product"><option value="product-category"><option value="public-ip"><option value="queue"><option value="queue-fifo"><option value="quick-query"><option value="quota-request"><option value="resource-group"><option value="resource-group-bulk"><option value="scf-apigateway-trigger"><option value="scf-cronjob-trigger"><option value="scf-function"><option value="scf-privatelink-endpoint"><option value="scr-image"><option value="scr-repository"><option value="scr-tag"><option value="searchengine-cluster"><option value="secret"><option value="secretvault-vault"><option value="security-group"><option value="security-group-rule"><option value="server"><option value="server-group"><option value="server-interface"><option value="server-static-nat"><option value="server-type"><option value="service-control-policy"><option value="ske-cluster"><option value="ske-cluster-upgrade"><option value="ske-image"><option value="ske-nodepool"><option value="ske-nodepool-upgrade"><option value="sqlserver-cluster"><option value="sts-token"><option value="subnet"><option value="support-inquiry"><option value="support-service-request"><option value="sw-custom-log-collect"><option value="sw-custom-metric-meta"><option value="sw-metric-catalog"><option value="trail"><option value="transit-gateway"><option value="vertica-cluster"><option value="volume-attachment"><option value="volume-snapshot"><option value="volume-transfer"><option value="vpc"><option value="vpc-endpoint"><option value="vpc-peering"><option value="vpn-gateway"><option value="vpn-tunnel">
+</datalist>
+
+<form hx-post="/planning/resources/scf-cronjob-trigger/save" hx-target="#save-result"
+      hx-swap="innerHTML">
+<input type="hidden" name="provenance"
+       value="VALIDATED">
+
+<section>
+  <h2>기본 정보</h2>
+  <table>
+    <tr>
+      <th style="width:140px">code (분류 코드)</th>
+      <td><input type="text" name="code" value="cp-scf-cronjob-trigger"
+                 placeholder="예: nw-vpc-subnet" size="18"></td>
+      <th style="width:140px">service</th>
+      <td><input type="text" name="service" value="compute/scf"
+                 placeholder="category/service" size="24" required></td>
+    </tr>
+    <tr>
+      <th>group (생략 시 code 접두)</th>
+      <td><input type="text" name="group" value=""
+                 placeholder="예: nw-vpc" size="14"></td>
+      <th>quota (core/budgets)</th>
+      <td><input type="text" name="quota" value=""
+                 placeholder="예: vpc" size="14"></td>
+    </tr>
+    <tr>
+      <th>provenance (읽기 전용)</th>
+      <td colspan="3" class="muted">VALIDATED —
+        역추출(라이브 검증) = VALIDATED, 사람/AI 입력 = docs.
+        승격은 scoped run 통과 시 자동 (C5).</td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <h2>전제조건 (requires) — 행 추가식</h2>
+  <p class="muted">type: <b>ref</b>(단일 의존) · <b>count</b>(다중성, 예: vpc×2) ·
+    <b>one_of</b>(OR-의존 — 대상에 콤마로 대안 나열, 항목은 <code>id</code> 또는
+    <code>id:use</code> 예: <code>load-balancer, server:ip</code>).
+    빈 행은 무시됩니다.</p>
+  <table>
+    <tbody id="req-rows">
+      <tr><th style="width:120px">type</th><th>대상 노드</th>
+          <th style="width:90px">count</th></tr>
+      
+      <tr>
+        <td><select name="req_type">
+          
+          <option value="ref" selected>ref</option>
+          
+          <option value="count" >count</option>
+          
+          <option value="one_of" >one_of</option>
+          </select></td>
+        <td><input type="text" name="req_target" value="scf-function"
+                   list="node-ids" style="width:96%"></td>
+        <td><input type="text" name="req_count" value="" size="4"></td>
+      </tr>
+      
+      <tr class="proto">
+        <td><select name="req_type">
+          <option value="ref">ref</option><option value="count">count</option>
+          <option value="one_of">one_of</option></select></td>
+        <td><input type="text" name="req_target" value="" list="node-ids"
+                   placeholder="노드 id (one_of는 콤마 나열)" style="width:96%"></td>
+        <td><input type="text" name="req_count" value="" size="4"></td>
+      </tr>
+    </tbody>
+  </table>
+  <button type="button" class="ghost" onclick="addRow('req-rows')">행 추가</button>
+</section>
+
+<section>
+  <h2>생성 옵션 (create.options)</h2>
+  <p class="muted">타입: cidr(블록 할당 — pick/of로 정책) · enum(값 목록,
+    vary=yes면 C4 변형 생성 대상) · ref(다른 노드 선행 생성) · string.</p>
+  <table>
+    <tbody id="opt-rows">
+      <tr><th>이름</th><th>타입</th><th>required</th><th>vary</th><th>기본값</th>
+          <th>enum 값들(콤마)</th><th>ref 대상</th><th>pick</th><th>of</th><th>note</th></tr>
+      
+      <tr class="proto">
+        <td><input type="text" name="opt_name" value="" size="12" placeholder="옵션명"></td>
+        <td><select name="opt_type">
+          <option value="cidr">cidr</option><option value="enum">enum</option><option value="ref">ref</option><option value="string">string</option>
+        </select></td>
+        <td><select name="opt_required">
+          <option value="no">no</option><option value="yes">yes</option></select></td>
+        <td><select name="opt_vary">
+          <option value="no">no</option><option value="yes">yes</option></select></td>
+        <td><input type="text" name="opt_default" value="" size="8"></td>
+        <td><input type="text" name="opt_enum" value="" size="18"></td>
+        <td><input type="text" name="opt_target" value="" list="node-ids" size="12"></td>
+        <td><input type="text" name="opt_pick" value="" size="10"></td>
+        <td><input type="text" name="opt_of" value="" size="8"></td>
+        <td><input type="text" name="opt_note" value="" size="14"></td>
+      </tr>
+    </tbody>
+  </table>
+  <button type="button" class="ghost" onclick="addRow('opt-rows')">행 추가</button>
+</section>
+
+<section>
+  <h2>생성 호출 — 검증된 body 템플릿</h2>
+  <p class="inline">
+    <label>create.endpoint
+      <input type="text" name="create_endpoint" size="40"
+             value="POST /v1/triggers/cronjob"
+             placeholder="POST /v1/vpcs"></label>
+  </p>
+  <p class="muted">body 템플릿 (JSON — 역추출값 표시, 수정 가능.
+    placeholder: <code>{opt.&lt;옵션&gt;}</code>, <code>{&lt;노드&gt;.&lt;capture&gt;}</code>,
+    <code>{ualpha}</code> 등 엔진 표기 그대로):</p>
+  <textarea name="create_body" spellcheck="false" wrap="off"
+    style="width:100%;height:140px;font:12px/1.5 ui-monospace,Consolas,monospace;
+           border:1px solid var(--line);border-radius:6px;padding:10px">{
+  &#34;cloud_function_id&#34;: &#34;{scf-function.cloud_function_id}&#34;,
+  &#34;schedule&#34;: &#34;0 0 * * 0&#34;,
+  &#34;timezone&#34;: &#34;Asia/Seoul&#34;
+}</textarea>
+</section>
+
+<section>
+  <h2>capture · ready · delete</h2>
+  <p class="muted">capture — 생성 응답에서 뽑을 산출물
+    (<code>변수: $.jsonpath</code> 한 줄씩):</p>
+  <textarea name="capture" spellcheck="false"
+    style="width:100%;height:64px;font:12px/1.5 ui-monospace,Consolas,monospace;
+           border:1px solid var(--line);border-radius:6px;padding:10px">trigger_id: $.triggers[0].trigger_id</textarea>
+  <p class="inline" style="margin-top:8px">
+    <label>ready.field <input type="text" name="ready_field" size="18"
+           value="" placeholder="$.vpc.state"></label>
+    <label>until <input type="text" name="ready_until" size="10"
+           value="" placeholder="ACTIVE"></label>
+    <label>timeout(s) <input type="text" name="ready_timeout" size="6"
+           value=""></label>
+  </p>
+  <p class="inline">
+    <label>delete.endpoint <input type="text" name="delete_endpoint" size="40"
+           value="DELETE /v1/triggers/{trigger_id}"
+           placeholder="DELETE /v1/vpcs/{vpc_id}"></label>
+    <label>destructive <select name="delete_destructive">
+      <option value="yes" selected>yes</option>
+      <option value="no" >no</option>
+    </select></label>
+  </p>
+</section>
+
+<section>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button type="submit"
+            hx-confirm="검증 통과 시 yaml로 저장하고 로컬 git 커밋합니다 — 진행할까요?">
+      검증 + 저장</button>
+    <a href="resource-compose.html">
+      <button type="button" class="ghost">이 자원만 테스트 (합성) →</button></a>
+    <a href="resources.html">목록으로</a>
+  </div>
+  <div id="save-result" style="margin-top:10px"></div>
+</section>
+</form>
+
+<script>
+function addRow(tbodyId) {
+  var tb = document.getElementById(tbodyId);
+  var proto = tb.querySelector("tr.proto");
+  if (!proto) return;
+  var clone = proto.cloneNode(true);
+  clone.classList.remove("proto");
+  tb.appendChild(clone);
+}
+</script>
+
+
+</main>
+</body>
+</html>

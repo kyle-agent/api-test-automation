@@ -1,0 +1,3071 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시나리오 카탈로그</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  /* ---- design tokens (owner IA mockup — shared with the static dashboard) ---- */
+  :root{
+    --bg:#fbfcfd; --surface:#fff; --surface2:#f5f7f9; --border:#e4e7eb;
+    --text:#1d2530; --muted:#6b7480; --faint:#9aa3ad;
+    --green:#15924f; --green-bg:#e7f6ed; --amber:#b5740b; --amber-bg:#fdf3e2;
+    --red:#c63434; --red-bg:#fbe9e9; --blue:#2563c9; --blue-bg:#e8f0fd;
+    --grey:#7a838d; --grey-bg:#eef1f4; --purple:#7a45c2; --purple-bg:#f1e9fb;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04);
+    /* legacy aliases (older templates reference these directly) */
+    --fg:#1d2530; --line:#e4e7eb; --accent:#2563c9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+  /* ---- app shell ---- */
+  header.shell{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border)}
+  .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
+  .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .nav{display:flex;gap:3px;align-items:center}
+  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a:hover{background:var(--surface2);text-decoration:none}
+  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .ctx select{border:1px solid var(--border);border-radius:7px;background:var(--surface);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit}
+  .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .ctxbar b{color:var(--text)}
+  .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .ctxbar .pip.off{background:var(--faint)}
+
+  main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+  h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  h2:first-child{margin-top:6px}
+  h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  .pad{padding:15px 17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+
+  /* status vocabulary (shared everywhere) */
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .s-verified{background:var(--green-bg);color:var(--green)}
+  .s-reached{background:var(--amber-bg);color:var(--amber)}
+  .s-unobs{background:var(--grey-bg);color:var(--grey)}
+  .s-regress{background:var(--red-bg);color:var(--red)}
+  .s-known{background:#3a1212;color:#ffb3b3}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .tag.heavy{background:var(--purple-bg);color:var(--purple)}
+  .tag.destructive{background:var(--red-bg);color:var(--red)}
+  .tag.mutation{background:var(--amber-bg);color:var(--amber)}
+  .tag.read{background:var(--blue-bg);color:var(--blue)}
+  .tag.disabled{background:#eceef0;color:var(--faint)}
+  .srv{font-size:10px;font-weight:700;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+  /* health verdict banner */
+  .verdict{display:flex;align-items:center;gap:11px;background:var(--green-bg);border:1px solid #c2e6d0;
+    border-radius:12px;padding:12px 16px;font-size:13.5px}
+  .verdict .pip{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .verdict b{color:#0d6e3a}
+  .verdict.bad{background:var(--red-bg);border-color:#ecc4c4}
+  .verdict.bad .pip{background:var(--red)}
+  .verdict.bad b{color:var(--red)}
+  .verdict.none{background:var(--grey-bg);border-color:var(--border)}
+  .verdict.none .pip{background:var(--faint)}
+  .verdict.none b{color:var(--muted)}
+
+  /* metric tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:13px}
+  .tile{padding:13px 14px}
+  .tile .v{font-size:24px;font-weight:800;letter-spacing:-.6px}
+  .tile .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tile .bar{height:5px;border-radius:3px;background:var(--grey-bg);overflow:hidden;margin-top:8px}
+  .tile .bar i{display:block;height:100%;border-radius:3px}
+  .tile .goal{font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* pipeline strip */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:6px}
+  .pstage{flex:1;border:1px solid var(--border);background:var(--surface);padding:13px 15px;position:relative;color:var(--text)}
+  .pstage:first-child{border-radius:11px 0 0 11px}
+  .pstage:last-child{border-radius:0 11px 11px 0}
+  .pstage:not(:last-child){border-right:0}
+  a.pstage:hover{background:var(--surface2);text-decoration:none}
+  .pstage .pl{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+  .pstage .pv{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-top:4px}
+  .pstage .ps{font-size:11.5px;color:var(--muted)}
+  .pstage .chev{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;
+    width:18px;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;color:var(--faint);font-size:10px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:7px 11px;
+    border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  td{padding:8px 11px;border-bottom:1px solid #eef1f3;vertical-align:top;font-size:13px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#fafbfc}
+  td code{font-size:11.5px}
+
+  /* environment / suite cards */
+  .envcard{padding:13px 15px}
+  .envcard .eh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .envcard .en{font-weight:700;font-family:ui-monospace,monospace;font-size:13px}
+  .envcard .er{font-size:11px;color:var(--muted);margin-left:auto}
+  .envcard .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .gate{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .gate .lbl{font-size:11px;color:var(--faint)}
+  .forbid{font-size:10.5px;font-weight:700;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:6px}
+  .allow{font-size:10.5px;font-weight:700;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:6px}
+
+  /* filter chips */
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+  .fchip{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 12px;font-size:12px;
+    font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .fchip b{color:var(--text)} .fchip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+  .fchip.on b{color:var(--blue)}
+  input.search{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-family:inherit;width:230px}
+
+  .note{font-size:11.5px;color:var(--faint);font-style:normal}
+  .biz{cursor:pointer} .biz .more{display:none;color:var(--muted);font-size:12px;margin-top:3px}
+  .biz.open .more{display:block} .biz .toggle{color:var(--blue);font-size:11px}
+
+  /* server-only badge */
+  .srvonly{font-size:10px;font-weight:700;color:var(--grey);background:var(--grey-bg);border-radius:5px;padding:1px 7px;border:1px dashed #c8cdd3;white-space:nowrap}
+  .btn{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.disabled{opacity:.5;cursor:not-allowed}
+
+  /* run compose */
+  .compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .picker label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .picker select,.picker input[type=text]{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  .preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .preview .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #e9edf0;font-size:12.5px}
+  .preview .row:last-child{border:0} .preview .row b{font-weight:700;text-align:right}
+
+  /* report sub-tabs */
+  .subtabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .subtabs a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subtabs a:hover{text-decoration:none;color:var(--text)}
+  .subtabs a.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* coverage ladder */
+  .lad{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:26px}
+  .lad .bar{flex:1;height:20px;border-radius:6px;background:var(--grey-bg);overflow:hidden}
+  .lad .bar i{display:block;height:100%;border-radius:6px}
+  .lad .pct{width:54px;text-align:right;font-weight:700}
+  .lad .desc{width:300px;font-size:12px;color:var(--muted)}
+
+  /* category bars */
+  .catrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #eef1f3}
+  .catrow:last-child{border:0}
+  .catrow .cn{width:170px;font-size:12.5px;font-weight:600}
+  .catrow .cb{flex:1;height:14px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+  .catrow .cb i{display:block;height:100%;border-radius:5px}
+  .catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+
+  /* sparkline */
+  .spark{width:100%;height:90px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{width:18px;height:3px;display:inline-block;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+  .banner{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;padding:9px 13px;font-size:12px;margin-bottom:16px}
+
+  /* ---- legacy components (older templates keep working untouched) ---- */
+  section{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+  section h2{margin:0 0 10px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap}
+  .cards .card{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:10px;box-shadow:none;padding:10px 14px}
+  .cards .card .num{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .cards .card .lbl{font-size:12px;color:var(--muted)}
+  .status{padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;white-space:nowrap}
+  .status.dispatched{background:var(--amber-bg);color:var(--amber)}
+  .status.running   {background:var(--blue-bg);color:var(--blue)}
+  .status.done      {background:var(--green-bg);color:var(--green)}
+  .status.failed    {background:var(--red-bg);color:var(--red)}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=text]{padding:5px 8px;border:1px solid var(--border);border-radius:7px;
+                          font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  button{padding:6px 14px;border:1px solid var(--blue);border-radius:8px;background:var(--blue);
+         color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .warn{color:#9a3412;font-size:12px}
+  pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
+      overflow-x:auto;font-size:12px}
+  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .cat.real_regression{background:var(--red-bg);color:var(--red)}
+  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  .cat.environment    {background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="shell">
+  <div class="navrow">
+    <a class="brand" href="index.html">SCP API Regression</a>
+    <nav class="nav">
+      <a href="index.html" class="">Overview</a>
+      <span class="arrow">→</span>
+      <a href="planning.html" class="active">Plan</a>
+      <span class="arrow">→</span>
+      <a href="testing.html" class="">Run</a>
+      <span class="arrow">→</span>
+      <a href="reporting.html" class="">Report</a>
+      <a href="knowledge.html" style="margin-left:10px"
+         class="">Knowledge</a>
+    </nav>
+    <div class="ctx">
+      환경
+      <select title="환경 프로파일 (environments/*.yaml) — RUN 조립에서 선택 적용">
+        <option>prod-kr-west1</option><option>stage-kr-west1</option>
+      </select>
+      스위트
+      <select title="스위트 (suites/*.yaml) — RUN 조립에서 선택 적용">
+        <option>conformance</option><option>full-heavy</option><option>full</option><option>smoke</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctxbar">
+    
+    
+    <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
+    2026-06-13T02:06:00Z · <b>sha 3a27edc</b>
+    (push) · 모든 수치는 이 스냅샷 기준
+    
+  </div>
+</header><div style="background:#fff3cd;border-bottom:1px solid #e8d9a0;padding:6px 24px;font-size:13px">📄 <b>정적 뷰</b> — GitHub Pages 발행본입니다. 실행·편집·개입 버튼은 플랫폼 서버(uvicorn)에서만 동작합니다. <a href="../index.html">현재 대시보드</a> · <a href="../ops.html">ops 뷰어</a></div>
+<main>
+
+
+<section>
+  <h2>시나리오 카탈로그 (187건)</h2>
+  <form class="inline" method="get" action="/planning/scenarios">
+    <input type="text" name="service" value=""
+           placeholder="서비스 필터 (예: networking)">
+    <button type="submit">필터</button>
+    
+    <span class="muted">편집은 lifecycle을 담은 파일 전체를 엽니다
+      (scenarios.json 또는 lifecycles/&lt;service&gt;.json fragment) —
+      해당 lifecycle 위치로 자동 스크롤.</span>
+  </form>
+  <table style="margin-top:10px">
+    <tr><th>id</th><th>service</th><th>steps</th><th>속성</th><th>비고</th><th></th></tr>
+    
+    <tr>
+      <td><code>resourcemanager-resource-group</code></td>
+      <td>management/resourcemanager</td>
+      <td>10</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Create a resource-group, read it, then set it + write/list/delete a tag on its SRN (each optional+grouped), probe path-param GETs, delete. COVERAGE EXPANSION (n</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>quota-reads</code></td>
+      <td>management/quota</td>
+      <td>3</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">Read-only: list account-quotas + quota-requests, soft-capture an id each, probe the 2 path-param GETs (showaccountquota/showquotarequest). No writes/cleanup. En</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>support-reads</code></td>
+      <td>management/support</td>
+      <td>3</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">Read-only: list inquiries + service-requests, soft-capture an id each, probe showinquiry/showservicerequest. No writes/cleanup. Env-dependent (records SOFT if t</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-vpc-subnet</code></td>
+      <td>networking/vpc</td>
+      <td>14</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted"></td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>container-scr-registry</code></td>
+      <td>container/scr</td>
+      <td>19</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Registry DELETE returns 500 for a few minutes right after creation (provisioning race), then succeeds; the delete step retries 500 up to ~6 min. Enabled. COVERA</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>filestorage-volume</code></td>
+      <td>storage/filestorage</td>
+      <td>7</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted"></td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-certificatemanager-selfsign</code></td>
+      <td>security/certificatemanager</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained: check the name is free, issue a self-signed certificate, read it, list, delete. Synchronous.</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-certificatemanager-import</code></td>
+      <td>security/certificatemanager</td>
+      <td>7</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">DISABLED: certificatemanager check-validation/import reject a runtime-minted self-signed key/cert regardless of PEM encoding (PKCS#8 and PKCS#1 both return &#39;Thi</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>application-queueservice-queue</code></td>
+      <td>application-service/queueservice</td>
+      <td>11</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained: create a Standard queue, read it, then exercise the config/description/deduplication/ACL writes, list, probe-read, delete. Synchronous. C</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-security-group</code></td>
+      <td>networking/security-group</td>
+      <td>8</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained: security groups are account/region-scoped (no VPC needed, per validated VM/ske lifecycles). Create SG + an ingress rule, read, list, dele</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>virtualserver-keypair</code></td>
+      <td>compute/virtualserver</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, zero-cost, self-contained: create an SSH keypair (public_key omitted so SCP generates one), read by name, list, probe, delete. Synchronous. VALIDATED-FAC</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>compute-virtualserver-volume-snapshot</code></td>
+      <td>compute/virtualserver</td>
+      <td>9</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, no-VPC: create a block volume, snapshot it, probe-read both (showvolume + showsnapshot), then tear down. Volume create body mirrors the VM lifecycle&#39;s cr</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-vpc-publicip</code></td>
+      <td>networking/vpc</td>
+      <td>7</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained: allocate a public IP (type IGW, unattached), read, list, probe, delete. Best-effort create body from docs (createpublicip 1.2); async cre</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-vpc-internet-gateway</code></td>
+      <td>networking/vpc</td>
+      <td>10</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained: create a VPC inline, attach an internet gateway, read both, probe, tear down in reverse. Best-effort create body from docs (createinterne</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>container-ske-cluster-nodepool</code></td>
+      <td>container/ske</td>
+      <td>46</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">VALIDATED end-to-end (real K8s cluster + nodepool, ~27min, billable). v1.4 schema: volume_id is a string, service_watch_logging_enabled required; nodepool with </td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>compute-virtualserver-full</code></td>
+      <td>virtualserver</td>
+      <td>55</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Core create/read/delete path VALIDATED end-to-end (creates a real, billable VM ~17min and tears it down). Enabled per request; disable (enabled=false) to avoid </td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>database-mysql-cluster</code></td>
+      <td>database/mysql</td>
+      <td>38</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">HEAVY: provisions a real, billable MySQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet, waits until service_state RUNNING, then tears ever</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>database-postgresql-cluster</code></td>
+      <td>database/postgresql</td>
+      <td>50</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">HEAVY: real billable PostgreSQL DBaaS cluster (single-node, ha_enabled=false) on its own VPC/subnet; create-&gt;RUNNING, then config writes (maintenance/backup/arc</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>heavy-shared-dbaas</code></td>
+      <td>networking/vpc</td>
+      <td>28</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Shared-infra parallel heavy plan: ONE vpc+subnet, then 5 dbaas engines (mysql/postgresql/mariadb/epas/cachestore); VM excluded (#6 no identifiable boot image); </td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-dns-hosted-zone</code></td>
+      <td>networking/dns</td>
+      <td>9</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">DISABLED — SUPERSEDED 2026-06-11 by networking-dns-hosted-zone-private (regression/scenarios/lifecycles/networking__dns.json), which encodes the full userguide </td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-kms-key</code></td>
+      <td>security/kms</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Real body from API ref (security/kms/createkey, see framework/api_bodies.json). Self-contained: create transit key -&gt; get -&gt; list -&gt; probe path-param GETs -&gt; de</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-secretsmanager-secret</code></td>
+      <td>security/secretsmanager</td>
+      <td>12</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Real bodies from API ref (createsecretsmanager + createkey). The secret requires a kms_id, so the lifecycle creates a KMS key first (chain) and tears it down la</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>application-apigateway-api-resource</code></td>
+      <td>application-service/apigateway</td>
+      <td>11</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, VPC-FREE, self-contained. Creates an API (REGION endpoint), reads root resource id, creates a child resource, creates a deployment, probe-reads every {ap</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>compute-scf-cloud-function-cronjob-trigger</code></td>
+      <td>compute/scf</td>
+      <td>22</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, VPC-FREE, self-contained. Creates a Cloud Function (inline content, Node.js:20 runtime), waits for state READY, then attaches a CRONJOB trigger (no apiga</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>heavy-shared-networking</code></td>
+      <td>networking/vpc</td>
+      <td>55</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">ONE shared vpc(10.140.0.0/20)+subnet(10.140.1.0/24)+publicip, then networking families created back-to-back as optional groups (igw, port, natgw, tgw, subnetvip</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-group</code></td>
+      <td>management/iam</td>
+      <td>7</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained: create an IAM group (no path-param POST /v1/groups), read it, probe the 3 group-id path-param GETs, delete. Body grounded on management/i</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-policy</code></td>
+      <td>management/iam</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained: create a USER_DEFINED identity policy (no path-param POST /v1/policies), read it, probe the 2 policy-id path-param GETs, delete. Body gro</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-role</code></td>
+      <td>management/iam</td>
+      <td>5</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">Light, self-contained: create a USER_DEFINED role (no path-param POST /v1/roles), read it, probe the 2 role-id path-param GETs, delete. Body grounded on managem</td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>servicewatch-loggroup-logstream</code></td>
+      <td>management/servicewatch</td>
+      <td>10</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light child-resource lifecycle: create log group -&gt; create log stream under it -&gt; read both (explicit get-group closes the showloggroup static gap; probe-reads </td>
+      <td style="white-space:nowrap" title="regression/scenarios/scenarios.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>aimlops-platform-release-write-coverage</code></td>
+      <td>ai-ml/aimlops-platform</td>
+      <td>6</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY + heavy (NOT yet runtime-proven). Closes all 3 aimlops-platform writes: POST /v1/aimlops-platform (releaseaimlopsplatformv1), PUT /v1/aimlops-plat</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/ai-ml__aimlops-platform.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>cloud-ml-write-coverage</code></td>
+      <td>ai-ml/cloud-ml</td>
+      <td>6</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY + heavy (NOT yet runtime-proven). Closes all 3 cloud-ml writes: POST /v1/cloud-ml (createcloudml), PUT /v1/cloud-ml/{cloud_ml_id} (updatecloudml),</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/ai-ml__cloud-ml.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>apigateway-api-write-coverage</code></td>
+      <td>application-service/apigateway</td>
+      <td>31</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, VPC-FREE, self-contained. Creates its OWN api (does NOT touch application-apigateway-api-resource) and exercises the apigateway WRITE surface that the ba</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/application-service__apigateway.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>apigateway-privatelink-endpoint</code></td>
+      <td>application-service/apigateway</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained PRIVATELINK-ENDPOINT lifecycle covering all 7 privatelink-endpoint write ops (POST create, PUT set, PUT request, PUT connection, PUT appro</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/application-service__apigateway.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>baremetal-server-coverage</code></td>
+      <td>compute/baremetal</td>
+      <td>13</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY, heavy (bare-metal servers are billable + slow to provision). Closes ALL 12 uncovered compute/baremetal WRITE endpoints WITHOUT provisioning a rea</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/compute__baremetal.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>mngc-gpu-node-coverage</code></td>
+      <td>compute/multinodegpucluster</td>
+      <td>10</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY, heavy (multi-node GPU cluster nodes are billable + slow). Closes ALL 9 uncovered compute/multinodegpucluster WRITE endpoints WITHOUT provisioning</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/compute__multinodegpucluster.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>scf-privatelink-apigateway-coverage</code></td>
+      <td>compute/scf</td>
+      <td>8</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, VPC-FREE, COVERAGE-ONLY. Closes the 7 SCF write endpoints the base compute-scf-cloud-function-cronjob-trigger lifecycle deliberately skips: the privateli</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/compute__scf.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vs-autoscaling-coverage</code></td>
+      <td>compute/virtualserver</td>
+      <td>17</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, VPC-FREE, COVERAGE-ONLY. Exercises the auto-scaling + launch-configuration WRITE surface the base virtualserver lifecycles never touch. No real ASG/VM is</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/compute__virtualserver.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vs-image-write-coverage</code></td>
+      <td>compute/virtualserver</td>
+      <td>7</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, VPC-FREE, COVERAGE-ONLY. Exercises image create/import/share/members (the base full-VM lifecycle only does server-&gt;image create + image PUT/DELETE). {ima</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/compute__virtualserver.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vs-volume-transfer-coverage</code></td>
+      <td>compute/virtualserver</td>
+      <td>8</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, VPC-FREE, COVERAGE-ONLY. Covers volume-transfer (cross-project handover), volume revert-to-snapshot, attach/detach a volume to a server via the /volumes/</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/compute__virtualserver.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vs-server-action-coverage</code></td>
+      <td>compute/virtualserver</td>
+      <td>13</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, COVERAGE-ONLY, NO REAL VM (cost control). Exercises the per-server WRITE actions the heavy full-VM lifecycle deliberately omits (lock/unlock — risk of st</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/compute__virtualserver.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>scr-image-write-coverage</code></td>
+      <td>container/scr</td>
+      <td>10</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY (NOT yet runtime-proven). SCR image ids are born by a `docker push` to a repository, NOT by any REST POST — so this lifecycle cannot create a real</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/container__scr.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>scr-tags-write-coverage</code></td>
+      <td>container/scr</td>
+      <td>7</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY (NOT yet runtime-proven). SCR tags ids (image tags) are born by a `docker push` too, not by REST — so {tags_id} is seeded via a soft-capture again</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/container__scr.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>scr-read-coverage</code></td>
+      <td>container/scr</td>
+      <td>13</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY (READ-ONLY). Fills coverage for the remaining id-bound SCR GET endpoints by CALLING each one so it is recorded at runtime. Harvests real ids best-</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/container__scr.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>ske-upgrade-write-coverage</code></td>
+      <td>container/ske</td>
+      <td>6</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY (NOT yet runtime-proven). Closes the last two ske write gaps: PUT /v1/clusters/{cluster_id}/upgrade and PUT /v1/nodepools/{nodepool_id}/upgrade. B</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/container__ske.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>ske-read-coverage</code></td>
+      <td>container/ske</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY (READ-ONLY). Closes the last three ske id-bound GET gaps: GET /v1/clusters/{cluster_id}/kubeconfig, GET /v1/clusters/{cluster_id}/user-kubeconfig,</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/container__ske.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>data-flow-service-and-flow-guarded</code></td>
+      <td>data-analytics/data-flow</td>
+      <td>12</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for data-flow&#39;s uncovered WRITE endpoints: createdataflowserviceconsole (POST /v1/data-flow-services), updatedataflowservicecons</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__data-flow.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>data-flow-read-coverage</code></td>
+      <td>data-analytics/data-flow</td>
+      <td>9</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for data-flow&#39;s id-bound GETs (READ-ONLY, never mutates). Lists the data-flows and data-flow-services collections, soft-captures id</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__data-flow.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>data-ops-service-and-ops-guarded</code></td>
+      <td>data-analytics/data-ops</td>
+      <td>12</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for data-ops&#39;s uncovered WRITE endpoints: createdataopsservice (POST /v1/data-ops-services), updatedataopsservice (PUT), deleted</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__data-ops.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>data-ops-read-coverage</code></td>
+      <td>data-analytics/data-ops</td>
+      <td>9</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for data-ops&#39;s id-bound GETs (READ-ONLY, never mutates). Lists the data-ops and data-ops-services collections, soft-captures ids un</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__data-ops.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>eventstreams-cluster-subops-guarded</code></td>
+      <td>data-analytics/eventstreams</td>
+      <td>15</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the eventstreams (Kafka DBaaS) WRITE endpoints. Does NOT provision a billable cluster: soft-captures an EXISTING cluster_id </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__eventstreams.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>eventstreams-read-coverage</code></td>
+      <td>data-analytics/eventstreams</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for eventstreams&#39; two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__eventstreams.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>quick-query-lifecycle-guarded</code></td>
+      <td>data-analytics/quick-query</td>
+      <td>10</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for quick-query&#39;s uncovered WRITE endpoints: createquickquery (POST /v1/quick-query), validatequickqueryresources (POST /v1/quic</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__quick-query.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>quick-query-read-coverage</code></td>
+      <td>data-analytics/quick-query</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for quick-query&#39;s id-bound GETs (READ-ONLY, never mutates). Lists the quick-query collection, soft-captures the id under the EXACT </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__quick-query.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>searchengine-cluster-subops-guarded</code></td>
+      <td>data-analytics/searchengine</td>
+      <td>20</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the searchengine (OpenSearch DBaaS) WRITE endpoints not already reachable via the shared /v1/clusters/* DBaaS scenarios. Pri</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__searchengine.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>searchengine-read-coverage</code></td>
+      <td>data-analytics/searchengine</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for searchengine&#39;s two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__searchengine.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vertica-cluster-subops-guarded</code></td>
+      <td>data-analytics/vertica</td>
+      <td>18</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the vertica (analytics DB DBaaS) cluster sub-op WRITE endpoints. vertica has ZERO GAP-write endpoints in spec.coverage_gap b</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__vertica.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vertica-read-coverage</code></td>
+      <td>data-analytics/vertica</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for vertica&#39;s two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT cata</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__vertica.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>cachestore-cluster-subops-guarded</code></td>
+      <td>database/cachestore</td>
+      <td>22</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the cachestore (Redis) DBaaS cluster sub-op WRITE endpoints. Soft-captures an existing cluster_id (+ instance_group_id/bsg_i</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__cachestore.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>cachestore-read-coverage</code></td>
+      <td>database/cachestore</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for cachestore id-bound GETs. Soft-captures an existing cluster_id (from /v1/clusters) and dbaas_engine_version_id (from /v1/engine</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__cachestore.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>epas-cluster-subops-guarded</code></td>
+      <td>database/epas</td>
+      <td>36</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the epas DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXISTING c</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__epas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>epas-read-coverage</code></td>
+      <td>database/epas</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for epas id-bound GETs. Soft-captures an existing cluster_id (from /v1/clusters) and dbaas_engine_version_id (from /v1/engine-versi</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__epas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>mariadb-cluster-subops-guarded</code></td>
+      <td>database/mariadb</td>
+      <td>35</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the mariadb DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXISTIN</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__mariadb.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>mariadb-read-coverage</code></td>
+      <td>database/mariadb</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for mariadb id-bound GETs. Soft-captures an existing cluster_id (from /v1/clusters) and dbaas_engine_version_id (from /v1/engine-ve</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__mariadb.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>mysql-cluster-subops-guarded</code></td>
+      <td>database/mysql</td>
+      <td>21</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the mysql DBaaS cluster sub-op WRITE endpoints that the real heavy `database-mysql-cluster` lifecycle does NOT exercise (rep</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__mysql.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>mysql-read-coverage</code></td>
+      <td>database/mysql</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for mysql id-bound GETs. Soft-captures an existing cluster_id (from /v1/clusters) and dbaas_engine_version_id (from /v1/engine-vers</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__mysql.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>postgresql-cluster-subops-guarded</code></td>
+      <td>database/postgresql</td>
+      <td>36</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the postgresql DBaaS cluster sub-op WRITE endpoints. It does NOT provision a real billable cluster: it soft-captures an EXIS</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__postgresql.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>postgresql-read-coverage</code></td>
+      <td>database/postgresql</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for postgresql id-bound GETs. Soft-captures an existing cluster_id (from /v1/clusters) and dbaas_engine_version_id (from /v1/engine</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__postgresql.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>sqlserver-cluster-subops-guarded</code></td>
+      <td>database/sqlserver</td>
+      <td>31</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded lifecycle for the sqlserver DBaaS cluster sub-op WRITE endpoints (incl. the sqlserver-only create/delete cluster which the shared heavy-sh</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__sqlserver.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>sqlserver-read-coverage</code></td>
+      <td>database/sqlserver</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__sqlserver.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>devopsservice-write-coverage</code></td>
+      <td>devops-tools/devopsservice</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY guarded, light (NOT yet runtime-proven). Closes both devopsservice writes: POST /v1/devops-services (createdevopsservice) and DELETE /v1/devops-se</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/devops-tools__devopsservice.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>billingplan-planned-computes-guarded</code></td>
+      <td>financial-management/billingplan</td>
+      <td>5</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">billingplan is a GLOBAL (account-scoped) service (CONTEXT.md global-services list). &#39;planned-computes&#39; are RESERVED/COMMITTED compute purchases — a real financi</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/financial-management__billingplan.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>budget-account-budget</code></td>
+      <td>financial-management/budget</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">budget is a GLOBAL (account-scoped, no region) financial-management service (see CONTEXT.md global-services list). Closes all 3 budget writes: POST /v1/budgets/</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/financial-management__budget.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-cloudml-chain</code></td>
+      <td>ai-ml/cloud-ml</td>
+      <td>24</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">composed cloud-ml full chain — 9-node closure: keypair/registry/k8s-version/sg/vpc/subnet/filestorage -&gt; ske-cluster -&gt; cloud-ml; needs credentials: scr-auth-ke</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__cloudml.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-backup</code></td>
+      <td>storage/backup</td>
+      <td>35</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">storage/backup AGENTLESS VM_IMAGE chain on a REAL server (owner directive 2026-06-13 — prior blocker was docs-example server UUIDs, &#39;실 서버 UUID 의존&#39;): VM closure </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-backup.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-backup-restore</code></td>
+      <td>storage/backup</td>
+      <td>27</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Restore flow: backup-restore-target lookup captures $.contents[0].restore_target_id (listbackuprestoretarget) + list-filesystem-path probe (agent-gated: 400 exp</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-backup.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-epas-replica</code></td>
+      <td>database/epas</td>
+      <td>27</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">PRIORITY heavy chain — epas-create has NO recorded live 2xx anywhere (heavy-shared-dbaas epas leg was optional-grouped); this chain is the first proof opportuni</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-mysql-replica</code></td>
+      <td>database/mysql</td>
+      <td>31</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -&gt; replica -&gt; sync-replica-state -&gt; reset-replica -&gt; promote (IRREVERSIBLE, last) </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-mariadb-replica</code></td>
+      <td>database/mariadb</td>
+      <td>35</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">mariadb delete drain is ~90min (run e3ba190) and applies to BOTH clusters — teardown deletes replica then origin; residual drain is absorbed by the composer&#39;s d</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-epas-restore</code></td>
+      <td>database/epas</td>
+      <td>18</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">composed-but-disabled restore chain (PG mirror). composed by regression/scenarios/composer.py — targets: epas-cluster, epas-restore</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-mysql-restore</code></td>
+      <td>database/mysql</td>
+      <td>22</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">composed-but-disabled restore chain (PG mirror). composed by regression/scenarios/composer.py — targets: mysql-cluster, mysql-restore</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-mariadb-restore</code></td>
+      <td>database/mariadb</td>
+      <td>26</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">composed-but-disabled restore chain (PG mirror). composed by regression/scenarios/composer.py — targets: mariadb-cluster, mariadb-restore</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-epas-upgrade</code></td>
+      <td>database/epas</td>
+      <td>18</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">old-major create -&gt; kernel-upgrade chain (PG gen-heavy-pg-upgrade mirror). DOUBLE-GATED: (1) the owner has confirmed old engine versions in the console only for</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-mysql-upgrade</code></td>
+      <td>database/mysql</td>
+      <td>22</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">old-major create -&gt; kernel-upgrade chain (PG gen-heavy-pg-upgrade mirror). DOUBLE-GATED: (1) the owner has confirmed old engine versions in the console only for</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-mariadb-upgrade</code></td>
+      <td>database/mariadb</td>
+      <td>26</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">old-major create -&gt; kernel-upgrade chain (PG gen-heavy-pg-upgrade mirror). DOUBLE-GATED: (1) the owner has confirmed old engine versions in the console only for</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-dbaas.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-pg-replica</code></td>
+      <td>database/postgresql</td>
+      <td>27</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">owner-approved replica flow (2026-06-13, same-region: &#39;한 리전에서 가능하면 하고 안되면 이야기 해줘&#39; — userguide confirms standard replicas are same-region/same-subnet, max 5/DB):</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-pg.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-pg-restore</code></td>
+      <td>database/postgresql</td>
+      <td>18</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">owner-approved restore try (2026-06-13): POST /v1/clusters/{id}/restore creates a NEW cluster from backup (userguide backupandrestore: &#39;신규 서버가 생성되고 ... DB의 구성 정</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-pg.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-pg-upgrade</code></td>
+      <td>database/postgresql</td>
+      <td>18</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">owner-approved upgrade strategy (2026-06-13, SKE precedent): create the cluster on the OLDER 16.x engine (pg-engine-version-16 filter lookup where_prefix major_</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-pg.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-ske-upgrade</code></td>
+      <td>container/ske</td>
+      <td>31</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">owner-approved upgrade flow (2026-06-13): cluster+nodepool at v1.33.5 -&gt; control-plane upgrade v1.34.3 -&gt; node roll -&gt; teardown. Also closes kubeconfig x2 (lowe</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-ske.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-vs-netops</code></td>
+      <td>compute/virtualserver</td>
+      <td>47</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">run 27450089575: static-nat create 2xx + capture proven; per-id read 403 &#39;Action definition is not found&#39; (PF-15) -&gt; verify [200,403]. Extended chain: server po</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__heavy-vs.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-pilot-net-basics</code></td>
+      <td>networking/vpc</td>
+      <td>22</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">recomposed 2026-06-13 — vpc add-cidr + igw list/set verifies added (retirement NEAR gaps; vpc-cidr-secondary/-internet-gateway hand-written chains retire after </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__pilot.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave-vslight</code></td>
+      <td>compute/virtualserver</td>
+      <td>9</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed verification wave 2 — re-composed with the id-bound GET verify additions (gap_getid lever); targets: server-group, volume-transfer</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave1.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave-apigw</code></td>
+      <td>application-service/apigateway</td>
+      <td>21</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed verification wave 2 — re-composed with the id-bound GET verify additions (gap_getid lever); targets: apigw-stage, apigw-usage-plan, apigw-api-key, apig</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave1.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave-dashboard</code></td>
+      <td>management/servicewatch</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed wave — delete body fixed to dashboard_ids (DashboardBulkDeleteRequest, run 27398084089 triage)</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave1.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave-mgmisc</code></td>
+      <td>management/cloudmonitoring</td>
+      <td>3</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">composed verification wave 1 (R3, rev 3 after run 27395331657 triage) — targets: cm-event-policy</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave1.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave-devops</code></td>
+      <td>devops-tools/devopsservice</td>
+      <td>3</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">composed verification wave 1 (R3, rev 3 after run 27395331657 triage) — targets: devops-service</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave1.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave-net-endpoint</code></td>
+      <td>networking/vpc</td>
+      <td>9</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">composed verification wave 1 (R3, rev 3 after run 27395331657 triage) — targets: vpc-endpoint</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave1.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-queue</code></td>
+      <td>application-service/queueservice</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-sec</code></td>
+      <td>security/kms</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: kms-key, secret</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-rg</code></td>
+      <td>management/resourcemanager</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: resource-group</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-iam</code></td>
+      <td>management/iam</td>
+      <td>7</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed verification wave 2 — vpc-free chains carrying the new id-bound GET verifies (docs/COVERAGE-GETID-PLAN.md); targets: iam-group, iam-policy</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-scf</code></td>
+      <td>compute/scf</td>
+      <td>16</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-volume</code></td>
+      <td>compute/virtualserver</td>
+      <td>10</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">recomposed 2026-06-13 — snapshot list verify (retirement gap) + transfer read</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-scr</code></td>
+      <td>container/scr</td>
+      <td>16</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">recomposed after run 27447899572 — lifecycle-policy PUT body uses untagged_rule_duration (untagged_rule_count -&gt; 400 Field required)</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-fs</code></td>
+      <td>storage/filestorage</td>
+      <td>7</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">recomposed after run 27421363609 (publicip_id field, fs delete volume_id query)</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave2-cmep</code></td>
+      <td>management/cloudmonitoring</td>
+      <td>4</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">composed wave 2 rev 2 — run 27399448835 triage fixes (delete retries, required params/headers, 403 findings)</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave2.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave3-quota</code></td>
+      <td>management/quota</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">recomposed after run 27428457582 — account-quota PROVEN (capture+read 200); quota-requests list empty in env -&gt; capture_soft + optional verify</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave3.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave3-support</code></td>
+      <td>management/support</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">recomposed 2026-06-13 — owner-provided known ids (inquiry sr-260613-00001-nuri-scp, SR SR0003870935) make the id-bound GETs deterministic; empty-list soft captu</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave3.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave3-product</code></td>
+      <td>platform/product</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">recomposed after run 27444823109 — live body: items carry category_id/product_id fields, not id</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave3.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave3-cost</code></td>
+      <td>financial-management/costexplorer</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed wave 3 rev 1 — lookup-task verification (read-only)</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave3.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave3-pricing</code></td>
+      <td>financial-management/pricing</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed wave 3 rev 1 — lookup-task verification (read-only)</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave3.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave3-qfifo</code></td>
+      <td>application-service/queueservice</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">owner domain knowledge 2026-06-13 — FIFO queue (name .fifo suffix) covers the 3 remaining queueservice ops: attributes GET + deduplication/-scope PUTs (FIFO-onl</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave3.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave4-asg</code></td>
+      <td>compute/virtualserver</td>
+      <td>28</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">ASG bodies rebuilt from V1Dot2 DTOs (old bodies mismatched); policy enums are documented-absent guesses — live 400 bodies will correct them || run 27452095757 f</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave4.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave4-nlog</code></td>
+      <td>management/network-logging</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">real DTO is just {bucket_name, resource_type}; bucket apitest-logsink is ensured by the workflow (core/oplog.py ensure-logsink). loggable security-group variati</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave4.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave4-sgrule</code></td>
+      <td>networking/security-group</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">owner-flagged gap 2026-06-13: list needs required security_group_id query (bare smoke GET 400s) — id-bound read + filtered list verifies</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave4.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave4-rmtags</code></td>
+      <td>management/resourcemanager</td>
+      <td>16</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">owner plan 2026-06-13: zero-cost resource-group as the live SRN source — full SRN tag family + rg set/show-resource + bulk rg delete. Tag keys carry {unique} so</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave4.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-apigw-policy</code></td>
+      <td>application-service/apigateway</td>
+      <td>31</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Closes the apigw GET leftovers (showresource/listmethods/showmethod/showstage/listreports/showauth/showaccesscontrol/showusageplan/listapikeys) + deleteresource</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-appsvc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-apigw-privatelink</code></td>
+      <td>application-service/apigateway</td>
+      <td>35</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">SELF-CONTAINED privatelink chain — enabled per the gate &#39;enabled only if self-contained&#39;: own vpc/subnet (10.163.0.0/20, unused block) -&gt; networking privatelink</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-appsvc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-scf-triggers</code></td>
+      <td>compute/scf</td>
+      <td>21</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">scf trigger + leftovers closure: apigateway trigger with the verbatim ApigatewayTriggerCreateRequest {apigateway_api_id (24-hex = our apigw api id), apigateway_</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-appsvc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-iam-bindings</code></td>
+      <td>management/iam</td>
+      <td>12</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed verification wave 5 (iam write-family closure) — group/policy binding families on self-created principals only: addgrouppolicybinding (POST group polic</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-iam-role</code></td>
+      <td>management/iam</td>
+      <td>12</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed verification wave 5 (iam write-family closure) — role family retry+extension: createrole now binds a self-created policy (DTO rolecreaterequestv1dot3 m</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-iam-saml</code></td>
+      <td>management/iam</td>
+      <td>4</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">composed verification wave 5 (iam write-family closure) — saml provider JSON experiment: doc request example is multipart/form-data with an OPTIONAL metadata fi</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-fw</code></td>
+      <td>networking/firewall</td>
+      <td>16</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: firewall, firewall-rule | adopt stamps stripped on purpose: the firewall lookup (GET /v1/firewalls?vpc_n</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-net.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-vpce</code></td>
+      <td>networking/vpc</td>
+      <td>12</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: vpc-endpoint</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-net.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-privnat</code></td>
+      <td>networking/vpc</td>
+      <td>8</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {&#34;private-nat&#34;: &#34;transit-gateway&#34;}</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-net.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-heavy-lb-members</code></td>
+      <td>networking/loadbalancer</td>
+      <td>41</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: lb-health-check, lb-listener, lb-member, lb-member-bulk, lb-server-group, lb-static-nat, load-balancer |</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5-net.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-swatch-metric</code></td>
+      <td>management/servicewatch</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: sw-metric-catalog — wave5 (owner 2026-06-13): metric catalog lookup + listmetricdata + downloadmetricdat</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-swatch-alert</code></td>
+      <td>management/servicewatch</td>
+      <td>7</td>
+      <td>
+        <span class="cat">disabled</span>
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: alert — wave5 (owner 2026-06-13): alert policy lifecycle with ids discovered via sw-metric-catalog (crea</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-swatch-dashboard</code></td>
+      <td>management/servicewatch</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: dashboard — wave5 (owner 2026-06-13): dashboard create/read/PUT-update/bulk-delete — closes setdashboard</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-swatch-event-rule</code></td>
+      <td>management/servicewatch</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: event-rule — wave5 (owner 2026-06-13): event rule create/read/bulk-delete — closes showeventrule (create</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-swatch-custom-metric</code></td>
+      <td>management/servicewatch</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: sw-custom-metric-meta — wave5 (owner 2026-06-13): custom metric meta + OTLP ingest + data readback (crea</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>gen-wave5-swatch-custom-log</code></td>
+      <td>management/servicewatch</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">composed by regression/scenarios/composer.py — targets: sw-custom-log-collect — wave5 (owner 2026-06-13): log-group -&gt; log-stream -&gt; custom collect registration</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/generated__wave5.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>cloudcontrol-landing-zone-guarded</code></td>
+      <td>management/cloudcontrol</td>
+      <td>13</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">HIGH BLAST RADIUS — cloudcontrol is the SCP landing-zone / account-factory / guardrail governance service (Control Tower equivalent). Creating a landing zone, f</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__cloudcontrol.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>cloudmonitoring-event-policy</code></td>
+      <td>management/cloudmonitoring</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light monitoring lifecycle. Covers all 4 uncovered writes: puteventpolicy(POST /v1/cloudmonitorings/event/v2/event-policies), modifyeventpolicy(PUT .../{eventPo</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__cloudmonitoring.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>idc-instance</code></td>
+      <td>management/iam-identity-center</td>
+      <td>5</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">SSO (IAM Identity Center) INSTANCE lifecycle. BLAST RADIUS: an SSO instance is account-structural — creating/patching/deleting one on a shared account is sensit</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>idc-user</code></td>
+      <td>management/iam-identity-center</td>
+      <td>6</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">SSO USER lifecycle: create -&gt; patch -&gt; delete (single) -&gt; delete (bulk). BLAST RADIUS: SSO users are tied to an SSO instance/identity store; creating them on a </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>idc-group</code></td>
+      <td>management/iam-identity-center</td>
+      <td>8</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">SSO GROUP + GROUP-USERS lifecycle: create group -&gt; patch group -&gt; add users (bulk) -&gt; remove users (bulk) -&gt; delete group -&gt; delete groups (bulk). BLAST RADIUS:</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>idc-permission-set</code></td>
+      <td>management/iam-identity-center</td>
+      <td>7</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">SSO PERMISSION-SET + its POLICIES lifecycle: create -&gt; patch -&gt; set policies (PUT) -&gt; delete policies -&gt; delete permission-set. BLAST RADIUS: permission-sets de</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>idc-account-assignment</code></td>
+      <td>management/iam-identity-center</td>
+      <td>4</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">SSO ACCOUNT-ASSIGNMENT lifecycle: create -&gt; delete (single by id) -&gt; delete (bulk). BLAST RADIUS: an account-assignment grants a principal a permission-set ON A</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-role-full</code></td>
+      <td>management/iam</td>
+      <td>10</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained ROLE lifecycle covering 7 role write ops. A real role create-&gt;read-&gt;update-&gt;bindings-&gt;delete is attempted in group &#39;role-real&#39;; every step</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-policy-extra-writes</code></td>
+      <td>management/iam</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light. Covers policy write ops NOT covered by the base iam-policy lifecycle: PUT /v1/policies/{policy_id}, PUT /v1/policies/{policy_id}/bindings, DELETE /v1/pol</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-group-bindings</code></td>
+      <td>management/iam</td>
+      <td>7</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light. Covers group member + policy-binding write ops not in the base iam-group lifecycle: POST/DELETE /v1/groups/{group_id}/members, POST/DELETE /v1/groups/{gr</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-user-policy-bindings</code></td>
+      <td>management/iam</td>
+      <td>2</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, standalone (no resource create). Covers POST/DELETE /v1/users/{user_id}/policy-bindings against a synthetic user id so both writes are CALLED. A syntheti</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-resource-policy</code></td>
+      <td>management/iam</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, standalone. Covers the resource-policy write ops: PUT/DELETE /v1/resource-policies/{srn}, POST /v1/resource-policies/{srn}/statements, PUT/DELETE /v1/res</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-credentials-heavy</code></td>
+      <td>management/iam</td>
+      <td>13</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">HEAVY (irreversible/credential + account-user + SAML ops). Runs only under SCP_RUN_HEAVY. Covers: POST/PUT/DELETE /v1/access-keys (+ bulk + send-otp); POST/PUT/</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>loggingaudit-trail</code></td>
+      <td>management/loggingaudit</td>
+      <td>8</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light governance lifecycle for loggingaudit (audit trails / CloudTrail-equivalent). Covers all 6 uncovered writes: createtrail(POST /v1/trails), settrail(PUT /v</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__loggingaudit.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>network-logging-storage</code></td>
+      <td>management/network-logging</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light control-plane lifecycle for network-logging storages: create a storage -&gt; read it via the configurations/storages lists + probe -&gt; delete. Covers createne</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__network-logging.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>org-organizations-guarded</code></td>
+      <td>management/organization</td>
+      <td>6</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">HIGHEST BLAST RADIUS. organization is the account-hierarchy root: creating/updating/deleting an organization, leaving membership, or moving accounts can restruc</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__organization.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>org-units-guarded</code></td>
+      <td>management/organization</td>
+      <td>8</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Organization units (OUs) carve up the account hierarchy; creating/deleting/moving them on a shared account reshapes real structure. COVERAGE-ONLY guarded calls:</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__organization.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>org-accounts-guarded</code></td>
+      <td>management/organization</td>
+      <td>5</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Organization-accounts are member cloud accounts in the hierarchy. Creating one provisions a NEW billable account; removing/deleting one detaches or closes a rea</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__organization.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>org-service-control-policies-guarded</code></td>
+      <td>management/organization</td>
+      <td>5</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">SERVICE CONTROL POLICIES (SCPs) are the single most dangerous resource in the platform: an SCP attached at the org/OU root can DENY actions account-wide and loc</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__organization.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>org-policy-bindings-and-delegation-guarded</code></td>
+      <td>management/organization</td>
+      <td>8</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Policy bindings ATTACH an SCP to a target (org/OU/account) — this is the step that ACTIVATES a deny policy and can lock the hierarchy. Delegation policies grant</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__organization.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>org-invitations-guarded</code></td>
+      <td>management/organization</td>
+      <td>6</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Invitations bring an external account into THIS organization (or invite this account into another). Accepting/declining changes real membership. COVERAGE-ONLY g</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__organization.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>resourcemanager-tag-lifecycle</code></td>
+      <td>management/resourcemanager</td>
+      <td>13</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, self-contained tag-write lifecycle for resourcemanager (global service). The EXISTING base scenarios.json:resourcemanager-resource-group already covers c</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__resourcemanager.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>servicewatch-alert</code></td>
+      <td>management/servicewatch</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Observability alert lifecycle: create alert -&gt; read it -&gt; PATCH full body / activated / description -&gt; bulk-delete. Body grounded from data/api_bodies.json mana</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__servicewatch.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>servicewatch-dashboard</code></td>
+      <td>management/servicewatch</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Dashboard lifecycle: create -&gt; read -&gt; PUT update -&gt; bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createdashboard (+setdashboard</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__servicewatch.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>servicewatch-event-rule</code></td>
+      <td>management/servicewatch</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Event-rule lifecycle: create -&gt; read -&gt; PATCH update -&gt; bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createeventrule (+seteventr</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__servicewatch.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>servicewatch-custom-ingest</code></td>
+      <td>management/servicewatch</td>
+      <td>5</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light ingest-only coverage for the remaining servicewatch write endpoints that POST data rather than create addressable resources (no capture / no teardown need</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__servicewatch.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-cdn-service</code></td>
+      <td>networking/cdn</td>
+      <td>9</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">CDN service CRUD (Wave 2, NOT runtime-proven; userguide-tightened 2026-06-11, pending live validation). REGION GATE (knowledge/formal/services/networking__cdn.y</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__cdn.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-direct-connect-routing</code></td>
+      <td>networking/direct-connect</td>
+      <td>12</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Direct Connect + routing-rule CRUD (Wave 2, NOT runtime-proven, HEAVY/billable). A direct-connect attaches to a base VPC: the session-shared VPC (adopt:vpc, per</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__direct-connect.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-dns-public-domain</code></td>
+      <td>networking/dns</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">DNS public-domain-name + hosted-zone-record write coverage (Wave 2, NOT runtime-proven, COVERAGE-ONLY). The 6 uncovered DNS writes split into two families neith</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__dns.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-dns-hosted-zone-private</code></td>
+      <td>networking/dns</td>
+      <td>13</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Private DNS -&gt; hosted zone -&gt; A record REAL chain (NEW 2026-06-11, userguide-grounded, NOT runtime-proven — pending live validation; supersedes the disabled net</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__dns.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-firewall-rule</code></td>
+      <td>networking/firewall</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY firewall lifecycle (Wave 2, NOT runtime-proven). A firewall is an attribute of a vpc/igw/direct-connect (created implicitly with firewall_enabled:</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__firewall.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-gslb-service</code></td>
+      <td>networking/gslb</td>
+      <td>8</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">GSLB CRUD (Wave 2, NOT runtime-proven; userguide-tightened 2026-06-11, pending live validation). REGION GATE (knowledge/formal/services/networking__gslb.yaml gs</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__gslb.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-loadbalancer-members-nat</code></td>
+      <td>networking/loadbalancer</td>
+      <td>24</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Loadbalancer server-group MEMBERS + static-NAT write coverage (Wave 2, NOT runtime-proven, HEAVY/billable). The 8 uncovered LB writes all hang off a real loadba</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__loadbalancer.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-security-group-update</code></td>
+      <td>networking/security-group</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Closes the 1 remaining SG write gap: PUT /v1/security-groups/{security_group_id} (setsecuritygroup), an in-place update sub-op NOT covered by the existing &#39;netw</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__security-group.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vpc-cidr-secondary</code></td>
+      <td>networking/vpc</td>
+      <td>4</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Closes POST /v1/vpcs/{vpc_id}/cidrs (secondary CIDR block). Adopts the session-shared VPC ({&#34;adopt&#34;:&#34;vpc&#34;}) so it does not consume the 5-VPC cap; falls back to </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__vpc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vpc-private-nat</code></td>
+      <td>networking/vpc</td>
+      <td>6</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Closes private-nats: POST /v1/private-nats, POST/DELETE .../private-nat-ips, PUT/DELETE /v1/private-nats/{id}. Bodies from data/api_bodies.json (networking/vpc/</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__vpc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vpc-privatelink-service</code></td>
+      <td>networking/vpc</td>
+      <td>11</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Closes privatelink-services: POST /v1/privatelink-services, PUT/DELETE /v1/privatelink-services/{id}. (privatelink-ENDPOINTS POST/PUT/DELETE are already covered</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__vpc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vpc-endpoint</code></td>
+      <td>networking/vpc</td>
+      <td>11</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Closes vpc-endpoints: POST /v1/vpc-endpoints, PUT/DELETE /v1/vpc-endpoints/{id}. Body from data/api_bodies.json (networking/vpc/createvpcendpoint) -&gt; UNPROVEN. </td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__vpc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vpc-peering</code></td>
+      <td>networking/vpc</td>
+      <td>15</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Closes vpc-peerings: POST /v1/vpc-peerings, POST .../routing-rules, PUT /v1/vpc-peerings/{id}, PUT .../approval, DELETE .../routing-rules/{id}, DELETE /v1/vpc-p</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__vpc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vpc-transit-gateway-children</code></td>
+      <td>networking/vpc</td>
+      <td>15</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Closes the transit-gateway CHILD writes (10): POST/DELETE for firewalls, firewall-connections, routing-rules, uplink-routing-rules, vpc-connections. (POST /v1/t</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__vpc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>vpc-subnet-vip-nat</code></td>
+      <td>networking/vpc</td>
+      <td>13</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Closes the subnet-VIP NAT children (4 writes): POST/DELETE /v1/subnets/{subnet_id}/vips/{vip_id}/connected-ports, POST/DELETE .../static-nat-ips. (The VIP itsel</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__vpc.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>networking-vpn-gateway-tunnel</code></td>
+      <td>networking/vpn</td>
+      <td>14</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">VPN gateway + tunnel CRUD (Wave 2, NOT runtime-proven, HEAVY/billable). A VPN gateway needs a base VPC + a public IP. The VPC is the session-shared VPC (adopt:v</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/networking__vpn.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>sts-token-issuance-coverage</code></td>
+      <td>platform/sts</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY, light (NOT yet runtime-proven). STS (Security Token Service) issues SHORT-LIVED CREDENTIALS. Closes all 3 sts writes: POST /v1/assume-role (assum</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/platform__sts.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-certificatemanager-import-cover</code></td>
+      <td>security/certificatemanager</td>
+      <td>2</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY lifecycle for the 2 uncovered certificatemanager WRITE ops: POST /v1/certificatemanager (import an external cert) and POST /v1/certificatemanager/</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/security__certificatemanager.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-configinspection-diagnosis</code></td>
+      <td>security/configinspection</td>
+      <td>4</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">COVERAGE-ONLY lifecycle for the 3 uncovered configinspection WRITE ops: POST /v1/configinspection/diagnosis/save (create a diagnosis object), POST /v1/configins</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/security__configinspection.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-kms-transit-crypto</code></td>
+      <td>security/kms</td>
+      <td>15</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">KMS transit-key CRYPTO lifecycle (Wave 2 coverage). The existing &#39;security-kms-key&#39; lifecycle covers create/get/list/update-description/delete; this sibling cov</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/security__kms.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-secretsmanager-writes</code></td>
+      <td>security/secretsmanager</td>
+      <td>12</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Secrets Manager lifecycle covering the 5 uncovered WRITE ops the existing &#39;security-secretsmanager-secret&#39; template does not touch: POST /v1/secrets/kms-key, PO</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/security__secretsmanager.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-secretvault-vault</code></td>
+      <td>security/secretvault</td>
+      <td>3</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Secret Vault CRUD covering the 2 uncovered WRITE ops: POST /v1/secretvault (create vault) and PUT /v1/secretvault/{secret_vault_id}/terminated (schedule deletio</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/security__secretvault.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>archivestorage-bucket</code></td>
+      <td>storage/archivestorage</td>
+      <td>12</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Archive Storage BUCKET lifecycle (billable object storage -&gt; heavy, gated by SCP_RUN_HEAVY). Closes the bucket-side write gap: create bucket (BucketCreateReques</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__archivestorage.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>archivestorage-archiving-policy</code></td>
+      <td>storage/archivestorage</td>
+      <td>6</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Archive Storage ARCHIVING-POLICY lifecycle (heavy). Closes the archiving-policy write gap: create-archiving-policy (ArchivingPolicyCreateRequest: archiving_sour</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__archivestorage.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>backup-agent</code></td>
+      <td>storage/backup</td>
+      <td>5</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Backup AGENT lifecycle (billable backup service -&gt; heavy, gated by SCP_RUN_HEAVY). Closes the backup-agent write gap: create-backup-agent (BackupAgentCreateRequ</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__backup.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>backup-job</code></td>
+      <td>storage/backup</td>
+      <td>14</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Backup JOB lifecycle (billable -&gt; heavy, gated by SCP_RUN_HEAVY). Closes the backup-job write gap: create-backup (BackupCreateRequest1Dot2) -&gt; capture $.resourc</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__backup.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>blockstorage-volume</code></td>
+      <td>storage/baremetal-blockstorage</td>
+      <td>23</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Baremetal block storage VOLUME lifecycle (billable -&gt; heavy, gated by SCP_RUN_HEAVY). Create a block volume (disk_type SSD, size_gb 10) -&gt; poll $.result.state t</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__baremetal-blockstorage.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>blockstorage-volume-group</code></td>
+      <td>storage/baremetal-blockstorage</td>
+      <td>22</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Baremetal block storage VOLUME-GROUP lifecycle (billable -&gt; heavy). Create a member volume -&gt; create a volume-group containing it -&gt; exercise members add/remove</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__baremetal-blockstorage.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>filestorage-replication-schedule</code></td>
+      <td>storage/filestorage</td>
+      <td>14</td>
+      <td>
+        
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">FileStorage REPLICATION + SNAPSHOT-SCHEDULE + SNAPSHOT-RESTORE lifecycle (billable NFS volume -&gt; heavy, gated by SCP_RUN_HEAVY). Complements the existing &#39;files</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__filestorage.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>parallel-filestorage-capacity-restore</code></td>
+      <td>storage/parallel-filestorage</td>
+      <td>9</td>
+      <td>
+        <span class="cat">disabled</span>
+        <span class="cat test_bug">heavy</span>
+        
+      </td>
+      <td class="muted">Parallel FileStorage CAPACITY + SNAPSHOT-RESTORE lifecycle (billable parallel volume -&gt; heavy, gated by SCP_RUN_HEAVY). Closes the 2 remaining write gaps: PUT /</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__parallel-filestorage.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+  </table>
+</section>
+
+
+</main>
+</body>
+</html>

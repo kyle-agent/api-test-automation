@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>knowledge/formal/flows.yaml</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  /* ---- design tokens (owner IA mockup — shared with the static dashboard) ---- */
+  :root{
+    --bg:#fbfcfd; --surface:#fff; --surface2:#f5f7f9; --border:#e4e7eb;
+    --text:#1d2530; --muted:#6b7480; --faint:#9aa3ad;
+    --green:#15924f; --green-bg:#e7f6ed; --amber:#b5740b; --amber-bg:#fdf3e2;
+    --red:#c63434; --red-bg:#fbe9e9; --blue:#2563c9; --blue-bg:#e8f0fd;
+    --grey:#7a838d; --grey-bg:#eef1f4; --purple:#7a45c2; --purple-bg:#f1e9fb;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04);
+    /* legacy aliases (older templates reference these directly) */
+    --fg:#1d2530; --line:#e4e7eb; --accent:#2563c9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+  /* ---- app shell ---- */
+  header.shell{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border)}
+  .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
+  .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .nav{display:flex;gap:3px;align-items:center}
+  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a:hover{background:var(--surface2);text-decoration:none}
+  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .ctx select{border:1px solid var(--border);border-radius:7px;background:var(--surface);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit}
+  .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .ctxbar b{color:var(--text)}
+  .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .ctxbar .pip.off{background:var(--faint)}
+
+  main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+  h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  h2:first-child{margin-top:6px}
+  h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  .pad{padding:15px 17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+
+  /* status vocabulary (shared everywhere) */
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .s-verified{background:var(--green-bg);color:var(--green)}
+  .s-reached{background:var(--amber-bg);color:var(--amber)}
+  .s-unobs{background:var(--grey-bg);color:var(--grey)}
+  .s-regress{background:var(--red-bg);color:var(--red)}
+  .s-known{background:#3a1212;color:#ffb3b3}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .tag.heavy{background:var(--purple-bg);color:var(--purple)}
+  .tag.destructive{background:var(--red-bg);color:var(--red)}
+  .tag.mutation{background:var(--amber-bg);color:var(--amber)}
+  .tag.read{background:var(--blue-bg);color:var(--blue)}
+  .tag.disabled{background:#eceef0;color:var(--faint)}
+  .srv{font-size:10px;font-weight:700;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+  /* health verdict banner */
+  .verdict{display:flex;align-items:center;gap:11px;background:var(--green-bg);border:1px solid #c2e6d0;
+    border-radius:12px;padding:12px 16px;font-size:13.5px}
+  .verdict .pip{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .verdict b{color:#0d6e3a}
+  .verdict.bad{background:var(--red-bg);border-color:#ecc4c4}
+  .verdict.bad .pip{background:var(--red)}
+  .verdict.bad b{color:var(--red)}
+  .verdict.none{background:var(--grey-bg);border-color:var(--border)}
+  .verdict.none .pip{background:var(--faint)}
+  .verdict.none b{color:var(--muted)}
+
+  /* metric tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:13px}
+  .tile{padding:13px 14px}
+  .tile .v{font-size:24px;font-weight:800;letter-spacing:-.6px}
+  .tile .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tile .bar{height:5px;border-radius:3px;background:var(--grey-bg);overflow:hidden;margin-top:8px}
+  .tile .bar i{display:block;height:100%;border-radius:3px}
+  .tile .goal{font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* pipeline strip */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:6px}
+  .pstage{flex:1;border:1px solid var(--border);background:var(--surface);padding:13px 15px;position:relative;color:var(--text)}
+  .pstage:first-child{border-radius:11px 0 0 11px}
+  .pstage:last-child{border-radius:0 11px 11px 0}
+  .pstage:not(:last-child){border-right:0}
+  a.pstage:hover{background:var(--surface2);text-decoration:none}
+  .pstage .pl{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+  .pstage .pv{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-top:4px}
+  .pstage .ps{font-size:11.5px;color:var(--muted)}
+  .pstage .chev{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;
+    width:18px;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;color:var(--faint);font-size:10px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:7px 11px;
+    border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  td{padding:8px 11px;border-bottom:1px solid #eef1f3;vertical-align:top;font-size:13px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#fafbfc}
+  td code{font-size:11.5px}
+
+  /* environment / suite cards */
+  .envcard{padding:13px 15px}
+  .envcard .eh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .envcard .en{font-weight:700;font-family:ui-monospace,monospace;font-size:13px}
+  .envcard .er{font-size:11px;color:var(--muted);margin-left:auto}
+  .envcard .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .gate{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .gate .lbl{font-size:11px;color:var(--faint)}
+  .forbid{font-size:10.5px;font-weight:700;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:6px}
+  .allow{font-size:10.5px;font-weight:700;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:6px}
+
+  /* filter chips */
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+  .fchip{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 12px;font-size:12px;
+    font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .fchip b{color:var(--text)} .fchip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+  .fchip.on b{color:var(--blue)}
+  input.search{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-family:inherit;width:230px}
+
+  .note{font-size:11.5px;color:var(--faint);font-style:normal}
+  .biz{cursor:pointer} .biz .more{display:none;color:var(--muted);font-size:12px;margin-top:3px}
+  .biz.open .more{display:block} .biz .toggle{color:var(--blue);font-size:11px}
+
+  /* server-only badge */
+  .srvonly{font-size:10px;font-weight:700;color:var(--grey);background:var(--grey-bg);border-radius:5px;padding:1px 7px;border:1px dashed #c8cdd3;white-space:nowrap}
+  .btn{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.disabled{opacity:.5;cursor:not-allowed}
+
+  /* run compose */
+  .compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .picker label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .picker select,.picker input[type=text]{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  .preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .preview .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #e9edf0;font-size:12.5px}
+  .preview .row:last-child{border:0} .preview .row b{font-weight:700;text-align:right}
+
+  /* report sub-tabs */
+  .subtabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .subtabs a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subtabs a:hover{text-decoration:none;color:var(--text)}
+  .subtabs a.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* coverage ladder */
+  .lad{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:26px}
+  .lad .bar{flex:1;height:20px;border-radius:6px;background:var(--grey-bg);overflow:hidden}
+  .lad .bar i{display:block;height:100%;border-radius:6px}
+  .lad .pct{width:54px;text-align:right;font-weight:700}
+  .lad .desc{width:300px;font-size:12px;color:var(--muted)}
+
+  /* category bars */
+  .catrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #eef1f3}
+  .catrow:last-child{border:0}
+  .catrow .cn{width:170px;font-size:12.5px;font-weight:600}
+  .catrow .cb{flex:1;height:14px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+  .catrow .cb i{display:block;height:100%;border-radius:5px}
+  .catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+
+  /* sparkline */
+  .spark{width:100%;height:90px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{width:18px;height:3px;display:inline-block;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+  .banner{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;padding:9px 13px;font-size:12px;margin-bottom:16px}
+
+  /* ---- legacy components (older templates keep working untouched) ---- */
+  section{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+  section h2{margin:0 0 10px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap}
+  .cards .card{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:10px;box-shadow:none;padding:10px 14px}
+  .cards .card .num{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .cards .card .lbl{font-size:12px;color:var(--muted)}
+  .status{padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;white-space:nowrap}
+  .status.dispatched{background:var(--amber-bg);color:var(--amber)}
+  .status.running   {background:var(--blue-bg);color:var(--blue)}
+  .status.done      {background:var(--green-bg);color:var(--green)}
+  .status.failed    {background:var(--red-bg);color:var(--red)}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=text]{padding:5px 8px;border:1px solid var(--border);border-radius:7px;
+                          font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  button{padding:6px 14px;border:1px solid var(--blue);border-radius:8px;background:var(--blue);
+         color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .warn{color:#9a3412;font-size:12px}
+  pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
+      overflow-x:auto;font-size:12px}
+  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .cat.real_regression{background:var(--red-bg);color:var(--red)}
+  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  .cat.environment    {background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="shell">
+  <div class="navrow">
+    <a class="brand" href="../index.html">SCP API Regression</a>
+    <nav class="nav">
+      <a href="../index.html" class="">Overview</a>
+      <span class="arrow">→</span>
+      <a href="../planning.html" class="active">Plan</a>
+      <span class="arrow">→</span>
+      <a href="../testing.html" class="">Run</a>
+      <span class="arrow">→</span>
+      <a href="../reporting.html" class="">Report</a>
+      <a href="../knowledge.html" style="margin-left:10px"
+         class="">Knowledge</a>
+    </nav>
+    <div class="ctx">
+      환경
+      <select title="환경 프로파일 (environments/*.yaml) — RUN 조립에서 선택 적용">
+        <option>prod-kr-west1</option><option>stage-kr-west1</option>
+      </select>
+      스위트
+      <select title="스위트 (suites/*.yaml) — RUN 조립에서 선택 적용">
+        <option>conformance</option><option>full-heavy</option><option>full</option><option>smoke</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctxbar">
+    
+    
+    <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
+    2026-06-13T02:06:00Z · <b>sha 3a27edc</b>
+    (push) · 모든 수치는 이 스냅샷 기준
+    
+  </div>
+</header><div style="background:#fff3cd;border-bottom:1px solid #e8d9a0;padding:6px 24px;font-size:13px">📄 <b>정적 뷰</b> — GitHub Pages 발행본입니다. 실행·편집·개입 버튼은 플랫폼 서버(uvicorn)에서만 동작합니다. <a href="../index.html">현재 대시보드</a> · <a href="../ops.html">ops 뷰어</a></div>
+<main>
+
+
+<section>
+  <h2>knowledge/formal/flows.yaml
+    <a href="#">편집 →</a>
+    </h2>
+  <pre># Layer 3 — SCENARIO-FLOW knowledge: rules that only exist in the context of a
+# flow (ordering, teardown, races, adoption, scheduling) + the canonical
+# per-resource call-order patterns. (Per-service facts live in services/;
+# cross-service dependencies in cross-service.yaml.)
+# Schema: knowledge/formal/FORMAT.md. Validate: python knowledge/formal/validate.py
+#
+# This is the PATTERN level. Exact step-by-step bodies live in
+# regression/scenarios/ (linked via encoded_in); field-level gotchas live in
+# knowledge/validated-facts.md.
+
+version: 1
+
+defaults:
+  teardown: reverse-order          # always delete in reverse creation order
+  delete_poll: {until_status: [404]}   # a delete is done when GET returns 404
+  delete_retry_on: [409, 500]      # dependency-release races — retry, don&#39;t fail
+
+# Rules that apply to FLOWS (multi-step scenarios), not to any single endpoint.
+flow_rules:
+  - id: teardown-reverse-order
+    rule: &#34;always tear down in exact reverse creation order, registry-owned&#34;
+    provenance: VALIDATED
+  - id: wait-child-404-before-parent-delete
+    rule: &#34;before deleting a parent, poll the child&#39;s GET to 404 (e.g. subnet 404 before vpc delete) — async deletes linger&#34;
+    provenance: VALIDATED
+  - id: delete-retry-races
+    rule: &#34;deletes racing a dependency release return 409 (or 500 for scr/snapshot/igw) — retry with backoff instead of failing&#34;
+    provenance: VALIDATED
+  - id: poll-ready-as-set
+    rule: &#34;ready-state casing is inconsistent across services (ACTIVE vs Running vs available) — always match a SET of values, never a single string&#34;
+    provenance: VALIDATED
+  - id: budget-reserve-before-quota-create
+    rule: &#34;reserve a core.budgets slot before any quota-bound create (vpc, private-dns); skip (not fail) when exhausted so quota pressure is never a false regression&#34;
+    provenance: VALIDATED
+  - id: shared-vpc-adopt-parallelism
+    rule: &#34;ADOPT-class lifecycles reuse the ONE session-shared VPC+subnet and run in PARALLEL; VPC-CRUD-class (self-create / mutate / need &gt;1 VPC) run SERIALLY; the shared VPC is torn down BEFORE the VPC-CRUD pass so it gets the full 3-VPC budget&#34;
+    provenance: VALIDATED
+  - id: vpc-cidr-allocation-per-lifecycle
+    rule: &#34;every VPC-creating lifecycle owns a unique /20 block (allocation table: knowledge/domain-constraints.md) so even fallback self-creates never overlap&#34;
+    provenance: VALIDATED
+  - id: group-optional-isolation
+    rule: &#34;multi-family scenarios isolate failures with group + optional: one bad body tears down and costs only its own group, not the whole run&#34;
+    provenance: VALIDATED
+  - id: coverage-only-pattern
+    rule: &#34;for billable/destructive resources not worth provisioning: soft-capture an existing id (or guarantee a 404 id), fire every write optional + broad expect_status — the endpoint is called and recorded without touching real resources&#34;
+    provenance: VALIDATED
+  - id: placeholder-seeding
+    rule: &#34;use engine-seeded placeholders ({unique}, {ualpha}, {region}, {today}, {today_plus_5y}) instead of hardcoded values so runs never collide; literal id segments in paths record ZERO coverage — always use {placeholder} tokens&#34;
+    provenance: VALIDATED
+  - id: no-overlapping-mutation-runs
+    rule: &#34;never let two VPC-mutating runs overlap (they compete for the same 3 VPCs) — one CRUD run at a time, wait for the prior regression job to finish&#34;
+    provenance: VALIDATED
+  - id: slow-provisioners-isolated
+    rule: &#34;resources with very slow create/delete (private-dns: hours observed) get their OWN lane/VPC and are scheduled create-first / delete-last with generous poll timeouts, so nothing serializes behind them and a stall doesn&#39;t wedge the whole run&#34;
+    provenance: VALIDATED
+  - id: db-lane-subnet
+    rule: &#34;the shared VPC carries TWO subnets: main (10.124.0.0/24 — VM/SKE/networking adopters, fixed IPs) and DB lane (10.124.7.0/24, adopt: subnet#db — mysql/postgresql/heavy-shared-dbaas). DB cluster provisioning is the slowest parallel-pass work; isolating it plus slowest-first xdist ordering targets wall-clock ~= max(slowest DB ~40-50min)&#34;
+    provenance: docs
+
+call_orders:
+  vpc:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/vpcs
+      capture: $.vpc.id
+      poll: {field: $.vpc.state, until: ACTIVE}
+    delete:
+      api: DELETE /v1/vpcs/{id}
+    notes: &#34;wait for child subnet 404 before deleting the vpc&#34;
+
+  subnet:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/subnets
+      capture: $.subnet.id
+      poll: {field: $.subnet.state, until: ACTIVE}
+    delete:
+      api: DELETE /v1/subnets/{id}
+
+  port:
+    provenance: VALIDATED
+    encoded_in: [networking-vpc-subnet]
+    create:
+      api: POST /v1/ports
+      capture: $.port.id
+    delete:
+      api: DELETE /v1/ports/{id}
+
+  server:
+    provenance: VALIDATED
+    encoded_in: [compute-virtualserver-full]
+    create:
+      api: POST /v1/servers
+      capture: $.servers[0].id
+      poll: {field: state, until: RUNNING}
+    delete:
+      api: DELETE /v1/servers/{id}
+    notes: &#34;full order: vpc → subnet → security-group → keypair → find-image → find-server-type → create; optional in-life ops: attach volume, rename, stop/start, image-create&#34;
+
+  ske-cluster:
+    provenance: VALIDATED
+    encoded_in: [container-ske-cluster-nodepool]
+    create:
+      api: POST /v1/clusters
+      capture: $.resource_id
+      poll: {field: status, until: Running}
+    delete:
+      api: DELETE /v1/clusters/{id}
+    notes: &#34;teardown order: nodepool → cluster → filestorage volume → keypair → sg → subnet → vpc&#34;
+
+  scr-registry:
+    provenance: VALIDATED
+    encoded_in: [container-scr-registry]
+    create:
+      api: POST /v1/container-registries
+      capture: $.id
+      poll: {field: $.state, until: Running}
+    delete:
+      api: DELETE /v1/container-registries/{id}
+    notes: &#34;DELETE 500-races for minutes after repository removal — keep retrying&#34;
+
+  mysql-cluster:
+    provenance: VALIDATED
+    encoded_in: [database-mysql-cluster]
+    create:
+      api: POST /v1/clusters
+      capture: $.resource.id
+      poll: {field: status, until: AVAILABLE}
+    delete:
+      api: DELETE /v1/clusters/{id}
+    notes: &#34;host is mysql.&lt;region&gt;... — /v1/clusters path collides with ske/mariadb across services, per-service hosts disambiguate&#34;
+
+  private-dns:
+    provenance: docs
+    encoded_in: [networking-dns-hosted-zone-private]
+    create:
+      api: POST /v1/private-dns
+      capture: $.private_dns.id
+      poll: {field: $.private_dns.state, until: ACTIVE}
+    delete:
+      api: DELETE /v1/private-dns/{id}
+    notes: &#34;name account-global unique (3-20 lc/digits/hyphen); VERY slow create/delete (hours observed) — heavy lane, generous timeouts; connect VPCs AFTER Active via PUT connected_vpc_ids (setters 400 invalid-state while CREATING); no activate call needed in the creation region (activate = other-region name reuse); delete blocked while any hosted zone exists&#34;
+
+  hosted-zone:
+    provenance: docs
+    encoded_in: [networking-dns-hosted-zone-private]
+    create:
+      api: POST /v1/hosted-zones
+      capture: $.id
+    delete:
+      api: DELETE /v1/hosted-zones/{id}
+    notes: &#34;needs private_dns_id of an ACTIVE private-dns + type:private; create response is a BARE envelope ($.id, not $.hosted_zone.id) — same for records ($.id); teardown record -&gt; zone -&gt; private-dns (reverse order, zone delete must precede the private-dns delete)&#34;
+</pre>
+</section>
+
+
+</main>
+</body>
+</html>

@@ -1,0 +1,4304 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자원 합성</title>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<style>
+  /* ---- design tokens (owner IA mockup — shared with the static dashboard) ---- */
+  :root{
+    --bg:#fbfcfd; --surface:#fff; --surface2:#f5f7f9; --border:#e4e7eb;
+    --text:#1d2530; --muted:#6b7480; --faint:#9aa3ad;
+    --green:#15924f; --green-bg:#e7f6ed; --amber:#b5740b; --amber-bg:#fdf3e2;
+    --red:#c63434; --red-bg:#fbe9e9; --blue:#2563c9; --blue-bg:#e8f0fd;
+    --grey:#7a838d; --grey-bg:#eef1f4; --purple:#7a45c2; --purple-bg:#f1e9fb;
+    --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04);
+    /* legacy aliases (older templates reference these directly) */
+    --fg:#1d2530; --line:#e4e7eb; --accent:#2563c9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+  code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+
+  /* ---- app shell ---- */
+  header.shell{position:sticky;top:0;z-index:50;background:var(--surface);border-bottom:1px solid var(--border)}
+  .navrow{display:flex;align-items:center;gap:18px;padding:9px 22px;flex-wrap:wrap}
+  .brand{font-weight:800;font-size:15px;letter-spacing:-.3px;white-space:nowrap;color:var(--text)}
+  .brand:hover{text-decoration:none}
+  .nav{display:flex;gap:3px;align-items:center}
+  .nav a{padding:7px 13px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted)}
+  .nav a:hover{background:var(--surface2);text-decoration:none}
+  .nav a.active{color:var(--blue);background:var(--blue-bg)}
+  .nav .arrow{color:var(--faint);align-self:center;font-size:11px;margin:0 -2px}
+  .ctx{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .ctx select{border:1px solid var(--border);border-radius:7px;background:var(--surface);padding:4px 8px;font-size:12px;color:var(--text);font-family:inherit}
+  .ctxbar{display:flex;align-items:center;gap:9px;padding:6px 22px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .ctxbar b{color:var(--text)}
+  .ctxbar .pip{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+  .ctxbar .pip.off{background:var(--faint)}
+
+  main{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+  h2{font-size:14px;letter-spacing:.2px;margin:26px 0 12px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  h2:first-child{margin-top:6px}
+  h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow)}
+  .pad{padding:15px 17px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  .muted{color:var(--muted)} .small{font-size:12px}
+
+  /* status vocabulary (shared everywhere) */
+  .chip{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block;white-space:nowrap}
+  .s-verified{background:var(--green-bg);color:var(--green)}
+  .s-reached{background:var(--amber-bg);color:var(--amber)}
+  .s-unobs{background:var(--grey-bg);color:var(--grey)}
+  .s-regress{background:var(--red-bg);color:var(--red)}
+  .s-known{background:#3a1212;color:#ffb3b3}
+  .tag{font-size:10px;font-weight:600;padding:1px 7px;border-radius:5px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .tag.heavy{background:var(--purple-bg);color:var(--purple)}
+  .tag.destructive{background:var(--red-bg);color:var(--red)}
+  .tag.mutation{background:var(--amber-bg);color:var(--amber)}
+  .tag.read{background:var(--blue-bg);color:var(--blue)}
+  .tag.disabled{background:#eceef0;color:var(--faint)}
+  .srv{font-size:10px;font-weight:700;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 6px;white-space:nowrap}
+
+  /* health verdict banner */
+  .verdict{display:flex;align-items:center;gap:11px;background:var(--green-bg);border:1px solid #c2e6d0;
+    border-radius:12px;padding:12px 16px;font-size:13.5px}
+  .verdict .pip{width:9px;height:9px;border-radius:50%;background:var(--green);flex:none}
+  .verdict b{color:#0d6e3a}
+  .verdict.bad{background:var(--red-bg);border-color:#ecc4c4}
+  .verdict.bad .pip{background:var(--red)}
+  .verdict.bad b{color:var(--red)}
+  .verdict.none{background:var(--grey-bg);border-color:var(--border)}
+  .verdict.none .pip{background:var(--faint)}
+  .verdict.none b{color:var(--muted)}
+
+  /* metric tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:13px}
+  .tile{padding:13px 14px}
+  .tile .v{font-size:24px;font-weight:800;letter-spacing:-.6px}
+  .tile .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .tile .bar{height:5px;border-radius:3px;background:var(--grey-bg);overflow:hidden;margin-top:8px}
+  .tile .bar i{display:block;height:100%;border-radius:3px}
+  .tile .goal{font-size:10px;color:var(--faint);margin-top:3px}
+
+  /* pipeline strip */
+  .pipe{display:flex;align-items:stretch;gap:0;margin-top:6px}
+  .pstage{flex:1;border:1px solid var(--border);background:var(--surface);padding:13px 15px;position:relative;color:var(--text)}
+  .pstage:first-child{border-radius:11px 0 0 11px}
+  .pstage:last-child{border-radius:0 11px 11px 0}
+  .pstage:not(:last-child){border-right:0}
+  a.pstage:hover{background:var(--surface2);text-decoration:none}
+  .pstage .pl{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.5px}
+  .pstage .pv{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-top:4px}
+  .pstage .ps{font-size:11.5px;color:var(--muted)}
+  .pstage .chev{position:absolute;right:-9px;top:50%;transform:translateY(-50%);z-index:2;
+    width:18px;height:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;
+    display:grid;place-items:center;color:var(--faint);font-size:10px}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:7px 11px;
+    border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+  td{padding:8px 11px;border-bottom:1px solid #eef1f3;vertical-align:top;font-size:13px}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr:hover{background:#fafbfc}
+  td code{font-size:11.5px}
+
+  /* environment / suite cards */
+  .envcard{padding:13px 15px}
+  .envcard .eh{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .envcard .en{font-weight:700;font-family:ui-monospace,monospace;font-size:13px}
+  .envcard .er{font-size:11px;color:var(--muted);margin-left:auto}
+  .envcard .meta{font-size:12px;color:var(--muted);margin-top:3px}
+  .gate{margin-top:9px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .gate .lbl{font-size:11px;color:var(--faint)}
+  .forbid{font-size:10.5px;font-weight:700;background:var(--red-bg);color:var(--red);padding:2px 8px;border-radius:6px}
+  .allow{font-size:10.5px;font-weight:700;background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:6px}
+
+  /* filter chips */
+  .fchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px;align-items:center}
+  .fchip{border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:5px 12px;font-size:12px;
+    font-weight:600;color:var(--muted);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .fchip b{color:var(--text)} .fchip.on{border-color:var(--blue);background:var(--blue-bg);color:var(--blue)}
+  .fchip.on b{color:var(--blue)}
+  input.search{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-family:inherit;width:230px}
+
+  .note{font-size:11.5px;color:var(--faint);font-style:normal}
+  .biz{cursor:pointer} .biz .more{display:none;color:var(--muted);font-size:12px;margin-top:3px}
+  .biz.open .more{display:block} .biz .toggle{color:var(--blue);font-size:11px}
+
+  /* server-only badge */
+  .srvonly{font-size:10px;font-weight:700;color:var(--grey);background:var(--grey-bg);border-radius:5px;padding:1px 7px;border:1px dashed #c8cdd3;white-space:nowrap}
+  .btn{border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:8px 15px;font-size:13px;font-weight:700;cursor:pointer;color:var(--text)}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .btn.disabled{opacity:.5;cursor:not-allowed}
+
+  /* run compose */
+  .compose{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .picker label{display:block;font-size:11.5px;font-weight:700;color:var(--muted);margin-bottom:5px}
+  .picker select,.picker input[type=text]{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  .preview{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .preview .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #e9edf0;font-size:12.5px}
+  .preview .row:last-child{border:0} .preview .row b{font-weight:700;text-align:right}
+
+  /* report sub-tabs */
+  .subtabs{display:flex;gap:3px;border-bottom:1px solid var(--border);margin-bottom:16px;flex-wrap:wrap}
+  .subtabs a{padding:9px 14px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+  .subtabs a:hover{text-decoration:none;color:var(--text)}
+  .subtabs a.active{color:var(--blue);border-bottom-color:var(--blue)}
+
+  /* coverage ladder */
+  .lad{display:flex;align-items:center;gap:12px;margin:10px 0}
+  .lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:26px}
+  .lad .bar{flex:1;height:20px;border-radius:6px;background:var(--grey-bg);overflow:hidden}
+  .lad .bar i{display:block;height:100%;border-radius:6px}
+  .lad .pct{width:54px;text-align:right;font-weight:700}
+  .lad .desc{width:300px;font-size:12px;color:var(--muted)}
+
+  /* category bars */
+  .catrow{display:flex;align-items:center;gap:11px;padding:7px 0;border-bottom:1px solid #eef1f3}
+  .catrow:last-child{border:0}
+  .catrow .cn{width:170px;font-size:12.5px;font-weight:600}
+  .catrow .cb{flex:1;height:14px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+  .catrow .cb i{display:block;height:100%;border-radius:5px}
+  .catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+
+  /* sparkline */
+  .spark{width:100%;height:90px}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-top:6px}
+  .legend i{width:18px;height:3px;display:inline-block;vertical-align:middle;margin-right:5px;border-radius:2px}
+
+  .banner{background:#eef4ff;border:1px solid #d3e2fb;color:#2c4d86;border-radius:10px;padding:9px 13px;font-size:12px;margin-bottom:16px}
+
+  /* ---- legacy components (older templates keep working untouched) ---- */
+  section{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+          box-shadow:var(--shadow);padding:16px 20px;margin-bottom:18px}
+  section h2{margin:0 0 10px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap}
+  .cards .card{flex:1;min-width:140px;background:var(--surface2);border:1px solid var(--border);
+               border-radius:10px;box-shadow:none;padding:10px 14px}
+  .cards .card .num{font-size:22px;font-weight:800;letter-spacing:-.4px}
+  .cards .card .lbl{font-size:12px;color:var(--muted)}
+  .status{padding:1px 9px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block;white-space:nowrap}
+  .status.dispatched{background:var(--amber-bg);color:var(--amber)}
+  .status.running   {background:var(--blue-bg);color:var(--blue)}
+  .status.done      {background:var(--green-bg);color:var(--green)}
+  .status.failed    {background:var(--red-bg);color:var(--red)}
+  form.inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input[type=text]{padding:5px 8px;border:1px solid var(--border);border-radius:7px;
+                          font-size:13px;font-family:inherit;background:var(--surface);color:var(--text)}
+  button{padding:6px 14px;border:1px solid var(--blue);border-radius:8px;background:var(--blue);
+         color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+  button.ghost{background:var(--surface);border-color:var(--border);color:var(--text)}
+  .warn{color:#9a3412;font-size:12px}
+  pre{background:var(--surface2);border:1px solid var(--border);padding:10px;border-radius:8px;
+      overflow-x:auto;font-size:12px}
+  .cat{font-size:11px;font-weight:600;padding:1px 7px;border-radius:8px;background:var(--grey-bg);color:var(--muted);display:inline-block}
+  .cat.real_regression{background:var(--red-bg);color:var(--red)}
+  .cat.test_bug       {background:var(--amber-bg);color:var(--amber)}
+  .cat.spec_change    {background:var(--purple-bg);color:var(--purple)}
+  .cat.environment    {background:var(--green-bg);color:var(--green)}
+</style>
+</head>
+<body>
+<header class="shell">
+  <div class="navrow">
+    <a class="brand" href="index.html">SCP API Regression</a>
+    <nav class="nav">
+      <a href="index.html" class="">Overview</a>
+      <span class="arrow">→</span>
+      <a href="planning.html" class="active">Plan</a>
+      <span class="arrow">→</span>
+      <a href="testing.html" class="">Run</a>
+      <span class="arrow">→</span>
+      <a href="reporting.html" class="">Report</a>
+      <a href="knowledge.html" style="margin-left:10px"
+         class="">Knowledge</a>
+    </nav>
+    <div class="ctx">
+      환경
+      <select title="환경 프로파일 (environments/*.yaml) — RUN 조립에서 선택 적용">
+        <option>prod-kr-west1</option><option>stage-kr-west1</option>
+      </select>
+      스위트
+      <select title="스위트 (suites/*.yaml) — RUN 조립에서 선택 적용">
+        <option>conformance</option><option>full-heavy</option><option>full</option><option>smoke</option>
+      </select>
+    </div>
+  </div>
+  <div class="ctxbar">
+    
+    
+    <span class="pip off"></span> 발행 스냅샷 정보 없음 — dashboard-data 브랜치를
+    읽을 수 없거나 아직 발행된 run이 없습니다
+    
+  </div>
+</header><div style="background:#fff3cd;border-bottom:1px solid #e8d9a0;padding:6px 24px;font-size:13px">📄 <b>정적 뷰</b> — GitHub Pages 발행본입니다. 실행·편집·개입 버튼은 플랫폼 서버(uvicorn)에서만 동작합니다. <a href="../index.html">현재 대시보드</a> · <a href="../ops.html">ops 뷰어</a></div>
+<main>
+
+
+<section>
+  <h2><a href="resources.html">자원 모델</a> › 합성 (단독 · 묶음 · 상품)</h2>
+  <p class="muted">대상 노드를 멀티선택하면 의존 폐포 합집합 + dedup으로 하나의
+    lifecycle을 합성합니다 (§2.5 — 단독 1개 = <code>gen-&lt;node&gt;</code>,
+    여러 개 = bundle/상품). 산출물은 <code>drafts/lifecycle-*.json</code>
+    draft로만 저장되며 자동 enable되지 않습니다 (C4).</p>
+  
+  
+</section>
+
+<form method="post" action="/planning/resources/compose">
+<section>
+  <h2>대상 노드 + 분기/옵션 선택</h2>
+  
+  <table>
+    <tr><th></th><th>code</th><th>id</th><th>requires</th>
+        <th>one_of 분기</th><th>옵션 값</th></tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="aimlops-platform"></td>
+      <td class="muted">ai-ml-aimlops</td>
+      <td><code>aimlops-platform</code></td>
+      <td class="muted">ske-cluster×2</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">image_id
+          <input type="text" name="opt__aimlops-platform__image_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="cloud-ml"></td>
+      <td class="muted">ai-ml-cloudml</td>
+      <td><code>cloud-ml</code></td>
+      <td class="muted">ske-cluster×2, container-registry, cloudml-image</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">endpoint_type
+          <input type="text" name="opt__cloud-ml__endpoint_type" size="10"
+                 value=""
+                 placeholder="PUBLIC, PRIVATE"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="cloudml-image"></td>
+      <td class="muted">ai-ml-image-lookup</td>
+      <td><code>cloudml-image</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-access-control"></td>
+      <td class="muted">ap-apigw-acl</td>
+      <td><code>apigw-access-control</code></td>
+      <td class="muted">apigw-api, apigw-deployment</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-api"></td>
+      <td class="muted">ap-apigw-api</td>
+      <td><code>apigw-api</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-api-key"></td>
+      <td class="muted">ap-apigw-api-key</td>
+      <td><code>apigw-api-key</code></td>
+      <td class="muted">apigw-api, apigw-usage-plan</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-auth"></td>
+      <td class="muted">ap-apigw-auth</td>
+      <td><code>apigw-auth</code></td>
+      <td class="muted">apigw-api, apigw-deployment</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-deployment"></td>
+      <td class="muted">ap-apigw-deploy</td>
+      <td><code>apigw-deployment</code></td>
+      <td class="muted">apigw-api, apigw-method</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-method"></td>
+      <td class="muted">ap-apigw-method</td>
+      <td><code>apigw-method</code></td>
+      <td class="muted">apigw-api, apigw-resource</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-privatelink-endpoint"></td>
+      <td class="muted">ap-apigw-ple</td>
+      <td><code>apigw-privatelink-endpoint</code></td>
+      <td class="muted">privatelink-service</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-resource"></td>
+      <td class="muted">ap-apigw-resource</td>
+      <td><code>apigw-resource</code></td>
+      <td class="muted">apigw-api, apigw-root-resource</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-root-resource"></td>
+      <td class="muted">ap-apigw-root-lookup</td>
+      <td><code>apigw-root-resource</code></td>
+      <td class="muted">apigw-api</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-stage"></td>
+      <td class="muted">ap-apigw-stage</td>
+      <td><code>apigw-stage</code></td>
+      <td class="muted">apigw-api, apigw-deployment</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="apigw-usage-plan"></td>
+      <td class="muted">ap-apigw-usage-plan</td>
+      <td><code>apigw-usage-plan</code></td>
+      <td class="muted">apigw-api</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="queue-fifo"></td>
+      <td class="muted">ap-queue-fifo</td>
+      <td><code>queue-fifo</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">deduplication_scope
+          <input type="text" name="opt__queue-fifo__deduplication_scope" size="10"
+                 value=""
+                 placeholder="Queue, MessageGroup"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="queue"></td>
+      <td class="muted">ap-queue-queue</td>
+      <td><code>queue</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="baremetal-server"></td>
+      <td class="muted">cp-bm-server</td>
+      <td><code>baremetal-server</code></td>
+      <td class="muted">vpc, subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="gpu-node"></td>
+      <td class="muted">cp-gpu-node</td>
+      <td><code>gpu-node</code></td>
+      <td class="muted">vpc, subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="scf-apigateway-trigger"></td>
+      <td class="muted">cp-scf-apigateway-trigger</td>
+      <td><code>scf-apigateway-trigger</code></td>
+      <td class="muted">scf-function, apigw-api, apigw-deployment</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="scf-cronjob-trigger"></td>
+      <td class="muted">cp-scf-cronjob-trigger</td>
+      <td><code>scf-cronjob-trigger</code></td>
+      <td class="muted">scf-function</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="scf-function"></td>
+      <td class="muted">cp-scf-function</td>
+      <td><code>scf-function</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="scf-privatelink-endpoint"></td>
+      <td class="muted">cp-scf-privatelink-endpoint</td>
+      <td><code>scf-privatelink-endpoint</code></td>
+      <td class="muted">scf-function, privatelink-service</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="auto-scaling-group"></td>
+      <td class="muted">cp-vs-asg</td>
+      <td><code>auto-scaling-group</code></td>
+      <td class="muted">launch-configuration, subnet, security-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="asg-notification"></td>
+      <td class="muted">cp-vs-asg-notification</td>
+      <td><code>asg-notification</code></td>
+      <td class="muted">auto-scaling-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">user_id
+          <input type="text" name="opt__asg-notification__user_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="asg-policy"></td>
+      <td class="muted">cp-vs-asg-policy</td>
+      <td><code>asg-policy</code></td>
+      <td class="muted">auto-scaling-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="asg-schedule"></td>
+      <td class="muted">cp-vs-asg-schedule</td>
+      <td><code>asg-schedule</code></td>
+      <td class="muted">auto-scaling-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="block-volume"></td>
+      <td class="muted">cp-vs-block-volume</td>
+      <td><code>block-volume</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="custom-image"></td>
+      <td class="muted">cp-vs-custom-image</td>
+      <td><code>custom-image</code></td>
+      <td class="muted">server</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="image"></td>
+      <td class="muted">cp-vs-image-lookup</td>
+      <td><code>image</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="image-registration"></td>
+      <td class="muted">cp-vs-image-reg</td>
+      <td><code>image-registration</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="server-interface"></td>
+      <td class="muted">cp-vs-interface</td>
+      <td><code>server-interface</code></td>
+      <td class="muted">server, port</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="keypair"></td>
+      <td class="muted">cp-vs-keypair</td>
+      <td><code>keypair</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="launch-configuration"></td>
+      <td class="muted">cp-vs-launch-config</td>
+      <td><code>launch-configuration</code></td>
+      <td class="muted">image, server-type, keypair</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="server"></td>
+      <td class="muted">cp-vs-server</td>
+      <td><code>server</code></td>
+      <td class="muted">vpc, subnet, security-group, keypair, image, server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="server-group"></td>
+      <td class="muted">cp-vs-server-group</td>
+      <td><code>server-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="server-type"></td>
+      <td class="muted">cp-vs-server-type</td>
+      <td><code>server-type</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="server-static-nat"></td>
+      <td class="muted">cp-vs-static-nat</td>
+      <td><code>server-static-nat</code></td>
+      <td class="muted">server-interface, server, port, public-ip, internet-gateway</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="volume-attachment"></td>
+      <td class="muted">cp-vs-volume-attach</td>
+      <td><code>volume-attachment</code></td>
+      <td class="muted">server, block-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="volume-snapshot"></td>
+      <td class="muted">cp-vs-volume-snapshot</td>
+      <td><code>volume-snapshot</code></td>
+      <td class="muted">block-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="volume-transfer"></td>
+      <td class="muted">cp-vs-volume-transfer</td>
+      <td><code>volume-transfer</code></td>
+      <td class="muted">block-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="scr-image"></td>
+      <td class="muted">ct-scr-image</td>
+      <td><code>scr-image</code></td>
+      <td class="muted">scr-repository</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="container-registry"></td>
+      <td class="muted">ct-scr-registry</td>
+      <td><code>container-registry</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="scr-repository"></td>
+      <td class="muted">ct-scr-repository</td>
+      <td><code>scr-repository</code></td>
+      <td class="muted">container-registry</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="scr-tag"></td>
+      <td class="muted">ct-scr-tag</td>
+      <td><code>scr-tag</code></td>
+      <td class="muted">scr-image</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ske-cluster"></td>
+      <td class="muted">ct-ske-cluster</td>
+      <td><code>ske-cluster</code></td>
+      <td class="muted">vpc, subnet, security-group, keypair, filestorage-volume, kubernetes-version</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">kubernetes_version
+          <input type="text" name="opt__ske-cluster__kubernetes_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ske-cluster-upgrade"></td>
+      <td class="muted">ct-ske-cluster-upgrade</td>
+      <td><code>ske-cluster-upgrade</code></td>
+      <td class="muted">ske-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">target_version
+          <input type="text" name="opt__ske-cluster-upgrade__target_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ske-image"></td>
+      <td class="muted">ct-ske-image</td>
+      <td><code>ske-image</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ske-nodepool"></td>
+      <td class="muted">ct-ske-nodepool</td>
+      <td><code>ske-nodepool</code></td>
+      <td class="muted">ske-cluster, kubernetes-version, server-type, keypair</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">kubernetes_version
+          <input type="text" name="opt__ske-nodepool__kubernetes_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ske-nodepool-upgrade"></td>
+      <td class="muted">ct-ske-nodepool-upgrade</td>
+      <td><code>ske-nodepool-upgrade</code></td>
+      <td class="muted">ske-nodepool, ske-cluster-upgrade</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="kubernetes-version"></td>
+      <td class="muted">ct-ske-version</td>
+      <td><code>kubernetes-version</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="data-flow"></td>
+      <td class="muted">da-df-flow</td>
+      <td><code>data-flow</code></td>
+      <td class="muted">data-flow-service</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="data-flow-service"></td>
+      <td class="muted">da-df-service</td>
+      <td><code>data-flow-service</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__data-flow-service__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type_name
+          <input type="text" name="opt__data-flow-service__server_type_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="data-ops"></td>
+      <td class="muted">da-do-ops</td>
+      <td><code>data-ops</code></td>
+      <td class="muted">data-ops-service</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="data-ops-service"></td>
+      <td class="muted">da-do-service</td>
+      <td><code>data-ops-service</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__data-ops-service__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type_name
+          <input type="text" name="opt__data-ops-service__server_type_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="eventstreams-cluster"></td>
+      <td class="muted">da-es-cluster</td>
+      <td><code>eventstreams-cluster</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__eventstreams-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type_name
+          <input type="text" name="opt__eventstreams-cluster__server_type_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">sasl_password
+          <input type="text" name="opt__eventstreams-cluster__sasl_password" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">role_type
+          <input type="text" name="opt__eventstreams-cluster__role_type" size="10"
+                 value=""
+                 placeholder="ZOOKEEPER_BROKER, BROKER, ZOOKEEPER, AKHQ, CONSOLE"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="quick-query"></td>
+      <td class="muted">da-qq-query</td>
+      <td><code>quick-query</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__quick-query__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type_name
+          <input type="text" name="opt__quick-query__server_type_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="searchengine-cluster"></td>
+      <td class="muted">da-se-cluster</td>
+      <td><code>searchengine-cluster</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__searchengine-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type_name
+          <input type="text" name="opt__searchengine-cluster__server_type_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">db_user_name
+          <input type="text" name="opt__searchengine-cluster__db_user_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">db_user_password
+          <input type="text" name="opt__searchengine-cluster__db_user_password" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="vertica-cluster"></td>
+      <td class="muted">da-vt-cluster</td>
+      <td><code>vertica-cluster</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__vertica-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type_name
+          <input type="text" name="opt__vertica-cluster__server_type_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">database_name
+          <input type="text" name="opt__vertica-cluster__database_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">db_user_name
+          <input type="text" name="opt__vertica-cluster__db_user_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">db_user_password
+          <input type="text" name="opt__vertica-cluster__db_user_password" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="cachestore-cluster"></td>
+      <td class="muted">db-cache-cluster</td>
+      <td><code>cachestore-cluster</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__cachestore-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__cachestore-cluster__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-add-block-storage"></td>
+      <td class="muted">db-epas-add-block-storage</td>
+      <td><code>epas-add-block-storage</code></td>
+      <td class="muted">epas-cluster, epas-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-cluster"></td>
+      <td class="muted">db-epas-cluster</td>
+      <td><code>epas-cluster</code></td>
+      <td class="muted">subnet, epas-engine-version, epas-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__epas-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__epas-cluster__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">engine_version_16
+          <input type="text" name="opt__epas-cluster__engine_version_16" size="10"
+                 value=""
+                 placeholder="ref"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-engine-version"></td>
+      <td class="muted">db-epas-engine-version</td>
+      <td><code>epas-engine-version</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-engine-version-16"></td>
+      <td class="muted">db-epas-engine-version-16</td>
+      <td><code>epas-engine-version-16</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-instance-group"></td>
+      <td class="muted">db-epas-instance-group</td>
+      <td><code>epas-instance-group</code></td>
+      <td class="muted">epas-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-kernel-upgrade"></td>
+      <td class="muted">db-epas-kernel-upgrade</td>
+      <td><code>epas-kernel-upgrade</code></td>
+      <td class="muted">epas-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-log-export-config"></td>
+      <td class="muted">db-epas-log-export-config</td>
+      <td><code>epas-log-export-config</code></td>
+      <td class="muted">epas-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">access_key
+          <input type="text" name="opt__epas-log-export-config__access_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">secret_key
+          <input type="text" name="opt__epas-log-export-config__secret_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">bucket_name
+          <input type="text" name="opt__epas-log-export-config__bucket_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">log_type
+          <input type="text" name="opt__epas-log-export-config__log_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-parameter"></td>
+      <td class="muted">db-epas-parameter</td>
+      <td><code>epas-parameter</code></td>
+      <td class="muted">epas-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-parameter-group"></td>
+      <td class="muted">db-epas-parameter-group</td>
+      <td><code>epas-parameter-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-patch"></td>
+      <td class="muted">db-epas-patch</td>
+      <td><code>epas-patch</code></td>
+      <td class="muted">epas-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">target_software_version
+          <input type="text" name="opt__epas-patch__target_software_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-promote"></td>
+      <td class="muted">db-epas-promote</td>
+      <td><code>epas-promote</code></td>
+      <td class="muted">epas-replica, epas-reset-replica</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-replica"></td>
+      <td class="muted">db-epas-replica</td>
+      <td><code>epas-replica</code></td>
+      <td class="muted">epas-cluster, epas-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__epas-replica__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-reset-replica"></td>
+      <td class="muted">db-epas-reset-replica</td>
+      <td><code>epas-reset-replica</code></td>
+      <td class="muted">epas-replica, epas-sync-replica-state</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-resize-block-storage"></td>
+      <td class="muted">db-epas-resize-block-storage</td>
+      <td><code>epas-resize-block-storage</code></td>
+      <td class="muted">epas-cluster, epas-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-resize-server-type"></td>
+      <td class="muted">db-epas-resize-server-type</td>
+      <td><code>epas-resize-server-type</code></td>
+      <td class="muted">epas-cluster, epas-instance-group, epas-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__epas-resize-server-type__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-restore"></td>
+      <td class="muted">db-epas-restore</td>
+      <td><code>epas-restore</code></td>
+      <td class="muted">epas-cluster, epas-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__epas-restore__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-server-type"></td>
+      <td class="muted">db-epas-server-type</td>
+      <td><code>epas-server-type</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-switchover"></td>
+      <td class="muted">db-epas-switchover</td>
+      <td><code>epas-switchover</code></td>
+      <td class="muted">epas-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="epas-sync-replica-state"></td>
+      <td class="muted">db-epas-sync-replica-state</td>
+      <td><code>epas-sync-replica-state</code></td>
+      <td class="muted">epas-cluster, epas-replica</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-add-block-storage"></td>
+      <td class="muted">db-mariadb-add-block-storage</td>
+      <td><code>mariadb-add-block-storage</code></td>
+      <td class="muted">mariadb-cluster, mariadb-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-cluster"></td>
+      <td class="muted">db-mariadb-cluster</td>
+      <td><code>mariadb-cluster</code></td>
+      <td class="muted">subnet, mariadb-engine-version, mariadb-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__mariadb-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__mariadb-cluster__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">engine_version_10
+          <input type="text" name="opt__mariadb-cluster__engine_version_10" size="10"
+                 value=""
+                 placeholder="ref"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-engine-version"></td>
+      <td class="muted">db-mariadb-engine-version</td>
+      <td><code>mariadb-engine-version</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-engine-version-10"></td>
+      <td class="muted">db-mariadb-engine-version-10</td>
+      <td><code>mariadb-engine-version-10</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-instance-group"></td>
+      <td class="muted">db-mariadb-instance-group</td>
+      <td><code>mariadb-instance-group</code></td>
+      <td class="muted">mariadb-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-kernel-upgrade"></td>
+      <td class="muted">db-mariadb-kernel-upgrade</td>
+      <td><code>mariadb-kernel-upgrade</code></td>
+      <td class="muted">mariadb-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-log-export-config"></td>
+      <td class="muted">db-mariadb-log-export-config</td>
+      <td><code>mariadb-log-export-config</code></td>
+      <td class="muted">mariadb-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">access_key
+          <input type="text" name="opt__mariadb-log-export-config__access_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">secret_key
+          <input type="text" name="opt__mariadb-log-export-config__secret_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">bucket_name
+          <input type="text" name="opt__mariadb-log-export-config__bucket_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">log_type
+          <input type="text" name="opt__mariadb-log-export-config__log_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-parameter"></td>
+      <td class="muted">db-mariadb-parameter</td>
+      <td><code>mariadb-parameter</code></td>
+      <td class="muted">mariadb-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-parameter-group"></td>
+      <td class="muted">db-mariadb-parameter-group</td>
+      <td><code>mariadb-parameter-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-patch"></td>
+      <td class="muted">db-mariadb-patch</td>
+      <td><code>mariadb-patch</code></td>
+      <td class="muted">mariadb-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">target_software_version
+          <input type="text" name="opt__mariadb-patch__target_software_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-promote"></td>
+      <td class="muted">db-mariadb-promote</td>
+      <td><code>mariadb-promote</code></td>
+      <td class="muted">mariadb-replica, mariadb-reset-replica</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-replica"></td>
+      <td class="muted">db-mariadb-replica</td>
+      <td><code>mariadb-replica</code></td>
+      <td class="muted">mariadb-cluster, mariadb-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__mariadb-replica__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-reset-replica"></td>
+      <td class="muted">db-mariadb-reset-replica</td>
+      <td><code>mariadb-reset-replica</code></td>
+      <td class="muted">mariadb-replica, mariadb-sync-replica-state</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-resize-block-storage"></td>
+      <td class="muted">db-mariadb-resize-block-storage</td>
+      <td><code>mariadb-resize-block-storage</code></td>
+      <td class="muted">mariadb-cluster, mariadb-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-resize-server-type"></td>
+      <td class="muted">db-mariadb-resize-server-type</td>
+      <td><code>mariadb-resize-server-type</code></td>
+      <td class="muted">mariadb-cluster, mariadb-instance-group, mariadb-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__mariadb-resize-server-type__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-restart"></td>
+      <td class="muted">db-mariadb-restart</td>
+      <td><code>mariadb-restart</code></td>
+      <td class="muted">mariadb-cluster, mariadb-start</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-restore"></td>
+      <td class="muted">db-mariadb-restore</td>
+      <td><code>mariadb-restore</code></td>
+      <td class="muted">mariadb-cluster, mariadb-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__mariadb-restore__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-server-type"></td>
+      <td class="muted">db-mariadb-server-type</td>
+      <td><code>mariadb-server-type</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-start"></td>
+      <td class="muted">db-mariadb-start</td>
+      <td><code>mariadb-start</code></td>
+      <td class="muted">mariadb-cluster, mariadb-stop</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-stop"></td>
+      <td class="muted">db-mariadb-stop</td>
+      <td><code>mariadb-stop</code></td>
+      <td class="muted">mariadb-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-switchover"></td>
+      <td class="muted">db-mariadb-switchover</td>
+      <td><code>mariadb-switchover</code></td>
+      <td class="muted">mariadb-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mariadb-sync-replica-state"></td>
+      <td class="muted">db-mariadb-sync-replica-state</td>
+      <td><code>mariadb-sync-replica-state</code></td>
+      <td class="muted">mariadb-cluster, mariadb-replica</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-add-block-storage"></td>
+      <td class="muted">db-mysql-add-block-storage</td>
+      <td><code>mysql-add-block-storage</code></td>
+      <td class="muted">mysql-cluster, mysql-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-cluster"></td>
+      <td class="muted">db-mysql-cluster</td>
+      <td><code>mysql-cluster</code></td>
+      <td class="muted">subnet, mysql-engine-version, mysql-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__mysql-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__mysql-cluster__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">engine_version_8
+          <input type="text" name="opt__mysql-cluster__engine_version_8" size="10"
+                 value=""
+                 placeholder="ref"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-engine-version"></td>
+      <td class="muted">db-mysql-engine-version</td>
+      <td><code>mysql-engine-version</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-engine-version-8"></td>
+      <td class="muted">db-mysql-engine-version-8</td>
+      <td><code>mysql-engine-version-8</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-instance-group"></td>
+      <td class="muted">db-mysql-instance-group</td>
+      <td><code>mysql-instance-group</code></td>
+      <td class="muted">mysql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-kernel-upgrade"></td>
+      <td class="muted">db-mysql-kernel-upgrade</td>
+      <td><code>mysql-kernel-upgrade</code></td>
+      <td class="muted">mysql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-log-export-config"></td>
+      <td class="muted">db-mysql-log-export-config</td>
+      <td><code>mysql-log-export-config</code></td>
+      <td class="muted">mysql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">access_key
+          <input type="text" name="opt__mysql-log-export-config__access_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">secret_key
+          <input type="text" name="opt__mysql-log-export-config__secret_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">bucket_name
+          <input type="text" name="opt__mysql-log-export-config__bucket_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">log_type
+          <input type="text" name="opt__mysql-log-export-config__log_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-parameter"></td>
+      <td class="muted">db-mysql-parameter</td>
+      <td><code>mysql-parameter</code></td>
+      <td class="muted">mysql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-parameter-group"></td>
+      <td class="muted">db-mysql-parameter-group</td>
+      <td><code>mysql-parameter-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-patch"></td>
+      <td class="muted">db-mysql-patch</td>
+      <td><code>mysql-patch</code></td>
+      <td class="muted">mysql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">target_software_version
+          <input type="text" name="opt__mysql-patch__target_software_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-promote"></td>
+      <td class="muted">db-mysql-promote</td>
+      <td><code>mysql-promote</code></td>
+      <td class="muted">mysql-replica, mysql-reset-replica</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-replica"></td>
+      <td class="muted">db-mysql-replica</td>
+      <td><code>mysql-replica</code></td>
+      <td class="muted">mysql-cluster, mysql-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__mysql-replica__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-reset-replica"></td>
+      <td class="muted">db-mysql-reset-replica</td>
+      <td><code>mysql-reset-replica</code></td>
+      <td class="muted">mysql-replica, mysql-sync-replica-state</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-resize-block-storage"></td>
+      <td class="muted">db-mysql-resize-block-storage</td>
+      <td><code>mysql-resize-block-storage</code></td>
+      <td class="muted">mysql-cluster, mysql-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-resize-server-type"></td>
+      <td class="muted">db-mysql-resize-server-type</td>
+      <td><code>mysql-resize-server-type</code></td>
+      <td class="muted">mysql-cluster, mysql-instance-group, mysql-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__mysql-resize-server-type__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-restart"></td>
+      <td class="muted">db-mysql-restart</td>
+      <td><code>mysql-restart</code></td>
+      <td class="muted">mysql-cluster, mysql-start</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-restore"></td>
+      <td class="muted">db-mysql-restore</td>
+      <td><code>mysql-restore</code></td>
+      <td class="muted">mysql-cluster, mysql-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__mysql-restore__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-server-type"></td>
+      <td class="muted">db-mysql-server-type</td>
+      <td><code>mysql-server-type</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-start"></td>
+      <td class="muted">db-mysql-start</td>
+      <td><code>mysql-start</code></td>
+      <td class="muted">mysql-cluster, mysql-stop</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-stop"></td>
+      <td class="muted">db-mysql-stop</td>
+      <td><code>mysql-stop</code></td>
+      <td class="muted">mysql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-switchover"></td>
+      <td class="muted">db-mysql-switchover</td>
+      <td><code>mysql-switchover</code></td>
+      <td class="muted">mysql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="mysql-sync-replica-state"></td>
+      <td class="muted">db-mysql-sync-replica-state</td>
+      <td><code>mysql-sync-replica-state</code></td>
+      <td class="muted">mysql-cluster, mysql-replica</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-add-block-storage"></td>
+      <td class="muted">db-postgresql-add-block-storage</td>
+      <td><code>pg-add-block-storage</code></td>
+      <td class="muted">postgresql-cluster, pg-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="postgresql-cluster"></td>
+      <td class="muted">db-postgresql-cluster</td>
+      <td><code>postgresql-cluster</code></td>
+      <td class="muted">subnet, pg-engine-version, pg-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__postgresql-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__postgresql-cluster__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">engine_version_16
+          <input type="text" name="opt__postgresql-cluster__engine_version_16" size="10"
+                 value=""
+                 placeholder="ref"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-engine-version"></td>
+      <td class="muted">db-postgresql-engine-version</td>
+      <td><code>pg-engine-version</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-engine-version-16"></td>
+      <td class="muted">db-postgresql-engine-version-16</td>
+      <td><code>pg-engine-version-16</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-instance-group"></td>
+      <td class="muted">db-postgresql-instance-group</td>
+      <td><code>pg-instance-group</code></td>
+      <td class="muted">postgresql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-kernel-upgrade"></td>
+      <td class="muted">db-postgresql-kernel-upgrade</td>
+      <td><code>pg-kernel-upgrade</code></td>
+      <td class="muted">postgresql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-log-export-config"></td>
+      <td class="muted">db-postgresql-log-export-config</td>
+      <td><code>pg-log-export-config</code></td>
+      <td class="muted">postgresql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">access_key
+          <input type="text" name="opt__pg-log-export-config__access_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">secret_key
+          <input type="text" name="opt__pg-log-export-config__secret_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">bucket_name
+          <input type="text" name="opt__pg-log-export-config__bucket_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">log_type
+          <input type="text" name="opt__pg-log-export-config__log_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-parameter"></td>
+      <td class="muted">db-postgresql-parameter</td>
+      <td><code>pg-parameter</code></td>
+      <td class="muted">postgresql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-parameter-group"></td>
+      <td class="muted">db-postgresql-parameter-group</td>
+      <td><code>pg-parameter-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-patch"></td>
+      <td class="muted">db-postgresql-patch</td>
+      <td><code>pg-patch</code></td>
+      <td class="muted">postgresql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">target_software_version
+          <input type="text" name="opt__pg-patch__target_software_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-promote"></td>
+      <td class="muted">db-postgresql-promote</td>
+      <td><code>pg-promote</code></td>
+      <td class="muted">pg-replica, pg-reset-replica</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-replica"></td>
+      <td class="muted">db-postgresql-replica</td>
+      <td><code>pg-replica</code></td>
+      <td class="muted">postgresql-cluster, pg-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__pg-replica__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-reset-replica"></td>
+      <td class="muted">db-postgresql-reset-replica</td>
+      <td><code>pg-reset-replica</code></td>
+      <td class="muted">pg-replica, pg-sync-replica-state</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-resize-block-storage"></td>
+      <td class="muted">db-postgresql-resize-block-storage</td>
+      <td><code>pg-resize-block-storage</code></td>
+      <td class="muted">postgresql-cluster, pg-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-resize-server-type"></td>
+      <td class="muted">db-postgresql-resize-server-type</td>
+      <td><code>pg-resize-server-type</code></td>
+      <td class="muted">postgresql-cluster, pg-instance-group, pg-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__pg-resize-server-type__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-restore"></td>
+      <td class="muted">db-postgresql-restore</td>
+      <td><code>pg-restore</code></td>
+      <td class="muted">postgresql-cluster, pg-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__pg-restore__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-server-type"></td>
+      <td class="muted">db-postgresql-server-type</td>
+      <td><code>pg-server-type</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-switchover"></td>
+      <td class="muted">db-postgresql-switchover</td>
+      <td><code>pg-switchover</code></td>
+      <td class="muted">postgresql-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pg-sync-replica-state"></td>
+      <td class="muted">db-postgresql-sync-replica-state</td>
+      <td><code>pg-sync-replica-state</code></td>
+      <td class="muted">postgresql-cluster, pg-replica</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="sqlserver-cluster"></td>
+      <td class="muted">db-sqlserver-cluster</td>
+      <td><code>sqlserver-cluster</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">engine_version_id
+          <input type="text" name="opt__sqlserver-cluster__engine_version_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__sqlserver-cluster__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="devops-service"></td>
+      <td class="muted">dt-devops-service</td>
+      <td><code>devops-service</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="planned-compute"></td>
+      <td class="muted">fm-billing-planned-compute</td>
+      <td><code>planned-compute</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">product_offering
+          <input type="text" name="opt__planned-compute__product_offering" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">payment_type
+          <input type="text" name="opt__planned-compute__payment_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="account-budget"></td>
+      <td class="muted">fm-budget-account</td>
+      <td><code>account-budget</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="cost-reads"></td>
+      <td class="muted">fm-cost-reads</td>
+      <td><code>cost-reads</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pricing-reads"></td>
+      <td class="muted">fm-pricing-reads</td>
+      <td><code>pricing-reads</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="cloudcontrol-landing-zone"></td>
+      <td class="muted">mg-cc-landing-zone</td>
+      <td><code>cloudcontrol-landing-zone</code></td>
+      <td class="muted">iam-identity-center</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="cm-account-resource"></td>
+      <td class="muted">mg-cm-account-resource</td>
+      <td><code>cm-account-resource</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="cm-event-policy"></td>
+      <td class="muted">mg-cm-event-policy</td>
+      <td><code>cm-event-policy</code></td>
+      <td class="muted">cm-account-resource</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">eventLevel
+          <input type="text" name="opt__cm-event-policy__eventLevel" size="10"
+                 value=""
+                 placeholder="WARNING, CRITICAL"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-access-key"></td>
+      <td class="muted">mg-iam-access-key</td>
+      <td><code>iam-access-key</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-group"></td>
+      <td class="muted">mg-iam-group</td>
+      <td><code>iam-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-group-member"></td>
+      <td class="muted">mg-iam-group-member</td>
+      <td><code>iam-group-member</code></td>
+      <td class="muted">iam-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">user_id
+          <input type="text" name="opt__iam-group-member__user_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-group-policy-binding"></td>
+      <td class="muted">mg-iam-group-policy-binding</td>
+      <td><code>iam-group-policy-binding</code></td>
+      <td class="muted">iam-group, iam-policy</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-policy"></td>
+      <td class="muted">mg-iam-policy</td>
+      <td><code>iam-policy</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-policy-binding-set"></td>
+      <td class="muted">mg-iam-policy-binding-set</td>
+      <td><code>iam-policy-binding-set</code></td>
+      <td class="muted">iam-group, iam-policy×2</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-resource-policy"></td>
+      <td class="muted">mg-iam-resource-policy</td>
+      <td><code>iam-resource-policy</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">srn
+          <input type="text" name="opt__iam-resource-policy__srn" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-role"></td>
+      <td class="muted">mg-iam-role</td>
+      <td><code>iam-role</code></td>
+      <td class="muted">iam-policy</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-role-policy-binding"></td>
+      <td class="muted">mg-iam-role-policy-binding</td>
+      <td><code>iam-role-policy-binding</code></td>
+      <td class="muted">iam-role, iam-policy×2</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-saml-provider"></td>
+      <td class="muted">mg-iam-saml-provider</td>
+      <td><code>iam-saml-provider</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-user"></td>
+      <td class="muted">mg-iam-user</td>
+      <td><code>iam-user</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">account_id
+          <input type="text" name="opt__iam-user__account_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-user-policy-binding"></td>
+      <td class="muted">mg-iam-user-policy-binding</td>
+      <td><code>iam-user-policy-binding</code></td>
+      <td class="muted">iam-policy</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">user_id
+          <input type="text" name="opt__iam-user-policy-binding__user_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="idc-account-assignment"></td>
+      <td class="muted">mg-idc-account-assignment</td>
+      <td><code>idc-account-assignment</code></td>
+      <td class="muted">iam-identity-center, idc-permission-set, idc-user</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="idc-group"></td>
+      <td class="muted">mg-idc-group</td>
+      <td><code>idc-group</code></td>
+      <td class="muted">iam-identity-center</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="iam-identity-center"></td>
+      <td class="muted">mg-idc-instance</td>
+      <td><code>iam-identity-center</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">identity_store_type
+          <input type="text" name="opt__iam-identity-center__identity_store_type" size="10"
+                 value=""
+                 placeholder="ACTIVE_DIRECTORY, IDENTITY_CENTER_DIRECTORY"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="idc-permission-set"></td>
+      <td class="muted">mg-idc-permission-set</td>
+      <td><code>idc-permission-set</code></td>
+      <td class="muted">iam-identity-center</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="idc-user"></td>
+      <td class="muted">mg-idc-user</td>
+      <td><code>idc-user</code></td>
+      <td class="muted">iam-identity-center</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="trail"></td>
+      <td class="muted">mg-la-trail</td>
+      <td><code>trail</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">object_storage_bucket_name
+          <input type="text" name="opt__trail__object_storage_bucket_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="network-logging-storage"></td>
+      <td class="muted">mg-nl-storage</td>
+      <td><code>network-logging-storage</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">bucket_name
+          <input type="text" name="opt__network-logging-storage__bucket_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">resource_type
+          <input type="text" name="opt__network-logging-storage__resource_type" size="10"
+                 value=""
+                 placeholder="SECURITY_GROUP, FIREWALL, NAT"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="organization-account"></td>
+      <td class="muted">mg-org-account</td>
+      <td><code>organization-account</code></td>
+      <td class="muted">organization</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="delegation-policy"></td>
+      <td class="muted">mg-org-delegation</td>
+      <td><code>delegation-policy</code></td>
+      <td class="muted">organization</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="org-invitation"></td>
+      <td class="muted">mg-org-invitation</td>
+      <td><code>org-invitation</code></td>
+      <td class="muted">organization</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="organization"></td>
+      <td class="muted">mg-org-org</td>
+      <td><code>organization</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="service-control-policy"></td>
+      <td class="muted">mg-org-scp</td>
+      <td><code>service-control-policy</code></td>
+      <td class="muted">organization</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="organization-unit"></td>
+      <td class="muted">mg-org-unit</td>
+      <td><code>organization-unit</code></td>
+      <td class="muted">organization</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="account-quota"></td>
+      <td class="muted">mg-quota-account</td>
+      <td><code>account-quota</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="quota-request"></td>
+      <td class="muted">mg-quota-request</td>
+      <td><code>quota-request</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="resource-group"></td>
+      <td class="muted">mg-rm-resource-group</td>
+      <td><code>resource-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="resource-group-bulk"></td>
+      <td class="muted">mg-rm-rg-bulk</td>
+      <td><code>resource-group-bulk</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="support-inquiry"></td>
+      <td class="muted">mg-support-inquiry</td>
+      <td><code>support-inquiry</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">known_inquiry_id
+          <input type="text" name="opt__support-inquiry__known_inquiry_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="support-service-request"></td>
+      <td class="muted">mg-support-sr</td>
+      <td><code>support-service-request</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">known_sr_id
+          <input type="text" name="opt__support-service-request__known_sr_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="alert"></td>
+      <td class="muted">mg-sw-alert</td>
+      <td><code>alert</code></td>
+      <td class="muted">sw-metric-catalog</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">level
+          <input type="text" name="opt__alert__level" size="10"
+                 value=""
+                 placeholder="HIGH, MIDDLE, LOW"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="sw-custom-log-collect"></td>
+      <td class="muted">mg-sw-custom-log-collect</td>
+      <td><code>sw-custom-log-collect</code></td>
+      <td class="muted">log-stream</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="sw-custom-metric-meta"></td>
+      <td class="muted">mg-sw-custom-metric-meta</td>
+      <td><code>sw-custom-metric-meta</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="dashboard"></td>
+      <td class="muted">mg-sw-dashboard</td>
+      <td><code>dashboard</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="event-rule"></td>
+      <td class="muted">mg-sw-event-rule</td>
+      <td><code>event-rule</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="log-group"></td>
+      <td class="muted">mg-sw-log-group</td>
+      <td><code>log-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="log-stream"></td>
+      <td class="muted">mg-sw-log-stream</td>
+      <td><code>log-stream</code></td>
+      <td class="muted">log-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="sw-metric-catalog"></td>
+      <td class="muted">mg-sw-metric-catalog</td>
+      <td><code>sw-metric-catalog</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="cdn"></td>
+      <td class="muted">nw-cdn-cdn</td>
+      <td><code>cdn</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">origin_hostname
+          <input type="text" name="opt__cdn__origin_hostname" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="direct-connect"></td>
+      <td class="muted">nw-dc-dc</td>
+      <td><code>direct-connect</code></td>
+      <td class="muted">vpc</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="hosted-zone"></td>
+      <td class="muted">nw-dns-hosted-zone</td>
+      <td><code>hosted-zone</code></td>
+      <td class="muted">private-dns</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="private-dns"></td>
+      <td class="muted">nw-dns-private-dns</td>
+      <td><code>private-dns</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="gslb"></td>
+      <td class="muted">nw-gslb-gslb</td>
+      <td><code>gslb</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="lb-health-check"></td>
+      <td class="muted">nw-lb-health-check</td>
+      <td><code>lb-health-check</code></td>
+      <td class="muted">vpc, subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="load-balancer"></td>
+      <td class="muted">nw-lb-lb</td>
+      <td><code>load-balancer</code></td>
+      <td class="muted">vpc, subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">service_ip
+          <input type="text" name="opt__load-balancer__service_ip" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="lb-listener"></td>
+      <td class="muted">nw-lb-listener</td>
+      <td><code>lb-listener</code></td>
+      <td class="muted">load-balancer, lb-server-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="lb-member"></td>
+      <td class="muted">nw-lb-member</td>
+      <td><code>lb-member</code></td>
+      <td class="muted">lb-server-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">member_ip
+          <input type="text" name="opt__lb-member__member_ip" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="lb-member-bulk"></td>
+      <td class="muted">nw-lb-member-bulk</td>
+      <td><code>lb-member-bulk</code></td>
+      <td class="muted">lb-server-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">member_ip
+          <input type="text" name="opt__lb-member-bulk__member_ip" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="lb-server-group"></td>
+      <td class="muted">nw-lb-server-group</td>
+      <td><code>lb-server-group</code></td>
+      <td class="muted">vpc, subnet, lb-health-check</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="lb-static-nat"></td>
+      <td class="muted">nw-lb-static-nat</td>
+      <td><code>lb-static-nat</code></td>
+      <td class="muted">load-balancer, public-ip, internet-gateway</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="security-group-rule"></td>
+      <td class="muted">nw-sg-rule</td>
+      <td><code>security-group-rule</code></td>
+      <td class="muted">security-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="security-group"></td>
+      <td class="muted">nw-sg-sg</td>
+      <td><code>security-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">loggable
+          <input type="text" name="opt__security-group__loggable" size="10"
+                 value=""
+                 placeholder="False, True"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="vpc-endpoint"></td>
+      <td class="muted">nw-vpc-endpoint</td>
+      <td><code>vpc-endpoint</code></td>
+      <td class="muted">vpc, subnet, filestorage-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">target
+          <input type="text" name="opt__vpc-endpoint__target" size="10"
+                 value=""
+                 placeholder="FS, OBS, SCR"></label>
+        
+        <label style="white-space:nowrap">endpoint_ip_address
+          <input type="text" name="opt__vpc-endpoint__endpoint_ip_address" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="firewall"></td>
+      <td class="muted">nw-vpc-firewall</td>
+      <td><code>firewall</code></td>
+      <td class="muted">internet-gateway</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="firewall-rule"></td>
+      <td class="muted">nw-vpc-firewall-rule</td>
+      <td><code>firewall-rule</code></td>
+      <td class="muted">firewall</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="internet-gateway"></td>
+      <td class="muted">nw-vpc-igw</td>
+      <td><code>internet-gateway</code></td>
+      <td class="muted">vpc</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">firewall_enabled
+          <input type="text" name="opt__internet-gateway__firewall_enabled" size="10"
+                 value=""
+                 placeholder="False, True"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="nat-gateway"></td>
+      <td class="muted">nw-vpc-natgw</td>
+      <td><code>nat-gateway</code></td>
+      <td class="muted">subnet, public-ip</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="vpc-peering"></td>
+      <td class="muted">nw-vpc-peering</td>
+      <td><code>vpc-peering</code></td>
+      <td class="muted">vpc×2</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="port"></td>
+      <td class="muted">nw-vpc-port</td>
+      <td><code>port</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">security_group
+          <input type="text" name="opt__port__security_group" size="10"
+                 value=""
+                 placeholder="ref"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="private-nat"></td>
+      <td class="muted">nw-vpc-private-nat</td>
+      <td><code>private-nat</code></td>
+      <td class="muted">direct-connect | transit-gateway</td>
+      <td>
+        
+        <select name="choice__private-nat">
+          <option value="">(기본 분기)</option>
+          
+          <option value="direct-connect" >direct-connect</option>
+          
+          <option value="transit-gateway" >transit-gateway</option>
+          
+        </select>
+        
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">service_type
+          <input type="text" name="opt__private-nat__service_type" size="10"
+                 value=""
+                 placeholder="TRANSIT_GATEWAY, DIRECT_CONNECT"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="privatelink-service"></td>
+      <td class="muted">nw-vpc-privatelink-service</td>
+      <td><code>privatelink-service</code></td>
+      <td class="muted">vpc, subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">service_ip
+          <input type="text" name="opt__privatelink-service__service_ip" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">connected_resource_ip
+          <input type="text" name="opt__privatelink-service__connected_resource_ip" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="public-ip"></td>
+      <td class="muted">nw-vpc-public-ip</td>
+      <td><code>public-ip</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="subnet"></td>
+      <td class="muted">nw-vpc-subnet</td>
+      <td><code>subnet</code></td>
+      <td class="muted">vpc</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">cidr
+          <input type="text" name="opt__subnet__cidr" size="10"
+                 value=""
+                 placeholder="cidr"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="transit-gateway"></td>
+      <td class="muted">nw-vpc-tgw</td>
+      <td><code>transit-gateway</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="vpc"></td>
+      <td class="muted">nw-vpc-vpc</td>
+      <td><code>vpc</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">cidr
+          <input type="text" name="opt__vpc__cidr" size="10"
+                 value=""
+                 placeholder="cidr"></label>
+        
+        <label style="white-space:nowrap">secondary_cidr
+          <input type="text" name="opt__vpc__secondary_cidr" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="vpn-gateway"></td>
+      <td class="muted">nw-vpn-gw</td>
+      <td><code>vpn-gateway</code></td>
+      <td class="muted">vpc, public-ip</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="vpn-tunnel"></td>
+      <td class="muted">nw-vpn-tunnel</td>
+      <td><code>vpn-tunnel</code></td>
+      <td class="muted">vpn-gateway</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">peer_gateway_ip
+          <input type="text" name="opt__vpn-tunnel__peer_gateway_ip" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">pre_shared_key
+          <input type="text" name="opt__vpn-tunnel__pre_shared_key" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">remote_subnet
+          <input type="text" name="opt__vpn-tunnel__remote_subnet" size="10"
+                 value=""
+                 placeholder="cidr"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="product-category"></td>
+      <td class="muted">pf-product-category</td>
+      <td><code>product-category</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="product"></td>
+      <td class="muted">pf-product-product</td>
+      <td><code>product</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="sts-token"></td>
+      <td class="muted">pf-sts-assume-role</td>
+      <td><code>sts-token</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">role_indicator
+          <input type="text" name="opt__sts-token__role_indicator" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="certificate"></td>
+      <td class="muted">sec-cert-cert</td>
+      <td><code>certificate</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="certificate-import"></td>
+      <td class="muted">sec-cert-import</td>
+      <td><code>certificate-import</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="diagnosis"></td>
+      <td class="muted">sec-ci-diagnosis</td>
+      <td><code>diagnosis</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">csp_type
+          <input type="text" name="opt__diagnosis__csp_type" size="10"
+                 value=""
+                 placeholder="SCP, AWS, AZURE"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="kms-key"></td>
+      <td class="muted">sec-kms-key</td>
+      <td><code>kms-key</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">purpose
+          <input type="text" name="opt__kms-key__purpose" size="10"
+                 value=""
+                 placeholder="rsa-2048, aes-256"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="secret"></td>
+      <td class="muted">sec-sm-secret</td>
+      <td><code>secret</code></td>
+      <td class="muted">kms-key</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">acl_cidr
+          <input type="text" name="opt__secret__acl_cidr" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="secretvault-vault"></td>
+      <td class="muted">sec-sv-vault</td>
+      <td><code>secretvault-vault</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">access_key_id
+          <input type="text" name="opt__secretvault-vault__access_key_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">acl_cidr
+          <input type="text" name="opt__secretvault-vault__acl_cidr" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="archiving-policy"></td>
+      <td class="muted">st-as-archiving-policy</td>
+      <td><code>archiving-policy</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">source_bucket
+          <input type="text" name="opt__archiving-policy__source_bucket" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="archive-bucket"></td>
+      <td class="muted">st-as-bucket</td>
+      <td><code>archive-bucket</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="backup-agent"></td>
+      <td class="muted">st-backup-agent</td>
+      <td><code>backup-agent</code></td>
+      <td class="muted">subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_uuid
+          <input type="text" name="opt__backup-agent__server_uuid" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="backup-manual"></td>
+      <td class="muted">st-backup-manual</td>
+      <td><code>backup-manual</code></td>
+      <td class="muted">backup-policy</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="backup-policy"></td>
+      <td class="muted">st-backup-policy</td>
+      <td><code>backup-policy</code></td>
+      <td class="muted">server, backup-target</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="backup-restore"></td>
+      <td class="muted">st-backup-restore</td>
+      <td><code>backup-restore</code></td>
+      <td class="muted">backup-policy, backup-restore-target, subnet, security-group, server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="backup-restore-target"></td>
+      <td class="muted">st-backup-restore-target</td>
+      <td><code>backup-restore-target</code></td>
+      <td class="muted">backup-policy, backup-manual</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="backup-target"></td>
+      <td class="muted">st-backup-target</td>
+      <td><code>backup-target</code></td>
+      <td class="muted">server</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="bm-group-snapshot"></td>
+      <td class="muted">st-bs-group-snapshot</td>
+      <td><code>bm-group-snapshot</code></td>
+      <td class="muted">bm-volume-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="bm-volume-snapshot"></td>
+      <td class="muted">st-bs-snapshot</td>
+      <td><code>bm-volume-snapshot</code></td>
+      <td class="muted">bm-block-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="bm-block-volume"></td>
+      <td class="muted">st-bs-volume</td>
+      <td><code>bm-block-volume</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="bm-volume-group"></td>
+      <td class="muted">st-bs-volume-group</td>
+      <td><code>bm-volume-group</code></td>
+      <td class="muted">bm-block-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="fs-replication"></td>
+      <td class="muted">st-fs-replication</td>
+      <td><code>fs-replication</code></td>
+      <td class="muted">filestorage-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">region
+          <input type="text" name="opt__fs-replication__region" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">replication_type
+          <input type="text" name="opt__fs-replication__replication_type" size="10"
+                 value=""
+                 placeholder="replication, backup"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="fs-snapshot"></td>
+      <td class="muted">st-fs-snapshot</td>
+      <td><code>fs-snapshot</code></td>
+      <td class="muted">filestorage-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="fs-snapshot-schedule"></td>
+      <td class="muted">st-fs-snapshot-schedule</td>
+      <td><code>fs-snapshot-schedule</code></td>
+      <td class="muted">filestorage-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="filestorage-volume"></td>
+      <td class="muted">st-fs-volume</td>
+      <td><code>filestorage-volume</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pfs-snapshot"></td>
+      <td class="muted">st-pfs-snapshot</td>
+      <td><code>pfs-snapshot</code></td>
+      <td class="muted">pfs-volume</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="pfs-volume"></td>
+      <td class="muted">st-pfs-volume</td>
+      <td><code>pfs-volume</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+  </table>
+  <p class="inline" style="margin-top:10px">
+    <label>lifecycle id (선택 — 기본 <code>gen-&lt;node&gt;</code>/<code>bundle-&lt;id&gt;</code>)
+      <input type="text" name="lifecycle_id" value="" size="24"></label>
+    <button type="submit" name="action" value="plan"
+            >합성 미리보기 (plan)</button>
+    <button type="submit" name="action" value="save"
+            
+            class="ghost">compose + draft 저장</button>
+  </p>
+</section>
+</form>
+
+
+
+
+
+
+
+
+</main>
+</body>
+</html>

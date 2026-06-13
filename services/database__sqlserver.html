@@ -1,0 +1,305 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sqlserver · database — coverage</title><style>
+:root{--bg:#fbfcfd;--surface:#fff;--surface2:#f5f7f9;--border:#e4e7eb;
+  --text:#1d2530;--muted:#6b7480;--faint:#9aa3ad;
+  --green:#15924f;--green-bg:#e7f6ed;--amber:#b5740b;--amber-bg:#fdf3e2;
+  --red:#c63434;--red-bg:#fbe9e9;--blue:#2563c9;--blue-bg:#e8f0fd;
+  --grey:#7a838d;--grey-bg:#eef1f4;--purple:#7a45c2;--purple-bg:#f1e9fb;
+  --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",'Noto Sans KR',sans-serif;
+  font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1240px;margin:0 auto;padding:20px 22px 80px}
+.crumb{color:var(--muted);font-size:12.5px;margin-bottom:14px}
+.crumb b{color:var(--text)}
+.hero{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px;
+  display:flex;flex-wrap:wrap;gap:22px;align-items:center}
+.hero h1{margin:0;font-size:21px;letter-spacing:-.2px;display:flex;align-items:center;gap:9px}
+.tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-bg);color:var(--blue)}
+.gauge{display:flex;align-items:center;gap:14px}
+.ring{width:62px;height:62px;border-radius:50%;flex:none;
+  background:conic-gradient(#d0d7de calc(—*1%),var(--grey-bg) 0);
+  display:grid;place-items:center;position:relative}
+.ring::after{content:"";position:absolute;inset:7px;background:var(--surface);border-radius:50%}
+.ring span{position:relative;font-weight:700;font-size:15px}
+.gauge .lbl{font-size:12.5px;color:var(--muted)}
+.gauge .lbl b{color:var(--text);font-size:13.5px}
+.split{margin-left:auto;display:flex;gap:26px;flex-wrap:wrap}
+.split .k{font-size:11.5px;color:var(--muted)}
+.split .v{font-size:18px;font-weight:700;letter-spacing:-.3px}
+.v .sub{font-size:11.5px;font-weight:500;color:var(--muted)}
+.action{display:flex;gap:10px;align-items:flex-start;background:var(--amber-bg);
+  border:1px solid #f0dcb6;border-radius:11px;padding:11px 14px;margin-bottom:16px;font-size:13px}
+.action b{color:#8a5a08}
+.controls{background:var(--bg);padding:10px 0 11px;margin-bottom:2px;border-bottom:1px solid var(--border)}
+.row1{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:6px 11px;font-size:12.5px;font-weight:600;
+  cursor:pointer;color:var(--muted);border-right:1px solid var(--border)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{color:#fff}
+.seg button.m-get[aria-pressed="true"]{background:var(--blue)}
+.seg button.m-post[aria-pressed="true"]{background:var(--green)}
+.seg button.m-put[aria-pressed="true"]{background:var(--amber)}
+.seg button.m-delete[aria-pressed="true"]{background:var(--red)}
+select,.search input{border:1px solid var(--border);border-radius:9px;background:var(--surface);
+  padding:6px 10px;font-size:12.5px;color:var(--text);font-family:inherit}
+.search{position:relative}
+.search input{width:230px;padding-left:30px}
+.search .mag{position:absolute;left:9px;top:7px;color:var(--faint)}
+.chiptog{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);
+  border-radius:9px;background:var(--surface);padding:6px 11px;font-size:12.5px;font-weight:600;
+  color:var(--muted);cursor:pointer;user-select:none}
+.chiptog input{accent-color:var(--blue);margin:0}
+.chiptog.on{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
+.spacer{flex:1}
+.reset{color:var(--muted);font-size:12px;cursor:pointer;border:0;background:none;text-decoration:underline}
+.row2{display:flex;gap:16px;align-items:center;margin-top:9px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.count b{color:var(--text);font-size:13px}
+.legend{display:flex;gap:13px;flex-wrap:wrap;margin-left:auto}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.dot.g{background:var(--green)}.dot.a{background:var(--amber)}
+.dot.r{background:var(--red)}.dot.s{background:var(--faint)}
+.grp{margin-top:14px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+.grp-h{display:flex;align-items:center;gap:11px;padding:10px 14px;cursor:pointer;
+  background:var(--surface2);border-bottom:1px solid var(--border);user-select:none}
+.grp-h .caret{transition:transform .15s;color:var(--muted);font-size:11px}
+.grp.collapsed .caret{transform:rotate(-90deg)}
+.grp.collapsed .grp-body{display:none}
+.grp-h .name{font-weight:700;font-size:13.5px}
+.mini{height:6px;width:130px;border-radius:4px;background:var(--grey-bg);overflow:hidden;display:inline-block}
+.mini i{display:block;height:100%;background:var(--green)}
+.grp-h .frac{font-size:12px;color:var(--muted)}
+.grp-h .gd{margin-left:auto;font-size:11.5px;color:var(--amber);font-weight:600}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+thead th{background:var(--surface2);text-align:left;font-size:11px;font-weight:600;color:var(--muted);
+  padding:7px 12px;border-bottom:2px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+thead th:nth-child(1){width:4px;padding:0}
+thead th:nth-child(2){width:84px}
+thead th:nth-child(3){width:30%}
+thead th:nth-child(4){width:280px}
+thead th:nth-child(5){width:50px}
+thead th:nth-child(6){width:150px}
+thead th:nth-child(7){width:110px}
+tbody td{padding:8px 12px;border-bottom:1px solid #eef1f3;vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#fafbfc}
+.cbar{width:4px;padding:0!important}
+tr.cov-y .cbar{background:var(--green)}tr.cov-p .cbar{background:var(--amber)}
+tr.cov-n .cbar{background:#dde2e7}tr.cov-f .cbar{background:var(--red)}
+.mb{font-family:ui-monospace,monospace;font-size:11px;font-weight:800;letter-spacing:.4px;padding:3px 8px;border-radius:5px;display:inline-block;min-width:62px;text-align:center;color:#fff}
+.mb.GET{background:#2f78c4}.mb.POST{background:#2c9a5e}.mb.PUT{background:#d97a0a}
+.mb.DELETE{background:#d63a3a}.mb.PATCH{background:#7a45c2}
+td.path code{font-size:12px;color:var(--text);word-break:break-all}
+td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-weight:600;word-break:break-all}
+.defbtn{border:0;background:var(--amber-bg);color:var(--amber);font-size:11px;font-weight:700;
+  padding:3px 10px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.defbtn .ca{font-size:9px;transition:transform .15s}
+.defbtn.open .ca{transform:rotate(180deg)}
+.defbtn:hover{filter:brightness(.97)}
+.defbtn.crit{background:var(--red-bg);color:var(--red)}
+.detailrow{display:none}
+.detailrow.open{display:table-row}
+.detailcell{background:var(--surface2);padding:9px 14px 12px;border-bottom:1px solid #eef1f3}
+.defitem{padding:7px 10px;background:#fff;border:1px solid var(--border);border-left:3px solid var(--amber);
+  border-radius:0 6px 6px 0;margin:5px 0;font-size:11.5px;max-width:860px}
+.defitem.crit{border-left-color:var(--red)}
+.defitem b{font-family:ui-monospace,monospace;color:var(--text);font-size:11.5px}
+.defitem .meta{color:var(--faint);font-size:10.5px;margin-left:5px}
+.defitem .dd{color:var(--muted);margin-top:3px;line-height:1.4;word-break:break-word}
+.cov{font-size:14px;font-weight:700}
+.cov.y{color:var(--green)}.cov.p{color:var(--amber)}.cov.n{color:var(--faint)}.cov.f{color:var(--red)}
+.st{font-family:ui-monospace,monospace;font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:6px;display:inline-block}
+.st.s2{background:var(--green-bg);color:var(--green)}
+.st.s404{background:var(--grey-bg);color:var(--grey)}
+.st.s4{background:var(--amber-bg);color:var(--amber)}
+.st.s5{background:var(--red-bg);color:var(--red)}
+.st.none{color:var(--faint);font-weight:500}
+.ms{font-size:11px;color:var(--muted);margin-left:6px}
+.ms.warn{color:var(--amber);font-weight:600}
+.ms.slow{color:var(--red);font-weight:700}
+.probe{font-size:10.5px;color:var(--faint);margin-left:6px}
+.prev{font-size:10px;color:var(--faint);margin-left:5px}
+.ok{color:var(--green);font-size:12px}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+.foot{margin-top:22px;font-size:11.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:12px}
+</style></head><body><div class="wrap">
+
+<div class="crumb"><a href="../index.html">← 대시보드</a> / database / <b>sqlserver</b></div>
+
+<div class="hero">
+  <div class="gauge">
+    <div class="ring"><span>—%</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>5 / 38</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 1</span></div>
+  </div>
+  <h1><span style='color:#8b949e'>sqlserver</span> <span class="tag">기능 테스트 제외</span> <span class="tag">database</span></h1>
+  <div class="split">
+    <div><div class="k">읽기 GET</div><div class="v" style="color:#d0d7de">—% <span class="sub">5/11</span></div></div>
+    <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:#d0d7de">—% <span class="sub">0/27</span></div></div>
+    <div><div class="k">설계/동작 결함</div><div class="v">0 <span class="sub">개선 · 결함 0</span></div></div>
+  </div>
+</div>
+
+<div class="action"><div><b>기능 테스트 제외 서비스</b> — 라이선스 없음 (owner 2026-06-13). smoke가 각 API의 <b>접근성만</b> 확인한다: 31/38개 엔드포인트가 응답(4xx 포함 = 도달). 커버리지 분모에서는 waiver로 제외되어 있다.</div></div>
+
+<div class="controls">
+  <div class="row1">
+    <div class="seg" id="methodSeg">
+      <button class="m-get" data-m="GET" aria-pressed="false">GET</button>
+      <button class="m-post" data-m="POST" aria-pressed="false">POST</button>
+      <button class="m-put" data-m="PUT" aria-pressed="false">PUT</button>
+      <button class="m-delete" data-m="DELETE" aria-pressed="false">DELETE</button>
+    </div>
+    <select id="covSel">
+      <option value="">커버 상태: 전체</option>
+      <option value="y">✓ 검증(2xx)</option>
+      <option value="p">◑ 도달·미검증</option>
+      <option value="f">⛔ fail(5xx/auth)</option>
+      <option value="n">· 미관측</option>
+    </select>
+    <select id="stSel">
+      <option value="">status: 전체</option>
+      <option value="2">2xx</option>
+      <option value="404">404 (probe 미도달)</option>
+      <option value="4">기타 4xx</option>
+      <option value="5">5xx</option>
+      <option value="none">미관측(빈칸)</option>
+    </select>
+    <label class="chiptog" id="defTog"><input type="checkbox"> 결함만</label>
+    <label class="chiptog" id="slowTog"><input type="checkbox"> 느린 호출(≥3s)</label>
+    <div class="search"><span class="mag">⌕</span><input id="q" placeholder="경로·API명 검색"></div>
+    <div class="spacer"></div>
+    <label class="chiptog on" id="grpTog"><input type="checkbox" checked> 리소스 그룹</label>
+    <button class="reset" id="reset">초기화</button>
+  </div>
+  <div class="row2">
+    <span class="count"><b id="shown"></b> / 38 endpoints</span>
+    <span class="legend">
+      <span><i class="dot g"></i>검증 2xx</span>
+      <span><i class="dot a"></i>도달·미검증</span>
+      <span><i class="dot s"></i>미관측</span>
+      <span><i class="dot r"></i>fail / 계약 위반</span>
+    </span>
+  </div>
+</div>
+
+<div id="out"></div>
+
+<div class="foot">생성 2026-06-13 22:08 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+</div>
+
+<script>
+var R=[{"m": "DELETE", "p": "/v1/clusters/{cluster_id}", "api": "sqlserverdeletecluster", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "DELETE", "p": "/v1/clusters/{cluster_id}/backups", "api": "sqlserverunsetbackup", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "DELETE", "p": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}", "api": "sqlserverunregisterlogexportconfig", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "DELETE", "p": "/v1/clusters/{cluster_id}/maintenance", "api": "sqlserverunsetmaintenance", "c": "n", "s": 404, "t": 1.2, "src": "a357115", "d": []}, {"m": "GET", "p": "/v1/clusters", "api": "sqlserverlistclusters", "c": "y", "s": 200, "t": 1.6, "src": "", "d": []}, {"m": "GET", "p": "/v1/clusters/{cluster_id}", "api": "sqlservershowcluster", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/clusters/{cluster_id}/backup-histories", "api": "sqlserverlistbackuphistories", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/clusters/{cluster_id}/log-export-configs", "api": "sqlserverlistlogexportconfigs", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/clusters/{cluster_id}/parameters", "api": "sqlserverlistparametervalues", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/engine-versions", "api": "sqlserverlistengineversions", "c": "y", "s": 200, "t": 1.1, "src": "", "d": []}, {"m": "GET", "p": "/v1/engine-versions/{dbaas_engine_version_id}/properties", "api": "sqlserverlistengineversionproperties", "c": "y", "s": 200, "t": 1.0, "src": "", "d": []}, {"m": "GET", "p": "/v1/parameter-groups", "api": "sqlserverlistparametergroups", "c": "y", "s": 200, "t": 1.0, "src": "", "d": []}, {"m": "GET", "p": "/v1/parameters", "api": "sqlserverlistparameters", "c": "p", "s": 400, "t": 0.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/requests/{request_id}", "api": "sqlservershowrequest", "c": "n", "s": 400, "t": 1.2, "src": "a357115", "d": [{"label": "notfound-inconsistent", "issue": "35", "kind": "runtime", "detail": "non-existent id -> 400 (not 404)", "crit": false}]}, {"m": "GET", "p": "/v1/server-types", "api": "sqlserverlistservertypes", "c": "y", "s": 200, "t": 1.6, "src": "", "d": []}, {"m": "POST", "p": "/v1/block-storage-groups/{block_storage_group_id}/resize", "api": "sqlserversetblockstoragesize", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/clusters", "api": "sqlservercreatecluster", "c": "n", "s": 400, "t": 1.5, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: dbaas_engine_version_id, instance_name_prefix, name, subnet_id, timezone", "crit": true}, {"label": "opaque-validation", "issue": "5", "kind": "runtime", "detail": "400 names neither field nor rule", "crit": true}]}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/add-secondary", "api": "sqlserveraddsecondary", "c": "n", "s": 404, "t": 0.9, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: license, name", "crit": false}]}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/backups", "api": "sqlserversetbackup", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: retention_period_day, starting_time_hour", "crit": false}]}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/databases", "api": "sqlserversetdatabases", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/log-export-configs", "api": "sqlserverregisterlogexportconfig", "c": "n", "s": 500, "t": 1.2, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: access_key, bucket_name, log_type, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key", "crit": false}]}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export", "api": "sqlserverexportlog", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/maintenance", "api": "sqlserversetmaintenance", "c": "n", "s": 404, "t": 1.3, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: start_time, term_hour", "crit": false}]}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/parameters/sync", "api": "sqlserversyncparametervalues", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/restart", "api": "sqlserverrestartcluster", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/restore", "api": "sqlservercreaterestore", "c": "n", "s": 400, "t": 1.0, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: instance_name_prefix, name, server_type_name", "crit": false}]}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/security-group-rules", "api": "sqlserversetsecuritygrouprules", "c": "n", "s": 400, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/start", "api": "sqlserverstartcluster", "c": "n", "s": 404, "t": 1.9, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/stop", "api": "sqlserverstopcluster", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/switchover", "api": "sqlserverswitchovercluster", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/clusters/{cluster_id}/sync-state", "api": "sqlserversyncclusterstate", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/instance-groups/{instance_group_id}/block-storage-groups", "api": "sqlserveraddblockstorages", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "POST", "p": "/v1/instance-groups/{instance_group_id}/resize", "api": "sqlserversetservertype", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: server_type_name", "crit": false}]}, {"m": "PUT", "p": "/v1/clusters/{cluster_id}/audit-log", "api": "sqlserversetauditlog", "c": "n", "s": 404, "t": 1.2, "src": "a357115", "d": []}, {"m": "PUT", "p": "/v1/clusters/{cluster_id}/backup-histories", "api": "sqlserverremovebackuphistories", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "PUT", "p": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}", "api": "sqlserversetlogexportconfig", "c": "n", "s": null, "t": null, "src": "", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: access_key, schedule_day_of_month, schedule_frequency_type, schedule_hour, secret_key", "crit": false}]}, {"m": "PUT", "p": "/v1/clusters/{cluster_id}/parameters", "api": "sqlserversetparametervalues", "c": "n", "s": 404, "t": 1.1, "src": "a357115", "d": []}, {"m": "PUT", "p": "/v1/clusters/{cluster_id}/patch", "api": "sqlserverpatchminorversion", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: software_version", "crit": false}]}];
+R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
+var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
+var out=document.getElementById('out');
+function stClass(s){if(s==null)return'none';if(s>=200&&s<300)return's2';if(s===404)return's404';if(s>=500)return's5';return's4';}
+function msClass(t){if(t==null)return'';if(t>=3)return'slow';if(t>=2)return'warn';return'';}
+function matches(r){
+  if(state.methods.size&&!state.methods.has(r.m))return false;
+  if(state.cov&&r.c!==state.cov)return false;
+  if(state.st){
+    if(state.st==='2'&&!(r.s>=200&&r.s<300))return false;
+    if(state.st==='404'&&r.s!==404)return false;
+    if(state.st==='4'&&!(r.s>=400&&r.s<500&&r.s!==404))return false;
+    if(state.st==='5'&&!(r.s>=500))return false;
+    if(state.st==='none'&&r.s!=null)return false;
+  }
+  if(state.def&&r.d.length===0)return false;
+  if(state.slow&&!(r.t>=3))return false;
+  if(state.q){var q=state.q.toLowerCase();
+    if(r.p.toLowerCase().indexOf(q)<0&&r.api.toLowerCase().indexOf(q)<0)return false;}
+  return true;
+}
+function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function defBtn(r){
+  if(!r.d.length)return '<span class="ok">✓ 정상</span>';
+  var crit=r.d.some(function(i){return i.crit;});
+  return '<button class="defbtn'+(crit?' crit':'')+'" onclick="toggleDetail(this)">'
+    +(crit?'결함':'개선')+' '+r.d.length+'<span class="ca">▾</span></button>';
+}
+function detailRowHTML(r){
+  if(!r.d.length)return '';
+  var items=r.d.map(function(i){
+    return '<div class="defitem'+(i.crit?' crit':'')+'"><b>'+esc(i.label)+'</b>'
+      +'<span class="meta">#'+esc(i.issue)+' · '+esc(i.kind)+'</span>'
+      +'<div class="dd">'+esc(i.detail)+'</div></div>';
+  }).join('');
+  return '<tr class="detailrow"><td class="cbar"></td><td colspan="6" class="detailcell">'+items+'</td></tr>';
+}
+function toggleDetail(btn){
+  var dr=btn.closest('tr').nextElementSibling;
+  if(dr&&dr.classList.contains('detailrow')){dr.classList.toggle('open');btn.classList.toggle('open');}
+}
+function rowHTML(r){
+  var covSym={y:'✓',p:'◑',n:'·',f:'⛔'}[r.c];
+  var st=r.s==null?'<span class="st none">—</span>':'<span class="st '+stClass(r.s)+'">'+r.s+'</span>';
+  var ms=r.t!=null?'<span class="ms '+msClass(r.t)+'">'+(r.t<1?Math.round(r.t*1000)+'ms':r.t+'s')+'</span>':'';
+  var probe=(r.c==='n'&&r.s===404)?'<span class="probe">probe 미도달</span>':'';
+  var prev=(r.src&&r.s!=null)?'<span class="prev" title="이번 런 미호출 — 마지막 관측 런">@'+esc(r.src)+'</span>':'';
+  return '<tr class="cov-'+r.c+'">'
+    +'<td class="cbar"></td>'
+    +'<td><span class="mb '+r.m+'">'+r.m+'</span></td>'
+    +'<td class="path"><code>'+esc(r.p)+'</code></td>'
+    +'<td class="api">'+esc(r.api)+'</td>'
+    +'<td><span class="cov '+r.c+'">'+covSym+'</span></td>'
+    +'<td>'+st+ms+probe+prev+'</td>'
+    +'<td class="defcell">'+defBtn(r)+'</td>'
+    +'</tr>'+detailRowHTML(r);
+}
+var thead='<thead><tr><th class="cbar"></th><th>메서드</th><th>경로</th><th>API</th><th>커버</th><th>최근 status · 응답시간</th><th>설계/동작 결함</th></tr></thead>';
+function render(){
+  var rows=R.filter(matches);
+  document.getElementById('shown').textContent=rows.length;
+  if(rows.length===0){out.innerHTML='<div class="empty">조건에 맞는 엔드포인트가 없습니다.</div>';return;}
+  if(!state.group){
+    out.innerHTML='<div class="grp"><table>'+thead+'<tbody>'+rows.map(rowHTML).join('')+'</tbody></table></div>';
+    return;
+  }
+  var groups={};
+  rows.forEach(function(r){(groups[r.res]=groups[r.res]||[]).push(r);});
+  var order=Object.keys(groups).sort(function(a,b){return groups[b].length-groups[a].length;});
+  out.innerHTML=order.map(function(res){
+    var g=groups[res];
+    var cov=g.filter(function(r){return r.c==='y';}).length;
+    var pct=Math.round(cov/g.length*100);
+    var defs=g.reduce(function(n,r){return n+r.d.length;},0);
+    return '<div class="grp"><div class="grp-h" onclick="this.parentNode.classList.toggle(\'collapsed\')">'
+      +'<span class="caret">▼</span>'
+      +'<span class="name">'+esc(res)+'</span>'
+      +'<span class="frac">'+cov+'/'+g.length+' 검증</span>'
+      +'<span class="mini"><i style="width:'+pct+'%"></i></span>'
+      +(defs?'<span class="gd">개선 '+defs+'</span>':'')
+      +'</div><div class="grp-body"><table>'+thead+'<tbody>'+g.map(rowHTML).join('')+'</tbody></table></div></div>';
+  }).join('');
+}
+document.querySelectorAll('#methodSeg button').forEach(function(b){b.onclick=function(){
+  var m=b.dataset.m,on=b.getAttribute('aria-pressed')==='true';
+  b.setAttribute('aria-pressed',String(!on));on?state.methods.delete(m):state.methods.add(m);render();
+};});
+document.getElementById('covSel').onchange=function(e){state.cov=e.target.value;render();};
+document.getElementById('stSel').onchange=function(e){state.st=e.target.value;render();};
+function tog(id,key){var el=document.getElementById(id);el.querySelector('input').onchange=function(e){
+  state[key]=e.target.checked;el.classList.toggle('on',e.target.checked);render();};}
+tog('defTog','def');tog('slowTog','slow');
+document.getElementById('grpTog').querySelector('input').onchange=function(e){
+  state.group=e.target.checked;document.getElementById('grpTog').classList.toggle('on',e.target.checked);render();};
+document.getElementById('q').oninput=function(e){state.q=e.target.value;render();};
+document.getElementById('reset').onclick=function(){
+  state.methods.clear();state.cov='';state.st='';state.def=false;state.slow=false;state.q='';
+  document.querySelectorAll('#methodSeg button').forEach(function(b){b.setAttribute('aria-pressed','false');});
+  document.getElementById('covSel').value='';document.getElementById('stSel').value='';
+  document.getElementById('q').value='';
+  ['defTog','slowTog'].forEach(function(id){var el=document.getElementById(id);
+    el.querySelector('input').checked=false;el.classList.remove('on');});
+  render();
+};
+render();
+</script>
+</body></html>

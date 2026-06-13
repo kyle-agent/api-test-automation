@@ -1,0 +1,302 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SCP API Regression — Dashboard</title><style>
+:root{--bg:#fbfcfd;--surface:#fff;--surface2:#f5f7f9;--border:#e4e7eb;
+  --text:#1d2530;--muted:#6b7480;--faint:#9aa3ad;
+  --green:#15924f;--green-bg:#e7f6ed;--amber:#b5740b;--amber-bg:#fdf3e2;
+  --red:#c63434;--red-bg:#fbe9e9;--blue:#2563c9;--blue-bg:#e8f0fd;
+  --grey:#7a838d;--grey-bg:#eef1f4;
+  --shadow:0 1px 2px rgba(20,30,45,.05),0 1px 6px rgba(20,30,45,.04)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",'Noto Sans KR',sans-serif;
+  font-size:13.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 22px 80px}
+h2{font-size:14px;letter-spacing:.2px;margin:30px 0 12px;display:flex;align-items:center;gap:8px}
+h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:13px;box-shadow:var(--shadow)}
+.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.top h1{margin:0;font-size:22px;letter-spacing:-.3px}
+.top .meta{color:var(--muted);font-size:12.5px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+  padding:4px 11px;border-radius:20px;background:var(--green-bg);color:var(--green)}
+.pill .d{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.pill.bad{background:var(--red-bg);color:var(--red)}.pill.bad .d{background:var(--red)}
+.action{display:flex;gap:11px;align-items:flex-start;background:var(--green-bg);
+  border:1px solid #c2e6d0;border-radius:12px;padding:13px 16px;margin:14px 0 8px;font-size:13.5px}
+.action b{color:#0d6e3a}.action .next{color:var(--amber)}
+.action.bad{background:var(--red-bg);border-color:#eec3c3}.action.bad b{color:var(--red)}
+.health{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+.hc{padding:15px 16px}
+.hc .n{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1}
+.hc .n.g{color:var(--green)}.hc .n.a{color:var(--amber)}.hc .n.r{color:var(--red)}
+.hc .t{font-size:12.5px;font-weight:600;margin-top:7px}
+.hc .s{font-size:11.5px;color:var(--muted);margin-top:2px}
+.hc.ok{background:linear-gradient(180deg,#f3fbf6,#fff)}
+.ladder{padding:16px 18px}
+.lad{display:flex;align-items:center;gap:13px;margin:11px 0}
+.lad .lv{font-family:ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--muted);width:30px}
+.lad .bar{flex:1;height:22px;border-radius:6px;background:var(--grey-bg);overflow:hidden;position:relative}
+.lad .bar i{display:block;height:100%;border-radius:6px}
+.lad .pct{width:54px;text-align:right;font-weight:700;font-size:13px}
+.lad .desc{width:340px;font-size:12px;color:var(--muted)}
+.lad .desc b{color:var(--text)}
+.lad-foot{font-size:11.5px;color:var(--muted);margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
+.dist{padding:16px 18px}
+.distbar{display:flex;height:26px;border-radius:7px;overflow:hidden;border:1px solid var(--border)}
+.distbar div{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:24px}
+.distleg{display:flex;gap:16px;flex-wrap:wrap;margin-top:11px;font-size:12px}
+.distleg span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.distleg i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.cats{padding:8px 18px 16px}
+.catrow{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #eef1f3}
+.catrow:last-child{border:0}
+.catrow .cn{width:200px;font-size:12.5px;font-weight:600}
+.catrow .cn .ops{font-weight:400;color:var(--faint);font-size:11px;margin-left:4px}
+.catrow .cbar{flex:1;height:16px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+.catrow .cbar i{display:block;height:100%;border-radius:5px}
+.catrow .cp{width:96px;text-align:right;font-size:12px;font-weight:700}
+.catrow .cp .frac{font-weight:400;color:var(--muted);font-size:11px}
+.blind{font-size:11px;font-weight:700;color:var(--red);background:var(--red-bg);padding:1px 7px;border-radius:10px;margin-left:8px}
+.svc-controls{display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.svc-controls select,.svc-controls input{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 10px;font-size:12.5px;font-family:inherit;color:var(--text)}
+.svc-controls input{width:200px}
+.svcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
+.svc{display:block;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);transition:.12s}
+.svc.unt .svc-n{color:#8b949e}
+.svc.unt{background:#fafbfc;border-style:dashed}
+.unt-badge{display:inline-block;font-size:10px;color:#8b949e;border:1px solid #d0d7de;border-radius:8px;padding:0 6px;vertical-align:1px}
+.svc:hover{border-color:var(--blue);text-decoration:none;transform:translateY(-1px)}
+.svc .sh{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.svc .sn{font-weight:700;font-size:13px;color:var(--text)}
+.svc .sp{font-size:13px;font-weight:800}
+.svc .sbar{height:7px;border-radius:4px;background:var(--grey-bg);overflow:hidden;margin:8px 0 4px}
+.svc .sbar i{display:block;height:100%;border-radius:4px}
+.svc .sfrac{font-size:11px;color:var(--muted)}
+.catsec{margin-bottom:16px}
+.catsec-h{display:flex;align-items:center;gap:12px;padding:7px 4px 9px;border-bottom:2px solid var(--border);margin-bottom:11px}
+.catsec-h .csn{font-weight:800;font-size:14.5px;letter-spacing:-.2px}
+.catsec-h .cso{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
+.catsec-h .csbar{width:130px;height:8px;border-radius:5px;background:var(--grey-bg);overflow:hidden}
+.catsec-h .csbar i{display:block;height:100%;border-radius:5px}
+.catsec-h .csp{font-size:14px;font-weight:800}
+.catsec-h .cscount{margin-left:auto;font-size:11.5px;color:var(--faint)}
+.crud-sum{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.badge{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:9px;
+  background:var(--surface);padding:7px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted)}
+.badge .c{font-size:15px;font-weight:800;color:var(--text)}
+.badge.on{border-color:var(--blue);background:var(--blue-bg)}
+.badge.pass .c{color:var(--green)}.badge.gated .c{color:var(--amber)}.badge.skip .c{color:var(--grey)}.badge.fail .c{color:var(--red)}
+#crudList{display:none;margin-top:4px}
+#crudList.show{display:block}
+.crud-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.crud-tbl td{padding:7px 12px;border-bottom:1px solid #eef1f3}
+.crud-tbl tr:hover{background:#fafbfc}
+.cstate{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px}
+.cstate.pass{background:var(--green-bg);color:var(--green)}
+.cstate.gated{background:var(--amber-bg);color:var(--amber)}
+.cstate.skip{background:var(--grey-bg);color:var(--grey)}
+.cstate.fail{background:var(--red-bg);color:var(--red)}
+.wt{font-size:10.5px;color:var(--faint);text-transform:uppercase}
+.toggle{font-size:12px;color:var(--blue);cursor:pointer;background:none;border:0;text-decoration:underline;padding:0}
+.di{padding:16px 18px}
+.di-stat{display:flex;gap:26px;flex-wrap:wrap;align-items:baseline;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.di-stat>div{font-size:12.5px;color:var(--muted)}
+.din{font-size:24px;font-weight:800;letter-spacing:-.5px;margin-right:5px}
+.din.red{color:var(--red)}.din.amber{color:var(--amber)}.din.green{color:var(--green)}
+.di-stat small{display:block;font-size:11px;color:var(--faint);margin-top:1px}
+.di-stat .ditot{margin-left:auto;font-weight:700;color:var(--text)}
+.dinote{font-size:12px;color:var(--muted);margin:11px 0 13px}
+.di-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.di-tbl th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:6px 10px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+.di-tbl td{padding:8px 10px;border-bottom:1px solid #eef1f3;vertical-align:top}
+.di-tbl tr:last-child td{border-bottom:0}
+.dic{font-weight:700;white-space:nowrap}.dic.amber{color:var(--amber)}
+.di-tbl code{font-size:11.5px;color:var(--text);font-weight:600}
+.di-tbl .scope{font-size:11px;color:var(--faint)}
+.di-tbl .desc{color:var(--muted);font-size:12px}
+.kn-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.kn-tbl th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);padding:6px 12px;text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+.kn-tbl td{padding:7px 12px;border-bottom:1px solid #eef1f3}
+.kn-none{color:var(--faint)}
+.trendgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.trend{padding:14px 16px}.trend .tl{font-size:12px;color:var(--muted);margin-bottom:6px}
+.tip{cursor:help;border-bottom:1px dotted var(--faint)}
+.foot{margin-top:26px;font-size:11.5px;color:var(--faint);border-top:1px solid var(--border);padding-top:12px}
+@media(max-width:720px){.health{grid-template-columns:repeat(2,1fr)}.lad .desc{display:none}.catrow .cn{width:130px}.di-stat{gap:16px}.trendgrid{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+
+<div class="top">
+  <h1>SCP API Regression</h1>
+  <span class="pill bad"><span class="d"></span>4 NEW REGRESSION(S)</span>
+  <span class="meta">branch <code>main</code> · 최근 실행 2026-06-13 22:08 KST · push</span>
+</div>
+
+<div class="action bad"><div><b>새 회귀 4건 — 조치 필요.</b><div><code>gen-wave5-apigw-policy:set-resource-policy</code> → 500</div><div><code>application-service/apigateway/setresourcepolicy</code> → 500</div><div><code>gen-wave5-iam-role:create-iam-role</code> → 500</div><div><code>management/iam/createrole</code> → 500</div></div></div>
+
+<div class="health"><div class="card hc"><div class="n r">4</div><div class="t">신규 회귀</div><div class="s">vs known baseline</div></div><div class="card hc"><div class="n ">83.0%</div><div class="t">Pass rate</div><div class="s">426 ok / 513 calls</div></div><div class="card hc"><div class="n a">47.6%</div><div class="t">C3 검증 커버리지</div><div class="s">535 / 1123 · 목표 100%</div></div><div class="card hc"><div class="n r">1</div><div class="t">Known-red</div><div class="s">tracked backend bugs</div></div></div>
+
+<h2>커버리지 사다리 <span class="hint">C1 도달 → C2 호출 → C3 검증 (docs/COVERAGE-CRITERIA.md)</span></h2>
+<div class="card ladder">
+    <div class="lad"><span class="lv">C3</span><div class="bar"><i style="width:47.6%;background:var(--green)"></i></div><span class="pct" style="color:var(--green)">47.6%</span>
+      <span class="desc"><b class="tip" title="2xx 동작 확인 — GET 200, 쓰기 2xx. 이 API는 동작한다">검증됨</b> · 535/1123 · full CRUD · 목표 100%</span></div>
+    <div class="lad"><span class="lv">C2</span><div class="bar"><i style="width:24.3%;background:var(--amber)"></i></div><span class="pct" style="color:var(--amber)">24.3%</span>
+      <span class="desc"><b class="tip" title="4xx 포함 응답 수신 — 호출은 된다(404 POST/DELETE는 생성/삭제 안 함)">호출됨</b> · 334/1372 (이번 run)</span></div>
+    <div class="lad"><span class="lv">C1</span><div class="bar"><i style="width:91.8%;background:var(--blue)"></i></div><span class="pct" style="color:var(--blue)">91.8%</span>
+      <span class="desc"><b class="tip" title="시나리오 정적 도달 가능">도달가능</b> · 1259/1372</span></div>
+    <div class="lad-foot">읽기 GET 2xx <b>56.4%</b> (297/527) · 쓰기 2xx <b>28.3%</b> (239/845) · C2뿐인 write 6 · waiver 249개(C2 충족 21, 해제 후보 1) · 남은 gap → write <b>33</b> · id-bound GET <b>80</b></div></div>
+
+<h2>응답 코드 분포 <span class="hint">513 calls</span></h2>
+<div class="card dist">
+  <div class="distbar"><div style="flex:306;background:#15924f" title="200 · 306">306</div><div style="flex:54;background:#7cc69b" title="201 · 54">54</div><div style="flex:30;background:#3aa86a" title="202 · 30"></div><div style="flex:36;background:#a9d9bf" title="204 · 36">36</div><div style="flex:63;background:#b5740b" title="400 · 63">63</div><div style="flex:6;background:#d28a1f" title="401 · 6"></div><div style="flex:11;background:#c63434" title="403 · 11"></div><div style="flex:2;background:#cf8a3a" title="404 · 2"></div><div style="flex:5;background:#c63434" title="500 · 5"></div></div>
+  <div class="distleg"><span><i style="background:#15924f"></i><code>200</code> · 306</span><span><i style="background:#7cc69b"></i><code>201</code> · 54</span><span><i style="background:#3aa86a"></i><code>202</code> · 30</span><span><i style="background:#a9d9bf"></i><code>204</code> · 36</span><span><i style="background:#b5740b"></i><code>400</code> · 63</span><span><i style="background:#d28a1f"></i><code>401</code> · 6</span><span><i style="background:#c63434"></i><code>403</code> · 11</span><span><i style="background:#cf8a3a"></i><code>404</code> · 2</span><span><i style="background:#c63434"></i><code>500</code> · 5</span></div>
+</div>
+
+<h2>카테고리별 커버리지 <span class="hint">검증 ops 기준 · 낮은 순 = 작업 백로그</span></h2>
+<div class="card cats"><div class="catrow"><div class="cn">ai-ml<span class="ops">21 ops</span></div><div class="cbar"><i style="width:10%;background:var(--red)"></i></div><div class="cp">10% <span class="frac">2/21</span></div></div><div class="catrow"><div class="cn">storage<span class="ops">129 ops</span></div><div class="cbar"><i style="width:11%;background:var(--red)"></i></div><div class="cp">11% <span class="frac">14/129</span></div></div><div class="catrow"><div class="cn">data-analytics<span class="ops">119 ops</span></div><div class="cbar"><i style="width:17%;background:var(--red)"></i></div><div class="cp">17% <span class="frac">20/119</span></div></div><div class="catrow"><div class="cn">devops-tools<span class="ops">6 ops</span></div><div class="cbar"><i style="width:17%;background:var(--red)"></i></div><div class="cp">17% <span class="frac">1/6</span></div></div><div class="catrow"><div class="cn">database<span class="ops">255 ops</span></div><div class="cbar"><i style="width:33%;background:var(--amber)"></i></div><div class="cp">33% <span class="frac">84/255</span></div></div><div class="catrow"><div class="cn">management<span class="ops">244 ops</span></div><div class="cbar"><i style="width:33%;background:var(--amber)"></i></div><div class="cp">33% <span class="frac">81/244</span></div></div><div class="catrow"><div class="cn">networking<span class="ops">205 ops</span></div><div class="cbar"><i style="width:50%;background:var(--amber)"></i></div><div class="cp">50% <span class="frac">103/205</span></div></div><div class="catrow"><div class="cn">financial-management<span class="ops">21 ops</span></div><div class="cbar"><i style="width:52%;background:var(--amber)"></i></div><div class="cp">52% <span class="frac">11/21</span></div></div><div class="catrow"><div class="cn">compute<span class="ops">181 ops</span></div><div class="cbar"><i style="width:54%;background:var(--amber)"></i></div><div class="cp">54% <span class="frac">97/181</span></div></div><div class="catrow"><div class="cn">container<span class="ops">63 ops</span></div><div class="cbar"><i style="width:56%;background:var(--green)"></i></div><div class="cp">56% <span class="frac">35/63</span></div></div><div class="catrow"><div class="cn">platform<span class="ops">7 ops</span></div><div class="cbar"><i style="width:57%;background:var(--green)"></i></div><div class="cp">57% <span class="frac">4/7</span></div></div><div class="catrow"><div class="cn">security<span class="ops">54 ops</span></div><div class="cbar"><i style="width:65%;background:var(--green)"></i></div><div class="cp">65% <span class="frac">35/54</span></div></div><div class="catrow"><div class="cn">application-service<span class="ops">67 ops</span></div><div class="cbar"><i style="width:73%;background:var(--green)"></i></div><div class="cp">73% <span class="frac">49/67</span></div></div></div>
+
+<h2>설계/동작 정합성 <span class="hint">회귀(호출 성공)와 별개 · 정적+런타임 점검에서 찾은 설계·구현 결함</span></h2>
+  <div class="card di">
+    <div class="di-stat">
+      <div><span class="din red">18</span>결함<small>계약 위반 구현버그</small></div>
+      <div><span class="din amber">454</span>개선<small>설계/문서 결함</small></div>
+      <div><span class="din green">900</span>정상<small>API별 고유 이슈 없음</small></div>
+      <div class="ditot">총 1372 API</div>
+    </div>
+    <p class="dinote">※ "정상"이어도 아래 <b>플랫폼 전역 항목</b>은 공통 적용됩니다. 서비스 클릭 → API별 <b>설계/동작 결함</b> 열에서 상세 확인.</p>
+    <table class="di-tbl"><thead><tr><th>건수</th><th>플랫폼 전역 점검 항목 (모든 서비스 공통)</th></tr></thead>
+    <tbody><tr><td class="dic amber">개선 1370</td><td><code>error-schema-undocumented</code> <span class="scope">#15 · all endpoints</span><br><span class="desc">4xx/5xx responses document no schema; ≥3 different error envelopes</span></td></tr><tr><td class="dic amber">개선 58</td><td><code>unauth-404</code> <span class="scope">#36 · all services</span><br><span class="desc">unauthenticated request -&gt; 404 + Spring envelope (not 401)</span></td></tr><tr><td class="dic amber">개선 58</td><td><code>no-cors</code> <span class="scope">#39 · all services</span><br><span class="desc">OPTIONS -&gt; 403; no Allow/CORS headers</span></td></tr><tr><td class="dic amber">개선 124</td><td><code>accept-language-ignored</code> <span class="scope">#40 · most endpoints</span><br><span class="desc">error messages English-only regardless of Accept-Language</span></td></tr><tr><td class="dic amber">개선 75</td><td><code>path-collisions</code> <span class="scope">#13 · 75 path groups</span><br><span class="desc">same method+path reused across services (no namespacing)</span></td></tr><tr><td class="dic amber">개선 432</td><td><code>model-fields-no-description</code> <span class="scope">#17 · 432 models</span><br><span class="desc">model fields with empty description</span></td></tr></tbody></table></div>
+
+<h2>서비스 드릴다운 <span class="hint">카테고리별 · 클릭 → API별 커버 현황 + 설계/동작 결함</span></h2>
+<div class="svc-controls">
+  <select id="svcSort">
+    <option value="pct">서비스: 커버리지 낮은 순</option>
+    <option value="pctd">서비스: 커버리지 높은 순</option>
+    <option value="ops">서비스: 규모(ops) 큰 순</option>
+    <option value="name">서비스: 이름순</option>
+  </select>
+  <select id="catOrder">
+    <option value="name">카테고리: 이름순</option>
+    <option value="pct">카테고리: 커버리지 낮은 순</option>
+    <option value="ops">카테고리: 규모(ops) 큰 순</option>
+  </select>
+  <input id="svcSearch" placeholder="서비스 검색">
+  <span style="font-size:12px;color:var(--muted)"><b id="svcCount"></b>개 서비스 · <b id="catCount"></b>개 카테고리</span>
+</div>
+<div id="svcWrap"></div>
+
+<h2>CRUD 라이프사이클 <span class="hint">대부분 skip/gated — 기본 접힘</span></h2>
+<div class="crud-sum" id="crudSum"></div>
+<button class="toggle" id="crudToggle">전체 시나리오 펼치기 ▾</button>
+<div class="card" id="crudList"><table class="crud-tbl"><tbody id="crudBody"></tbody></table></div>
+
+<h2>추세 <span class="hint">133 runs 누적 (dashboard-data 브랜치)</span></h2>
+<div class="trendgrid">
+  <div class="card trend"><div class="tl">성공률</div><svg viewBox="0 0 520 120" width="100%" height="120"><polygon points="10,110 10.0,110.0 55.5,56.6 100.9,60.9 146.4,46.8 191.8,38.5 237.3,28.1 282.7,17.3 328.2,23.8 373.6,28.2 419.1,10.0 464.5,19.1 510.0,34.9 510,110" fill="#15924f1a"/><polyline points="10.0,110.0 55.5,56.6 100.9,60.9 146.4,46.8 191.8,38.5 237.3,28.1 282.7,17.3 328.2,23.8 373.6,28.2 419.1,10.0 464.5,19.1 510.0,34.9" fill="none" stroke="#15924f" stroke-width="2"/><circle cx="10.0" cy="110.0" r="2.5" fill="#15924f"/><circle cx="55.5" cy="56.6" r="2.5" fill="#15924f"/><circle cx="100.9" cy="60.9" r="2.5" fill="#15924f"/><circle cx="146.4" cy="46.8" r="2.5" fill="#15924f"/><circle cx="191.8" cy="38.5" r="2.5" fill="#15924f"/><circle cx="237.3" cy="28.1" r="2.5" fill="#15924f"/><circle cx="282.7" cy="17.3" r="2.5" fill="#15924f"/><circle cx="328.2" cy="23.8" r="2.5" fill="#15924f"/><circle cx="373.6" cy="28.2" r="2.5" fill="#15924f"/><circle cx="419.1" cy="10.0" r="2.5" fill="#15924f"/><circle cx="464.5" cy="19.1" r="2.5" fill="#15924f"/><circle cx="510.0" cy="34.9" r="2.5" fill="#15924f"/></svg></div>
+  <div class="card trend"><div class="tl">커버리지 — <span style="color:var(--green)">C1 도달가능</span> · <span style="color:var(--blue)">C3 검증(목표)</span></div><svg viewBox="0 0 520 120" width="100%" height="120"><polyline points="10.0,20.9 55.5,17.7 100.9,17.7 146.4,17.7 191.8,17.7 237.3,17.7 282.7,16.8 328.2,16.8 373.6,16.8 419.1,16.8 464.5,13.7 510.0,10.0" fill="none" stroke="#15924f" stroke-width="2"/><circle cx="10.0" cy="20.9" r="2.5" fill="#15924f"/><circle cx="55.5" cy="17.7" r="2.5" fill="#15924f"/><circle cx="100.9" cy="17.7" r="2.5" fill="#15924f"/><circle cx="146.4" cy="17.7" r="2.5" fill="#15924f"/><circle cx="191.8" cy="17.7" r="2.5" fill="#15924f"/><circle cx="237.3" cy="17.7" r="2.5" fill="#15924f"/><circle cx="282.7" cy="16.8" r="2.5" fill="#15924f"/><circle cx="328.2" cy="16.8" r="2.5" fill="#15924f"/><circle cx="373.6" cy="16.8" r="2.5" fill="#15924f"/><circle cx="419.1" cy="16.8" r="2.5" fill="#15924f"/><circle cx="464.5" cy="13.7" r="2.5" fill="#15924f"/><circle cx="510.0" cy="10.0" r="2.5" fill="#15924f"/><polyline points="10.0,109.8 55.5,110.0 100.9,109.8 146.4,109.8 191.8,109.4 237.3,109.2 282.7,109.0 328.2,109.0 373.6,109.0 419.1,108.5 464.5,106.0 510.0,103.4" fill="none" stroke="#2563c9" stroke-width="2"/><circle cx="10.0" cy="109.8" r="2.5" fill="#2563c9"/><circle cx="55.5" cy="110.0" r="2.5" fill="#2563c9"/><circle cx="100.9" cy="109.8" r="2.5" fill="#2563c9"/><circle cx="146.4" cy="109.8" r="2.5" fill="#2563c9"/><circle cx="191.8" cy="109.4" r="2.5" fill="#2563c9"/><circle cx="237.3" cy="109.2" r="2.5" fill="#2563c9"/><circle cx="282.7" cy="109.0" r="2.5" fill="#2563c9"/><circle cx="328.2" cy="109.0" r="2.5" fill="#2563c9"/><circle cx="373.6" cy="109.0" r="2.5" fill="#2563c9"/><circle cx="419.1" cy="108.5" r="2.5" fill="#2563c9"/><circle cx="464.5" cy="106.0" r="2.5" fill="#2563c9"/><circle cx="510.0" cy="103.4" r="2.5" fill="#2563c9"/></svg></div>
+</div>
+
+<h2>알려진 이슈 <span class="hint">data/baselines/known_issues.json</span></h2>
+<div class="card"><table class="kn-tbl">
+<thead><tr><th>endpoint</th><th>status</th><th>유형</th></tr></thead>
+<tbody><tr><td><code>financial-management/billingplan/listplannedcomputeservertypes</code></td><td>500</td><td>Product Bug</td></tr></tbody></table></div>
+
+<div class="foot">생성 <code>dashboard/build.py</code> ← unified results store (reports/results/*.jsonl) + legacy fallback · 추세 <code>dashboard-data</code> 브랜치 · 배포 GitHub Pages</div>
+</div>
+
+<script>
+var SVCS=[{"n": "cloud-ml", "c": "ai-ml", "cov": 0, "tot": 9, "u": "services/ai-ml__cloud-ml.html"}, {"n": "aimlops-platform", "c": "ai-ml", "cov": 2, "tot": 12, "u": "services/ai-ml__aimlops-platform.html"}, {"n": "apigateway", "c": "application-service", "cov": 38, "tot": 55, "u": "services/application-service__apigateway.html"}, {"n": "queueservice", "c": "application-service", "cov": 11, "tot": 12, "u": "services/application-service__queueservice.html"}, {"n": "baremetal", "c": "compute", "cov": 2, "tot": 16, "u": "services/compute__baremetal.html"}, {"n": "multinodegpucluster", "c": "compute", "cov": 3, "tot": 16, "u": "services/compute__multinodegpucluster.html"}, {"n": "virtualserver", "c": "compute", "cov": 66, "tot": 113, "u": "services/compute__virtualserver.html"}, {"n": "scf", "c": "compute", "cov": 26, "tot": 36, "u": "services/compute__scf.html"}, {"n": "scr", "c": "container", "cov": 16, "tot": 39, "u": "services/container__scr.html"}, {"n": "ske", "c": "container", "cov": 19, "tot": 24, "u": "services/container__ske.html"}, {"n": "quick-query", "c": "data-analytics", "cov": 1, "tot": 12, "u": "services/data-analytics__quick-query.html"}, {"n": "searchengine", "c": "data-analytics", "cov": 4, "tot": 26, "u": "services/data-analytics__searchengine.html"}, {"n": "vertica", "c": "data-analytics", "cov": 4, "tot": 23, "u": "services/data-analytics__vertica.html"}, {"n": "data-flow", "c": "data-analytics", "cov": 3, "tot": 17, "u": "services/data-analytics__data-flow.html"}, {"n": "data-ops", "c": "data-analytics", "cov": 3, "tot": 17, "u": "services/data-analytics__data-ops.html"}, {"n": "eventstreams", "c": "data-analytics", "cov": 5, "tot": 24, "u": "services/data-analytics__eventstreams.html"}, {"n": "sqlserver", "c": "database", "cov": 5, "tot": 38, "u": "services/database__sqlserver.html"}, {"n": "epas", "c": "database", "cov": 13, "tot": 47, "u": "services/database__epas.html"}, {"n": "mariadb", "c": "database", "cov": 13, "tot": 46, "u": "services/database__mariadb.html"}, {"n": "mysql", "c": "database", "cov": 16, "tot": 45, "u": "services/database__mysql.html"}, {"n": "cachestore", "c": "database", "cov": 13, "tot": 32, "u": "services/database__cachestore.html"}, {"n": "postgresql", "c": "database", "cov": 24, "tot": 47, "u": "services/database__postgresql.html"}, {"n": "devopsservice", "c": "devops-tools", "cov": 1, "tot": 6, "u": "services/devops-tools__devopsservice.html"}, {"n": "budget", "c": "financial-management", "cov": 1, "tot": 5, "u": "services/financial-management__budget.html"}, {"n": "billingplan", "c": "financial-management", "cov": 4, "tot": 10, "u": "services/financial-management__billingplan.html"}, {"n": "costexplorer", "c": "financial-management", "cov": 3, "tot": 3, "u": "services/financial-management__costexplorer.html"}, {"n": "pricing", "c": "financial-management", "cov": 3, "tot": 3, "u": "services/financial-management__pricing.html"}, {"n": "cloudcontrol", "c": "management", "cov": 0, "tot": 15, "u": "services/management__cloudcontrol.html"}, {"n": "iam-identity-center", "c": "management", "cov": 1, "tot": 32, "u": "services/management__iam-identity-center.html"}, {"n": "organization", "c": "management", "cov": 2, "tot": 37, "u": "services/management__organization.html"}, {"n": "loggingaudit", "c": "management", "cov": 1, "tot": 10, "u": "services/management__loggingaudit.html"}, {"n": "cloudmonitoring", "c": "management", "cov": 4, "tot": 18, "u": "services/management__cloudmonitoring.html"}, {"n": "iam", "c": "management", "cov": 27, "tot": 62, "u": "services/management__iam.html"}, {"n": "network-logging", "c": "management", "cov": 2, "tot": 4, "u": "services/management__network-logging.html"}, {"n": "resourcemanager", "c": "management", "cov": 14, "tot": 27, "u": "services/management__resourcemanager.html"}, {"n": "servicewatch", "c": "management", "cov": 23, "tot": 31, "u": "services/management__servicewatch.html"}, {"n": "quota", "c": "management", "cov": 3, "tot": 4, "u": "services/management__quota.html"}, {"n": "support", "c": "management", "cov": 4, "tot": 4, "u": "services/management__support.html"}, {"n": "cdn", "c": "networking", "cov": 1, "tot": 9, "u": "services/networking__cdn.html"}, {"n": "direct-connect", "c": "networking", "cov": 1, "tot": 8, "u": "services/networking__direct-connect.html"}, {"n": "gslb", "c": "networking", "cov": 2, "tot": 10, "u": "services/networking__gslb.html"}, {"n": "vpn", "c": "networking", "cov": 2, "tot": 10, "u": "services/networking__vpn.html"}, {"n": "vpc", "c": "networking", "cov": 50, "tot": 95, "u": "services/networking__vpc.html"}, {"n": "loadbalancer", "c": "networking", "cov": 20, "tot": 34, "u": "services/networking__loadbalancer.html"}, {"n": "dns", "c": "networking", "cov": 13, "tot": 22, "u": "services/networking__dns.html"}, {"n": "firewall", "c": "networking", "cov": 6, "tot": 8, "u": "services/networking__firewall.html"}, {"n": "security-group", "c": "networking", "cov": 8, "tot": 9, "u": "services/networking__security-group.html"}, {"n": "sts", "c": "platform", "cov": 0, "tot": 3, "u": "services/platform__sts.html"}, {"n": "product", "c": "platform", "cov": 4, "tot": 4, "u": "services/platform__product.html"}, {"n": "secretvault", "c": "security", "cov": 1, "tot": 5, "u": "services/security__secretvault.html"}, {"n": "configinspection", "c": "security", "cov": 2, "tot": 7, "u": "services/security__configinspection.html"}, {"n": "secretsmanager", "c": "security", "cov": 10, "tot": 15, "u": "services/security__secretsmanager.html"}, {"n": "certificatemanager", "c": "security", "cov": 5, "tot": 7, "u": "services/security__certificatemanager.html"}, {"n": "kms", "c": "security", "cov": 17, "tot": 20, "u": "services/security__kms.html"}, {"n": "archivestorage", "c": "storage", "cov": 0, "tot": 25, "u": "services/storage__archivestorage.html"}, {"n": "baremetal-blockstorage", "c": "storage", "cov": 2, "tot": 41, "u": "services/storage__baremetal-blockstorage.html"}, {"n": "parallel-filestorage", "c": "storage", "cov": 1, "tot": 11, "u": "services/storage__parallel-filestorage.html"}, {"n": "backup", "c": "storage", "cov": 3, "tot": 31, "u": "services/storage__backup.html"}, {"n": "filestorage", "c": "storage", "cov": 8, "tot": 21, "u": "services/storage__filestorage.html"}];
+var CRUD=[{"name": "resourcemanager-resource-group", "w": "light", "steps": 10, "state": "skip"}, {"name": "networking-vpc-subnet", "w": "light", "steps": 14, "state": "skip"}, {"name": "container-scr-registry", "w": "light", "steps": 19, "state": "skip"}, {"name": "filestorage-volume", "w": "light", "steps": 7, "state": "skip"}, {"name": "security-certificatemanager-selfsign", "w": "light", "steps": 6, "state": "skip"}, {"name": "application-queueservice-queue", "w": "light", "steps": 11, "state": "skip"}, {"name": "networking-security-group", "w": "light", "steps": 8, "state": "skip"}, {"name": "virtualserver-keypair", "w": "light", "steps": 5, "state": "skip"}, {"name": "compute-virtualserver-volume-snapshot", "w": "light", "steps": 9, "state": "skip"}, {"name": "networking-vpc-publicip", "w": "light", "steps": 7, "state": "skip"}, {"name": "networking-vpc-internet-gateway", "w": "light", "steps": 10, "state": "skip"}, {"name": "container-ske-cluster-nodepool", "w": "heavy", "steps": 46, "state": "gated"}, {"name": "compute-virtualserver-full", "w": "heavy", "steps": 55, "state": "gated"}, {"name": "database-mysql-cluster", "w": "heavy", "steps": 38, "state": "gated"}, {"name": "database-postgresql-cluster", "w": "heavy", "steps": 50, "state": "gated"}, {"name": "heavy-shared-dbaas", "w": "heavy", "steps": 28, "state": "gated"}, {"name": "security-kms-key", "w": "light", "steps": 6, "state": "skip"}, {"name": "security-secretsmanager-secret", "w": "light", "steps": 12, "state": "skip"}, {"name": "application-apigateway-api-resource", "w": "light", "steps": 11, "state": "skip"}, {"name": "compute-scf-cloud-function-cronjob-trigger", "w": "light", "steps": 22, "state": "skip"}, {"name": "heavy-shared-networking", "w": "heavy", "steps": 55, "state": "gated"}, {"name": "iam-group", "w": "light", "steps": 7, "state": "skip"}, {"name": "iam-policy", "w": "light", "steps": 5, "state": "skip"}, {"name": "servicewatch-loggroup-logstream", "w": "light", "steps": 10, "state": "skip"}, {"name": "aimlops-platform-release-write-coverage", "w": "heavy", "steps": 6, "state": "gated"}, {"name": "cloud-ml-write-coverage", "w": "heavy", "steps": 6, "state": "gated"}, {"name": "apigateway-api-write-coverage", "w": "light", "steps": 31, "state": "skip"}, {"name": "apigateway-privatelink-endpoint", "w": "light", "steps": 6, "state": "skip"}, {"name": "baremetal-server-coverage", "w": "heavy", "steps": 13, "state": "gated"}, {"name": "mngc-gpu-node-coverage", "w": "heavy", "steps": 10, "state": "gated"}, {"name": "scf-privatelink-apigateway-coverage", "w": "light", "steps": 8, "state": "skip"}, {"name": "vs-autoscaling-coverage", "w": "light", "steps": 17, "state": "skip"}, {"name": "vs-image-write-coverage", "w": "light", "steps": 7, "state": "skip"}, {"name": "vs-volume-transfer-coverage", "w": "light", "steps": 8, "state": "skip"}, {"name": "vs-server-action-coverage", "w": "light", "steps": 13, "state": "skip"}, {"name": "scr-image-write-coverage", "w": "light", "steps": 10, "state": "skip"}, {"name": "scr-tags-write-coverage", "w": "light", "steps": 7, "state": "skip"}, {"name": "scr-read-coverage", "w": "light", "steps": 13, "state": "skip"}, {"name": "ske-upgrade-write-coverage", "w": "heavy", "steps": 6, "state": "gated"}, {"name": "ske-read-coverage", "w": "light", "steps": 6, "state": "skip"}, {"name": "data-flow-service-and-flow-guarded", "w": "heavy", "steps": 12, "state": "gated"}, {"name": "data-flow-read-coverage", "w": "light", "steps": 9, "state": "skip"}, {"name": "data-ops-service-and-ops-guarded", "w": "heavy", "steps": 12, "state": "gated"}, {"name": "data-ops-read-coverage", "w": "light", "steps": 9, "state": "skip"}, {"name": "eventstreams-cluster-subops-guarded", "w": "heavy", "steps": 15, "state": "gated"}, {"name": "eventstreams-read-coverage", "w": "light", "steps": 4, "state": "skip"}, {"name": "quick-query-lifecycle-guarded", "w": "heavy", "steps": 10, "state": "gated"}, {"name": "quick-query-read-coverage", "w": "light", "steps": 4, "state": "skip"}, {"name": "searchengine-cluster-subops-guarded", "w": "heavy", "steps": 20, "state": "gated"}, {"name": "searchengine-read-coverage", "w": "light", "steps": 4, "state": "skip"}, {"name": "vertica-cluster-subops-guarded", "w": "heavy", "steps": 18, "state": "gated"}, {"name": "vertica-read-coverage", "w": "light", "steps": 4, "state": "skip"}, {"name": "cachestore-cluster-subops-guarded", "w": "heavy", "steps": 22, "state": "gated"}, {"name": "cachestore-read-coverage", "w": "light", "steps": 5, "state": "skip"}, {"name": "epas-cluster-subops-guarded", "w": "heavy", "steps": 36, "state": "gated"}, {"name": "epas-read-coverage", "w": "light", "steps": 5, "state": "skip"}, {"name": "mariadb-cluster-subops-guarded", "w": "heavy", "steps": 35, "state": "gated"}, {"name": "mariadb-read-coverage", "w": "light", "steps": 5, "state": "skip"}, {"name": "mysql-cluster-subops-guarded", "w": "heavy", "steps": 21, "state": "gated"}, {"name": "mysql-read-coverage", "w": "light", "steps": 5, "state": "skip"}, {"name": "postgresql-cluster-subops-guarded", "w": "heavy", "steps": 36, "state": "gated"}, {"name": "postgresql-read-coverage", "w": "light", "steps": 5, "state": "skip"}, {"name": "sqlserver-cluster-subops-guarded", "w": "heavy", "steps": 31, "state": "gated"}, {"name": "sqlserver-read-coverage", "w": "light", "steps": 3, "state": "skip"}, {"name": "devopsservice-write-coverage", "w": "light", "steps": 5, "state": "skip"}, {"name": "billingplan-planned-computes-guarded", "w": "heavy", "steps": 5, "state": "gated"}, {"name": "budget-account-budget", "w": "light", "steps": 5, "state": "skip"}, {"name": "gen-heavy-backup", "w": "heavy", "steps": 35, "state": "gated"}, {"name": "gen-heavy-epas-replica", "w": "heavy", "steps": 27, "state": "gated"}, {"name": "gen-heavy-mysql-replica", "w": "heavy", "steps": 31, "state": "gated"}, {"name": "gen-heavy-mariadb-replica", "w": "heavy", "steps": 35, "state": "gated"}, {"name": "gen-heavy-pg-replica", "w": "heavy", "steps": 27, "state": "gated"}, {"name": "gen-heavy-ske-upgrade", "w": "heavy", "steps": 31, "state": "gated"}, {"name": "gen-heavy-vs-netops", "w": "heavy", "steps": 47, "state": "fail"}, {"name": "gen-pilot-net-basics", "w": "light", "steps": 22, "state": "skip"}, {"name": "gen-wave-vslight", "w": "light", "steps": 9, "state": "skip"}, {"name": "gen-wave-apigw", "w": "light", "steps": 21, "state": "skip"}, {"name": "gen-wave-dashboard", "w": "light", "steps": 3, "state": "skip"}, {"name": "gen-wave2-queue", "w": "light", "steps": 3, "state": "skip"}, {"name": "gen-wave2-sec", "w": "light", "steps": 6, "state": "skip"}, {"name": "gen-wave2-rg", "w": "light", "steps": 3, "state": "skip"}, {"name": "gen-wave2-iam", "w": "light", "steps": 7, "state": "skip"}, {"name": "gen-wave2-scf", "w": "light", "steps": 16, "state": "skip"}, {"name": "gen-wave2-volume", "w": "light", "steps": 10, "state": "skip"}, {"name": "gen-wave2-scr", "w": "light", "steps": 16, "state": "skip"}, {"name": "gen-wave2-fs", "w": "light", "steps": 7, "state": "skip"}, {"name": "gen-wave3-quota", "w": "light", "steps": 4, "state": "skip"}, {"name": "gen-wave3-support", "w": "light", "steps": 6, "state": "skip"}, {"name": "gen-wave3-product", "w": "light", "steps": 4, "state": "skip"}, {"name": "gen-wave3-cost", "w": "light", "steps": 3, "state": "skip"}, {"name": "gen-wave3-pricing", "w": "light", "steps": 3, "state": "skip"}, {"name": "gen-wave3-qfifo", "w": "light", "steps": 5, "state": "skip"}, {"name": "gen-wave4-asg", "w": "light", "steps": 28, "state": "fail"}, {"name": "gen-wave4-nlog", "w": "light", "steps": 4, "state": "pass"}, {"name": "gen-wave4-sgrule", "w": "light", "steps": 6, "state": "pass"}, {"name": "gen-wave4-rmtags", "w": "light", "steps": 16, "state": "fail"}, {"name": "gen-wave5-apigw-policy", "w": "light", "steps": 31, "state": "fail"}, {"name": "gen-wave5-apigw-privatelink", "w": "light", "steps": 35, "state": "fail"}, {"name": "gen-wave5-scf-triggers", "w": "light", "steps": 21, "state": "fail"}, {"name": "gen-wave5-iam-bindings", "w": "light", "steps": 12, "state": "pass"}, {"name": "gen-wave5-iam-role", "w": "light", "steps": 12, "state": "fail"}, {"name": "gen-wave5-fw", "w": "light", "steps": 16, "state": "pass"}, {"name": "gen-wave5-vpce", "w": "light", "steps": 12, "state": "fail"}, {"name": "gen-wave5-privnat", "w": "light", "steps": 8, "state": "fail"}, {"name": "gen-heavy-lb-members", "w": "heavy", "steps": 41, "state": "gated"}, {"name": "gen-wave5-swatch-metric", "w": "light", "steps": 3, "state": "pass"}, {"name": "gen-wave5-swatch-dashboard", "w": "light", "steps": 4, "state": "pass"}, {"name": "gen-wave5-swatch-event-rule", "w": "light", "steps": 3, "state": "pass"}, {"name": "gen-wave5-swatch-custom-metric", "w": "light", "steps": 3, "state": "pass"}, {"name": "gen-wave5-swatch-custom-log", "w": "light", "steps": 6, "state": "pass"}, {"name": "cloudcontrol-landing-zone-guarded", "w": "heavy", "steps": 13, "state": "gated"}, {"name": "cloudmonitoring-event-policy", "w": "light", "steps": 6, "state": "skip"}, {"name": "iam-role-full", "w": "light", "steps": 10, "state": "skip"}, {"name": "iam-policy-extra-writes", "w": "light", "steps": 6, "state": "skip"}, {"name": "iam-group-bindings", "w": "light", "steps": 7, "state": "skip"}, {"name": "iam-user-policy-bindings", "w": "light", "steps": 2, "state": "skip"}, {"name": "iam-resource-policy", "w": "light", "steps": 5, "state": "skip"}, {"name": "iam-credentials-heavy", "w": "heavy", "steps": 13, "state": "gated"}, {"name": "loggingaudit-trail", "w": "light", "steps": 8, "state": "skip"}, {"name": "network-logging-storage", "w": "light", "steps": 4, "state": "skip"}, {"name": "org-organizations-guarded", "w": "heavy", "steps": 6, "state": "gated"}, {"name": "org-units-guarded", "w": "heavy", "steps": 8, "state": "gated"}, {"name": "org-accounts-guarded", "w": "heavy", "steps": 5, "state": "gated"}, {"name": "org-service-control-policies-guarded", "w": "heavy", "steps": 5, "state": "gated"}, {"name": "org-policy-bindings-and-delegation-guarded", "w": "heavy", "steps": 8, "state": "gated"}, {"name": "org-invitations-guarded", "w": "heavy", "steps": 6, "state": "gated"}, {"name": "resourcemanager-tag-lifecycle", "w": "light", "steps": 13, "state": "skip"}, {"name": "servicewatch-alert", "w": "light", "steps": 6, "state": "skip"}, {"name": "servicewatch-dashboard", "w": "light", "steps": 4, "state": "skip"}, {"name": "servicewatch-event-rule", "w": "light", "steps": 4, "state": "skip"}, {"name": "servicewatch-custom-ingest", "w": "light", "steps": 5, "state": "skip"}, {"name": "networking-cdn-service", "w": "light", "steps": 9, "state": "skip"}, {"name": "networking-direct-connect-routing", "w": "heavy", "steps": 12, "state": "gated"}, {"name": "networking-dns-public-domain", "w": "light", "steps": 6, "state": "skip"}, {"name": "networking-dns-hosted-zone-private", "w": "heavy", "steps": 13, "state": "gated"}, {"name": "networking-firewall-rule", "w": "light", "steps": 4, "state": "skip"}, {"name": "networking-gslb-service", "w": "light", "steps": 8, "state": "skip"}, {"name": "networking-loadbalancer-members-nat", "w": "heavy", "steps": 24, "state": "gated"}, {"name": "networking-security-group-update", "w": "light", "steps": 4, "state": "skip"}, {"name": "vpc-cidr-secondary", "w": "heavy", "steps": 4, "state": "gated"}, {"name": "vpc-private-nat", "w": "heavy", "steps": 6, "state": "gated"}, {"name": "vpc-privatelink-service", "w": "heavy", "steps": 11, "state": "gated"}, {"name": "vpc-endpoint", "w": "heavy", "steps": 11, "state": "gated"}, {"name": "vpc-peering", "w": "heavy", "steps": 15, "state": "gated"}, {"name": "vpc-transit-gateway-children", "w": "heavy", "steps": 15, "state": "gated"}, {"name": "vpc-subnet-vip-nat", "w": "heavy", "steps": 13, "state": "gated"}, {"name": "networking-vpn-gateway-tunnel", "w": "heavy", "steps": 14, "state": "gated"}, {"name": "sts-token-issuance-coverage", "w": "light", "steps": 3, "state": "skip"}, {"name": "security-certificatemanager-import-cover", "w": "light", "steps": 2, "state": "skip"}, {"name": "security-configinspection-diagnosis", "w": "light", "steps": 4, "state": "skip"}, {"name": "security-kms-transit-crypto", "w": "light", "steps": 15, "state": "skip"}, {"name": "security-secretsmanager-writes", "w": "light", "steps": 12, "state": "skip"}, {"name": "security-secretvault-vault", "w": "light", "steps": 3, "state": "skip"}, {"name": "backup-agent", "w": "heavy", "steps": 5, "state": "gated"}, {"name": "backup-job", "w": "heavy", "steps": 14, "state": "gated"}, {"name": "blockstorage-volume", "w": "heavy", "steps": 23, "state": "gated"}, {"name": "blockstorage-volume-group", "w": "heavy", "steps": 22, "state": "gated"}, {"name": "filestorage-replication-schedule", "w": "heavy", "steps": 14, "state": "gated"}];
+function barColor(p){return p<25?'var(--red)':p<55?'var(--amber)':'var(--green)';}
+var catMeta={};
+SVCS.forEach(function(s){
+  s.pct=s.tot?Math.round(s.cov/s.tot*100):0;
+  var m=catMeta[s.c]||(catMeta[s.c]={cov:0,tot:0});
+  m.cov+=s.cov;m.tot+=s.tot;
+});
+Object.keys(catMeta).forEach(function(c){var m=catMeta[c];m.pct=m.tot?Math.round(m.cov/m.tot*100):0;});
+function svcCard(s){
+  return '<a class="svc" href="'+s.u+'">'
+    +'<div class="sh"><span class="sn">'+s.n+'</span><span class="sp" style="color:'+barColor(s.pct)+'">'+s.pct+'%</span></div>'
+    +'<div class="sbar"><i style="width:'+s.pct+'%;background:'+barColor(s.pct)+'"></i></div>'
+    +'<div class="sfrac">'+s.cov+'/'+s.tot+' ops 검증</div></a>';
+}
+function renderSvcs(){
+  var q=document.getElementById('svcSearch').value.toLowerCase();
+  var sort=document.getElementById('svcSort').value;
+  var corder=document.getElementById('catOrder').value;
+  var categories=Object.keys(catMeta);
+  categories.sort(function(a,b){
+    if(corder==='pct')return catMeta[a].pct-catMeta[b].pct;
+    if(corder==='ops')return catMeta[b].tot-catMeta[a].tot;
+    return a.localeCompare(b);
+  });
+  var htmlOut='',totSvc=0,totCat=0;
+  categories.forEach(function(cat){
+    var list=SVCS.filter(function(s){return s.c===cat&&(!q||s.n.indexOf(q)>=0);});
+    if(!list.length)return;
+    list.sort(function(a,b){
+      if(sort==='pct')return a.pct-b.pct;
+      if(sort==='pctd')return b.pct-a.pct;
+      if(sort==='ops')return b.tot-a.tot;
+      return a.n.localeCompare(b.n);
+    });
+    totSvc+=list.length;totCat++;
+    var m=catMeta[cat];
+    htmlOut+='<div class="catsec"><div class="catsec-h">'
+      +'<span class="csn">'+cat+'</span>'
+      +'<span class="cso">'+m.cov+'/'+m.tot+' ops</span>'
+      +'<span class="csbar"><i style="width:'+m.pct+'%;background:'+barColor(m.pct)+'"></i></span>'
+      +'<span class="csp" style="color:'+barColor(m.pct)+'">'+m.pct+'%</span>'
+      +(m.cov===0?'<span class="blind">사각지대</span>':'')
+      +'<span class="cscount">'+list.length+' svc</span>'
+      +'</div><div class="svcgrid">'+list.map(svcCard).join('')+'</div></div>';
+  });
+  document.getElementById('svcWrap').innerHTML=htmlOut||'<div style="color:var(--muted)">검색 결과 없음</div>';
+  document.getElementById('svcCount').textContent=totSvc;
+  document.getElementById('catCount').textContent=totCat;
+}
+document.getElementById('svcSort').onchange=renderSvcs;
+document.getElementById('catOrder').onchange=renderSvcs;
+document.getElementById('svcSearch').oninput=renderSvcs;
+renderSvcs();
+
+var counts={pass:0,gated:0,skip:0,fail:0};
+CRUD.forEach(function(c){counts[c.state]=(counts[c.state]||0)+1;});
+var crudFilter=null;
+var ORDER={fail:0,pass:1,gated:2,skip:3};
+function showList(){document.getElementById('crudList').classList.add('show');
+  document.getElementById('crudToggle').textContent='전체 시나리오 접기 ▴';}
+function renderSum(){
+  var defs=[['fail','fail',counts.fail],['pass','통과',counts.pass],
+            ['gated','gated (heavy)',counts.gated],['skip','skip (light)',counts.skip]];
+  var el=document.getElementById('crudSum');
+  el.innerHTML=defs.filter(function(d){return d[2]>0;}).map(function(d){
+    return '<span class="badge '+d[0]+(crudFilter===d[0]?' on':'')+'" data-k="'+d[0]+'">'
+      +'<span class="c">'+d[2]+'</span> '+d[1]+'</span>';
+  }).join('')+'<span class="badge'+(crudFilter===null?' on':'')+'" data-k="all">'
+    +'<span class="c">'+CRUD.length+'</span> 전체</span>';
+  el.querySelectorAll('.badge').forEach(function(b){
+    b.onclick=function(){crudFilter=b.dataset.k==='all'?null:b.dataset.k;
+      showList();renderSum();renderCrud();};
+  });
+}
+function renderCrud(){
+  var list=CRUD.filter(function(c){return !crudFilter||c.state===crudFilter;})
+    .slice().sort(function(a,b){return (ORDER[a.state]-ORDER[b.state])||(b.steps-a.steps);});
+  document.getElementById('crudBody').innerHTML=list.map(function(c){
+    return '<tr><td><span class="cstate '+c.state+'">'+c.state+'</span></td>'
+      +'<td><code>'+c.name+'</code></td>'
+      +'<td class="wt">'+c.w+' · '+c.steps+' steps</td></tr>';
+  }).join('');
+}
+document.getElementById('crudToggle').onclick=function(){
+  var el=document.getElementById('crudList');el.classList.toggle('show');
+  this.textContent=el.classList.contains('show')?'전체 시나리오 접기 ▴':'전체 시나리오 펼치기 ▾';
+};
+renderSum();renderCrud();
+if(9>0){crudFilter='fail';showList();renderSum();renderCrud();}
+</script>
+</body></html>

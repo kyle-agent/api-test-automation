@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SCP API Test — 워크플로 운영 대시보드</title>
+<style>
+ body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+      margin:0;background:#f6f8fa;color:#1f2328}
+ .wrap{max-width:1080px;margin:0 auto;padding:20px}
+ h1{font-size:20px;margin:0 0 4px} .mut{color:#656d76}
+ .panel{background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:14px;margin:12px 0}
+ table{border-collapse:collapse;width:100%} th,td{padding:5px 8px;text-align:left;
+      border-bottom:1px solid #eaeef2;font-size:13px} th{color:#656d76;font-weight:600}
+ code{background:#eff1f3;padding:1px 5px;border-radius:4px;font-size:12px}
+ .ok{color:#1a7f37}.bad{color:#cf222e}.run{color:#9a6700}
+ .ev{display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px dashed #eaeef2}
+ .ev time{color:#656d76;font-size:12px;white-space:nowrap}
+ .pill{display:inline-block;padding:0 8px;border-radius:10px;font-size:11px;border:1px solid #d0d7de}
+ .cfg input{width:420px;font-size:12px;padding:3px 6px}
+ a{color:#0969da;text-decoration:none}
+ #live .job{font-weight:600;margin-top:8px}
+ .bar{height:8px;background:#eaeef2;border-radius:4px;overflow:hidden;margin:2px 0 8px}
+ .bar div{height:100%;background:#2da44e}
+ /* resource hierarchy tree */
+ .t-children{margin-left:13px;padding-left:14px;border-left:2px solid #e3e8ee}
+ .t-node{display:inline-flex;align-items:center;gap:7px;padding:2px 10px;margin:3px 0;
+         border:1px solid #d8dee4;border-radius:6px;background:#fff;font-size:12px}
+ .t-kind{color:#57606a;font-size:11px}
+ .dot{width:9px;height:9px;border-radius:50%;flex:none}
+ .st-alive .dot{background:#2da44e;animation:pulse 1.4s infinite}
+ .st-alive{border-color:#2da44e}
+ .st-done{opacity:.62} .st-done .dot{background:#a5b0bb}
+ .st-fail{border-color:#cf222e;background:#fff5f5} .st-fail .dot{background:#cf222e}
+ .t-dur{font-weight:600;color:#0969da;font-size:11px}
+ .t-grp{font-weight:600;font-size:12px;color:#57606a;margin:12px 0 3px}
+ @keyframes pulse{50%{opacity:.5}}
+ .st-leak{border-color:#b5740b;background:#fdf3e2} .st-leak .dot{background:#b5740b}
+ .verdict{display:flex;align-items:center;gap:13px;border-radius:10px;padding:11px 15px;margin:8px 0;border:1px solid #d0d7de;background:#fff}
+ .verdict.warn{background:#fdf3e2;border-color:#f0dcb6} .verdict.ok{background:#e7f6ed;border-color:#c2e6d0}
+ .verdict.run{background:#e8f0fd;border-color:#d3e2fb}
+ .verdict .big{font-size:24px;font-weight:800;letter-spacing:-1px}
+ .verdict.warn .big{color:#b5740b}.verdict.ok .big{color:#15924f}.verdict.run .big{color:#2563c9}
+ .verdict .split{margin-left:auto;display:flex;gap:18px;text-align:center}
+ .verdict .split .n{font-size:16px;font-weight:800}.verdict .split .l{font-size:11px;color:#656d76}
+ .nleak{color:#b5740b}.nfail{color:#cf222e}.ndel{color:#7a838d}.ntest{color:#15924f}
+ .rtools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+ .seg{display:inline-flex;border:1px solid #d0d7de;border-radius:8px;overflow:hidden;background:#fff}
+ .seg button{border:0;background:transparent;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#656d76;border-right:1px solid #d0d7de}
+ .seg button:last-child{border-right:0}
+ .seg button.on{background:#2563c9;color:#fff}
+ .seg button .c{opacity:.85;font-weight:700;margin-left:3px}
+ input.rsearch{border:1px solid #d0d7de;border-radius:8px;background:#fff;padding:6px 10px;font-size:12px;font-family:inherit;width:200px}
+ .tchip{border:1px solid #d0d7de;background:#fff;border-radius:8px;padding:4px 9px;font-size:11.5px;cursor:pointer;color:#656d76;white-space:nowrap}
+ .tchip b{color:#1f2328;font-weight:700} .tchip.on{border-color:#2563c9;background:#e8f0fd}
+ .tchip .lk{color:#b5740b;font-weight:700} .tchip .dl{color:#a5b0bb}
+ .runpill{border:1px solid #d0d7de;background:#fff;border-radius:8px;padding:5px 11px;font-size:12px;cursor:pointer;color:#656d76;display:inline-flex;gap:7px;align-items:center}
+ .runpill b{font-family:ui-monospace,monospace;color:#1f2328;font-weight:600}
+ .runpill.on{border-color:#2563c9;background:#e8f0fd}
+ .runpill .rdot{width:8px;height:8px;border-radius:50%;background:#a5b0bb;flex:none}
+ .runpill.live .rdot{background:#2da44e;animation:pulse 1.4s infinite}
+ .runpill .rwhen{font-size:11px;color:#9aa3ad}
+ .lcbar{height:9px;border-radius:5px;background:#eaeef2;overflow:hidden;min-width:60px}
+ .lcbar i{display:block;height:100%;border-radius:5px;background:#2563c9}
+ tr.lc-slow td.dur{color:#cf222e;font-weight:700} tr.lc-slow .lcbar i{background:#cf222e}
+ tr.lc-med td.dur{color:#b5740b;font-weight:700} tr.lc-med .lcbar i{background:#b5740b}
+ td.dur{font-family:ui-monospace,monospace;font-size:12px;text-align:right;white-space:nowrap;width:80px}
+
+ .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+ .chip{border:1px solid #d0d7de;border-radius:12px;padding:1px 10px;font-size:12px;background:#fff}
+ .chip b{color:#1a7f37} .chip s{color:#656d76;text-decoration:none}
+ .lcst{font-size:11px}
+</style>
+</head>
+<body><div class="wrap">
+<h1>워크플로 운영 대시보드 <span class="mut" style="font-size:13px">oplog bucket 직접 조회 · 30초 자동 갱신</span></h1>
+<div class="mut">소스: 영구 Object Storage 버킷(<code id="bsrc"></code>)의 진행 이벤트/런 이력 ·
+<a href="index.html">커버리지 대시보드 →</a></div>
+
+<details class="panel cfg" style="padding:8px 14px">
+  <summary class="mut" style="cursor:pointer;font-size:12px">고급 — 버킷 엔드포인트 변경 (기본값 내장됨, 보통 불필요)</summary>
+  <div style="margin-top:6px">
+  <input id="ep" placeholder="기본: <account_id>:apitest-oplog-permanent path-style 엔드포인트">
+  <button onclick="saveCfg()">저장</button>
+  <span class="mut" id="cfgmsg"></span></div>
+</details>
+
+<div class="panel" id="live"><b>진행 중인 런</b><div id="liveBody" class="mut">불러오는 중…</div></div>
+
+<div class="panel" id="res"><b>자원 계층 · 상태</b>
+  <span class="mut">(자원 모델 의존 순서로 중첩: VPC → Subnet → Port/GW/VM/DB… ·
+  <span style="color:#2da44e">● 테스트 중</span> <span style="color:#b5740b">● 잔존(끝났는데 미정리)</span>
+  <span style="color:#a5b0bb">● 삭제됨</span> <span style="color:#cf222e">● 정리 실패</span>)</span>
+  <div class="chips" id="runPick" style="margin-top:6px"></div>
+  <select id="resRun" onchange="renderRes()" style="display:none"></select>
+  <div id="resVerdict"></div>
+  <div class="chips" id="resChips"></div>
+  <div class="rtools">
+    <div class="seg" id="resSeg">
+      <button data-s="tree" class="on">계층(전체)</button>
+      <button data-s="open">잔존·테스트중<span class="c" id="cOpen"></span></button>
+      <button data-s="failed">정리실패<span class="c" id="cFail"></span></button>
+      <button data-s="deleted">삭제됨<span class="c" id="cDel"></span></button>
+    </div>
+    <input class="rsearch" id="resSearch" placeholder="자원 id·타입 검색">
+    <span class="mut" style="font-size:12px;margin-left:auto"><b id="resShown"></b>개 표시</span>
+  </div>
+  <div id="resBody" class="mut">런 선택…</div>
+  <div class="t-grp" style="margin-top:14px">Lifecycle 수행시간 <span class="mut" style="font-weight:400">— 느린 순 · ≥5분 <span style="color:#cf222e;font-weight:700">빨강</span> · ≥1분 <span style="color:#b5740b;font-weight:700">주황</span></span></div>
+  <table id="lcTbl" style="display:none"><thead><tr><th>Lifecycle</th><th style="width:90px;text-align:right">수행시간</th><th></th></tr></thead><tbody id="lcBody"></tbody></table></div>
+
+<div class="panel"><b>런 이력</b> <span class="mut">(최신순 · 행 클릭 = 그 런의 자원 상태 보기)</span>
+<table id="hist"><thead><tr>
+  <th>run</th><th>sha</th><th>종료(KST)</th><th>형태</th><th>ok</th><th>soft</th>
+  <th>fail<sub>new</sub></th><th>cov_op</th><th>C3</th><th>tested</th>
+</tr></thead><tbody></tbody></table></div>
+
+<footer class="mut" style="font-size:12px;margin:20px 0">
+이벤트는 각 CI 잡이 <code>core.oplog</code>로 적재 — 키가 런/타임스탬프별로 고유해 A∥B 병렬 잡 간 경합이 없습니다.
+이력 행은 런 종료 시 dashboard 잡(단일 작성자)이 <code>index.json</code>에 누적합니다.</footer>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+function kst(iso){ // ISO(UTC) -> 'MM-DD HH:MM KST'
+  if(!iso)return"";
+  const d=new Date(iso); if(isNaN(d))return String(iso);
+  const p=n=>String(n).padStart(2,"0");
+  const k=new Date(d.getTime()+9*3600*1000);
+  return `${p(k.getUTCMonth()+1)}-${p(k.getUTCDate())} ${p(k.getUTCHours())}:${p(k.getUTCMinutes())} KST`;
+}
+const DEFAULT_BASE="https://object-store.kr-west1.e.samsungsdscloud.com/ec11538abf8f46d2953539521f745366:apitest-oplog-permanent";  // live-verified 2026-06-11 (anon GET 200 + CORS)
+function base(){
+  // URL PREFIX that object keys append to (RGW tenant syntax account:bucket)
+  let ep=localStorage.getItem("oplog_ep")||DEFAULT_BASE;
+  return ep.replace(/\/+$/,"");
+}
+function saveCfg(){ localStorage.setItem("oplog_ep",$("#ep").value.trim());
+  $("#cfgmsg").textContent="저장됨 — 새로고침"; setTimeout(()=>location.reload(),600); }
+async function jget(key){
+  const r=await fetch(base()+"/"+key,{cache:"no-store"});
+  if(!r.ok) throw new Error(r.status+" "+key);
+  return r.json();
+}
+async function xlist(prefix){
+  // S3 ListObjectsV2 (public) WITH pagination — a single page caps at 1000
+  // keys, which silently hid all but a few runs from the picker.
+  const keys=[]; let token="";
+  for(let page=0; page<30; page++){
+    const url=base()+"/?list-type=2&prefix="+encodeURIComponent(prefix)
+      +(token?"&continuation-token="+encodeURIComponent(token):"");
+    const r=await fetch(url,{cache:"no-store"});
+    if(!r.ok) throw new Error(r.status+" list "+prefix);
+    const xml=new DOMParser().parseFromString(await r.text(),"text/xml");
+    for(const k of xml.querySelectorAll("Contents>Key")) keys.push(k.textContent);
+    const trunc=xml.querySelector("IsTruncated");
+    const next=xml.querySelector("NextContinuationToken");
+    if(!trunc||trunc.textContent!=="true"||!next){ break; }
+    token=next.textContent;
+  }
+  return keys;
+}
+function fmtRow(s){
+  const h=s.history||{};
+  return `<tr class="histrow" data-run="${s.run_id}" style="cursor:pointer"
+    title="클릭 → 이 런의 자원 상태 보기"><td><a href="${s.url||'#'}" target="_blank">${s.run_id}</a></td>
+   <td><code>${s.sha||h.sha||""}</code></td><td>${kst(s.finished)}</td>
+   <td>${h.crud_ran?"CRUD":"read-only"}</td><td class="ok">${h.ok??""}</td><td>${h.soft??""}</td>
+   <td class="${(h.fail_new||0)>0?'bad':'ok'}">${h.fail_new??""}</td>
+   <td>${h.cov_op??""}%</td><td>${h.cov_c3??""}%</td><td>${h.tested??""}</td></tr>`;
+}
+async function loadHistory(){
+  try{
+    const idx=await jget("index.json");
+    $("#hist tbody").innerHTML=idx.map(fmtRow).join("");
+    document.querySelectorAll("#hist .histrow").forEach(tr=>tr.onclick=e=>{
+      if(e.target.tagName==="A")return;          // 링크 클릭은 그대로 통과
+      const sel=$("#resRun");
+      if([...sel.options].some(o=>o.value===tr.dataset.run)){
+        sel.value=tr.dataset.run; renderRes();
+        document.getElementById("res").scrollIntoView({behavior:"smooth"});
+      } else {
+        $("#resBody").textContent="이 런에는 자원 이벤트가 없습니다 (read-only 런)";
+      }
+    });
+    return idx;
+  }catch(e){ $("#hist tbody").innerHTML=
+    `<tr><td colspan="10" class="mut">index.json 읽기 실패 (${e.message}) — 엔드포인트/공개권한 확인</td></tr>`;
+    return []; }
+}
+async function loadLive(idx){
+  try{
+    // a run currently in flight = has events but no summary yet; probe the
+    // newest few run prefixes from the listing.
+    const keys=await xlist("runs/");
+    const ids=[...new Set(keys.map(k=>k.split("/")[1]))];
+    const done=new Set(idx.map(s=>String(s.run_id)));
+    // 숫자 id만 진짜 run — 'oplog-test-*' 같은 개발기 테스트 prefix는 요약이
+    // 없어 영원히 '진행 중'으로 보이므로 제외 (owner 발견 2026-06-12)
+    const liveIds=ids.filter(i=>/^[0-9]+$/.test(String(i))&&!done.has(String(i)))
+      .sort((a,b)=>Number(a)-Number(b)).slice(-2);
+    window.LIVE_RUNS=new Set(liveIds.map(String));
+    if(!liveIds.length){
+      const last=idx&&idx[0];
+      $("#liveBody").textContent="지금 도는 런 없음"+(last?` — 마지막 런 ${last.run_id} ${kst(last.finished)} 종료`:"");
+      return; }
+    let html="";
+    for(const rid of liveIds){
+      let man={}; try{ man=await jget(`runs/${rid}/run.json`);}catch(e){}
+      const evKeys=keys.filter(k=>k.startsWith(`runs/${rid}/events/`)).sort();
+      const evs=await Promise.all(evKeys.slice(-40).map(k=>jget(k).catch(()=>null)));
+      html+=`<div class="job">run <a href="${man.url||'#'}" target="_blank">${rid}</a>
+        <code>${man.sha||""}</code> <span class="pill run">in flight</span></div>`;
+      html+=evs.filter(Boolean).map(e=>
+        `<div class="ev"><time>${kst(e.ts).slice(6)}</time>
+         <span class="pill">${e.job||"?"}</span> <b>${e.stage}</b>
+         <span class="${e.status==='done'?'ok':e.status==='fail'?'bad':'run'}">${e.status}</span>
+         <span class="mut">${(e.detail||"").slice(0,140)}</span></div>`).join("");
+    }
+    $("#liveBody").innerHTML=html;
+  }catch(e){ $("#liveBody").textContent="라이브 조회 실패: "+e.message; }
+}
+// ---------------- resource gantt ----------------
+let RES_KEYS=[];           // bucket keys cache from the last listing
+const KIND_LABEL={vpcs:"VPC",subnets:"Subnet",servers:"VM(Server)",volumes:"Block Storage(Volume)",
+  snapshots:"Snapshot",clusters:"Cluster(DB/SKE)",keypairs:"Keypair","security-groups":"Security Group",
+  publicips:"Public IP","internet-gateways":"Internet Gateway","log-groups":"Log Group",
+  secrets:"Secret","kms":"KMS Key",functions:"Function",apis:"API",queues:"Queue",
+  registries:"Registry","vpc-peerings":"VPC Peering",lifecycle:"Lifecycle"};
+function kindLabel(e){
+  const base=KIND_LABEL[e.kind]||e.kind;
+  return e.kind==="clusters"&&e.service?`Cluster · ${e.service}`:base;
+}
+const RES_CACHE=new Map();   // key -> events[] (objects are immutable; fetch once)
+async function loadResEvents(rid){
+  const keys=RES_KEYS.filter(k=>k.startsWith(`runs/${rid}/res/`)).sort();
+  const missing=keys.filter(k=>!RES_CACHE.has(k));
+  // limited-concurrency incremental fetch with progress (385 objects through
+  // the browser's ~6-connection limit took tens of seconds and the 30s tick
+  // kept restarting it — now each object is fetched ONCE per session)
+  let done=0;
+  const workers=Array.from({length:8},async()=>{
+    for(;;){
+      const k=missing.shift(); if(!k) return;
+      try{ const b=await jget(k); RES_CACHE.set(k,(b.events)||[]); }
+      catch(e){ RES_CACHE.set(k,[]); }
+      done++;
+      if(done%25===0||done===missing.length)
+        $("#resBody").textContent=`이벤트 로딩 중… ${done} 객체`;
+    }
+  });
+  await Promise.all(workers);
+  return keys.flatMap(k=>RES_CACHE.get(k)||[]);
+}
+// ---- DEP-MAP (generated — python3 dashboard/gen_dep_map.py) ----
+const DEP={"depth": {"access-keys": 0, "account-assignments": 2, "aimlops-platform": 3, "alerts": 0, "apis": 5, "archiving-policies": 0, "auto-scaling-groups": 3, "backup-agents": 2, "backups": 0, "baremetals": 2, "buckets": 0, "budgets": 0, "certificatemanager": 0, "cloud-functions": 2, "cloud-ml": 3, "cloudmonitorings": 0, "clusters": 2, "configinspection": 0, "container-registries": 0, "dashboards": 0, "data-flow-services": 2, "data-flows": 3, "data-ops": 3, "data-ops-services": 2, "delegation-policies": 1, "devops-services": 0, "direct-connects": 1, "event-rules": 0, "gpu-nodes": 2, "groups": 1, "hosted-zones": 1, "images": 0, "instances": 0, "internet-gateways": 1, "invitations": 1, "keypairs": 0, "kms": 0, "kubernetes-versions": 0, "landing-zones": 1, "launch-configurations": 1, "lb-health-checks": 2, "lb-listeners": 4, "lb-server-groups": 4, "loadbalancers": 2, "log-groups": 1, "nat-gateways": 2, "network-logging": 0, "nodepools": 3, "organization-accounts": 1, "organization-units": 1, "organizations": 0, "permission-sets": 1, "planned-computes": 0, "policies": 0, "ports": 2, "private-dns": 0, "private-nats": 0, "privatelink-endpoints": 0, "publicips": 0, "queues": 0, "quick-query": 2, "replications": 1, "repositories": 1, "resource-groups": 0, "roles": 0, "secrets": 1, "secretvault": 0, "security-group-rules": 1, "security-groups": 0, "server-groups": 0, "server-types": 0, "servers": 3, "service-control-policies": 1, "snapshot-schedules": 1, "snapshots": 1, "subnets": 1, "trails": 0, "transit-gateways": 0, "triggers": 1, "users": 1, "volume-groups": 2, "volume-transfer": 1, "volumes": 1, "vpc-endpoints": 2, "vpc-peerings": 1, "vpcs": 0}, "parent": {"account-assignments": "permission-sets", "aimlops-platform": "clusters", "auto-scaling-groups": "launch-configurations", "backup-agents": "subnets", "baremetals": "subnets", "cloud-functions": "subnets", "cloud-ml": "clusters", "clusters": "subnets", "data-flow-services": "subnets", "data-flows": "data-flow-services", "data-ops": "data-ops-services", "data-ops-services": "subnets", "delegation-policies": "organizations", "direct-connects": "vpcs", "gpu-nodes": "subnets", "groups": "instances", "hosted-zones": "private-dns", "internet-gateways": "vpcs", "invitations": "organizations", "landing-zones": "instances", "launch-configurations": "images", "lb-health-checks": "subnets", "lb-listeners": "lb-server-groups", "lb-server-groups": "lb-health-checks", "loadbalancers": "subnets", "nat-gateways": "subnets", "nodepools": "clusters", "organization-accounts": "organizations", "organization-units": "organizations", "permission-sets": "instances", "ports": "subnets", "quick-query": "subnets", "replications": "volumes", "repositories": "container-registries", "secrets": "kms", "security-group-rules": "security-groups", "servers": "subnets", "service-control-policies": "organizations", "snapshot-schedules": "volumes", "snapshots": "volumes", "subnets": "vpcs", "triggers": "cloud-functions", "users": "instances", "volume-groups": "volumes", "volume-transfer": "volumes", "vpc-endpoints": "subnets", "vpc-peerings": "vpcs"}};
+// ---- /DEP-MAP ----
+let RES_BUSY=false;
+function foldResources(evs){
+  // pair created→deleted by res_id (fallback kind+lifecycle FIFO)
+  const res=[]; const open={}; const lcs={};
+  for(const e of evs.sort((a,b)=>a.t-b.t)){
+    if(e.action==="lifecycle-start"){ lcs[e.lifecycle]={name:e.lifecycle,start:e.t,svc:e.service}; continue; }
+    if(e.action==="lifecycle-end"){ const l=lcs[e.lifecycle]; if(l){l.end=e.t;l.status=e.status;} continue; }
+    const key=e.res_id?`id:${e.res_id}`:`k:${e.service}/${e.kind}/${e.lifecycle}`;
+    if(e.action==="created"){
+      const r={kind:e.kind,service:e.service,name:e.name||e.res_id||e.lifecycle,
+               lifecycle:e.lifecycle,start:e.t,state:"alive",
+               res_id:e.res_id||"",parent:e.parent||""};
+      res.push(r); (open[key]=open[key]||[]).push(r);
+    }else if(e.action==="deleted"||e.action==="delete-failed"){
+      const q=open[key]||open[`k:${e.service}/${e.kind}/${e.lifecycle}`]||[];
+      const r=q.find(x=>x.state==="alive");
+      if(r){ r.end=e.t; r.state=e.action==="deleted"?"done":"fail"; }
+      else res.push({kind:e.kind,service:e.service,name:e.res_id||e.lifecycle,
+                     lifecycle:e.lifecycle,start:e.t,end:e.t,
+                     state:e.action==="deleted"?"done":"fail"});
+    }
+  }
+  return {res,lcs:Object.values(lcs)};
+}
+function fmtDur(ms){
+  const sec=Math.max(1,Math.round(ms/1000));
+  if(sec<90) return sec+"s";
+  const m=Math.floor(sec/60), s2=sec%60;
+  if(m<90) return s2?`${m}m ${s2}s`:`${m}m`;
+  return `${Math.floor(m/60)}h ${m%60}m`;
+}
+function attachByDep(res){
+  // model-declared parent kind (DEP.parent) fills in when the event stream
+  // didn't carry an explicit parent res_id — prefer same lifecycle, then the
+  // most recent instance created before the child
+  const byKind={}; for(const r of res)(byKind[r.kind]=byKind[r.kind]||[]).push(r);
+  for(const r of res){
+    if(r.parent) continue;
+    const pk=DEP.parent[r.kind]; if(!pk||pk===r.kind) continue;
+    const cands=(byKind[pk]||[]).filter(p=>p!==r&&p.res_id);
+    if(!cands.length) continue;
+    let best=cands.filter(p=>p.lifecycle===r.lifecycle&&p.start<=r.start);
+    if(!best.length) best=cands.filter(p=>p.start<=r.start);
+    if(!best.length) best=cands;
+    r.parent=best.sort((a,b)=>b.start-a.start)[0].res_id;
+  }
+}
+// ---- status vocabulary: run finished -> alive means LEAKED, not testing ----
+window.DONE_RUNS=window.DONE_RUNS||new Set();
+let RFILTER={mode:"tree",type:null,q:""};
+function statusOf(r,fin){
+  if(r.state==="fail")return"failed";
+  if(r.state==="alive")return fin?"leaked":"testing";
+  return"deleted";
+}
+function nodeHtml(r,fin){
+  const st=statusOf(r,fin);
+  const cls={testing:"st-alive",leaked:"st-leak",failed:"st-fail",deleted:"st-done"}[st];
+  // 종료된 런은 시계를 런 종료 시점에 멈춘다 — 30h+로 자라는 표시는 sweep이
+  // 회수한 자원의 '삭제 이벤트 미기록'일 뿐 실제 잔존이 아님
+  const endAt=r.end||(fin?(window.RUN_FINISH[String(SELECTED_RUN)]||Date.now()):Date.now());
+  const dur=fmtDur(Math.max(1000,endAt-r.start));
+  const lab={testing:"테스트 중 "+dur,leaked:"미정리(이벤트) "+dur,failed:"정리 실패",
+             deleted:"수명 "+dur}[st];
+  return `<span class="t-node ${cls}" title="${r.name} · ${lab}${r.lifecycle?" · "+r.lifecycle:""}">
+    <span class="dot"></span><span class="t-kind">${kindLabel(r)}</span>
+    <b>${r.name||r.res_id||"?"}</b><span class="t-dur">${lab}</span></span>`;
+}
+function rMatch(r){
+  if(RFILTER.type&&r.kind!==RFILTER.type)return false;
+  if(RFILTER.q){const q=RFILTER.q;
+    if(!((r.name||"").toLowerCase().includes(q)||(r.res_id||"").toLowerCase().includes(q)
+       ||r.kind.toLowerCase().includes(q)||kindLabel(r).toLowerCase().includes(q)))return false;}
+  return true;
+}
+function renderTree(res,lcs){
+  const fin=window.DONE_RUNS.has(String(SELECTED_RUN));
+  if(!res.length&&!lcs.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; $("#resVerdict").innerHTML=""; return; }
+  attachByDep(res);
+  // ---- verdict (끝난 run = 정리 무결성 판정) ----
+  const cnt={testing:0,leaked:0,failed:0,deleted:0};
+  for(const r of res)cnt[statusOf(r,fin)]++;
+  $("#cOpen").textContent=cnt.leaked+cnt.testing; $("#cFail").textContent=cnt.failed; $("#cDel").textContent=cnt.deleted;
+  let v;
+  if(!fin){
+    v=`<div class="verdict run"><div class="big">${cnt.testing}</div><div><b>RUN 진행 중</b> — 살아있는 자원 ${cnt.testing}개 테스트 중 · 삭제 ${cnt.deleted} · 정리실패 ${cnt.failed}</div>
+       <div class="split"><div><div class="n ntest">${cnt.testing}</div><div class="l">테스트 중</div></div>
+       <div><div class="n nfail">${cnt.failed}</div><div class="l">정리 실패</div></div>
+       <div><div class="n ndel">${cnt.deleted}</div><div class="l">삭제됨</div></div></div></div>`;
+  }else if(cnt.leaked+cnt.failed===0){
+    v=`<div class="verdict ok"><div class="big">✓</div><div><b>RUN 종료 — 깨끗하게 정리됨.</b> 잔존 0 · 정리실패 0 · 정상 삭제 ${cnt.deleted}건</div></div>`;
+  }else{
+    v=`<div class="verdict warn"><div class="big">${cnt.leaked+cnt.failed}</div>
+       <div><b>RUN 종료 — 이벤트상 미정리 ${cnt.leaked}건${cnt.failed?` · 정리실패 ${cnt.failed}건`:""}.</b>
+       대부분 tag-scoped sweep이 회수하지만 reconciler 회수분은 삭제 이벤트가 기록되지 않아 여기 남습니다 — 실제 잔존 여부는 콘솔/다음 런 기준.</div>
+       <div class="split"><div><div class="n nleak">${cnt.leaked}</div><div class="l">잔존</div></div>
+       <div><div class="n nfail">${cnt.failed}</div><div class="l">정리 실패</div></div>
+       <div><div class="n ndel">${cnt.deleted}</div><div class="l">정상 삭제</div></div></div></div>`;
+  }
+  $("#resVerdict").innerHTML=v;
+  // ---- type chips (잔존 많은 순) ----
+  const agg={};
+  for(const r of res){ (agg[r.kind]=agg[r.kind]||{n:0,leak:0,del:0,fail:0,label:kindLabel(r)}); const a=agg[r.kind]; a.n++;
+    const st=statusOf(r,fin); if(st==="leaked"||st==="testing")a.leak++; else if(st==="failed")a.fail++; else a.del++; }
+  const tOrder=Object.keys(agg).sort((a,b)=>(agg[b].leak-agg[a].leak)||(agg[b].n-agg[a].n));
+  $("#resChips").innerHTML=tOrder.map(k=>{const x=agg[k];
+    return `<span class="tchip${RFILTER.type===k?" on":""}" data-type="${k}"><b>${x.label}</b> ${x.n}`+
+      `${x.leak?` · <span class="lk">${fin?"잔존":"테스트중"} ${x.leak}</span>`:""}`+
+      `${x.fail?` · <span style="color:#cf222e;font-weight:700">실패 ${x.fail}</span>`:""}`+
+      `${x.del?` · <span class="dl">삭제 ${x.del}</span>`:""}</span>`;}).join("");
+  document.querySelectorAll("#resChips .tchip").forEach(c=>c.onclick=()=>{
+    RFILTER.type=(RFILTER.type===c.dataset.type)?null:c.dataset.type; renderTree(res,lcs);});
+  // ---- body ----
+  let shown=0;
+  if(RFILTER.mode==="tree"){
+    const byId={}; for(const r of res) if(r.res_id) byId[r.res_id]=r;
+    const kids={}; const roots=[];
+    for(const r of res){
+      if(r.parent&&byId[r.parent]&&byId[r.parent]!==r)(kids[r.parent]=kids[r.parent]||[]).push(r);
+      else roots.push(r);
+    }
+    // visible = self matches OR any descendant matches (검색해도 계층 유지)
+    const vis=new Map();
+    const visit=r=>{let v=rMatch(r);for(const c of kids[r.res_id]||[])v=visit(c)||v;vis.set(r,v);return v;};
+    roots.forEach(visit);
+    const renderNode=r=>{
+      if(!vis.get(r))return"";
+      shown++;
+      const ch=(kids[r.res_id]||[]).filter(c=>vis.get(c)).sort((a,b)=>a.start-b.start);
+      return `<div>${nodeHtml(r,fin)}${ch.length?`<div class="t-children">${ch.map(renderNode).join("")}</div>`:""}</div>`;
+    };
+    const vpcs=roots.filter(r=>r.kind==="vpcs"&&vis.get(r)).sort((a,b)=>a.start-b.start);
+    const rest=roots.filter(r=>r.kind!=="vpcs"&&vis.get(r));
+    let html="";
+    if(vpcs.length){ html+=`<div class="t-grp">네트워크 계층 <span class="mut">(VM·DB 등은 자기 subnet 아래 중첩)</span></div>`+vpcs.map(renderNode).join(""); }
+    const grp={};
+    for(const r of rest){ (grp[r.kind]=grp[r.kind]||[]).push(r); }
+    const kinds=Object.keys(grp).sort((a,b)=>(DEP.depth[a]??99)-(DEP.depth[b]??99)||a.localeCompare(b));
+    for(const k of kinds){
+      const lbl=kindLabel(grp[k][0]); const d=DEP.depth[k];
+      html+=`<div class="t-grp">${lbl} <span class="mut">(${grp[k].length}${d!=null?` · 의존단계 ${d}`:""})</span></div>`
+          + grp[k].sort((a,b)=>a.start-b.start).map(renderNode).join(" ");
+    }
+    $("#resBody").innerHTML=html||'<div class="mut" style="padding:10px">조건에 맞는 자원이 없습니다.</div>';
+  }else{
+    const want=RFILTER.mode==="open"?["leaked","testing"]:[RFILTER.mode];
+    const list=res.filter(r=>want.includes(statusOf(r,fin))&&rMatch(r));
+    shown=list.length;
+    if(!list.length){
+      $("#resBody").innerHTML=RFILTER.mode==="open"
+        ?'<div style="padding:12px;color:#15924f">✓ 잔존/테스트중 자원 없음 — 모두 정상 삭제되었습니다.</div>'
+        :'<div class="mut" style="padding:10px">해당 상태의 자원이 없습니다.</div>';
+    }else{
+      const g={}; list.forEach(r=>{(g[r.kind]=g[r.kind]||[]).push(r);});
+      const order=Object.keys(g).sort((a,b)=>g[b].length-g[a].length);
+      $("#resBody").innerHTML=order.map(k=>{
+        return `<div class="t-grp">${kindLabel(g[k][0])} <span class="mut">(${g[k].length})</span></div>`
+          + g[k].sort((a,b)=>b.start-a.start).map(r=>nodeHtml(r,fin)).join(" ");
+      }).join("");
+    }
+  }
+  $("#resShown").textContent=shown;
+  // ---- lifecycle 수행시간 (느린 순 + 막대) ----
+  if(lcs.length){
+    const rows=lcs.map(l=>({name:l.name,sec:((l.end||Date.now())-l.start)/1000,
+      end:!!l.end,failed:l.status==="failed"})).sort((a,b)=>b.sec-a.sec);
+    const mx=Math.max(...rows.map(r=>r.sec),1);
+    $("#lcBody").innerHTML=rows.map(r=>{
+      const cls=r.sec>=300?"lc-slow":r.sec>=60?"lc-med":"";
+      const nm=r.failed?`<code style="color:#cf222e">${r.name}</code> <span style="color:#cf222e;font-size:11px;font-weight:700">failed</span>`
+                       :`<code>${r.name}</code>${r.end?"":' <span class="run" style="font-size:11px">진행 중</span>'}`;
+      return `<tr class="${cls}"><td>${nm}</td><td class="dur">${fmtDur(r.sec*1000)}</td>
+        <td><div class="lcbar"><i style="width:${Math.max(2,r.sec/mx*100)}%"></i></div></td></tr>`;
+    }).join("");
+    $("#lcTbl").style.display="";
+  }else{ $("#lcTbl").style.display="none"; }
+}
+document.querySelectorAll("#resSeg button").forEach(b=>b.onclick=()=>{
+  RFILTER.mode=b.dataset.s;
+  document.querySelectorAll("#resSeg button").forEach(x=>x.classList.toggle("on",x===b));
+  renderRes(true);
+});
+$("#resSearch").oninput=e=>{RFILTER.q=e.target.value.toLowerCase();renderRes(true);};
+let SELECTED_RUN="";
+let FOLD_CACHE={run:"",res:[],lcs:[]};
+async function renderRes(rerenderOnly){
+  SELECTED_RUN=$("#resRun").value||SELECTED_RUN;
+  if(!SELECTED_RUN||RES_BUSY){ return; }
+  if(rerenderOnly&&FOLD_CACHE.run===String(SELECTED_RUN)){
+    renderTree(FOLD_CACHE.res,FOLD_CACHE.lcs); return;
+  }
+  RES_BUSY=true;
+  try{ const evs=await loadResEvents(SELECTED_RUN);
+       if(!evs.length){ $("#resBody").textContent="이 런에는 자원 이벤트가 없습니다 (read-only/정리 런)"; }
+       else { const {res,lcs}=foldResources(evs);
+              FOLD_CACHE={run:String(SELECTED_RUN),res,lcs};
+              renderTree(res,lcs); }
+  }catch(e){ $("#resBody").textContent="자원 이벤트 조회 실패: "+e.message; }
+  finally{ RES_BUSY=false; }
+}
+window.RUN_FINISH=window.RUN_FINISH||{};   // rid -> finished ms (index.json)
+window.LIVE_RUNS=window.LIVE_RUNS||new Set(); // rids with events but no summary, recent
+function fillRunSelect(ids,idx){
+  // only runs that actually HAVE resource events, newest first, newest default
+  const withRes=[...new Set(RES_KEYS.filter(k=>k.includes("/res/")).map(k=>k.split("/")[1]))]
+    .filter(i=>/^[0-9]+$/.test(String(i)));
+  const sorted=withRes.sort((a,b)=>String(b).localeCompare(String(a),undefined,{numeric:true}));
+  const sel=$("#resRun"); const cur=sel.value;
+  sel.innerHTML=sorted.map(i=>`<option value="${i}">${i}</option>`).join("");
+  sel.value=cur&&sorted.includes(cur)?cur:(sorted[0]||"");
+  // 알약 = 진행 중인 런만 (동시성은 1이 정상 — 시퀀싱 규칙). 과거 런은
+  // 아래 '런 이력' 행 클릭으로 선택한다.
+  const live=[...window.LIVE_RUNS].filter(i=>sorted.includes(String(i)));
+  $("#runPick").innerHTML = live.length
+    ? live.map(i=>`<span class="runpill live${sel.value===String(i)?" on":""}" data-run="${i}"
+        title="run ${i} · 진행 중"><span class="rdot"></span><b>…${String(i).slice(-5)}</b>
+        <span class="run" style="font-size:11px">진행 중</span></span>`).join("")
+    : `<span class="mut" style="font-size:12px">지금 도는 런 없음 — 아래 런 이력에서 행을 클릭하면 그 런의 자원 상태를 봅니다</span>`;
+  document.querySelectorAll("#runPick .runpill").forEach(pl=>pl.onclick=()=>{
+    sel.value=pl.dataset.run; renderRes();
+  });
+}
+async function tick(){
+  $("#bsrc").textContent=base()||"(엔드포인트 미설정)";
+  $("#ep").value=localStorage.getItem("oplog_ep")||"";
+  if(window.SAMPLE){ renderSample(); return; }
+  const idx=await loadHistory();
+  window.DONE_RUNS=new Set(idx.map(s=>String(s.run_id)));
+  try{ RES_KEYS=await xlist("runs/"); }catch(e){ RES_KEYS=[]; }
+  await loadLive(idx);
+  const ids=[...new Set(RES_KEYS.map(k=>k.split("/")[1]))];
+  fillRunSelect(ids,idx); await renderRes();
+}
+// --------------- sample mode (?sample=1) ---------------
+function renderSample(){
+  const d=window.SAMPLE;
+  $("#bsrc").textContent="(샘플 데이터)";
+  $("#hist tbody").innerHTML=d.index.map(fmtRow).join("");
+  $("#liveBody").innerHTML=`<div class="job">run <a>${d.live.run_id}</a> <code>${d.live.sha}</code>
+    <span class="pill run">in flight</span></div>`+d.live.events.map(e=>
+    `<div class="ev"><time>${e.ts.slice(11,19)}</time><span class="pill">${e.job}</span>
+     <b>${e.stage}</b> <span class="${e.status==='success'?'ok':e.status==='failure'?'bad':'run'}">${e.status}</span>
+     <span class="mut">${e.detail||""}</span></div>`).join("");
+  fillRunSelect([d.live.run_id]);
+  const {res,lcs}=foldResources(d.resEvents); renderTree(res,lcs);
+}
+if(new URLSearchParams(location.search).has("sample")){
+  window.SAMPLE=window.SAMPLE_DATA||null;
+}
+tick(); setInterval(tick,30000);
+</script>
+<script>
+// ---- 샘플 데이터 (실제 런 형태를 본뜬 미리보기; ?sample=1 불필요 — 이 파일은 항상 샘플) ----
+(function(){
+  const NOW=Date.now(), M=60000, T=m=>NOW-(95-m)*M;          // 95분짜리 런, 진행 중
+  const TS=m=>new Date(T(m)).toISOString();
+  const ev=(m,action,kind,service,name,res_id,lifecycle,status,parent)=>(
+    {t:T(m),ts:TS(m),action,kind,service,name,res_id,lifecycle,status:status||"",parent:parent||""});
+  window.SAMPLE_DATA={
+    live:{run_id:"27314355676",sha:"3f59837",events:[
+      {ts:TS(0), job:"spec",        stage:"run-start",  status:"running", detail:"event=push mutations=true destructive=true heavy=true"},
+      {ts:TS(1), job:"regression-B",stage:"vpc-crud",   status:"running", detail:"serial pass (hsn last)"},
+      {ts:TS(14),job:"regression-A",stage:"smoke",      status:"success", detail:"1,059 endpoints called"},
+      {ts:TS(48),job:"regression-B",stage:"vpc-crud",   status:"success", detail:"7 passed (peering 2-VPC fix live)"},
+      {ts:TS(15),job:"regression-A",stage:"adopt-crud", status:"running", detail:"-n 6 · shared-dbaas slimmed"},
+    ]},
+    resEvents:[
+      // ev(분, action, kind, service, name, res_id, lifecycle, status, parent)
+      ev(15,"lifecycle-start","","vpc","heavy-shared-dbaas","","heavy-shared-dbaas"),
+      ev(15.2,"created","vpcs","vpc","regrvpc-shared","vpc-a1","heavy-shared-dbaas"),
+      ev(16,"created","subnets","vpc","regrsub-main","sub-s1","heavy-shared-dbaas","","vpc-a1"),
+      ev(16.3,"created","subnets","vpc","regrsub-db","sub-b2","heavy-shared-dbaas","","vpc-a1"),
+      ev(18,"created","clusters","mariadb","regrmaria (DB)","cl-m1","heavy-shared-dbaas","","sub-b2"),
+      ev(18.2,"created","clusters","epas","regrepas (DB)","cl-e1","heavy-shared-dbaas","","sub-b2"),
+      ev(18.4,"created","clusters","cachestore","regrcache (Redis)","cl-c1","heavy-shared-dbaas","","sub-b2"),
+      ev(60,"deleted","clusters","mariadb","","cl-m1","heavy-shared-dbaas"),
+      ev(55,"deleted","clusters","epas","","cl-e1","heavy-shared-dbaas"),
+      ev(52,"deleted","clusters","cachestore","","cl-c1","heavy-shared-dbaas"),
+      ev(62,"deleted","subnets","vpc","","sub-b2","heavy-shared-dbaas"),
+      ev(64,"lifecycle-end","","vpc","heavy-shared-dbaas","","heavy-shared-dbaas","passed"),
+
+      ev(16,"lifecycle-start","","virtualserver","compute-virtualserver-full","","compute-virtualserver-full"),
+      ev(17,"created","keypairs","virtualserver","regrkey","kp-1","compute-virtualserver-full"),
+      ev(17.5,"created","security-groups","security-group","regrsg","sg-1","compute-virtualserver-full"),
+      ev(19,"created","servers","virtualserver","regrsrv (VM)","srv-1","compute-virtualserver-full","","sub-s1"),
+      ev(21,"created","volumes","virtualserver","regrvol-data","vol-1","compute-virtualserver-full","","sub-s1"),
+      ev(23,"created","publicips","vpc","public-ip","pip-1","compute-virtualserver-full"),
+      ev(44,"deleted","publicips","vpc","","pip-1","compute-virtualserver-full"),
+      ev(45,"deleted","volumes","virtualserver","","vol-1","compute-virtualserver-full"),
+      ev(48,"deleted","servers","virtualserver","","srv-1","compute-virtualserver-full"),
+      ev(49,"deleted","security-groups","security-group","","sg-1","compute-virtualserver-full"),
+      ev(49.5,"deleted","keypairs","virtualserver","","kp-1","compute-virtualserver-full"),
+      ev(50,"lifecycle-end","","virtualserver","compute-virtualserver-full","","compute-virtualserver-full","passed"),
+
+      ev(16,"lifecycle-start","","ske","container-ske-cluster-nodepool","","container-ske-cluster-nodepool"),
+      ev(20,"created","clusters","ske","regrske (K8s)","cl-k1","container-ske-cluster-nodepool","","sub-s1"),
+
+      ev(17,"lifecycle-start","","baremetal-blockstorage","blockstorage-volume","","blockstorage-volume"),
+      ev(18,"created","volumes","baremetal-blockstorage","regrbsvol (BM)","bsv-1","blockstorage-volume"),
+      ev(30,"created","snapshots","virtualserver","snapshot for regrvol","snap-1","virtualserver-volume-snapshot","","vol-1"),
+      ev(40,"deleted","snapshots","virtualserver","","snap-1","virtualserver-volume-snapshot"),
+      ev(42,"delete-failed","volumes","baremetal-blockstorage","","bsv-1","blockstorage-volume","409 attached"),
+      ev(43,"lifecycle-end","","baremetal-blockstorage","blockstorage-volume","","blockstorage-volume","failed"),
+
+      ev(2,"lifecycle-start","","vpc","vpc-peering","","vpc-peering"),
+      ev(3,"created","vpcs","vpc","regrvpc-peerA","vpc-p1","vpc-peering"),
+      ev(4,"created","vpcs","vpc","regrvpcb-peerB","vpc-p2","vpc-peering"),
+      ev(6,"created","vpc-peerings","vpc","regrpeer","peer-1","vpc-peering","","vpc-p1"),
+      ev(10,"deleted","vpc-peerings","vpc","","peer-1","vpc-peering"),
+      ev(11,"deleted","vpcs","vpc","","vpc-p2","vpc-peering"),
+      ev(12,"deleted","vpcs","vpc","","vpc-p1","vpc-peering"),
+      ev(12.5,"lifecycle-end","","vpc","vpc-peering","","vpc-peering","passed"),
+    ],
+    index:[
+      {run_id:"27314355676",sha:"3f59837",finished:"",url:"#",history:{crud_ran:true,ok:"",soft:"",fail_new:"",cov_op:"",cov_c3:"",tested:"(진행 중)"}},
+      {run_id:"27306490231",sha:"84df549",finished:"2026-06-10T23:19:21Z",url:"#",history:{crud_ran:true,ok:1098,soft:1217,fail_new:50,cov_op:35.57,cov_c3:37.69,tested:1059}},
+      {run_id:"27258520218",sha:"e3ba190",finished:"2026-06-10T10:36:00Z",url:"#",history:{crud_ran:true,ok:1202,soft:1246,fail_new:52,cov_op:35.35,cov_c3:37.54,tested:1073}},
+    ]};
+  
+  if(new URLSearchParams(location.search).has("sample")){
+    window.SAMPLE=window.SAMPLE_DATA;
+    tick();                       // re-render now (the first tick ran before this block)
+  }
+})();
+</script>
+</body></html>
