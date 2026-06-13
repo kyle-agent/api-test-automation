@@ -1,8 +1,9 @@
-# Re-verify wave4+5 triage fixes (run 27452095757): rmtags set-tags, asg LC
-# vol 104, swatch image 1400x500 + custom-metric ingest tolerant, iam
-# instance-unique policy names, VS password [200,400]. alert+saml disabled.
-# No probe — SCR docker login settled (PF-16, needs console auth key).
+# PG replica dedicated heavy window — first live test of the replica family
+# (gen-heavy-pg-replica, 27 steps): cluster v16 -> replica create -> sync-
+# replica-state -> reset-replica -> promote (irreversible, last) -> teardown
+# (replica deleted before origin). Owner-approved same-region replica flow
+# (2026-06-13). Self-contained (own VPC + 2 PG clusters); ~30-50min billable.
 mutations=true
 destructive=true
 heavy=true
-crud_filter=gen-wave4 or gen-wave5 or gen-heavy-vs
+crud_filter=gen-heavy-pg-replica
