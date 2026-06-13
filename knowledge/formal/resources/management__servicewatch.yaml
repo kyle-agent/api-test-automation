@@ -1,15 +1,23 @@
 # Resource-task model — management/servicewatch (mg-sw group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # servicewatch-loggroup-logstream (enabled, live-validated) +
-# servicewatch-alert/-dashboard/-event-rule (enabled, guarded — UNPROVEN
-# envelopes) by extract.py, curated by hand.
+# servicewatch-alert/-dashboard/-event-rule by extract.py, curated by hand.
+# Wave5 extension (owner directive 2026-06-13, userguide
+# https://docs.e.samsungsdscloud.com/userguide/management/service_watch/):
+# adds the metric-catalog LOOKUP node (un-blocks alert composition), the
+# custom-metric meta+ingest and custom-log collect+ingest nodes, and verify
+# steps for the previously uncovered ops (showalert, setalert,
+# setalertactivated, setalertdescription, setdashboard, showeventrule,
+# listmetricinfos, listmetricdata, downloadmetricdataimage,
+# createcustommetricmetas, createcustommetrics, createcustomlogstream,
+# createcustomlogevents, deletebulkalerts).
 #
 # ALL servicewatch deletes are collection DELETEs with an {ids:[...]} body
 # (services/management__servicewatch.yaml bulk-deletes-take-ids-body) —
-# composer delete-body support is an R3 task. The ingest-only POSTs (custom
-# metrics/meta, metric chart image, custom log-stream collect, OTLP log
-# events) create no addressable resource and are not modeled
-# (servicewatch-custom-ingest stays hand-written).
+# EXCEPT dashboards, whose DashboardBulkDeleteRequest field is dashboard_ids
+# (run 27398084089). The OTLP-shaped ingest POSTs create no NEW addressable
+# resource — they are modeled as create/verify of the resource they belong
+# to (metric meta · custom-collect registration), not as standalone nodes.
 version: 1
 resources:
   log-group:
@@ -47,25 +55,93 @@ resources:
     source: {lifecycle: servicewatch-loggroup-logstream, steps: [create-stream, delete-stream]}
     notes: "부모 log-group 하위 child 자원 — delete path가 부모 capture를 쓴다 (validator의 dotted-prereq-token-in-delete 허용 케이스). teardown 역순: stream 먼저, group 나중. 주의: log-streams LIST GET은 403 'Action definition is not found' (IAM action 미정의 — 제품 결함 후보, run 27394211896) → verify는 per-id GET 사용."
 
-  alert:
-    code: "mg-sw-alert"
+  # read-only LOOKUP node (cm-account-resource / server-type pattern):
+  # listmetricinfos is a POST-shaped list ("Get metric list", POST
+  # /v1/metrics, MetricSearchRequestV1Dot1 — every field optional → {}
+  # returns the full catalog). Response MetricsResponseV1Dot1 →
+  # namespaces[]: MetricNamespaceDtoV1Dot1{id, name, dimensions[]:
+  # {metrics[]: MetricListDtoV1Dot1{id, name, namespace_id, ...}}}.
+  # This is the API-discoverable source of the REAL namespace_id/metric_id
+  # the alert node needs — the earlier COMPOSITION-BLOCKED note ("namespace/
+  # metric 목록 GET이 카탈로그에 없어") missed this POST list. GET-less
+  # create + capture + verify, no delete by design (the validator's
+  # "create without delete" warning is expected here).
+  sw-metric-catalog:
+    code: "mg-sw-metric-catalog"
     service: management/servicewatch
     requires: []
     create:
+      endpoint: "POST /v1/metrics"
+      body: {}
+    capture:
+      namespace_id: "$.namespaces[0].id"
+      namespace_name: "$.namespaces[0].name"
+      metric_id: "$.namespaces[0].dimensions[0].metrics[0].id"
+      metric_name: "$.namespaces[0].dimensions[0].metrics[0].name"
+    verify:
+      # listmetricdata — MetricDataRequestV1Dot1 (docs verbatim): end·
+      # metrics[MetricDetailDtoV1Dot1]·period·start·statistic_type 모두
+      # required; MetricDetailDtoV1Dot1 required는 dimensions·name·
+      # namespace_name. dimensions는 빈 배열로 전송(실 자원 id 미상 —
+      # 빈 결과 200이면 충분, 400이면 error-driven으로 보강).
+      - name: data
+        endpoint: "POST /v1/metrics/data"
+        json:
+          start: 1780272000
+          end: 1780272900
+          period: 300
+          statistic_type: AVG
+          metrics:
+            - {name: "{self.metric_name}",
+               namespace_name: "{self.namespace_name}",
+               dimensions: []}
+        expect_status: [200]
+      # downloadmetricdataimage — MetricDataImageRequestV1Dot1 adds
+      # height(def 500)/width(def 1400)/timezone(def UTC)/title to the same
+      # required core. 200 body is the image binary (no capture).
+      - name: image
+        endpoint: "POST /v1/metrics/data/download/image"
+        json:
+          start: 1780272000
+          end: 1780272900
+          period: 300
+          statistic_type: AVG
+          timezone: "UTC"
+          title: "regr metric chart"
+          height: 400
+          width: 600
+          metrics:
+            - {name: "{self.metric_name}",
+               namespace_name: "{self.namespace_name}",
+               dimensions: []}
+        expect_status: [200]
+    provenance: docs
+    notes: "읽기 전용 LOOKUP 노드 — docs listmetricinfos/MetricsResponseV1Dot1 모델 파생(UNPROVEN, 라이브 미관측). capture는 의도적 fail-fast: 계정에 지표를 내는 자원이 하나도 없으면 $.namespaces[0].dimensions[0].metrics[0]가 비어 capture가 실패한다(cm-account-resource 패턴 — compute 자원을 requires로 끌어오면 HEAVY 체인이 되어 배제). start/end는 고정 epoch(2026-06-01 UTC, 1780272000) — 유저가이드 '지표 15개월(455일) 보존' 기준 2027-08까지 유효, 그 후 재생성 필요. 유저가이드 지표 페이지: Object Storage 차트 내보내기 제약 '지표 개수: 10개 이내'·'조회 기간: 2개월(63일) 이내' — image/data verify는 지표 1개·15분 윈도우로 한계 내."
+
+  alert:
+    code: "mg-sw-alert"
+    service: management/servicewatch
+    requires: [sw-metric-catalog]
+    create:
       endpoint: "POST /v1/alerts"
+      # AlertCreateRequest required (docs verbatim): level, metric_id, name,
+      # namespace_id, operator, period, statistic. Optional kept:
+      # description, evaluation_count, lower/upper_bound (RANGE),
+      # missing_data_option, recipient_ids, tags, violation_count.
+      # dimension/dimensions/individual_items (optional) DROPPED — the old
+      # body carried doc-sample resource uuids there; real ids are
+      # account-specific. If live 400 demands a dimension, wire it from the
+      # lookup ($.namespaces[0].dimensions[0].metrics[0].dimensions[0]
+      # carries real key/value pairs — MetricListDtoV1Dot1.dimensions).
       body:
         description: "regr alert {unique}"
-        dimension: {key: InstanceId, value: "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"}
-        dimensions: []
         evaluation_count: 3
-        individual_items:
-          - {key: VolumeID, value: "45fbde15-cdd2-4891-be31-4a9de75fccda"}
         level: "{opt.level}"
         lower_bound: 80.0
-        metric_id: "d91097ac-0387-4e69-adb2-7b8d453b8db5"
+        metric_id: "{sw-metric-catalog.metric_id}"
         missing_data_option: BREACHING
         name: "regralert{unique}"
-        namespace_id: "d583a229-9766-4eb8-96c4-ec389902ba3d"
+        namespace_id: "{sw-metric-catalog.namespace_id}"
         operator: RANGE
         period: 300
         recipient_ids: []
@@ -76,17 +152,50 @@ resources:
         upper_bound: 90.0
         violation_count: 2
       options:
-        level: {type: enum, values: [HIGH, MEDIUM, LOW], required: true,
+        level: {type: enum, values: [HIGH, MIDDLE, LOW], required: true,
                 default: HIGH, vary: true,
-                note: "알람 등급 — HIGH만 소스에서 전송(2xx 미확인); MEDIUM/LOW 코드값은 docs 추정 UNPROVEN"}
-    capture: {alert_id: "$.alert.id"}
+                note: "알람 등급 — docs AlertCreateRequest enum verbatim 'HIGH, MIDDLE, LOW' (이전 모델의 MEDIUM은 docs와 불일치하던 추정값, MIDDLE로 정정). HIGH만 소스에서 전송(2xx 미관측) — MIDDLE/LOW는 UNPROVEN"}
+    # AlertCreateResponse (docs): {created_at, created_by, id} — id는 FLAT
+    # 최상위. 이전 capture $.alert.id는 docs와 불일치하던 추정(dashboard의
+    # flat-$.id 결함과 같은 패턴, run 27396649009 참조) → $.id로 정정.
+    capture: {alert_id: "$.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/alerts/{alert_id}",
+         expect_status: [200]}
+      # setalert — AlertSetRequest (docs verbatim) required: level,
+      # metric_id, namespace_id, operator, period, statistic (no name/
+      # description/recipient_ids/tags fields vs create). Optional kept
+      # mirrors create; dimension/individual_items dropped likewise.
+      - name: set
+        endpoint: "PATCH /v1/alerts/{alert_id}"
+        json:
+          evaluation_count: 3
+          level: "{opt.level}"
+          lower_bound: 80.0
+          metric_id: "{sw-metric-catalog.metric_id}"
+          missing_data_option: BREACHING
+          namespace_id: "{sw-metric-catalog.namespace_id}"
+          operator: RANGE
+          period: 300
+          statistic: AVG
+          upper_bound: 90.0
+          violation_count: 2
+        expect_status: [200]
+      # setalertactivated — AlertActivatedSetRequest {activated_yn: enum
+      # (N, Y)}. N(비활성) 전송: 유저가이드 경보 페이지 — 비활성 정책은
+      # 평가만 하고 알림을 보내지 않음(probe 발화 방지).
+      - {name: set-activated, endpoint: "PATCH /v1/alerts/{alert_id}/activated",
+         json: {activated_yn: "N"}, expect_status: [200]}
+      # setalertdescription — AlertDescriptionSetRequest {description ≤1000}.
+      - {name: set-description, endpoint: "PATCH /v1/alerts/{alert_id}/description",
+         json: {description: "regr alert {unique} updated"}, expect_status: [200]}
     delete:
       endpoint: "DELETE /v1/alerts"
       json: {ids: ["{alert_id}"]}
       destructive: true
     provenance: docs
     source: {lifecycle: servicewatch-alert, steps: [create-alert, delete-alert]}
-    notes: "body는 api_bodies createalert 기반이지만 metric_id/namespace_id/dimension 값들이 doc 샘플 id. COMPOSITION-BLOCKED: namespace/metric 목록 GET이 카탈로그에 없어 실 id를 API로 발견할 수 없음 — Planning 폼(M5)에서 소유자가 콘솔의 실 id를 옵션으로 입력해야 합성 가능. threshold/RANGE 충돌은 수정됨(run 27395331657)."
+    notes: "wave5: metric_id/namespace_id를 sw-metric-catalog LOOKUP capture로 배선 — doc 샘플 uuid로는 라이브 400이라 createalert가 미검증으로 남아 있었음(COMPOSITION-BLOCKED 해제). recipient_ids는 빈 배열 유지 — 유저가이드 경보 페이지: '로그인 이력이 있는 사용자(이메일, 휴대전화 번호 등록 사용자)만 알림 수신자로 추가할 수 있습니다' → 수신자는 콘솔 지식 없이 안전하게 생략 가능(최대 100명, 선택 입력). 평가 주기는 60의 배수·최대 604,800초(유저가이드) — period 300 적합. Auto-Scaling Group 연동 정책은 ServiceWatch에서 수정/삭제 불가(유저가이드) — 본 노드는 자체 생성분만 다루므로 비해당. threshold/RANGE 충돌은 수정됨(run 27395331657)."
 
   dashboard:
     code: "mg-sw-dashboard"
@@ -119,6 +228,41 @@ resources:
             type: metric
             width: 1
     capture: {dashboard_id: "$.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/dashboards/{dashboard_id}",
+         expect_status: [200]}
+      # setdashboard — PUT, DashboardUpdateRequest {name?, widgets?[WidgetDTO]}
+      # (둘 다 optional). 이름 변경 + 위젯 유지로 전송. 유저가이드 대시보드
+      # 페이지: '서비스 대시보드는 수정할 수 없습니다' — 사용자 생성
+      # 대시보드만 PUT 가능(본 노드 생성분이므로 해당 없음); 이름 규칙
+      # 영문/숫자/특수문자(-, _) 3~40자 → regrdashu{unique} 적합.
+      - name: set
+        endpoint: "PUT /v1/dashboards/{dashboard_id}"
+        json:
+          name: "regrdashu{unique}"
+          widgets:
+            - height: 1
+              order: 1
+              properties:
+                metrics:
+                  - color: "#ff7f0e"
+                    dimensions:
+                      - {key: InstanceId, value: "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"}
+                    display_name: "EC2-Prod-CPU"
+                    individual_items:
+                      - {key: BucketId, value: "b-1234567890abcdef0"}
+                    name: CPUUtilization
+                    namespace_name: "Virtual Server"
+                    period: 300
+                    statistic_type: AVG
+                period: 300
+                stacked: false
+                statistic_type: AVG
+                title: "Virtual Server | CPU Utilization"
+                view: line
+              type: metric
+              width: 1
+        expect_status: [200]
     delete:
       endpoint: "DELETE /v1/dashboards"
       # DashboardBulkDeleteRequest의 필드는 dashboard_ids — 다른 servicewatch
@@ -127,7 +271,7 @@ resources:
       destructive: true
     provenance: docs
     source: {lifecycle: servicewatch-dashboard, steps: [create-dashboard, delete-dashboard]}
-    notes: "body는 api_bodies createdashboard 기반. create 201 라이브 확인(run 27396649009) — 응답은 DashboardDetailResponseV1Dot1, id가 FLAT 최상위($.id; 초기 추정 $.dashboard.id는 오류). 당시 캡처 실패로 dashboard 1건 누수 가능(레지스트리 sweep 대상)."
+    notes: "body는 api_bodies createdashboard 기반. create 201 라이브 확인(run 27396649009) — 응답은 DashboardDetailResponseV1Dot1, id가 FLAT 최상위($.id; 초기 추정 $.dashboard.id는 오류). 당시 캡처 실패로 dashboard 1건 누수 가능(레지스트리 sweep 대상). wave5: verify read+set 추가 — setdashboard(PUT)가 마지막 미검증 dashboard op. 위젯의 doc 샘플 dimension uuid는 create 201 라이브 증거상 검증 없이 수용됨 → PUT에도 그대로 사용."
 
   event-rule:
     code: "mg-sw-event-rule"
@@ -147,10 +291,134 @@ resources:
         srn_list: []
         tags: []
     capture: {event_rule_id: "$.event_rule.id"}
+    verify:
+      # showeventrule — 201 create와 같은 EventRuleShowResponse 스키마
+      # ($.event_rule envelope). createeventrule/seteventrule/
+      # deleteeventrules가 라이브 검증된 상태에서 유일하게 미실행으로 남은
+      # event-rule op.
+      - {name: read, endpoint: "GET /v1/event-rules/{event_rule_id}",
+         expect_status: [200]}
     delete:
       endpoint: "DELETE /v1/event-rules"
       json: {ids: ["{event_rule_id}"]}
       destructive: true
+    provenance: VALIDATED
+    source: {lifecycle: servicewatch-event-rule, steps: [create-event-rule, delete-event-rule],
+             verified: "dashboard-data verified_endpoints (2026-06): createeventrule·seteventrule·deleteeventrules 2xx"}
+    notes: "COMPOSITION-BLOCKED 해제 — createeventrule이 이 body 그대로 라이브 2xx(verified_endpoints)이고 후속 seteventrule/deleteeventrules까지 검증됨 ⇒ event_ids/resource_type_id/service_id의 doc 샘플 id는 계정 종속이 아니라 플랫폼 전역 이벤트 카탈로그 값. 유저가이드 이벤트 페이지의 생성 입력(이벤트 소스=서비스, 이벤트 유형=자원 유형, '모든 이벤트' 또는 개별 이벤트 선택)과 대응. recipient_ids는 빈 배열 유지 — 수신자는 '로그인 이력이 있는 사용자'만 가능(유저가이드, 경보와 동일 제약, 최대 100명). 규칙 한도 계정/리전당 300개(유저가이드 overview)."
+
+  # custom metric meta — the addressable half of the custom-metrics pair:
+  # the meta DEFINES the metric (namespace + metricName + unit + dimension
+  # keys); the OTLP data POST then feeds it. No delete API exists for custom
+  # metric meta → fixed names (no {unique}) so reruns reuse one metric
+  # instead of accumulating billable definitions ("Custom Metrics/Logs:
+  # 10 free monthly" — userguide overview). Validator's create-without-
+  # delete warning is expected.
+  sw-custom-metric-meta:
+    code: "mg-sw-custom-metric-meta"
+    service: management/servicewatch
+    requires: []
+    create:
+      # createcustommetricmetas — MetricCustomMetaRequest (docs verbatim):
+      # metricMetas[MetricMetaDto{descriptionEn, descriptionKo, dimensions
+      # [[key]], metricName, storageResolution?, unit}], namespace.
+      # 200 MetricCustomMetaResponse{account_id, max_data_points?,
+      # unit_logs[]} — no id (meta는 namespace+metricName으로 주소화).
+      endpoint: "POST /v1/metrics/custom/meta"
+      body:
+        metricMetas:
+          - descriptionEn: "regression custom metric probe"
+            descriptionKo: "회귀 커스텀 지표 프로브"
+            dimensions: [["resource_id"]]
+            metricName: "Custom_regr_probe_count"
+            storageResolution: 60
+            unit: "Count"
+        namespace: "MyCustom/regr"
+    verify:
+      # createcustommetrics — OTLP-shaped MetricCustomRequest; endpoint doc:
+      # "The request body of this API can receive data in either camelCase
+      # or snake_case." metric type 제약(docs OtlpScopeMetricDto): "The
+      # metric type can only be gauge or sum, and you must send exactly one
+      # value." → gauge + as_int 단일값. 202 Accepted, 응답 body 없음.
+      - name: ingest
+        endpoint: "POST /v1/metrics/custom"
+        json:
+          resource_metrics:
+            - resource:
+                attributes:
+                  - {key: "namespace", value: {string_value: "MyCustom/regr"}}
+              scope_metrics:
+                - scope: {name: "ServiceWatch-Agent", version: "1.0.0"}
+                  metrics:
+                    - name: "Custom_regr_probe_count"
+                      description: "regression custom metric probe"
+                      unit: "Count"
+                      gauge:
+                        data_points:
+                          - as_int: 1
+                            attributes:
+                              - {key: "resource_id", value: {string_value: "regr-probe"}}
+                            time_unix_nano: 1780272000000000000
+        expect_status: [202]
+      # listmetricdata readback — 정의/적재한 커스텀 지표를 조회 윈도가
+      # ingest 시각(1780272000e9 ns = 2026-06-01T00:00Z)을 덮도록 질의.
+      # 적재가 비동기(202)라 빈 결과 200도 통과로 간주.
+      - name: data-readback
+        endpoint: "POST /v1/metrics/data"
+        json:
+          start: 1780271700
+          end: 1780272900
+          period: 300
+          statistic_type: AVG
+          metrics:
+            - {name: "Custom_regr_probe_count", namespace_name: "MyCustom/regr",
+               dimensions: []}
+        expect_status: [200]
     provenance: docs
-    source: {lifecycle: servicewatch-event-rule, steps: [create-event-rule, delete-event-rule]}
-    notes: "event_ids/resource_type_id/service_id가 doc 샘플 id. COMPOSITION-BLOCKED: event/service/resource-type 목록 GET이 카탈로그에 없어 실 id를 API로 발견할 수 없음 — Planning 폼(M5)에서 소유자가 콘솔의 실 id를 입력해야 합성 가능."
+    notes: "docs 모델 verbatim(UNPROVEN, 라이브 미관측). unit 표기는 docs가 자기모순 — MetricMetaDto 허용 목록은 대문자(SECONDS…COUNT, NONE)인데 예시는 'Bytes' → 예시 표기('Count')를 따르고 400이면 'COUNT'로 정정(error-driven). resource.attributes의 key 'namespace'는 추정 — doc 예시는 key가 빈 문자열인 placeholder뿐(routing 단서 없음); 400/유실 시 후보는 meta의 namespace 문자열 매칭. time_unix_nano는 고정값(2026-06-01) — 오래된 타임스탬프 거부 정책이 있으면 적재가 무시될 수 있으나 202 수신 자체가 커버리지 목적엔 충분. 메트릭명/네임스페이스 고정 재사용: 커스텀 지표는 삭제 API가 없고 월 10개 초과분 과금."
+
+  # custom log collect registration — createcustomlogstream registers an
+  # EXISTING log-group/log-stream pair (by NAME) for custom (OTLP) log
+  # ingestion and returns the routing values the log-events POST needs.
+  # No delete API — the registration goes away with the stream/group
+  # teardown (validator's create-without-delete warning is expected).
+  sw-custom-log-collect:
+    code: "mg-sw-custom-log-collect"
+    service: management/servicewatch
+    requires: [log-stream]
+    create:
+      # LogGroupsLogStreamsCollectCustomRequest (docs verbatim):
+      # {log_group_name, log_stream_name} — id가 아니라 이름. 이름 결합:
+      # log-group/log-stream 노드의 create body 이름 템플릿(regrlg{unique}/
+      # regrls{unique})과 반드시 일치해야 한다 — 그쪽을 바꾸면 여기도.
+      endpoint: "POST /v1/log-groups/log-streams/collect/custom"
+      body: {log_group_name: "regrlg{unique}", log_stream_name: "regrls{unique}"}
+    # LogGroupsLogStreamsCollectCustomResponse (docs): account_id,
+    # log_group_value, log_stream_value, requests_per_second — value들이
+    # OTLP log-events의 resource.attributes 라우팅 키.
+    capture:
+      log_group_value: "$.log_group_value"
+      log_stream_value: "$.log_stream_value"
+      account_id: "$.account_id"
+    verify:
+      # createcustomlogevents — OTLP CustomLogEventsCreateRequest (docs
+      # verbatim): resourceLogs[{resource.attributes: log_stream_value/
+      # log_group_value/account_id (LogValueDTO.stringValue), scopeLogs:
+      # [{logRecords: [{body.stringValue, timeUnixNano}]}]}]. 202 Accepted,
+      # LogEventsCreateResponse{status}.
+      - name: ingest-events
+        endpoint: "POST /v1/log-groups/log-streams/log-events"
+        json:
+          resourceLogs:
+            - resource:
+                attributes:
+                  - {key: "log_stream_value", value: {stringValue: "{self.log_stream_value}"}}
+                  - {key: "log_group_value", value: {stringValue: "{self.log_group_value}"}}
+                  - {key: "account_id", value: {stringValue: "{self.account_id}"}}
+              scopeLogs:
+                - logRecords:
+                    - body: {stringValue: "level=info regr otlp test log"}
+                      timeUnixNano: 1780272000000000000
+        expect_status: [202]
+    provenance: docs
+    notes: "docs 모델 verbatim(UNPROVEN, 라이브 미관측). 로그 이벤트 최대 1MB(유저가이드 overview) — probe는 한 줄. timeUnixNano는 고정값(2026-06-01); 모델 타입은 integer인데 doc 예시는 문자열 — integer로 전송, 400이면 문자열로 정정(error-driven). 유저가이드 로그 페이지의 위계(로그 그룹 → '로그 스트림을 생성할 로그 그룹명을 클릭하세요' → 스트림) 그대로 log-stream을 선행 — collect 등록은 기존 그룹/스트림 이름을 참조하므로 생성 후에만 유효."

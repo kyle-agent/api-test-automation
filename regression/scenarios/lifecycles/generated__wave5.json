@@ -1,0 +1,731 @@
+{
+  "_comment": "Composed wave 5 — owner directive 2026-06-13: close the remaining management/servicewatch coverage. The metric-catalog lookup (POST /v1/metrics) discovers real namespace_id/metric_id and un-blocks the alert chain; event-rule was un-blocked by live evidence (createeventrule/seteventrule/deleteeventrules verified with doc-sample global catalog ids). Custom metric/log ingestion are modeled as verify steps of their defining resource (no delete APIs exist).",
+  "lifecycles": [
+    {
+      "id": "gen-wave5-swatch-metric",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: sw-metric-catalog — wave5 (owner 2026-06-13): metric catalog lookup + listmetricdata + downloadmetricdataimage; model notes in knowledge/formal/resources/management__servicewatch.yaml",
+      "steps": [
+        {
+          "name": "create-sw-metric-catalog",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "namespace_id": "$.namespaces[0].id",
+            "namespace_name": "$.namespaces[0].name",
+            "metric_id": "$.namespaces[0].dimensions[0].metrics[0].id",
+            "metric_name": "$.namespaces[0].dimensions[0].metrics[0].name"
+          }
+        },
+        {
+          "name": "verify-sw-metric-catalog-data",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics/data",
+          "json": {
+            "start": 1780272000,
+            "end": 1780272900,
+            "period": 300,
+            "statistic_type": "AVG",
+            "metrics": [
+              {
+                "name": "{metric_name}",
+                "namespace_name": "{namespace_name}",
+                "dimensions": []
+              }
+            ]
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-sw-metric-catalog-image",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics/data/download/image",
+          "json": {
+            "start": 1780272000,
+            "end": 1780272900,
+            "period": 300,
+            "statistic_type": "AVG",
+            "timezone": "UTC",
+            "title": "regr metric chart",
+            "height": 400,
+            "width": 600,
+            "metrics": [
+              {
+                "name": "{metric_name}",
+                "namespace_name": "{namespace_name}",
+                "dimensions": []
+              }
+            ]
+          },
+          "expect_status": [
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen-wave5-swatch-alert",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: alert — wave5 (owner 2026-06-13): alert policy lifecycle with ids discovered via sw-metric-catalog (createalert/showalert/setalert/setalertactivated/setalertdescription/deletebulkalerts); model notes in knowledge/formal/resources/management__servicewatch.yaml",
+      "steps": [
+        {
+          "name": "create-sw-metric-catalog",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "namespace_id": "$.namespaces[0].id",
+            "namespace_name": "$.namespaces[0].name",
+            "metric_id": "$.namespaces[0].dimensions[0].metrics[0].id",
+            "metric_name": "$.namespaces[0].dimensions[0].metrics[0].name"
+          }
+        },
+        {
+          "name": "create-alert",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/alerts",
+          "json": {
+            "description": "regr alert {unique}",
+            "evaluation_count": 3,
+            "level": "HIGH",
+            "lower_bound": 80.0,
+            "metric_id": "{metric_id}",
+            "missing_data_option": "BREACHING",
+            "name": "regralert{unique}",
+            "namespace_id": "{namespace_id}",
+            "operator": "RANGE",
+            "period": 300,
+            "recipient_ids": [],
+            "statistic": "AVG",
+            "tags": [],
+            "upper_bound": 90.0,
+            "violation_count": 2
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "alert_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/alerts",
+            "json": {
+              "ids": [
+                "{alert_id}"
+              ]
+            },
+            "service": "servicewatch"
+          }
+        },
+        {
+          "name": "verify-alert-read",
+          "service": "servicewatch",
+          "method": "GET",
+          "path": "/v1/alerts/{alert_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-alert-set",
+          "service": "servicewatch",
+          "method": "PATCH",
+          "path": "/v1/alerts/{alert_id}",
+          "json": {
+            "evaluation_count": 3,
+            "level": "HIGH",
+            "lower_bound": 80.0,
+            "metric_id": "{metric_id}",
+            "missing_data_option": "BREACHING",
+            "namespace_id": "{namespace_id}",
+            "operator": "RANGE",
+            "period": 300,
+            "statistic": "AVG",
+            "upper_bound": 90.0,
+            "violation_count": 2
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-alert-set-activated",
+          "service": "servicewatch",
+          "method": "PATCH",
+          "path": "/v1/alerts/{alert_id}/activated",
+          "json": {
+            "activated_yn": "N"
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-alert-set-description",
+          "service": "servicewatch",
+          "method": "PATCH",
+          "path": "/v1/alerts/{alert_id}/description",
+          "json": {
+            "description": "regr alert {unique} updated"
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-alert",
+          "service": "servicewatch",
+          "method": "DELETE",
+          "path": "/v1/alerts",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "json": {
+            "ids": [
+              "{alert_id}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "gen-wave5-swatch-dashboard",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: dashboard — wave5 (owner 2026-06-13): dashboard create/read/PUT-update/bulk-delete — closes setdashboard; model notes in knowledge/formal/resources/management__servicewatch.yaml",
+      "steps": [
+        {
+          "name": "create-dashboard",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/dashboards",
+          "json": {
+            "name": "regrdash{unique}",
+            "widgets": [
+              {
+                "height": 1,
+                "order": 1,
+                "properties": {
+                  "metrics": [
+                    {
+                      "color": "#ff7f0e",
+                      "dimensions": [
+                        {
+                          "key": "InstanceId",
+                          "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+                        }
+                      ],
+                      "display_name": "EC2-Prod-CPU",
+                      "individual_items": [
+                        {
+                          "key": "BucketId",
+                          "value": "b-1234567890abcdef0"
+                        }
+                      ],
+                      "name": "CPUUtilization",
+                      "namespace_name": "Virtual Server",
+                      "period": 300,
+                      "statistic_type": "AVG"
+                    }
+                  ],
+                  "period": 300,
+                  "stacked": false,
+                  "statistic_type": "AVG",
+                  "title": "Virtual Server | CPU Utilization",
+                  "view": "line"
+                },
+                "type": "metric",
+                "width": 1
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "dashboard_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/dashboards",
+            "json": {
+              "dashboard_ids": [
+                "{dashboard_id}"
+              ]
+            },
+            "service": "servicewatch"
+          }
+        },
+        {
+          "name": "verify-dashboard-read",
+          "service": "servicewatch",
+          "method": "GET",
+          "path": "/v1/dashboards/{dashboard_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-dashboard-set",
+          "service": "servicewatch",
+          "method": "PUT",
+          "path": "/v1/dashboards/{dashboard_id}",
+          "json": {
+            "name": "regrdashu{unique}",
+            "widgets": [
+              {
+                "height": 1,
+                "order": 1,
+                "properties": {
+                  "metrics": [
+                    {
+                      "color": "#ff7f0e",
+                      "dimensions": [
+                        {
+                          "key": "InstanceId",
+                          "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
+                        }
+                      ],
+                      "display_name": "EC2-Prod-CPU",
+                      "individual_items": [
+                        {
+                          "key": "BucketId",
+                          "value": "b-1234567890abcdef0"
+                        }
+                      ],
+                      "name": "CPUUtilization",
+                      "namespace_name": "Virtual Server",
+                      "period": 300,
+                      "statistic_type": "AVG"
+                    }
+                  ],
+                  "period": 300,
+                  "stacked": false,
+                  "statistic_type": "AVG",
+                  "title": "Virtual Server | CPU Utilization",
+                  "view": "line"
+                },
+                "type": "metric",
+                "width": 1
+              }
+            ]
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-dashboard",
+          "service": "servicewatch",
+          "method": "DELETE",
+          "path": "/v1/dashboards",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "json": {
+            "dashboard_ids": [
+              "{dashboard_id}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "gen-wave5-swatch-event-rule",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: event-rule — wave5 (owner 2026-06-13): event rule create/read/bulk-delete — closes showeventrule (create/set/delete already live-verified with these global catalog ids); model notes in knowledge/formal/resources/management__servicewatch.yaml",
+      "steps": [
+        {
+          "name": "create-event-rule",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/event-rules",
+          "json": {
+            "description": "regr event rule {unique}",
+            "event_ids": [
+              "014cb88ca2a9420e840d5c9ac16cac89",
+              "28520cbbc8c54a3f86f513a9695e6481"
+            ],
+            "name": "regrevtrule{unique}",
+            "recipient_ids": [],
+            "resource_type_id": "596bf16709e84e27b7df397bf59b877c",
+            "service_id": "2778de83d7e247609445bbd570a4eba9",
+            "srn_list": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "event_rule_id": "$.event_rule.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/event-rules",
+            "json": {
+              "ids": [
+                "{event_rule_id}"
+              ]
+            },
+            "service": "servicewatch"
+          }
+        },
+        {
+          "name": "verify-event-rule-read",
+          "service": "servicewatch",
+          "method": "GET",
+          "path": "/v1/event-rules/{event_rule_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-event-rule",
+          "service": "servicewatch",
+          "method": "DELETE",
+          "path": "/v1/event-rules",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "json": {
+            "ids": [
+              "{event_rule_id}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "gen-wave5-swatch-custom-metric",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: sw-custom-metric-meta — wave5 (owner 2026-06-13): custom metric meta + OTLP ingest + data readback (createcustommetricmetas/createcustommetrics; fixed names — custom metrics have no delete API and bill past 10/month); model notes in knowledge/formal/resources/management__servicewatch.yaml",
+      "steps": [
+        {
+          "name": "create-sw-custom-metric-meta",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics/custom/meta",
+          "json": {
+            "metricMetas": [
+              {
+                "descriptionEn": "regression custom metric probe",
+                "descriptionKo": "회귀 커스텀 지표 프로브",
+                "dimensions": [
+                  [
+                    "resource_id"
+                  ]
+                ],
+                "metricName": "Custom_regr_probe_count",
+                "storageResolution": 60,
+                "unit": "Count"
+              }
+            ],
+            "namespace": "MyCustom/regr"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "verify-sw-custom-metric-meta-ingest",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics/custom",
+          "json": {
+            "resource_metrics": [
+              {
+                "resource": {
+                  "attributes": [
+                    {
+                      "key": "namespace",
+                      "value": {
+                        "string_value": "MyCustom/regr"
+                      }
+                    }
+                  ]
+                },
+                "scope_metrics": [
+                  {
+                    "scope": {
+                      "name": "ServiceWatch-Agent",
+                      "version": "1.0.0"
+                    },
+                    "metrics": [
+                      {
+                        "name": "Custom_regr_probe_count",
+                        "description": "regression custom metric probe",
+                        "unit": "Count",
+                        "gauge": {
+                          "data_points": [
+                            {
+                              "as_int": 1,
+                              "attributes": [
+                                {
+                                  "key": "resource_id",
+                                  "value": {
+                                    "string_value": "regr-probe"
+                                  }
+                                }
+                              ],
+                              "time_unix_nano": 1780272000000000000
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            202
+          ]
+        },
+        {
+          "name": "verify-sw-custom-metric-meta-data-readback",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/metrics/data",
+          "json": {
+            "start": 1780271700,
+            "end": 1780272900,
+            "period": 300,
+            "statistic_type": "AVG",
+            "metrics": [
+              {
+                "name": "Custom_regr_probe_count",
+                "namespace_name": "MyCustom/regr",
+                "dimensions": []
+              }
+            ]
+          },
+          "expect_status": [
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen-wave5-swatch-custom-log",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: sw-custom-log-collect — wave5 (owner 2026-06-13): log-group -> log-stream -> custom collect registration -> OTLP log events (createcustomlogstream/createcustomlogevents); model notes in knowledge/formal/resources/management__servicewatch.yaml",
+      "steps": [
+        {
+          "name": "create-log-group",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/log-groups",
+          "json": {
+            "name": "regrlg{unique}",
+            "retention_period": 365,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "log_group_id": "$.log_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/log-groups",
+            "json": {
+              "ids": [
+                "{log_group_id}"
+              ]
+            },
+            "service": "servicewatch"
+          }
+        },
+        {
+          "name": "create-log-stream",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/log-groups/{log_group_id}/log-streams",
+          "json": {
+            "name": "regrls{unique}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "log_stream_id": "$.log_stream.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/log-groups/{log_group_id}/log-streams",
+            "json": {
+              "ids": [
+                "{log_stream_id}"
+              ]
+            },
+            "service": "servicewatch"
+          }
+        },
+        {
+          "name": "create-sw-custom-log-collect",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/log-groups/log-streams/collect/custom",
+          "json": {
+            "log_group_name": "regrlg{unique}",
+            "log_stream_name": "regrls{unique}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "log_group_value": "$.log_group_value",
+            "log_stream_value": "$.log_stream_value",
+            "account_id": "$.account_id"
+          }
+        },
+        {
+          "name": "verify-sw-custom-log-collect-ingest-events",
+          "service": "servicewatch",
+          "method": "POST",
+          "path": "/v1/log-groups/log-streams/log-events",
+          "json": {
+            "resourceLogs": [
+              {
+                "resource": {
+                  "attributes": [
+                    {
+                      "key": "log_stream_value",
+                      "value": {
+                        "stringValue": "{log_stream_value}"
+                      }
+                    },
+                    {
+                      "key": "log_group_value",
+                      "value": {
+                        "stringValue": "{log_group_value}"
+                      }
+                    },
+                    {
+                      "key": "account_id",
+                      "value": {
+                        "stringValue": "{account_id}"
+                      }
+                    }
+                  ]
+                },
+                "scopeLogs": [
+                  {
+                    "logRecords": [
+                      {
+                        "body": {
+                          "stringValue": "level=info regr otlp test log"
+                        },
+                        "timeUnixNano": 1780272000000000000
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            202
+          ]
+        },
+        {
+          "name": "delete-log-stream",
+          "service": "servicewatch",
+          "method": "DELETE",
+          "path": "/v1/log-groups/{log_group_id}/log-streams",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "json": {
+            "ids": [
+              "{log_stream_id}"
+            ]
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-log-group",
+          "service": "servicewatch",
+          "method": "DELETE",
+          "path": "/v1/log-groups",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "json": {
+            "ids": [
+              "{log_group_id}"
+            ]
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ]
+    }
+  ]
+}
