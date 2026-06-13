@@ -1,7 +1,6 @@
-# PG replica re-run (rev 2) — setsecuritygrouprules body fixed (non-empty
-# add_ip_addresses); the cluster spine already proved live (run 27468351624).
-# This run should finally exercise the replica family: create -> sync-
-# replica-state -> reset-replica -> promote -> teardown (replica before origin).
+# PG replica rev3 — replica create now retries 400 InvalidServiceState while
+# the cluster settles after RUNNING (rev2 proved cluster+sg-rules; this should
+# finally land create -> sync-replica-state -> reset-replica -> promote).
 mutations=true
 destructive=true
 heavy=true
