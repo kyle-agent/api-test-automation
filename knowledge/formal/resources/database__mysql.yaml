@@ -144,24 +144,28 @@ resources:
       # (생성 직후 archive 미존재 가능).
       - {name: showarchiveconfig,
          endpoint: "GET /v1/clusters/{cluster_id}/archive",
-         expect_status: [200, 404]}
+         expect_status: [200, 404],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # setarchiveconfig — ArchiveConfigSetRequest {archive_enabled REQ bool,
       # retention_period_day opt int default 1} (api_docs verbatim). body는
       # subops-guarded set-archive probe 초안 verbatim (mariadb/epas와 공유).
       - {name: setarchiveconfig,
          endpoint: "PUT /v1/clusters/{cluster_id}/archive",
          json: {archive_enabled: true, retention_period_day: 1},
-         expect_status: [200, 202]}
+         expect_status: [200, 202],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # syncarchiveconfig — body 없음, 202 AsyncResponse. 409는 '적용할 변경
       # 없음' 관용 (PG sync-parameters 관용 idiom 승계).
       - {name: syncarchiveconfig,
          endpoint: "POST /v1/clusters/{cluster_id}/archive/sync",
-         expect_status: [200, 202, 409]}
+         expect_status: [200, 202, 409],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # syncclusterstate — 소스 sync-cluster-state expect [200,201,202,409]
       # verbatim (409 관용 라이브 idiom). setter 뒤 상태 재동기화로 마지막.
       - {name: syncclusterstate,
          endpoint: "POST /v1/clusters/{cluster_id}/sync-state",
-         expect_status: [200, 201, 202, 409]}
+         expect_status: [200, 201, 202, 409],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: database-mysql-cluster,

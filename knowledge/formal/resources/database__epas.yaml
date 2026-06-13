@@ -129,7 +129,7 @@ resources:
       - {name: read-after-sg, endpoint: "GET /v1/clusters/{cluster_id}",
          expect_status: [200]}
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # epas first live 2xx + replica family — run 27478985079 (gen-heavy-epas-replica PASSED)
     source: {lifecycle: heavy-shared-dbaas,
              steps: [epas-create, epas-wait, epas-delete]}
     notes: "HEAVY 과금. body는 PG형 relational 템플릿 (database_encoding/locale, audit_enabled boolean, service_watch_log_collection 없음, instances에 service_ip_address 없음) — heavy-shared-dbaas verbatim이지만 epas 레그 자체의 2xx 기록이 없어 docs (같은 run에 포함됐으나 optional group이라 성공이 기록으로 안 남음 — R3 scoped run에서 승격). ** gen-heavy-epas-replica가 우선 체인: 이 노드의 첫 라이브 증명 기회 — 성공 시 provenance 승격 + cross-service epas-cluster 승격 트리거. capture 변수는 소스 epas_cid → cluster_id 개명. 주의: epas/mariadb guarded sub-op는 placeholder cluster_id에 500을 던진다(cachestore는 400 soft — HANDOFF-fail-new-triage §B 비대칭). dbaas_parameter_group_id는 cluster detail DTO에 없음 — epas-parameter-group lookup에서만 발견 가능. requires는 body 소비 기준 subnet + lookup 2종 (cross-service 발산 경고 의도)."
@@ -327,7 +327,7 @@ resources:
              destructive: true,
              retry_on_status: [400, 401, 409, 500, 503],
              retries: 20, retry_interval: 60}
-    provenance: docs
+    provenance: VALIDATED  # epas first live 2xx + replica family — run 27478985079 (gen-heavy-epas-replica PASSED)
     source: {lifecycle: epas-cluster-subops-guarded, steps: [create-replica]}
     notes: "HEAVY — 두 번째 과금 클러스터. ReplicasCreateRequest verbatim (api_docs — PG와 동일 DTO). instances에 service_ip_address 없음 = epas 본체 instance 형 미러. 응답 AsyncResponse $.resource.id = replica cluster id. PG userguide 확정 준용: 동일 리전·동일 subnet, DB당 최대 5개, storage 유형 원본 강제. create 409 재시도는 직전 async 쓰기 reconcile 경합 대비. delete 재시도 스택은 PG verbatim 승계 (401 quirk family)."
 
@@ -348,7 +348,7 @@ resources:
       - {name: replicas-list,
          endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}/replicas",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # epas first live 2xx + replica family — run 27478985079 (gen-heavy-epas-replica PASSED)
     source: {lifecycle: epas-cluster-subops-guarded,
              steps: [sync-replica-state]}
     notes: "path param은 ORIGIN cluster id (api_docs). body 없음, 202 AsyncResponse. listreplicas verify로 replica_state 노출 확인 (PG와 동일 DTO)."
@@ -384,7 +384,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{epas-replica.replica_cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # epas first live 2xx + replica family — run 27478985079 (gen-heavy-epas-replica PASSED)
     source: {lifecycle: epas-cluster-subops-guarded, steps: [reset-replica]}
     notes: "Replica 재구성 — path param replica_cluster_id = REPLICA role 클러스터 (api_docs). 전체 재복제라 ready 1800s. body 없음, 202."
 
@@ -402,7 +402,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{epas-replica.replica_cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
-    provenance: docs
+    provenance: VALIDATED  # epas first live 2xx + replica family — run 27478985079 (gen-heavy-epas-replica PASSED)
     source: {lifecycle: epas-cluster-subops-guarded, steps: [promote-replica]}
     notes: "IRREVERSIBLE — 승격 시 기존 Master와 동기화 중단 (PG userguide 준용). requires로 reset-replica 이후 '마지막' 보장; teardown은 replica delete가 origin delete보다 먼저."
 

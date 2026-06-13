@@ -138,17 +138,20 @@ resources:
       # showarchiveconfig — 404 관용은 mysql verify-backup-config verbatim.
       - {name: showarchiveconfig,
          endpoint: "GET /v1/clusters/{cluster_id}/archive",
-         expect_status: [200, 404]}
+         expect_status: [200, 404],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # setarchiveconfig — ArchiveConfigSetRequest {archive_enabled REQ bool,
       # retention_period_day opt default 1} (api_docs verbatim). body는
       # subops-guarded set-archive probe 초안 verbatim.
       - {name: setarchiveconfig,
          endpoint: "PUT /v1/clusters/{cluster_id}/archive",
          json: {archive_enabled: true, retention_period_day: 1},
-         expect_status: [200, 202]}
+         expect_status: [200, 202],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       - {name: syncarchiveconfig,
          endpoint: "POST /v1/clusters/{cluster_id}/archive/sync",
-         expect_status: [200, 202, 409]}
+         expect_status: [200, 202, 409],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # setbackup — BackupSettingRequest 3필드 전부 REQUIRED (api_docs
       # verbatim: archive_frequency_minute ^(5|10|30|60)$, retention 7-35,
       # hour 0-23). body는 mysql 수작업 set-backup verbatim 이전.
@@ -156,14 +159,16 @@ resources:
          endpoint: "POST /v1/clusters/{cluster_id}/backups",
          json: {archive_frequency_minute: "30", retention_period_day: "8",
                 starting_time_hour: "3"},
-         expect_status: [200, 202]}
+         expect_status: [200, 202],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # setauditlog — AuditLogRequest {use_audit_log REQ bool} (api_docs
       # verbatim; mariadb/epas/pg에만 있는 op — mysql 카탈로그에 없음).
       # 생성 body audit_enabled:false에서 켜는 실변경 — 1회용 클러스터 허용.
       - {name: setauditlog,
          endpoint: "PUT /v1/clusters/{cluster_id}/audit-log",
          json: {use_audit_log: true},
-         expect_status: [200, 202]}
+         expect_status: [200, 202],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # setmaintenance — MaintenanceRequest 4필드 전부 REQUIRED (api_docs
       # verbatim). body는 mysql 수작업 set-maintenance 라이브-2xx verbatim
       # 이전 (run 27258520218 non-optional 통과).
@@ -171,17 +176,20 @@ resources:
          endpoint: "POST /v1/clusters/{cluster_id}/maintenance",
          json: {start_day_of_week: SUN, start_minute: "00",
                 start_time: "03", term_hour: "4"},
-         expect_status: [200, 202]}
+         expect_status: [200, 202],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # unsetmaintenance — body 없음 (mysql 수작업 unset-maintenance expect
       # verbatim). set 직후 해제: 1회용 클러스터라 윈도우 부재 무해.
       - {name: unsetmaintenance,
          endpoint: "DELETE /v1/clusters/{cluster_id}/maintenance",
-         expect_status: [200, 202, 204]}
+         expect_status: [200, 202, 204],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # syncclusterstate — mysql 수작업 sync-cluster-state expect verbatim
       # (409 = 변경 없음 관용). setter들 뒤 상태 재동기화로 마지막.
       - {name: syncclusterstate,
          endpoint: "POST /v1/clusters/{cluster_id}/sync-state",
-         expect_status: [200, 201, 202, 409]}
+         expect_status: [200, 201, 202, 409],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: heavy-shared-dbaas,

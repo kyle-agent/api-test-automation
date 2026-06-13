@@ -865,6 +865,13 @@ def compose(targets: list, choices: dict | None = None,
                     if v.get("headers") is not None:
                         vstep["headers"] = ctx.sub(inst, v["headers"])
                     vstep["expect_status"] = v.get("expect_status") or [200]
+                    # verify entries may carry retry semantics (e.g. DBaaS
+                    # state-sensitive ops that 400 'not in RUNNING' while the
+                    # cluster reconciles after a prior setter) — passthrough.
+                    if v.get("retry_on_status"):
+                        vstep["retry_on_status"] = list(v["retry_on_status"])
+                        vstep["retries"] = int(v.get("retries", 8))
+                        vstep["retry_interval"] = int(v.get("retry_interval", 30))
                     if len(target_set) > 1:
                         vstep["group"] = node
                     if task.get("capture_soft"):
