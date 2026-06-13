@@ -348,10 +348,11 @@
             "tags": []
           },
           "retry_on_status": [
+            400,
             409
           ],
-          "retries": 8,
-          "retry_interval": 30,
+          "retries": 12,
+          "retry_interval": 60,
           "expect_status": [
             200,
             201,

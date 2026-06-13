@@ -354,9 +354,9 @@ resources:
     requires: [mariadb-cluster]
     create:
       endpoint: "POST /v1/clusters/{mariadb-cluster.cluster_id}/stop"
-      retry_on_status: [409]
-      retries: 8
-      retry_interval: 30
+      retry_on_status: [400, 409]
+      retries: 12
+      retry_interval: 60
     ready: {endpoint: "GET /v1/clusters/{mariadb-cluster.cluster_id}",
             field: "$.service_state", until: [STOPPED],
             timeout: 1800, interval: 30}
