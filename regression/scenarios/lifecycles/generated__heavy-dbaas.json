@@ -5,7 +5,7 @@
       "id": "gen-heavy-epas-replica",
       "service": "database/epas",
       "enabled": true,
-      "_note": "PRIORITY heavy chain — epas-create has NO recorded live 2xx anywhere (heavy-shared-dbaas epas leg was optional-grouped); this chain is the first proof opportunity for the epas create path — on success promote epas-cluster/lookups docs->VALIDATED (C5). PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the heavy cluster), so this chain also exercises them right after cluster-ready. switchover is deliberately ABSENT (HA Active<->Standby flip; proven body is ha_enabled:false — HA-gated node stays modeled only). Two billable clusters, ~60-90min; dedicated heavy window (crud_filter=gen-heavy-epas). composed by regression/scenarios/composer.py — targets: epas-cluster, epas-promote, epas-replica, epas-reset-replica, epas-sync-replica-state",
+      "_note": "PRIORITY heavy chain — epas-create has NO recorded live 2xx anywhere (heavy-shared-dbaas epas leg was optional-grouped); this chain is the first proof opportunity for the epas create path — on success promote epas-cluster/lookups docs->VALIDATED (C5). PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster nod",
       "steps": [
         {
           "name": "create-epas-engine-version",
@@ -25,6 +25,16 @@
           }
         },
         {
+          "name": "verify-epas-engine-version-read",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-engine-version"
+        },
+        {
           "name": "create-epas-server-type",
           "service": "epas",
           "method": "GET",
@@ -40,6 +50,16 @@
               "get": "name"
             }
           }
+        },
+        {
+          "name": "verify-epas-server-type-read",
+          "service": "epas",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "group": "epas-server-type"
         },
         {
           "name": "create-vpc",
@@ -85,6 +105,21 @@
           }
         },
         {
+          "name": "verify-vpc-add-cidr",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs/{vpc_id}/cidrs",
+          "json": {
+            "cidr": "10.200.0.0/20"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "vpc"
+        },
+        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -128,6 +163,26 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "verify-subnet-read-vips",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "verify-subnet-read-sap-secondary-subnets",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
         },
         {
           "name": "create-epas-cluster",
@@ -235,7 +290,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.10.10.10/32"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
@@ -560,7 +617,7 @@
       "id": "gen-heavy-mysql-replica",
       "service": "database/mysql",
       "enabled": true,
-      "_note": "PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the heavy cluster), so this chain also exercises them right after cluster-ready. switchover is deliberately ABSENT (HA Active<->Standby flip; proven body is ha_enabled:false — HA-gated node stays modeled only). Two billable clusters, ~60-90min; dedicated heavy window (crud_filter=gen-heavy-mysql). composed by regression/scenarios/composer.py — targets: mysql-cluster, mysql-promote, mysql-replica, mysql-reset-replica, mysql-sync-replica-state",
+      "_note": "PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the heavy cluster), so this chain also exercises them right after cluster-ready. switchover is deliberately ABSENT (HA Active<->Standby flip; proven body is ha_enabled:false — HA-gated node stays modeled o",
       "steps": [
         {
           "name": "create-mysql-engine-version",
@@ -580,6 +637,16 @@
           }
         },
         {
+          "name": "verify-mysql-engine-version-read",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-engine-version"
+        },
+        {
           "name": "create-mysql-server-type",
           "service": "mysql",
           "method": "GET",
@@ -595,6 +662,16 @@
               "get": "name"
             }
           }
+        },
+        {
+          "name": "verify-mysql-server-type-read",
+          "service": "mysql",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "group": "mysql-server-type"
         },
         {
           "name": "create-vpc",
@@ -640,6 +717,21 @@
           }
         },
         {
+          "name": "verify-vpc-add-cidr",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs/{vpc_id}/cidrs",
+          "json": {
+            "cidr": "10.200.0.0/20"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "vpc"
+        },
+        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -683,6 +775,26 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "verify-subnet-read-vips",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "verify-subnet-read-sap-secondary-subnets",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
         },
         {
           "name": "create-mysql-cluster",
@@ -792,7 +904,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.10.10.10/32"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
@@ -1169,7 +1283,7 @@
       "id": "gen-heavy-mariadb-replica",
       "service": "database/mariadb",
       "enabled": true,
-      "_note": "mariadb delete drain is ~90min (run e3ba190) and applies to BOTH clusters — teardown deletes replica then origin; residual drain is absorbed by the composer's dependent-delete 409 retries (40x30s) and the engine cleanup pass as backstop. PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the heavy cluster), so this chain also exercises them right after cluster-ready. switchover is deliberately ABSENT (HA Active<->Standby flip; proven body is ha_enabled:false — HA-gated node stays modeled only). Two billable clusters, ~60-90min; dedicated heavy window (crud_filter=gen-heavy-mariadb). composed by regression/scenarios/composer.py — targets: mariadb-cluster, mariadb-promote, mariadb-replica, mariadb-reset-replica, mariadb-sync-replica-state",
+      "_note": "mariadb delete drain is ~90min (run e3ba190) and applies to BOTH clusters — teardown deletes replica then origin; residual drain is absorbed by the composer's dependent-delete 409 retries (40x30s) and the engine cleanup pass as backstop. PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate",
       "steps": [
         {
           "name": "create-mariadb-engine-version",
@@ -1189,6 +1303,16 @@
           }
         },
         {
+          "name": "verify-mariadb-engine-version-read",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-engine-version"
+        },
+        {
           "name": "create-mariadb-server-type",
           "service": "mariadb",
           "method": "GET",
@@ -1204,6 +1328,16 @@
               "get": "name"
             }
           }
+        },
+        {
+          "name": "verify-mariadb-server-type-read",
+          "service": "mariadb",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "group": "mariadb-server-type"
         },
         {
           "name": "create-vpc",
@@ -1249,6 +1383,21 @@
           }
         },
         {
+          "name": "verify-vpc-add-cidr",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs/{vpc_id}/cidrs",
+          "json": {
+            "cidr": "10.200.0.0/20"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "vpc"
+        },
+        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -1292,6 +1441,26 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "verify-subnet-read-vips",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "verify-subnet-read-sap-secondary-subnets",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
         },
         {
           "name": "create-mariadb-cluster",
@@ -1399,7 +1568,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.10.10.10/32"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [

@@ -134,7 +134,7 @@ resources:
       # optional array (api_docs, PG와 동일 DTO). 빈 목록 = 무변경 no-op.
       - {name: setsecuritygrouprules,
          endpoint: "POST /v1/clusters/{cluster_id}/security-group-rules",
-         json: {add_ip_addresses: [], del_ip_addresses: []},
+         json: {add_ip_addresses: ["10.10.10.10/32"], del_ip_addresses: []},
          expect_status: [200, 202]}
       - {name: read-after-sg, endpoint: "GET /v1/clusters/{cluster_id}",
          expect_status: [200]}

@@ -5,7 +5,7 @@
       "id": "gen-heavy-pg-replica",
       "service": "database/postgresql",
       "enabled": true,
-      "_note": "owner-approved replica flow (2026-06-13, same-region: '한 리전에서 가능하면 하고 안되면 이야기 해줘' — userguide confirms standard replicas are same-region/same-subnet, max 5/DB): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. pg-switchover is deliberately ABSENT: userguide (how_to_guides/) defines Switch-Over as the HA Active<->Standby flip of one cluster ('HA 구성된 경우에는 Switch-over를 통해 Active-Standby 서버를 전환할 수 있습니다'), and the proven create body is ha_enabled:false — the owner chain's 'switchover back OR reset-replica' resolves to the reset-replica branch; pg-switchover stays modeled as an HA-gated action node. ~60-90min, two billable clusters; dedicated heavy window (crud_filter=gen-heavy-pg). composed by regression/scenarios/composer.py — targets: pg-promote, pg-replica, pg-reset-replica, pg-sync-replica-state, postgresql-cluster",
+      "_note": "owner-approved replica flow (2026-06-13, same-region: '한 리전에서 가능하면 하고 안되면 이야기 해줘' — userguide confirms standard replicas are same-region/same-subnet, max 5/DB): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. pg-switchover is deliberately ABSENT: userguide (how_to_guides/) defines Switch-Over as the HA Active<->Standby flip of one cluster ('HA 구성된 경우에는 Switch-over를 통해 Active-Standby 서버를 전환할 수 있습니다'), and the prove",
       "steps": [
         {
           "name": "create-pg-engine-version",
@@ -25,6 +25,16 @@
           }
         },
         {
+          "name": "verify-pg-engine-version-read",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200
+          ],
+          "group": "pg-engine-version"
+        },
+        {
           "name": "create-pg-server-type",
           "service": "postgresql",
           "method": "GET",
@@ -40,6 +50,16 @@
               "get": "name"
             }
           }
+        },
+        {
+          "name": "verify-pg-server-type-read",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200
+          ],
+          "group": "pg-server-type"
         },
         {
           "name": "create-vpc",
@@ -85,6 +105,21 @@
           }
         },
         {
+          "name": "verify-vpc-add-cidr",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs/{vpc_id}/cidrs",
+          "json": {
+            "cidr": "10.200.0.0/20"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "vpc"
+        },
+        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -128,6 +163,26 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "verify-subnet-read-vips",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "verify-subnet-read-sap-secondary-subnets",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
         },
         {
           "name": "create-postgresql-cluster",
@@ -236,7 +291,9 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.10.10.10/32"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
