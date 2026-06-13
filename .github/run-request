@@ -1,7 +1,9 @@
-# PG replica rev4 — replica block storage role_type now DATA (rev3 proved the
-# settling-retry rides past InvalidServiceState). create -> sync-replica-state
-# -> reset-replica -> promote should land now.
+# DBaaS replica cascade — PG replica family is LIVE-PROVEN (run 27472090705);
+# mysql/mariadb/epas mirror the same pattern + the same fixes (sg-rules CIDR,
+# settling [400,409] retry, replica block-storage DATA). epas is the priority:
+# its cluster create has never had a live 2xx. Parallel window; if concurrent
+# DB-cluster quota bites, the 4xx body will name the limit.
 mutations=true
 destructive=true
 heavy=true
-crud_filter=gen-heavy-pg-replica
+crud_filter=gen-heavy-mysql-replica or gen-heavy-mariadb-replica or gen-heavy-epas-replica
