@@ -16,8 +16,8 @@ resources:
              is_multi_region: false, tags: []}
       options:
         object_storage_bucket_name: {type: string, required: true,
-                                     default: "regrtrail{unique}",
-                                     note: "감사 로그를 받을 Object Storage 버킷명 — createtrail은 실존 버킷이 필요할 가능성이 높다(기본값은 미존재 버킷명 추정이라 400/403/422 예상). object-storage 버킷 노드가 모델에 생기면 ref 옵션으로 승격할 것 (R3)"}
+                                     default: "apitest-logsink",
+                                     note: "owner 확인(2026-06-13): trail도 사전 존재하는 Object Storage 버킷 필요 — 워크플로 ensure-logsink가 만드는 공용 apitest-logsink 사용 (network-logging과 공유)"}
     capture: {trail_id: "$.trail.id"}
     delete: {endpoint: "DELETE /v1/trails/{trail_id}", destructive: true}
     provenance: docs

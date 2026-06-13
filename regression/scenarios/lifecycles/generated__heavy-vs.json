@@ -5,7 +5,7 @@
       "id": "gen-heavy-vs-netops",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "recomposed after run 27447899572 — attach-time 409 CreateInterface.Conflict race -> create retry 409 x8x15s",
+      "_note": "extended after owner knowledge 2026-06-13: server post-create ops (lock/unlock/dump/password w/ keypair private_key), block-volume attach/detach, custom-image from RUNNING server. attach-409 retry from run 27447899572 retained.",
       "steps": [
         {
           "name": "create-keypair",
@@ -21,6 +21,9 @@
             201,
             202
           ],
+          "capture": {
+            "private_key": "$.private_key"
+          },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/keypairs/regrkey{unique}",
@@ -62,6 +65,53 @@
               },
               "get": "id"
             }
+          }
+        },
+        {
+          "name": "create-block-volume",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrvol{unique}",
+            "description": "API regression suite",
+            "size": 104,
+            "volume_type": "SSD_Provisioned",
+            "max_iops": 10000,
+            "max_throughput": 500,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vol_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{vol_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "wait-block-volume",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
           }
         },
         {
@@ -236,6 +286,162 @@
             "timeout": 600,
             "interval": 15
           }
+        },
+        {
+          "name": "verify-server-read-ips",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/ips",
+          "expect_status": [
+            200
+          ],
+          "group": "server"
+        },
+        {
+          "name": "verify-server-read-ips-by-subnet",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/ips/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "server"
+        },
+        {
+          "name": "verify-server-read-security-groups",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/security-groups",
+          "expect_status": [
+            200
+          ],
+          "group": "server"
+        },
+        {
+          "name": "verify-server-read-console-log",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/console-log",
+          "expect_status": [
+            200
+          ],
+          "group": "server"
+        },
+        {
+          "name": "verify-server-lock",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/lock",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "server"
+        },
+        {
+          "name": "verify-server-unlock",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/unlock",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "server"
+        },
+        {
+          "name": "verify-server-dump",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/dump",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "server"
+        },
+        {
+          "name": "verify-server-password",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/password",
+          "json": {
+            "private_key": "{private_key}"
+          },
+          "expect_status": [
+            200
+          ],
+          "group": "server"
+        },
+        {
+          "name": "create-volume-attachment",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/volumes/{vol_id}/servers",
+          "json": {
+            "server_id": "{server_id}",
+            "delete_on_termination": false
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{vol_id}/servers/{server_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-volume-attachment-volume-shows-attachment",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "volume-attachment"
+        },
+        {
+          "name": "create-custom-image",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers/{server_id}/images",
+          "json": {
+            "image_name": "regrimg{ualpha}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "custom_image_id": "$.image_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/images/{custom_image_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-custom-image-read-members",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/images/{custom_image_id}/members",
+          "expect_status": [
+            200
+          ],
+          "group": "custom-image"
         },
         {
           "name": "create-port",
@@ -439,6 +645,56 @@
             200
           ],
           "group": "server-static-nat"
+        },
+        {
+          "name": "delete-volume-attachment",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/volumes/{vol_id}/servers/{server_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-block-volume",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            500,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-custom-image",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/images/{custom_image_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
         },
         {
           "name": "delete-server-static-nat",

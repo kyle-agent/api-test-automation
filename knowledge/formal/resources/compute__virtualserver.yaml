@@ -19,10 +19,13 @@ resources:
     create:
       endpoint: "POST /v1/keypairs"
       body: {name: "regrkey{unique}", tags: []}
+    # KeypairCreateResponse 최상위에 private_key — server password 복호 op의
+    # 입력 (owner 2026-06-13: showvirtualserverpassword는 private key를 param으로)
+    capture: {private_key: "$.private_key"}
     delete: {endpoint: "DELETE /v1/keypairs/regrkey{unique}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: virtualserver-keypair, steps: [create, get, delete]}
-    notes: "keypair는 id가 아니라 NAME으로 주소된다 — capture 없음, 소비자(server/ske-nodepool 등)는 같은 {unique} 값으로 keypair_name: regrkey{unique}를 보낸다 (소스 lifecycle들과 동일한 run-스코프 {unique} 공유 시맨틱). public_key 생략 시 SCP가 생성(zero-cost, 동기). 409 KeypairNameUsed = 동명 orphan 존재 — 이름 주소라 재사용 안전 (compute-virtualserver-full create-keypair는 409 허용)."
+    notes: "keypair는 id가 아니라 NAME으로 주소된다 — id capture 없음(private_key만 password op용으로 capture), 소비자(server/ske-nodepool 등)는 같은 {unique} 값으로 keypair_name: regrkey{unique}를 보낸다 (소스 lifecycle들과 동일한 run-스코프 {unique} 공유 시맨틱). public_key 생략 시 SCP가 생성(zero-cost, 동기). 409 KeypairNameUsed = 동명 orphan 존재 — 이름 주소라 재사용 안전 (compute-virtualserver-full create-keypair는 409 허용)."
 
   server-group:
     code: "cp-vs-server-group"
@@ -104,6 +107,19 @@ resources:
       - {name: read-console-log,
          endpoint: "GET /v1/servers/{server_id}/console-log",
          expect_status: [200]}
+      # post-create ops (owner 2026-06-12/13): lock 걸고 즉시 unlock(잠긴 채로
+      # teardown 가면 삭제 불가 위험), dump 생성, password는 keypair private_key
+      # 를 body로 (api_docs ServerPasswordRequest; lock/unlock/dump는 body 없음)
+      - {name: lock, endpoint: "POST /v1/servers/{server_id}/lock",
+         expect_status: [200, 202, 204]}
+      - {name: unlock, endpoint: "POST /v1/servers/{server_id}/unlock",
+         expect_status: [200, 202, 204]}
+      - {name: dump, endpoint: "POST /v1/servers/{server_id}/dump",
+         expect_status: [200, 201, 202]}
+      - {name: password, endpoint: "POST /v1/servers/{server_id}/password",
+         json: {private_key: "{keypair.private_key}"},
+         expect_status: [200],
+         note: "ubuntu/keypair 서버에서의 응답 형태는 라이브로 확인 (Windows 전용일 가능성 — 400이면 본문 기록 후 분류)"}
     delete: {endpoint: "DELETE /v1/servers/{server_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-full,
@@ -149,6 +165,35 @@ resources:
              steps: [create-snapshot, delete-snapshot, wait-snapshot-gone]}
     notes: "스냅샷을 지운 뒤(409/500 재시도 + 404 폴링) 볼륨을 지워야 한다 — 역순 teardown이 자연 보장. PUT /v1/snapshots/{id} rename은 vs-volume-transfer-coverage에서 UNPROVEN."
 
+  # owner 2026-06-13: 별도 block volume을 만들어 두고 VM에 붙였다 뗐다 —
+  # attach=create / detach=delete (server-interface와 같은 액션-자원 매핑)
+  volume-attachment:
+    code: "cp-vs-volume-attach"
+    service: compute/virtualserver
+    heavy: true
+    requires: [server, block-volume]
+    create:
+      endpoint: "POST /v1/volumes/{block-volume.vol_id}/servers"
+      body: {server_id: "{server.server_id}", delete_on_termination: false}
+      # attach 시점 충돌 race 대비 (interface attach 409와 동류 가능성)
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 15
+    delete:
+      endpoint: "DELETE /v1/volumes/{block-volume.vol_id}/servers/{server.server_id}"
+      retry_on_status: [409, 500]
+      retries: 8
+      retry_interval: 15
+      destructive: true
+    verify:
+      # attach 상태는 볼륨 상세에서 확인 (delete 경로의 GET 형제는 카탈로그에 없음)
+      - {name: volume-shows-attachment,
+         endpoint: "GET /v1/volumes/{block-volume.vol_id}",
+         expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: compute-virtualserver-full, steps: []}
+    notes: "VolumeServerAttachRequest {server_id, delete_on_termination} (api_docs). capture 없음 — detach가 prereq 토큰만 사용 (dotted-prereq-token-in-delete). delete_on_termination false: 볼륨 수명은 우리가 관리(역순 teardown이 detach 후 volume 삭제)."
+
   custom-image:
     code: "cp-vs-custom-image"
     service: compute/virtualserver
@@ -167,7 +212,7 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-full,
              steps: [image-create, image-wait, image-delete]}
-    notes: "서버 스냅샷 이미지 — 서버가 STOPPED 상태여야 한다 (소스는 stop-server → image-create → start-server 순서; 합성기는 아직 이 상태 전이를 모르므로 단독 합성은 R3 과제). capture envelope $.image_id (services captures custom-image). 삭제는 409 재시도. POST /v1/images (외부 소스 등록)는 별도 image-registration 노드."
+    notes: "서버 스냅샷 이미지 — owner 확인(2026-06-13): 서버 실행 중에도 생성 가능 (소스의 stop→image→start 순서는 보수적 선택이었음 → RUNNING 서버에서 합성 가능, heavy 체인 편입). capture envelope $.image_id (services captures custom-image). 삭제는 409 재시도. POST /v1/images (외부 소스 등록)는 별도 image-registration 노드."
 
   image-registration:
     code: "cp-vs-image-reg"
@@ -191,6 +236,9 @@ resources:
       endpoint: "POST /v1/volume-transfer"
       body: {name: "regrvt{unique}", volume_id: "{block-volume.vol_id}"}
     capture: {transfer_id: "$.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/volume-transfer/{transfer_id}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/volume-transfer/{transfer_id}",
              destructive: true}
     provenance: VALIDATED  # full pass incl. teardown — run 27394211896 (gen-wave-vslight)
@@ -226,16 +274,43 @@ resources:
     requires: [launch-configuration, subnet, security-group]
     create:
       endpoint: "POST /v1/auto-scaling-groups"
+      # AutoScalingGroupCreateRequestV1Dot2 (api_docs): 필수 = name/launch_
+      # configuration_id/desired·min·max_server_count/desired_server_count_
+      # editable/server_name_prefix/state_check_delay_time/use_lb_state_check/
+      # subnet_ids(배열). 이전 body(subnet_id/security_groups)는 DTO 불일치.
+      # owner 2026-06-13: desired/min 0 시도 — 0이면 billable VM 없이 ASG
+      # 21 ops 전부 검증 가능
       body:
         name: "regrasg{unique}"
         launch_configuration_id: "{launch-configuration.launch_configuration_id}"
-        desired_server_count: 1
-        min_server_count: 1
-        max_server_count: 2
-        subnet_id: "{subnet.subnet_id}"
-        security_groups: ["{security-group.sg_id}"]
+        desired_server_count: 0
+        desired_server_count_editable: true
+        min_server_count: 0
+        max_server_count: 1
+        server_name_prefix: "regrasg{ualpha}"
+        state_check_delay_time: 300
+        use_lb_state_check: false
+        subnet_ids: ["{subnet.subnet_id}"]
+        security_group_ids: ["{security-group.sg_id}"]
         tags: []
     capture: {auto_scaling_group_id: "$.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/auto-scaling-groups/{auto_scaling_group_id}",
+         expect_status: [200]}
+      - {name: update,
+         endpoint: "PUT /v1/auto-scaling-groups/{auto_scaling_group_id}",
+         json: {desired_server_count_editable: true},
+         expect_status: [200, 202]}
+      - {name: server-count,
+         endpoint: "PUT /v1/auto-scaling-groups/{auto_scaling_group_id}/server-count",
+         json: {desired_server_count: 0},
+         expect_status: [200, 202]}
+      - {name: list-virtual-servers,
+         endpoint: "GET /v1/auto-scaling-groups/{auto_scaling_group_id}/virtual-servers",
+         expect_status: [200]}
+      - {name: list-lb-server-groups,
+         endpoint: "GET /v1/auto-scaling-groups/{auto_scaling_group_id}/lb-server-groups",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto_scaling_group_id}",
              destructive: true}
     provenance: docs
@@ -249,9 +324,12 @@ resources:
     requires: [auto-scaling-group]
     create:
       endpoint: "POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies"
-      body: {name: "regrpol{unique}", policy_type: SCALE_OUT,
-             adjustment_type: CHANGE_IN_CAPACITY, adjustment_value: 1,
-             cooldown: 300}
+      # AutoScalingGroupPolicyCreateRequest (api_docs) 필수 10필드 — enum
+      # 값들은 docs 미기재라 추정, 라이브 400 본문이 정답을 줄 것
+      body: {name: "regrpol{unique}", metric_type: CPU, metric_method: AVG,
+             comparison_operator: GREATER_THAN_OR_EQUAL_TO, threshold: 90,
+             evaluation_minutes: 5, scale_type: SCALE_OUT, scale_method: AMOUNT,
+             scale_value: 1, cooldown_seconds: 300}
     capture: {policy_id: "$.id"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}",
              destructive: true}
@@ -266,9 +344,11 @@ resources:
     requires: [auto-scaling-group]
     create:
       endpoint: "POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules"
-      body: {name: "regrsch{unique}", desired_server_count: 2,
-             min_server_count: 1, max_server_count: 3,
-             start_time: "{today_plus_5y}T00:00:00Z"}
+      # AutoScalingGroupScheduleCreateRequest (api_docs): frequency/start_date/
+      # hour/minute/timezone 필수 — ONCE + 5년 뒤 날짜로 실발화 차단
+      body: {name: "regrsch{unique}", frequency: ONCE,
+             start_date: "{today_plus_5y}", hour: 3, minute: 0,
+             timezone: "Asia/Seoul", desired_server_count: 0}
     capture: {schedule_id: "$.id"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}",
              destructive: true}
@@ -283,8 +363,14 @@ resources:
     requires: [auto-scaling-group]
     create:
       endpoint: "POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications"
-      body: {name: "regrntf{unique}", notification_type: EMAIL,
-             recipients: ["regression-coverage@example.com"]}
+      # AutoScalingGroupNotificationCreateRequest (api_docs): notification_
+      # events(enum 배열) + user_ids 필수 — user_id는 계정 사용자 ID라
+      # 기본값 없는 required 옵션 (sts role_indicator와 같은 폼-입력 게이트)
+      body: {notification_events: [SCALE_OUT, SCALE_IN],
+             user_ids: ["{opt.user_id}"]}
+      options:
+        user_id: {type: string, required: true,
+                  note: "알림 받을 계정 사용자 ID — owner가 콘솔에서 확인해 제공 (기본값 없음 = 의도된 게이트)"}
     capture: {notification_id: "$.id"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}",
              destructive: true}

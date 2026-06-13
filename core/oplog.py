@@ -142,6 +142,31 @@ def _put(c, cfg, key, payload: dict) -> bool:
         return False
 
 
+LOGSINK_BUCKET = "apitest-logsink"  # shared pre-existing OBS sink for
+# network-logging storages and loggingaudit trails (owner 2026-06-13: both
+# need a pre-defined Object Storage bucket). Plain private bucket — no CORS/
+# public ACL, never swept.
+
+
+def ensure_logsink() -> bool:
+    c, cfg = _client()
+    if not c:
+        return False
+    try:
+        c.head_bucket(Bucket=LOGSINK_BUCKET)
+        print(f"[oplog] logsink bucket {LOGSINK_BUCKET} exists")
+        return True
+    except Exception:
+        pass
+    try:
+        c.create_bucket(Bucket=LOGSINK_BUCKET)
+        print(f"[oplog] logsink bucket {LOGSINK_BUCKET} created (PERSISTENT)")
+        return True
+    except Exception as exc:
+        print(f"[oplog] logsink create_bucket failed: {exc}")
+        return False
+
+
 def ensure_bucket() -> bool:
     """Create the bucket if missing; apply CORS + public-read so the static
     ops viewer (GitHub Pages) can fetch/list it from the browser. Each step is
@@ -318,6 +343,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="workflow oplog -> object storage")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("ensure")
+    sub.add_parser("ensure-logsink")
     em = sub.add_parser("emit")
     em.add_argument("--stage", required=True)
     em.add_argument("--status", required=True)
@@ -328,6 +354,8 @@ def main(argv=None) -> int:
     a = ap.parse_args(argv)
     if a.cmd == "ensure":
         ensure_bucket()
+    elif a.cmd == "ensure-logsink":
+        ensure_logsink()
     elif a.cmd == "emit":
         emit(a.stage, a.status, a.detail, a.job)
     elif a.cmd == "finalize":

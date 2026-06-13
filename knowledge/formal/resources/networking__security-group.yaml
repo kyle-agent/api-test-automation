@@ -10,7 +10,10 @@ resources:
     create:
       endpoint: "POST /v1/security-groups"
       body: {name: "regrsg{unique}", description: "API regression suite",
-             loggable: false, tags: []}
+             loggable: "{opt.loggable}", tags: []}
+      options:
+        loggable: {type: enum, values: [false, true], default: false, vary: true,
+                   note: "owner 2026-06-13: log 옵션 포함 생성 시 network-logging configurations에 행이 등장 — true 변형은 network-logging-storage(SECURITY_GROUP) 선행 후"}
     capture: {sg_id: "$.security_group.id"}
     delete: {endpoint: "DELETE /v1/security-groups/{sg_id}", destructive: true}
     provenance: VALIDATED

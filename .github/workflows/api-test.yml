@@ -259,6 +259,7 @@ jobs:
         continue-on-error: true
         run: |
           python -m core.oplog ensure || true
+          python -m core.oplog ensure-logsink || true
           python -m core.oplog emit --stage run-start --status running --job spec \
             --detail "event=${{ github.event_name }} mutations=${{ steps.req.outputs.mutations }} destructive=${{ steps.req.outputs.destructive }} heavy=${{ steps.req.outputs.heavy }}" || true
       - name: Diff catalog vs published (incremental signal)

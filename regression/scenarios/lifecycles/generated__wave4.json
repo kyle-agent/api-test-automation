@@ -1,0 +1,605 @@
+{
+  "_comment": "Composed wave 4 — owner domain knowledge 2026-06-13: ASG chain with desired/min 0 (no billable VM; launch-config wired to real image/server-type/keypair lookups) and network-logging storage against the ensured apitest-logsink bucket. asg-notification is form-gated on user_id (no default).",
+  "lifecycles": [
+    {
+      "id": "gen-wave4-asg",
+      "service": "compute/virtualserver",
+      "enabled": true,
+      "_note": "ASG bodies rebuilt from V1Dot2 DTOs (old bodies mismatched); policy enums are documented-absent guesses — live 400 bodies will correct them",
+      "steps": [
+        {
+          "name": "create-keypair",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "private_key": "$.private_key"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "create-image",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "create-server-type",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_type_id": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": "g"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-launch-configuration",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/launch-configurations",
+          "json": {
+            "name": "regrlc{unique}",
+            "image_id": "{image_id}",
+            "server_type_id": "{server_type_id}",
+            "keypair_name": "regrkey{unique}",
+            "volumes": [
+              {
+                "boot_index": 0,
+                "size": 100,
+                "type": "SSD",
+                "delete_on_termination": true
+              }
+            ],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "launch_configuration_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/launch-configurations/{launch_configuration_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-launch-configuration",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/launch-configurations/{launch_configuration_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "launch-configuration"
+        },
+        {
+          "name": "create-security-group",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-auto-scaling-group",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups",
+          "json": {
+            "name": "regrasg{unique}",
+            "launch_configuration_id": "{launch_configuration_id}",
+            "desired_server_count": 0,
+            "desired_server_count_editable": true,
+            "min_server_count": 0,
+            "max_server_count": 1,
+            "server_name_prefix": "regrasg{ualpha}",
+            "state_check_delay_time": 300,
+            "use_lb_state_check": false,
+            "subnet_ids": [
+              "{subnet_id}"
+            ],
+            "security_group_ids": [
+              "{sg_id}"
+            ],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "auto_scaling_group_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-auto-scaling-group-read",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "auto-scaling-group"
+        },
+        {
+          "name": "verify-auto-scaling-group-update",
+          "service": "virtualserver",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+          "json": {
+            "desired_server_count_editable": true
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "auto-scaling-group"
+        },
+        {
+          "name": "verify-auto-scaling-group-server-count",
+          "service": "virtualserver",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/server-count",
+          "json": {
+            "desired_server_count": 0
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "auto-scaling-group"
+        },
+        {
+          "name": "verify-auto-scaling-group-list-virtual-servers",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/virtual-servers",
+          "expect_status": [
+            200
+          ],
+          "group": "auto-scaling-group"
+        },
+        {
+          "name": "verify-auto-scaling-group-list-lb-server-groups",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/lb-server-groups",
+          "expect_status": [
+            200
+          ],
+          "group": "auto-scaling-group"
+        },
+        {
+          "name": "create-asg-policy",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies",
+          "json": {
+            "name": "regrpol{unique}",
+            "metric_type": "CPU",
+            "metric_method": "AVG",
+            "comparison_operator": "GREATER_THAN_OR_EQUAL_TO",
+            "threshold": 90,
+            "evaluation_minutes": 5,
+            "scale_type": "SCALE_OUT",
+            "scale_method": "AMOUNT",
+            "scale_value": 1,
+            "cooldown_seconds": 300
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-asg-policy",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "asg-policy"
+        },
+        {
+          "name": "create-asg-schedule",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules",
+          "json": {
+            "name": "regrsch{unique}",
+            "frequency": "ONCE",
+            "start_date": "{today_plus_5y}",
+            "hour": 3,
+            "minute": 0,
+            "timezone": "Asia/Seoul",
+            "desired_server_count": 0
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "schedule_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-asg-schedule",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "asg-schedule"
+        },
+        {
+          "name": "delete-asg-policy",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-asg-schedule",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-auto-scaling-group",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-security-group",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-launch-configuration",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/launch-configurations/{launch_configuration_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-keypair",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ]
+    },
+    {
+      "id": "gen-wave4-nlog",
+      "service": "management/network-logging",
+      "enabled": true,
+      "_note": "real DTO is just {bucket_name, resource_type}; bucket apitest-logsink is ensured by the workflow (core/oplog.py ensure-logsink). loggable security-group variation rides later (C4)",
+      "steps": [
+        {
+          "name": "create-network-logging-storage",
+          "service": "network-logging",
+          "method": "POST",
+          "path": "/v1/network-logging/storages",
+          "json": {
+            "bucket_name": "apitest-logsink",
+            "resource_type": "SECURITY_GROUP"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "network_logging_storage_id": "$.network_logging_storage.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/network-logging/storages/{network_logging_storage_id}",
+            "service": "network-logging"
+          }
+        },
+        {
+          "name": "verify-network-logging-storage-list-storages",
+          "service": "network-logging",
+          "method": "GET",
+          "path": "/v1/network-logging/storages?resource_type=SECURITY_GROUP",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-network-logging-storage-list-configurations",
+          "service": "network-logging",
+          "method": "GET",
+          "path": "/v1/network-logging/configurations?resource_type=SECURITY_GROUP",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-network-logging-storage",
+          "service": "network-logging",
+          "method": "DELETE",
+          "path": "/v1/network-logging/storages/{network_logging_storage_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

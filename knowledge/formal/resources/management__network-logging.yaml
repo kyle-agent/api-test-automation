@@ -1,6 +1,8 @@
 # Resource-task model — management/network-logging (mg-nl group).
-# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
-# network-logging-storage (enabled, guarded) by extract.py, curated by hand.
+# owner 2026-06-13: 사전 정의된 Object Storage 버킷이 하나 있어야 하고,
+# firewall/security-group/NAT를 log 옵션 포함으로 생성하면 networklogging
+# API(configurations)가 활용 가능해진다. 워크플로가 apitest-logsink 버킷을
+# ensure (core/oplog.py ensure-logsink — loggingaudit trail과 공용).
 version: 1
 resources:
   network-logging-storage:
@@ -9,19 +11,27 @@ resources:
     requires: []
     create:
       endpoint: "POST /v1/network-logging/storages"
-      body: {name: "regrnl{unique}", log_type: "{opt.log_type}",
-             object_storage_bucket_name: "{opt.object_storage_bucket_name}",
-             description: "API regression coverage probe"}
+      # 실제 DTO NetworkLoggingStorageCreateRequest는 단 2필드 (api_docs):
+      # bucket_name + resource_type — 이전 BEST-GUESS body(name/log_type/...)는
+      # 전부 허구였다
+      body: {bucket_name: "{opt.bucket_name}", resource_type: "{opt.resource_type}"}
       options:
-        log_type: {type: enum, values: [VPC_FLOW_LOG], required: true,
-                   default: VPC_FLOW_LOG,
-                   note: "소스가 보낸 유일한 값 — 다른 log_type 코드(FW/LB 로그 추정)는 docs JS-rendered라 미확인; 값 목록 확장은 R3 과제"}
-        object_storage_bucket_name: {type: string, required: true,
-                                     default: "regrnl{unique}",
-                                     note: "로그를 받을 Object Storage 버킷명 추정(BEST-GUESS) — 실존 버킷 필요 가능성, object-storage 노드 모델링 후 ref 옵션으로 승격 (R3)"}
+        bucket_name: {type: string, required: true, default: "apitest-logsink",
+                      note: "사전 존재해야 하는 OBS 버킷 (owner 2026-06-13) — 워크플로 ensure-logsink가 생성·유지"}
+        resource_type: {type: enum, values: [SECURITY_GROUP, FIREWALL, NAT],
+                        default: SECURITY_GROUP, vary: true,
+                        note: "로그를 수집할 리소스 타입 — 타입별 storage 1개"}
     capture: {network_logging_storage_id: "$.network_logging_storage.id"}
+    verify:
+      - {name: list-storages,
+         endpoint: "GET /v1/network-logging/storages?resource_type={opt.resource_type}",
+         expect_status: [200]}
+      - {name: list-configurations,
+         endpoint: "GET /v1/network-logging/configurations?resource_type={opt.resource_type}",
+         expect_status: [200],
+         note: "configuration 행은 loggable=true 리소스(sg/fw/nat)가 생기면 나타난다 — storage만 있으면 빈 목록 200"}
     delete: {endpoint: "DELETE /v1/network-logging/storages/{network_logging_storage_id}",
              destructive: true}
     provenance: docs
     source: {lifecycle: network-logging-storage, steps: [create-storage, delete-storage]}
-    notes: "api_bodies 항목 없음 + docs JS-rendered — create body 필드들과 capture envelope $.network_logging_storage.id 모두 BEST-GUESS UNPROVEN (공유 계정에선 400/403/422가 정상, 라이브 2xx 후 승격)."
+    notes: "capture envelope $.network_logging_storage.id는 ShowResponse wrapper에서 유추 (UNPROVEN — 라이브 후 확정). 흐름 전체: logsink 버킷 → storage(resource_type) → loggable=true 리소스 생성 → configurations에 행 등장. security-group 노드의 loggable 옵션과 합성 시 연동 (C4 변형)."
