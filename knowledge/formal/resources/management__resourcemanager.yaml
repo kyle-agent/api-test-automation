@@ -1,10 +1,15 @@
 # Resource-task model — management/resourcemanager (mg-rm group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
-# resourcemanager-resource-group (enabled, live-validated) by extract.py,
-# curated by hand. The tag write family (per-tag PUT/DELETE on both the SRN
-# and region/service/type/id addressing schemes, bulk tag deletes) are
-# operations on existing resources — they stay in
-# resourcemanager-tag-lifecycle, not modeled as nodes.
+# resourcemanager-resource-group (enabled, live-validated), curated by hand.
+#
+# owner 계획 (2026-06-13): "과금 없는 자원 하나 만들고 tag 붙이고 떼고" —
+# resource-group 자체가 그 자원이다 (zero-cost + 생성 응답에 srn).
+# SRN 태그 패밀리 전부를 resource-group verify로 닫는다:
+#   bulk set → list → show key → update value → global bulk set →
+#   delete key → global bulk delete → delete all. (DTO: Tag{key,value*},
+#   TagSetRequest{tags[Tag]}, TagsSetRequest/TagDeleteRequest{tags: {srn: [...]}}.)
+# components-주소 per-key 3종(show/update/delete by region/service/type/id/key)은
+# components 주소 스킴 확정 후 2차 (updatecomponentstags(bulk)는 검증됨).
 version: 1
 resources:
   resource-group:
@@ -14,12 +19,72 @@ resources:
     create:
       endpoint: "POST /v1/resource-groups"
       body: {name: "regr-rg-{unique}", description: "created by API regression suite"}
-    capture: {rg_id: "$.resource_group.id"}
+    # rg_srn: 소스 lifecycle이 capture_soft하던 envelope — 하드 승격 (owner
+    # 2026-06-13: 자원 생성 시 srn 발급). 비면 capture-failure 본문이 정답을 줌.
+    capture: {rg_id: "$.resource_group.id", rg_srn: "$.resource_group.srn"}
     verify:
       - {name: read-resources,
          endpoint: "GET /v1/resource-groups/{rg_id}/resources",
          expect_status: [200]}
+      - {name: set,
+         endpoint: "PUT /v1/resource-groups/{rg_id}",
+         json: {name: "regr-rg-{unique}", description: "updated by API regression suite",
+                resource_types: ["resourcemanager:resource-group"], tags: []},
+         expect_status: [200, 202],
+         note: "소스 set-rg는 [200,202] 관용 뒤에서 미검증 상태였다 — 하드 기대로 표면화"}
+      - {name: show-resource,
+         endpoint: "GET /v1/resources/{rg_srn}",
+         expect_status: [200]}
+      - {name: tags-bulk-set,
+         endpoint: "PUT /v1/tags/{rg_srn}/bulk",
+         json: {tags: [{key: "regr{unique}", value: regrv}]},
+         expect_status: [200, 201, 202]}
+      - {name: tags-list,
+         endpoint: "GET /v1/tags/{rg_srn}",
+         expect_status: [200]}
+      - {name: tag-show,
+         endpoint: "GET /v1/tags/{rg_srn}/regr{unique}",
+         expect_status: [200]}
+      - {name: tag-update-value,
+         endpoint: "PUT /v1/tags/{rg_srn}/regr{unique}",
+         json: {value: regrv2},
+         expect_status: [200, 201, 202],
+         note: "TagValue DTO는 {value} 단일 필드"}
+      - {name: tags-global-bulk-set,
+         endpoint: "PUT /v1/tags/bulk",
+         json: {tags: {"{rg_srn}": [{key: "regrx{unique}", value: regrv}]}},
+         expect_status: [200, 201, 202],
+         note: "TagsSetRequest: {srn: [Tag]} 맵 — dict KEY 자리의 placeholder는 엔진 _fill_obj가 키도 치환하는지 라이브로 확인 (실패 시 본문이 알려줌)"}
+      - {name: tag-delete-one,
+         endpoint: "DELETE /v1/tags/{rg_srn}/regr{unique}",
+         expect_status: [200, 202, 204]}
+      - {name: tags-global-bulk-delete,
+         endpoint: "DELETE /v1/tags",
+         json: {tags: {"{rg_srn}": ["regrx{unique}"]}},
+         expect_status: [200, 202, 204],
+         note: "TagDeleteRequest: {srn: [key,...]} 맵"}
+      - {name: tags-delete-all,
+         endpoint: "DELETE /v1/tags/{rg_srn}",
+         expect_status: [200, 202, 204]}
     delete: {endpoint: "DELETE /v1/resource-groups/{rg_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: resourcemanager-resource-group, steps: [create, delete]}
-    notes: "글로벌(account-scoped) 서비스 — host에 region 세그먼트 없음 (cross-service와 일치). 싸고 가역적인 실생성 자원 — tag-write 계열의 실 SRN 공급원으로 쓰인다. 소스는 $.resource_group.srn도 capture_soft하지만 envelope UNPROVEN이라 모델 capture에는 넣지 않음 (vpc-peering의 미검증 capture 배제 원칙) — srn이 필요한 합성은 R3에서 envelope 확정 후."
+    notes: "글로벌(account-scoped) 서비스 — host에 region 세그먼트 없음. 싸고 가역적인 실생성 자원 — tag-write 계열의 실 SRN 공급원 (owner 2026-06-13 계획). rg_srn envelope은 소스 capture_soft에서 하드 승격 — 1차 라이브에서 확정."
+
+  # deleteresourcegroups(벌크) 전용 — 두 번째 rg를 만들고 벌크 DELETE로 지운다
+  # (delete.json passthrough). 단일 rg의 teardown과 중복 없이 벌크 경로를 검증.
+  resource-group-bulk:
+    code: "mg-rm-rg-bulk"
+    service: management/resourcemanager
+    requires: []
+    create:
+      endpoint: "POST /v1/resource-groups"
+      body: {name: "regr-rgb-{unique}", description: "bulk-delete probe"}
+    capture: {rgb_id: "$.resource_group.id"}
+    delete:
+      endpoint: "DELETE /v1/resource-groups"
+      json: {ids: ["{rgb_id}"]}
+      destructive: true
+    provenance: docs
+    source: {lifecycle: resourcemanager-resource-group, steps: [create]}
+    notes: "ResourceGroupsDeleteRequest {ids:[...]} (api_docs). create는 검증된 rg body와 동일 — 벌크 DELETE 경로만 신규."

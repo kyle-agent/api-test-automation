@@ -711,6 +711,264 @@
           "retry_interval": 30
         }
       ]
+    },
+    {
+      "id": "gen-wave4-rmtags",
+      "service": "management/resourcemanager",
+      "enabled": true,
+      "_note": "owner plan 2026-06-13: zero-cost resource-group as the live SRN source — full SRN tag family + rg set/show-resource + bulk rg delete. Tag keys carry {unique} so the per-key paths resolve to catalog endpoints (the old literal-key probe never counted).",
+      "steps": [
+        {
+          "name": "create-resource-group",
+          "service": "resourcemanager",
+          "method": "POST",
+          "path": "/v1/resource-groups",
+          "json": {
+            "name": "regr-rg-{unique}",
+            "description": "created by API regression suite"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "rg_id": "$.resource_group.id",
+            "rg_srn": "$.resource_group.srn"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/resource-groups/{rg_id}",
+            "service": "resourcemanager"
+          }
+        },
+        {
+          "name": "verify-resource-group-read-resources",
+          "service": "resourcemanager",
+          "method": "GET",
+          "path": "/v1/resource-groups/{rg_id}/resources",
+          "expect_status": [
+            200
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-set",
+          "service": "resourcemanager",
+          "method": "PUT",
+          "path": "/v1/resource-groups/{rg_id}",
+          "json": {
+            "name": "regr-rg-{unique}",
+            "description": "updated by API regression suite",
+            "resource_types": [
+              "resourcemanager:resource-group"
+            ],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-show-resource",
+          "service": "resourcemanager",
+          "method": "GET",
+          "path": "/v1/resources/{rg_srn}",
+          "expect_status": [
+            200
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-tags-bulk-set",
+          "service": "resourcemanager",
+          "method": "PUT",
+          "path": "/v1/tags/{rg_srn}/bulk",
+          "json": {
+            "tags": [
+              {
+                "key": "regr{unique}",
+                "value": "regrv"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-tags-list",
+          "service": "resourcemanager",
+          "method": "GET",
+          "path": "/v1/tags/{rg_srn}",
+          "expect_status": [
+            200
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-tag-show",
+          "service": "resourcemanager",
+          "method": "GET",
+          "path": "/v1/tags/{rg_srn}/regr{unique}",
+          "expect_status": [
+            200
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-tag-update-value",
+          "service": "resourcemanager",
+          "method": "PUT",
+          "path": "/v1/tags/{rg_srn}/regr{unique}",
+          "json": {
+            "value": "regrv2"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-tags-global-bulk-set",
+          "service": "resourcemanager",
+          "method": "PUT",
+          "path": "/v1/tags/bulk",
+          "json": {
+            "tags": {
+              "{rg_srn}": [
+                {
+                  "key": "regrx{unique}",
+                  "value": "regrv"
+                }
+              ]
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-tag-delete-one",
+          "service": "resourcemanager",
+          "method": "DELETE",
+          "path": "/v1/tags/{rg_srn}/regr{unique}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-tags-global-bulk-delete",
+          "service": "resourcemanager",
+          "method": "DELETE",
+          "path": "/v1/tags",
+          "json": {
+            "tags": {
+              "{rg_srn}": [
+                "regrx{unique}"
+              ]
+            }
+          },
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "verify-resource-group-tags-delete-all",
+          "service": "resourcemanager",
+          "method": "DELETE",
+          "path": "/v1/tags/{rg_srn}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "group": "resource-group"
+        },
+        {
+          "name": "create-resource-group-bulk",
+          "service": "resourcemanager",
+          "method": "POST",
+          "path": "/v1/resource-groups",
+          "json": {
+            "name": "regr-rgb-{unique}",
+            "description": "bulk-delete probe"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "rgb_id": "$.resource_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/resource-groups",
+            "json": {
+              "ids": [
+                "{rgb_id}"
+              ]
+            },
+            "service": "resourcemanager"
+          }
+        },
+        {
+          "name": "verify-resource-group-bulk",
+          "service": "resourcemanager",
+          "method": "GET",
+          "path": "/v1/resource-groups",
+          "expect_status": [
+            200
+          ],
+          "group": "resource-group-bulk"
+        },
+        {
+          "name": "delete-resource-group",
+          "service": "resourcemanager",
+          "method": "DELETE",
+          "path": "/v1/resource-groups/{rg_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-resource-group-bulk",
+          "service": "resourcemanager",
+          "method": "DELETE",
+          "path": "/v1/resource-groups",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "json": {
+            "ids": [
+              "{rgb_id}"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

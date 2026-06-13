@@ -320,7 +320,10 @@ def _fill_obj(obj, ctx: dict):
     if isinstance(obj, str):
         return _fill(obj, ctx)
     if isinstance(obj, dict):
-        return {k: _fill_obj(v, ctx) for k, v in obj.items()}
+        # keys can be templated too (e.g. resourcemanager bulk-tag bodies are
+        # {"{rg_srn}": [...]} maps keyed by SRN)
+        return {(_fill(k, ctx) if isinstance(k, str) else k): _fill_obj(v, ctx)
+                for k, v in obj.items()}
     if isinstance(obj, list):
         return [_fill_obj(v, ctx) for v in obj]
     return obj
