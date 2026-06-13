@@ -30,6 +30,18 @@ def sh(*cmd: str, timeout: int = 120) -> tuple[int, str]:
 def main() -> int:
     from core.config import Settings
     from core.http_client import ApiClient
+    try:
+        from core import oplog as _oplog
+    except Exception:
+        _oplog = None
+
+    def _ev(action, **kw):
+        # probe bypasses the engine, so emit resource events itself —
+        # otherwise the ops dashboard never shows the probe registry
+        # (owner report 2026-06-13)
+        if _oplog:
+            _oplog.emit_resource(action, service="scr",
+                                 lifecycle="scr-docker-probe", **kw)
 
     cfg = Settings()
     client = ApiClient(cfg)
@@ -56,6 +68,9 @@ def main() -> int:
         print(f"{VERDICT} create -> {resp.status} {str(resp.raw_text)[:300]}")
         body = resp.body or {}
         reg_id = str(body.get("id") or body.get("registry_id") or "")
+        if reg_id:
+            _ev("created", path="/v1/container-registries", name=name,
+                res_id=reg_id, status=str(resp.status))
         borrowed = False
         if not reg_id and resp.status == 403 and "quota" in str(resp.raw_text):
             # NON_VISIBILITY max 1 (userguide fact, live-confirmed run
@@ -143,10 +158,18 @@ def main() -> int:
                                        service="scr")
                     print(f"{VERDICT} delete -> {r.status}")
                     if r.status < 500:
+                        _ev("deleted",
+                            path=f"/v1/container-registries/{reg_id}",
+                            name=name, res_id=reg_id, status=str(r.status))
                         break
                 except Exception as exc:
                     print(f"{VERDICT} delete error {exc}")
                 time.sleep(15)
+    if _oplog:
+        try:
+            _oplog.flush_resources()
+        except Exception:
+            pass
     return 0
 
 
