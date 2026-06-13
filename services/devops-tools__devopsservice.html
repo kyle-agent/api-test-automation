@@ -191,11 +191,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-13 23:12 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-13 23:58 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/devops-services/{devops_service_id}", "api": "deletedevopsservice", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "GET", "p": "/v1/devops-services", "api": "listdevopsservices", "c": "y", "s": 200, "t": 1.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/{devops_service_id}", "api": "showdevopsservice", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/{devops_service_id}/check-deletable", "api": "checkdeletabledevopsservice", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/check-duplication", "api": "checkduplicationdevopsservice", "c": "p", "s": 400, "t": 1.9, "src": "", "d": []}, {"m": "POST", "p": "/v1/devops-services", "api": "createdevopsservice", "c": "n", "s": 400, "t": 1.7, "src": "80b6741", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: tenant_code, tenant_name", "crit": false}]}];
+var R=[{"m": "DELETE", "p": "/v1/devops-services/{devops_service_id}", "api": "deletedevopsservice", "c": "n", "s": 404, "t": 1.0, "src": "a357115", "d": []}, {"m": "GET", "p": "/v1/devops-services", "api": "listdevopsservices", "c": "y", "s": 200, "t": 1.2, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/{devops_service_id}", "api": "showdevopsservice", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/{devops_service_id}/check-deletable", "api": "checkdeletabledevopsservice", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/devops-services/check-duplication", "api": "checkduplicationdevopsservice", "c": "p", "s": 400, "t": 1.1, "src": "", "d": []}, {"m": "POST", "p": "/v1/devops-services", "api": "createdevopsservice", "c": "n", "s": 400, "t": 1.7, "src": "80b6741", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: tenant_code, tenant_name", "crit": false}]}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
