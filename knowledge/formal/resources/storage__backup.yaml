@@ -1,8 +1,22 @@
 # Resource-task model — storage/backup (st-backup group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from backup-agent +
-# backup-job (enabled+heavy, bodies DOCS-ONLY per source _notes: they
-# reference docs-example server UUIDs that do not exist on this account, so
-# creates 4xx → both nodes docs until a real target server exists).
+# backup-job lifecycles, REWORKED 2026-06-13 per owner directive: backup
+# attaches to a REAL server — the heavy VM chain (compute__virtualserver
+# `server` node) is now modeled, so the docs-example-UUID placeholders are
+# replaced by a backup-target LOOKUP that discovers the live server's
+# uuid/guid through the backup service's own discovery endpoint.
+#
+# Userguide (/userguide/storage/backup/overview/, fetched 2026-06-13):
+#   - Agentless backup (VM_IMAGE, Virtual Server/GPU Server): agent 설치 불필요
+#     — 바로 서비스 생성 가능.
+#   - Agent backup (FILESYSTEM, incl. Bare Metal): "Agent backups require
+#     prior agent creation and configuration on target servers before
+#     service creation" — 에이전트 설치 필수.
+#   - Owner decision 2026-06-10: "agent 없는 백업으로만" — the 8 agent-family
+#     ops are WAIVED (data/baselines/coverage_waivers.json). This model
+#     therefore drives the AGENTLESS VM_IMAGE path live, and keeps agent-
+#     dependent ops either waived (agent family) or broad-expect with notes
+#     (filesystem-path family on an agentless policy).
 version: 1
 resources:
   backup-agent:
@@ -18,47 +32,223 @@ resources:
         tags: []
       options:
         server_uuid: {type: string, required: true,
-                      default: "89f5ef44-1021-4a5c-8e06-fbb289eac366",
-                      note: "Agent를 설치할 실서버(VS/BM)의 UUID — 기본값은 소스의 문서 예시 UUID(이 계정에 미존재 → 4xx). 진짜 의존은 server 노드인데 compute 카테고리 미모델 — compute 추출 후 {server.server_uuid} ref 옵션으로 갱신할 것"}
+                      note: "Agent를 설치할 실서버(VS/BM)의 UUID — 기본값 제거(의도된 폼-게이트): agent 계열 8 ops는 owner waiver(2026-06-10 'agent 없는 백업으로만') 대상이라 합성하지 않는다. server 노드가 모델링되어 {server.server_id} 주입이 가능해졌지만, 유저가이드상 Agent 백업은 생성 후 게스트 OS 안에서 설치 파일 실행/구성이 필요(콘솔/in-VM 절차, API로 완결 불가) — waiver 해제 시 owner가 폼으로 실서버 UUID를 주입"}
     capture: {backup_agent_id: "$.resource.id"}
     delete: {endpoint: "DELETE /v1/backup-agents/{backup_agent_id}", destructive: true}
     provenance: docs
     source: {lifecycle: backup-agent, steps: [create-backup-agent, delete-backup-agent]}
-    notes: "BackupAgentCreateRequest1Dot2 (api_bodies createbackupagent). 소스는 subnet_id도 문서 예시 리터럴이었다 — 실소유 subnet 주입은 이 모델이 처음 제공 (private-nat 패턴) → body UNPROVEN 유지. Agent형(Filesystem/BM) 백업은 백업 생성 전에 Agent가 서버에 설치/구성돼 있어야 한다 (services constraint server-prereq)."
+    notes: "WAIVED FAMILY — coverage_waivers.json (owner 2026-06-10): createbackupagent/deletebackupagent/showbackupagent/checkconnectionstate/listbackupagenttargets/listagentbackuprestoretargetservers/restoreagentbackup/showinstallfilepath. BackupAgentCreateRequest1Dot2 (api_bodies createbackupagent). 유저가이드 overview: Agent형(FILESYSTEM) 백업은 백업 생성 전에 Agent가 서버에 설치/구성돼 있어야 한다 (services constraint server-prereq) — 'Agent backups require prior agent creation and configuration on target servers'. 노드는 폼-게이트로 보존만 한다 (합성 대상 아님)."
 
+  # LOOKUP — 백업 대상 서버 발견 (getbackuptargetlist). 실서버가 백업 서비스
+  # 관점에서 노출하는 server_uuid/server_guid를 가져와 backup-policy create에
+  # 공급한다 — server.server_id == server_uuid 추측 대신 문서가 제공하는 발견
+  # 경로를 쓴다. server_name 쿼리는 server 노드의 create body name과 동일한
+  # run-스코프 {unique} 공유 시맨틱 (keypair_name: regrkey{unique} 선례).
+  backup-target:
+    code: "st-backup-target"
+    service: storage/backup
+    heavy: true
+    requires: [server]
+    create:
+      endpoint: "GET /v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE&server_name=regrsrv{unique}"
+    capture:
+      backup_server_uuid: "$.contents[0].server_uuid"
+      backup_server_guid: "$.contents[0].server_guid"
+    provenance: docs
+    source: {lifecycle: backup-job, steps: []}
+    notes: "읽기 전용 LOOKUP 노드 (create=GET, teardown 없음 — validator 경고는 의도). 쿼리 필수: server_category + policy_type (api_docs getbackuptargetlist; server_name/region/page/size는 optional). 응답 BackupTargetListResponse.contents[] = {server_uuid, server_guid, server_name, server_os_version, server_type}. capture는 HARD(soft 아님 — backup-policy를 먹인다): ACTIVE 직후 서버가 목록에 즉시 반영되지 않으면 capture 미충족 → 라이브 1회전에서 전파 지연이 관측되면 create-poll 능력이 필요해진다 (triage 환류 포인트)."
+
+  # 본체 — AGENTLESS VM_IMAGE 백업 정책 (createbackup). cross-service.yaml의
+  # backup-policy(requires: [server])와 정렬 — 이전 모델의 requires: [] +
+  # 문서예시 UUID placeholder 발산은 server/backup-target 모델링으로 해소됐다.
   backup-policy:
     code: "st-backup-policy"
     service: storage/backup
     heavy: true
-    requires: []
+    requires: [server, backup-target]
     create:
       endpoint: "POST /v1/backups"
+      # BackupCreateRequest1Dot2 (api_docs VERBATIM): required = name,
+      # policy_category(AGENTLESS|AGENT), policy_type(VM_IMAGE|FILESYSTEM),
+      # schedules(array[BackupScheduleCreateRequest]), server_category
+      # (VIRTUAL_SERVER|GPU_SERVER|BAREMETAL_SERVER), server_uuid.
+      # optional = dr_enabled, encrypt_enabled(default True), filesystem_paths,
+      # is_all_filesystem, region, retention_period(default WEEK_2),
+      # server_guid, tags. filesystem_paths/is_all_filesystem은 FILESYSTEM
+      # (Agent형) 전용 의미라 AGENTLESS body에서 제거 (구 모델은 문서 예시
+      # 그대로 실어 보냈었다 — 500의 의심 요인 중 하나).
       body:
         name: "regrbk{unique}"
         policy_category: AGENTLESS
         policy_type: VM_IMAGE
         server_category: VIRTUAL_SERVER
-        server_guid: "{opt.server_guid}"
-        server_uuid: "{opt.server_uuid}"
+        server_uuid: "{backup-target.backup_server_uuid}"
+        server_guid: "{backup-target.backup_server_guid}"
         region: "{region}"
         retention_period: WEEK_2
         dr_enabled: false
         encrypt_enabled: true
-        is_all_filesystem: false
-        filesystem_paths: ["/aaa", "/bbb"]
         schedules:
-          - {frequency: DAILY, start_day: MON, start_time: "09:00:00",
-             start_week: WEEK_2, type: FULL}
+          # BackupScheduleCreateRequest: required = frequency(MONTHLY|WEEKLY|
+          # DAILY), start_time, type(FULL|INCREMENTAL); start_day/start_week는
+          # WEEKLY/MONTHLY 전용 optional — DAILY라 생략. services constraint
+          # schedule-limits: Full 정확히 1 + Incremental ≤6, 분은 00/30만.
+          - {frequency: DAILY, start_time: "09:00:00", type: FULL}
         tags: []
-      options:
-        server_guid: {type: string, required: true,
-                      default: "9ab33c66-3dbd-46cd-b0af-abccd3eb3170",
-                      note: "백업 대상 서버 GUID — 문서 예시(미존재 → 4xx); compute 모델 후 server ref로 교체"}
-        server_uuid: {type: string, required: true,
-                      default: "89f5ef44-1021-4a5c-8e06-fbb289eac366",
-                      note: "백업 대상 서버 UUID — 문서 예시(미존재 → 4xx)"}
     capture: {backup_id: "$.resource.id"}
-    delete: {endpoint: "DELETE /v1/backups/{backup_id}", destructive: true}
+    ready: {endpoint: "GET /v1/backups/{backup_id}",
+            field: "$.state", until: [AVAILABLE], timeout: 900, interval: 15}
+    verify:
+      # showbackup — BackupDetailResponse1Dot2는 FLAT (id/state/… 최상위)
+      - {name: read, endpoint: "GET /v1/backups/{backup_id}",
+         expect_status: [200]}
+      # checkbackupnameduplicate — 쿼리 필수 backup_name
+      - {name: check-name-dup,
+         endpoint: "GET /v1/backups/check-name-duplication?backup_name=regrbk{unique}",
+         expect_status: [200]}
+      # checkbackuprestoreservernameduplicate — 쿼리 필수 restore_server_name
+      # (복구 전 이름 중복 검사 — 복구 자체와 독립이라 여기서 라이브 검증 가능)
+      - {name: check-restore-name-dup,
+         endpoint: "GET /v1/backups/restore/check-name-duplication?restore_server_name=regrrst{unique}",
+         expect_status: [200]}
+      # checkfilesystemduplication — 쿼리 필수 filesystem_path + server_uuid.
+      # FILESYSTEM(Agent형) 정책용 검사 — agentless 전용 계정에선 200(result
+      # false) 기대하나 400 가능성 있어 broad (userguide: filesystem 백업은
+      # agent 필수)
+      - {name: check-filesystem-dup,
+         endpoint: "GET /v1/backups/check-filesystem-duplication?filesystem_path=/&server_uuid={backup-target.backup_server_uuid}",
+         expect_status: [200, 400]}
+      # listbackupschedules
+      - {name: list-schedules, endpoint: "GET /v1/backups/{backup_id}/schedules",
+         expect_status: [200]}
+      # setbackupschedules — ModifyBackupSchedulesRequest {schedules}; Full 1개
+      # 유지(스케줄 제약), 시작 시간만 09:00 → 10:00 변경으로 실갱신 증명
+      - {name: set-schedules, endpoint: "PUT /v1/backups/{backup_id}/schedules",
+         json: {schedules: [{frequency: DAILY, start_time: "10:00:00", type: FULL}]},
+         expect_status: [200]}
+      # listbackuphistories (쿼리 전부 optional — 생성 직후 빈 목록 200 기대)
+      - {name: list-histories,
+         endpoint: "GET /v1/backups/{backup_id}/backup-histories",
+         expect_status: [200]}
+      # listbackuprestorehistories
+      - {name: list-restore-histories,
+         endpoint: "GET /v1/backups/{backup_id}/restore-histories",
+         expect_status: [200]}
+      # listbackuprestoretarget — 완료된 백업 전이면 빈 목록 200 기대 (복구
+      # 시점 capture는 backup-restore-target 노드가 담당)
+      - {name: list-restore-targets,
+         endpoint: "GET /v1/backups/{backup_id}/restore-targets",
+         expect_status: [200]}
+      # listbackuprestoresubnets — 쿼리 필수 region. 복구 가능 백업이 없으면
+      # 400 가능성 있어 broad
+      - {name: list-restore-subnets,
+         endpoint: "GET /v1/backups/{backup_id}/restore/restorable-subnets?region={region}",
+         expect_status: [200, 400]}
+      # setfilesystempath — FileSystemPathUpdateRequest1Dot2 (둘 다 optional
+      # 필드지만 body 자체는 required). FILESYSTEM(Agent형) 정책 전용 의미 —
+      # AGENTLESS VM_IMAGE 정책엔 400 거부가 정상일 수 있어 broad. userguide:
+      # filesystem 백업/복구는 Backup Agent 필수
+      - {name: set-filesystem-path,
+         endpoint: "PUT /v1/backups/{backup_id}/filesystem-path",
+         json: {backup_filesystem_paths: ["/"], is_all_filesystem: false},
+         expect_status: [200, 400]}
+      # updatereplicationuse — BackupReplicationUseUpdateBody {dr_enabled}
+      # (required). userguide 복제 페이지: 복제는 Agent Backup 전용("Only
+      # Agent Backup supports replication; Agentless ... does not"), agentless
+      # 는 원격지 백업으로 갈음 + kr-south 리전 복제 불가 — AGENTLESS 정책에
+      # dr_enabled:false no-op PUT도 400일 수 있어 broad
+      - {name: update-replication,
+         endpoint: "PUT /v1/backups/{backup_id}/replication",
+         json: {dr_enabled: false},
+         expect_status: [200, 400]}
+      # updateretentionperiod — RetentionPeriodUpdateBody {retention_period}
+      # enum (WEEK_2, MONTH_1, MONTH_3, MONTH_6, YEAR_1); WEEK_2 → MONTH_1
+      # 실갱신 (teardown이 정책을 지우므로 보존 연장 부작용 없음)
+      - {name: update-retention,
+         endpoint: "PUT /v1/backups/{backup_id}/retention-period",
+         json: {retention_period: MONTH_1},
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/backups/{backup_id}",
+             retry_on_status: [409, 500], retries: 40, retry_interval: 30,
+             destructive: true}
     provenance: docs
     source: {lifecycle: backup-job, steps: [create-backup, delete-backup]}
-    notes: "cross-service.yaml의 backup-policy 노드 (requires: [server] — server는 compute 미모델이라 본 모델은 requires:[] + 옵션 placeholder; 의도된 발산 경고). BackupCreateRequest1Dot2 (api_bodies createbackup). 제약(services/storage__backup.yaml): retention은 ENUM(14/31/93/186/365일 = 2주/1/3/6/12개월 — API 코드는 WEEK_2만 관측), 스케줄은 Full 1 + Incremental ≤6, 분은 00/30만; Agentless(VM_IMAGE)는 서버만 있으면 되고 Agent형은 backup-agent 선행. AES-256 암호화는 항상 적용(파라미터 아님). 삭제 후 404 폴링(소스 wait-backup-gone 300s)."
+    notes: "createbackup → SyncResponse {request_id, resource: {id}} — capture $.resource.id verbatim. ready는 showbackup의 FLAT state(BackupDetailResponse1Dot2 'Backup 상태 Example : AVAILABLE')를 AVAILABLE까지 폴링. 유저가이드 overview: Agentless(VM_IMAGE, VS/GPU)는 agent 설치 불필요 — 'Agentless Backup: No separate agent installation required.' 이전 라이브 시도는 문서예시 UUID로 500(run a357115) — 실서버 + backup-target 발견 경로가 이 모델의 교정. retention enum WEEK_2/MONTH_1/MONTH_3/MONTH_6/YEAR_1 (api_docs verbatim — services constraint retention-enum 14/31/93/186/365일과 합치). AES-256 암호화 상시 적용(encrypt_enabled default True). 삭제는 manual-backup job 진행 중 409/500 충돌 가능 → 40×30s 재시도 (소스 wait-backup-gone 300s 의도 흡수)."
+
+  # 액션 노드 (manualbackup) — ske-cluster-upgrade 패턴: create=POST 액션,
+  # capture/delete 없음, ready가 본체 상태의 재-폴링.
+  backup-manual:
+    code: "st-backup-manual"
+    service: storage/backup
+    heavy: true
+    requires: [backup-policy]
+    create:
+      endpoint: "POST /v1/backups/{backup-policy.backup_id}/manual-backup"
+      body: {}
+    ready: {endpoint: "GET /v1/backups/{backup-policy.backup_id}",
+            field: "$.state", until: [AVAILABLE], timeout: 3600, interval: 60}
+    verify:
+      - {name: histories-after,
+         endpoint: "GET /v1/backups/{backup-policy.backup_id}/backup-histories",
+         expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: backup-job, steps: [manual-backup]}
+    notes: "즉시 백업 — userguide on_demand: '즉시 Backup은 Full Backup으로 수행됩니다' + 백업이 Available 상태여야 실행 가능 (backup-policy ready가 보장). api_docs manualbackup: path param만 문서화(body 스키마 없음) — 소스 lifecycle과 동일하게 빈 {} 전송. 응답 SyncResponse. ready는 state가 job 동안 이탈하면 AVAILABLE 복귀까지 최대 60분 재폴링(Full 이미지 백업), state가 AVAILABLE에 머무는 구현이면 즉시 통과하고 job은 이력에서만 추적 — 그 경우 teardown의 delete-backup 409 재시도가 흡수. 이력 도달(SUCCESS)은 verify가 아니라 backup-restore-target의 시간 게이트 문제."
+
+  # LOOKUP + 삭제 — 복구 시점(restore target) 발견 (listbackuprestoretarget
+  # capture) + deletebackuprestoretarget (json body 동반 DELETE passthrough).
+  backup-restore-target:
+    code: "st-backup-restore-target"
+    service: storage/backup
+    heavy: true
+    requires: [backup-policy, backup-manual]
+    create:
+      endpoint: "GET /v1/backups/{backup-policy.backup_id}/restore-targets"
+    capture: {restore_target_id: "$.contents[0].restore_target_id"}
+    verify:
+      # listfilesystempath — 쿼리 필수 restore_target_id + path. FILESYSTEM
+      # (Agent형) 복구 흐름의 경로 탐색이라 VM_IMAGE 복구 시점엔 400 기대
+      # (userguide recovery: filesystem 복구는 'must have Backup Agent') —
+      # 실 2xx는 agent waiver 해제 후에만 가능
+      - {name: list-filesystem-path,
+         endpoint: "GET /v1/backups/{backup-policy.backup_id}/filesystem-path?restore_target_id={self.restore_target_id}&path=/",
+         expect_status: [200, 400, 404]}
+    delete:
+      endpoint: "DELETE /v1/backups/{backup-policy.backup_id}/restore-targets"
+      json: {restore_target_ids: ["{self.restore_target_id}"]}
+      expect_status: [200, 202, 204, 400, 404]
+      destructive: true
+    provenance: docs
+    source: {lifecycle: backup-job, steps: [delete-backup-restore-targets]}
+    notes: "TIMING-GATED: restore target(복구 시점)은 백업 job이 SUCCESS로 완료된 뒤에야 contents에 나타난다 (BackupRestoreTargetResponse {restore_target_id, is_restore_available, schedule_id, backup_start_time}) — manual-backup 직후 목록이 비어 있으면 capture 미충족. 그래서 이 노드를 끄는 합성본(gen-heavy-backup-restore)은 enabled:false로 둔다 — 첫 gen-heavy-backup 라이브에서 job 소요시간을 관측한 뒤 게이트 해제. delete는 json body 동반 DELETE(BackupRestoreTargetDeleteRequest {restore_target_ids} required, api_docs verbatim) — 보존기간 관리 대상인 복구 시점의 명시 삭제라 400 거부 가능성 포함 broad."
+
+  # 액션 노드 (restorebackup) — VM 이미지 복구 = 신규 서버 생성 (202 Async).
+  backup-restore:
+    code: "st-backup-restore"
+    service: storage/backup
+    heavy: true
+    requires: [backup-policy, backup-restore-target, subnet, security-group, server-type]
+    create:
+      endpoint: "POST /v1/backups/{backup-policy.backup_id}/restore"
+      # BackupRestoreRequest (api_docs VERBATIM): required = restore_server_
+      # name(^[a-zA-Z0-9-_ ]*$, ≤63), restore_target_id, server_type_id;
+      # optional = networks(array[Network{subnet_id}]), restore_region,
+      # security_groups
+      body:
+        restore_server_name: "regrrst{unique}"
+        restore_target_id: "{backup-restore-target.restore_target_id}"
+        server_type_id: "{server-type.server_type_id}"
+        restore_region: "{region}"
+        networks:
+          - {subnet_id: "{subnet.subnet_id}"}
+        security_groups: ["{security-group.sg_id}"]
+    capture: {restore_resource_id: "$.resource.id"}
+    ready: {endpoint: "GET /v1/backups/{backup-policy.backup_id}",
+            field: "$.state", until: [AVAILABLE], timeout: 3600, interval: 60}
+    verify:
+      - {name: restore-histories-after,
+         endpoint: "GET /v1/backups/{backup-policy.backup_id}/restore-histories",
+         expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: backup-job, steps: [restore-backup]}
+    notes: "BLAST RADIUS: 복구는 NEW billable 서버를 만든다 (userguide recovery: VM Image 복구 = 'Creates a new server from backup'; '원본의 Security Group, NAT IP, Delete on termination 설정은 복구되지 않으므로' 네트워크/SG 입력 필요, 복구 서버는 Rebuild 불가). 202 AsyncResponse — $.resource.id가 복구 job인지 신규 서버 id인지 UNPROVEN. 복구 산출 서버의 삭제는 compute/virtualserver DELETE /v1/servers/{id}로 해야 하는데 모델 delete는 노드 service(backup)로 라우팅되므로 cross-service teardown 미지원 — 신규 서버는 tags 미지원 body라 reconciler에도 안 잡힌다 → 이 노드는 enabled 합성 금지(gen-heavy-backup-restore enabled:false), 라이브 시도는 scoped run + 수동 정리 전제. restore_server_name은 backup-policy verify check-restore-name-dup과 같은 {unique} 이름."

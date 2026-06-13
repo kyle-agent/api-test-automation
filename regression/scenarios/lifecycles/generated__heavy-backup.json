@@ -1,0 +1,1204 @@
+{
+  "_comment": "Composed heavy backup chain (storage/backup, owner directive 2026-06-13). gen-heavy-backup is the agentless VM_IMAGE live chain (enabled, heavy window). gen-heavy-backup-restore models the restore flow but stays disabled until backup-job timing is observed live — see _disabled_reason. Agent family (8 ops) stays WAIVED per owner 2026-06-10 'agent 없는 백업으로만' (data/baselines/coverage_waivers.json).",
+  "lifecycles": [
+    {
+      "id": "gen-heavy-backup",
+      "service": "storage/backup",
+      "enabled": true,
+      "_note": "storage/backup AGENTLESS VM_IMAGE chain on a REAL server (owner directive 2026-06-13 — prior blocker was docs-example server UUIDs, '실 서버 UUID 의존'): VM closure -> backup-target lookup (GET /v1/backups/backup-targets discovers the live server's server_uuid/server_guid; covers getbackuptargetlist) -> create backup policy (BackupCreateRequest1Dot2 verbatim; agentless needs NO agent per userguide overview: 'Agentless Backup: No separate agent installation required') -> ready $.state AVAILABLE -> verify family: showbackup, check-name-dup, check-restore-name-dup, check-filesystem-dup(broad: FILESYSTEM/agent-oriented), list/set schedules, backup-/restore-histories, restore-targets, restorable-subnets(broad), set-filesystem-path(broad: agent-policy-only per userguide), update-replication(broad: replication is Agent-Backup-only per userguide), update-retention (WEEK_2->MONTH_1) -> manual-backup ('즉시 Backup은 Full Backup으로 수행됩니다' — always FULL) with AVAILABLE re-poll up to 60min -> teardown (delete-backup retries 409/500 40x30s in case the full-backup job still holds the policy). Restore flow lives in gen-heavy-backup-restore (disabled, timing-gated).",
+      "steps": [
+        {
+          "name": "create-keypair",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "private_key": "$.private_key"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "create-image",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "create-server-type",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_type_id": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": "g"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-security-group",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-server",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers",
+          "json": {
+            "name": "regrsrv{unique}",
+            "image_id": "{image_id}",
+            "server_type_id": "{server_type_id}",
+            "keypair_name": "regrkey{unique}",
+            "product_category": "compute",
+            "product_offering": "virtual_server",
+            "networks": [
+              {
+                "subnet_id": "{subnet_id}"
+              }
+            ],
+            "security_groups": [
+              "{sg_id}"
+            ],
+            "volumes": [
+              {
+                "boot_index": 0,
+                "size": 104,
+                "type": "SSD",
+                "delete_on_termination": true
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_id": "$.servers[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "wait-server",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 600,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-backup-target",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE&server_name=regrsrv{unique}",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "backup_server_uuid": "$.contents[0].server_uuid",
+            "backup_server_guid": "$.contents[0].server_guid"
+          }
+        },
+        {
+          "name": "create-backup-policy",
+          "service": "backup",
+          "method": "POST",
+          "path": "/v1/backups",
+          "json": {
+            "name": "regrbk{unique}",
+            "policy_category": "AGENTLESS",
+            "policy_type": "VM_IMAGE",
+            "server_category": "VIRTUAL_SERVER",
+            "server_uuid": "{backup_server_uuid}",
+            "server_guid": "{backup_server_guid}",
+            "region": "{region}",
+            "retention_period": "WEEK_2",
+            "dr_enabled": false,
+            "encrypt_enabled": true,
+            "schedules": [
+              {
+                "frequency": "DAILY",
+                "start_time": "09:00:00",
+                "type": "FULL"
+              }
+            ],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "backup_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/backups/{backup_id}",
+            "service": "backup"
+          }
+        },
+        {
+          "name": "wait-backup-policy",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 15
+          }
+        },
+        {
+          "name": "verify-backup-policy-read",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-check-name-dup",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/check-name-duplication?backup_name=regrbk{unique}",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-check-restore-name-dup",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/restore/check-name-duplication?restore_server_name=regrrst{unique}",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-check-filesystem-dup",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/check-filesystem-duplication?filesystem_path=/&server_uuid={backup_server_uuid}",
+          "expect_status": [
+            200,
+            400
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-list-schedules",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/schedules",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-set-schedules",
+          "service": "backup",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/schedules",
+          "json": {
+            "schedules": [
+              {
+                "frequency": "DAILY",
+                "start_time": "10:00:00",
+                "type": "FULL"
+              }
+            ]
+          },
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-list-histories",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/backup-histories",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-list-restore-histories",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/restore-histories",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-list-restore-targets",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/restore-targets",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-list-restore-subnets",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/restore/restorable-subnets?region={region}",
+          "expect_status": [
+            200,
+            400
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-set-filesystem-path",
+          "service": "backup",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/filesystem-path",
+          "json": {
+            "backup_filesystem_paths": [
+              "/"
+            ],
+            "is_all_filesystem": false
+          },
+          "expect_status": [
+            200,
+            400
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-update-replication",
+          "service": "backup",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/replication",
+          "json": {
+            "dr_enabled": false
+          },
+          "expect_status": [
+            200,
+            400
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "verify-backup-policy-update-retention",
+          "service": "backup",
+          "method": "PUT",
+          "path": "/v1/backups/{backup_id}/retention-period",
+          "json": {
+            "retention_period": "MONTH_1"
+          },
+          "expect_status": [
+            200
+          ],
+          "group": "backup-policy"
+        },
+        {
+          "name": "create-backup-manual",
+          "service": "backup",
+          "method": "POST",
+          "path": "/v1/backups/{backup_id}/manual-backup",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-backup-manual",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "AVAILABLE"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          }
+        },
+        {
+          "name": "verify-backup-manual-histories-after",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/backup-histories",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-manual"
+        },
+        {
+          "name": "delete-backup-policy",
+          "service": "backup",
+          "method": "DELETE",
+          "path": "/v1/backups/{backup_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-server",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-security-group",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-keypair",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ],
+      "heavy": true
+    },
+    {
+      "id": "gen-heavy-backup-restore",
+      "service": "storage/backup",
+      "enabled": false,
+      "_note": "Restore flow: backup-restore-target lookup captures $.contents[0].restore_target_id (listbackuprestoretarget) + list-filesystem-path probe (agent-gated: 400 expected on a VM_IMAGE restore point) + teardown DELETE restore-targets with json body restore_target_ids (deletebackuprestoretarget) -> restorebackup POST (BackupRestoreRequest verbatim: restore_server_name/restore_target_id/server_type_id required) -> 202 AsyncResponse, $.resource.id semantics UNPROVEN.",
+      "steps": [
+        {
+          "name": "create-keypair",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "private_key": "$.private_key"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "create-image",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "create-server-type",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_type_id": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": "g"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-security-group",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-server",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/servers",
+          "json": {
+            "name": "regrsrv{unique}",
+            "image_id": "{image_id}",
+            "server_type_id": "{server_type_id}",
+            "keypair_name": "regrkey{unique}",
+            "product_category": "compute",
+            "product_offering": "virtual_server",
+            "networks": [
+              {
+                "subnet_id": "{subnet_id}"
+              }
+            ],
+            "security_groups": [
+              "{sg_id}"
+            ],
+            "volumes": [
+              {
+                "boot_index": 0,
+                "size": 104,
+                "type": "SSD",
+                "delete_on_termination": true
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_id": "$.servers[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/servers/{server_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "wait-server",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.server.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 600,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-backup-target",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE&server_name=regrsrv{unique}",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "backup_server_uuid": "$.contents[0].server_uuid",
+            "backup_server_guid": "$.contents[0].server_guid"
+          }
+        },
+        {
+          "name": "create-backup-policy",
+          "service": "backup",
+          "method": "POST",
+          "path": "/v1/backups",
+          "json": {
+            "name": "regrbk{unique}",
+            "policy_category": "AGENTLESS",
+            "policy_type": "VM_IMAGE",
+            "server_category": "VIRTUAL_SERVER",
+            "server_uuid": "{backup_server_uuid}",
+            "server_guid": "{backup_server_guid}",
+            "region": "{region}",
+            "retention_period": "WEEK_2",
+            "dr_enabled": false,
+            "encrypt_enabled": true,
+            "schedules": [
+              {
+                "frequency": "DAILY",
+                "start_time": "09:00:00",
+                "type": "FULL"
+              }
+            ],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "backup_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/backups/{backup_id}",
+            "service": "backup"
+          }
+        },
+        {
+          "name": "wait-backup-policy",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-backup-manual",
+          "service": "backup",
+          "method": "POST",
+          "path": "/v1/backups/{backup_id}/manual-backup",
+          "json": {},
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-backup-manual",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "AVAILABLE"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          }
+        },
+        {
+          "name": "create-backup-restore-target",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/restore-targets",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "restore_target_id": "$.contents[0].restore_target_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/backups/{backup_id}/restore-targets",
+            "json": {
+              "restore_target_ids": [
+                "{restore_target_id}"
+              ]
+            },
+            "service": "backup"
+          }
+        },
+        {
+          "name": "verify-backup-restore-target-list-filesystem-path",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/filesystem-path?restore_target_id={restore_target_id}&path=/",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "group": "backup-restore-target"
+        },
+        {
+          "name": "create-backup-restore",
+          "service": "backup",
+          "method": "POST",
+          "path": "/v1/backups/{backup_id}/restore",
+          "json": {
+            "restore_server_name": "regrrst{unique}",
+            "restore_target_id": "{restore_target_id}",
+            "server_type_id": "{server_type_id}",
+            "restore_region": "{region}",
+            "networks": [
+              {
+                "subnet_id": "{subnet_id}"
+              }
+            ],
+            "security_groups": [
+              "{sg_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "restore_resource_id": "$.resource.id"
+          }
+        },
+        {
+          "name": "wait-backup-restore",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "AVAILABLE"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          }
+        },
+        {
+          "name": "verify-backup-restore-restore-histories-after",
+          "service": "backup",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/restore-histories",
+          "expect_status": [
+            200
+          ],
+          "group": "backup-restore"
+        },
+        {
+          "name": "delete-backup-restore-target",
+          "service": "backup",
+          "method": "DELETE",
+          "path": "/v1/backups/{backup_id}/restore-targets",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
+          "destructive": true,
+          "json": {
+            "restore_target_ids": [
+              "{restore_target_id}"
+            ]
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-backup-policy",
+          "service": "backup",
+          "method": "DELETE",
+          "path": "/v1/backups/{backup_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409,
+            500
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-server",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/servers/{server_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-security-group",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-keypair",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "TIMING-GATED + BLAST RADIUS (modeled per plan, intentionally off): (1) a restore target only appears in GET /v1/backups/{id}/restore-targets after the manual FULL image backup job reaches SUCCESS in backup-histories — job duration unobserved (could exceed the heavy window), so the hard capture of restore_target_id would come up empty right after create-backup-manual; (2) restorebackup creates a NEW billable server (userguide recovery: VM image restore 'creates a new server'; '원본의 Security Group, NAT IP, Delete on termination 설정은 복구되지 않으므로') whose cleanup needs a cross-service DELETE /v1/servers/{id} the model cannot route (node service=backup), and the restore body carries no tags so the reconciler cannot adopt the orphan. Enable after gen-heavy-backup live data shows job duration, via a scoped run with manual cleanup of the restored server."
+    }
+  ]
+}

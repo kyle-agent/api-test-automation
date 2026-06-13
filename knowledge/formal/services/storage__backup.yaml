@@ -30,3 +30,12 @@ quirks:
   - id: encryption-fixed
     note: "AES-256 encryption is always applied; not a request parameter"
     provenance: docs
+  - id: on-demand-full
+    note: "즉시 Backup(manual-backup)은 항상 Full로 수행된다 — userguide how_to_guides/on_demand: '즉시 Backup은 Full Backup으로 수행됩니다'; 실행 전제는 백업이 Available 상태일 것"
+    provenance: docs
+  - id: restore-makes-new-server
+    note: "VM Image 복구는 NEW 서버를 생성한다 (기존 서버 복원이 아님) — userguide how_to_guides/recovery: 복구 시 서버명/서버유형/네트워크/Security Group을 새로 입력하며 '원본의 Security Group, NAT IP, Delete on termination 설정은 복구되지 않으므로' 주의; 복구된 서버는 Rebuild 불가, 원본 Server Group 미적용. Filesystem 복구는 기존 대상 서버로 복원하되 대상 서버에 Backup Agent + 원본과 동일 Backup Master/OS 필요 (agent-gated)"
+    provenance: docs
+  - id: replication-agent-only
+    note: "복제(replication)는 Agent Backup 전용 — userguide how_to_guides/replication: Agentless Backup은 복제 미제공(원격지 백업으로 갈음), kr-south 리전은 복제 불가, 타 리전 복제 시 '데이터 전송 요금이 추가됩니다' — AGENTLESS 정책에 대한 PUT /replication은 400 거부 가능"
+    provenance: docs
