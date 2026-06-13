@@ -70,6 +70,22 @@
  .chip{border:1px solid #d0d7de;border-radius:12px;padding:1px 10px;font-size:12px;background:#fff}
  .chip b{color:#1a7f37} .chip s{color:#656d76;text-decoration:none}
  .lcst{font-size:11px}
+ /* intended-vs-actual plan overlay (M6d / T5) */
+ .planlc{margin:10px 0 4px} .planlc .plc-h{font-size:12px;font-weight:700;color:#1f2328;margin-bottom:3px}
+ .planlc .plc-h .svc{color:#656d76;font-weight:400} .planlc .plc-h .ph{color:#9aa3ad;font-weight:600;font-size:11px;margin-left:6px}
+ .pchain{display:flex;flex-wrap:wrap;align-items:center;gap:2px}
+ .pstep{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border:1px solid #d8dee4;border-radius:6px;
+        background:#f6f8fa;font-size:11.5px;color:#9aa3ad}
+ .pstep .dot{width:8px;height:8px;border-radius:50%;background:#c8d0d8;flex:none}
+ .pstep .pk{font-size:10.5px;color:#aab2bb}
+ .pstep.p-alive{background:#fff;color:#1f2328;border-color:#2da44e} .pstep.p-alive .dot{background:#2da44e;animation:pulse 1.4s infinite}
+ .pstep.p-alive .pk{color:#57606a}
+ .pstep.p-done{background:#fff;color:#57606a;border-color:#d8dee4} .pstep.p-done .dot{background:#a5b0bb}
+ .pstep.p-fail{background:#fff5f5;color:#1f2328;border-color:#cf222e} .pstep.p-fail .dot{background:#cf222e}
+ .pstep.p-next{background:#e8f0fd;color:#1f2328;border-color:#2563c9;box-shadow:0 0 0 2px #d3e2fb}
+ .pstep.p-next .dot{background:#2563c9;animation:pulse 1.4s infinite}
+ .parrow{color:#c8d0d8;font-size:11px;padding:0 1px}
+ .ptd{color:#9aa3ad;font-size:11px;margin:0 5px} .ptd b{color:#b5740b;font-weight:700}
 </style>
 </head>
 <body><div class="wrap">
@@ -94,6 +110,7 @@
   <div class="chips" id="runPick" style="margin-top:6px"></div>
   <select id="resRun" onchange="renderRes()" style="display:none"></select>
   <div id="resVerdict"></div>
+  <div id="planOverlay"></div>
   <div class="chips" id="resChips"></div>
   <div class="rtools">
     <div class="seg" id="resSeg">
@@ -231,6 +248,17 @@ function kindLabel(e){
   return e.kind==="clusters"&&e.service?`Cluster · ${e.service}`:base;
 }
 const RES_CACHE=new Map();   // key -> events[] (objects are immutable; fetch once)
+// ---- plan-manifest (T4 emits runs/<id>/plan.json — the INTENDED chain) ----
+// {generated_at, lifecycles:[{id,service,order:[node],teardown:[node],dedup:{},peak_quota:{},kinds:{node:kind}}]}
+const PLAN_CACHE=new Map();  // rid -> manifest | null (null = fetched, 404/absent → no overlay)
+async function loadPlan(rid){
+  if(PLAN_CACHE.has(rid)) return PLAN_CACHE.get(rid);
+  let man=null;
+  try{ man=await jget(`runs/${rid}/plan.json`); }   // 404 throws → older pre-T4 runs have no manifest
+  catch(e){ man=null; }
+  PLAN_CACHE.set(rid,man);
+  return man;
+}
 async function loadResEvents(rid){
   const keys=RES_KEYS.filter(k=>k.startsWith(`runs/${rid}/res/`)).sort();
   const missing=keys.filter(k=>!RES_CACHE.has(k));
@@ -329,8 +357,84 @@ function rMatch(r){
        ||r.kind.toLowerCase().includes(q)||kindLabel(r).toLowerCase().includes(q)))return false;}
   return true;
 }
+// ---------------- intended-vs-actual plan overlay (M6d / T5) ----------------
+// Join the INTENDED chain (plan.json `order` per lifecycle) to the ACTUAL res
+// events. The join key is kind+lifecycle: `kinds[node]` maps an intended node
+// to its resource kind; folded `res` items already carry {kind,lifecycle}. We
+// match an intended node to the actual instance(s) of that kind in the same
+// lifecycle, deriving each step's state and which step is currently in flight.
+function planStepState(actuals,fin){
+  // actuals = folded res items (this kind+lifecycle), may be 0..n instances.
+  // alive(testing) > fail > done(deleted) > pending(none yet).
+  if(!actuals.length) return {st:"pending",inst:null};
+  // an in-flight (alive & not finished) instance dominates → "alive"
+  const alive=actuals.find(r=>r.state==="alive");
+  if(alive&&!fin) return {st:"alive",inst:alive};
+  if(alive&&fin)  return {st:"alive",inst:alive};   // run done but instance never deleted → leaked-but-was-created
+  if(actuals.some(r=>r.state==="fail")) return {st:"fail",inst:actuals.find(r=>r.state==="fail")};
+  return {st:"done",inst:actuals[actuals.length-1]};
+}
+function renderPlanOverlay(man,res){
+  const host=$("#planOverlay");
+  if(!host) return;
+  if(!man||!Array.isArray(man.lifecycles)||!man.lifecycles.length){ host.innerHTML=""; return; }  // pre-T4 / absent → nothing
+  const fin=window.DONE_RUNS.has(String(SELECTED_RUN));
+  // index folded actuals by lifecycle -> kind -> [items]
+  const byLcKind={};
+  for(const r of res){
+    const lc=r.lifecycle||""; (byLcKind[lc]=byLcKind[lc]||{});
+    (byLcKind[lc][r.kind]=byLcKind[lc][r.kind]||[]).push(r);
+  }
+  const dedupOf=(node)=>{          // who shares this prereq (plan.dedup: node -> [sharers] | count)
+    const d=man.dedup&&man.dedup[node]; if(!d) return "";
+    if(Array.isArray(d)) return d.length?` · 공유 prereq: ${d.join(", ")}`:"";
+    return ` · 공유 ${d}`;
+  };
+  const sections=man.lifecycles.map(lc=>{
+    const kinds=lc.kinds||{};
+    const acts=byLcKind[lc.id]||{};
+    const order=Array.isArray(lc.order)?lc.order:[];
+    const td=Array.isArray(lc.teardown)?lc.teardown:[];
+    // per intended node -> {node,kind,state,inst}
+    const steps=order.map(node=>{
+      const kind=kinds[node]||node;
+      const ss=planStepState(acts[kind]||[],fin);
+      return {node,kind,...ss};
+    });
+    // CURRENT in-flight step = the latest created-but-not-yet-done/ended (alive).
+    // Among alive steps prefer the one whose instance started most recently.
+    let curIdx=-1, curStart=-1;
+    steps.forEach((s,i)=>{ if(s.st==="alive"&&s.inst&&s.inst.start>curStart){ curStart=s.inst.start; curIdx=i; } });
+    // NEXT step = first intended node not yet created (pending), if the run is live.
+    let nextIdx=-1;
+    if(!fin) for(let i=0;i<steps.length;i++){ if(steps[i].st==="pending"){ nextIdx=i; break; } }
+    const stepHtml=steps.map((s,i)=>{
+      let cls="pstep", lab="대기";
+      if(i===curIdx){ cls+=" p-alive"; lab="진행 중"; }
+      else if(s.st==="alive"){ cls+=" p-alive"; lab=fin?"미정리":"진행 중"; }
+      else if(s.st==="fail"){ cls+=" p-fail"; lab="실패"; }
+      else if(s.st==="done"){ cls+=" p-done"; lab="완료"; }
+      else if(i===nextIdx){ cls+=" p-next"; lab="다음 ▸"; }
+      const klabel=KIND_LABEL[s.kind]||s.kind;
+      const tip=`${s.node} (${klabel}) — ${lab}${dedupOf(s.node)}`;
+      const arrow=i<steps.length-1?'<span class="parrow">▸</span>':'';
+      return `<span class="${cls}" title="${tip}"><span class="dot"></span>`+
+             `<b>${s.node}</b><span class="pk">${klabel}</span><span class="pk">${lab}</span></span>${arrow}`;
+    }).join("");
+    const tdHtml=td.length?`<span class="ptd">teardown: <b>${td.join(" ◂ ")}</b></span>`:"";
+    const phase=curIdx>=0?"실행 중":(steps.every(s=>s.st==="done")?"완료":(fin?"종료":"대기"));
+    return `<div class="planlc"><div class="plc-h">${lc.id} `+
+      `<span class="svc">${lc.service||""}</span><span class="ph">의도된 체인 · ${phase}</span></div>`+
+      `<div class="pchain">${stepHtml||'<span class="mut" style="font-size:11px">order 없음</span>'} ${tdHtml}</div></div>`;
+  }).join("");
+  host.innerHTML=`<div class="t-grp" style="margin-top:10px">의도된 연쇄 vs 실제 진행 `+
+    `<span class="mut" style="font-weight:400">(plan.json 매니페스트 · 회색=대기 · `+
+    `<span style="color:#2563c9">파랑=다음</span> · <span style="color:#2da44e">초록=진행중</span> · `+
+    `회색점=완료 · <span style="color:#cf222e">빨강=실패</span>)</span></div>${sections}`;
+}
 function renderTree(res,lcs){
   const fin=window.DONE_RUNS.has(String(SELECTED_RUN));
+  renderPlanOverlay(window.PLAN_MAN,res);   // additive overlay; no-op when no manifest
   if(!res.length&&!lcs.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; $("#resVerdict").innerHTML=""; return; }
   attachByDep(res);
   // ---- verdict (끝난 run = 정리 무결성 판정) ----
@@ -443,11 +547,16 @@ async function renderRes(rerenderOnly){
   SELECTED_RUN=$("#resRun").value||SELECTED_RUN;
   if(!SELECTED_RUN||RES_BUSY){ return; }
   if(rerenderOnly&&FOLD_CACHE.run===String(SELECTED_RUN)){
-    renderTree(FOLD_CACHE.res,FOLD_CACHE.lcs); return;
+    renderTree(FOLD_CACHE.res,FOLD_CACHE.lcs); return;   // PLAN_MAN already matches this run
   }
   RES_BUSY=true;
-  try{ const evs=await loadResEvents(SELECTED_RUN);
-       if(!evs.length){ $("#resBody").textContent="이 런에는 자원 이벤트가 없습니다 (read-only/정리 런)"; }
+  try{ // intended chain (T4 plan.json) loads alongside res/*; absent → no overlay
+       window.PLAN_MAN=await loadPlan(SELECTED_RUN);
+       const evs=await loadResEvents(SELECTED_RUN);
+       if(!evs.length){ const {res,lcs}=foldResources([]);   // still draw overlay (placeholders) if a plan exists
+              FOLD_CACHE={run:String(SELECTED_RUN),res,lcs};
+              if(window.PLAN_MAN){ renderTree(res,lcs); $("#resBody").textContent="아직 자원 이벤트 없음 — 위 의도된 체인이 다음 단계를 표시합니다"; }
+              else { $("#planOverlay").innerHTML=""; $("#resBody").textContent="이 런에는 자원 이벤트가 없습니다 (read-only/정리 런)"; } }
        else { const {res,lcs}=foldResources(evs);
               FOLD_CACHE={run:String(SELECTED_RUN),res,lcs};
               renderTree(res,lcs); }
@@ -498,6 +607,8 @@ function renderSample(){
      <b>${e.stage}</b> <span class="${e.status==='success'?'ok':e.status==='failure'?'bad':'run'}">${e.status}</span>
      <span class="mut">${e.detail||""}</span></div>`).join("");
   fillRunSelect([d.live.run_id]);
+  SELECTED_RUN=String(d.live.run_id);
+  window.PLAN_MAN=d.plan||null;          // sample intended-chain manifest (T5 overlay demo)
   const {res,lcs}=foldResources(d.resEvents); renderTree(res,lcs);
 }
 if(new URLSearchParams(location.search).has("sample")){
@@ -567,6 +678,34 @@ tick(); setInterval(tick,30000);
       ev(12,"deleted","vpcs","vpc","","vpc-p1","vpc-peering"),
       ev(12.5,"lifecycle-end","","vpc","vpc-peering","","vpc-peering","passed"),
     ],
+    // INTENDED chain per composed lifecycle (mirrors T4's runs/<id>/plan.json).
+    // kinds maps each ordered node -> resource kind so the overlay joins to res
+    // events by kind+lifecycle. teardown is the reverse-order delete plan.
+    plan:{generated_at:TS(0), lifecycles:[
+      {id:"heavy-shared-dbaas", service:"mariadb",
+       order:["vpc","subnet-main","subnet-db","cluster-maria","cluster-epas","cluster-cache"],
+       teardown:["cluster-cache","cluster-epas","cluster-maria","subnet-db","subnet-main","vpc"],
+       kinds:{vpc:"vpcs","subnet-main":"subnets","subnet-db":"subnets",
+              "cluster-maria":"clusters","cluster-epas":"clusters","cluster-cache":"clusters"},
+       dedup:{vpc:["compute-virtualserver-full","container-ske-cluster-nodepool"]},
+       peak_quota:{vpc:1,subnets:2,clusters:3}},
+      {id:"compute-virtualserver-full", service:"virtualserver",
+       order:["keypair","security-group","server","volume","public-ip"],
+       teardown:["public-ip","volume","server","security-group","keypair"],
+       kinds:{keypair:"keypairs","security-group":"security-groups",server:"servers",
+              volume:"volumes","public-ip":"publicips"},
+       dedup:{}, peak_quota:{servers:1}},
+      {id:"container-ske-cluster-nodepool", service:"ske",
+       order:["cluster","nodepool"],
+       teardown:["nodepool","cluster"],
+       kinds:{cluster:"clusters",nodepool:"nodepools"},
+       dedup:{}, peak_quota:{clusters:1}},
+      {id:"vpc-peering", service:"vpc",
+       order:["vpc-a","vpc-b","peering"],
+       teardown:["peering","vpc-b","vpc-a"],
+       kinds:{"vpc-a":"vpcs","vpc-b":"vpcs",peering:"vpc-peerings"},
+       dedup:{}, peak_quota:{vpcs:2}}
+    ]},
     index:[
       {run_id:"27314355676",sha:"3f59837",finished:"",url:"#",history:{crud_ran:true,ok:"",soft:"",fail_new:"",cov_op:"",cov_c3:"",tested:"(진행 중)"}},
       {run_id:"27306490231",sha:"84df549",finished:"2026-06-10T23:19:21Z",url:"#",history:{crud_ran:true,ok:1098,soft:1217,fail_new:50,cov_op:35.57,cov_c3:37.69,tested:1059}},
