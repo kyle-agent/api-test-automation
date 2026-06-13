@@ -1,0 +1,600 @@
+{
+  "_comment": "Composed HEAVY SKE upgrade window — run in a DEDICATED window (crud_filter=gen-heavy-ske): cluster+nodepool+upgrade is ~60-90min billable and adds a 4th concurrent VPC if mixed with the other heavy chains.",
+  "lifecycles": [
+    {
+      "id": "gen-heavy-ske-upgrade",
+      "service": "container/ske",
+      "enabled": true,
+      "_note": "owner-approved upgrade flow (2026-06-13): cluster+nodepool at v1.33.5 -> control-plane upgrade v1.34.3 -> node roll -> teardown. Also closes kubeconfig x2 (lowercase 'public' — the legacy probe sent PUBLIC against a lowercase enum) and listimages. Version literals are current live values; re-check the kubernetes-versions lookup if this rots.",
+      "steps": [
+        {
+          "name": "create-keypair",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "create-server-type",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_type_id": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": "g"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-kubernetes-version",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/kubernetes-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "kube_ver": "$.kubernetes_versions[0].kubernetes_version"
+          }
+        },
+        {
+          "name": "create-ske-image",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/images",
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "verify-ske-image-images-page",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/images?size=20&page=0",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-image"
+        },
+        {
+          "name": "create-security-group",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-filestorage-volume",
+          "service": "filestorage",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrfs{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "volume_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-filestorage-volume",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-ske-cluster",
+          "service": "ske",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrske{unique}",
+            "kubernetes_version": "v1.33.5",
+            "cloud_logging_enabled": "false",
+            "vpc_id": "{vpc_id}",
+            "subnet_id": "{subnet_id}",
+            "security_group_id_list": [
+              "{sg_id}"
+            ],
+            "private_endpoint_access_control_resources": [],
+            "tags": [],
+            "volume_id": "{volume_id}",
+            "public_endpoint_access_control_ip": "0.0.0.0/0",
+            "service_watch_logging_enabled": "true"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "ske"
+          }
+        },
+        {
+          "name": "wait-ske-cluster",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-ske-cluster-kubeconfig",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/kubeconfig?kubeconfig_type=public",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-cluster"
+        },
+        {
+          "name": "verify-ske-cluster-user-kubeconfig",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/user-kubeconfig?kubeconfig_type=public",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-cluster"
+        },
+        {
+          "name": "create-ske-nodepool",
+          "service": "ske",
+          "method": "POST",
+          "path": "/v1/nodepools",
+          "json": {
+            "cluster_id": "{cluster_id}",
+            "name": "regrnp{unique}",
+            "kubernetes_version": "v1.33.5",
+            "desired_node_count": "1",
+            "min_node_count": "1",
+            "max_node_count": "2",
+            "server_type_id": "{server_type_id}",
+            "image_os": "ubuntu",
+            "image_os_version": "22.04",
+            "keypair_name": "regrkey{unique}",
+            "volume_size": "104",
+            "volume_type_name": "SSD_Provisioned",
+            "is_auto_recovery": "true",
+            "is_auto_scale": "false",
+            "volume_max_iops": "10000",
+            "volume_max_throughput": "500"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "nodepool_id": "$.nodepool.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/nodepools/{nodepool_id}",
+            "service": "ske"
+          }
+        },
+        {
+          "name": "wait-ske-nodepool",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "create-ske-cluster-upgrade",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/upgrade",
+          "json": {
+            "kubernetes_version": "v1.34.3"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-ske-cluster-upgrade",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          }
+        },
+        {
+          "name": "verify-ske-cluster-upgrade",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-cluster-upgrade"
+        },
+        {
+          "name": "create-ske-nodepool-upgrade",
+          "service": "ske",
+          "method": "PUT",
+          "path": "/v1/nodepools/{nodepool_id}/upgrade",
+          "json": {
+            "os_version": "22.04"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-ske-nodepool-upgrade",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-ske-nodepool-upgrade",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-nodepool-upgrade"
+        },
+        {
+          "name": "delete-ske-nodepool",
+          "service": "ske",
+          "method": "DELETE",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-ske-cluster",
+          "service": "ske",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-filestorage-volume",
+          "service": "filestorage",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-security-group",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-keypair",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ],
+      "heavy": true
+    }
+  ]
+}

@@ -548,6 +548,13 @@ class _Ctx:
             raise ComposeError(
                 f"{node}: required option '{name}' has no value, default or "
                 f"pick scheme")
+        # option defaults may themselves be templates (e.g. ske-cluster's
+        # kubernetes_version defaulting to the lookup capture
+        # "{kubernetes-version.kube_ver}") — resolve nested tokens so an
+        # explicit override and the default land in the same (engine-ready)
+        # form
+        if isinstance(value, str) and "{" in value and "." in value:
+            value = self.sub(inst, value)
         vals[name] = value
         return value
 

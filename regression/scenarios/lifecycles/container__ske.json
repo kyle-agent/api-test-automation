@@ -11,7 +11,11 @@
           "name": "find-k8s-version",
           "method": "GET",
           "path": "/v1/kubernetes-versions",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "ske-upgrade",
           "capture_soft": {
@@ -22,7 +26,11 @@
           "name": "seed-cluster-placeholder",
           "method": "GET",
           "path": "/v1/clusters",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "ske-upgrade",
           "capture_soft": {
@@ -33,7 +41,11 @@
           "name": "seed-nodepool-placeholder",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/nodepools",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "ske-upgrade",
           "capture_soft": {
@@ -47,7 +59,17 @@
           "json": {
             "kubernetes_version": "{kube_ver}"
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "ske-cluster-upgrade"
         },
@@ -58,7 +80,17 @@
           "json": {
             "kubernetes_version": "{kube_ver}"
           },
-          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "ske-nodepool-upgrade"
         },
@@ -82,7 +114,11 @@
           "name": "list-clusters",
           "method": "GET",
           "path": "/v1/clusters",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "ske-read",
           "capture_soft": {
@@ -93,7 +129,11 @@
           "name": "list-nodepools",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/nodepools",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "ske-read",
           "capture_soft": {
@@ -105,9 +145,13 @@
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/kubeconfig",
           "params": {
-            "kubeconfig_type": "PUBLIC"
+            "kubeconfig_type": "public"
           },
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "ske-read"
         },
@@ -116,9 +160,13 @@
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/user-kubeconfig",
           "params": {
-            "kubeconfig_type": "PUBLIC"
+            "kubeconfig_type": "public"
           },
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "ske-read"
         },
@@ -126,7 +174,11 @@
           "name": "get-nodepool-nodes",
           "method": "GET",
           "path": "/v1/nodepools/{nodepool_id}/nodes",
-          "expect_status": [200, 400, 404],
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
           "optional": true,
           "group": "ske-read"
         },
