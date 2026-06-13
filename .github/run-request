@@ -1,8 +1,10 @@
-# HEAVY rev 7: attach-409 retry + scr lifecycle-policy duration field +
-# probe public_endpoint_enabled + NEW gen-wave3-qfifo (FIFO queue dedup ops,
-# owner knowledge 2026-06-13).
+# Wave 4+5 window: rmtags(SRN tag family) + asg(desired 0) + nlog(logsink) +
+# sgrule + qfifo/known-id support re-verify + servicewatch closure(6) +
+# iam closure(3) + extended heavy 47-step (static-nat [200,403] PF-15,
+# server ops, volume attach, custom-image) + probe with DNS wait.
+# heavy-pg / heavy-ske / heavy-backup / heavy-dbaas run in DEDICATED windows.
 mutations=true
 destructive=true
 heavy=true
-crud_filter=gen-
+crud_filter=gen-pilot or gen-wave or gen-heavy-vs
 docker_probe=true
