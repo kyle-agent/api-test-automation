@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-13T02:06:00Z · <b>sha 3a27edc</b>
+    2026-06-13T13:08:11Z · <b>sha f9392c8</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -261,44 +261,45 @@
 
   
   
-  <div class="verdict ">
+  <div class="verdict bad">
     <span class="pip"></span>
     <div>
-      <b>HEALTHY — 신규 회귀 0.</b>
-      486 ok · soft 90 ·
+      <b>REGRESSIONS — 신규 fail 4건.</b>
+      
+      426 ok · soft 82 ·
       known-red 1
-      (354 calls · sha 3a27edc)
+      (334 calls · sha f9392c8)
     </div>
   </div>
 
   <h2>커버리지 사다리 <span class="hint">C1 도달 → C2 호출 → C3 검증</span></h2>
   <div class="card pad">
     <div class="lad"><span class="lv">C3</span>
-      <div class="bar"><i style="width:46.39%;background:var(--green)"></i></div>
-      <span class="pct" style="color:var(--green)">46.39%</span>
+      <div class="bar"><i style="width:47.64%;background:var(--green)"></i></div>
+      <span class="pct" style="color:var(--green)">47.64%</span>
       <span class="desc">검증됨 · 누적 — 동작 확인</span></div>
     
     
     
     <div class="lad"><span class="lv">C2</span>
-      <div class="bar"><i style="width:25.8%;background:var(--amber)"></i></div>
-      <span class="pct" style="color:var(--amber)">25.8%</span>
-      <span class="desc">호출됨 · 이번 run 354/1372</span></div>
+      <div class="bar"><i style="width:24.3%;background:var(--amber)"></i></div>
+      <span class="pct" style="color:var(--amber)">24.3%</span>
+      <span class="desc">호출됨 · 이번 run 334/1372</span></div>
     <div class="lad"><span class="lv">C1</span>
-      <div class="bar"><i style="width:90.01%;background:var(--blue)"></i></div>
-      <span class="pct" style="color:var(--blue)">90.01%</span>
+      <div class="bar"><i style="width:91.76%;background:var(--blue)"></i></div>
+      <span class="pct" style="color:var(--blue)">91.76%</span>
       <span class="desc">도달가능 · static reachable / 1372 API</span></div>
   </div>
 
-  <h2>이번 스냅샷 <span class="hint">2026-06-13T02:06:00Z</span></h2>
+  <h2>이번 스냅샷 <span class="hint">2026-06-13T13:08:11Z</span></h2>
   <div class="tiles" style="margin-top:6px">
-    <div class="card tile"><div class="v" style="color:var(--amber)">38.05%</div>
+    <div class="card tile"><div class="v" style="color:var(--amber)">39.07%</div>
       <div class="k">write-op (cov_op)</div></div>
     <div class="card tile"><div class="v" style="color:var(--green)">56.36%</div>
       <div class="k">GET (cov_get)</div></div>
-    <div class="card tile"><div class="v">486/354</div>
+    <div class="card tile"><div class="v">426/334</div>
       <div class="k">ok / 호출</div></div>
-    <div class="card tile"><div class="v" style="color:var(--green)">0</div>
+    <div class="card tile"><div class="v" style="color:var(--red)">4</div>
       <div class="k">신규 fail</div></div>
   </div>
   

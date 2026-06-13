@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-13T02:06:00Z · <b>sha 3a27edc</b>
+    2026-06-13T13:08:11Z · <b>sha f9392c8</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -311,6 +311,17 @@
   </form>
 </div>
 
+<h2>라이브 운영 뷰 <span class="hint">ops — res-event 트리·간트 + T5 의도 vs 실제 오버레이</span></h2>
+<div class="card pad" style="padding:0;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
+    <span class="muted small">실행 중 리소스 라이프사이클이 아래에 실시간으로 표시됩니다
+      (S3 oplog 직접 fetch).</span>
+    <a class="small" style="margin-left:auto" href="../ops.html" target="_blank">전체 화면으로 열기 →</a>
+  </div>
+  <iframe src="../ops.html" title="ops 라이브 뷰어"
+          style="width:100%;height:560px;border:0;display:block"></iframe>
+</div>
+
 <h2>관제</h2>
 <div class="card pad">
   <a href="resources.html">🧹 리소스 인벤토리 — 살아있는 테스트 리소스 조회/삭제 →</a>
@@ -333,7 +344,7 @@
     <a href="reporting-trends.html">전체 히스토리는 Report →</a></p>
 </div>
 
-<script id="previewData" type="application/json">{"profiles": {"prod-kr-west1": {"forbid": ["mutations", "destructive", "heavy"], "label": "\uc6b4\uc601\uacc4 (production) \u00b7 kr-west1 \u2014 read-only"}, "stage-kr-west1": {"forbid": [], "label": "\uac80\uc99d\uacc4 (stage) \u00b7 kr-west1"}}, "suites": {"conformance": {"eta": "~15\u201320\ubd84", "gates": "conformance", "heavy": 0, "label": "Conformance \u2014 static + read-only runtime probes + baseline diff", "targets": 187}, "full": {"eta": "~1\uc2dc\uac04", "gates": "mutations + destructive", "heavy": 0, "label": "Full \u2014 smoke + all light CRUD lifecycles (no heavy)", "targets": 102}, "full-heavy": {"eta": "~3\u20134\uc2dc\uac04", "gates": "mutations + destructive + heavy + conformance", "heavy": 56, "label": "Full+Heavy \u2014 everything incl. billable heavy lifecycles + conformance", "targets": 158}, "smoke": {"eta": "~15\u201320\ubd84", "gates": "read-only", "heavy": 0, "label": "Smoke \u2014 read-only smoke + read-chains, whole catalog (~15 min)", "targets": 187}}}</script>
+<script id="previewData" type="application/json">{"profiles": {"prod-kr-west1": {"forbid": ["mutations", "destructive", "heavy"], "label": "\uc6b4\uc601\uacc4 (production) \u00b7 kr-west1 \u2014 read-only"}, "stage-kr-west1": {"forbid": [], "label": "\uac80\uc99d\uacc4 (stage) \u00b7 kr-west1"}}, "suites": {"conformance": {"eta": "~15\u201320\ubd84", "gates": "conformance", "heavy": 0, "label": "Conformance \u2014 static + read-only runtime probes + baseline diff", "targets": 187}, "full": {"eta": "~1\uc2dc\uac04", "gates": "mutations + destructive", "heavy": 0, "label": "Full \u2014 smoke + all light CRUD lifecycles (no heavy)", "targets": 99}, "full-heavy": {"eta": "~3\u20134\uc2dc\uac04", "gates": "mutations + destructive + heavy + conformance", "heavy": 56, "label": "Full+Heavy \u2014 everything incl. billable heavy lifecycles + conformance", "targets": 155}, "smoke": {"eta": "~15\u201320\ubd84", "gates": "read-only", "heavy": 0, "label": "Smoke \u2014 read-only smoke + read-chains, whole catalog (~15 min)", "targets": 187}}}</script>
 <script>
 (function(){
   var data = JSON.parse(document.getElementById('previewData').textContent);

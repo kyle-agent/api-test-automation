@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-13T02:06:00Z · <b>sha 3a27edc</b>
+    2026-06-13T13:08:11Z · <b>sha f9392c8</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -246,22 +246,21 @@
 
   
   
-  <div class="verdict ">
+  <div class="verdict bad">
     <span class="pip"></span>
     <div>
       
-      <b>HEALTHY — 신규 회귀 0건.</b>
-      마지막 스냅샷에서 새로 깨진 5xx/auth 없음, known-red 1.
-      다음 레버: 쓰기 커버리지(cov_op 38.05%).
+      <b>REGRESSIONS — 신규 fail 4건.</b>
+      마지막 스냅샷에서 새로 깨진 5xx/auth가 있습니다 — Report › Triage에서 분류를 확인하세요.
       
     </div>
   </div>
 
   <div class="tiles">
     <div class="card tile">
-      <div class="v" style="color:var(--amber)">38.05%</div>
+      <div class="v" style="color:var(--amber)">39.07%</div>
       <div class="k">write-op 커버리지 (cov_op)</div>
-      <div class="bar"><i style="width:38.05%;background:var(--amber)"></i></div>
+      <div class="bar"><i style="width:39.07%;background:var(--amber)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
     <div class="card tile">
@@ -271,21 +270,21 @@
       <div class="goal">목표 100%</div>
     </div>
     <div class="card tile">
-      <div class="v">46.39%</div>
+      <div class="v">47.64%</div>
       <div class="k">누적 C3 검증</div>
-      <div class="bar"><i style="width:46.39%;background:var(--blue)"></i></div>
+      <div class="bar"><i style="width:47.64%;background:var(--blue)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
     <div class="card tile">
-      <div class="v">90.01%</div>
+      <div class="v">91.76%</div>
       <div class="k">C1 static reachable</div>
-      <div class="bar"><i style="width:90.01%;background:var(--blue)"></i></div>
+      <div class="bar"><i style="width:91.76%;background:var(--blue)"></i></div>
       <div class="goal">전체 1372 API</div>
     </div>
     <div class="card tile">
-      <div class="v" style="color:var(--green)">0</div>
+      <div class="v" style="color:var(--red)">4</div>
       <div class="k">신규 fail</div>
-      <div class="goal" style="margin-top:8px">회귀 없음</div>
+      <div class="goal" style="margin-top:8px">회귀 발생 — Triage 확인</div>
     </div>
   </div>
 
@@ -295,7 +294,7 @@
   <a class="pstage" href="planning.html">
     <div class="pl">Plan</div>
     <div class="pv">187</div>
-    <div class="ps">시나리오 (158 enabled ·
+    <div class="ps">시나리오 (155 enabled ·
       60 서비스)</div>
     <span class="chev">→</span>
   </a>
@@ -308,8 +307,8 @@
   </a>
   <a class="pstage" href="reporting.html">
     <div class="pl">Report</div>
-    <div class="pv">46.39%</div>
-    <div class="ps">C3 검증 · 신규 회귀 0</div>
+    <div class="pv">47.64%</div>
+    <div class="ps">C3 검증 · 신규 회귀 4</div>
   </a>
 </div>
 
