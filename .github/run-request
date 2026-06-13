@@ -1,10 +1,8 @@
-# Wave 4+5 window: rmtags(SRN tag family) + asg(desired 0) + nlog(logsink) +
-# sgrule + qfifo/known-id support re-verify + servicewatch closure(6) +
-# iam closure(3) + extended heavy 47-step (static-nat [200,403] PF-15,
-# server ops, volume attach, custom-image) + probe with DNS wait.
-# heavy-pg / heavy-ske / heavy-backup / heavy-dbaas run in DEDICATED windows.
+# Re-verify wave4+5 triage fixes (run 27452095757): rmtags set-tags, asg LC
+# vol 104, swatch image 1400x500 + custom-metric ingest tolerant, iam
+# instance-unique policy names, VS password [200,400]. alert+saml disabled.
+# No probe — SCR docker login settled (PF-16, needs console auth key).
 mutations=true
 destructive=true
 heavy=true
-crud_filter=gen-pilot or gen-wave or gen-heavy-vs
-docker_probe=true
+crud_filter=gen-wave4 or gen-wave5 or gen-heavy-vs
