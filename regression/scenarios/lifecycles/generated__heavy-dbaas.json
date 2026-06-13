@@ -618,7 +618,7 @@
       "id": "gen-heavy-mysql-replica",
       "service": "database/mysql",
       "enabled": true,
-      "_note": "PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate light setters chain — they need the heavy cluster), so this chain also exercises them right after cluster-ready. switchover is deliberately ABSENT (HA Active<->Standby flip; proven body is ha_enabled:false — HA-gated node stays modeled o",
+      "_note": "replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance) move to a separate setter chain. PG/epas pattern.",
       "steps": [
         {
           "name": "create-mysql-engine-version",
@@ -638,16 +638,6 @@
           }
         },
         {
-          "name": "verify-mysql-engine-version-read",
-          "service": "mysql",
-          "method": "GET",
-          "path": "/v1/engine-versions",
-          "expect_status": [
-            200
-          ],
-          "group": "mysql-engine-version"
-        },
-        {
           "name": "create-mysql-server-type",
           "service": "mysql",
           "method": "GET",
@@ -663,16 +653,6 @@
               "get": "name"
             }
           }
-        },
-        {
-          "name": "verify-mysql-server-type-read",
-          "service": "mysql",
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "group": "mysql-server-type"
         },
         {
           "name": "create-vpc",
@@ -718,21 +698,6 @@
           }
         },
         {
-          "name": "verify-vpc-add-cidr",
-          "service": "vpc",
-          "method": "POST",
-          "path": "/v1/vpcs/{vpc_id}/cidrs",
-          "json": {
-            "cidr": "10.200.0.0/20"
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "group": "vpc"
-        },
-        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -776,26 +741,6 @@
             "timeout": 180,
             "interval": 10
           }
-        },
-        {
-          "name": "verify-subnet-read-vips",
-          "service": "vpc",
-          "method": "GET",
-          "path": "/v1/subnets/{subnet_id}/vips",
-          "expect_status": [
-            200
-          ],
-          "group": "subnet"
-        },
-        {
-          "name": "verify-subnet-read-sap-secondary-subnets",
-          "service": "vpc",
-          "method": "GET",
-          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
-          "expect_status": [
-            200
-          ],
-          "group": "subnet"
         },
         {
           "name": "create-mysql-cluster",
@@ -888,118 +833,6 @@
             "timeout": 2400,
             "interval": 30
           }
-        },
-        {
-          "name": "verify-mysql-cluster-read",
-          "service": "mysql",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200
-          ],
-          "group": "mysql-cluster"
-        },
-        {
-          "name": "verify-mysql-cluster-setsecuritygrouprules",
-          "service": "mysql",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/security-group-rules",
-          "json": {
-            "add_ip_addresses": [
-              "10.10.10.10/32"
-            ],
-            "del_ip_addresses": []
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "group": "mysql-cluster"
-        },
-        {
-          "name": "verify-mysql-cluster-read-after-sg",
-          "service": "mysql",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200
-          ],
-          "group": "mysql-cluster"
-        },
-        {
-          "name": "verify-mysql-cluster-showarchiveconfig",
-          "service": "mysql",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}/archive",
-          "expect_status": [
-            200,
-            404
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mysql-cluster"
-        },
-        {
-          "name": "verify-mysql-cluster-setarchiveconfig",
-          "service": "mysql",
-          "method": "PUT",
-          "path": "/v1/clusters/{cluster_id}/archive",
-          "json": {
-            "archive_enabled": true,
-            "retention_period_day": 1
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mysql-cluster"
-        },
-        {
-          "name": "verify-mysql-cluster-syncarchiveconfig",
-          "service": "mysql",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/archive/sync",
-          "expect_status": [
-            200,
-            202,
-            409
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mysql-cluster"
-        },
-        {
-          "name": "verify-mysql-cluster-syncclusterstate",
-          "service": "mysql",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/sync-state",
-          "expect_status": [
-            200,
-            201,
-            202,
-            409
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mysql-cluster"
         },
         {
           "name": "create-mysql-replica",
@@ -1308,7 +1141,7 @@
       "id": "gen-heavy-mariadb-replica",
       "service": "database/mariadb",
       "enabled": true,
-      "_note": "mariadb delete drain is ~90min (run e3ba190) and applies to BOTH clusters — teardown deletes replica then origin; residual drain is absorbed by the composer's dependent-delete 409 retries (40x30s) and the engine cleanup pass as backstop. PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster node (no separate",
+      "_note": "replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance) move to a separate setter chain. PG/epas pattern.",
       "steps": [
         {
           "name": "create-mariadb-engine-version",
@@ -1328,16 +1161,6 @@
           }
         },
         {
-          "name": "verify-mariadb-engine-version-read",
-          "service": "mariadb",
-          "method": "GET",
-          "path": "/v1/engine-versions",
-          "expect_status": [
-            200
-          ],
-          "group": "mariadb-engine-version"
-        },
-        {
           "name": "create-mariadb-server-type",
           "service": "mariadb",
           "method": "GET",
@@ -1353,16 +1176,6 @@
               "get": "name"
             }
           }
-        },
-        {
-          "name": "verify-mariadb-server-type-read",
-          "service": "mariadb",
-          "method": "GET",
-          "path": "/v1/server-types",
-          "expect_status": [
-            200
-          ],
-          "group": "mariadb-server-type"
         },
         {
           "name": "create-vpc",
@@ -1408,21 +1221,6 @@
           }
         },
         {
-          "name": "verify-vpc-add-cidr",
-          "service": "vpc",
-          "method": "POST",
-          "path": "/v1/vpcs/{vpc_id}/cidrs",
-          "json": {
-            "cidr": "10.200.0.0/20"
-          },
-          "expect_status": [
-            200,
-            201,
-            202
-          ],
-          "group": "vpc"
-        },
-        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -1466,26 +1264,6 @@
             "timeout": 180,
             "interval": 10
           }
-        },
-        {
-          "name": "verify-subnet-read-vips",
-          "service": "vpc",
-          "method": "GET",
-          "path": "/v1/subnets/{subnet_id}/vips",
-          "expect_status": [
-            200
-          ],
-          "group": "subnet"
-        },
-        {
-          "name": "verify-subnet-read-sap-secondary-subnets",
-          "service": "vpc",
-          "method": "GET",
-          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
-          "expect_status": [
-            200
-          ],
-          "group": "subnet"
         },
         {
           "name": "create-mariadb-cluster",
@@ -1576,201 +1354,6 @@
             "timeout": 2400,
             "interval": 30
           }
-        },
-        {
-          "name": "verify-mariadb-cluster-read",
-          "service": "mariadb",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200
-          ],
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-setsecuritygrouprules",
-          "service": "mariadb",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/security-group-rules",
-          "json": {
-            "add_ip_addresses": [
-              "10.10.10.10/32"
-            ],
-            "del_ip_addresses": []
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-read-after-sg",
-          "service": "mariadb",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [
-            200
-          ],
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-showarchiveconfig",
-          "service": "mariadb",
-          "method": "GET",
-          "path": "/v1/clusters/{cluster_id}/archive",
-          "expect_status": [
-            200,
-            404
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-setarchiveconfig",
-          "service": "mariadb",
-          "method": "PUT",
-          "path": "/v1/clusters/{cluster_id}/archive",
-          "json": {
-            "archive_enabled": true,
-            "retention_period_day": 1
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-syncarchiveconfig",
-          "service": "mariadb",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/archive/sync",
-          "expect_status": [
-            200,
-            202,
-            409
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-setbackup",
-          "service": "mariadb",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/backups",
-          "json": {
-            "archive_frequency_minute": "30",
-            "retention_period_day": "8",
-            "starting_time_hour": "3"
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-setauditlog",
-          "service": "mariadb",
-          "method": "PUT",
-          "path": "/v1/clusters/{cluster_id}/audit-log",
-          "json": {
-            "use_audit_log": true
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-setmaintenance",
-          "service": "mariadb",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/maintenance",
-          "json": {
-            "start_day_of_week": "SUN",
-            "start_minute": "00",
-            "start_time": "03",
-            "term_hour": "4"
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-unsetmaintenance",
-          "service": "mariadb",
-          "method": "DELETE",
-          "path": "/v1/clusters/{cluster_id}/maintenance",
-          "expect_status": [
-            200,
-            202,
-            204
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mariadb-cluster"
-        },
-        {
-          "name": "verify-mariadb-cluster-syncclusterstate",
-          "service": "mariadb",
-          "method": "POST",
-          "path": "/v1/clusters/{cluster_id}/sync-state",
-          "expect_status": [
-            200,
-            201,
-            202,
-            409
-          ],
-          "retry_on_status": [
-            400,
-            409
-          ],
-          "retries": 10,
-          "retry_interval": 30,
-          "group": "mariadb-cluster"
         },
         {
           "name": "create-mariadb-replica",
