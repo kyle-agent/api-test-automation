@@ -77,8 +77,13 @@ resources:
     requires: [vpc]
     create:
       endpoint: "POST /v1/internet-gateways"
-      body: {description: "API regression suite", firewall_enabled: false,
+      body: {description: "API regression suite",
+             firewall_enabled: "{opt.firewall_enabled}",
              firewall_loggable: false, type: IGW, vpc_id: "{vpc.vpc_id}", tags: []}
+      options:
+        firewall_enabled: {type: enum, values: [false, true], default: false,
+                           vary: true,
+                           note: "true면 firewall이 암묵 생성된다 (R3 carrier-capture: firewall 노드가 GET /v1/firewalls?vpc_name=...&product_type=IGW lookup으로 회수). 기본 false가 VALIDATED 생성형; true 변형은 docs — firewall 과금(flavor) 동반하므로 firewall 체인 합성에서만 켠다"}
     capture: {internet_gateway_id: "$.internet_gateway.id"}
     ready: {field: "$.internet_gateway.state",
             until: [ACTIVE, ATTACHED, CREATED, RUNNING], timeout: 300, interval: 15}
@@ -87,7 +92,7 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: networking-vpc-internet-gateway,
              steps: [create-igw, wait-igw-active, delete-igw]}
-    notes: "firewall_enabled: true로 만들면 firewall이 암묵 생성된다 (firewall 노드 참조)"
+    notes: "firewall_enabled: true로 만들면 firewall이 암묵 생성된다 (firewall 노드 참조) — 옵션 기본 false는 VALIDATED body와 동일형. IGW 삭제가 암묵 firewall도 함께 제거한다 (firewall 노드는 delete 없음)."
 
   nat-gateway:
     code: "nw-vpc-natgw"
@@ -140,35 +145,39 @@ resources:
     delete: {endpoint: "DELETE /v1/private-nats/{private_nat_id}", destructive: true}
     provenance: docs
     source: {lifecycle: vpc-private-nat, steps: [create-private-nat, delete-private-nat]}
-    notes: "§1의 OR-의존 사례 (direct connect OR transit gateway). 소스 lifecycle은 service_resource_id에 {unique} placeholder를 보내 4xx — 실소유 uplink 자원 주입은 이 모델이 처음 제공하므로 body는 UNPROVEN(docs). capture envelope $.private_nat.id UNPROVEN."
+    notes: "§1의 OR-의존 사례 (direct connect OR transit gateway). 소스 lifecycle은 service_resource_id에 {unique} placeholder를 보내 4xx — 실소유 uplink 자원 주입은 이 모델이 처음 제공하므로 body는 UNPROVEN(docs). capture envelope $.private_nat.id UNPROVEN. 분기 결정(2026-06-13, gap report 그룹 1 #2): direct-connect는 물리 회선 의심(owner 확인 대기)이라 transit-gateway 경로로 검증 — composer 기본 분기도 TGW다 (_branch_cost: tgw closure 1 create vs dc 2 [dc+vpc]; 합성 시 choices={'private-nat': 'transit-gateway'}를 명시해 의도를 고정). service_type 기본값 TRANSIT_GATEWAY(첫 enum)와 정합."
 
   vpc-endpoint:
     code: "nw-vpc-endpoint"
     service: networking/vpc
-    requires: [vpc, subnet]
+    requires: [vpc, subnet, filestorage-volume]
     create:
       endpoint: "POST /v1/vpc-endpoints"
+      # R3 FS wiring (2026-06-13, gap report 그룹 1 #3): resource_key must be a
+      # REAL filestorage volume id (run 27395331657: placeholder -> 400
+      # scp-network.vpc-endpoint.subnet-not-found "VPC Endpoint Type Subnet not
+      # found" — the API resolves the TARGET service's subnet from
+      # resource_key). Cross-file requires on storage__filestorage.yaml's
+      # filestorage-volume injects {volume_id}. resource_info is free text
+      # describing the resource key (api_docs: string, max 200) — use the
+      # volume's name template.
       body: {name: "regrvpce{unique}", description: "API regression vpc endpoint",
              endpoint_ip_address: "{opt.endpoint_ip_address}",
-             resource_info: "x.samsungsdscloud.com(Registry)",
-             resource_key: "{unique}", resource_type: "{opt.target}",
+             resource_info: "regrfs{unique}",
+             resource_key: "{filestorage-volume.volume_id}",
+             resource_type: "{opt.target}",
              subnet_id: "{subnet.subnet_id}", vpc_id: "{vpc.vpc_id}", tags: []}
       options:
         target: {type: enum, values: [FS, OBS, SCR], default: FS,
                  required: true, vary: true,
-                 note: "유효 enum은 라이브 ValidationError가 직접 알려줌(run 27394211896): 'VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)' — dns는 유효 타입이 아님 (VALIDATED enum)"}
-        # R3 BLOCKER (run 27395331657): type=FS -> 400 scp-network.vpc-endpoint
-        # .subnet-not-found "VPC Endpoint Type Subnet not found" — the API looks
-        # up the TARGET service's subnet from resource_key, so a real FS volume
-        # (resource_key = its id) is required, not a placeholder. Needs
-        # filestorage-volume wiring + userguide research before composing.
+                 note: "유효 enum은 라이브 ValidationError가 직접 알려줌(run 27394211896): 'VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)' — dns는 유효 타입이 아님 (VALIDATED enum). resource_key가 FS 볼륨 id로 배선되어 있으므로 OBS/SCR 변형은 각자의 실 자원 키로 재배선 전에는 합성 금지"}
         endpoint_ip_address: {type: string, required: true, default: "10.124.0.20",
-                              note: "선택한 subnet cidr 내부의 빈 IP여야 한다 — 기본값은 소스 lifecycle의 공유 subnet에 묶인 값"}
+                              note: "선택한 subnet cidr 내부의 빈 IP여야 한다 — 기본값은 공유 subnet(10.124.0.0/24, engine._SHARED_SUBNET_CIDR) 재호밍 규칙을 따른다; adopt 없이 자가 생성 subnet(10.160.8.0/24)으로 합성 시 override 필요"}
     capture: {vpc_endpoint_id: "$.vpc_endpoint.id"}
     delete: {endpoint: "DELETE /v1/vpc-endpoints/{vpc_endpoint_id}", destructive: true}
     provenance: docs
     source: {lifecycle: vpc-endpoint, steps: [create-vpc-endpoint, delete-vpc-endpoint]}
-    notes: "resource_key는 실재 대상 서비스 키가 필요해 소스 lifecycle도 {unique}로 4xx — body/capture UNPROVEN(docs)"
+    notes: "endpoint_type(=resource_type) enum FS/OBS/SCR 라이브 증명; 실 FS volume_id 주입은 이 배선이 처음 제공 — body/capture UNPROVEN(docs). FS 볼륨은 VPC 무관(standalone NFS)이라 'TARGET 서비스 subnet' 해석이 볼륨 쪽에서 어떻게 풀리는지는 라이브 정제 대상."
 
   privatelink-service:
     code: "nw-vpc-privatelink-service"

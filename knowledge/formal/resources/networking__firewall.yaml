@@ -1,16 +1,112 @@
-# Resource-task model — networking/firewall (nw-vpc-firewall).
-# Schema: docs/RESOURCE-MODEL-PLAN.md §1. The firewall has NO Open API create in
-# data/api_catalog.json — modeled with no_api: true (composer never composes it;
-# it documents the dependency shape until a carrier-capture flow lands in R3).
+# Resource-task model — networking/firewall (nw-vpc-firewall group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validated by knowledge/formal/validate.py
+# · consumed by regression/scenarios/composer.py (R2a).
+#
+# The firewall has NO Open API create (POST /v1/firewalls does not exist in
+# data/api_catalog.json) — it is implicitly created when a carrier resource
+# (internet gateway / transit gateway / direct connect / load balancer) is
+# created with firewall_enabled: true (cross-service.yaml
+# firewall-implicit-on-gateway-resources). R3 carrier-capture flow (2026-06-13):
+# the `firewall` node below is a lookup-on-list — create = GET /v1/firewalls
+# filtered to THIS run's VPC, because the firewall_id is NOT in the carrier's
+# create response. listfirewalls has NO vpc_id query param (api_docs verbatim:
+# name/vpc_name/product_type/state only), and engine capture expressions are
+# NOT placeholder-filled (no dynamic where-filter on a captured vpc_id) — but
+# the request PATH is placeholder-filled and {unique} is stable per lifecycle
+# run, so filtering by vpc_name=regrvpc{unique} (the vpc node's name template)
+# + product_type=IGW pins exactly our firewall.
+#
+# ADOPTION CAVEAT: the vpc_name filter only resolves when the lifecycle
+# SELF-CREATES its VPC. A composed lifecycle that adopts the session-shared
+# VPC (adopt: vpc) has a different vpc name — compositions of this chain must
+# strip the adopt stamps from the vpc steps (see generated__wave5-net.json).
 version: 1
 resources:
   firewall:
     code: "nw-vpc-firewall"
     service: networking/firewall
-    no_api: true
-    requires:
-      - one_of: [internet-gateway, transit-gateway, direct-connect, load-balancer]
-        bind: carrier
+    requires: [internet-gateway]
+    create:
+      # lookup-on-list (pg-instance-group lookup-on-detail variant): no create
+      # API — the IGW (composed with firewall_enabled: true, see the
+      # internet-gateway option) implicitly created the firewall; find it via
+      # the list filtered to this run's unique VPC name + IGW product type.
+      endpoint: "GET /v1/firewalls?vpc_name=regrvpc{unique}&product_type=IGW"
+    capture: {firewall_id: "$.firewalls[0].id"}
+    ready: {endpoint: "GET /v1/firewalls/{firewall_id}",
+            field: "$.firewall.state", until: [ACTIVE],
+            timeout: 600, interval: 15}
+    verify:
+      - {name: show, endpoint: "GET /v1/firewalls/{firewall_id}",
+         expect_status: [200]}
+      - {name: list-rules,
+         endpoint: "GET /v1/firewalls/rules?firewall_id={firewall_id}",
+         expect_status: [200]}
+      # FirewallSetRequest {flavor_name opt enum(EXSMALL..EXLARGE), loggable
+      # opt bool} (api_docs verbatim) — same-value loggable set = no-op
+      # (carrier was created with firewall_loggable: false). Kept LAST among
+      # the verifies: a set can flip state to EDITING and would race the
+      # firewall-rule create that follows in composed order.
+      - {name: set-loggable, endpoint: "PUT /v1/firewalls/{firewall_id}",
+         json: {loggable: false},
+         expect_status: [200, 202]}
+    # NO delete by design: the firewall is destroyed implicitly when its
+    # carrier (the IGW) is deleted — the composed teardown deletes the IGW.
     provenance: docs
     source: {lifecycle: networking-firewall-rule, steps: [createfirewallrule]}
-    notes: "Open API 없음: POST /v1/firewalls는 카탈로그에 존재하지 않는다 — firewall은 carrier 자원(internet gateway, transit gateway uplink, direct connect, load balancer)에 'Firewall 사용'을 켜면 암묵 생성된다 (cross-service.yaml firewall-implicit-on-gateway-resources + networking-firewall-rule lifecycle note). 카탈로그에 있는 것은 규칙/수정 API뿐 (POST /v1/firewalls/rules, PUT /v1/firewalls/{id}). 합성 경로는 R3에서 carrier 생성 시 firewall_enabled: true + firewall_id capture로 열린다 — 그때까지 이 노드는 그래프 문서화 전용이며 composer 대상이 될 수 없다."
+    notes: "암묵 생성 자원의 lookup-on-list 노드 (R3 carrier-capture). 카탈로그의 firewall ops 8개 중 list/show/set을 이 노드가, rules 4종을 firewall-rule 노드가 커버한다. 상태기계 CREATING→ACTIVE (list enum: CREATING, ACTIVE, DELETING, DELETED, EDITING, ERROR, DEPLOYING — api_docs listfirewalls state 파라미터 verbatim); IGW가 ACTIVE여도 firewall은 CREATING일 수 있어 ready가 ACTIVE까지 재폴링한다. 리스트가 IGW-ACTIVE 직후 일시적으로 비어 캡처가 실패할 가능성은 라이브 정제 대상 (IGW ready 300s 윈도우가 보통 흡수). capture envelope $.firewalls[0].id는 api_docs response_example 기반 UNPROVEN — docs."
+
+  firewall-rule:
+    code: "nw-vpc-firewall-rule"
+    service: networking/firewall
+    requires: [firewall]
+    create:
+      endpoint: "POST /v1/firewalls/rules"
+      # FirewallRuleCreateSingleRequest {firewall_id REQ, firewall_rule REQ
+      # FirewallRuleCreateRequest {action REQ enum(ALLOW,DENY),
+      # destination_address REQ [str], direction REQ enum(INBOUND,OUTBOUND),
+      # service REQ [FirewallPort {service_type REQ enum(TCP,UDP,ICMP,...),
+      # service_value opt}], source_address REQ [str], status REQ
+      # enum(ENABLE,DISABLE), description/order_direction/order_rule_id opt}
+      # (api_docs verbatim; addresses = doc example values).
+      body:
+        firewall_id: "{firewall.firewall_id}"
+        firewall_rule:
+          action: ALLOW
+          description: "API regression firewall rule"
+          destination_address: ["10.0.0.1"]
+          direction: INBOUND
+          service: [{service_type: TCP, service_value: "443"}]
+          source_address: ["192.168.1.1"]
+          status: ENABLE
+      # the firewall set-loggable verify directly precedes this create in
+      # composed order and can leave the firewall EDITING -> invalid-state
+      # 400/409 race; spaced retries absorb it.
+      retry_on_status: [400, 409]
+      retries: 8
+      retry_interval: 15
+    capture: {firewall_rule_id: "$.firewall_rule.id"}
+    ready: {endpoint: "GET /v1/firewalls/rules/{firewall_rule_id}",
+            field: "$.firewall_rule.state", until: [ACTIVE],
+            timeout: 600, interval: 15}
+    verify:
+      - {name: show, endpoint: "GET /v1/firewalls/rules/{firewall_rule_id}",
+         expect_status: [200]}
+      # FirewallRuleSetRequest (api_docs): action/destination_address/
+      # direction/service/source_address REQ, description opt — same-value
+      # set = no-op edit.
+      - {name: set,
+         endpoint: "PUT /v1/firewalls/rules/{firewall_rule_id}",
+         json: {action: ALLOW,
+                description: "API regression firewall rule (set)",
+                destination_address: ["10.0.0.1"],
+                direction: INBOUND,
+                service: [{service_type: TCP, service_value: "443"}],
+                source_address: ["192.168.1.1"]},
+         expect_status: [200, 202]}
+    delete: {endpoint: "DELETE /v1/firewalls/rules/{firewall_rule_id}",
+             destructive: true,
+             retry_on_status: [400, 409], retries: 8, retry_interval: 15}
+    provenance: docs
+    source: {lifecycle: networking-firewall-rule, steps: [createfirewallrule]}
+    notes: "rule 상태기계 CREATING→ACTIVE (listfirewallrules state enum verbatim); set 직후 EDITING에서 delete가 400/409 가능성 → delete retry. 소스 lifecycle은 firewall_id placeholder로 4xx — 실 firewall_id 주입(carrier-capture)은 이 모델이 처음 제공하므로 body/capture 전부 UNPROVEN(docs). 카탈로그 createfirewallrule 201 응답 FirewallRuleShowResponse $.firewall_rule.id."

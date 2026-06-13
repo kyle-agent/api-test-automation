@@ -30,6 +30,15 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/lb-health-checks/{lb_health_check_id}",
          expect_status: [200]}
+      # LbHealthCheckSetRequest {lb_health_check REQ LbHealthCheckSet — 전부
+      # optional 필드} (api_docs verbatim) — 동일 값 set = no-op (wave5 setter
+      # 커버: setlbhealthcheck).
+      - {name: set, endpoint: "PUT /v1/lb-health-checks/{lb_health_check_id}",
+         json: {lb_health_check: {description: "API regression suite (set)",
+                                  health_check_count: 3,
+                                  health_check_interval: 5,
+                                  health_check_timeout: 5}},
+         expect_status: [200, 202]}
     delete: {endpoint: "DELETE /v1/lb-health-checks/{lb_health_check_id}",
              destructive: true}
     provenance: VALIDATED
@@ -58,8 +67,8 @@ resources:
           vpc_id: "{vpc.vpc_id}"
           tags: []
       options:
-        service_ip: {type: string, required: true, default: "10.140.6.100",
-                     note: "서비스 subnet cidr 내부의 빈 IP — 기본값은 소스 lifecycle의 공유 subnet(10.140.6.0/24)에 묶인 값. subnet에서 4개 IP 소비(service+SNAT+HC 2), SNAT/HC IP는 생성 후 불변"}
+        service_ip: {type: string, required: true, default: "10.124.0.100",
+                     note: "서비스 subnet cidr 내부의 빈 IP — 기본값은 공유 subnet(10.124.0.0/24, engine._SHARED_SUBNET_CIDR) 재호밍 규칙을 따른다 (구 기본 10.140.6.100은 소스 lifecycle의 자체 subnet에 묶인 값이었음; 수작업 members-nat의 10.124.0.30과 충돌 회피로 .100 선택). adopt 없이 자가 생성 subnet(10.160.8.0/24)으로 합성 시 override 필요. subnet에서 4개 IP 소비(service+SNAT+HC 2), SNAT/HC IP는 생성 후 불변"}
     capture: {loadbalancer_id: "$.loadbalancer.id"}
     ready: {field: "$.loadbalancer.state",
             until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 600, interval: 20}
@@ -70,6 +79,12 @@ resources:
       - {name: read-private-static-nats,
          endpoint: "GET /v1/loadbalancers/{loadbalancer_id}/private-static-nats",
          expect_status: [200]}
+      # LoadbalancerUpdateRequest {loadbalancer REQ {description REQ}}
+      # (api_docs verbatim — description이 유일한 수정 필드; wave5 setter 커버:
+      # setloadbalancer).
+      - {name: set, endpoint: "PUT /v1/loadbalancers/{loadbalancer_id}",
+         json: {loadbalancer: {description: "API regression suite (set)"}},
+         expect_status: [200, 202]}
     delete: {endpoint: "DELETE /v1/loadbalancers/{loadbalancer_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: heavy-shared-networking, steps: [lb-create, lb-wait, lb-delete]}
@@ -97,6 +112,13 @@ resources:
       - {name: read-members,
          endpoint: "GET /v1/lb-server-groups/{lb_server_group_id}/members",
          expect_status: [200]}
+      # LbServerGroupSetRequest {lb_server_group REQ {description/
+      # lb_health_check_id/lb_method 전부 optional}} (api_docs verbatim) —
+      # 동일 값 set = no-op (wave5 setter 커버: setlbservergroup).
+      - {name: set, endpoint: "PUT /v1/lb-server-groups/{lb_server_group_id}",
+         json: {lb_server_group: {description: "API regression suite (set)",
+                                  lb_method: ROUND_ROBIN}},
+         expect_status: [200, 202]}
     delete: {endpoint: "DELETE /v1/lb-server-groups/{lb_server_group_id}",
              destructive: true}
     provenance: VALIDATED
@@ -125,6 +147,14 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/lb-listeners/{listener_id}",
          expect_status: [200]}
+      # LbListenerSetRequestV1Dot3 {listener REQ ListenerForSetV1Dot3 — 전부
+      # optional 필드} (api_docs verbatim): 생성값과 동일한 최소 set = no-op.
+      # heavy-shared-networking의 setlblistener는 빈 문자열 다발로 UNPROVEN —
+      # 여기는 타입에 맞는 필드만 보낸다 (wave5 setter 커버: setlblistener).
+      - {name: set, endpoint: "PUT /v1/lb-listeners/{listener_id}",
+         json: {listener: {description: "API regression suite (set)",
+                           session_duration_time: 120}},
+         expect_status: [200, 202]}
     delete: {endpoint: "DELETE /v1/lb-listeners/{listener_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: heavy-shared-networking,
@@ -136,6 +166,11 @@ resources:
     requires: [lb-server-group]
     create:
       endpoint: "POST /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members"
+      # MemberListCreateRequestV1Dot1 {members REQ [MemberCreateRequestV1Dot1
+      # {member_ip REQ, member_port REQ, name REQ, object_type REQ,
+      # member_state/member_weight/object_id opt}]} (api_docs verbatim).
+      # member_ip는 subnet 내 임의 IP 직접 입력 가능 — 실 VM 불필요 (수작업
+      # members-nat _note 검증 사항: "no backend VM required").
       body:
         members:
           - name: regrmember1
@@ -146,12 +181,85 @@ resources:
             object_id: ""
             object_type: VM
       options:
-        member_ip: {type: string, required: true, default: "10.124.0.31",
-                    note: "LB와 같은 VPC의 VS/BM 서버 IP 또는 직접 입력 IP (직접 입력이 테스트 최저비용) — 기본값은 소스의 공유 subnet에 묶인 값"}
+        member_ip: {type: string, required: true, default: "10.124.0.101",
+                    note: "LB와 같은 VPC의 VS/BM 서버 IP 또는 직접 입력 IP (직접 입력이 테스트 최저비용 — VM 불필요). 기본값은 공유 subnet(10.124.0.0/24) 재호밍 규칙 (수작업 members-nat의 10.124.0.31과 충돌 회피로 .101). 자가 생성 subnet 합성 시 override 필요"}
     capture: {member_id: "$.members[0].id"}
+    verify:
+      - {name: show,
+         endpoint: "GET /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members/{member_id}",
+         expect_status: [200]}
+      # MemberSetRequest {member REQ {member_port/member_state/member_weight
+      # 전부 optional}} (api_docs verbatim) — 동일 값 set = no-op (wave5 setter
+      # 커버: setlbservergroupmember).
+      - {name: set,
+         endpoint: "PUT /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members/{member_id}",
+         json: {member: {member_port: 80, member_state: ENABLE,
+                         member_weight: 100}},
+         expect_status: [200, 202]}
     delete: {endpoint: "DELETE /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members/{member_id}",
              destructive: true}
     provenance: docs
     source: {lifecycle: networking-loadbalancer-members-nat,
-             steps: [members-add, members-remove-single]}
-    notes: "capture는 소스에서 capture_soft($.members[0].id, envelope UNPROVEN) — docs 유지"
+             steps: [members-add, members-set, members-remove-single]}
+    notes: "capture는 소스에서 capture_soft($.members[0].id, envelope UNPROVEN) — docs 유지. delete = removelbservergroupmember(단건); bulk 삭제는 lb-member-bulk 노드가 커버"
+
+  # 두 번째 member — 같은 add API로 생성하되 teardown이 BULK 삭제
+  # (DELETE .../members + member_id_list body = removelbservergroupmembers)를
+  # 커버한다. lb-member와 ip/이름만 다르다.
+  lb-member-bulk:
+    code: "nw-lb-member-bulk"
+    service: networking/loadbalancer
+    requires: [lb-server-group]
+    create:
+      endpoint: "POST /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members"
+      body:
+        members:
+          - name: regrmember2
+            member_ip: "{opt.member_ip}"
+            member_port: 80
+            member_state: ENABLE
+            member_weight: 100
+            object_id: ""
+            object_type: VM
+      options:
+        member_ip: {type: string, required: true, default: "10.124.0.102",
+                    note: "lb-member와 동일 규칙 — 공유 subnet 재호밍, .102로 분리 (동일 ip:port 중복 등록 회피)"}
+    capture: {member_bulk_id: "$.members[0].id"}
+    # MemberDeleteBulkRequestV1Dot2 {member_id_list REQ [string]} (api_docs
+    # verbatim) — bulk 삭제가 이 노드의 teardown.
+    delete: {endpoint: "DELETE /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members",
+             json: {member_id_list: ["{member_bulk_id}"]},
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-loadbalancer-members-nat,
+             steps: [members-add, members-remove-bulk]}
+    notes: "removelbservergroupmembers(벌크) 커버 전용 노드 — capture envelope $.members[0].id UNPROVEN(docs)"
+
+  # public static-NAT — PF-13 교훈: LB에 Public NAT IP를 붙이려면 그 VPC에
+  # IGW가 있어야 한다 (수작업 members-nat _note: "attaching a Public NAT IP
+  # requires an IGW on the VPC" — IGW 없는 VPC에서 4xx). internet-gateway를
+  # requires로 배선해 closure에 강제 포함시킨다.
+  lb-static-nat:
+    code: "nw-lb-static-nat"
+    service: networking/loadbalancer
+    requires: [load-balancer, public-ip, internet-gateway]
+    create:
+      endpoint: "POST /v1/loadbalancers/{load-balancer.loadbalancer_id}/static-nats"
+      # StaticNatCreateRequest {static_nat REQ {publicip_id REQ}} (api_docs
+      # verbatim) — 수작업 members-nat은 빈 publicip_id로 4xx-tolerant였고,
+      # 실 public-ip 주입은 이 모델이 처음 제공.
+      body: {static_nat: {publicip_id: "{public-ip.publicip_id}"}}
+    capture: {static_nat_id: "$.static_nat.id"}
+    verify:
+      - {name: read,
+         endpoint: "GET /v1/loadbalancers/{load-balancer.loadbalancer_id}/static-nats",
+         expect_status: [200]}
+    # deleteloadbalancerpublicnatip: DELETE .../static-nats (path param만 문서화;
+    # 수작업 members-nat은 static_nat_id_list body를 보냈다 — 그 형식 승계).
+    delete: {endpoint: "DELETE /v1/loadbalancers/{load-balancer.loadbalancer_id}/static-nats",
+             json: {static_nat_id_list: ["{static_nat_id}"]},
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-loadbalancer-members-nat,
+             steps: [static-nat-create, static-nat-delete]}
+    notes: "createloadbalancerpublicnatip/deleteloadbalancerpublicnatip 커버. capture envelope $.static_nat.id는 api_docs response_example 기반 UNPROVEN. private-static-nats(createloadbalancerprivatenatip)는 private_nat_id + private_nat_ip_id가 필요 — private-nat IP 하위자원 모델이 없어 미배선 (owner 질문: private NAT IP 발급 경로)"
