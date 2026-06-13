@@ -308,7 +308,7 @@ resources:
               - role_type: ACTIVE
                 server_type_name: "{opt.server_type}"
                 block_storage_groups:
-                  - {role_type: OS, size_gb: 104, volume_type: SSD}
+                  - {role_type: DATA, size_gb: 104, volume_type: SSD}  # replica는 DATA만 허용 (run 27470602788; cluster는 OS로 작동)
                 instances:
                   - {role_type: ACTIVE, public_ip_id: ""}
         tags: []
