@@ -31,6 +31,15 @@ resources:
              port_range_max: "22", remote_ip_prefix: "0.0.0.0/0",
              description: "API regression suite"}
     capture: {rule_id: "$.security_group_rule.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/security-group-rules/{rule_id}",
+         expect_status: [200]}
+      # security_group_id 쿼리 REQUIRED (api_docs) — smoke의 bare GET은 400이라
+      # 미커버였다 (owner 지적 2026-06-13; queue attributes·fs snapshot list와
+      # 같은 required-query list 클래스)
+      - {name: list-by-sg,
+         endpoint: "GET /v1/security-group-rules?security_group_id={security-group.sg_id}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/security-group-rules/{rule_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: networking-security-group, steps: [create-rule, delete-rule]}

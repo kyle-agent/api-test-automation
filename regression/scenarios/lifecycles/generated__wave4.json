@@ -600,6 +600,117 @@
           "destructive": true
         }
       ]
+    },
+    {
+      "id": "gen-wave4-sgrule",
+      "service": "networking/security-group",
+      "enabled": true,
+      "_note": "owner-flagged gap 2026-06-13: list needs required security_group_id query (bare smoke GET 400s) — id-bound read + filtered list verifies",
+      "steps": [
+        {
+          "name": "create-security-group",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-security-group-rule",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-group-rules",
+          "json": {
+            "security_group_id": "{sg_id}",
+            "direction": "ingress",
+            "ethertype": "IPv4",
+            "protocol": "tcp",
+            "port_range_min": "22",
+            "port_range_max": "22",
+            "remote_ip_prefix": "0.0.0.0/0",
+            "description": "API regression suite"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "rule_id": "$.security_group_rule.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-group-rules/{rule_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "verify-security-group-rule-read",
+          "service": "security-group",
+          "method": "GET",
+          "path": "/v1/security-group-rules/{rule_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-security-group-rule-list-by-sg",
+          "service": "security-group",
+          "method": "GET",
+          "path": "/v1/security-group-rules?security_group_id={sg_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-security-group-rule",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-group-rules/{rule_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-security-group",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ]
     }
   ]
 }
