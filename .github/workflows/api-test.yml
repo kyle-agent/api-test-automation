@@ -993,6 +993,19 @@ jobs:
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Serialize the publish across concurrent runs so two dashboard publishes
+    # never race the same dashboard-data branch (IB-001 / M6-DESIGN §D.2). This
+    # group is INTENTIONALLY independent of github.run_id (the workflow-level
+    # concurrency group is per-run) so publishes from DIFFERENT runs queue
+    # instead of overlapping. cancel-in-progress:false => the in-flight publish
+    # finishes (never interrupted mid-push) and the next one waits its turn. The
+    # conformance job is a DIFFERENT job and is NOT in this group, so it still
+    # runs freely; the two serialize on the branch itself via the clone+rebase
+    # retry loop below (disjoint file sets => no rebase conflict), so there is
+    # no deadlock — neither job ever waits on the other to release this group.
+    concurrency:
+      group: dashboard-publish-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
@@ -1084,33 +1097,70 @@ jobs:
       - name: Publish dashboard to data branch
         if: ${{ !cancelled() }}
         continue-on-error: true
+        # NON-DESTRUCTIVE publish (IB-001 / M6-DESIGN §D.2, option 1). This step
+        # USED TO `git init` a fresh history and `git push -f`, which silently
+        # dropped anything the conformance job (or any concurrent run) had pushed
+        # to dashboard-data between this job's Build step (git show
+        # origin/dashboard-data:...) and the force-push. Now it mirrors the
+        # conformance job's publish: clone the EXISTING branch, copy only the
+        # files this job OWNS on top (no wipe — files we don't manage, notably
+        # the conformance job's conformance*.json when it didn't run this build,
+        # are left untouched), commit, then push with a fetch+rebase retry loop.
+        # The two publishers write DISJOINT file sets (dashboard owns
+        # index.html/history.jsonl/services/*/ops.html/platform/*/
+        # verified_endpoints.json/endpoint_status.json/smoke_status.tsv;
+        # conformance owns conformance.json/baseline/new), so a concurrent
+        # conformance push is rebased ON TOP, never clobbered.
         run: |
+          url="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           pub=$(mktemp -d)
-          cp dashboard/index.html "$pub"/ 2>/dev/null || true
-          cp dashboard/history.jsonl "$pub"/ 2>/dev/null || true
+          # Clone the existing branch so its current contents (incl. the
+          # conformance job's files) are preserved; fall back to a fresh init
+          # only if the branch doesn't exist yet (first ever publish).
+          git clone --depth=1 --branch dashboard-data "$url" "$pub/dd" 2>/dev/null || { mkdir -p "$pub/dd"; ( cd "$pub/dd" && git init -q -b dashboard-data ); }
+          dd="$pub/dd"
+          # ---- copy ONLY this job's owned artifacts OVER the clone (no rm -rf:
+          # we never delete files we don't manage) ----
+          cp dashboard/index.html "$dd"/ 2>/dev/null || true
+          # history.jsonl is the cumulative trend: the Build step already pulled
+          # the prior history (git show origin/dashboard-data:history.jsonl) and
+          # appended one row, so copying it over is prior+1 (correct).
+          cp dashboard/history.jsonl "$dd"/ 2>/dev/null || true
           # per-service drill-down pages (dashboard/services/*.html)
-          cp -r dashboard/services "$pub"/services 2>/dev/null || true
-          cp dashboard/verified_endpoints.json "$pub"/ 2>/dev/null || true
-          cp dashboard/endpoint_status.json "$pub"/ 2>/dev/null || true
+          rm -rf "$dd"/services 2>/dev/null || true
+          cp -r dashboard/services "$dd"/services 2>/dev/null || true
+          # verified_endpoints / endpoint_status are cumulative-merged in Build
+          cp dashboard/verified_endpoints.json "$dd"/ 2>/dev/null || true
+          cp dashboard/endpoint_status.json "$dd"/ 2>/dev/null || true
           # static ops viewer (reads the persistent oplog bucket directly)
-          cp dashboard/ops.html "$pub"/ 2>/dev/null || true
+          cp dashboard/ops.html "$dd"/ 2>/dev/null || true
           # view-only platform pages (controlplane/static_export.py)
-          cp -r reports/platform-static "$pub"/platform 2>/dev/null || true
-          cp reports/smoke_status.tsv "$pub"/ 2>/dev/null || true
-          cp data/conformance.json "$pub"/ 2>/dev/null || true
-          cp data/conformance_baseline.json "$pub"/ 2>/dev/null || true
-          cp reports/conformance_new.json "$pub"/ 2>/dev/null || true
+          rm -rf "$dd"/platform 2>/dev/null || true
+          cp -r reports/platform-static "$dd"/platform 2>/dev/null || true
+          cp reports/smoke_status.tsv "$dd"/ 2>/dev/null || true
+          # conformance*.json: only overwrite when THIS build actually produced
+          # them (the Build step writes data/conformance.json etc. only when the
+          # source files exist this run). If conformance didn't run, these copies
+          # no-op and the clone's existing conformance files survive untouched.
+          cp data/conformance.json "$dd"/ 2>/dev/null || true
+          cp data/conformance_baseline.json "$dd"/ 2>/dev/null || true
+          cp reports/conformance_new.json "$dd"/ 2>/dev/null || true
           # nojekyll so GitHub Pages serves the raw HTML as-is
-          touch "$pub/.nojekyll"
-          cd "$pub"
-          git init -q -b dashboard-data
+          touch "$dd/.nojekyll"
+          cd "$dd"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -q -m "dashboard @ ${{ github.sha }} (${{ github.event_name }})" || exit 0
-          git push -f \
-            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
-            dashboard-data
+          git commit -q -m "dashboard @ ${{ github.sha }} (${{ github.event_name }})" || { echo "no change"; exit 0; }
+          # push with a fetch+rebase retry loop (mirrors the conformance job): a
+          # concurrent push that landed first is rebased onto, not force-clobbered.
+          pushed=""
+          for i in 1 2 3 4 5; do
+            if git push "$url" HEAD:dashboard-data 2>/dev/null; then echo pushed; pushed=1; break; fi
+            echo "push race, rebasing ($i)"; git fetch "$url" dashboard-data 2>/dev/null && git rebase FETCH_HEAD 2>/dev/null || git rebase --abort 2>/dev/null || true
+            sleep 3
+          done
+          [ -n "$pushed" ] || { echo "::warning::dashboard publish could not push after 5 rebase attempts"; }
           echo "published dashboard-data (enable Pages -> Deploy from branch -> dashboard-data /root)"
       - name: Snapshot run results (per-run archive on the oplog bucket)
         # docs/PLATFORM-PLAN.md M0: every run's canonical outputs (results
