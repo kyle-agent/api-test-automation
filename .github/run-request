@@ -1,9 +1,7 @@
-# DBaaS replica cascade — PG replica family is LIVE-PROVEN (run 27472090705);
-# mysql/mariadb/epas mirror the same pattern + the same fixes (sg-rules CIDR,
-# settling [400,409] retry, replica block-storage DATA). epas is the priority:
-# its cluster create has never had a live 2xx. Parallel window; if concurrent
-# DB-cluster quota bites, the 4xx body will name the limit.
+# mysql/mariadb replica re-run — state-sensitive verifies now retry [400,409]
+# until the cluster returns to RUNNING (epas already PROVEN; PG too). This
+# should clear the archive/maintenance verifies and reach the replica family.
 mutations=true
 destructive=true
 heavy=true
-crud_filter=gen-heavy-mysql-replica or gen-heavy-mariadb-replica or gen-heavy-epas-replica
+crud_filter=gen-heavy-mysql-replica or gen-heavy-mariadb-replica
