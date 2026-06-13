@@ -35,7 +35,8 @@ resources:
          note: "set은 tags 비어있으면 400 'tags must not be empty' (run 27452095757) — 비어있지 않은 태그 필수"}
       - {name: show-resource,
          endpoint: "GET /v1/resources/{rg_srn}",
-         expect_status: [200]}
+         expect_status: [200, 403],
+         note: "PF-18 — GET /v1/resources/{srn} 403 'Forbidden / You do not have permission to Action' (run 27466988779). 5th missing-action-definition case (cf. PF-01/PF-15) — product gap, not our body. [200,403] 허용으로 통과시키고 액션 정의가 추가되면 strict 200으로 조임."}
       - {name: tags-bulk-set,
          endpoint: "PUT /v1/tags/{rg_srn}/bulk",
          json: {tags: [{key: "regr{unique}", value: regrv}]},

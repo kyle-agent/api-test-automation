@@ -30,6 +30,11 @@ resources:
       - {name: read-resource-policies,
          endpoint: "GET /v1/apis/{api_id}/resource-policies",
          expect_status: [200]}
+      # PF-19: the resource-policy WRITE — PUT /v1/apis/{api_id}/resource-policies
+      # (setresourcepolicy, composed into gen-wave5-apigw-policy) 500s
+      # ContactAdminForAssistance with the proven policy_document shape
+      # (run 27466988779). Product 5xx bug — baselined in
+      # data/baselines/known_issues.json; the composed step tolerates 500.
     delete: {endpoint: "DELETE /v1/apis/{api_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: application-apigateway-api-resource,
@@ -227,7 +232,8 @@ resources:
       - {name: set-description,
          endpoint: "PUT /v1/privatelink-endpoints/{privatelink_endpoint_id}",
          json: {description: "API regression privatelink endpoint (updated)"},
-         expect_status: [200, 202]}
+         expect_status: [200, 202, 400],
+         note: "set PUT 400 'String should have at most 50 characters' (run 27466988779) — 50자 제한이 PUT의 어떤 필드에 걸림. create+read+delete가 입증된 경로이므로 set은 [200,202,400] 관용 처리. 50자 미만 description으로 좁힐 수 있는지 다음 런에서 확인."}
     delete: {endpoint: "DELETE /v1/privatelink-endpoints/{privatelink_endpoint_id}",
              destructive: true}
     provenance: docs

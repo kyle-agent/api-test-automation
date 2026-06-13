@@ -24,6 +24,8 @@
 | IB-009 | coverage | alert 노드: dimension 필수인데 sw-metric-catalog lookup이 중첩 dimension(key/value)을 못 잡음 → gen-wave5-swatch-alert 비활성 | composer/engine에 중첩 배열 capture(`$.namespaces[0]...dimensions[0]`) 지원 추가 후 활성 | M | open |
 | IB-010 | coverage | iam-saml 체인: SAML provider는 multipart/form-data 필요, 엔진은 JSON 전용 → 비활성 | 엔진에 multipart 지원 추가 vs 4 saml ops waive (owner 질문) | M | open (owner 결정 대기) |
 | IB-011 | onboarding | custom-metric OTLP ingest namespace 라우팅 키 미상(SWT_CUSTOM_NAMESPACE 400) | 콘솔 agent 설정 확인 후 routing attribute 확정 (owner 질문) | S | open (owner 확인 대기) |
+| IB-012 | coverage | gen-wave5-privnat 비활성: create-private-nat가 Connectable 상태의 TGW를 요구(scp-network.private-nat.connectable-transit-gateway-not-found, run 27466988779) — TGW에 VPC attachment/connection이 있어야 Connectable이 됨 | transit-gateway VPC-connection prerequisite 노드 모델링 후 private-nat 체인에 배선 → 재활성 | M | open |
+| IB-013 | coverage | gen-wave5-vpce 비활성: create-vpc-endpoint가 전용 endpoint-type subnet을 요구(scp-network.vpc-endpoint.subnet-not-found, run 27466988779) — FS-volume resource_key 배선으로는 부족 | 올바른 type/role로 생성한 endpoint-type-subnet prerequisite 노드 모델링 후 vpc-endpoint에 배선 → 재활성 | M | open |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 

@@ -28,6 +28,13 @@
       "classification": "Product Bug",
       "note": "POST /v1/budgets/account -> 500 ContactAdminForAssistance with a complete-looking body incl. amount (run 27395331657, gen-wave-mgmisc). A validation problem must not 500. Muted pending backend fix; node stays docs-provenance and out of composed waves.",
       "added": "2026-06-12"
+    },
+    {
+      "key": "application-service/apigateway/setresourcepolicy",
+      "status": 500,
+      "classification": "Product Bug",
+      "note": "PF-19 — PUT /v1/apis/{api_id}/resource-policies -> 500 ContactAdminForAssistance with the proven policy_document shape (run 27466988779, gen-wave5-apigw-policy). Previously thought VERIFIED; a write that worked before now 5xxes. Muted pending backend fix; the composed step tolerates 500 so the chain survives.",
+      "added": "2026-06-13"
     }
   ]
 }

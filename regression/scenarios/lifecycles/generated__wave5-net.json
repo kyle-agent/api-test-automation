@@ -323,7 +323,8 @@
   {
    "id": "gen-wave5-vpce",
    "service": "networking/vpc",
-   "enabled": true,
+   "enabled": false,
+   "_disabled_reason": "create-vpc-endpoint 400 'scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet not found' (run 27466988779). The endpoint needs a dedicated endpoint-type subnet (subnet created with the right type/role); the FS-volume resource_key wiring is insufficient. Needs an endpoint-type-subnet prerequisite node not yet modeled. Nodes kept.",
    "_note": "composed by regression/scenarios/composer.py — targets: vpc-endpoint",
    "steps": [
     {
@@ -572,7 +573,8 @@
   {
    "id": "gen-wave5-privnat",
    "service": "networking/vpc",
-   "enabled": true,
+   "enabled": false,
+   "_disabled_reason": "create-private-nat 400 'scp-network.private-nat.connectable-transit-gateway-not-found ... Cannot find the Transit Gateway in Connectable state' (run 27466988779). The TGW is created but not Connectable — private-nat needs a TGW with a VPC attachment/connection in Connectable state, which requires a transit-gateway VPC-connection prerequisite node not yet modeled. Nodes kept.",
    "_note": "composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {\"private-nat\": \"transit-gateway\"}",
    "steps": [
     {

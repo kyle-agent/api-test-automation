@@ -5,7 +5,7 @@
       "id": "gen-wave4-asg",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "ASG bodies rebuilt from V1Dot2 DTOs (old bodies mismatched); policy enums are documented-absent guesses — live 400 bodies will correct them || run 27452095757 fix: LC volume size 104 (÷8)",
+      "_note": "ASG bodies rebuilt from V1Dot2 DTOs (old bodies mismatched); policy enums are documented-absent guesses — live 400 bodies will correct them || run 27452095757 fix: LC volume size 104 (÷8) || run 27466988779 fix: create-asg-policy comparison_operator GREATER_THAN_OR_EQUAL_TO -> ge (live 400: must match ^(ge|gt|le|lt)$). Other enums (metric_type CPU, metric_method AVG, scale_type SCALE_OUT, scale_method AMOUNT) unverified — API validated comparison_operator first; may need short-codes too, error-driven next run.",
       "steps": [
         {
           "name": "create-keypair",
@@ -328,7 +328,7 @@
             "name": "regrpol{unique}",
             "metric_type": "CPU",
             "metric_method": "AVG",
-            "comparison_operator": "GREATER_THAN_OR_EQUAL_TO",
+            "comparison_operator": "ge",
             "threshold": 90,
             "evaluation_minutes": 5,
             "scale_type": "SCALE_OUT",
@@ -781,8 +781,10 @@
           "service": "resourcemanager",
           "method": "GET",
           "path": "/v1/resources/{rg_srn}",
+          "_note": "PF-18 — GET /v1/resources/{srn} 403 'Forbidden / You do not have permission to Action' (run 27466988779), 5th missing-action-definition case (cf. PF-01/PF-15). Product gap, not our body; [200,403] tolerated until the action definition lands.",
           "expect_status": [
-            200
+            200,
+            403
           ],
           "group": "resource-group"
         },

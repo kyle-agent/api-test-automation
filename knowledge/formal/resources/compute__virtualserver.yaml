@@ -330,10 +330,11 @@ resources:
     requires: [auto-scaling-group]
     create:
       endpoint: "POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies"
-      # AutoScalingGroupPolicyCreateRequest (api_docs) 필수 10필드 — enum
-      # 값들은 docs 미기재라 추정, 라이브 400 본문이 정답을 줄 것
+      # AutoScalingGroupPolicyCreateRequest (api_docs) 필수 10필드.
+      # comparison_operator는 short-code 검증 (run 27466988779 live 400:
+      # "should be in ^(ge|gt|le|lt)$ format. Example: ge") — ge로 확정.
       body: {name: "regrpol{unique}", metric_type: CPU, metric_method: AVG,
-             comparison_operator: GREATER_THAN_OR_EQUAL_TO, threshold: 90,
+             comparison_operator: ge, threshold: 90,
              evaluation_minutes: 5, scale_type: SCALE_OUT, scale_method: AMOUNT,
              scale_value: 1, cooldown_seconds: 300}
     capture: {policy_id: "$.id"}
@@ -342,7 +343,7 @@ resources:
     provenance: docs
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-asg-policy, delete-asg-policy]}
-    notes: "UNPROVEN body/capture (소스는 literal-seed ASG에 4xx). 정책 자체는 무자원이지만 부모 ASG가 billable — auto-scaling-group 노트 참조."
+    notes: "comparison_operator=ge VERIFIED (run 27466988779). UNVERIFIED enums — metric_type CPU, metric_method AVG, scale_type SCALE_OUT, scale_method AMOUNT — NOT flagged by the API (comparison_operator validated first); may also need short-code values, error-driven on the next run. 정책 자체는 무자원이지만 부모 ASG가 billable — auto-scaling-group 노트 참조."
 
   asg-schedule:
     code: "cp-vs-asg-schedule"

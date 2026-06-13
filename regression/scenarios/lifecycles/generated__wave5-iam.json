@@ -286,7 +286,8 @@
     {
       "id": "gen-wave5-iam-role",
       "service": "management/iam",
-      "enabled": true,
+      "enabled": false,
+      "_disabled_reason": "PF-20 — POST /v1/roles (createrole) 500s ContactAdminForAssistance even with a self-created policy bound (run 27466988779). The earlier hypothesis that policy_ids: [] caused it was wrong — it 500s with a bound policy too. Product 5xx bug; chain disabled, iam-role node kept modeled. gen-wave5-iam-bindings is separate and stays enabled.",
       "_note": "composed verification wave 5 (iam write-family closure) — role family retry+extension: createrole now binds a self-created policy (DTO rolecreaterequestv1dot3 marks policy_ids REQUIRED; previous live 500 ContactAdminForAssistance was with policy_ids: [] — this is the fix candidate), plus setrole/setroletrustpolicy/removebulkrolepolicybindings verifies and the role-policy-binding node (add/remove with policy#2); composed by regression/scenarios/composer.py — targets: iam-role, iam-role-policy-binding",
       "steps": [
         {
