@@ -1,0 +1,1354 @@
+{
+  "_comment": "Composed HEAVY PostgreSQL window (crud_filter=gen-heavy-pg) — owner approvals 2026-06-13. gen-heavy-pg-replica: origin+replica (two billable clusters, ~60-90min) with the same-region replica chain ending in the irreversible promote; run in a DEDICATED heavy window, not mixed with other heavy DB chains (2 PG clusters + their VPC). gen-heavy-pg-restore / gen-heavy-pg-upgrade are composed but DISABLED behind documented gates (backup timing / kernel-patchable precondition) — see _disabled_reason on each.",
+  "lifecycles": [
+    {
+      "id": "gen-heavy-pg-replica",
+      "service": "database/postgresql",
+      "enabled": true,
+      "_note": "owner-approved replica flow (2026-06-13, same-region: '한 리전에서 가능하면 하고 안되면 이야기 해줘' — userguide confirms standard replicas are same-region/same-subnet, max 5/DB): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. pg-switchover is deliberately ABSENT: userguide (how_to_guides/) defines Switch-Over as the HA Active<->Standby flip of one cluster ('HA 구성된 경우에는 Switch-over를 통해 Active-Standby 서버를 전환할 수 있습니다'), and the proven create body is ha_enabled:false — the owner chain's 'switchover back OR reset-replica' resolves to the reset-replica branch; pg-switchover stays modeled as an HA-gated action node. ~60-90min, two billable clusters; dedicated heavy window (crud_filter=gen-heavy-pg). composed by regression/scenarios/composer.py — targets: pg-promote, pg-replica, pg-reset-replica, pg-sync-replica-state, postgresql-cluster",
+      "steps": [
+        {
+          "name": "create-pg-engine-version",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-pg-server-type",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-postgresql-cluster",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrpg{ualpha}",
+            "instance_name_prefix": "regrpg",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C",
+              "database_name": "regrpg",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "postgresql"
+          }
+        },
+        {
+          "name": "wait-postgresql-cluster",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-postgresql-cluster-read",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "verify-postgresql-cluster-setsecuritygrouprules",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "verify-postgresql-cluster-read-after-sg",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "create-pg-replica",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "json": {
+            "allowable_ip_addresses": [],
+            "replica_count": 1,
+            "replicas": [
+              {
+                "name": "regrrep{ualpha}",
+                "instance_groups": [
+                  {
+                    "role_type": "ACTIVE",
+                    "server_type_name": "{db_server_type}",
+                    "block_storage_groups": [
+                      {
+                        "role_type": "OS",
+                        "size_gb": 104,
+                        "volume_type": "SSD"
+                      }
+                    ],
+                    "instances": [
+                      {
+                        "role_type": "ACTIVE",
+                        "service_ip_address": "",
+                        "public_ip_id": ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "tags": []
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "replica_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{replica_cluster_id}",
+            "service": "postgresql"
+          }
+        },
+        {
+          "name": "wait-pg-replica",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-pg-replica",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "pg-replica"
+        },
+        {
+          "name": "create-pg-sync-replica-state",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/sync-replica-state",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-pg-sync-replica-state",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-pg-sync-replica-state-replicas-list",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/replicas",
+          "expect_status": [
+            200
+          ],
+          "group": "pg-sync-replica-state"
+        },
+        {
+          "name": "create-pg-reset-replica",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/reset-replica",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-pg-reset-replica",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-pg-reset-replica",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "pg-reset-replica"
+        },
+        {
+          "name": "create-pg-promote",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters/{replica_cluster_id}/promote",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-pg-promote",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-pg-promote",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "pg-promote"
+        },
+        {
+          "name": "delete-pg-replica",
+          "service": "postgresql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{replica_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-postgresql-cluster",
+          "service": "postgresql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true
+    },
+    {
+      "id": "gen-heavy-pg-restore",
+      "service": "database/postgresql",
+      "enabled": false,
+      "_note": "owner-approved restore try (2026-06-13): POST /v1/clusters/{id}/restore creates a NEW cluster from backup (userguide backupandrestore: '신규 서버가 생성되고 ... DB의 구성 정보와 데이터로 복구'). Restore types: backup-point (backup_history_number from listbackuphistories) or PITR (backup_recovery_time, window starts at '최초 백업 시작 시점'). Body omits both -> behavior undocumented; refine live. composed by regression/scenarios/composer.py — targets: pg-restore, postgresql-cluster",
+      "steps": [
+        {
+          "name": "create-pg-engine-version",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-pg-server-type",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-postgresql-cluster",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrpg{ualpha}",
+            "instance_name_prefix": "regrpg",
+            "dbaas_engine_version_id": "{engine_version_id}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C",
+              "database_name": "regrpg",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "postgresql"
+          }
+        },
+        {
+          "name": "wait-postgresql-cluster",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-postgresql-cluster-read",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "verify-postgresql-cluster-setsecuritygrouprules",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "verify-postgresql-cluster-read-after-sg",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "create-pg-restore",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/restore",
+          "json": {
+            "name": "regrrst{ualpha}",
+            "instance_name_prefix": "regrrst",
+            "server_type_name": "{db_server_type}",
+            "allowable_ip_addresses": [],
+            "tags": []
+          },
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "restore_cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{restore_cluster_id}",
+            "service": "postgresql"
+          }
+        },
+        {
+          "name": "wait-pg-restore",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-pg-restore",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "pg-restore"
+        },
+        {
+          "name": "delete-pg-restore",
+          "service": "postgresql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{restore_cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-postgresql-cluster",
+          "service": "postgresql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "backup-timing gate: backups are SCHEDULED, not taken at creation — userguide: '백업을 설정한 경우에는 설정한 시간 이후 지정된 시간에 백업이 수행되며' (proven body schedules full backup at starting_time_hour=2, minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Needs its own window: either run after 02:xx KST against a cluster that lived past its backup hour, or pre-create the cluster >=1 backup-cycle earlier. Steps are composed and validator-green; enable for a dedicated post-backup window."
+    },
+    {
+      "id": "gen-heavy-pg-upgrade",
+      "service": "database/postgresql",
+      "enabled": false,
+      "_note": "owner-approved upgrade strategy (2026-06-13, SKE precedent): create the cluster on the OLDER 16.x engine (pg-engine-version-16 filter lookup where_prefix major_version='16'; live: 17.6 latest / 16.10 available) then PUT kernel-upgrade (no body). pg-patch (minor patch) is NOT composed: userguide says minor-only within the same major ('동일한 Major 버전 내에서 Minor 버전 업그레이드 기능만 지원') and the engine-versions list appears to expose only the latest minor per major (16.10), so a fresh 16.10 cluster has no patch target — pg-patch stays gated behind its required target_software_version option. composed by regression/scenarios/composer.py — targets: pg-kernel-upgrade, postgresql-cluster",
+      "steps": [
+        {
+          "name": "create-pg-engine-version",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id": {
+              "list": "$.contents",
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-pg-engine-version-16",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/engine-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "engine_version_id_16": {
+              "list": "$.contents",
+              "where_prefix": {
+                "major_version": "16"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-pg-server-type",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "db_server_type": {
+              "list": "$.contents",
+              "get": "name"
+            }
+          }
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-postgresql-cluster",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrpg{ualpha}",
+            "instance_name_prefix": "regrpg",
+            "dbaas_engine_version_id": "{engine_version_id_16}",
+            "ha_enabled": false,
+            "nat_enabled": false,
+            "subnet_id": "{subnet_id}",
+            "timezone": "Asia/Seoul",
+            "allowable_ip_addresses": [],
+            "origin_cluster_id": "",
+            "vip_public_ip_id": "",
+            "virtual_ip_address": "",
+            "tags": [],
+            "init_config_option": {
+              "audit_enabled": false,
+              "database_encoding": "UTF-8",
+              "database_locale": "C",
+              "database_name": "regrpg",
+              "database_port": 2866,
+              "database_user_name": "regruser",
+              "database_user_password": "Regr1ss!2026Xy",
+              "backup_option": {
+                "archive_frequency_minute": "60",
+                "retention_period_day": "7",
+                "starting_time_hour": "2"
+              }
+            },
+            "maintenance_option": {
+              "period_hour": "5",
+              "starting_day_of_week": "MON",
+              "starting_time": "0000"
+            },
+            "instance_groups": [
+              {
+                "role_type": "ACTIVE",
+                "server_type_name": "{db_server_type}",
+                "block_storage_groups": [
+                  {
+                    "role_type": "OS",
+                    "size_gb": 104,
+                    "volume_type": "SSD"
+                  }
+                ],
+                "instances": [
+                  {
+                    "role_type": "ACTIVE",
+                    "service_ip_address": "",
+                    "public_ip_id": ""
+                  }
+                ]
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "postgresql"
+          }
+        },
+        {
+          "name": "wait-postgresql-cluster",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 2400,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-postgresql-cluster-read",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "verify-postgresql-cluster-setsecuritygrouprules",
+          "service": "postgresql",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "json": {
+            "add_ip_addresses": [],
+            "del_ip_addresses": []
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "verify-postgresql-cluster-read-after-sg",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "postgresql-cluster"
+        },
+        {
+          "name": "create-pg-kernel-upgrade",
+          "service": "postgresql",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 30,
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "wait-pg-kernel-upgrade",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 3600,
+            "interval": 60
+          }
+        },
+        {
+          "name": "verify-pg-kernel-upgrade",
+          "service": "postgresql",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "pg-kernel-upgrade"
+        },
+        {
+          "name": "delete-postgresql-cluster",
+          "service": "postgresql",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            401,
+            409,
+            500,
+            503
+          ],
+          "retries": 20,
+          "retry_interval": 60
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true,
+      "_disabled_reason": "precondition unproven: kernel-upgrade requires is_kernel_patchable=true (cluster detail v1.1) — a freshly created 16.10 cluster may already run the newest OS kernel, in which case the PUT 4xxes and the composer's fixed [200,201,202] create expect fails the chain. Userguide also warns of service outage during the roll and no kernel downgrade after success. Enable for a probe window once is_kernel_patchable has been read from a live 16.x cluster detail (or wire a pre-check)."
+    }
+  ]
+}
