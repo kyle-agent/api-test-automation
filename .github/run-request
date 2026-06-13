@@ -1,6 +1,6 @@
-# mysql/mariadb replica re-run — state-sensitive verifies now retry [400,409]
-# until the cluster returns to RUNNING (epas already PROVEN; PG too). This
-# should clear the archive/maintenance verifies and reach the replica family.
+# mysql/mariadb replica family-only — cluster as clean prereq (no disruptive
+# setter verifies). Setter ops already banked last run. Should land replica
+# create/sync/reset/promote like PG/epas.
 mutations=true
 destructive=true
 heavy=true
