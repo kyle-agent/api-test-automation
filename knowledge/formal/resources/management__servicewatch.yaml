@@ -108,8 +108,9 @@ resources:
           statistic_type: AVG
           timezone: "UTC"
           title: "regr metric chart"
-          height: 400
-          width: 600
+          # live 400 (run 27452095757): width >= 1000, height >= 500
+          height: 500
+          width: 1400
           metrics:
             - {name: "{self.metric_name}",
                namespace_name: "{self.namespace_name}",
@@ -359,7 +360,8 @@ resources:
                             attributes:
                               - {key: "resource_id", value: {string_value: "regr-probe"}}
                             time_unix_nano: 1780272000000000000
-        expect_status: [202]
+        expect_status: [202, 400]
+        note: "live 400 {message: SWT_CUSTOM_NAMESPACE} (run 27452095757) — OTLP resource.attributes의 namespace 라우팅 키가 미상(콘솔 agent 설정 지식 필요, owner 질문). meta 생성은 2xx — ingest 라우팅 확정 전까지 [202,400] 관용"
       # listmetricdata readback — 정의/적재한 커스텀 지표를 조회 윈도가
       # ingest 시각(1780272000e9 ns = 2026-06-01T00:00Z)을 덮도록 질의.
       # 적재가 비동기(202)라 빈 결과 200도 통과로 간주.

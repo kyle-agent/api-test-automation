@@ -33,6 +33,9 @@
 | PF-14 | container/scr · `GET /v1/repositories/check-duplication/name` | `name` alone → 400 `ValidationError ["Field required"]` without naming the field; repo names are registry-scoped so `registry_id` is required — neither the requirement nor the field name is discoverable from the error or docs | 27424991237 | error-schema-defect + undiscoverable-params | fixed — model sends `registry_id` query param |
 | PF-15 | compute/virtualserver · `GET …/static-nats/{nat_id}` | 403 "Action definition is not found" on the per-id read right after a successful create — 4th instance of the missing-IAM-action-definition class (with servicewatch log-streams LIST, iam api-key per-id GET, fs snapshot read) | 27450089575 | missing-IAM-action-definition | worked around — verify expects [200,403] with this note |
 
+| PF-16 | container/scr · docker `login` to the registry endpoint | DNS resolved + registry reachable, but SCP access/secret keys → `unauthorized: authentication required`. **Settled**: SCP platform keys are NOT the docker credential — a separate console-issued SCR auth key is required (owner hypothesis 2026-06-12 disproven) | 27452095757 | entitlement (console-issued credential) | closed — cloud-ml chain stays gated on scr-auth-key; probe retired |
+| PF-17 | compute/virtualserver · `POST /v1/servers/{id}/password` | 400 `VirtualServer.InvalidPrivateKeyValue` 'Failed to decrypt' on a Linux/ubuntu server with the correct keypair private_key — Linux servers have no encrypted admin password to decrypt (Windows-only feature) | 27452095757 | service-quirk (OS-conditional op) | worked around — verify [200,400] with note |
+
 ## The masked-defect lesson (PF-11 · PF-12)
 
 Tolerant expectations (`expect_status: [200, 400]` etc.) on hand-written

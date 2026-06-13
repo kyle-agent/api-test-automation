@@ -1,665 +1,666 @@
 {
- "lifecycles": [
-  {
-   "id": "gen-wave5-iam-bindings",
-   "service": "management/iam",
-   "enabled": true,
-   "_note": "composed verification wave 5 (iam write-family closure) — group/policy binding families on self-created principals only: addgrouppolicybinding (POST group policy-bindings), setpolicygroupbinding (PUT policy bindings add/remove as create/teardown), with policy#2 to avoid duplicate-binding conflicts; composed by regression/scenarios/composer.py — targets: iam-group-policy-binding, iam-policy-binding-set",
-   "steps": [
+  "lifecycles": [
     {
-     "name": "create-iam-group",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/groups",
-     "json": {
-      "name": "regrgrp{ualpha}",
-      "description": "API regression suite",
-      "policy_ids": [],
-      "user_ids": [],
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "group_id": "$.group.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/groups/{group_id}",
-      "service": "iam"
-     }
-    },
-    {
-     "name": "create-iam-policy",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/policies",
-     "json": {
-      "policy_name": "regrpol{ualpha}",
-      "description": "API regression suite",
-      "policy_category": "IDENTITY_BASED",
-      "policy_type": "USER_DEFINED",
-      "service_type": "scp-iam",
-      "policy_version": {
-       "policy_version_name": "PolicyVersion-1",
-       "policy_document": {
-        "Version": "2024-07-01",
-        "Statement": [
-         {
-          "Sid": "Statement1",
-          "Effect": "Allow",
-          "Action": [
-           "iam:*"
-          ],
-          "Resource": [
-           "*"
-          ],
-          "Principal": null
-         }
-        ]
-       }
-      },
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "policy_id": "$.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/policies/{policy_id}",
-      "service": "iam"
-     }
-    },
-    {
-     "name": "create-iam-policy-2",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/policies",
-     "json": {
-      "policy_name": "regrpol{ualpha}",
-      "description": "API regression suite",
-      "policy_category": "IDENTITY_BASED",
-      "policy_type": "USER_DEFINED",
-      "service_type": "scp-iam",
-      "policy_version": {
-       "policy_version_name": "PolicyVersion-1",
-       "policy_document": {
-        "Version": "2024-07-01",
-        "Statement": [
-         {
-          "Sid": "Statement1",
-          "Effect": "Allow",
-          "Action": [
-           "iam:*"
-          ],
-          "Resource": [
-           "*"
-          ],
-          "Principal": null
-         }
-        ]
-       }
-      },
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "policy_id_2": "$.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/policies/{policy_id_2}",
-      "service": "iam"
-     }
-    },
-    {
-     "name": "create-iam-group-policy-binding",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/groups/{group_id}/policy-bindings",
-     "json": {
-      "policy_ids": [
-       "{policy_id}"
-      ]
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/groups/{group_id}/policy-bindings/{policy_id}",
-      "service": "iam"
-     }
-    },
-    {
-     "name": "verify-iam-group-policy-binding-list",
-     "service": "iam",
-     "method": "GET",
-     "path": "/v1/groups/{group_id}/policy-bindings",
-     "expect_status": [
-      200
-     ],
-     "group": "iam-group-policy-binding"
-    },
-    {
-     "name": "create-iam-policy-binding-set",
-     "service": "iam",
-     "method": "PUT",
-     "path": "/v1/policies/{policy_id_2}/bindings",
-     "json": {
-      "identity_type": "GROUP",
-      "add_ids": [
-       "{group_id}"
-      ],
-      "remove_ids": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "cleanup": {
-      "method": "PUT",
-      "path": "/v1/policies/{policy_id_2}/bindings",
-      "json": {
-       "identity_type": "GROUP",
-       "add_ids": [],
-       "remove_ids": [
-        "{group_id}"
-       ]
-      },
-      "service": "iam"
-     }
-    },
-    {
-     "name": "verify-iam-policy-binding-set-list",
-     "service": "iam",
-     "method": "GET",
-     "path": "/v1/policies/{policy_id_2}/bindings",
-     "expect_status": [
-      200
-     ],
-     "group": "iam-policy-binding-set"
-    },
-    {
-     "name": "delete-iam-group-policy-binding",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/groups/{group_id}/policy-bindings/{policy_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
-    },
-    {
-     "name": "delete-iam-policy-binding-set",
-     "service": "iam",
-     "method": "PUT",
-     "path": "/v1/policies/{policy_id_2}/bindings",
-     "expect_status": [
-      200
-     ],
-     "destructive": true,
-     "json": {
-      "identity_type": "GROUP",
-      "add_ids": [],
-      "remove_ids": [
-       "{group_id}"
-      ]
-     }
-    },
-    {
-     "name": "delete-iam-policy-2",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/policies/{policy_id_2}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-iam-policy",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/policies/{policy_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-iam-group",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/groups/{group_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    }
-   ]
-  },
-  {
-   "id": "gen-wave5-iam-role",
-   "service": "management/iam",
-   "enabled": true,
-   "_note": "composed verification wave 5 (iam write-family closure) — role family retry+extension: createrole now binds a self-created policy (DTO rolecreaterequestv1dot3 marks policy_ids REQUIRED; previous live 500 ContactAdminForAssistance was with policy_ids: [] — this is the fix candidate), plus setrole/setroletrustpolicy/removebulkrolepolicybindings verifies and the role-policy-binding node (add/remove with policy#2); composed by regression/scenarios/composer.py — targets: iam-role, iam-role-policy-binding",
-   "steps": [
-    {
-     "name": "create-iam-policy",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/policies",
-     "json": {
-      "policy_name": "regrpol{ualpha}",
-      "description": "API regression suite",
-      "policy_category": "IDENTITY_BASED",
-      "policy_type": "USER_DEFINED",
-      "service_type": "scp-iam",
-      "policy_version": {
-       "policy_version_name": "PolicyVersion-1",
-       "policy_document": {
-        "Version": "2024-07-01",
-        "Statement": [
-         {
-          "Sid": "Statement1",
-          "Effect": "Allow",
-          "Action": [
-           "iam:*"
-          ],
-          "Resource": [
-           "*"
-          ],
-          "Principal": null
-         }
-        ]
-       }
-      },
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "policy_id": "$.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/policies/{policy_id}",
-      "service": "iam"
-     }
-    },
-    {
-     "name": "create-iam-policy-2",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/policies",
-     "json": {
-      "policy_name": "regrpol{ualpha}",
-      "description": "API regression suite",
-      "policy_category": "IDENTITY_BASED",
-      "policy_type": "USER_DEFINED",
-      "service_type": "scp-iam",
-      "policy_version": {
-       "policy_version_name": "PolicyVersion-1",
-       "policy_document": {
-        "Version": "2024-07-01",
-        "Statement": [
-         {
-          "Sid": "Statement1",
-          "Effect": "Allow",
-          "Action": [
-           "iam:*"
-          ],
-          "Resource": [
-           "*"
-          ],
-          "Principal": null
-         }
-        ]
-       }
-      },
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "policy_id_2": "$.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/policies/{policy_id_2}",
-      "service": "iam"
-     }
-    },
-    {
-     "name": "create-iam-role",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/roles",
-     "json": {
-      "name": "regrrole{ualpha}",
-      "description": "API regression suite",
-      "role_type": "USER_DEFINED",
-      "max_session_duration": 3600,
-      "assume_role_policy_document": {
-       "Version": "2024-07-01",
-       "Statement": [
+      "id": "gen-wave5-iam-bindings",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "composed verification wave 5 (iam write-family closure) — group/policy binding families on self-created principals only: addgrouppolicybinding (POST group policy-bindings), setpolicygroupbinding (PUT policy bindings add/remove as create/teardown), with policy#2 to avoid duplicate-binding conflicts; composed by regression/scenarios/composer.py — targets: iam-group-policy-binding, iam-policy-binding-set",
+      "steps": [
         {
-         "Sid": "statement1",
-         "Effect": "Allow",
-         "Action": [
-          "sts:AssumeRole"
-         ],
-         "Condition": {},
-         "Resource": []
-        }
-       ]
-      },
-      "policy_ids": [
-       "{policy_id}"
-      ],
-      "principals": [],
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "role_id": "$.role.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/roles/{role_id}",
-      "service": "iam"
-     }
-    },
-    {
-     "name": "verify-iam-role-set",
-     "service": "iam",
-     "method": "PUT",
-     "path": "/v1/roles/{role_id}",
-     "json": {
-      "description": "updated by API regression suite",
-      "max_session_duration": 3600
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "iam-role"
-    },
-    {
-     "name": "verify-iam-role-set-trust-policy",
-     "service": "iam",
-     "method": "PUT",
-     "path": "/v1/roles/{role_id}/trust-policy",
-     "json": {
-      "assume_role_policy_document": {
-       "Version": "2024-07-01",
-       "Statement": [
+          "name": "create-iam-group",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/groups",
+          "json": {
+            "name": "regrgrp{ualpha}",
+            "description": "API regression suite",
+            "policy_ids": [],
+            "user_ids": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "group_id": "$.group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/groups/{group_id}",
+            "service": "iam"
+          }
+        },
         {
-         "Sid": "statement1",
-         "Effect": "Allow",
-         "Action": [
-          "sts:AssumeRole"
-         ],
-         "Condition": {},
-         "Resource": []
+          "name": "create-iam-policy",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/policies",
+          "json": {
+            "policy_name": "regrpol{ualpha}",
+            "description": "API regression suite",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{policy_id}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "create-iam-policy-2",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/policies",
+          "json": {
+            "policy_name": "regrpol{ualpha}2",
+            "description": "API regression suite",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "policy_id_2": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{policy_id_2}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "create-iam-group-policy-binding",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/groups/{group_id}/policy-bindings",
+          "json": {
+            "policy_ids": [
+              "{policy_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/groups/{group_id}/policy-bindings/{policy_id}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "verify-iam-group-policy-binding-list",
+          "service": "iam",
+          "method": "GET",
+          "path": "/v1/groups/{group_id}/policy-bindings",
+          "expect_status": [
+            200
+          ],
+          "group": "iam-group-policy-binding"
+        },
+        {
+          "name": "create-iam-policy-binding-set",
+          "service": "iam",
+          "method": "PUT",
+          "path": "/v1/policies/{policy_id_2}/bindings",
+          "json": {
+            "identity_type": "GROUP",
+            "add_ids": [
+              "{group_id}"
+            ],
+            "remove_ids": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "PUT",
+            "path": "/v1/policies/{policy_id_2}/bindings",
+            "json": {
+              "identity_type": "GROUP",
+              "add_ids": [],
+              "remove_ids": [
+                "{group_id}"
+              ]
+            },
+            "service": "iam"
+          }
+        },
+        {
+          "name": "verify-iam-policy-binding-set-list",
+          "service": "iam",
+          "method": "GET",
+          "path": "/v1/policies/{policy_id_2}/bindings",
+          "expect_status": [
+            200
+          ],
+          "group": "iam-policy-binding-set"
+        },
+        {
+          "name": "delete-iam-group-policy-binding",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/groups/{group_id}/policy-bindings/{policy_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-iam-policy-binding-set",
+          "service": "iam",
+          "method": "PUT",
+          "path": "/v1/policies/{policy_id_2}/bindings",
+          "expect_status": [
+            200
+          ],
+          "destructive": true,
+          "json": {
+            "identity_type": "GROUP",
+            "add_ids": [],
+            "remove_ids": [
+              "{group_id}"
+            ]
+          }
+        },
+        {
+          "name": "delete-iam-policy-2",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/policies/{policy_id_2}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-iam-policy",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/policies/{policy_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-iam-group",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/groups/{group_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
         }
-       ]
-      }
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "iam-role"
-    },
-    {
-     "name": "verify-iam-role-unbind-bulk",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/roles/{role_id}/policy-bindings",
-     "json": {
-      "policy_ids": [
-       "{policy_id}"
       ]
-     },
-     "expect_status": [
-      200,
-      204
-     ],
-     "group": "iam-role"
     },
     {
-     "name": "create-iam-role-policy-binding",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/roles/{role_id}/policy-bindings",
-     "json": {
-      "policy_ids": [
-       "{policy_id_2}"
+      "id": "gen-wave5-iam-role",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "composed verification wave 5 (iam write-family closure) — role family retry+extension: createrole now binds a self-created policy (DTO rolecreaterequestv1dot3 marks policy_ids REQUIRED; previous live 500 ContactAdminForAssistance was with policy_ids: [] — this is the fix candidate), plus setrole/setroletrustpolicy/removebulkrolepolicybindings verifies and the role-policy-binding node (add/remove with policy#2); composed by regression/scenarios/composer.py — targets: iam-role, iam-role-policy-binding",
+      "steps": [
+        {
+          "name": "create-iam-policy",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/policies",
+          "json": {
+            "policy_name": "regrpol{ualpha}",
+            "description": "API regression suite",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{policy_id}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "create-iam-policy-2",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/policies",
+          "json": {
+            "policy_name": "regrpol{ualpha}2",
+            "description": "API regression suite",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {
+                    "Sid": "Statement1",
+                    "Effect": "Allow",
+                    "Action": [
+                      "iam:*"
+                    ],
+                    "Resource": [
+                      "*"
+                    ],
+                    "Principal": null
+                  }
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "policy_id_2": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/policies/{policy_id_2}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "create-iam-role",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/roles",
+          "json": {
+            "name": "regrrole{ualpha}",
+            "description": "API regression suite",
+            "role_type": "USER_DEFINED",
+            "max_session_duration": 3600,
+            "assume_role_policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "statement1",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
+                  "Condition": {},
+                  "Resource": []
+                }
+              ]
+            },
+            "policy_ids": [
+              "{policy_id}"
+            ],
+            "principals": [],
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "role_id": "$.role.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/roles/{role_id}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "verify-iam-role-set",
+          "service": "iam",
+          "method": "PUT",
+          "path": "/v1/roles/{role_id}",
+          "json": {
+            "description": "updated by API regression suite",
+            "max_session_duration": 3600
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "iam-role"
+        },
+        {
+          "name": "verify-iam-role-set-trust-policy",
+          "service": "iam",
+          "method": "PUT",
+          "path": "/v1/roles/{role_id}/trust-policy",
+          "json": {
+            "assume_role_policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "statement1",
+                  "Effect": "Allow",
+                  "Action": [
+                    "sts:AssumeRole"
+                  ],
+                  "Condition": {},
+                  "Resource": []
+                }
+              ]
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "iam-role"
+        },
+        {
+          "name": "verify-iam-role-unbind-bulk",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/roles/{role_id}/policy-bindings",
+          "json": {
+            "policy_ids": [
+              "{policy_id}"
+            ]
+          },
+          "expect_status": [
+            200,
+            204
+          ],
+          "group": "iam-role"
+        },
+        {
+          "name": "create-iam-role-policy-binding",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/roles/{role_id}/policy-bindings",
+          "json": {
+            "policy_ids": [
+              "{policy_id_2}"
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/roles/{role_id}/policy-bindings/{policy_id_2}",
+            "service": "iam"
+          }
+        },
+        {
+          "name": "verify-iam-role-policy-binding-list",
+          "service": "iam",
+          "method": "GET",
+          "path": "/v1/roles/{role_id}/policy-bindings",
+          "expect_status": [
+            200
+          ],
+          "group": "iam-role-policy-binding"
+        },
+        {
+          "name": "delete-iam-role-policy-binding",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/roles/{role_id}/policy-bindings/{policy_id_2}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-iam-role",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/roles/{role_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-iam-policy-2",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/policies/{policy_id_2}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-iam-policy",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/policies/{policy_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
       ]
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/roles/{role_id}/policy-bindings/{policy_id_2}",
-      "service": "iam"
-     }
     },
     {
-     "name": "verify-iam-role-policy-binding-list",
-     "service": "iam",
-     "method": "GET",
-     "path": "/v1/roles/{role_id}/policy-bindings",
-     "expect_status": [
-      200
-     ],
-     "group": "iam-role-policy-binding"
-    },
-    {
-     "name": "delete-iam-role-policy-binding",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/roles/{role_id}/policy-bindings/{policy_id_2}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
-    },
-    {
-     "name": "delete-iam-role",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/roles/{role_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-iam-policy-2",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/policies/{policy_id_2}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-iam-policy",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/policies/{policy_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
+      "id": "gen-wave5-iam-saml",
+      "service": "management/iam",
+      "enabled": false,
+      "_note": "composed verification wave 5 (iam write-family closure) — saml provider JSON experiment: doc request example is multipart/form-data with an OPTIONAL metadata file; the engine sends JSON only, so this chain probes whether the gateway accepts JSON without a file. If it 400/415s, disable and reclassify as engine-multipart-blocked. deletesamlproviders (bulk, body ids) is the only saml delete; composed by regression/scenarios/composer.py — targets: iam-saml-provider",
+      "steps": [
+        {
+          "name": "create-iam-saml-provider",
+          "service": "iam",
+          "method": "POST",
+          "path": "/v1/saml-providers",
+          "json": {
+            "federation_type": "SAML",
+            "saml_provider_name": "regrsaml{ualpha}",
+            "description": "API regression suite"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "saml_provider_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/saml-providers/bulk",
+            "json": {
+              "ids": [
+                "{saml_provider_id}"
+              ]
+            },
+            "service": "iam"
+          }
+        },
+        {
+          "name": "verify-iam-saml-provider-show",
+          "service": "iam",
+          "method": "GET",
+          "path": "/v1/saml-providers/{saml_provider_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "verify-iam-saml-provider-set",
+          "service": "iam",
+          "method": "PUT",
+          "path": "/v1/saml-providers/{saml_provider_id}",
+          "json": {
+            "description": "updated by API regression suite"
+          },
+          "expect_status": [
+            200,
+            202
+          ]
+        },
+        {
+          "name": "delete-iam-saml-provider",
+          "service": "iam",
+          "method": "DELETE",
+          "path": "/v1/saml-providers/bulk",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "json": {
+            "ids": [
+              "{saml_provider_id}"
+            ]
+          }
+        }
+      ],
+      "_disabled_reason": "run 27452095757: create-iam-saml-provider 400 'Field required'×2 — JSON-without-file 시도 실패. SAML provider는 multipart/form-data(메타데이터 파일) 필요 — 엔진은 JSON 전용. engine-multipart-blocked로 재분류 (owner 질문: 멀티파트 지원 vs waive)"
     }
-   ]
-  },
-  {
-   "id": "gen-wave5-iam-saml",
-   "service": "management/iam",
-   "enabled": true,
-   "_note": "composed verification wave 5 (iam write-family closure) — saml provider JSON experiment: doc request example is multipart/form-data with an OPTIONAL metadata file; the engine sends JSON only, so this chain probes whether the gateway accepts JSON without a file. If it 400/415s, disable and reclassify as engine-multipart-blocked. deletesamlproviders (bulk, body ids) is the only saml delete; composed by regression/scenarios/composer.py — targets: iam-saml-provider",
-   "steps": [
-    {
-     "name": "create-iam-saml-provider",
-     "service": "iam",
-     "method": "POST",
-     "path": "/v1/saml-providers",
-     "json": {
-      "federation_type": "SAML",
-      "saml_provider_name": "regrsaml{ualpha}",
-      "description": "API regression suite"
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "saml_provider_id": "$.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/saml-providers/bulk",
-      "json": {
-       "ids": [
-        "{saml_provider_id}"
-       ]
-      },
-      "service": "iam"
-     }
-    },
-    {
-     "name": "verify-iam-saml-provider-show",
-     "service": "iam",
-     "method": "GET",
-     "path": "/v1/saml-providers/{saml_provider_id}",
-     "expect_status": [
-      200
-     ]
-    },
-    {
-     "name": "verify-iam-saml-provider-set",
-     "service": "iam",
-     "method": "PUT",
-     "path": "/v1/saml-providers/{saml_provider_id}",
-     "json": {
-      "description": "updated by API regression suite"
-     },
-     "expect_status": [
-      200,
-      202
-     ]
-    },
-    {
-     "name": "delete-iam-saml-provider",
-     "service": "iam",
-     "method": "DELETE",
-     "path": "/v1/saml-providers/bulk",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true,
-     "json": {
-      "ids": [
-       "{saml_provider_id}"
-      ]
-     }
-    }
-   ]
-  }
- ]
+  ]
 }

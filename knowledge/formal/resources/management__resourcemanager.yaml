@@ -29,9 +29,10 @@ resources:
       - {name: set,
          endpoint: "PUT /v1/resource-groups/{rg_id}",
          json: {name: "regr-rg-{unique}", description: "updated by API regression suite",
-                resource_types: ["resourcemanager:resource-group"], tags: []},
+                resource_types: ["resourcemanager:resource-group"],
+                tags: [{key: "regrset{unique}", value: regrv}]},
          expect_status: [200, 202],
-         note: "소스 set-rg는 [200,202] 관용 뒤에서 미검증 상태였다 — 하드 기대로 표면화"}
+         note: "set은 tags 비어있으면 400 'tags must not be empty' (run 27452095757) — 비어있지 않은 태그 필수"}
       - {name: show-resource,
          endpoint: "GET /v1/resources/{rg_srn}",
          expect_status: [200]}

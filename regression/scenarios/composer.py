@@ -650,6 +650,12 @@ class _Ctx:
         """
         if isinstance(obj, str):
             caps = self.capture_vars(inst) if own_vars else {}
+            # extra instances (node#2, node#3) must get instance-unique NAMES,
+            # else two instances of the same node render identical {unique}
+            # values and collide (live 409 PolicyAlreadyExist, run 27452095757).
+            # Append the instance number to the run-unique builtins so the
+            # engine's single per-run value still yields distinct names.
+            inum = inst.partition("#")[2]
 
             single = _TOKEN_RE.fullmatch(obj)
             if single:
@@ -658,6 +664,8 @@ class _Ctx:
                     return self._token_value(inst, tok)
                 if tok in caps:
                     return "{%s}" % caps[tok]
+                if inum and tok in ("unique", "ualpha"):
+                    return "{%s}%s" % (tok, inum)
                 return obj
 
             def repl(m):
@@ -669,6 +677,8 @@ class _Ctx:
                     return val if isinstance(val, str) else str(val)
                 if tok in caps:
                     return "{%s}" % caps[tok]
+                if inum and tok in ("unique", "ualpha"):
+                    return "{%s}%s" % (tok, inum)
                 return m.group(0)
 
             return _TOKEN_RE.sub(repl, obj)

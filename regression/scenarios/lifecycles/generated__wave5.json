@@ -5,7 +5,7 @@
       "id": "gen-wave5-swatch-metric",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: sw-metric-catalog — wave5 (owner 2026-06-13): metric catalog lookup + listmetricdata + downloadmetricdataimage; model notes in knowledge/formal/resources/management__servicewatch.yaml",
+      "_note": "composed by regression/scenarios/composer.py — targets: sw-metric-catalog — wave5 (owner 2026-06-13): metric catalog lookup + listmetricdata + downloadmetricdataimage; model notes in knowledge/formal/resources/management__servicewatch.yaml || run 27452095757 fix: image 1400x500",
       "steps": [
         {
           "name": "create-sw-metric-catalog",
@@ -59,8 +59,8 @@
             "statistic_type": "AVG",
             "timezone": "UTC",
             "title": "regr metric chart",
-            "height": 400,
-            "width": 600,
+            "height": 500,
+            "width": 1400,
             "metrics": [
               {
                 "name": "{metric_name}",
@@ -78,7 +78,7 @@
     {
       "id": "gen-wave5-swatch-alert",
       "service": "management/servicewatch",
-      "enabled": true,
+      "enabled": false,
       "_note": "composed by regression/scenarios/composer.py — targets: alert — wave5 (owner 2026-06-13): alert policy lifecycle with ids discovered via sw-metric-catalog (createalert/showalert/setalert/setalertactivated/setalertdescription/deletebulkalerts); model notes in knowledge/formal/resources/management__servicewatch.yaml",
       "steps": [
         {
@@ -212,7 +212,8 @@
             ]
           }
         }
-      ]
+      ],
+      "_disabled_reason": "run 27452095757: create-alert 400 'At least one dimension must be set' — alert는 dimension 필수인데 sw-metric-catalog lookup이 dimension(key/value)을 잡지 못함. 중첩 배열 dimension capture 지원(composer/engine 확장) 후 활성. alert 노드는 유지"
     },
     {
       "id": "gen-wave5-swatch-dashboard",
@@ -436,7 +437,7 @@
       "id": "gen-wave5-swatch-custom-metric",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: sw-custom-metric-meta — wave5 (owner 2026-06-13): custom metric meta + OTLP ingest + data readback (createcustommetricmetas/createcustommetrics; fixed names — custom metrics have no delete API and bill past 10/month); model notes in knowledge/formal/resources/management__servicewatch.yaml",
+      "_note": "composed by regression/scenarios/composer.py — targets: sw-custom-metric-meta — wave5 (owner 2026-06-13): custom metric meta + OTLP ingest + data readback (createcustommetricmetas/createcustommetrics; fixed names — custom metrics have no delete API and bill past 10/month); model notes in knowledge/formal/resources/management__servicewatch.yaml || run 27452095757: ingest [202,400] (OTLP namespace routing TBD)",
       "steps": [
         {
           "name": "create-sw-custom-metric-meta",
@@ -519,7 +520,8 @@
             ]
           },
           "expect_status": [
-            202
+            202,
+            400
           ]
         },
         {

@@ -5,7 +5,7 @@
       "id": "gen-wave4-asg",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "ASG bodies rebuilt from V1Dot2 DTOs (old bodies mismatched); policy enums are documented-absent guesses — live 400 bodies will correct them",
+      "_note": "ASG bodies rebuilt from V1Dot2 DTOs (old bodies mismatched); policy enums are documented-absent guesses — live 400 bodies will correct them || run 27452095757 fix: LC volume size 104 (÷8)",
       "steps": [
         {
           "name": "create-keypair",
@@ -80,7 +80,7 @@
             "volumes": [
               {
                 "boot_index": 0,
-                "size": 100,
+                "size": 104,
                 "type": "SSD",
                 "delete_on_termination": true
               }
@@ -716,7 +716,7 @@
       "id": "gen-wave4-rmtags",
       "service": "management/resourcemanager",
       "enabled": true,
-      "_note": "owner plan 2026-06-13: zero-cost resource-group as the live SRN source — full SRN tag family + rg set/show-resource + bulk rg delete. Tag keys carry {unique} so the per-key paths resolve to catalog endpoints (the old literal-key probe never counted).",
+      "_note": "owner plan 2026-06-13: zero-cost resource-group as the live SRN source — full SRN tag family + rg set/show-resource + bulk rg delete. Tag keys carry {unique} so the per-key paths resolve to catalog endpoints (the old literal-key probe never counted). || run 27452095757 fix: set tags non-empty",
       "steps": [
         {
           "name": "create-resource-group",
@@ -763,7 +763,12 @@
             "resource_types": [
               "resourcemanager:resource-group"
             ],
-            "tags": []
+            "tags": [
+              {
+                "key": "regrset{unique}",
+                "value": "regrv"
+              }
+            ]
           },
           "expect_status": [
             200,

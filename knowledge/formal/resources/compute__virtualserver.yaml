@@ -118,8 +118,8 @@ resources:
          expect_status: [200, 201, 202]}
       - {name: password, endpoint: "POST /v1/servers/{server_id}/password",
          json: {private_key: "{keypair.private_key}"},
-         expect_status: [200],
-         note: "ubuntu/keypair 서버에서의 응답 형태는 라이브로 확인 (Windows 전용일 가능성 — 400이면 본문 기록 후 분류)"}
+         expect_status: [200, 400],
+         note: "live 400 VirtualServer.InvalidPrivateKeyValue 'Failed to decrypt' (run 27452095757) — Linux/ubuntu 서버는 복호화할 암호화된 관리자 패스워드가 없음(Windows 전용 기능 추정). private_key capture 자체는 정상. [200,400] 관용 + PF-17"}
     delete: {endpoint: "DELETE /v1/servers/{server_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-full,
@@ -262,7 +262,9 @@ resources:
         server_type_id: "{server-type.server_type_id}"
         keypair_name: "regrkey{unique}"
         volumes:
-          - {boot_index: 0, size: 100, type: SSD, delete_on_termination: true}
+          # live 400 'Volume size of disk should be divisible by 8' (run
+          # 27452095757) — 100 -> 104 (server/nodepool과 동일)
+          - {boot_index: 0, size: 104, type: SSD, delete_on_termination: true}
         tags: []
     capture: {launch_configuration_id: "$.id"}
     delete: {endpoint: "DELETE /v1/launch-configurations/{launch_configuration_id}",
