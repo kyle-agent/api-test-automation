@@ -601,7 +601,7 @@
       "id": "gen-wave2-volume",
       "service": "compute/virtualserver",
       "enabled": true,
-      "_note": "composed wave 2 rev 3 — run 27401527554 triage fixes",
+      "_note": "recomposed 2026-06-13 — snapshot list verify (retirement gap) + transfer read",
       "steps": [
         {
           "name": "create-block-volume",
@@ -651,6 +651,16 @@
           }
         },
         {
+          "name": "verify-block-volume",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volumes/{vol_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "block-volume"
+        },
+        {
           "name": "create-volume-snapshot",
           "service": "virtualserver",
           "method": "POST",
@@ -676,13 +686,47 @@
           }
         },
         {
-          "name": "verify-volume-snapshot",
+          "name": "verify-volume-snapshot-list",
           "service": "virtualserver",
           "method": "GET",
-          "path": "/v1/snapshots/{snap_id}",
+          "path": "/v1/snapshots?volume_id={vol_id}",
           "expect_status": [
             200
-          ]
+          ],
+          "group": "volume-snapshot"
+        },
+        {
+          "name": "create-volume-transfer",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/volume-transfer",
+          "json": {
+            "name": "regrvt{unique}",
+            "volume_id": "{vol_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "transfer_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volume-transfer/{transfer_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-volume-transfer-read",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volume-transfer/{transfer_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "volume-transfer"
         },
         {
           "name": "delete-volume-snapshot",
@@ -701,6 +745,18 @@
           ],
           "retries": 8,
           "retry_interval": 15
+        },
+        {
+          "name": "delete-volume-transfer",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/volume-transfer/{transfer_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
         },
         {
           "name": "delete-block-volume",

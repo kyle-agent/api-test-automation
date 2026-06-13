@@ -20,7 +20,14 @@ resources:
       options:
         cidr: {type: cidr, required: true, pick: unique-block,
                note: "live VPC들과 비겹침 (docs/domain-constraints 블록 할당; composer가 10.<160+k>.0.0/20을 할당)"}
+        secondary_cidr: {type: string, default: "10.200.0.0/20",
+                         note: "add-cidr verify용 보조 블록 — unique-block(10.16x)과 비겹침 고정값"}
     capture: {vpc_id: "$.vpc.id"}
+    verify:
+      - {name: add-cidr, endpoint: "POST /v1/vpcs/{vpc_id}/cidrs",
+         json: {cidr: "{opt.secondary_cidr}"},
+         expect_status: [200, 201, 202],
+         note: "수작업 vpc-cidr-secondary 은퇴 갭: addvpccidr. 수작업은 [200..422] 관용이라 UNPROVEN이었음 — 하드 기대. 보조 CIDR은 표준 DELETE가 없어 VPC 삭제로 함께 제거"}
     ready: {field: "$.vpc.state", until: ACTIVE, timeout: 180, interval: 10}
     delete: {endpoint: "DELETE /v1/vpcs/{vpc_id}", destructive: true}
     quota: vpc
@@ -87,6 +94,13 @@ resources:
     capture: {internet_gateway_id: "$.internet_gateway.id"}
     ready: {field: "$.internet_gateway.state",
             until: [ACTIVE, ATTACHED, CREATED, RUNNING], timeout: 300, interval: 15}
+    verify:
+      - {name: list, endpoint: "GET /v1/internet-gateways?vpc_id={vpc.vpc_id}",
+         expect_status: [200]}
+      - {name: set, endpoint: "PUT /v1/internet-gateways/{internet_gateway_id}",
+         json: {description: "API regression suite (updated)"},
+         expect_status: [200, 202],
+         note: "수작업 체인 은퇴 갭: listinternetgateways + setinternetgateway (set body는 description-only 추정 — 라이브 본문이 정정)"}
     delete: {endpoint: "DELETE /v1/internet-gateways/{internet_gateway_id}",
              destructive: true}
     provenance: VALIDATED

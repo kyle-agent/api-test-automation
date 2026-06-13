@@ -156,6 +156,10 @@ resources:
       body: {name: "regrsnap{unique}", description: "API regression suite",
              force: true, volume_id: "{block-volume.vol_id}"}
     capture: {snap_id: "$.id"}
+    verify:
+      - {name: list, endpoint: "GET /v1/snapshots?volume_id={block-volume.vol_id}",
+         expect_status: [200],
+         note: "수작업 체인 은퇴 갭 (retirement NEAR): listsnapshot"}
     delete: {endpoint: "DELETE /v1/snapshots/{snap_id}",
              retry_on_status: [500, 409], retries: 8, retry_interval: 15,
              destructive: true}

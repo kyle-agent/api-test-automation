@@ -155,7 +155,7 @@
     {
       "id": "quota-reads",
       "service": "management/quota",
-      "enabled": true,
+      "enabled": false,
       "_note": "Read-only: list account-quotas + quota-requests, soft-capture an id each, probe the 2 path-param GETs (showaccountquota/showquotarequest). No writes/cleanup. Envelope/id grounded from docs ($.account_quotas[].id, $.quota_requests[].id). Runs in CRUD mode (engine gates all lifecycles on SCP_ALLOW_MUTATIONS); env-dependent (records SOFT if the account has no quota-requests).",
       "steps": [
         {
@@ -187,12 +187,13 @@
             "request_id": "{request_id}"
           }
         }
-      ]
+      ],
+      "_disabled_reason": "RETIRED 2026-06-13 — gen-wave3-quota/support가 동일 op를 라이브 그린으로 커버 (tools/retirement.py 1차 배치; 한 윈도우 무영향 확인 후 물리 삭제)"
     },
     {
       "id": "support-reads",
       "service": "management/support",
-      "enabled": true,
+      "enabled": false,
       "_note": "Read-only: list inquiries + service-requests, soft-capture an id each, probe showinquiry/showservicerequest. No writes/cleanup. Env-dependent (records SOFT if the account has no inquiries/tickets — there is no create-ticket API in the catalog).",
       "steps": [
         {
@@ -224,7 +225,8 @@
             "service_request_id": "{service_request_id}"
           }
         }
-      ]
+      ],
+      "_disabled_reason": "RETIRED 2026-06-13 — gen-wave3-quota/support가 동일 op를 라이브 그린으로 커버 (tools/retirement.py 1차 배치; 한 윈도우 무영향 확인 후 물리 삭제)"
     },
     {
       "id": "networking-vpc-subnet",

@@ -4,7 +4,7 @@
       "id": "gen-pilot-net-basics",
       "service": "networking/vpc",
       "enabled": true,
-      "_note": "composed canary — re-composed with id-bound GET verifies (wave 2)",
+      "_note": "recomposed 2026-06-13 — vpc add-cidr + igw list/set verifies added (retirement NEAR gaps; vpc-cidr-secondary/-internet-gateway hand-written chains retire after this goes green)",
       "steps": [
         {
           "name": "create-vpc",
@@ -50,12 +50,17 @@
           }
         },
         {
-          "name": "verify-vpc",
+          "name": "verify-vpc-add-cidr",
           "service": "vpc",
-          "method": "GET",
-          "path": "/v1/vpcs/{vpc_id}",
+          "method": "POST",
+          "path": "/v1/vpcs/{vpc_id}/cidrs",
+          "json": {
+            "cidr": "10.200.0.0/20"
+          },
           "expect_status": [
-            200
+            200,
+            201,
+            202
           ],
           "group": "vpc"
         },
@@ -228,12 +233,26 @@
           }
         },
         {
-          "name": "verify-internet-gateway",
+          "name": "verify-internet-gateway-list",
           "service": "vpc",
           "method": "GET",
-          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "path": "/v1/internet-gateways?vpc_id={vpc_id}",
           "expect_status": [
             200
+          ],
+          "group": "internet-gateway"
+        },
+        {
+          "name": "verify-internet-gateway-set",
+          "service": "vpc",
+          "method": "PUT",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "json": {
+            "description": "API regression suite (updated)"
+          },
+          "expect_status": [
+            200,
+            202
           ],
           "group": "internet-gateway"
         },
