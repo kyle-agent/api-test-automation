@@ -95,3 +95,69 @@ the next obvious objective is named for the following session.
 
 backlog가 `dashboard/history.jsonl`·PF 원장·retirement 매트릭스를 반영해
 최신이고, 다음 배치 티켓이 의존 순서와 병렬 가능 여부와 함께 명명돼 있다.
+
+---
+
+## 자율 루프 강화 — 에스컬레이션 사다리 · 병렬 파이프라인 (owner 2026-06-14)
+
+목적: 사람 개입을 **"사람만 풀 수 있는 것"** 으로 한정한다. 그러려면 ① 언제
+멈출지(Stop-when)를 **루프 시작 전에** 못박고(즉흥 "한 번 더?" 금지 → self-
+justification bias 차단), ② 누구도 run 결과를 기다리며 놀지 않게 작업을 항상
+병렬로 돌린다.
+
+### 에스컬레이션 사다리 (한 단위 = 체인/노드/런의 Stop-when)
+
+각 실패 단위는 아래를 **순서대로** 밟는다. 한계는 진입 전에 박혀 있다.
+
+- **L0 시도** — 현재 지식으로 compose → run/validate.
+- **L1 재진단** — 실패 시 아티팩트(oplog/observations/response body)로 원인 분류,
+  지식 기반 수정(model/compose) 후 1회 재시도.
+- **L2 가이드 fallback** — 그래도 실패면 해당 서비스 **userguide**를 WebFetch
+  (`knowledge/formal/INGESTION.md`의 경로) → 제약·선행조건·네이밍·상태머신 추출 →
+  `knowledge/formal/resources/*.yaml`(`requires`/`options`/`notes`) 갱신 →
+  recompose → 재시도.
+- **L3 자기판단** — 그래도 실패면 아래 **사람-필요 기준**과 대조.
+  - 하나라도 해당 → **STOP + 에스컬레이션**: IB 티켓 + (제품결함이면)
+    `docs/PRODUCT-FINDINGS.md` 기록, 그 단위는 비활성/waive하고 **다음 슬라이스로
+    이동**(파이프라인 안 막음).
+  - 아니면 → 한도 내 1회 추가 재시도, 그래도 실패면 STOP.
+
+**한계 (둘 중 먼저 도달 시 중단):**
+- 윈도우당 한 체인 **최대 3 rev**.
+- **무진전 감지** — 최근 2 rev에서 `fail_new`·`cov_op`·에러클래스가 모두 불변이면
+  중단(같은 자리 맴돌기 금지).
+
+### 사람-필요 기준 (STOP-and-escalate) — 이것만 사람을 부른다
+
+1. credential/license 필요(2계정·전용 인증키·콘솔 전용 토큰).
+2. 콘솔 전용 단계(선행 자원에 Open API 부재).
+3. 제품결함 확정(우리 사용법이 아니라 API 버그) → baseline/waive, 재시도 금지.
+4. 과금·비가역 게이트가 owner 미승인.
+5. 엔진 능력 갭으로 설계 결정 필요(예: multipart, 중첩 capture — IB-009/010).
+6. docs와 관측이 모순되고 안전한 기본값이 없음.
+
+위 6개에 **해당하지 않으면 사람을 부르지 않는다** — 루프 안에서 돈다.
+
+### 병렬 파이프라인 (모두 바쁘게 = 처리량/토큰 최대화)
+
+run은 owner 룰상 한 번에 하나지만, **비-디스패치 작업은 항상 병렬**로 돌려
+누구도 run 결과만 기다리며 놀지 않게 한다.
+
+| 레인 | 하는 일 | run 상태 의존 |
+|---|---|---|
+| **A 결과대기/triage** | in-flight run 감시 → 종료 시 triage → 수정 티켓 | run에 의존 |
+| **B 가이드/도메인** | userguide ingest → resource 노드 모델링/정련(미검증·미인입 우선) | **무관(항상 가동)** |
+| **C 합성/준비** | 신규 노드 compose → 오프라인 게이트 → 다음 Run request 큐잉(디스패치는 A의 run 종료 후) | 부분 |
+
+세 레인은 git 블랙보드(`agents/coordination/ledger.json`, `INGESTION.md` status,
+`CONTEXT.md`)로만 통신한다. **공유자원(VPC 5캡 등) 점유는
+`regression/scenarios/dependencies.json:vpc_schedule` + ledger `shared_contracts`를
+read-before-claim** — B/C가 heavy 슬라이스를 준비할 때 A가 잡은 슬롯을 반드시
+확인하고, 겹치면 adopt(공유 VPC) 또는 대기로 배치(상세: `knowledge/vpc-scheduling-strategy.md`).
+
+### Executor 병렬 팬아웃 규칙 (no-collision 재확인)
+
+각 Executor는 **자기에게 배정된 파일만** 편집한다(`resources/<cat>__<svc>.yaml`,
+`services/<cat>__<svc>.yaml`, 자기 fragment). `INGESTION.md`·`CONTEXT.md`·
+`ledger.json` 같은 **공유 인덱스는 Executor가 만지지 않고** Coordinator가 머지
+시점에 status를 전이한다(E.3 프로토콜). 커밋도 Coordinator가 한다.

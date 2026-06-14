@@ -28,6 +28,8 @@
 | IB-013 | coverage | gen-wave5-vpce 비활성: create-vpc-endpoint가 전용 endpoint-type subnet을 요구(scp-network.vpc-endpoint.subnet-not-found, run 27466988779) — FS-volume resource_key 배선으로는 부족 | 올바른 type/role로 생성한 endpoint-type-subnet prerequisite 노드 모델링 후 vpc-endpoint에 배선 → 재활성 | M | open |
 
 | IB-014 | debt | lookup 노드가 즉시-빈 리스트를 받으면 hard capture 실패(backup-target: 서버 ACTIVE 직후 목록 미반영, run 27483004836) — 엔진에 'capture 충족까지 GET 재폴링' 능력 부재 | engine에 lookup poll-until-capture(또는 ready 후 capture) 지원 추가 → gen-heavy-backup 재활성 | M | open |
+| IB-015 | loop | 종료조건(Stop-when) 부재 — 실패 체인의 재시도 한계가 즉흥적(SKE rev3/PG rev4), 무한 두드림·매번 사람판단 위험 | 에스컬레이션 사다리(L0→L3) + 윈도우당 3 rev 한계 + 무진전 감지 + 사람-필요 6기준 명문화(orchestrator.md). 후속: 한계 수치를 composer/dispatch에 자동화(rev 카운터·history.jsonl diff 게이트) | M | in-progress (정책 codified) |
+| IB-016 | loop | 직렬 운영 toil — run 결과를 기다리는 동안 도메인 작업이 멈춰 처리량 저하 | 3-레인 병렬 파이프라인(A 결과대기·B 가이드/도메인·C 합성/준비) 명문화(orchestrator.md), 공유자원 read-before-claim. 후속: 레인 B 상시가동을 세션 부트스트랩에 기본 포함 | M | in-progress (정책 codified) |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 
