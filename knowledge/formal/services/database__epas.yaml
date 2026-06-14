@@ -1,0 +1,72 @@
+# Layer 1 — per-service knowledge: database/epas
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /database/epas/{overview, how_to_guides/readreplica,
+#   how_to_guides/backupandrestore, how_to_guides/managing} (WebFetch 2026-06-14)
+#   + data/api_docs.json epas entries. EPAS (EnterpriseDB Postgres Advanced
+#   Server) is Postgres-family — it shares the DBaaS cluster API shape with
+#   mysql/mariadb/postgresql/cachestore (47-op catalog identical to postgresql),
+#   so quirks/DTOs mirror postgresql; the version/limit/restore facts below are
+#   EPAS-specific from the userguide. Resource-task model (requires/options/body
+#   templates) lives in resources/database__epas.yaml.
+version: 1
+service: database/epas
+
+constraints:
+  - id: prereq-vpc-subnet
+    rule: "VPC is the mandatory prerequisite before creating an EPAS(DBaaS) cluster (userguide overview: 'VPC Required'); the cluster is placed in a subnet (subnet_id REQUIRED in create body) — same VPC/subnet model as mysql/mariadb/postgresql"
+    provenance: docs
+  - id: async-writes-return-request-id
+    rule: "write calls answer with AsyncResponse {request_id, resource:{id}} (api_docs response examples — same DTO as postgresql) — request_id is the ONLY key to GET /v1/requests/{request_id} (epasshowrequest); capture it from the create response, no list exposes it"
+    provenance: docs
+  - id: list-parameters-needs-group-id
+    rule: "GET /v1/parameters REQUIRES query param dbaas_parameter_group_id (api_docs required:true) — harvest it from GET /v1/parameter-groups contents[].id first; dbaas_parameter_group_id is NOT present on the cluster detail DTO"
+    provenance: docs
+  - id: engine-versions-supported
+    rule: "userguide overview (2026-06-14): EPAS exposes EPAS-specific version lines 14.17-14.19, 15.12-15.14, 16.8-16.10, and 17.6 (distinct from PostgreSQL which only exposes 16/17) — EPAS additionally carries majors 14 and 15. EOS/EoTS: 14.x EOS 2026-05-20 (already PAST as of today 2026-06-14 → the 14 line may be blocked for new creation / dropped from the catalog), 15.x EoTS 2028-02-13, 16.x EoTS 2028-11-09, 17.6 EoTS 2029-11-08. Future 15.15/16.11/17.17 planned 2026-07+. New creation stops before EoTS — surfaced via the end_of_service field"
+    provenance: docs
+  - id: server-type-naming
+    rule: "DBaaS server-type NAME format is [Category][Series][vCore][Memory] e.g. 'Standard db1v2m4' (userguide overview/servertype): Category = Standard (typical) | High Capacity (24+ vCore), Series = db1 (standard) | dbh2 (large-scale), vCore = v2 (2 cores, scalable), Memory = m4 (4GB, scalable). Consumed by NAME (not id) via GET /v1/server-types contents[].name"
+    provenance: docs
+  - id: minor-patch-same-major
+    rule: "version upgrade supports MINOR within the SAME MAJOR only (userguide managing: 동일한 Major 버전 내에서 Minor 버전 업그레이드 기능만 지원); requires a configured backup + service-state sync first; with a replica, the Master DB version cannot exceed the Replica version (patch replica first); the pre-upgrade backup is auto-deleted after the upgrade completes (백업한 데이터는 버전 업그레이드 완료 후에 자동으로 삭제)"
+    provenance: docs
+  - id: kernel-upgrade-irreversible
+    rule: "OS/kernel upgrade interrupts service while running (OS 업그레이드가 진행되는 동안 서비스가 중단), reverts to the previous config on failure (업그레이드가 실패할 경우 이전 구성으로 원복), but is IRREVERSIBLE on success (cannot recover to the previous OS)"
+    provenance: docs
+  - id: replica-max-5-same-region
+    rule: "up to 5 replicas per Database (userguide readreplica: 하나의 Database당 최대 5개의 Replica); standard Replica is same-region; cross-region (DR) uses the separate 'Replica 구성(Other Region)' path; replica count input is 2-5; replica name = 3-19 chars lowercase letters/numbers/hyphens (NOTE: narrower than postgresql's 3-20); promotion to master is irreversible — sync with the original master ceases (Master 승격 시, 기존 Master Cluster와 동기화가 중단)"
+    provenance: docs
+  - id: backup-scheduled-not-immediate
+    rule: "backups are SCHEDULED, not on-demand (userguide backupandrestore: 설정한 시간 이후 지정된 시간에 백업이 수행); PITR granularity selectable 1h/30m/10m/5m prior (1시간/30분/10분/5분 전) via the Archive backup cycle; archive mode enabled by default with a 3-day retention at service creation (managing), configurable 1-35 days"
+    provenance: docs
+  - id: restore-creates-new-cluster-no-network-inherit
+    rule: "restore creates a NEW cluster/servers from the original provisioning OS image (최초 프로비저닝 시점의 OS 이미지로 신규 서버가 생성), with two recovery types — backup-point (from the backup history list) and user-specified PITR within the archive range; needs at least the original DATA-type disk capacity available (적어도 데이터 유형 Disk 용량과 동일한 용량이 필요). EPAS DIFFERS from postgresql: the restored cluster does NOT inherit network settings — IP access-control policies must be reconfigured. The EPAS docs do NOT explicitly mandate a completed backup before restore (PG note inferred one); gate restore conservatively since a fresh cluster has no completed backup yet"
+    provenance: docs
+  - id: log-export-needs-obs-and-authkey
+    rule: "DB log export targets an Object Storage Bucket and requires an Access key + Secret key (userguide managing); if the auth key expires logs stop being stored (인증키가 만료될 경우, 로그가 Bucket에 저장되지 않습니다); an auto-delete-on-export option exists to conserve DB-side storage"
+    provenance: docs
+
+captures: {}
+
+states:
+  # service_state polled by the resource model (RUNNING family for ready). Exact
+  # enum is undocumented in the userguide — these are the values the model polls;
+  # live refinement expected. Mirrors the postgresql/mariadb cluster state model.
+  cluster: {field: "$.service_state", ready: [RUNNING, ACTIVE, AVAILABLE]}
+
+quirks:
+  - id: backup-subresource-401-family
+    note: "PUT /v1/clusters/{id}/backup-histories and DELETE /v1/clusters/{id}/backups are expected to return 401 with a valid HMAC while sibling sub-ops on the same cluster path 400 — backend auth quirk family shared with mysql/mariadb/postgresql/cachestore; retry once during a live-cluster window before registering as known-red"
+    provenance: docs
+  - id: guarded-subop-500-on-placeholder
+    note: "epas (like mariadb) guarded sub-ops throw 500 against a placeholder cluster_id, whereas cachestore returns a softer 400 (HANDOFF-fail-new-triage §B asymmetry) — do not treat the 500 as a hard defect during pre-cluster probing"
+    provenance: docs
+  - id: create-body-no-service-ip
+    note: "the epas create/replica body omits service_ip_address from instances[] (unlike the postgresql standard shape which carries it) — kept verbatim from the heavy-shared-dbaas epas leg; DTO-optional but the epas leg's own live 2xx for this field is unproven (_note)"
+    provenance: docs
+  - id: epas-create-first-proof-via-replica
+    note: "no live 2xx was ever recorded for epas-create until gen-heavy-epas-replica (run 27478985079 PASSED) became the first proof of the epas creation path — the replica family (create/sync/reset/promote) is VALIDATED; the base cluster node was promoted on the same run. R3 scoped runs still owe proof for the non-replica sub-ops (parameter/storage/log-export/patch/kernel)"
+    provenance: VALIDATED
+  - id: epas-only-delete-archive-log
+    note: "EPAS exposes an epas-specific deletearchivelog (DELETE /archive) op that has no postgresql mirror — currently unmodelled in resources/database__epas.yaml (left to the guarded-probe delete-archive residual coverage)"
+    provenance: docs

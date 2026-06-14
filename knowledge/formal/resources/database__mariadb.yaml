@@ -16,6 +16,15 @@
 # database-mysql-cluster 체인에서 검증된 형을 verbatim 이전 (이 엔진에서는
 # 미검증 → provenance docs). 검증된 create body는 VERBATIM 유지 (mariadb:
 # instances에 service_ip_address 없음, character_set utf8).
+#
+# 2026-06-14 userguide WebFetch 검증 (overview/readreplica/backupandrestore/
+# managing): 엔진 버전(10.6.x·10.11.x·11.4.7, 구버전 majors 공존 확정 →
+# 업그레이드 전략 게이트 해소), replica DB당 최대 5개·동일리전/subnet 상속·
+# storage 유형 동일·총 볼륨 최대 9개, add-volume 8의 배수(16-5120),
+# archive 기본 3일(range 1-35), audit 활성 시 성능 저하·해제 시 로그 파일 삭제,
+# kernel-upgrade IRREVERSIBLE, restore 신규 클러스터+데이터디스크 2배 용량.
+# 모든 기존 사실이 userguide와 일치 — 신규 facts(8-배수/총9볼륨·audit 부작용·
+# archive 기본3일·버전 EoTS 일정)만 보강.
 version: 1
 resources:
   # 읽기 전용 LOOKUP — 소스 maria-find-version 스텝 verbatim (contents[0]).
@@ -50,7 +59,7 @@ resources:
       - {name: read, endpoint: "GET /v1/engine-versions?eos_included=false",
          expect_status: [200]}
     provenance: docs
-    notes: "Engine.major_version prefix '10' 필터 — MariaDB 메이저 표기 추정 (10.x vs 11.x; api_docs Example 공란, 라이브 카탈로그 owner 미확인). 10.x가 유일/최신 메이저면 구버전 전략 불성립 — owner 콘솔 확인 후 prefix 재조정 (의도된 폭발 반경: gen-heavy-mariadb-upgrade)."
+    notes: "Engine.major_version prefix '10' 필터 — userguide overview 확정 (2026-06-14): 10.6.x(10종)·10.11.x(3종)·11.4.7 공존하므로 10.x 구버전→업그레이드 전략 성립. 단 10.6.x EoTS 2026-07-06 임박 → 그 뒤 prefix '10' 매치는 10.11.x만 남는다(여전히 유효). 11.4.7만 남는 미래 시점에는 이 필터가 None → gen-heavy-mariadb-upgrade만 hard-fail (의도된 폭발 반경). owner 콘솔 확인은 더 이상 차단 아님 — 라이브 카탈로그 EoTS rot만 주기 점검."
 
   # 읽기 전용 LOOKUP — 소스 maria-find-stype verbatim: NAME 캡처 (id 아님).
   mariadb-server-type:
@@ -113,7 +122,7 @@ resources:
       options:
         engine_version_id: {type: string, required: true,
                             default: "{mariadb-engine-version.engine_version_id}",
-                            note: "기본 = lookup contents[0] (소스 maria-find-version 패턴). 업그레이드 체인은 {mariadb-engine-version-10.engine_version_id_10}로 override + engine_version_10 ref 옵션 활성화 (PG 전략 미러; owner 구버전 확인 대기)"}
+                            note: "기본 = lookup contents[0] (소스 maria-find-version 패턴). 업그레이드 체인은 {mariadb-engine-version-10.engine_version_id_10}로 override + engine_version_10 ref 옵션 활성화 (PG 전략 미러; userguide 2026-06-14 확정으로 10.x/11.x 공존 — 구버전 전략 성립)"}
         server_type: {type: string, required: true,
                       default: "{mariadb-server-type.db_server_type}",
                       note: "기본 = lookup contents[0] NAME (id 아님; 소스 maria-find-stype 스텝)"}
@@ -142,7 +151,9 @@ resources:
          retry_on_status: [400, 409], retries: 10, retry_interval: 30}
       # setarchiveconfig — ArchiveConfigSetRequest {archive_enabled REQ bool,
       # retention_period_day opt default 1} (api_docs verbatim). body는
-      # subops-guarded set-archive probe 초안 verbatim.
+      # subops-guarded set-archive probe 초안 verbatim. userguide 확정
+      # (2026-06-14, managing): Archive 모드 기본 ON, 기본 보관기간 3일 (range
+      # 1-35); 여기 retention 1은 의도적 축소 변경 (no-op 회피).
       - {name: setarchiveconfig,
          endpoint: "PUT /v1/clusters/{cluster_id}/archive",
          json: {archive_enabled: true, retention_period_day: 1},
@@ -164,6 +175,8 @@ resources:
       # setauditlog — AuditLogRequest {use_audit_log REQ bool} (api_docs
       # verbatim; mariadb/epas/pg에만 있는 op — mysql 카탈로그에 없음).
       # 생성 body audit_enabled:false에서 켜는 실변경 — 1회용 클러스터 허용.
+      # userguide 확정 (2026-06-14, managing): Audit 로그 활성 시 DB 성능 저하
+      # 가능; 해제 시 Audit 로그 저장 파일이 삭제됨 (1회용이라 무해).
       - {name: setauditlog,
          endpoint: "PUT /v1/clusters/{cluster_id}/audit-log",
          json: {use_audit_log: true},
@@ -275,13 +288,14 @@ resources:
     create:
       endpoint: "POST /v1/instance-groups/{mariadb-instance-group.instance_group_id}/block-storage-groups"
       body: {role_type: DATA, size_gb: 104, volume_type: SSD}
+      _note: "userguide 확정 (2026-06-14, readreplica): 추가 볼륨 용량은 16~5,120 GB '8의 배수'로 입력 가능, 원본 포함 최대 9개 볼륨. size_gb:104는 8의 배수가 아님 (104=8×13 → 실은 배수 OK) — 검증된 add-volume probe body가 아니라 PG 미러 초안값이므로 라이브 거부 시 8의 배수(예: 96 또는 112)로 정제. DTO range 16-5120(api_docs)와 userguide 8-배수/9-볼륨 제약은 services/database__mariadb.yaml storage-volume-granularity 참조."
     ready: {endpoint: "GET /v1/clusters/{mariadb-cluster.cluster_id}",
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
     source: {lifecycle: mariadb-cluster-subops-guarded,
              steps: [add-block-storages]}
-    notes: "AddBlockStoragesRequest {role_type REQ enum(OS,DATA,ARCHIVE,TEMP,BACKUP), size_gb REQ 16-5120, volume_type opt default SSD} (api_docs verbatim — PG와 동일 DTO). DATA 볼륨 추가 비가역 — 1회용 클러스터 전용."
+    notes: "AddBlockStoragesRequest {role_type REQ enum(OS,DATA,ARCHIVE,TEMP,BACKUP), size_gb REQ 16-5120, volume_type opt default SSD} (api_docs verbatim — PG와 동일 DTO). DATA 볼륨 추가 비가역 — 1회용 클러스터 전용. userguide(2026-06-14): 용량은 8의 배수, 클러스터당 총 볼륨 최대 9개 (원본 포함)."
 
   mariadb-resize-block-storage:
     code: "db-mariadb-resize-block-storage"
@@ -297,7 +311,7 @@ resources:
     provenance: docs
     source: {lifecycle: mariadb-cluster-subops-guarded,
              steps: [resize-block-storage]}
-    notes: "ResizeBlockStorageGroupRequest {size_gb REQ} (api_docs — PG와 동일 DTO). 104→112 GB 증설 — 축소 불가(비가역), 1회용 클러스터 전용."
+    notes: "ResizeBlockStorageGroupRequest {size_gb REQ} (api_docs — PG와 동일 DTO). 104→112 GB 증설 — 축소 불가(비가역), 1회용 클러스터 전용. userguide(2026-06-14): 용량은 8의 배수 입력 (112=8×14 OK), range 16-5,120."
 
   mariadb-resize-server-type:
     code: "db-mariadb-resize-server-type"
@@ -444,7 +458,7 @@ resources:
              retries: 20, retry_interval: 60}
     provenance: VALIDATED  # replica family live-proven — run 27481666055 (family-only chain PASSED)
     source: {lifecycle: mariadb-cluster-subops-guarded, steps: [create-replica]}
-    notes: "HEAVY — 두 번째 과금 클러스터, mariadb delete drain ~90분이 둘 다 적용될 수 있음 (run e3ba190) — teardown은 replica 먼저, 잔여 drain은 subnet 409 재시도 + cleanup 패스 백스톱. ReplicasCreateRequest verbatim (api_docs — PG와 동일 DTO). instances에 service_ip_address 없음 = mariadb 검증 본체 instance 형 미러. 응답 AsyncResponse $.resource.id = replica cluster id. PG userguide 확정 준용: 동일 리전·동일 subnet, DB당 최대 5개. create 409 재시도는 직전 async setter verify reconcile 경합 대비 (mariadb는 폴딩 setter가 가장 많음 — 예산 부족 시 라이브 정제). delete 재시도 스택은 PG verbatim 승계 (401 quirk family)."
+    notes: "HEAVY — 두 번째 과금 클러스터, mariadb delete drain ~90분이 둘 다 적용될 수 있음 (run e3ba190) — teardown은 replica 먼저, 잔여 drain은 subnet 409 재시도 + cleanup 패스 백스톱. ReplicasCreateRequest verbatim (api_docs — PG와 동일 DTO). instances에 service_ip_address 없음 = mariadb 검증 본체 instance 형 미러. 응답 AsyncResponse $.resource.id = replica cluster id. mariadb userguide 확정 (2026-06-14, readreplica): 동일 리전·동일 subnet (입력 필드 없음 — origin 상속; cross-region은 'Replica 구성(Other Region)' 별도 DR 경로), \"하나의 Database당 최대 5개\", storage 유형은 원본 클러스터에서 설정한 유형으로 동일 적용·primary DATA 용량 독립 변경 불가, 원본 포함 총 볼륨 최대 9개. create 409 재시도는 직전 async setter verify reconcile 경합 대비 (mariadb는 폴딩 setter가 가장 많음 — 예산 부족 시 라이브 정제). delete 재시도 스택은 PG verbatim 승계 (401 quirk family)."
 
   mariadb-sync-replica-state:
     code: "db-mariadb-sync-replica-state"
@@ -554,7 +568,9 @@ resources:
     source: {lifecycle: mariadb-cluster-subops-guarded, steps: [create-restore]}
     notes: "HEAVY — 백업 기반 새 과금 클러스터 (+90분 delete drain 가능). ClusterRestoreRequest verbatim (api_docs — PG와 동일 DTO). PG userguide 확정 준용: 백업은 예약 수행 — 생성 직후 restore 실패 예상 (gen-heavy-mariadb-restore enabled:false 게이트). 응답 AsyncResponse $.resource.id = 신규 클러스터 id."
 
-  # ---- patch / kernel-upgrade — 합성 체인은 owner 구버전 확인 대기 게이트 --
+  # ---- patch / kernel-upgrade — 구버전(10.x) 생성 후 업그레이드 전략. owner
+  # ---- 구버전 확인은 userguide(2026-06-14)로 해소(10.6.x/10.11.x 공존);
+  # ---- 합성 게이트는 라이브 검증(메이저당 최신 마이너만이면 패치 대상 부재)만 대기 --
   mariadb-patch:
     code: "db-mariadb-patch"
     service: database/mariadb
@@ -590,4 +606,4 @@ resources:
             timeout: 3600, interval: 60}
     provenance: docs
     source: {lifecycle: mariadb-cluster-subops-guarded, steps: [upgrade-kernel]}
-    notes: "body 없음 (api_docs — upgradekernel). PG userguide 준용: 진행 중 서비스 중단, 실패 시 원복, 성공 시 IRREVERSIBLE. 전제 is_kernel_patchable=true. mariadb 구버전 라이브 유무 owner 미확인 → gen-heavy-mariadb-upgrade는 'owner가 콘솔에서 엔진 구버전 유무 확인 대기'로 비활성."
+    notes: "body 없음 (api_docs — upgradekernel). PG userguide 준용: 진행 중 서비스 중단, 실패 시 원복, 성공 시 IRREVERSIBLE. 전제 is_kernel_patchable=true. userguide overview(2026-06-14) 확정으로 구버전 majors(10.6.x/10.11.x) 존재 — 구버전 생성→업그레이드 전략 성립; gen-heavy-mariadb-upgrade는 라이브 검증(엔진 카탈로그가 메이저당 최신 마이너만 노출 시 패치 대상 부재 가능)만 대기. 최신 이미지가 이미 최신 커널이면 4xx 예상 (composer create expect [200,201,202] 고정이라 hard-fail로 드러남)."

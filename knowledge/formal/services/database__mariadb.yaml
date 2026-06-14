@@ -1,0 +1,63 @@
+# Layer 1 — per-service knowledge: database/mariadb
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /database/mariadb/{overview,how_to_guides/readreplica,
+#   how_to_guides/backupandrestore,how_to_guides/managing} (WebFetch 2026-06-14)
+#   + data/api_docs.json mariadb entries. DBaaS shares the cluster API shape with
+#   mysql/postgresql/epas/cachestore — quirks mirrored, version/limit facts are
+#   mariadb-specific from the userguide.
+version: 1
+service: database/mariadb
+
+constraints:
+  - id: prereq-vpc-subnet
+    rule: "VPC is the mandatory prerequisite before creating a MariaDB(DBaaS) cluster (userguide overview); the cluster is placed in a subnet (subnet_id REQUIRED in create body) — same VPC/subnet model as mysql/postgresql"
+    provenance: docs
+  - id: async-writes-return-request-id
+    rule: "write calls answer with AsyncResponse {request_id, resource:{id}} (api_docs response examples) — request_id is the ONLY key to GET /v1/requests/{request_id} (mariadbshowrequest); capture it from the create response, no list exposes it"
+    provenance: docs
+  - id: list-parameters-needs-group-id
+    rule: "GET /v1/parameters REQUIRES query param dbaas_parameter_group_id (api_docs required:true) — harvest it from GET /v1/parameter-groups contents[].id first"
+    provenance: docs
+  - id: engine-versions-supported
+    rule: "userguide overview (2026-06-14): supported MariaDB Community versions are 10.6.x (10 minor versions, EOS 2026-03-19 / EoTS 2026-07-06 — VERY near, expected to rot out of the catalog soon), 10.11.x (3 minor versions, EOS 2027-09 / EoTS 2028-02-16), and 11.4.7 (EOS 2028-12 / EoTS 2029-05-29). Upcoming (2026-07 target, subject to change): 10.11.15, 11.4.10. BOTH 10.x and 11.x majors exist, so the older-major-then-upgrade strategy (mariadb-engine-version-10, prefix '10') is viable — but once 10.6.x EoTS passes (2026-07-06) the only remaining 10.x is 10.11.x, so the prefix-'10' lookup stays valid while the EoTS-near 10.6.x set may vanish. Patch is within same major only"
+    provenance: docs
+  - id: minor-patch-same-major
+    rule: "version upgrade supports MINOR within the SAME MAJOR only (userguide managing: 동일한 Major 버전 내에서 Minor 버전 업그레이드 기능만 지원); requires service-state sync + a configured backup first; with a replica, the Master DB version cannot exceed the Replica version (patch replica first); backup_before_upgrade data is auto-deleted after the upgrade completes"
+    provenance: docs
+  - id: kernel-upgrade-irreversible
+    rule: "OS kernel upgrade interrupts service while running, reverts to previous config on failure, but is IRREVERSIBLE on success (userguide managing: 업그레이드 완료 후 기존 OS로 복구할 수 없습니다)"
+    provenance: docs
+  - id: replica-max-5-same-region
+    rule: "up to 5 replicas per Database (userguide readreplica: 하나의 Database당 최대 5개); standard Replica is same-region/same-subnet (inherited, no input fields); cross-region uses a separate 'Replica 구성(Other Region)' path; replica storage type/capacity inherited from master (DATA/TEMP purposes only), max 9 total storage volumes including the original"
+    provenance: docs
+  - id: backup-scheduled-not-immediate
+    rule: "backups are SCHEDULED, not on-demand (userguide backupandrestore: 설정한 시간 이후 지정된 시간에 백업이 수행); archive frequency drives PITR granularity (1h/30m/10m/5m prior); archive retention configurable 1-35 days, default 3 days (managing)"
+    provenance: docs
+  - id: restore-creates-new-cluster
+    rule: "restore creates a NEW cluster/servers (신규 서버가 생성), inheriting origin storage type and network; requires ~2x the data-disk capacity available (userguide backupandrestore: 데이터 유형 Disk 용량의 2배 용량이 필요); two restore types — backup-point (recommended) and user-specified PITR within the archive range; a completed backup must exist, so restore immediately after create fails (gate the restore lifecycle)"
+    provenance: docs
+  - id: storage-volume-granularity
+    rule: "added block-storage volume size must be 16–5,120 GB in multiples of 8 (userguide readreplica: 16~5,120 범위에서 8의 배수로 입력 가능); a cluster may hold at most 9 storage volumes total including the original (DATA/TEMP/etc.). NOTE: the live-proven create body uses OS size_gb 104 (not a multiple of 8) — the multiple-of-8 rule documented for the ADD-volume console flow may not bind the create-time OS volume; live-refine if an added DATA volume of 104 is rejected"
+    provenance: docs
+  - id: server-type-naming
+    rule: "DBaaS server types follow '[Type] db[spec][cores]m[memory]' e.g. Standard db1v2m4 (Type=Standard|High Capacity; spec=db1 standard / dbh2 24+ vCore; cores=v<n> vCore; mem=m<n> GB) — userguide overview. The model selects a type by NAME from GET /v1/server-types contents[] (mariadb-server-type lookup), so this is descriptive context for choosing/overriding, not a value the model constructs"
+    provenance: docs
+
+captures: {}
+
+states:
+  # service_state polled by the resource model (RUNNING family for ready, STOPPED
+  # after stop). Exact enum is undocumented in the userguide — these are the values
+  # the model polls; live refinement expected (see mariadb-stop node note).
+  cluster: {field: "$.service_state", ready: [RUNNING, ACTIVE, AVAILABLE]}
+
+quirks:
+  - id: slow-delete-drain
+    note: "cluster DELETE drains very slowly — run e3ba190 observed ~90 minutes until the mariadb cluster vanished; teardown leans on subnet-delete 409 retries + the cleanup pass as a backstop rather than blocking the per-node delete budget"
+    provenance: VALIDATED
+  - id: backup-subresource-401-family
+    note: "PUT /v1/clusters/{id}/backup-histories and DELETE /v1/clusters/{id}/backups return 401 with a valid HMAC while sibling sub-ops on the same cluster path 400 — backend auth quirk family shared with mysql/postgresql/cachestore; retry once during a live-cluster window before registering as known-red"
+    provenance: docs
+  - id: create-body-no-service-ip
+    note: "the validated mariadb create body omits service_ip_address from instances[] (auto-assigned), unlike the mysql/postgresql standard shape; character_set is utf8 (mysql uses utf8mb4). Kept verbatim from the live-proven heavy-shared-dbaas leg (run e3ba190)"
+    provenance: VALIDATED

@@ -135,9 +135,29 @@ resources:
       body: {name: "regrvol{unique}", description: "API regression suite",
              size: 104, volume_type: SSD_Provisioned, max_iops: 10000,
              max_throughput: 500, tags: []}
+      # block_storage_vm userguide (overview + how_to_guides, 2026-06-14):
+      # volume_type ∈ {SSD, HDD, SSD_Provisioned, SSD_KMS/HDD_KMS,
+      # SSD_MultiAttach/HDD_MultiAttach}. SSD_Provisioned는 IOPS/Throughput
+      # 설정 가능한 유일 타입 — max_iops/max_throughput 필수 (다른 타입은 무시).
+      # _KMS는 AES-256 암호화(약 60% 성능 저하), _MultiAttach는 2대 이상
+      # 동시 연결 가능. size는 8~12228 GB, 8의 배수 (live: 'should be
+      # divisible by 8' run 27452095757과 일치). max_iops 5000~20000,
+      # max_throughput 250~1000 (SSD_Provisioned 전용 범위).
+      # size/max_iops/max_throughput는 정수 범위 옵션이라 validator의 옵션
+      # 타입(cidr|enum|ref|string)에 매핑되지 않는다 — 범위/배수 제약은 위
+      # 주석 + node notes에 docs로 보존하고, varyable enum인 volume_type만
+      # options로 노출한다 (_note→note: validator OPTION_KEYS 준수).
+      options:
+        volume_type: {type: enum, default: SSD_Provisioned,
+                      values: [SSD, HDD, SSD_Provisioned, SSD_KMS, HDD_KMS, SSD_MultiAttach, HDD_MultiAttach],
+                      note: "docs-only: 카탈로그/엔진은 SSD_Provisioned만 라이브 검증. _MultiAttach/_KMS variants는 docs. SSD_Provisioned만 max_iops(5000~20000)/max_throughput(250~1000) 필수, 그 외 타입은 무시. 모든 볼륨 AES-256 기본 암호화, _KMS는 추가로 인스턴스↔스토리지 전송구간 암호화(~60% 성능 저하). _MultiAttach만 다중 서버 동시 attach(Windows VM 불가)."}
     capture: {vol_id: "$.id"}
     ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
             timeout: 300, interval: 15}
+    # docs state-machine (block_storage_vm): Creating -> (Downloading) ->
+    # Available -> Reserved/Attaching -> In-use -> Detaching -> Available;
+    # Deleting/Error/Maintenance/Reverting도 존재. attach는 Available에서만,
+    # delete/snapshot/restore도 상태 게이트가 있다 (아래 notes).
     delete: {endpoint: "DELETE /v1/volumes/{vol_id}",
              retry_on_status: [500, 409], retries: 8, retry_interval: 15,
              destructive: true}
@@ -145,7 +165,7 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-volume-snapshot,
              steps: [create-volume, wait-volume-available, delete-volume]}
-    notes: "standalone (VPC 불필요). 필드는 volume_type이지 type이 아니다 (services quirk volume-field-name); capture는 FLAT $.id (filestorage의 $.volume_id와 다름). SSD_Provisioned는 max_iops/max_throughput 필수. 삭제는 409/500 재시도 6×20s + wait-gone 404 (소스 시맨틱)."
+    notes: "standalone (VPC 불필요). 필드는 volume_type이지 type이 아니다 (services quirk volume-field-name); capture는 FLAT $.id (filestorage의 $.volume_id와 다름). SSD_Provisioned는 max_iops/max_throughput 필수. 삭제는 409/500 재시도 6×20s + wait-gone 404 (소스 시맨틱). [block_storage_vm userguide 2026-06-14] 데이터 볼륨 용량 8~12228GB·8배수(이미지별 OS/boot 볼륨은 최소가 '이미지별 최소 용량'이고 12TB까지 증설), SSD_Provisioned만 IOPS(5000~20000)/Throughput(250~1000) 설정. 리사이즈는 EXPAND-ONLY(축소 불가)·온라인·8배수 증설, 확장 후 스냅샷은 확장 전 상태로 복원 불가. 삭제 차단(termination): 볼륨이 서버에 attach됨 / OS(boot) 볼륨 / 비-삭제가능 상태 — 삭제 가능한 상태는 정확히 {Available, Error, Error Extending, Error Restoring, Error Managing} 뿐 → 그래서 역순 teardown(detach→delete)이 필수. 상태머신 21개 상태: Creating/Downloading/Available/Reserved/Attaching/Detaching/In Use/Deleting/Awaiting Transfer/Extending/Error Extending/Backing Up/Restoring Backup/Error Backing Up/Error Restoring/Error Deleting/Error Managing/Error/Maintenance/Reverting. attach는 Available 상태 + VM과 동일 location에서만."
 
   volume-snapshot:
     code: "cp-vs-volume-snapshot"
@@ -155,6 +175,15 @@ resources:
       endpoint: "POST /v1/snapshots"
       body: {name: "regrsnap{unique}", description: "API regression suite",
              force: true, volume_id: "{block-volume.vol_id}"}
+      # block_storage_vm userguide (2026-06-14): 스냅샷 요금은 원본 볼륨
+      # 크기 기준 (Asia/Seoul timestamp). create/delete/restore 지원이되
+      # restore(=revert, Reverting 상태)는 원본 볼륨이 서버에 연결되지 않은
+      # (detached/Available) 상태에서만 가능. force: true는 in-use(연결된)
+      # 볼륨에서도 스냅샷을 강제 생성 (소스가 standalone Available 볼륨에
+      # 쓰므로 무해하지만 attach 시나리오 대비 보존).
+      # force는 bool 옵션이라 validator 옵션 타입에 매핑 안 됨 — body에 고정
+      # 값(true)으로 두고 의미는 notes에 docs로 보존. (force: true =
+      # in-use/연결된 볼륨에서도 강제 스냅샷, detach 없이 스냅샷할 때 필요)
     capture: {snap_id: "$.id"}
     verify:
       - {name: list, endpoint: "GET /v1/snapshots?volume_id={block-volume.vol_id}",
@@ -167,7 +196,7 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: compute-virtualserver-volume-snapshot,
              steps: [create-snapshot, delete-snapshot, wait-snapshot-gone]}
-    notes: "스냅샷을 지운 뒤(409/500 재시도 + 404 폴링) 볼륨을 지워야 한다 — 역순 teardown이 자연 보장. PUT /v1/snapshots/{id} rename은 vs-volume-transfer-coverage에서 UNPROVEN."
+    notes: "스냅샷을 지운 뒤(409/500 재시도 + 404 폴링) 볼륨을 지워야 한다 — 역순 teardown이 자연 보장. PUT /v1/snapshots/{id} rename은 vs-volume-transfer-coverage에서 UNPROVEN. [block_storage_vm userguide 2026-06-14] restore/revert(Reverting 상태; POST 추정, 미모델)는 원본 볼륨이 detached(Available) 상태여야 함 — 서버에 연결된(in-use) 볼륨엔 restore 불가. 복원 방식 2가지: ① 스냅샷에서 신규 '복구 볼륨' 생성, ② 가장 최근 Available 스냅샷으로 in-place 복원. 스냅샷 요금은 원본 볼륨 크기 기준(Asia/Seoul timestamp). 스냅샷 보유는 부모 볼륨 삭제를 막는 termination 차단 조건은 아니지만(삭제 가능 상태는 block-volume notes 참조), 역순 teardown 안정성을 위해 자식 스냅샷 먼저 삭제 후 부모 삭제."
 
   # owner 2026-06-13: 별도 block volume을 만들어 두고 VM에 붙였다 뗐다 —
   # attach=create / detach=delete (server-interface와 같은 액션-자원 매핑)
@@ -179,6 +208,18 @@ resources:
     create:
       endpoint: "POST /v1/volumes/{block-volume.vol_id}/servers"
       body: {server_id: "{server.server_id}", delete_on_termination: false}
+      # block_storage_vm userguide (2026-06-14): attach 전제 = 볼륨이
+      # Available 상태 + VM과 동일 location. VM당 최대 26개 볼륨 연결.
+      # _MultiAttach 타입만 2대 이상 서버에 동시 연결 (현재 block-volume은
+      # SSD_Provisioned라 단일 attach). running/stopped VM 모두 attach 가능
+      # (docs는 상태 제약 명시 안 함 — 온라인 attach 지원).
+      # delete_on_termination은 bool이라 validator enum(string 값)으로 노출:
+      # false=볼륨 수명을 우리가 관리(역순 teardown이 detach 후 삭제),
+      # true=VM 삭제 시 볼륨도 reap.
+      options:
+        delete_on_termination: {type: enum, default: "false",
+                                values: ["true", "false"],
+                                note: "false(기본): 볼륨 수명을 우리가 관리 — 역순 teardown이 detach 후 volume 삭제. true: VM 삭제 시 볼륨도 함께 reap."}
       # attach 시점 충돌 race 대비 (interface attach 409와 동류 가능성)
       retry_on_status: [409]
       retries: 8
@@ -196,7 +237,7 @@ resources:
          expect_status: [200]}
     provenance: docs
     source: {lifecycle: compute-virtualserver-full, steps: []}
-    notes: "VolumeServerAttachRequest {server_id, delete_on_termination} (api_docs). capture 없음 — detach가 prereq 토큰만 사용 (dotted-prereq-token-in-delete). delete_on_termination false: 볼륨 수명은 우리가 관리(역순 teardown이 detach 후 volume 삭제)."
+    notes: "VolumeServerAttachRequest {server_id, delete_on_termination} (api_docs). capture 없음 — detach가 prereq 토큰만 사용 (dotted-prereq-token-in-delete). delete_on_termination false: 볼륨 수명은 우리가 관리(역순 teardown이 detach 후 volume 삭제). [block_storage_vm userguide 2026-06-14] attach 게이트: 볼륨 Available 상태 + VM과 동일 location(블록 스토리지와 서버가 같은 location이어야 연결 대상). VM당 OS(basic) 볼륨 외에 추가 데이터 볼륨 최대 26개. running/stopped VM 모두 온라인 attach 지원(docs는 VM 상태 게이트 명시 안 함). detach는 게스트 OS에서 umount(Linux)/disk-offline(Windows)을 먼저 해야 연결 서버 hang(상태 에러)을 피함 — 우리 합성은 OS 미진입이라 데이터 볼륨(boot 아님)을 빈 채로 detach(안전). OS/boot 볼륨은 detach 불가(termination 차단 조건). _MultiAttach 타입만 다중 서버 동시 attach(Windows VM 불가)."
 
   custom-image:
     code: "cp-vs-custom-image"

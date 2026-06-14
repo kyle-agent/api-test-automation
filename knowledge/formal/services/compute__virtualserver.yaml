@@ -14,6 +14,15 @@ constraints:
   - id: vs-postcreate-ops
     rule: "After a server is created the following ops are possible (owner 2026-06-12): dump 생성(POST /dump), lock/unlock(POST /lock·/unlock), 패스워드 조회(POST /password — read-by-POST, the known method-verb defect). C4 verify candidates on the server node."
     provenance: docs
+  - id: volume-deletable-states
+    rule: "A block volume can be DELETED only when its state is one of {Available, Error, Error Extending, Error Restoring, Error Managing}. Any other state (esp. In Use / attached, Attaching, Reverting, Extending, Deleting) blocks deletion. Additionally an OS(boot) volume and a server-attached volume cannot be deleted — detach first. (block_storage_vm userguide 2026-06-14)"
+    provenance: docs
+  - id: volume-size-rules
+    rule: "Data volume size 8~12228 GB in 8 GB increments. OS(boot) volume minimum is the per-image minimum (not 8 GB), expandable up to 12 TB. Resize is EXPAND-ONLY (no shrink), online, in 8 GB steps; a snapshot taken AFTER an expansion cannot restore the volume to its pre-expansion state. Only SSD_Provisioned takes max_iops (5000~20000) and max_throughput (250~1000); other types ignore them. All volumes are AES-256 encrypted by default; _KMS adds instance↔storage in-transit encryption (~60% perf penalty). (block_storage_vm userguide 2026-06-14)"
+    provenance: docs
+  - id: volume-attach-rules
+    rule: "Attach gate: volume in Available state AND in the SAME location as the VM. Per VM: max 26 data volumes in addition to the OS volume. Online attach to running or stopped VM. Before DETACH the guest must umount(Linux)/disk-offline(Windows) or the server hangs; OS(boot) volume cannot be detached. Only *_MultiAttach volume types attach to 2+ servers concurrently (not usable by Windows VMs). Snapshot restore/revert requires the volume DETACHED (Available); cannot restore an in-use volume. (block_storage_vm userguide 2026-06-14)"
+    provenance: docs
   - id: server-type-prefix-s
     rule: "server_type_id must be chosen with prefix filter: id starts with 's', NOT 'g' (g-types rejected). Lookup from /v1/server-types"
     provenance: VALIDATED

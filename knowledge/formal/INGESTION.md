@@ -44,13 +44,13 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/networking/gslb/overview/ | networking/gslb |
 | ✅ | P1 | /userguide/networking/global_cdn/overview/ | networking/cdn |
 | ✅ | P1 | /userguide/database/mysql/overview/ | database/mysql |
-| — | P1 | /userguide/database/mariadb/overview/ | database/mariadb |
+| ✅ | P1 | /userguide/database/mariadb/overview/ | database/mariadb |
 | ✅ | P1 | /userguide/database/postgresql/overview/ | database/postgresql |
-| — | P1 | /userguide/database/epas/overview/ | database/epas |
+| ✅ | P1 | /userguide/database/epas/overview/ | database/epas |
 | — | P1 | /userguide/database/mssql/overview/ | database/sqlserver |
 | ✅ | P1 | /userguide/database/cachestore/overview/ | database/cachestore |
 | ✅ | P1 | /userguide/compute/baremetal_server/overview/ | compute/baremetal |
-| — | P1 | /userguide/compute/block_storage_vm/overview/ | compute/virtualserver (volumes) |
+| ✅ | P1 | /userguide/compute/block_storage_vm/overview/ | compute/virtualserver (volumes) |
 | ✅ | P1 | /userguide/compute/cloud_functions/overview/ | compute/scf |
 | — | P1 | /userguide/compute/mngc/overview/ | compute/multinodegpucluster |
 | ✅ | P1 | /userguide/storage/archive_storage/overview/ | storage/archivestorage — **대상 영구 제외** (owner 2026-06-11: 전용 인증키 미발급, waiver 25/25; 다시 끌어올리지 말 것) |

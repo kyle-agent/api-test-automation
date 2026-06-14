@@ -198,6 +198,11 @@ resources:
     requires: [vpc, subnet]
     provenance: VALIDATED
     notes: "heavy, billable"
+  epas-cluster:
+    service: database/epas
+    requires: [vpc, subnet]
+    provenance: VALIDATED
+    notes: "heavy, billable; Postgres-family (EPAS) cluster (run 27478985079)"
 
   # --- security ---------------------------------------------------------------
   certificate:
