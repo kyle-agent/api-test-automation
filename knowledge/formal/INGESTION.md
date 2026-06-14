@@ -69,10 +69,10 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | — | P1 | /userguide/management/cloud_monitoring/overview/ | management/cloudmonitoring (smoke 400s) |
 | — | P1 | /userguide/management/logging_audit/overview/ | management/loggingaudit |
 | ✅ | P1 | /userguide/management/service_watch/overview/ | management/servicewatch |
-| — | P1 | /userguide/management/resource_groups/overview/ | management/resourcemanager |
+| ✅ | P1 | /userguide/management/resource_groups/overview/ | management/resourcemanager (tags ≤50/resource; RG name-len/quota undocumented — confirm live) |
 | ✅ | P1 | /userguide/management/quota/overview/ | management/quota (verify the VPC 3-vs-5!) |
 | — | P1 | /userguide/application/api_gateway/overview/ | application-service/apigateway |
-| — | P1 | /userguide/application/queue_service/overview/ | application-service/queueservice |
+| ✅ | P1 | /userguide/application/queue_service/overview/ | application-service/queueservice (name 3-64/.fifo; size ≤256KB; retention ≤14d; kr-west1/east1) |
 | — | P1 | /userguide/analytics/data_flow/overview/ | data-analytics/data-flow |
 | — | P1 | /userguide/analytics/data_ops/overview/ | data-analytics/data-ops |
 | ✅ | P1 | /userguide/analytics/event_streams/overview/ | data-analytics/eventstreams (smoke 400s) |

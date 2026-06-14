@@ -23,7 +23,13 @@ resources:
     delete: {endpoint: "DELETE /v1/queues/{queue_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: application-queueservice-queue, steps: [create, get, delete]}
-    notes: "선행조건 없음 (cross-service와 일치) — 폴링 불필요(create 즉시 사용 가능, 소스에 ready 폴링 없음). config/dedup/acl setter는 lifecycle 영역."
+    notes: "선행조건 없음 (cross-service와 일치) — 폴링 불필요(create 즉시 사용 가능, 소스에 ready 폴링 없음). config/dedup/acl setter는 lifecycle 영역. 리전: kr-west1/kr-east1 만 제공 (kr-south1/2/3 미제공, overview docs 2026-06-14)."
+    _note: "docs(how_to_guides 2026-06-14) 한도 — 검증된 create body 값(40min/256KB)은 유지, 합성기 C4 경계값 변형 참고용. \
+            name 3-64자·소문자 시작·[a-z0-9-]·Standard 큐는 '.fifo' 접미사 금지; \
+            message_retention_period 단위별 범위 second 60-1209600 / minute 1-20160 / hour 1-336 / day 1-14 (현재 40min 유효); \
+            message_size 1-256 KB (현재 256=상한); \
+            data_key_reuse_period (KMS) minute 5-1440 / hour 1-24 (현재 40min 유효); \
+            description 최대 100자; tags 큐당 최대 50개; IP allowlist(ACL) 큐당 최대 150개."
 
   # owner 2026-06-13: queue 잔여 3종 (attributes GET / dedup PUT / dedup-scope
   # PUT). 유저가이드: 중복 제거는 FIFO 유형에서만 설정 가능 — FIFO는 별도 type
@@ -64,4 +70,8 @@ resources:
     delete: {endpoint: "DELETE /v1/queues/{queue_id}", destructive: true}
     provenance: VALIDATED  # gen-wave3-qfifo 전 단계 2xx — run 27450089575 (attributes 200 + dedup PUT 2종)
     source: {lifecycle: application-queueservice-queue, steps: [create, delete]}
-    notes: "owner 도메인 지식(2026-06-13) + api_docs DTO 추출. 폴링 불필요(표준 queue와 동일). 표준 queue에는 dedup PUT가 400/유효성 거부일 것으로 예상 — C4 음성 변형 후보."
+    notes: "owner 도메인 지식(2026-06-13) + api_docs DTO 추출. 폴링 불필요(표준 queue와 동일). 표준 queue에는 dedup PUT가 400/유효성 거부일 것으로 예상 — C4 음성 변형 후보. 리전: kr-west1/kr-east1 만 제공."
+    _note: "docs(how_to_guides 2026-06-14): FIFO 큐는 name 에 '.fifo' 접미사 필수 (Standard 는 금지). \
+            content_based_deduplication·deduplication_scope 는 FIFO 전용 토글. \
+            deduplication_scope=MessageGroup 시 큐당 메시지 그룹 최대 100개. \
+            기타 한도(retention/size/data_key/description/tags/ACL)는 queue 노드 _note 와 동일."

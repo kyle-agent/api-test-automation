@@ -1,0 +1,29 @@
+# Layer 1 — per-service knowledge: management/resourcemanager
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: /userguide/management/resource_groups/{overview,how_to_guides}/ (2026-06-14)
+
+version: 1
+service: management/resourcemanager
+
+constraints:
+  - id: tags-max-per-resource
+    rule: "자원당 태그 최대 50개 (how_to_guides: '자원 당 최대 50개까지 추가 가능'). 51번째 태그 부여 시 거부 예상 — C4 음성 변형 후보"
+    provenance: docs
+  - id: resource-group-create-required-fields
+    rule: "콘솔 생성은 name(필수)·resource_types(필수)·그룹핑 기준 태그(필수)·description(선택) 요구. API 는 name+description 만으로 201 검증됨; resource_types/tags 는 PUT /v1/resource-groups/{id} set 으로 적용 (set 은 tags 비면 400 'tags must not be empty')"
+    provenance: docs
+  - id: delete-irreversible
+    rule: "resource-group 삭제는 영구이며 복구 불가 (how_to_guides). teardown 은 단일 DELETE 또는 벌크 DELETE /v1/resource-groups {ids:[...]}"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: no-prerequisites
+    note: "선행 서비스 없음 — 글로벌(account-scoped) 서비스, host 에 region 세그먼트 없음 (resources 노드 notes 와 일치)"
+    provenance: docs
+  - id: naming-and-quota-undocumented
+    note: "resource-group 이름 길이/허용문자 및 계정당 그룹 최대 개수가 userguide 에 미명시 — API Reference 미확인. 라이브 4xx 본문에서 확정 필요"
+    provenance: docs

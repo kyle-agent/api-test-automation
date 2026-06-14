@@ -71,7 +71,8 @@ resources:
     delete: {endpoint: "DELETE /v1/resource-groups/{rg_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: resourcemanager-resource-group, steps: [create, delete]}
-    notes: "글로벌(account-scoped) 서비스 — host에 region 세그먼트 없음. 싸고 가역적인 실생성 자원 — tag-write 계열의 실 SRN 공급원 (owner 2026-06-13 계획). rg_srn envelope은 소스 capture_soft에서 하드 승격 — 1차 라이브에서 확정."
+    notes: "글로벌(account-scoped) 서비스 — host에 region 세그먼트 없음. 싸고 가역적인 실생성 자원 — tag-write 계열의 실 SRN 공급원 (owner 2026-06-13 계획). rg_srn envelope은 소스 capture_soft에서 하드 승격 — 1차 라이브에서 확정. 콘솔 생성은 name(필수)·description(선택)·resource_types(필수)·그룹핑 기준 태그(필수) 요구 — 검증된 API create 는 name+description 만으로 201, resource_types/tags 는 PUT set 에서 적용(verify set 노드). 삭제는 영구(복구 불가) — destructive 표시와 일치."
+    _note: "docs(how_to_guides 2026-06-14): 태그는 자원당 최대 50개. resource-group 이름 길이/허용문자 및 계정당 그룹 최대 개수는 userguide 에 미명시(API Reference 미확인) — quota/naming 미상, 라이브에서 확정 필요."
 
   # deleteresourcegroups(벌크) 전용 — 두 번째 rg를 만들고 벌크 DELETE로 지운다
   # (delete.json passthrough). 단일 rg의 teardown과 중복 없이 벌크 경로를 검증.
