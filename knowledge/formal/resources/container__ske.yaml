@@ -108,13 +108,13 @@ resources:
     service: container/ske
     requires: []
     create:
-      endpoint: "GET /v1/images"
+      endpoint: "GET /v1/images?size=20&page=0"
     verify:
       - {name: images-page, endpoint: "GET /v1/images?size=20&page=0",
          expect_status: [200]}
     provenance: docs
     source: {lifecycle: container-ske-cluster-nodepool, steps: [list-images]}
-    notes: "노드 OS 이미지 목록 (size/page/sort 쿼리는 모두 optional, api_docs). capture 불요 — nodepool은 image_os/image_os_version 문자열을 직접 받는다."
+    notes: "노드 OS 이미지 목록 — bare GET /v1/images는 400 'Field required' (run 27483895557; docs는 size/page optional이라 했으나 라이브는 필수) → size/page 쿼리 필수. capture 불요 — nodepool은 image_os/image_os_version 문자열을 직접 받는다."
 
   # owner 승인(2026-06-13): "구버전 생성 → 업그레이드 → 삭제" 흐름 허용.
   # 현재 라이브 버전: v1.33.5(구) / v1.34.3(신) — 합성 시 options로 주입,

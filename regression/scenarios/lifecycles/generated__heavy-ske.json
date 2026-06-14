@@ -3,9 +3,9 @@
   "lifecycles": [
     {
       "id": "gen-heavy-ske-upgrade",
-      "service": "container/ske",
+      "service": "storage/filestorage",
       "enabled": true,
-      "_note": "owner-approved upgrade flow (2026-06-13): cluster+nodepool at v1.33.5 -> control-plane upgrade v1.34.3 -> node roll -> teardown. Also closes kubeconfig x2 (lowercase 'public' — the legacy probe sent PUBLIC against a lowercase enum) and listimages. Version literals are current live values; re-check the kubernetes-versions lookup if this rots.",
+      "_note": "owner-approved upgrade flow (2026-06-13): cluster+nodepool at v1.33.5 -> control-plane upgrade v1.34.3 -> node roll -> teardown. Also closes kubeconfig x2 (lowercase 'public' — the legacy probe sent PUBLIC against a lowercase enum) and listimages. Version literals are current live values; re-check the kubernetes-versions lookup if this rots. || run 27483895557 fix: ske-image GET needs size/page query",
       "steps": [
         {
           "name": "create-keypair",
@@ -21,11 +21,24 @@
             201,
             202
           ],
+          "capture": {
+            "private_key": "$.private_key"
+          },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/keypairs/regrkey{unique}",
             "service": "virtualserver"
           }
+        },
+        {
+          "name": "verify-keypair",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200
+          ],
+          "group": "keypair"
         },
         {
           "name": "create-server-type",
@@ -51,6 +64,17 @@
           }
         },
         {
+          "name": "verify-server-type-read",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types/{server_type_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "server-type"
+        },
+        {
           "name": "create-kubernetes-version",
           "service": "ske",
           "method": "GET",
@@ -65,10 +89,20 @@
           }
         },
         {
+          "name": "verify-kubernetes-version-read",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/kubernetes-versions",
+          "expect_status": [
+            200
+          ],
+          "group": "kubernetes-version"
+        },
+        {
           "name": "create-ske-image",
           "service": "ske",
           "method": "GET",
-          "path": "/v1/images",
+          "path": "/v1/images?size=20&page=0",
           "expect_status": [
             200,
             201,
@@ -109,6 +143,16 @@
             "path": "/v1/security-groups/{sg_id}",
             "service": "security-group"
           }
+        },
+        {
+          "name": "verify-security-group",
+          "service": "security-group",
+          "method": "GET",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "security-group"
         },
         {
           "name": "create-vpc",
@@ -152,6 +196,21 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "verify-vpc-add-cidr",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs/{vpc_id}/cidrs",
+          "json": {
+            "cidr": "10.200.0.0/20"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "vpc"
         },
         {
           "name": "create-subnet",
@@ -199,6 +258,26 @@
           }
         },
         {
+          "name": "verify-subnet-read-vips",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "verify-subnet-read-sap-secondary-subnets",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
           "name": "create-filestorage-volume",
           "service": "filestorage",
           "method": "POST",
@@ -240,6 +319,16 @@
             "timeout": 300,
             "interval": 15
           }
+        },
+        {
+          "name": "verify-filestorage-volume-read-access-rules",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}/access-rules",
+          "expect_status": [
+            200
+          ],
+          "group": "filestorage-volume"
         },
         {
           "name": "create-ske-cluster",
@@ -370,6 +459,16 @@
             "timeout": 1200,
             "interval": 30
           }
+        },
+        {
+          "name": "verify-ske-nodepool",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-nodepool"
         },
         {
           "name": "create-ske-cluster-upgrade",
