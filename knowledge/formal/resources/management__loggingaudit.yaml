@@ -3,23 +3,65 @@
 # (enabled, guarded) by extract.py, curated by hand. start/stop trail and
 # downloadlogs are operations on the trail, not resources — they stay in the
 # hand-written lifecycle.
+#
+# 2026-06-14 ingest: the create body was the WRONG MODEL. The catalog endpoint
+# POST /v1/trails takes TrailCreateRequestV1dot1 (data/api_docs.json), whose
+# REQUIRED fields are account_id, bucket_name, bucket_region — NOT
+# name/object_storage_bucket_name/is_multi_region/tags. The trail's display
+# name is trail_name (5-26 chars, [A-Za-z0-9-] per the userguide trail page;
+# UNCONFIRMED whether it is required at API level). Capture $.trail.id is
+# CONFIRMED against the response model TrailShowResponseV1dot1{trail:
+# Trail1dot1} and Trail1dot1.id. Body rewritten to the real model below.
 version: 1
 resources:
   trail:
     code: "mg-la-trail"
     service: management/loggingaudit
-    requires: []
+    requires:
+      # bucket_region must match where the bucket lives; bucket_name is a
+      # pre-existing Object Storage bucket (userguide: "Object Storage required
+      # for Trail creation"). Object Storage has no node in this model yet, so
+      # the bucket is a docs-only precondition carried in options (_note).
+      - {credential: account_id,
+         note: "account_id (ACCOUNT_ID-xxxx) is a required body field — the caller's account id, supplied by the harness/credential context, not a graph node"}
     create:
       endpoint: "POST /v1/trails"
-      body: {name: "regrtrail{unique}", description: "API regression coverage probe",
-             object_storage_bucket_name: "{opt.object_storage_bucket_name}",
-             is_multi_region: false, tags: []}
+      # TrailCreateRequestV1dot1 required: account_id, bucket_name,
+      # bucket_region. Optional sent: trail_name (display name), region_total_yn
+      # (Y = all regions), log_type_total_yn (Y = all log types),
+      # log_verification_yn (N), organization_trail_yn (N), trail_description,
+      # trail_save_type (JSON|CSV). iam_role_id/log_group_name are ServiceWatch-
+      # trail-only; log_archive_account_id is org-trail-only — all omitted.
+      body:
+        account_id: "{opt.account_id}"
+        bucket_name: "{opt.bucket_name}"
+        bucket_region: "{region}"
+        trail_name: "regrtrail{unique}"
+        trail_description: "API regression coverage probe"
+        region_total_yn: "Y"
+        log_type_total_yn: "Y"
+        log_verification_yn: "N"
+        organization_trail_yn: "N"
+        trail_save_type: "JSON"
       options:
-        object_storage_bucket_name: {type: string, required: true,
-                                     default: "apitest-logsink",
-                                     note: "owner 확인(2026-06-13): trail도 사전 존재하는 Object Storage 버킷 필요 — 워크플로 ensure-logsink가 만드는 공용 apitest-logsink 사용 (network-logging과 공유)"}
+        account_id: {type: string, required: true, default: "{account_id}",
+                     note: "_note: 본문 필수 account_id — 호출 계정 id(ACCOUNT_ID-xxxx). 엔진 builtin {account_id}가 없으면 크리덴셜 컨텍스트에서 채워야 함(라이브 검증 대상)"}
+        bucket_name: {type: string, required: true,
+                      default: "apitest-logsink",
+                      note: "사전 존재하는 Object Storage 버킷명 (생성 후 변경 불가). 워크플로 ensure-logsink가 만드는 공용 apitest-logsink 사용 — network-logging과 공유 (owner 2026-06-13)"}
+        trail_name: {type: string, required: false, default: "regrtrail{unique}",
+                     note: "_note: 트레일 표시명. userguide trail 페이지: 5-26자, 영문/숫자/하이픈만. API 레벨 필수 여부는 스펙에 명시 없음(optional 표기) — 라이브 검증 대상"}
+        trail_save_type: {type: enum, values: [JSON, CSV], required: false,
+                          default: JSON, vary: true,
+                          note: "저장 포맷 — 생성 후 변경 가능. userguide 'Save Format: JSON or CSV'"}
+        region_total_yn: {type: enum, values: ["Y", "N"], required: false,
+                          default: "Y", vary: false,
+                          note: "대상 리전 전체 여부(default Y). N이면 region_names 목록 필요 — 미모델"}
+        log_verification_yn: {type: enum, values: ["N", "Y"], required: false,
+                              default: "N", vary: true,
+                              note: "로그파일 검증(digest) 활성 — Y면 무결성 검증용 digest 파일 저장(userguide Log File Validation)"}
     capture: {trail_id: "$.trail.id"}
     delete: {endpoint: "DELETE /v1/trails/{trail_id}", destructive: true}
     provenance: docs
     source: {lifecycle: loggingaudit-trail, steps: [create-trail, delete-trail]}
-    notes: "CloudTrail-equivalent 감사 trail. api_bodies 항목 없음 + docs JS-rendered — body(버킷 + log selector 추정)와 capture envelope $.trail.id 모두 BEST-GUESS UNPROVEN, 라이브 2xx 후 승격. start/stop은 body 없는 POST /v1/trails/{trail_id}/start|stop 오퍼레이션. Landing Zone 선행 체인의 구성 요소이기도 하다 (cloudcontrol-landing-zone notes)."
+    notes: "CloudTrail-equivalent 감사 trail (90일 콘솔 보관 + Object Storage 장기 보관). 2026-06-14 정정: create body는 종전 {name, object_storage_bucket_name, is_multi_region, tags} 추정값이 아니라 docs TrailCreateRequestV1dot1 모델(필수 account_id/bucket_name/bucket_region; 표시명은 trail_name; multi-region은 region_total_yn/region_names). capture $.trail.id는 응답 모델 TrailShowResponseV1dot1{trail: Trail1dot1}, Trail1dot1.id로 CONFIRMED(라이브 2xx 후 VALIDATED 승격). start/stop은 body 없는 POST /v1/trails/{trail_id}/start|stop 오퍼레이션(자원 아님 — 핸드라이트 lifecycle에 유지). downloadlogs는 POST /v1/logs/download. Object Storage 버킷이 선행 필수(userguide Prerequisites) — cross-service 엣지 후보(아래 리포트). Landing Zone 선행 체인 구성요소이기도 함(cloudcontrol-landing-zone notes). _note(smoke-400 관련 아님): loggingaudit의 listlogs(GET /v1/logs)는 start_at/end_at(필수 시간범위)를, listtrails(GET /v1/trails)는 필수 없음 — service yaml constraints 참조."

@@ -31,6 +31,7 @@
 | IB-015 | loop | 종료조건(Stop-when) 부재 — 실패 체인의 재시도 한계가 즉흥적(SKE rev3/PG rev4), 무한 두드림·매번 사람판단 위험 | 에스컬레이션 사다리(L0→L3) + 윈도우당 3 rev 한계 + 무진전 감지 + 사람-필요 6기준 명문화(orchestrator.md). 후속: 한계 수치를 composer/dispatch에 자동화(rev 카운터·history.jsonl diff 게이트) | M | in-progress (정책 codified) |
 | IB-016 | loop | 직렬 운영 toil — run 결과를 기다리는 동안 도메인 작업이 멈춰 처리량 저하 | 3-레인 병렬 파이프라인(A 결과대기·B 가이드/도메인·C 합성/준비) 명문화(orchestrator.md), 공유자원 read-before-claim. 후속: 레인 B 상시가동을 세션 부트스트랩에 기본 포함 | M | in-progress (정책 codified) |
 | IB-017 | coverage | sqlserver Always On Secondary(add-secondary) + Enterprise 전용 경로가 **SQL Server License Key**를 요구 — userguide에 자체 발급 절차 없음(archivestorage 전용키 미발급 선례와 동급) | owner가 라이선스 키 발급 → `ss-add-secondary` credential 주입 후 HA/secondary 체인 합성·검증. 그 전까지 해당 노드 gated | M | open (owner credential 대기) |
+| IB-018 | coverage | analytics data-flow(NiFi)/data-ops(Airflow)/quick-query(Trino)는 DBaaS가 아니라 **SKE k8s 엔진 위에 설치** — 기존 create body가 dbaas instance_groups 모양(coverage probe artifact)이라 docs-vs-reality 불일치, 실제 2xx 미검증. quick-query는 추가로 DSC domain 실값 필요, data-flow/ops는 account id/pw 필요 | api_bodies.json에 실제 SKE-엔진 body 작성(ske-cluster+filestorage prereq 배선) → heavy 윈도우 라이브 검증; DSC domain/account 값은 owner 도메인 지식 주입 | L | open (UNPROVEN body + 일부 owner 도메인값) |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 

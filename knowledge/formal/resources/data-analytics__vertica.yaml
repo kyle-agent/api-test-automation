@@ -42,18 +42,20 @@ resources:
         timezone: "Asia/Seoul"
       options:
         engine_version_id: {type: string, required: true,
-                            note: "lookup — GET /v1/engine-versions $.contents[0].id (vertica-read-coverage capture)"}
+                            note: "lookup — GET /v1/engine-versions $.contents[0].id (vertica-read-coverage capture). userguide 확정 (2026-06-14, overview): 24.2.0-2 단일 버전 (EOS 2026-09 예정, EoTS 2027-04-30) — 메이저당 단일이라 contents[0]가 안전"}
         server_type_name: {type: string, required: true,
-                           note: "lookup — DBaaS server-type 목록; api_bodies sample은 빈 문자열"}
+                           note: "lookup — DBaaS server-type 목록; api_bodies sample은 빈 문자열. userguide 확정 (2026-06-14, overview/servertype): Standard(db1/db2, 최대 16 vCore/256GB) · High Capacity(dbh2, 24+ vCore, 최대 128 vCore/1536GB). 최소 db1v1m2 (1 vCore/2GB)"}
         database_name: {type: string, required: true,
-                        note: "Vertica DB 이름 — 정책 미문서, R3 라이브 검증"}
+                        note: "Vertica DB 이름. userguide 확정 (2026-06-14) + api_docs VerticaInitConfigOptionRequest.database_name: 영문 시작, 영문·숫자만 ^[a-zA-Z][a-zA-Z0-9]*$ 3-20자"}
         db_user_name: {type: string, required: true,
-                       note: "DB 관리자 계정명 — 정책 미문서, R3 라이브 검증"}
+                       note: "DB 관리자 계정명. userguide 확정 (2026-06-14) + api_docs: 영문 소문자만 ^[a-z]*$ 2-20자"}
         db_user_password: {type: string, required: true,
-                           note: "DB 관리자 비밀번호 — 정책 미문서, R3 라이브 검증"}
+                           note: "DB 관리자 비밀번호. userguide 확정 (2026-06-14): 영문·숫자·특수문자(\\\", ' 제외) 포함 8-30자 (api_docs length 8-30)"}
+        license: {type: string, default: "",
+                  note: "api_docs VerticaClusterCreateRequest.license = optional string, max 5000자. userguide(2026-06-14)는 BYOL 명시 없음 (Search Engine과 달리 Elasticsearch 같은 BYOL 문구 없음) — doc sample대로 빈 문자열 기본; 라이선스 요건은 R3 라이브 검증"}
     capture: {cluster_id: "$.resource.id"}
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
     provenance: docs
     source: {lifecycle: vertica-cluster-subops-guarded,
              steps: [list-clusters, capture-subop-ids]}
-    notes: "소스 lifecycle은 기존 cluster adopt형 coverage probe — create body는 api_bodies verticacreatecluster 형상의 UNPROVEN(docs) 템플릿. license는 doc sample 그대로 빈 문자열(BYOL 여부 미문서). capture envelope $.resource.id는 DBaaS AsyncResponse 패턴 추론 — UNPROVEN. 라이선스/restore/backup sub-op은 task가 아닌 lifecycle 영역."
+    notes: "소스 lifecycle은 기존 cluster adopt형 coverage probe — create body는 api_bodies verticacreatecluster 형상의 UNPROVEN(docs) 템플릿. capture envelope $.resource.id는 DBaaS AsyncResponse 패턴 추론 — UNPROVEN. userguide 확정 (2026-06-14, overview + how_to_guides): Data Warehouse 기반 고가용성 분석 DB, \"Masterless\" MPP 토폴로지 (단일 장애점 없음, 모든 노드에서 쿼리 시작 — instance_groups role_type 단일 ACTIVE 그룹이 자연스러움). 선행=VPC/Subnet 필수. cluster name ^[a-zA-Z]*$ 3-20, instance_name_prefix ^[a-z][a-zA-Z0-9\\-]*$ 3-13(postfix 001/002 자동), database_locale 기본 ko_KR.utf8, DB port 1200-65535. 노드 수 1-10 (HA 위해 최소 2 권장). storage size_gb 16-5120 GB 8의 배수 (최대 9개 추가 디스크), tags 최대 50. SearchEngine과 달리 add-instances/dashboard-restart/patch 엔드포인트 없음 (카탈로그 확인 2026-06-14) — 라이프사이클: create→(modify: resize-server-type/resize-block-storage/add-block-storages)·start/stop/restart→backup/restore→delete. 백업: retention 7-35일, 시작 '시'만 선택(분은 자동), 즉시 아님; restore는 완료된 백업 선행 필수 + 새 클러스터 생성(네트워크 미상속, IP 접근제어 재구성 필요, DATA 용량 ≥ 원본·storage 유형 동일). restore/backup sub-op은 task가 아닌 lifecycle 영역."

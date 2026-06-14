@@ -1,0 +1,34 @@
+# Layer 1 — per-service knowledge: management/loggingaudit
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /management/logging_audit/* + data/api_docs.json
+# (TrailCreateRequestV1dot1 / listlogs param specs). Recorded 2026-06-14.
+
+version: 1
+service: management/loggingaudit
+
+constraints:
+  - id: trail-needs-object-storage-bucket
+    rule: "Trail creation REQUIRES a pre-existing Object Storage bucket (userguide Prerequisites). createtrail (POST /v1/trails, TrailCreateRequestV1dot1) required body fields: account_id, bucket_name, bucket_region. bucket_name and bucket_region CANNOT be changed after creation. This is a cross-service dependency loggingaudit/trail → storage/objectstorage (bucket) — see cross-service edge report."
+    provenance: docs
+  - id: trail-name-rules
+    rule: "Trail name (trail_name) is 5-26 chars, English letters/numbers/hyphens only (userguide trail page). save format (trail_save_type) JSON or CSV, changeable after creation. region_total_yn Y = all regions; N requires region_names. Activity-log changes apply within ~1-hour intervals."
+    provenance: docs
+  - id: listlogs-needs-time-window
+    rule: "listlogs (GET /v1/logs) REQUIRES start_at + end_at (ISO-8601 UTC, e.g. 2025-11-28T08:00:00Z); resource_id/resource_name/user_name/page/size/sort are optional. A bare smoke call therefore 400s for missing time window. listtrails (GET /v1/trails) has NO required params (trail_name/bucket_name/state/resource_type/page/size/sort all optional) and should 200 bare."
+    provenance: docs
+  - id: activity-retention-90-days
+    rule: "Console activity history retains 90 days without configuration; long-term archival requires a Trail to Object Storage. Trail integrity is verifiable when log_verification_yn=Y (digest files)."
+    provenance: docs
+  - id: servicewatch-and-org-trail-variants
+    rule: "ServiceWatch-collection trails additionally need iam_role_id + log_group_name (IAM role with service principal loggingaudit.samsungsdscloud.com). Organization trails additionally use log_archive_account_id + organization_trail_yn=Y. Standard Object-Storage trail omits all of these."
+    provenance: docs
+
+captures:
+  trail: $.trail.id    # TrailShowResponseV1dot1{trail: Trail1dot1}.id (confirmed against the response model)
+
+states: {}
+
+quirks:
+  - id: create-body-model-corrected
+    note: "createtrail body is TrailCreateRequestV1dot1 (account_id/bucket_name/bucket_region + trail_name/region_total_yn/log_type_total_yn/trail_save_type), NOT the earlier {name, object_storage_bucket_name, is_multi_region, tags} guess. start/stop are body-less POST /v1/trails/{id}/start|stop operations; downloadlogs is POST /v1/logs/download. No api_bodies.json entry — promote to VALIDATED after a live 2xx."
+    provenance: docs

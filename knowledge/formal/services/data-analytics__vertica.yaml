@@ -1,0 +1,38 @@
+# Layer 1 — per-service knowledge: data-analytics/vertica
+# (Vertica Data-Warehouse DBaaS — masterless MPP analytics database)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /analytics/vertica/* (WebFetch 2026-06-14) + data/api_docs.json
+#         (apireference .../vertica/...). Ingested 2026-06-14 (IB row P1).
+
+version: 1
+service: data-analytics/vertica
+
+constraints:
+  - id: create-cluster-naming-rules
+    rule: "POST /v1/clusters (VerticaClusterCreateRequest) field patterns (api_docs + userguide 2026-06-14): name ^[a-zA-Z]*$ len 3-20 (영문만); instance_name_prefix ^[a-z][a-zA-Z0-9\\-]*$ len 3-13 (소문자 시작, postfix 001/002 자동); init_config_option.database_name ^[a-zA-Z][a-zA-Z0-9]*$ len 3-20 (영문 시작, 영문·숫자); database_user_name ^[a-z]*$ len 2-20 (영문 소문자만); database_user_password len 8-30 (영문·숫자·특수문자 포함, \", ' 제외); database_locale default ko_KR.utf8; DB port range 1200-65535. block_storage_groups[].size_gb 16-5120 GB in 8 GB steps (up to 9 added disks). dbaas_engine_version_id/init_config_option/instance_groups/instance_name_prefix/name/subnet_id/timezone REQUIRED; license optional string max 5000"
+    provenance: docs
+  - id: vpc-subnet-prerequisite
+    rule: "Vertica cluster requires a VPC + Subnet to exist first (userguide overview: VPC must be configured before creating Vertica instances; create body takes subnet_id). nat_enabled optional (any-of[bool,null], default false). allowable_ip_addresses is the allowed-IP list (security-group-rules update uses {add_ip_addresses, del_ip_addresses})"
+    provenance: docs
+  - id: masterless-mpp-topology
+    rule: "Vertica is a 'masterless' MPP Data Warehouse (userguide overview): self-contained HA, no single point of failure, queries can start from any node — a single ACTIVE instance group is the natural shape. Node count 1-10 (minimum 2 recommended for HA). Engine version 24.2.0-2 only (EOS 2026-09 planned, EoTS 2027-04-30). Server types: Standard db1/db2 (≤16 vCore/256GB), High Capacity dbh2 (24+ vCore, ≤128 vCore/1536GB), min db1v1m2"
+    provenance: docs
+  - id: no-add-instances-dashboard-patch
+    rule: "Unlike searchengine, the vertica catalog has NO add-instances, NO dashboard-restart, and NO patch (minor-version) endpoints (catalog check 2026-06-14). Lifecycle ops are: create · start/stop/restart · resize-server-type · resize/add block-storage · backup/restore · delete. Engine version changes are not exposed as an in-place patch"
+    provenance: docs
+  - id: backup-restore-rules
+    rule: "Backup (POST /v1/clusters/{id}/backups): retention 7-35 days, user selects start HOUR only (minute auto-assigned), backups are scheduled not immediate. Restore (POST /v1/clusters/{id}/restore): two recovery types — backup-point (recommended, from backup-histories) and PITR (custom timestamp from earliest backup onward); a COMPLETED backup must already exist. Restore creates a NEW cluster; it does NOT inherit network settings (IP access control must be reconfigured); DATA disk must be ≥ source DATA size and storage type matches the source. Separate storage charges apply to backup capacity"
+    provenance: docs
+
+captures:
+  cluster: $.contents[0].id              # GET /v1/clusters (list; coverage-only adopt)
+
+states: {}
+
+quirks:
+  - id: async-writes-return-request-id
+    note: "create + write calls answer 202 AsyncResponse {request_id, resource:{id}}; request_id appears ONLY in those write envelopes — GET /v1/requests/{request_id} (verticashowrequest) is unreachable from any list (read-only run can only C2 it via literal-token 404). Same DBaaS framework as postgresql/searchengine"
+    provenance: docs
+  - id: no-body-subops
+    note: "restart, start, stop, sync-state are documented WITHOUT a request body (api_docs) — send no/empty body. backup-histories PUT (remove) / backups DELETE (unset) may share the DBaaS 401 quirk family (mysql/postgresql/cachestore) — retry once during a live-cluster window before flagging known-red"
+    provenance: docs

@@ -1,0 +1,47 @@
+# Layer 1 — per-service knowledge: data-analytics/data-flow (Apache NiFi on SKE)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide WebFetch 2026-06-14 — /userguide/analytics/data_flow/
+#   overview/ + how_to_guides/data_flow_services/ + how_to_guides/ingress_install/
+# Recorded while ingesting the data-flow resource-task model (Lane B).
+
+version: 1
+service: data-analytics/data-flow
+
+constraints:
+  - id: runs-on-ske-not-dbaas
+    rule: "Data Flow is Apache NiFi running ON A KUBERNETES ENGINE (SKE) cluster, not a DBaaS subnet cluster. Prerequisite chain (in order): ① SKE standard cluster, ② Ingress Controller installed on it, ③ File Storage for network file sharing. The dbaas instance_groups/subnet_id create body in the coverage-probe lifecycle is UNPROVEN and does not reflect the NiFi-on-K8s console form (Storage Class, Node Selector, account id/password, workload module selection, host alias)"
+    provenance: docs
+  - id: ingress-controller-one-per-cluster
+    rule: "Exactly ONE Ingress Controller may be installed per Kubernetes cluster (namespace dss-ingress, ServiceAccount dss-ingress, IngressClass dss-nginx set as default, Service type NodePort ports 30708 HTTP / 31416 HTTPS, controller image from region-specific private Container Registry). It must be installed BEFORE creating a Data Flow service; it is a console/YAML-apply precondition, not a graph resource node"
+    provenance: docs
+  - id: region-restricted
+    rule: "Data Flow is available only in kr-west1 and kr-east1; kr-south1/2/3 are unsupported"
+    provenance: docs
+  - id: flow-name-rules
+    rule: "Data Flow / Data Flow Service name: must start with a lowercase letter, may use lowercase letters + digits + hyphen, must NOT end with a hyphen, length 3-30. Domain: same character rules, length 3-50, must not end with hyphen. Pre-check name collisions via GET /v1/data-flows/{name}/check-duplication and GET /v1/data-flow-services/{name}/check-duplication (free-form NAME path-param, not an id)"
+    provenance: docs
+  - id: account-credential-rules
+    rule: "Service account: ID 6-30 chars; password 8-50 chars containing uppercase + lowercase + digits + special chars. These are user-supplied console-form credentials — no model default should be issued"
+    provenance: docs
+  - id: optional-field-limits
+    rule: "Description optional, max 150 chars. Host Alias optional, up to 20 hostname/IP entries total. Tags max 50 per service. Recommended minimum spec: CPU 21 cores / Memory 57 GB / Storage 100+ GB. Requested resource scale must not exceed available K8s cluster capacity"
+    provenance: docs
+
+captures:
+  data_flow: $.id                         # from POST /v1/data-flows (UNPROVEN; list fallback $.contents[0].id)
+  data_flow_service: $.id                 # from POST /v1/data-flow-services (UNPROVEN; list fallback $.contents[0].id)
+  cluster: $.cluster_id                   # from GET /v1/data-flow-services/{id} detail (best-effort, feeds ingress GETs)
+
+states:
+  data_flow_service: {field: $.status, ready: [Running]}   # Creating -> Running -> Updating -> Terminating -> Error
+
+quirks:
+  - id: create-body-unproven-dbaas-shape
+    note: "No data/api_bodies.json entry exists for data-flow (only createcluster for searchengine/vertica/eventstreams). The coverage-probe lifecycle's create body mirrors the dbaas instance_groups/block_storage shape and was only ever sent with empty-string ids (guaranteed 4xx). The real NiFi-on-K8s body is undocumented at the API level — promote to VALIDATED only after a real 2xx with a console-derived body"
+    provenance: docs
+  - id: validate-resources-preflight
+    note: "The console calls POST /v1/data-flow-services/clusters/{cluster_id}/validate-resources (create scope) and POST /v1/data-flow-services/{data_flow_service_id}/validate-resources (update scope) as a dry-run preflight before create/update — a resource-capacity check against the cluster"
+    provenance: docs
+  - id: service-selects-existing-flow
+    note: "Creation order is flow-first: a Data Flow Service must SELECT an existing Data Flow ('Data Flow Selection — must choose existing Data Flow'). The legacy resource model that put data_flow_service_id inside the create-flow body had the dependency direction reversed"
+    provenance: docs

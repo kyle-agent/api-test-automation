@@ -66,19 +66,19 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/management/id_center/overview/ | management/iam-identity-center (smoke 400s) |
 | ✅ | P1 | /userguide/management/organization/overview/ | management/organization (waiver class) |
 | ✅ | P1 | /userguide/management/cloud_control/overview/ | management/cloudcontrol (smoke 403s) |
-| — | P1 | /userguide/management/cloud_monitoring/overview/ | management/cloudmonitoring (smoke 400s) |
-| — | P1 | /userguide/management/logging_audit/overview/ | management/loggingaudit |
+| ✅ | P1 | /userguide/management/cloud_monitoring/overview/ | management/cloudmonitoring (smoke 400s = events/event-policies need productResourceId+eventState+queryStartDt+queryEndDt; X-ResourceType header was invention, removed; discontinued after Sep 2026) |
+| ✅ | P1 | /userguide/management/logging_audit/overview/ | management/loggingaudit (trail needs Object Storage bucket; create body=TrailCreateRequestV1dot1 account_id+bucket_name+bucket_region; capture $.trail.id) |
 | ✅ | P1 | /userguide/management/service_watch/overview/ | management/servicewatch |
 | ✅ | P1 | /userguide/management/resource_groups/overview/ | management/resourcemanager (tags ≤50/resource; RG name-len/quota undocumented — confirm live) |
 | ✅ | P1 | /userguide/management/quota/overview/ | management/quota (verify the VPC 3-vs-5!) |
 | — | P1 | /userguide/application/api_gateway/overview/ | application-service/apigateway |
 | ✅ | P1 | /userguide/application/queue_service/overview/ | application-service/queueservice (name 3-64/.fifo; size ≤256KB; retention ≤14d; kr-west1/east1) |
-| — | P1 | /userguide/analytics/data_flow/overview/ | data-analytics/data-flow |
-| — | P1 | /userguide/analytics/data_ops/overview/ | data-analytics/data-ops |
+| ✅ | P1 | /userguide/analytics/data_flow/overview/ | data-analytics/data-flow — NiFi-on-SKE (ske-cluster+filestorage, ingress 1/cluster; create body UNPROVEN docs-vs-reality, IB-018) |
+| ✅ | P1 | /userguide/analytics/data_ops/overview/ | data-analytics/data-ops — Airflow-on-SKE (executor K8s/Celery; create body UNPROVEN docs-vs-reality, IB-018) |
 | ✅ | P1 | /userguide/analytics/event_streams/overview/ | data-analytics/eventstreams (smoke 400s) |
-| — | P1 | /userguide/analytics/quick_query/overview/ | data-analytics/quick-query (smoke 400s) |
-| — | P1 | /userguide/analytics/search_engine/overview/ | data-analytics/searchengine |
-| — | P1 | /userguide/analytics/vertica/overview/ | data-analytics/vertica |
+| ✅ | P1 | /userguide/analytics/quick_query/overview/ | data-analytics/quick-query (smoke 400 = bare GET /v1/quick-query missing required size+page; fixed; real create gated on DSC domain, IB-018) |
+| ✅ | P1 | /userguide/analytics/search_engine/overview/ | data-analytics/searchengine (ES BYOL / OpenSearch; subnet; data nodes 1-10/50; add-instances model) |
+| ✅ | P1 | /userguide/analytics/vertica/overview/ | data-analytics/vertica (masterless MPP; 24.2.0-2 only; no add-instances/patch; backup 7-35d) |
 | ✅ | P1 | /userguide/ai_ml/ai_ml_ops_platform/overview/ | ai-ml/aimlops-platform (smoke 400s) |
 | ✅ | P1 | /userguide/ai_ml/cloud_ml/overview/ | ai-ml/cloud-ml (smoke 404s) |
 | — | P1 | /userguide/devopstools/devops_service/overview/ | devops-tools/devopsservice |

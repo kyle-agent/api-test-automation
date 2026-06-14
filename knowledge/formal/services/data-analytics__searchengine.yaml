@@ -1,0 +1,41 @@
+# Layer 1 — per-service knowledge: data-analytics/searchengine
+# (Elasticsearch Enterprise + OpenSearch DBaaS, Kibana/OpenSearch Dashboard)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /analytics/search_engine/* (WebFetch 2026-06-14) + data/api_docs.json
+#         (apireference .../searchengine/...). Ingested 2026-06-14 (IB row P1).
+
+version: 1
+service: data-analytics/searchengine
+
+constraints:
+  - id: create-cluster-naming-rules
+    rule: "POST /v1/clusters (SearchEngineClusterCreateRequest) field patterns (api_docs + userguide 2026-06-14): name ^[a-zA-Z]*$ len 3-20 (영문만); instance_name_prefix ^[a-z][a-zA-Z0-9\\-]*$ len 3-13 (소문자 시작, postfix 001/002 자동); init_config_option.database_user_name ^[a-z]*$ len 2-20 (영문 소문자만); database_user_password len 8-30 (영문·숫자·특수문자 포함, \", ', \\ 제외); database_port default 9200. block_storage_groups[].size_gb 16-5120 GB in 8 GB steps. dbaas_engine_version_id/init_config_option/instance_groups/instance_name_prefix/name/subnet_id/timezone are REQUIRED; the api_bodies sample carries empty strings for engine_version/user creds → field-less 400 if sent as-is"
+    provenance: docs
+  - id: vpc-subnet-prerequisite
+    rule: "Search Engine cluster requires a VPC + Subnet to exist first (userguide overview: \"독립된 가상 네트워크(VPC)\" 필요; create body takes subnet_id). nat_enabled optional (default false). allowable_ip_addresses is the allowed-IP list (security-group-rules update uses the same {add_ip_addresses, del_ip_addresses} model)"
+    provenance: docs
+  - id: node-topology-and-engines
+    rule: "Cluster = master nodes + data nodes (userguide overview): data nodes min 1 / max 10 when NO dedicated master; max 50 when dedicated master nodes installed. is_combined=false separates master/data; dual-role (data node also master) is the combined variant. Two engine families coexist: Elasticsearch Enterprise (8.15.0 / 8.19.7, BYOL) and OpenSearch (2.19.3; 3.4.0 planned after 2026-03). Server types: Standard ses1/ses2 (≤16 vCore/256GB), High Capacity seh2 (24+ vCore, ≤72 vCore/288GB), min ses1v1m2"
+    provenance: docs
+  - id: elasticsearch-byol-license
+    rule: "license field (any-of[string,null], optional): Elasticsearch Enterprise uses user-held licensing (BYOL) per userguide overview — cloud licensing follows vendor policy. OpenSearch needs no license (empty string OK). An Elasticsearch-engine create requires a BYOL key (console/account-issued credential, not a model default)"
+    provenance: docs
+  - id: add-instances-request-model
+    rule: "POST /v1/clusters/{id}/add-instances takes SearchEngineClusterAddInstancesRequest {instance_count (int, REQUIRED), service_ip_addresses (array[string], REQUIRED), public_ip_ids (optional)} — NOT an instances[] array of {role_type, service_ip_address}. Same shape as eventstreams add-instances; add-instances scales data nodes (≤10 without dedicated master)"
+    provenance: docs
+  - id: minor-patch-is-upgrade
+    rule: "PUT /v1/clusters/{id}/patch takes MinorPatchDbEngineRequest {dbaas_engine, software_version} (both REQUIRED) — a minor-version engine patch, treated as NOT reversible (same conservative sub-op stance as mysql/postgresql/eventstreams)"
+    provenance: docs
+
+captures:
+  cluster: $.contents[0].id              # GET /v1/clusters (list; coverage-only adopt)
+
+states: {}
+
+quirks:
+  - id: async-writes-return-request-id
+    note: "create + write calls answer 202 AsyncResponse {request_id, resource:{id}}; request_id appears ONLY in those write envelopes — GET /v1/requests/{request_id} (searchengineshowrequest) cannot be reached from any list (a read-only run can only C2 it via literal-token 404). Same DBaaS framework as postgresql/eventstreams"
+    provenance: docs
+  - id: no-body-subops
+    note: "restart, dashboard-restart, start, stop, sync-state are documented WITHOUT a request body (api_docs) — send no/empty body. backup-histories PUT (remove) / backups DELETE (unset) may share the DBaaS 401 quirk family seen on mysql/postgresql/cachestore — retry once during a live-cluster window before flagging known-red"
+    provenance: docs

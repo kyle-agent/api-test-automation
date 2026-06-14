@@ -2,20 +2,66 @@
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # data-ops-service-and-ops-guarded (enabled, heavy, COVERAGE-ONLY — bodies
 # mirror data-flow which mirrors the dbaas shape, UNPROVEN -> docs).
+#
+# 2026-06-14 userguide ingest (WebFetch /userguide/analytics/data_ops/
+# overview/ + how_to_guides/data_ops_services/): Data Ops is an Apache
+# Airflow-based managed workflow-orchestration service that runs ON A
+# KUBERNETES ENGINE (SKE) CLUSTER — NOT on a DBaaS subnet cluster (same
+# correction as data-flow). True console prerequisite chain:
+#   ① SKE cluster  ② Ingress Controller (max 1/cluster)  ③ File Storage.
+# Regional availability: kr-west1, kr-east1 ONLY (kr-south1/2/3 unsupported).
+# The dbaas-shaped create body below is kept verbatim from the source coverage
+# lifecycle for runtime parity; every dbaas-only field is flagged _note
+# docs-only — the real Airflow API body (storage_class, node_selector,
+# executor type Kubernetes|Celery, workload Web Server/Scheduler/Worker,
+# DAGs GitSync, account id/password, host_alias) is UNPROVEN with no
+# data/api_bodies.json entry. See ESCALATE: docs-vs-reality.
 version: 1
 resources:
+  data-ops:
+    code: "da-do-ops"
+    service: data-analytics/data-ops
+    heavy: true
+    # userguide: the "Data Ops" logical entity is created first; a "Data Ops
+    # Service" is then provisioned on a cluster and selects an EXISTING Data
+    # Ops (create form "Data Ops Name — Required selection"). ops precedes
+    # service in the create order.
+    requires: []
+    create:
+      endpoint: "POST /v1/data-ops"
+      body:
+        name: "regrdo{ualpha}"
+        description: "API regression suite"
+        tags: []
+      options:
+        name: {type: string, default: "regrdo{ualpha}",
+               note: "userguide naming rule (data_ops_services page): 영문 소문자로 시작, '-'로 끝나지 않게, 소문자/숫자/'-', 3~30자. {ualpha}=소문자 a-p. GET /v1/data-ops/{name}/check-duplication 사전 중복 점검. 최종 접속 URL = {ServiceName}.{Domain} (Domain 3~50자, 동일 문자 규칙)."}
+        description: {type: string, default: "API regression suite",
+                     note: "userguide: 선택, 최대 150자."}
+    capture: {data_ops_id: "$.id"}
+    delete: {endpoint: "DELETE /v1/data-ops/{data_ops_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: data-ops-service-and-ops-guarded,
+             steps: [create-data-ops, update-data-ops, delete-data-ops]}
+    _note: "body는 소스 coverage-probe lifecycle verbatim (UNPROVEN): name/description/tags만 확정 추정. data_ops_service_id를 create-ops body에 넣던 종전 모델은 잘못 — userguide상 ops가 service보다 선행. capture envelope $.id는 read-coverage list($.contents[0].id) 관례 추론 (UNPROVEN)."
+    notes: "ops = Airflow 워크플로 논리 자원 (서비스 인스턴스가 올라타는 대상). userguide: GET /v1/data-ops/{name}/check-duplication 이름 중복 사전 점검, getdataopssubversions(/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions) sub-version 조회. update/delete는 소스 lifecycle PUT/DELETE /v1/data-ops/{data_ops_id} (UNPROVEN)."
+
   data-ops-service:
     code: "da-do-service"
     service: data-analytics/data-ops
     heavy: true
-    requires: [subnet]
+    # TRUE userguide prerequisites: SKE cluster + File Storage (+ ingress
+    # controller, modeled as precondition note — no graph node exists). Legacy
+    # [subnet] edge mirrored the dbaas body and is docs-only. Divergence from
+    # cross-service.yaml (still subnet) is an expected WARNING.
+    requires: [ske-cluster, filestorage-volume, data-ops]
     create:
       endpoint: "POST /v1/data-ops-services"
       body:
         name: "regrdosvc{ualpha}"
         description: "API regression suite"
         dbaas_engine_version_id: "{opt.engine_version_id}"
-        subnet_id: "{subnet.subnet_id}"
+        subnet_id: ""   # DOCS-ONLY dbaas field; source coverage probe sent "" (Airflow-on-K8s body has no subnet)
         nat_enabled: false
         instance_name_prefix: "regrdo"
         timezone: "Asia/Seoul"
@@ -30,9 +76,16 @@ resources:
         tags: []
       options:
         engine_version_id: {type: string, required: true,
-                            note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다(4xx 예상 coverage probe); 실값 출처는 R3 과제"}
+                            note: "DOCS-ONLY dbaas field — 소스 lifecycle 빈 문자열(4xx 예상 coverage probe). Airflow-on-K8s 실 create body에는 dbaas engine version 개념이 없다. 실값 출처 미확인 — ESCALATE docs-vs-reality."}
         server_type_name: {type: string, required: true,
-                           note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다; POST .../validate-resources가 콘솔의 dry-run preflight"}
+                           note: "DOCS-ONLY dbaas field — 소스 lifecycle 빈 문자열. userguide 실 폼은 Storage Class + Node Selector + 워크로드(Web Server/Scheduler/Worker) + Worker Executor 선택. POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources가 콘솔 dry-run preflight."}
+        executor_type: {type: enum, values: [Kubernetes, Celery],
+                        default: Kubernetes,
+                        note: "DOCS-ONLY (body 미배선) — userguide Worker Executor: Kubernetes(동적 pod) | Celery(정적 pod, replica 수 입력 필요). 권장 사양도 갈림: KubernetesExecutor 43 CPU코어 vs CeleryExecutor 25 CPU코어, 공통 Mem 50GB/Storage 100GB+. 실 API body 키 미확인."}
+        account_id: {type: string, default: "regrdoadmin",
+                     note: "DOCS-ONLY (body 미배선) — userguide: Airflow 계정 ID 6~30자, 소문자+숫자만. 실 API body 미확인."}
+        account_password: {type: string,
+                           note: "DOCS-ONLY (body 미배선) — userguide: Airflow password 8~50자, 대/소문자+숫자+특수문자(!@#$%^&*) 필수. 계정 자격 — 기본값 부여 부적절(의도된 게이트). 실 API body 미확인."}
     capture: {data_ops_service_id: "$.id"}
     delete: {endpoint: "DELETE /v1/data-ops-services/{data_ops_service_id}",
              destructive: true}
@@ -40,23 +93,5 @@ resources:
     source: {lifecycle: data-ops-service-and-ops-guarded,
              steps: [create-data-ops-service, update-data-ops-service,
                      delete-data-ops-service]}
-    notes: "billable analytics cluster + service 프로비저닝 — 소스 lifecycle은 실생성하지 않는 coverage probe(기존 id를 list에서 capture_soft). body는 data-flow와 동일한 UNPROVEN(docs) 템플릿, capture envelope $.id는 list 관례 추론. 콘솔은 create 전에 POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources를 호출한다."
-
-  data-ops:
-    code: "da-do-ops"
-    service: data-analytics/data-ops
-    heavy: true
-    requires: [data-ops-service]
-    create:
-      endpoint: "POST /v1/data-ops"
-      body:
-        name: "regrdo{ualpha}"
-        description: "API regression suite"
-        data_ops_service_id: "{data-ops-service.data_ops_service_id}"
-        tags: []
-    capture: {data_ops_id: "$.id"}
-    delete: {endpoint: "DELETE /v1/data-ops/{data_ops_id}", destructive: true}
-    provenance: docs
-    source: {lifecycle: data-ops-service-and-ops-guarded,
-             steps: [create-data-ops, update-data-ops, delete-data-ops]}
-    notes: "ops는 data-ops-service 위의 논리 자원. body는 소스 lifecycle 그대로(UNPROVEN — coverage probe), capture envelope $.id는 read-coverage list 관례에서 추론. GET /v1/data-ops/{name}/check-duplication으로 이름 중복 사전 점검 가능."
+    _note: "create body 전체가 DOCS-ONLY-NOT-RUNTIME-PROVEN: dbaas_engine_version_id/subnet_id/instance_groups/block_storage_groups/instances는 dbaas 형상 미러링 UNPROVEN 템플릿(data-flow와 동일). 종전 {subnet.subnet_id} 토큰은 requires에 subnet이 없어 빈 문자열 리터럴로 교체(소스 coverage probe verbatim과 일치). NiFi/Airflow 실 body 확정 시 instance_groups 블록 전체 교체 필요. capture envelope $.id는 list($.contents[0].id) 관례 추론 (UNPROVEN)."
+    notes: "billable Airflow-on-SKE 서비스. userguide 확정 (2026-06-14): 선행 = ① SKE 클러스터 ② Ingress Controller(클러스터당 1개) ③ File Storage. 리전 제한 kr-west1·kr-east1만. 상태 머신 Creating→Running→Updating→Terminating→Error (services/data-analytics__data-ops.yaml states). 콘솔 create 폼: Data Ops 선택(기존 ops), Storage Class, Node Selector, Description(≤150), 워크로드(Web Server/Scheduler/Worker 필수), Worker Executor(Kubernetes|Celery), Host Alias(최대 20쌍, 선택), Tags(최대 50), DAGs GitSync 저장소. modify=tag/alias/description/리소스 스케일/GitSync 수정; delete(해지)=비가역, 실행 중 워크로드 즉시 중단. 콘솔은 create 전 POST .../clusters/{cluster_id}/validate-resources dry-run preflight 호출, '리소스 스케일이 K8s 클러스터 가용량을 초과하면 안 됨' 제약. Ingress Controller는 자원 그래프 노드가 없어 precondition로 노트화 — ESCALATE."

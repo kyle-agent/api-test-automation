@@ -1,0 +1,40 @@
+# Layer 1 — per-service knowledge: management/cloudmonitoring
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /management/cloud_monitoring/* + data/api_docs.json
+# (parameter specs). Recorded 2026-06-14 diagnosing the smoke 400s.
+
+version: 1
+service: management/cloudmonitoring
+
+constraints:
+  - id: list-gets-need-required-query-params
+    rule: "The smoke 400s are MISSING REQUIRED QUERY PARAMS, not entitlement. Per data/api_docs.json the required-param matrix is: getproducteventlist (GET /event/v2/events) needs productResourceId + eventState + queryStartDt + queryEndDt; getaccounteventlist (GET /event/v2/accounts/events) needs eventState + queryStartDt + queryEndDt; getproducteventpolicylist (GET /event/v2/event-policies) needs productResourceId. The bare read-only smoke probe sends none of these, so each returns 400 'needs required query params'. getaccountproductlist, getmetriclist, getproducttypelist, getaccountmembers, getadressbooklist have ONLY optional params (page/size/sort/productTypeCode/objectType/productCategoryCode) and should 200 bare — if they 400, that is a different (real) issue to triage."
+    provenance: docs
+  - id: event-metric-query-time-window
+    rule: "queryStartDt/queryEndDt are ISO-8601 UTC (e.g. 2021-10-23T18:00:00.000Z). The metric-data query (POST /v1/cloudmonitorings/product/v2/metric-data, MetricDataSearchCriteriaOpenAPIV2) caps the window at 24 hours and ≤10 query conditions; each condition needs metricKey + productResourceInfos (≤50). eventState example value is ALL."
+    provenance: docs
+  - id: productresourceid-from-listaccountresources
+    rule: "productResourceId (required for event/event-policy queries AND event-policy create) is harvested from ListAccountResources = getaccountproductlist (GET /v1/cloudmonitorings/product/v2/accounts/products → contents[].productResourceId, e.g. INSTANCE-c4Hsd27ttDaLw533X4B6Sp). metricKey comes from ListMetrics = getmetriclist (e.g. system.cpu.system.pct). These are read-only lookups, no resource created."
+    provenance: docs
+  - id: event-policy-camelcase-v2
+    rule: "The event API is a camelCase v2 API (eventPolicyId, productResourceId, queryStartDt) — NOT the platform-standard snake_case. Op name 'puteventpolicy' is the CREATE (POST), 'modifyeventpolicy' is the update (PUT)."
+    provenance: docs
+  - id: service-discontinued-2026-09
+    rule: "Cloud Monitoring is discontinued after the September 2026 release; SCP recommends migrating to ServiceWatch (launched Oct 2025). Coverage value is time-bounded — do not invest in deep parameter coverage beyond C3."
+    provenance: docs
+
+captures:
+  event_policy: $.eventPolicyId    # EventPolicyDetailResponse.eventPolicyId (docs, unproven)
+
+states: {}
+
+quirks:
+  - id: dashboard-delete-400-sweep-noise
+    note: "2 cloudmonitoring dashboards 400 on every sweep delete attempt (ids 8b498aa3..., bc3343cf...) — delete body/precondition unknown, recurring sweep noise (validated-facts.md 2026-06-10). Not modeled (no dashboard create endpoint in the catalog)."
+    provenance: VALIDATED
+  - id: event-level-enum-is-fatal-warning-information
+    note: "eventLevel enum = FATAL/WARNING/INFORMATION (userguide event page shows the console tiers Fatal/Warning/Information; docs EventPolicyInfo example uses WARNING). The earlier draft's CRITICAL was a cross-service confusion (servicewatch) — corrected. Full set still UNPROVEN against a live 2xx."
+    provenance: docs
+  - id: no-x-resourcetype-header
+    note: "getaccountproductlist has NO X-ResourceType header in the spec (only page/size/sort query params, all optional). An earlier model draft sent X-ResourceType:INSTANCE and got 400 InvalidHeaderValue — that header was an invention, removed."
+    provenance: docs

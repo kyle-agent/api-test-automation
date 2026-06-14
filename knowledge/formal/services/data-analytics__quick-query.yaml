@@ -1,0 +1,51 @@
+# Layer 1 — per-service knowledge: data-analytics/quick-query (interactive SQL / Trino on SKE)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /analytics/quick_query/overview/ + data/api_docs.json
+#   (apireference .../quick-query/...). Ingested 2026-06-14 (Lane B), provenance: docs.
+
+version: 1
+service: data-analytics/quick-query
+
+constraints:
+  - id: list-requires-size-and-page
+    rule: "GET /v1/quick-query (getquickquerylist) marks BOTH `size` AND `page` query params required:true (api_docs). A bare `GET /v1/quick-query` therefore returns 400 Bad Request — this is the documented cause of the smoke 400s. Always send ?size=20&page=0. Other filters (sort default created_dt:desc, cluster_name, created_by, quick_query_state enum, version, quick_query_name) are optional."
+    provenance: docs
+  - id: list-envelope-id-field
+    rule: "The list response is {contents:[{quick_query_id, quick_query_name, quick_query_state, cluster_id, ...}], page, size, sort, total_count}. The id field on each item is `quick_query_id`, NOT `id` — capture from $.contents[0].quick_query_id, not $.contents[0].id."
+    provenance: docs
+  - id: name-pattern
+    rule: "quick_query_name pattern ^[a-z][a-z0-9\\-]*[a-z0-9]$ (lowercase start, len >=3); kubernetes_engine_name follows the SKE cluster-name pattern ^[a-z][a-z0-9...]$. Use a 'regrqq{ualpha}' style token."
+    provenance: docs
+  - id: create-is-ske-engine-triple
+    rule: "POST /v1/quick-query (QuickQueryTotalCreateRequest) is an SKE-engine install, NOT a DBaaS instance_groups create. Required top-level fields: kubernetes_engine_create_request (REQUIRED), node_pool_create_requests[] (REQUIRED), quick_query_create_request (REQUIRED); tags optional. Returns 202 AsyncResponse. kubernetes_engine_create_request REQUIRES vpc_id, subnet_id, security_group_id_list, volume_id, k8s_version, kubernetes_engine_name. node_pool_create_requests[] REQUIRES image_os, image_os_version, keypair_name, server_type_id, volume_size, volume_type_name. quick_query_create_request REQUIRES domain, dsc_domain, image_id, is_engine_type_private, max_query (^(32|64|96|128)$), quick_query_name, version, query_engine_spec."
+    provenance: docs
+  - id: max-query-enum
+    rule: "quick_query_create_request.max_query is a string constrained to ^(32|64|96|128)$ (concurrent query slots)."
+    provenance: docs
+  - id: prerequisites
+    rule: "Userguide prerequisites: VPC (network), Security Group (firewall), File Storage (shared volume across query clients). The k8s engine create consumes vpc_id + subnet_id + security_group_id_list + volume_id (the File Storage volume_id)."
+    provenance: docs
+  - id: dsc-domain-needs-real-value
+    rule: "quick_query_create_request.domain and dsc_domain (each len 3-50, REQUIRED) are real Data Security Center (DSC) domain values — they cannot be synthesized, so a true create is owner/IB-blocked. The 5 in-place PUT setters .../domain and .../dsc-domain have the same dependency."
+    provenance: docs
+  - id: regional-availability
+    rule: "Service available in kr-west1 and kr-east1; NOT available in kr-south1/2/3 (userguide). Trino-based parallel distributed engine on standard Kubernetes."
+    provenance: docs
+
+captures:
+  quick-query: $.contents[0].quick_query_id   # from GET /v1/quick-query?size=&page= (list adopt; id field is quick_query_id)
+  image-version: $.contents[0].image_id       # from GET /v1/quick-query/image-versions
+  query-engine-detail: $.cluster_id           # GET /v1/quick-query/{id} -> QuickQueryDetailResponse.cluster_id
+
+states: {}   # detail carries quick_query_state enum (ACTIVE/CREATING/RUNNING/ERROR/.../DELETED); poll values undocumented (R3)
+
+quirks:
+  - id: smoke-400-is-bare-list
+    note: "The recorded 'smoke 400s' (INGESTION.md) are the bare GET /v1/quick-query missing the required size+page query params — same class as ske-image (run 27483895557). GET /v1/quick-query/image-versions has NO params (api_docs parameters:[]) so it is a safe bare smoke; check-duplication takes a PATH name (no query); GET /v1/quick-query/{id} needs a real id."
+    provenance: docs
+  - id: create-coverage-only
+    note: "billable (installs an SKE cluster + node pool + Trino). The source guarded lifecycle (quick-query-lifecycle-guarded) is COVERAGE-ONLY: it adopts an existing id via the list and never provisions. Real create blocked on real DSC domain values + an undocumented query_engine_spec shape (DOMAIN-HUNT)."
+    provenance: docs
+  - id: validate-resources-is-dry-run
+    note: "POST /v1/quick-query/validate-resources (QuickQueryValidateResourceRequest: node_pool_validation_request[] + quick_query_engine_request, both REQUIRED; cluster_id optional) is a non-destructive preflight that checks whether resources can be created/modified — cheap probe that creates no resource."
+    provenance: docs

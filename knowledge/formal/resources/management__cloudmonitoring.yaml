@@ -2,14 +2,24 @@
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # cloudmonitoring-event-policy (enabled, guarded) by extract.py, curated by
 # hand. NOTE the misleading API op names: 'puteventpolicy' is the CREATE
-# (POST); 'getmetricperfdatalist' is a read-shaped POST query (not modeled —
-# operation, no resource).
+# (POST /event-policies); 'getmetricperfdatalist' is a read-shaped POST query
+# (POST /metric-data) — an operation, not a resource (not modeled here).
 #
 # R3 rework: the flat draft body that run 27396649009 rejected (400
 # InvalidInputValue resourceType/productResourceId) was replaced with the
 # docs-grounded nested EventPolicyCreateRequest shape, and a read-only
-# cm-account-resource LOOKUP node now feeds productResourceId. Pending live
-# verification.
+# cm-account-resource LOOKUP node now feeds productResourceId.
+#
+# 2026-06-14 ingest (smoke-400 diagnosis): the smoke 400s on this service are
+# NOT entitlement/permission — they are MISSING REQUIRED QUERY PARAMS. The
+# read-only smoke probe (regression/smoke.py) calls list GETs with no params,
+# but several cloudmonitoring list endpoints REQUIRE query params per
+# data/api_docs.json (the userguide event/performance pages confirm the
+# console mandates the same: an event/metric search needs a time range + a
+# monitoring target). See the cm-event-query/cm-account-resource notes for the
+# per-endpoint required-param matrix (the 400 fix). Also corrected the
+# X-ResourceType header guess (no such header in the spec) and the eventLevel
+# enum to the docs values. Pending live verification.
 version: 1
 resources:
   # read-only LOOKUP node (server-type / apigw-root-resource pattern):
@@ -25,9 +35,15 @@ resources:
     requires: []
     create:
       endpoint: "GET /v1/cloudmonitorings/product/v2/accounts/products"
-      headers: {X-ResourceType: "INSTANCE"}
-      # run 27399448835: 400 InvalidHeaderValue 'X-ResourceType' — docs에 없는
-      # 필수 헤더(undiscoverable-params 결함 후보). INSTANCE는 추정값
+      # 2026-06-14 CORRECTION: the previous draft sent X-ResourceType:INSTANCE
+      # header and got 400 InvalidHeaderValue — that header is NOT in the spec
+      # (data/api_docs.json getaccountproductlist has ONLY page/size/sort query
+      # params, all OPTIONAL). So this GET should 200 with no params; the 400
+      # the smoke saw was a stale header guess, removed. Pagination is the only
+      # tuning available.
+      options:
+        size: {type: string, required: false, default: "100", vary: false,
+               note: "page size (docs default 10) — widened so the productResourceId scan has the whole first page; page/sort also accepted (all optional)"}
     capture:
       product_resource_id:
         list: "$.contents"
@@ -38,7 +54,7 @@ resources:
          endpoint: "GET /v1/cloudmonitorings/product/v2/accounts/products",
          expect_status: [200]}
     provenance: docs
-    notes: "읽기 전용 LOOKUP 노드 — docs getaccountproductlist(ListAccountResources) 응답 모델 PageResponseAccountProductDto/AccountProductDto에서 파생(UNPROVEN, 라이브 미관측). where_prefix INSTANCE-는 cm-event-policy의 metricKey(system.* — VM 메트릭)와 상품 유형을 맞추기 위한 필터 — 계정에 Running VM이 하나도 없으면 capture가 실패한다(의도적 fail-fast; compute server를 requires로 끌어오면 HEAVY 체인이 되어 배제). 모니터링 등록 지연으로 새 VM이 목록에 늦게 뜰 수 있음도 라이브 검증 대상."
+    notes: "읽기 전용 LOOKUP 노드 — docs getaccountproductlist(ListAccountResources) 응답 모델 PageResponseAccountProductDto/AccountProductDto에서 파생(UNPROVEN). 이 GET 자체는 필수 쿼리 파라미터가 없으므로(page/size/sort 전부 optional) bare 호출이 200이어야 한다 — 종전 X-ResourceType 헤더는 스펙에 없는 추정값이라 제거(그게 400 InvalidHeaderValue의 원인). where_prefix INSTANCE-는 cm-event-policy의 metricKey(system.* — VM 메트릭)와 상품 유형을 맞추기 위한 필터 — 계정에 Running VM이 하나도 없으면 capture가 실패한다(의도적 fail-fast; compute server를 requires로 끌면 HEAVY 체인이라 배제). 모니터링 등록 지연으로 새 VM이 목록에 늦게 뜰 수 있음도 라이브 검증 대상. _note(smoke-400 진단): productResourceId는 events/event-policies 조회의 필수 쿼리 파라미터이므로 이 lookup이 그쪽 400을 푸는 선행 노드다."
 
   cm-event-policy:
     code: "mg-cm-event-policy"
@@ -46,30 +62,36 @@ resources:
     requires: [cm-account-resource]
     create:
       endpoint: "POST /v1/cloudmonitorings/event/v2/event-policies"
-      # REAL nested shape per docs EventPolicyCreateRequest =
+      # REAL nested shape per docs EventPolicyCreateRequest (puteventpolicy) =
       # {eventPolicyRequest: EventPolicyInfo (req), productResourceId (req),
       # notificationRecipients? (≤10)} — run 27396649009 proved the old flat
-      # body invalid. EventPolicyInfo required fields: disableYn, eventLevel,
-      # eventThreshold, ftCount, isLogMetric, metricKey; optional fields
-      # (eventMessagePrefix, eventOccurTimeZone, eventPolicyStatistics,
+      # body invalid. EventPolicyInfo required fields (data/api_docs.json):
+      # disableYn, eventLevel, eventThreshold, ftCount, isLogMetric, metricKey.
+      # Optional (eventMessagePrefix, eventOccurTimeZone, eventPolicyStatistics,
       # metricName, object*/podObject*) deliberately omitted to minimise the
       # 400 surface. notificationRecipients omitted (needs recipientKey from
       # getaccountmembers/getadressbooklist — separate lookup, R3+ task).
+      # eventThreshold: thresholdType SINGLE_VALUE -> SingleThreshold
+      # {comparisonOperator (req), value (req)}; RANGE_VALUE would use
+      # RangeThreshold {min/maxComparisonOperator, min/maxValue}.
       body:
         eventPolicyRequest:
           disableYn: "N"
           eventLevel: "{opt.eventLevel}"
           eventThreshold:
             thresholdType: SINGLE_VALUE
-            singleThreshold: {comparisonOperator: GT, value: 95}
+            singleThreshold: {comparisonOperator: "{opt.comparisonOperator}", value: 95}
           ftCount: 3
           isLogMetric: "N"
           metricKey: "system.cpu.system.pct"
         productResourceId: "{cm-account-resource.product_resource_id}"
       options:
-        eventLevel: {type: enum, values: [WARNING, CRITICAL], required: true,
+        eventLevel: {type: enum, values: [WARNING, FATAL, INFORMATION], required: true,
                      default: WARNING, vary: true,
-                     note: "이벤트 등급 — WARNING은 docs EventPolicyInfo 예시, CRITICAL은 소스 lifecycle modify body에서 관측. docs 이벤트 조회 예시에는 FATAL도 등장 — enum 전체 집합/라이브 2xx 미확인(UNPROVEN)"}
+                     note: "이벤트 레벨 — docs EventPolicyInfo.eventLevel 예시 WARNING. 콘솔(userguide event 페이지)은 등급을 Fatal/Warning/Information 3단계로 노출하므로 enum을 그 매핑(FATAL/WARNING/INFORMATION)으로 확정. 종전 draft의 CRITICAL은 servicewatch/타서비스 혼동값 — 제거. 전체 집합 라이브 2xx 미확인(UNPROVEN)"}
+        comparisonOperator: {type: enum, values: [GT, GE, LT, LE, EQ, NE], required: true,
+                             default: GT, vary: true,
+                             note: "SingleThreshold.comparisonOperator — docs 예시는 LT만 관측(GE/GT 등은 콘솔 비교연산자 '이상/초과/이하/미만/일치/상이'에서 매핑한 추정). GT 95(CPU)로 사실상 미발화 probe. UNPROVEN"}
     # docs-grounded shape (was COMPOSITION-BLOCKED): create body now mirrors
     # the docs EventPolicyCreateRequest/EventPolicyInfo models verbatim and
     # productResourceId is wired from the cm-account-resource lookup —
@@ -84,4 +106,4 @@ resources:
     provenance: docs
     source: {lifecycle: cloudmonitoring-event-policy,
              steps: [create-event-policy, delete-event-policy]}
-    notes: "run 27396649009: 평면 body가 400 InvalidInputValue(resourceType/productResourceId) — 실제 요청은 docs eventpolicycreaterequest/eventpolicyinfo 모델의 중첩 구조(이 파일이 반영). create 응답은 EventPolicyDetailResponse — capture $.eventPolicyId(integer, required)는 docs 모델 근거로 격상되었으나 라이브 미관측(UNPROVEN). 임계치는 SINGLE_VALUE(GT 95, CPU 메트릭 system.cpu.system.pct — EventPolicyResponse 예시 키)로 사실상 미발화 probe; comparisonOperator enum은 docs 예시 LT만 관측, GT는 추정. delete 경로는 카탈로그 deleteeventpolicy verbatim. camelCase v2 API(플랫폼 표준 snake_case 아님)."
+    notes: "run 27396649009: 평면 body가 400 InvalidInputValue(resourceType/productResourceId) — 실제 요청은 docs EventPolicyCreateRequest/EventPolicyInfo 모델의 중첩 구조(이 파일이 반영). 응답 모델은 EventPolicyDetailResponse; capture $.eventPolicyId(EventPolicyDetailResponse.eventPolicyId 필드 확인, required)는 docs 근거이나 라이브 미관측(UNPROVEN). 임계치는 SINGLE_VALUE(GT 95, CPU 메트릭 system.cpu.system.pct — EventPolicyInfo 예시 키)로 사실상 미발화 probe. delete 경로는 카탈로그 deleteeventpolicy verbatim. camelCase v2 API(플랫폼 표준 snake_case 아님). _note(smoke-400 진단): 이 정책의 조회 GET(getproducteventpolicylist GET /event-policies)는 productResourceId(필수)를 요구한다 — bare 호출이 400이 나는 이유이며 cm-account-resource lookup으로 채운다."

@@ -1,42 +1,163 @@
 # Resource-task model — data-analytics/quick-query (da-qq group).
-# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
-# quick-query-lifecycle-guarded (enabled, heavy, COVERAGE-ONLY — body
-# best-effort from the shared SCP analytics shape, UNPROVEN -> docs).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validate: python knowledge/formal/validate.py
+#
+# Ingested 2026-06-14 (Lane B): userguide /analytics/quick_query/overview/ +
+# api_docs.json (data-analytics/quick-query/*). Quick Query is an interactive
+# SQL service that installs an SKE (k8s) engine on top of a VPC/subnet/SG and a
+# (file-storage) volume, then runs a Trino query engine — so its create body is
+# an SKE-engine + node-pool + query-engine triple, NOT the DBaaS instance_groups
+# shape the pre-ingest draft carried (that body was a wrong-model placeholder
+# copied from the analytics-console shape — corrected below).
+#
+# SMOKE 400 ROOT CAUSE (the INGESTION.md "smoke 400s" note): the smoke/read
+# probe fires a bare `GET /v1/quick-query` (getquickquerylist), but api_docs
+# marks BOTH `size` AND `page` query params required:true on that endpoint →
+# bare list = documented 400 Bad Request. Same class as ske-image (run
+# 27483895557). Fix encoded in the quick-query-list lookup node below
+# (?size=20&page=0) so the read-chain satisfies the required query.
 version: 1
 resources:
+
+  # ------------------------------------------------------------------ LOOKUPS
+  # Read-only list — the smoke surface. Bare GET /v1/quick-query 400s because
+  # size+page are required (api_docs required:true). With them it is a clean
+  # [200]. capture_soft pulls an existing id for coverage-only adopt (the engine
+  # is billable; we do NOT create one in smoke). NOTE the id field is
+  # `quick_query_id`, NOT `id` — the pre-ingest draft's "$.contents[0].id"
+  # capture assumption was wrong.
+  quick-query-list:
+    code: "da-qq-list"
+    service: data-analytics/quick-query
+    requires: []
+    create:
+      endpoint: "GET /v1/quick-query?size=20&page=0"
+    capture_soft: {quick_query_id: "$.contents[0].quick_query_id"}
+    verify:
+      - {name: list-page, endpoint: "GET /v1/quick-query?size=20&page=0",
+         expect_status: [200]}
+    provenance: docs
+    notes: "SMOKE 400 FIX — bare GET /v1/quick-query는 400 (api_docs: size,page 둘 다 required:true). ?size=20&page=0 필수. 응답 envelope = {contents:[{quick_query_id, quick_query_name, quick_query_state, cluster_id, ...}], page, size, total_count} → id 필드는 quick_query_id (NOT .id). 기타 optional 필터: sort(default created_dt:desc), cluster_name, created_by, quick_query_state(enum), version, quick_query_name. 빈 계정에서도 200(contents 빈배열)이라야 정상."
+
+  # Image versions list — NO query params (api_docs parameters:[]) → safe bare
+  # GET, clean [200]. A create-time lookup: quick_query_create_request.image_id
+  # comes from here ($.contents[0].image_id).
+  quick-query-image-versions:
+    code: "da-qq-image-versions"
+    service: data-analytics/quick-query
+    requires: []
+    create:
+      endpoint: "GET /v1/quick-query/image-versions"
+    capture_soft: {image_id: "$.contents[0].image_id"}
+    verify:
+      - {name: image-versions, endpoint: "GET /v1/quick-query/image-versions",
+         expect_status: [200]}
+    provenance: docs
+    notes: "쿼리 파라미터 없음 (api_docs parameters:[]) → bare GET 200. 응답 {contents:[{image_id, image_name, version, image_attr:{k8s.version, os.type}}], total_count}. create의 quick_query_create_request.image_id 출처."
+
+  # ------------------------------------------------------------------ ENGINE
+  # The query engine itself. HEAVY + billable (installs an SKE cluster + node
+  # pool + Trino). The source guarded lifecycle is COVERAGE-ONLY — it does NOT
+  # really create one; it soft-captures an existing id. Body below is the REAL
+  # QuickQueryTotalCreateRequest model (api_docs), docs-provenance/UNPROVEN.
   quick-query:
     code: "da-qq-query"
     service: data-analytics/quick-query
     heavy: true
-    requires: [subnet]
+    requires: [vpc, subnet, security-group, {ref: filestorage-volume, mode: existing_or_create}]
     create:
       endpoint: "POST /v1/quick-query"
       body:
-        name: "regrqq{ualpha}"
-        description: "API regression suite"
-        dbaas_engine_version_id: "{opt.engine_version_id}"
-        subnet_id: "{subnet.subnet_id}"
-        nat_enabled: false
-        instance_name_prefix: "regrqq"
-        timezone: "Asia/Seoul"
-        allowable_ip_addresses: []
-        instance_groups:
-          - role_type: ACTIVE
-            server_type_name: "{opt.server_type_name}"
-            block_storage_groups:
-              - {role_type: OS, size_gb: 104, volume_type: SSD}
-            instances:
-              - {role_type: ACTIVE, service_ip_address: "192.168.10.10/32"}
+        kubernetes_engine_create_request:
+          kubernetes_engine_name: "regrqq{ualpha}"
+          k8s_version: "{opt.k8s_version}"
+          vpc_id: "{vpc.vpc_id}"
+          subnet_id: "{subnet.subnet_id}"
+          security_group_id_list: ["{security-group.sg_id}"]
+          volume_id: "{filestorage-volume.volume_id}"
+          cloud_logging_enabled: false
+        node_pool_create_requests:
+          - name: "regrqqnp{ualpha}"
+            image_os: "{opt.image_os}"
+            image_os_version: "{opt.image_os_version}"
+            keypair_name: "{opt.keypair_name}"
+            server_type_id: "{opt.server_type_id}"
+            volume_size: 104
+            volume_type_name: "SSD"
+            is_auto_recovery: false
+            is_auto_scale: false
+            desired_node_count: 3
+        quick_query_create_request:
+          quick_query_name: "regrqq{ualpha}"
+          version: "{opt.version}"
+          image_id: "{opt.image_id}"
+          domain: "{opt.domain}"
+          dsc_domain: "{opt.dsc_domain}"
+          is_engine_type_private: false
+          max_query: "32"
+          query_engine_spec: "{opt.query_engine_spec}"
+          description: "API regression suite"
         tags: []
       options:
-        engine_version_id: {type: string, required: true,
-                            note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다(4xx 예상 coverage probe); 실값 출처는 R3 과제"}
-        server_type_name: {type: string, required: true,
-                           note: "lookup — 소스 lifecycle은 빈 문자열을 보냈다; POST /v1/quick-query/validate-resources가 dry-run preflight, PUT .../engine이 사후 변경"}
+        k8s_version: {type: string, required: true,
+                      note: "lookup — SKE kubernetes-versions (GET /v1/kubernetes-versions $.kubernetes_versions[0].kubernetes_version); 소스 lifecycle은 빈 문자열을 보냈다"}
+        image_os: {type: string, required: true,
+                   note: "node-pool OS (예: ubuntu) — SKE images 룩업"}
+        image_os_version: {type: string, required: true,
+                           note: "node-pool OS 버전 (예: 22.04)"}
+        keypair_name: {type: string, required: true,
+                       note: "virtualserver keypair 이름 — keypair 노드와 {unique} 공유 (compute__virtualserver.yaml)"}
+        server_type_id: {type: string, required: true,
+                         note: "node-pool 서버 타입 (예: s1v16m64) — s-프리픽스 (virtualserver server-type 룩업)"}
+        version: {type: string, required: true,
+                  note: "quick query 이미지 version — quick-query-image-versions 룩업 $.contents[0].version"}
+        image_id: {type: ref, required: true, target: quick-query-image-versions,
+                   note: "quick_query_create_request.image_id — quick-query-image-versions $.contents[0].image_id"}
+        domain: {type: string, required: true,
+                 note: "DSC domain (len 3-50) — 실 DSC(Data Security Center) 값 필요, 합성 불가 (owner/IB 대기)"}
+        dsc_domain: {type: string, required: true,
+                     note: "DSC domain (len 3-50) — 실 DSC 값 필요, 합성 불가 (owner/IB 대기)"}
+        query_engine_spec: {type: string, required: true,
+                            note: "QueryEngineSpec(엔진 cpu/memory/replica/auto_scale 등) — 콘솔 파생 형상 미문서, R3 DOMAIN-HUNT"}
     capture: {quick_query_id: "$.id"}
+    capture_soft: {quick_query_id: "$.contents[0].quick_query_id"}
     delete: {endpoint: "DELETE /v1/quick-query/{quick_query_id}",
              destructive: true}
     provenance: docs
     source: {lifecycle: quick-query-lifecycle-guarded,
              steps: [validate-resources, create-quick-query, delete-quick-query]}
-    notes: "billable query engine — 소스 lifecycle은 실생성하지 않는 coverage probe(기존 id를 list에서 capture_soft). body는 analytics-console 공유 형상의 UNPROVEN(docs) 템플릿, capture envelope $.id는 list($.contents[0].id) 관례에서 추론. description/domain/dsc-domain/engine/host-alias의 5개 in-place PUT setter는 task가 아닌 lifecycle/verify 영역 (domain/dsc-domain은 실 DSC 값 필요)."
+    notes: "billable query engine (SKE+Trino 설치). 소스 lifecycle은 실생성하지 않는 coverage probe — 기존 id를 list에서 capture_soft($.contents[0].quick_query_id). body는 REAL QuickQueryTotalCreateRequest 모델(api_docs, UNPROVEN docs): kubernetes_engine_create_request + node_pool_create_requests[] + quick_query_create_request. create 응답은 202 AsyncResponse(envelope $.id 추정 — capture_soft가 안전한 fallback). max_query 패턴 ^(32|64|96|128)$. quick_query_name 패턴 ^[a-z][a-z0-9\\-]*[a-z0-9]$ (len 3+). domain/dsc_domain은 실 DSC 값 필요 → 실생성은 owner/IB 대기. 사전 검증은 quick-query-validate(POST .../validate-resources)."
+
+  # ------------------------------------------------------------ PREFLIGHT/SUBOPS
+  # Dry-run resource validation — POST .../validate-resources. No path id; body
+  # is QuickQueryValidateResourceRequest. Cheap preflight (no provisioning).
+  quick-query-validate:
+    code: "da-qq-validate"
+    service: data-analytics/quick-query
+    requires: []
+    create:
+      endpoint: "POST /v1/quick-query/validate-resources"
+      body:
+        node_pool_validation_request:
+          - {auto_scale: false, desired_node_count: 3, max_node_count: 3,
+             min_node_count: 3, scale_name: "regrqqscale"}
+        quick_query_engine_request:
+          {auto_scale: false, cluster_size: "Small", cpu: "4", memory: "8",
+           replica: "1", is_engine_type_private: false}
+      options:
+        cluster_id: {type: string, required: false,
+                     note: "기존 엔진 수정 검증 시에만; 신규 생성 검증은 생략 (api_docs required:false)"}
+    provenance: docs
+    notes: "dry-run preflight (수정/생성 전 자원 검증). node_pool_validation_request + quick_query_engine_request 필수(api_docs). cluster_id는 optional. 비파괴, id 미생성 — capture 불요. 200 QuickQueryValidateResourceResponse."
+
+  # In-place setters on an existing engine (PUT .../{id}/<field>). All require a
+  # live quick_query_id; modeled as no_api action notes (no resource created).
+  # 5 setters: description/domain/dsc-domain/engine/host-alias.
+  quick-query-update-description:
+    code: "da-qq-set-description"
+    service: data-analytics/quick-query
+    requires: [quick-query]
+    create:
+      endpoint: "PUT /v1/quick-query/{quick-query.quick_query_id}/description"
+      body: {description: "API regression suite (updated)"}
+    provenance: docs
+    notes: "in-place setter (QuickQueryDescriptionRequest). 살아있는 quick_query_id 필요 → coverage-only(soft) 또는 실엔진 생성 후. 나머지 4 setter(domain/dsc-domain/engine/host-alias)는 실 DSC/엔진 값 필요 — domain/dsc-domain은 실 DSC 값, engine은 QuickQueryUpdateEngineRequest, host-alias는 array — R3."
