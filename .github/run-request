@@ -1,9 +1,12 @@
-# Light gen-* verification wave (2026-06-14) — re-validate this session's
-# docs-enriched LIGHT nodes against live: queueservice (queue + FIFO),
-# resourcemanager (resource-group + tags), apigateway, financial
-# (cost/budget + pricing). No heavy clusters; mutations+destructive for
-# create->delete teardown. budget 500 is baselined (fail_new unaffected).
+# Light gen-* re-run rev2 (2026-06-14) — verify the {unique} collision fix
+# (commit 05d747b) and confirm the queue-create 400 persistence.
+#   * gen-wave2-rg + gen-wave4-rmtags run concurrently (xdist): with the fix
+#     their regr-rg-{unique} names must no longer collide -> both 201.
+#   * gen-wave2-queue + gen-wave3-qfifo: validated/doc-compliant create body
+#     returned opaque scp-queueservice.bad-request 400 (4/4) in run
+#     27500363845 while list/check-duplication were 200 — re-run to confirm
+#     this is a persistent backend regression (then baseline + escalate).
 mutations=true
 destructive=true
 heavy=false
-crud_filter=gen-wave2-queue or gen-wave3-qfifo or gen-wave2-rg or gen-wave4-rmtags or gen-wave-apigw or gen-wave3-cost or gen-wave3-pricing
+crud_filter=gen-wave2-queue or gen-wave3-qfifo or gen-wave2-rg or gen-wave4-rmtags
