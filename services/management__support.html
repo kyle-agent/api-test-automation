@@ -191,11 +191,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-14 22:51 KST · branch <code>claude/autonomous-progress-check-rklsix</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-14 22:51 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "GET", "p": "/v1/inquiries", "api": "getinquirylist", "c": "y", "s": 200, "t": 1.5, "src": "", "d": []}, {"m": "GET", "p": "/v1/inquiries/{inquiry_id}", "api": "showinquiry", "c": "y", "s": 200, "t": 1.2, "src": "", "d": []}, {"m": "GET", "p": "/v1/service-requests", "api": "getservicerequestlist", "c": "y", "s": 200, "t": 1.0, "src": "", "d": []}, {"m": "GET", "p": "/v1/service-requests/{service_request_id}", "api": "showservicerequest", "c": "y", "s": 200, "t": 0.9, "src": "", "d": []}];
+var R=[{"m": "GET", "p": "/v1/inquiries", "api": "getinquirylist", "c": "y", "s": 200, "t": 1.5, "src": "", "d": []}, {"m": "GET", "p": "/v1/inquiries/{inquiry_id}", "api": "showinquiry", "c": "y", "s": 200, "t": 1.0, "src": "", "d": []}, {"m": "GET", "p": "/v1/service-requests", "api": "getservicerequestlist", "c": "y", "s": 200, "t": 0.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/service-requests/{service_request_id}", "api": "showservicerequest", "c": "y", "s": 200, "t": 0.9, "src": "", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
