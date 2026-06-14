@@ -1,0 +1,803 @@
+{
+  "_comment": "Composed HEAVY AIMLOps live-provision window — run in a DEDICATED window (crud_filter=gen-heavy-aimlops): provisions a REAL SKE cluster + nodepool AND then a REAL aimlops-platform release ON it, so it is the heaviest/most-billable chain in the suite (SKE create+release+teardown). Owner-approved cost + dedicated window. Adds a 4th concurrent VPC if mixed with the other heavy chains — keep it isolated.",
+  "lifecycles": [
+    {
+      "id": "gen-heavy-aimlops",
+      "service": "ai-ml/aimlops-platform",
+      "enabled": true,
+      "_note": "owner-approved live aimlops provision (2026-06-14): branch (1) adopt/create real SKE cluster then release aimlops on it. The SKE-create closure (keypair -> server-type/k8s-version/ske-image lookups -> security-group -> vpc -> subnet -> filestorage volume -> POST /v1/clusters -> POST /v1/nodepools) is copied FAITHFULLY from gen-heavy-ske-upgrade (same paths/bodies/captures/polling/expect_status/groups); the upgrade steps are intentionally omitted. After RUNNING, the 5 aimlops precondition GETs run against the REAL cluster_id (expect 200, tolerate 4xx), then GET images -> image_id, then POST /v1/aimlops-platform (UNPROVEN body — first live attempt) -> capture release_id -> poll ready -> PUT update -> DELETE. FULL teardown in reverse mirrors gen-heavy-ske so nothing leaks. || POST /v1/aimlops-platform body is UNPROVEN/first-live: NO data/api_bodies.json entry exists; field set (release_name/cluster_id/image_id/namespace/description + resource sizing) is best-effort from knowledge/formal/resources+services/ai-ml__aimlops-platform.yaml semantics. expect_status is broad so the first exploratory run RECORDS the real response without hard-failing.",
+      "steps": [
+        {
+          "name": "create-keypair",
+          "service": "virtualserver",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrkey{unique}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "private_key": "$.private_key"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/regrkey{unique}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "verify-keypair",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200
+          ],
+          "group": "keypair"
+        },
+        {
+          "name": "create-server-type",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "server_type_id": {
+              "list": "$.server_types",
+              "where_prefix": {
+                "id": "s"
+              },
+              "where_not_prefix": {
+                "id": "g"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "verify-server-type-read",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/server-types/{server_type_id}",
+          "expect_status": [
+            200,
+            404
+          ],
+          "group": "server-type"
+        },
+        {
+          "name": "create-kubernetes-version",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/kubernetes-versions",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "kube_ver": "$.kubernetes_versions[0].kubernetes_version"
+          }
+        },
+        {
+          "name": "verify-kubernetes-version-read",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/kubernetes-versions",
+          "expect_status": [
+            200
+          ],
+          "group": "kubernetes-version"
+        },
+        {
+          "name": "create-ske-image",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/images?scp_original_image_type=k8s&size=20&page=0",
+          "expect_status": [
+            200,
+            201,
+            202
+          ]
+        },
+        {
+          "name": "verify-ske-image-images-page",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/images?scp_original_image_type=k8s&size=20&page=0",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-image"
+        },
+        {
+          "name": "create-security-group",
+          "service": "security-group",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "json": {
+            "name": "regrsg{unique}",
+            "description": "API regression suite",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "verify-security-group",
+          "service": "security-group",
+          "method": "GET",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "security-group"
+        },
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "verify-vpc-add-cidr",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs/{vpc_id}/cidrs",
+          "json": {
+            "cidr": "10.200.0.0/20"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "group": "vpc"
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "verify-subnet-read-vips",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "verify-subnet-read-sap-secondary-subnets",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/sap-secondary-subnets",
+          "expect_status": [
+            200
+          ],
+          "group": "subnet"
+        },
+        {
+          "name": "create-filestorage-volume",
+          "service": "filestorage",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrfs{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "volume_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-filestorage-volume",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "verify-filestorage-volume-read-access-rules",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}/access-rules",
+          "expect_status": [
+            200
+          ],
+          "group": "filestorage-volume"
+        },
+        {
+          "name": "create-ske-cluster",
+          "service": "ske",
+          "method": "POST",
+          "path": "/v1/clusters",
+          "json": {
+            "name": "regrske{unique}",
+            "kubernetes_version": "v1.33.5",
+            "cloud_logging_enabled": "false",
+            "vpc_id": "{vpc_id}",
+            "subnet_id": "{subnet_id}",
+            "security_group_id_list": [
+              "{sg_id}"
+            ],
+            "private_endpoint_access_control_resources": [],
+            "tags": [],
+            "volume_id": "{volume_id}",
+            "public_endpoint_access_control_ip": "0.0.0.0/0",
+            "service_watch_logging_enabled": "true"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "cluster_id": "$.resource_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/clusters/{cluster_id}",
+            "service": "ske"
+          }
+        },
+        {
+          "name": "wait-ske-cluster",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.cluster.status",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-ske-cluster-kubeconfig",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/kubeconfig?kubeconfig_type=public",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-cluster"
+        },
+        {
+          "name": "verify-ske-cluster-user-kubeconfig",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/user-kubeconfig?kubeconfig_type=public",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-cluster"
+        },
+        {
+          "name": "create-ske-nodepool",
+          "service": "ske",
+          "method": "POST",
+          "path": "/v1/nodepools",
+          "json": {
+            "cluster_id": "{cluster_id}",
+            "name": "regrnp{unique}",
+            "kubernetes_version": "v1.33.5",
+            "desired_node_count": "1",
+            "min_node_count": "1",
+            "max_node_count": "2",
+            "server_type_id": "{server_type_id}",
+            "image_os": "ubuntu",
+            "image_os_version": "22.04",
+            "keypair_name": "regrkey{unique}",
+            "volume_size": "104",
+            "volume_type_name": "SSD_Provisioned",
+            "is_auto_recovery": "true",
+            "is_auto_scale": "false",
+            "volume_max_iops": "10000",
+            "volume_max_throughput": "500"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "nodepool_id": "$.nodepool.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/nodepools/{nodepool_id}",
+            "service": "ske"
+          }
+        },
+        {
+          "name": "wait-ske-nodepool",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.nodepool.status",
+            "until": [
+              "Running",
+              "RUNNING",
+              "ACTIVE",
+              "active"
+            ],
+            "timeout": 1200,
+            "interval": 30
+          }
+        },
+        {
+          "name": "verify-ske-nodepool",
+          "service": "ske",
+          "method": "GET",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "ske-nodepool"
+        },
+        {
+          "name": "aimlops-check-version",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/clusters/{cluster_id}/check-version",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "aimlops-precond",
+          "_note": "precondition GET against the REAL cluster_id — expect 200 now that the cluster is RUNNING; tolerate 4xx (optional+grouped) so a precondition hiccup does not abandon the cluster before teardown."
+        },
+        {
+          "name": "aimlops-validate-namespaces",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/clusters/{cluster_id}/validate-namespaces",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "aimlops-precond"
+        },
+        {
+          "name": "aimlops-validate-resources",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/clusters/{cluster_id}/validate-resources",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "aimlops-precond"
+        },
+        {
+          "name": "aimlops-internal-nodes",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/internal/clusters/{cluster_id}/nodes",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "aimlops-precond"
+        },
+        {
+          "name": "aimlops-internal-storageclasses",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/internal/clusters/{cluster_id}/storageclasses",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "aimlops-precond"
+        },
+        {
+          "name": "aimlops-list-images",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/images",
+          "expect_status": [
+            200
+          ],
+          "capture": {
+            "image_id": "$.images[0].id"
+          },
+          "_note": "image_id = $.images[0].id (same selector as the coverage lifecycle's list-images capture_soft). Required hard-capture: a release needs a real image_id."
+        },
+        {
+          "name": "release-aimlops-platform",
+          "method": "POST",
+          "path": "/v1/aimlops-platform",
+          "json": {
+            "release_name": "regraimlops{ualpha}",
+            "cluster_id": "{cluster_id}",
+            "image_id": "{image_id}",
+            "namespace": "regr-aimlops-{ualpha}",
+            "description": "API regression suite — live provision",
+            "cpu": "2",
+            "memory": "4",
+            "storage_class_name": "",
+            "volume_size": "20"
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture_soft": {
+            "release_id": "$.id"
+          },
+          "_note": "UNPROVEN / FIRST-LIVE body. NO data/api_bodies.json entry exists for aimlops-platform. Field set is best-effort from knowledge/formal/resources/ai-ml__aimlops-platform.yaml (release_name/cluster_id/image_id/namespace/description proven-in-model) PLUS resource sizing (cpu/memory/storage_class_name/volume_size) inferred from the validate-resources precondition semantics — UNPROVEN guesses. expect_status is deliberately BROAD ([200,201,202,400,403,404,409,422]) so the first exploratory run RECORDS the real API response (incl. a 4xx that reveals the true required body) WITHOUT hard-failing the lifecycle and abandoning the live cluster. capture_soft (not hard capture) so a 4xx that yields no $.id leaves {release_id} literal -> the PUT/DELETE below 404 harmlessly and teardown still runs."
+        },
+        {
+          "name": "wait-aimlops-release",
+          "method": "GET",
+          "path": "/v1/aimlops-platform/{release_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "aimlops-release",
+          "poll": {
+            "field": "$.status",
+            "until": [
+              "READY",
+              "Ready",
+              "ready",
+              "RUNNING",
+              "Running",
+              "ACTIVE",
+              "Completed",
+              "COMPLETED"
+            ],
+            "timeout": 1800,
+            "interval": 30
+          },
+          "_note": "poll the release to a ready/running state. UNPROVEN poll: status field path ($.status) and ready enum are best-effort. optional+grouped+broad expect_status so a 404 (release never created on a 4xx POST) or an unexpected status field does not hard-fail before teardown."
+        },
+        {
+          "name": "update-aimlops-platform",
+          "method": "PUT",
+          "path": "/v1/aimlops-platform/{release_id}",
+          "json": {
+            "description": "API regression suite — updated (live)"
+          },
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "aimlops-update",
+          "_note": "in-place update (updateaimlopsplatformv1). UNPROVEN body (description-only guess). optional+broad: 404 if no real release_id was captured."
+        },
+        {
+          "name": "delete-aimlops-platform",
+          "method": "DELETE",
+          "path": "/v1/aimlops-platform/{release_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "_note": "destructive teardown of the real release BEFORE the cluster is destroyed (a release on a deleted cluster would orphan). Targets the captured {release_id}; if none was captured (4xx POST) the literal placeholder 404s harmlessly. Broad expect_status + 409-retry so a still-provisioning release is reaped, not leaked."
+        },
+        {
+          "name": "delete-ske-nodepool",
+          "service": "ske",
+          "method": "DELETE",
+          "path": "/v1/nodepools/{nodepool_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-ske-cluster",
+          "service": "ske",
+          "method": "DELETE",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-filestorage-volume",
+          "service": "filestorage",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-security-group",
+          "service": "security-group",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{sg_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-keypair",
+          "service": "virtualserver",
+          "method": "DELETE",
+          "path": "/v1/keypairs/regrkey{unique}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ],
+      "heavy": true
+    }
+  ]
+}
