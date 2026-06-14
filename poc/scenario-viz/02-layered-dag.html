@@ -1,0 +1,104 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>② 레이어드 DAG + 스윔레인</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="data/model.js"></script><script src="assets/viz.js"></script>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>② 레이어드 DAG + 스윔레인</h1>
+  <span class="crumbs"><a href="index.html">홈</a> › 위상 깊이 = 생성순서, 밴드 = 카테고리</span>
+  <nav class="nav">
+    <a href="index.html">홈</a><a href="01-compose-canvas.html">①</a>
+    <a class="active" href="02-layered-dag.html">②</a><a href="03-closure-overlap.html">③</a>
+    <a href="04-branch-toggle.html">④</a><a href="05-sequence-gantt.html">⑤</a>
+    <a href="references.html">참고</a>
+  </nav>
+</header>
+<p class="lede">선택한 카테고리들의 자원 노드를 <b>왼→오 = 생성 순서(위상 깊이)</b>,
+  <b>가로 밴드 = 카테고리(스윔레인)</b> 로 배치합니다. 교차-카테고리 의존도 화살표로 드러나며,
+  "teardown 오버레이"를 켜면 역순 삭제 순서를 보여줍니다. (Airflow/Dagster의 그래프 뷰 스타일)</p>
+
+<div class="panel">
+  <div class="toolbar" id="cats"></div>
+  <div class="toolbar">
+    <label class="chk"><input type="checkbox" id="td"> teardown 오버레이(역순 삭제)</label>
+    <label class="chk"><input type="checkbox" id="deps" checked> 교차-카테고리 의존 자동 포함</label>
+    <span class="muted small" id="cnt"></span>
+  </div>
+  <div class="legend">
+    <span><i class="sw-val"></i>VALIDATED</span><span><i class="sw-docs"></i>docs</span>
+    <span>🜂 heavy · ⛔ quota</span><span style="color:#5b7088">→ 생성 의존</span>
+    <span style="color:#ff6b6b">⇠ teardown</span>
+  </div>
+  <div class="svgbox"><svg id="svg"></svg></div>
+</div>
+<div class="foot">깊이 = 최장경로(longest-path layering, Sugiyama 1단계). 밴드 내 같은 깊이는 세로로 적층.</div>
+</div>
+<script>
+const V=VIZ,N=V.N,NS="http://www.w3.org/2000/svg";
+const CATS=[...new Set(V.allIds().map(id=>N[id].category))].sort();
+const sel=new Set(["networking","compute","container","storage","security"].filter(c=>CATS.includes(c)));
+function chips(){
+  document.getElementById("cats").innerHTML=CATS.map(c=>
+    `<label class="chk"><input type="checkbox" data-c="${c}" ${sel.has(c)?"checked":""}> ${c}</label>`).join("");
+  document.querySelectorAll('#cats input').forEach(cb=>cb.onchange=()=>{
+    cb.checked?sel.add(cb.dataset.c):sel.delete(cb.dataset.c);draw();});
+}
+function pickSet(){
+  let ids=V.allIds().filter(id=>sel.has(N[id].category));
+  if(document.getElementById("deps").checked){
+    const cl=V.closure(ids); ids=[...cl];
+  }
+  return new Set(ids);
+}
+function draw(){
+  const set=pickSet();
+  const dep=V.depths(set);
+  const bands=[...new Set([...set].map(id=>N[id].category))]
+    .sort((a,b)=>(sel.has(a)?0:1)-(sel.has(b)?0:1)||(a<b?-1:1));
+  const colGap=200,rowGap=58,bw=164,bh=42,padX=120,padY=20,bandPad=18;
+  // group by band -> column -> ids
+  const byId={}; let y=padY; let maxCol=0;
+  bands.forEach(cat=>{
+    const cols={};
+    [...set].filter(id=>N[id].category===cat).forEach(id=>{(cols[dep[id]]=cols[dep[id]]||[]).push(id);});
+    const rows=Math.max(1,...Object.values(cols).map(a=>a.length));
+    const bandTop=y, bandH=rows*rowGap+bandPad;
+    Object.keys(cols).map(Number).forEach(c=>{maxCol=Math.max(maxCol,c);
+      cols[c].sort().forEach((id,i)=>{byId[id]={id,x:padX+c*colGap,
+        y:bandTop+bandPad/2+i*rowGap,w:bw,h:bh,band:cat,bandTop,bandH};});});
+    y+=bandH+10;
+  });
+  const W=padX+maxCol*colGap+bw+40,H=y+10;
+  const svg=document.getElementById("svg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("width",W);svg.setAttribute("height",H);
+  const td=document.getElementById("td").checked;
+  let s=`<defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="#5b7088"/></marker>
+    <marker id="td" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="#ff6b6b"/></marker></defs>`;
+  // band backgrounds + labels
+  const drawn=new Set();
+  Object.values(byId).forEach(p=>{if(drawn.has(p.band))return;drawn.add(p.band);
+    s+=`<rect x="2" y="${p.bandTop}" width="${W-4}" height="${p.bandH}" rx="9" fill="#16212e" stroke="#27384b"/>`;
+    s+=`<text x="12" y="${p.bandTop+18}" font-size="12" font-weight="700" fill="#90a4ba" transform="rotate(0)">${p.band}</text>`;});
+  // edges
+  [...set].forEach(id=>V.depRefs(id).forEach(r=>{const a=byId[r],b=byId[id];if(!a||!b)return;
+    if(td){const x1=b.x,y1=b.y+b.h/2,x2=a.x+a.w,y2=a.y+a.h/2;
+      s+=`<path d="M${x1},${y1} C${x1-50},${y1} ${x2+50},${y2} ${x2},${y2}" fill="none" stroke="#ff6b6b" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#td)" opacity=".8"/>`;}
+    else{const x1=a.x+a.w,y1=a.y+a.h/2,x2=b.x,y2=b.y+b.h/2;
+      s+=`<path d="M${x1},${y1} C${x1+50},${y1} ${x2-50},${y2} ${x2},${y2}" fill="none" stroke="#5b7088" stroke-width="1.3" marker-end="url(#ar)"/>`;}}));
+  // nodes
+  Object.values(byId).forEach(p=>{const n=N[p.id];
+    s+=`<g><title>${p.id} — ${n.service}\nprovenance ${n.provenance}\ndepth ${dep[p.id]}${n.options.length?"\noptions: "+n.options.map(o=>o.name).join(", "):""}</title>
+      <rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8" fill="#1c2a3a" stroke="${V.provColor(n.provenance)}" stroke-width="1.5"/>
+      <text x="${p.x+9}" y="${p.y+17}" font-size="12" font-weight="600">${n.heavy?"🜂 ":""}${p.id}</text>
+      <text x="${p.x+9}" y="${p.y+32}" font-size="10" fill="#90a4ba">${n.service.split("/").pop()}${n.quota?" ⛔"+n.quota:""}</text></g>`;});
+  svg.innerHTML=s;
+  document.getElementById("cnt").textContent=`· ${set.size} 노드 / ${bands.length} 밴드 / 깊이 ${maxCol}`;
+}
+chips();
+document.getElementById("td").onchange=draw;
+document.getElementById("deps").onchange=draw;
+draw();
+</script>
+</body></html>
