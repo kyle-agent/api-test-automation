@@ -4,7 +4,7 @@
     {
       "id": "gen-heavy-backup",
       "service": "storage/backup",
-      "enabled": true,
+      "enabled": false,
       "_note": "storage/backup AGENTLESS VM_IMAGE chain on a REAL server (owner directive 2026-06-13 — prior blocker was docs-example server UUIDs, '실 서버 UUID 의존'): VM closure -> backup-target lookup (GET /v1/backups/backup-targets discovers the live server's server_uuid/server_guid; covers getbackuptargetlist) -> create backup policy (BackupCreateRequest1Dot2 verbatim; agentless needs NO agent per userguide overview: 'Agentless Backup: No separate agent installation required') -> ready $.state AVAILABLE -> verify family: showbackup, check-name-dup, check-restore-name-dup, check-filesystem-dup(broad: FILESYSTEM/agent-oriented), list/set schedules, backup-/restore-histories, restore-targets, restorable-subnets(broad), set-filesystem-path(broad: agent-policy-only per userguide), update-replication(broad: replication is Agent-Backup-only per userguide), update-retention (WEEK_2->MONTH_1) -> manual-backup ('즉시 Backup은 Full Backup으로 수행됩니다' — always FULL) with AVAILABLE re-poll up to 60min -> teardown (delete-backup retries 409/500 40x30s in case the full-backup job still holds the policy). Restore flow lives in gen-heavy-backup-restore (disabled, timing-gated).",
       "steps": [
         {
@@ -623,7 +623,8 @@
           "retry_interval": 30
         }
       ],
-      "heavy": true
+      "heavy": true,
+      "_disabled_reason": "run 27483004836: backup-target lookup returned {contents:[],count:0} — the just-ACTIVE server isn't yet registered as a backup target (propagation delay). Needs an engine capability: poll a lookup GET until its list populates / capture resolves (IB-014). Backup model otherwise correct (agentless VM_IMAGE, owner-confirmed)."
     },
     {
       "id": "gen-heavy-backup-restore",

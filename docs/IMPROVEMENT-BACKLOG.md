@@ -27,6 +27,8 @@
 | IB-012 | coverage | gen-wave5-privnat 비활성: create-private-nat가 Connectable 상태의 TGW를 요구(scp-network.private-nat.connectable-transit-gateway-not-found, run 27466988779) — TGW에 VPC attachment/connection이 있어야 Connectable이 됨 | transit-gateway VPC-connection prerequisite 노드 모델링 후 private-nat 체인에 배선 → 재활성 | M | open |
 | IB-013 | coverage | gen-wave5-vpce 비활성: create-vpc-endpoint가 전용 endpoint-type subnet을 요구(scp-network.vpc-endpoint.subnet-not-found, run 27466988779) — FS-volume resource_key 배선으로는 부족 | 올바른 type/role로 생성한 endpoint-type-subnet prerequisite 노드 모델링 후 vpc-endpoint에 배선 → 재활성 | M | open |
 
+| IB-014 | debt | lookup 노드가 즉시-빈 리스트를 받으면 hard capture 실패(backup-target: 서버 ACTIVE 직후 목록 미반영, run 27483004836) — 엔진에 'capture 충족까지 GET 재폴링' 능력 부재 | engine에 lookup poll-until-capture(또는 ready 후 capture) 지원 추가 → gen-heavy-backup 재활성 | M | open |
+
 ## 진행 중 티켓 (M6-DESIGN §F)
 
 - 배치1(병렬): T1 new_service.py · T2 expand_targets/targets.py · T4 plan-manifest emit · T6 Planner cadence(이 문서 + orchestrator.md) ✅
