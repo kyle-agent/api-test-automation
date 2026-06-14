@@ -1,5 +1,5 @@
 {
-  "_comment": "Composed HEAVY DBaaS sibling-engine windows (mysql / mariadb / epas) — PG reference patterns (database__postgresql.yaml, owner approvals 2026-06-13) mirrored per engine. PRIORITY: gen-heavy-epas-replica first — epas create has never had a live 2xx; run it in the next heavy window to prove the epas create path. Each gen-heavy-<engine>-replica is a dedicated window (2 billable clusters + VPC; crud_filter=gen-heavy-<engine>); do NOT mix engines in one window. Setter sub-ops (mysql/mariadb: archive PUT+sync, sync-state; mariadb: +setbackup/setauditlog/setmaintenance+unset) are folded into the cluster nodes' verifies and ride along. gen-heavy-*-restore disabled (backup-timing gate, as PG). gen-heavy-*-upgrade disabled: owner가 콘솔에서 엔진 구버전 유무 확인 대기 (old versions confirmed for PG only). sqlserver intentionally absent (license-gated); cachestore/eventstreams/searchengine/vertica are different topologies.",
+  "_comment": "Composed HEAVY DBaaS sibling-engine windows (mysql / mariadb / epas) — PG reference patterns (database__postgresql.yaml, owner approvals 2026-06-13) mirrored per engine. PRIORITY: gen-heavy-epas-replica first — epas create has never had a live 2xx; run it in the next heavy window to prove the epas create path. Each gen-heavy-<engine>-replica is a dedicated window (2 billable clusters + VPC; crud_filter=gen-heavy-<engine>); do NOT mix engines in one window. Setter sub-ops (mysql/mariadb: archive PUT+sync, sync-state; mariadb: +setbackup/setauditlog/setmaintenance+unset) are folded into the cluster nodes' verifies and ride along. gen-heavy-*-restore disabled (backup-timing gate, as PG). gen-heavy-mariadb-upgrade ENABLED 2026-06-14 (old majors 10.x confirmed via userguide); gen-heavy-mysql/epas-upgrade still disabled: owner가 콘솔에서 엔진 구버전 유무 확인 대기 (old versions confirmed for PG only). sqlserver intentionally absent (license-gated); cachestore/eventstreams/searchengine/vertica are different topologies.",
   "lifecycles": [
     {
       "id": "gen-heavy-epas-replica",
@@ -3052,7 +3052,8 @@
               },
               "get": "id"
             }
-          }
+          },
+          "_note": "UNPROVEN-FILTER: major_version='16' (docs 16.8-16.10). Live availability of an OLDER minor than latest is owner-UNCONFIRMED; also epas create has no live 2xx yet."
         },
         {
           "name": "create-epas-server-type",
@@ -3298,7 +3299,8 @@
             200,
             201,
             202
-          ]
+          ],
+          "_note": "UNPROVEN-PRECONDITION: kernel-upgrade needs is_kernel_patchable=true; IRREVERSIBLE on success; no body (api_docs upgradekernel)."
         },
         {
           "name": "wait-epas-kernel-upgrade",
@@ -3390,7 +3392,7 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "owner가 콘솔에서 엔진 구버전 유무 확인 대기"
+      "_disabled_reason": "GATE-0 UNPROVEN: epas cluster CREATE itself has NO recorded live 2xx anywhere (prove via gen-heavy-epas-replica first). GATE-1: where_prefix major_version='16' targets the documented 16.8-16.10 range (userguide 2026-06-14) but live availability of an OLDER minor (16.8/16.9) than latest is owner-UNCONFIRMED; 14.x EOS 2026-05-20 already passed (likely absent). GATE-2 (is_kernel_patchable=true) also applies."
     },
     {
       "id": "gen-heavy-mysql-upgrade",
@@ -3433,7 +3435,8 @@
               },
               "get": "id"
             }
-          }
+          },
+          "_note": "UNPROVEN-FILTER: major_version='8.0' OLD-major prefix is owner-UNCONFIRMED (may be the only/latest mysql major). Confirm a strictly-older live major exists before enabling."
         },
         {
           "name": "create-mysql-server-type",
@@ -3732,7 +3735,8 @@
             200,
             201,
             202
-          ]
+          ],
+          "_note": "UNPROVEN-PRECONDITION: kernel-upgrade needs is_kernel_patchable=true; IRREVERSIBLE on success; no body (api_docs upgradekernel)."
         },
         {
           "name": "wait-mysql-kernel-upgrade",
@@ -3824,13 +3828,13 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "owner가 콘솔에서 엔진 구버전 유무 확인 대기"
+      "_disabled_reason": "GATE-1 UNRESOLVED: mysql old engine version not owner-confirmed. where_prefix major_version='8.0' (mysql-engine-version-8) is a docs-level GUESS — if 8.0 is the only/latest mysql major, 'old create -> upgrade' has no older target and capture may select the latest (no real upgrade) or be None. Needs owner console check of live engine-versions for a major older than the latest before enabling. GATE-2 (is_kernel_patchable=true) also applies."
     },
     {
       "id": "gen-heavy-mariadb-upgrade",
       "service": "database/mariadb",
-      "enabled": false,
-      "_note": "old-major create -> kernel-upgrade chain (PG gen-heavy-pg-upgrade mirror). DOUBLE-GATED: (1) the owner has confirmed old engine versions in the console only for PG so far — the where_prefix major filter on mariadb-engine-version-10 is a docs-level guess and must be re-checked against the live catalog before enabling; (2) kernel-upgrade additionally requires is_kernel_patchable=true on the cluster detail (PG gate). composed by regression/scenarios/composer.py — targets: mariadb-cluster, mariadb-kernel-upgrade",
+      "enabled": true,
+      "_note": "DISPATCH-READY (2026-06-14): old-major(10.x) create -> kernel-upgrade chain, faithful PG gen-heavy-pg-upgrade / SKE gen-heavy-ske-upgrade mirror. GATE-1 (old version creatable) RESOLVED by mariadb userguide overview 2026-06-14: majors 10.6.x(10) / 10.11.x(3) / 11.4.7 coexist, so where_prefix major_version='10' resolves to a creatable OLD major while 11.4.7 is latest. NOTE 10.6.x EoTS 2026-07-06: after that, prefix '10' still matches 10.11.x (still an older major than 11.4.7) — re-check the live catalog only if the engine-versions list ever collapses to 11.x-only (then capture None -> engine hard-fails THIS chain only, intended blast radius). GATE-2 still LIVE: kernel-upgrade needs is_kernel_patchable=true on the cluster detail v1.1 — a fresh 10.x image may already run the newest OS kernel, in which case the PUT 4xxes and the fixed create expect [200,201,202] surfaces it as a hard-fail (expected live refinement). Dedicated heavy window only (own VPC). composed by regression/scenarios/composer.py — targets: mariadb-cluster, mariadb-kernel-upgrade",
       "steps": [
         {
           "name": "create-mariadb-engine-version",
@@ -3867,7 +3871,8 @@
               },
               "get": "id"
             }
-          }
+          },
+          "_note": "UNPROVEN-FILTER: where_prefix major_version='10' is a docs-backed (userguide 2026-06-14) OLD-major selector, not yet live-captured. If the live catalog drops all 10.x (post-EoTS collapse to 11.x), this capture is None and the engine hard-fails this lifecycle by design."
         },
         {
           "name": "create-mariadb-server-type",
@@ -4223,7 +4228,8 @@
             200,
             201,
             202
-          ]
+          ],
+          "_note": "UNPROVEN-PRECONDITION: PUT /kernel-upgrade (no body, api_docs upgradekernel) needs is_kernel_patchable=true; a freshly created OLD-major cluster on the newest OS image may already be current -> 4xx. IRREVERSIBLE on success (no kernel downgrade); service interruption during the roll (userguide)."
         },
         {
           "name": "wait-mariadb-kernel-upgrade",
@@ -4314,8 +4320,7 @@
           "adopt": "vpc"
         }
       ],
-      "heavy": true,
-      "_disabled_reason": "owner가 콘솔에서 엔진 구버전 유무 확인 대기"
+      "heavy": true
     }
   ]
 }
