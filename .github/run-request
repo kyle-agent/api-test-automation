@@ -1,7 +1,7 @@
-# mysql/mariadb replica family-only — cluster as clean prereq (no disruptive
-# setter verifies). Setter ops already banked last run. Should land replica
-# create/sync/reset/promote like PG/epas.
+# Backup heavy window — agentless VM_IMAGE backup chain (gen-heavy-backup,
+# never run live): VM closure -> backup-target lookup -> policy create/
+# AVAILABLE -> 13 verify sub-ops -> manual full backup + re-poll -> teardown.
 mutations=true
 destructive=true
 heavy=true
-crud_filter=gen-heavy-mysql-replica or gen-heavy-mariadb-replica
+crud_filter=gen-heavy-backup
