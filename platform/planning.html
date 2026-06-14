@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-14T13:51:24Z · <b>sha ad6fc3d</b>
+    2026-06-14T20:56:45Z · <b>sha 5342084</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -256,9 +256,9 @@
   </a>
   <a class="pstage" href="#sec-scen">
     <div class="pl">② 시나리오 <span style="font-weight:400;color:var(--faint)">실행 단위</span></div>
-    <div class="pv">187</div>
+    <div class="pv">188</div>
     <div class="ps">생성→검증→역순 정리 스텝 ·
-      합성 <b>59</b> · 수작업 128</div>
+      합성 <b>60</b> · 수작업 128</div>
     <div class="ps" style="color:var(--blue)">속성(mutation·destructive·heavy)이 게이트 통과해야 실행 →</div>
     <span class="chev">→</span>
   </a>
@@ -286,10 +286,10 @@
 
 <h2 id="sec-scen">② 시나리오 카탈로그 <span class="hint">실행되는 테스트 전체 목록 — ①에서 합성된 gen-* 와 수작업이 함께 (비고 클릭 = 전체 보기)</span></h2>
 <div class="fchips" id="scenChips">
-  <span class="fchip on" data-f="all"><b>187</b> 전체</span>
-  <span class="fchip" data-f="enabled"><b>154</b> enabled</span>
-  <span class="fchip" data-f="heavy"><b>74</b> heavy(과금성)</span>
-  <span class="fchip" data-f="gen"><b>59</b> 합성(gen)</span>
+  <span class="fchip on" data-f="all"><b>188</b> 전체</span>
+  <span class="fchip" data-f="enabled"><b>155</b> enabled</span>
+  <span class="fchip" data-f="heavy"><b>75</b> heavy(과금성)</span>
+  <span class="fchip" data-f="gen"><b>60</b> 합성(gen)</span>
   <span class="fchip" data-f="disabled"><b>33</b> disabled</span>
   <input class="search" id="scenSearch" placeholder="서비스·시나리오 검색" style="margin-left:auto">
 </div>
@@ -994,7 +994,7 @@
           data-gen="">
         <td><code>aimlops-platform-release-write-coverage</code></td>
         <td><span class="srv">ai-ml/aimlops-platform</span></td>
-        <td>6</td>
+        <td>7</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -2040,6 +2040,30 @@
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/generated__cloudml.json">
+          <a href="#">보기</a> ·
+          <a href="#">편집</a></td>
+      </tr>
+      
+      <tr data-id="gen-heavy-aimlops" data-service="ai-ml/aimlops-platform"
+          data-enabled="1"
+          data-heavy="1"
+          data-gen="1">
+        <td><code>gen-heavy-aimlops</code></td>
+        <td><span class="srv">ai-ml/aimlops-platform</span></td>
+        <td>44</td>
+        <td>
+          <span class="tag read" title="자원 모델에서 합성기로 생성된 시나리오">합성</span>
+          <span class="tag heavy">heavy</span>
+          
+          
+        </td>
+        <td>
+          
+          <div class="biz" onclick="this.classList.toggle('open')">owner-approved live aimlops provision (2026-06-14): branch (… <span class="toggle">더보기</span>
+            <div class="more">owner-approved live aimlops provision (2026-06-14): branch (1) adopt/create real SKE cluster then release aimlops on it. The SKE-create closure (keypair -&gt; server-type/k8s-version/ske-image lookups -&gt; security-group -&gt; vpc -&gt; subnet -&gt; filestorage volume -&gt; POST /v1/clusters -&gt; POST /v1/nodepools) i</div></div>
+          
+        </td>
+        <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/generated__heavy-aimlops.json">
           <a href="#">보기</a> ·
           <a href="#">편집</a></td>
       </tr>
