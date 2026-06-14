@@ -1,26 +1,51 @@
 # Resource-task model — devops-tools/devopsservice (dt-devops group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
-# devopsservice-write-coverage (enabled, light, guarded REAL-create attempt —
-# body/capture UNPROVEN per the lifecycle's own note -> docs) by extract.py,
-# curated by hand.
+# devopsservice-write-coverage (enabled, light) by extract.py, curated by hand.
+#
+# 2026-06-14 ingest (PF-05 fix): the prior create body {name, description} was
+# the WRONG SHAPE and caused the live 400 ValidationError ["Field required"]×3
+# (run 27394211896). The catalog endpoint POST /v1/devops-services takes
+# DevOpsServiceCreateRequest (data/api_docs.json) whose REQUIRED fields are
+# members (array[string], >=1), tenant_code (^[a-z0-9\-]*$), tenant_name
+# (^[a-z0-9\-]*$) — exactly the 3 unnamed "Field required" errors. tags is
+# optional. Body rewritten to the real model below. Capture $.devops_service.id
+# is CONFIRMED against DevOpsServiceShowResponse{devops_service: DevOpsService}
+# / DevOpsService.id (api_docs) — no longer a guess.
 version: 1
 resources:
   devops-service:
     code: "dt-devops-service"
     service: devops-tools/devopsservice
-    requires: []
+    requires:
+      # members must be >=1 existing IAM user id. IAM users are not modelled as
+      # graph nodes here, so the member id set is a console/credential-supplied
+      # precondition carried in options (_note), not a create step.
+      - {credential: iam-member,
+         note: "members[] = 1명 이상의 기존 IAM 사용자 id (필수). 그래프 노드 아님 — 크리덴셜/환경 컨텍스트가 제공하는 사전조건(라이브 검증 시 실제 IAM user id 주입 필요)"}
     create:
       endpoint: "POST /v1/devops-services"
-      body: {name: "regr-devops-{ualpha}",
-             description: "API regression suite"}
+      # DevOpsServiceCreateRequest required: members, tenant_code, tenant_name.
+      # tags optional (array[Tag{key,value}], omitted). tenant_code/tenant_name
+      # share the same pattern ^[a-z0-9\-]*$ (lowercase start, [a-z0-9-], 3-30).
+      body:
+        tenant_name: "{opt.tenant_name}"
+        tenant_code: "{opt.tenant_code}"
+        members: "{opt.members}"
+      options:
+        tenant_name: {type: string, required: true, default: "regrdevops{ualpha}",
+                      note: "_note: 본문 필수 테넌트명. 영문 소문자 시작, [a-z0-9-], 3-30자 (API 패턴 ^[a-z0-9\\-]*$). {ualpha}는 소문자 보장 빌트인"}
+        tenant_code: {type: string, required: true, default: "regrdevops{ualpha}",
+                      note: "_note: 본문 필수 테넌트 코드. 영문 소문자 시작, [a-z0-9-], 3-30자 (API 패턴 ^[a-z0-9\\-]*$). 생성 전 check-duplication?tenant_code=&tenant_name= 로 중복 점검"}
+        members: {type: string, required: true, default: "{iam_member}",
+                  note: "_note: 본문 필수 members(array[string]) — 1명 이상 IAM 사용자 id. 빈 배열 불가(=400 Field required 유발). 합성 시 환경 IAM user id 1개 이상으로 배선(크리덴셜 사전조건). 미주입 환경은 env-skip"}
+        tags: {type: string, required: false,
+               note: "_note: 선택 태그 array[Tag{key,value}], 자원당 최대 50개. 기본 미전송 — C4 변형 후보"}
     capture: {devops_service_id: "$.devops_service.id"}
     delete: {endpoint: "DELETE /v1/devops-services/{devops_service_id}",
              destructive: true}
     provenance: docs
-    # live 400 (run 27394211896): ValidationError detail ["Field required"]x3
-    # WITHOUT field names — the API hides which fields are missing (itself an
-    # error-schema defect). Needs userguide research before the next attempt.
+    # PF-05 root cause now encoded (see header). live 2xx 후 VALIDATED 승격.
     source: {lifecycle: devopsservice-write-coverage,
              steps: [check-name-duplication, create-devops-service,
                      delete-devops-service]}
-    notes: "컨트롤플레인 CI/CD 워크스페이스(명백한 billable 인프라 없음 → light). body(name/description)는 best-effort(공식 문서 JS-rendered, api_bodies 없음), capture envelope $.devops_service.id는 소스 lifecycle도 '추측'으로 명시한 capture_soft — 모두 UNPROVEN(docs), 실 2xx 후 승격. 생성 전 GET /v1/devops-services/check-duplication?name=...으로 이름 중복 점검(소스 step), 삭제 전 checkdeletabledevopsservice GET 존재."
+    notes: "컨트롤플레인 CI/CD 워크스페이스(테넌트) — 명백한 billable 인프라 없음(light). 2026-06-14 정정: create body는 종전 {name, description} 추정값(=PF-05 400 ['Field required']×3의 원인)이 아니라 docs DevOpsServiceCreateRequest 모델 — 필수 members/tenant_code/tenant_name(누락 3개 = 익명 'Field required' 3개와 정확히 일치), tags optional. capture $.devops_service.id는 응답 모델 DevOpsServiceShowResponse{devops_service: DevOpsService}.id로 CONFIRMED(라이브 2xx 후 VALIDATED). 생성 전 GET /v1/devops-services/check-duplication?tenant_code=&tenant_name= (둘 다 query/선택, result:boolean) — 종전 ?name= 파라미터는 잘못된 추정이었음. 삭제 전 GET /v1/devops-services/{id}/check-deletable 존재. 선행 서비스 없음(overview); SKE+SCR은 생성 후 CI/CD 구성용으로만 필요 — create 선행조건 아님. Account당 1개 한도(userguide) → 2번째 생성은 conflict 예상, quota 노드는 미모델(환경 점유 시 borrow/skip 권장). members는 IAM user id 사전조건(credential requires)."

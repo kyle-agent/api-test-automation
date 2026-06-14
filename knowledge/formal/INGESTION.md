@@ -81,7 +81,7 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/analytics/vertica/overview/ | data-analytics/vertica (masterless MPP; 24.2.0-2 only; no add-instances/patch; backup 7-35d) |
 | ✅ | P1 | /userguide/ai_ml/ai_ml_ops_platform/overview/ | ai-ml/aimlops-platform (smoke 400s) |
 | ✅ | P1 | /userguide/ai_ml/cloud_ml/overview/ | ai-ml/cloud-ml (smoke 404s) |
-| — | P1 | /userguide/devopstools/devops_service/overview/ | devops-tools/devopsservice |
+| ✅ | P1 | /userguide/devopstools/devops_service/overview/ | devops-tools/devopsservice (PF-05 fixed: create body needs members+tenant_code+tenant_name, NOT name/description; capture $.devops_service.id; dup-check by tenant; 1/account) |
 | — | P1 | /userguide/financial_management/planned_compute/overview/ | financial-management/billingplan (smoke 500!) |
 | — | P1 | /userguide/financial_management/cost_management/overview/ | financial-management/budget·costexplorer |
 | — | P2 | /userguide/compute/gpu_server/overview/ | compute (gpu types) |

@@ -1,0 +1,56 @@
+# Layer 1 — per-service knowledge: devops-tools/devopsservice
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: /userguide/devopstools/devops_service/{overview,how_to_guides}/ (2026-06-14)
+#         + API Reference DevOpsServiceCreateRequest (data/api_docs.json).
+#
+# Ingest note (PF-05 fix): the live create 400 ValidationError ["Field
+# required"]×3 (run 27394211896) was a request-shape bug — the model sent
+# {name, description}, but POST /v1/devops-services takes
+# DevOpsServiceCreateRequest whose REQUIRED fields are members, tenant_code,
+# tenant_name (3 required = the 3 unnamed "Field required" errors). Encoded in
+# the resources/ node.
+
+version: 1
+service: devops-tools/devopsservice
+
+constraints:
+  - id: tenant-name-rule
+    rule: "tenant_name(테넌트명) — 영문 소문자로 시작, 허용문자 [a-z0-9-] (API 패턴 ^[a-z0-9\\-]*$), 3-30자 (userguide how_to_guides)"
+    provenance: docs
+  - id: tenant-code-rule
+    rule: "tenant_code(테넌트 코드) — 영문 소문자로 시작, 허용문자 [a-z0-9-] (API 패턴 ^[a-z0-9\\-]*$), 3-30자 (userguide how_to_guides)"
+    provenance: docs
+  - id: members-required
+    rule: "사용자(members) 1명 이상 선택해야 생성 가능 — DevOpsServiceCreateRequest.members(array[string]) required, 빈 배열 불가. 생성자는 Tenant Admin 권한을 받음"
+    provenance: docs
+  - id: one-per-account
+    rule: "Account당 DevOps Service 1개만 이용 가능 (userguide how_to_guides 'Account당 하나의 DevOps Service 서비스를 이용할 수 있습니다') — 2번째 생성 시도는 quota/conflict 예상"
+    provenance: docs
+  - id: iam-user-only
+    rule: "IAM 사용자만 DevOps Service를 생성할 수 있음 (members 후보도 IAM 사용자) — root/계정 자체로는 생성 불가"
+    provenance: docs
+  - id: tags-limit
+    rule: "태그 자원당 최대 50개. tags 본문 필드 = array[Tag{key,value}] (선택)"
+    provenance: docs
+
+captures:
+  devops-service: "$.devops_service.id"
+
+states: {}
+
+quirks:
+  - id: no-prerequisites
+    note: "선행 서비스 없음 (overview: 'DevOps Service는 선행 서비스가 없습니다'). SKE(Kubernetes Engine)+SCR(Container Registry)는 생성 후 CI/CD 구성 시에만 필요 — create의 선행조건이 아님"
+    provenance: docs
+  - id: region-availability
+    note: "전 리전 제공 — kr-west1, kr-east1, kr-south1, kr-south2, kr-south3 (overview 2026-06-14)"
+    provenance: docs
+  - id: control-plane-only
+    note: "컨트롤플레인 CI/CD 워크스페이스(테넌트) — 명백한 billable 인프라 없음(light). status는 응답 필드 존재하나 ready 값/머신은 미문서, console_url로 콘솔 진입"
+    provenance: docs
+  - id: dup-check-by-tenant
+    note: "생성 전 중복 점검은 GET /v1/devops-services/check-duplication?tenant_code=&tenant_name= (둘 다 query, 둘 다 선택) — result:boolean 반환. 종전 모델의 ?name= 점검은 잘못된 파라미터였음"
+    provenance: docs
+  - id: error-schema-defect
+    note: "PF-05: create 400 ValidationError detail이 ['Field required']×3으로 어느 필드인지 밝히지 않는 에러스키마 결함 (run 27394211896). 누락 필드 = members/tenant_code/tenant_name (api_docs DevOpsServiceCreateRequest로 식별). AI-usability 결함 사례로 PRODUCT-FINDINGS 등재 유지"
+    provenance: docs
