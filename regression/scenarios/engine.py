@@ -508,9 +508,20 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                              name=lifecycle["id"], lifecycle=lifecycle["id"])
 
     _now = time.gmtime()
+    # {unique}/{ualpha} name the resources a lifecycle creates. A bare
+    # int(time.time()) only has 1-second resolution, so two lifecycles that
+    # share a name prefix and start in the same second (routine under
+    # pytest-xdist) generate IDENTICAL names — the second create then 400s
+    # ("name already exists", field report run 27500363845: gen-wave2-rg vs
+    # gen-wave4-rmtags). Mix in 3 random bytes so names are unique across
+    # concurrent lifecycles while staying STABLE within this call (computed
+    # once here, reused by every step + its cleanup).
+    _rand = os.urandom(3)
+    _ts_hex = format(int(time.time()), "x")
     ctx: dict[str, str] = {
-        "unique": format(int(time.time()), "x"),
-        "ualpha": "".join(chr(ord("a") + int(c, 16)) for c in format(int(time.time()), "x")),
+        "unique": _ts_hex + _rand.hex(),
+        "ualpha": ("".join(chr(ord("a") + int(c, 16)) for c in _ts_hex)
+                   + "".join(chr(ord("a") + b % 26) for b in _rand)),
         "region": cfg.region,
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
