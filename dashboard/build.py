@@ -692,7 +692,9 @@ def render_service_page(s, meta):
             "@@SVC@@": html.escape(s["service"]),
             "@@CAT@@": html.escape(s["category"]),
             "@@RINGPCT@@": "—", "@@RINGCOL@@": "#d0d7de",
-            "@@COV@@": str(s["covered"]), "@@TOT@@": str(s["total"]),
+            # untestable: verified(2xx) coverage is not the framing — show "—"
+            # and let @@REACHED@@ + the action banner carry the reachability signal.
+            "@@COV@@": "—", "@@TOT@@": str(s["total"]),
             "@@REACHED@@": str(s["reached"]),
             "@@GETPCT@@": "—", "@@GCOV@@": str(s["gcov"]), "@@GTOT@@": str(s["gtot"]),
             "@@WPCT@@": "—", "@@WCOV@@": str(s["wcov"]), "@@WTOT@@": str(s["wtot"]),
@@ -1083,6 +1085,12 @@ def render(d, hist, meta, services):
     # ---- category aggregates (verified ops / total ops, services as source)
     cat_agg = {}
     for s in services:
+        # untestable services (license/resource-blocked) are waived from the
+        # coverage denominator — same as the JS drill-down's catMeta — so the
+        # headline category bars don't get systematically depressed and stay
+        # consistent with the drill-down (field report: storage 5% vs 8%).
+        if s.get("untestable"):
+            continue
         a = cat_agg.setdefault(s["category"], {"cov": 0, "tot": 0})
         a["cov"] += s["covered"]
         a["tot"] += s["total"]
@@ -1176,7 +1184,8 @@ def render(d, hist, meta, services):
     # ---- services / crud JSON for the client-side controls ----
     svc_json = json.dumps([
         {"n": s["service"], "c": s["category"], "cov": s["covered"],
-         "tot": s["total"], "u": f'services/{s["slug"]}.html'}
+         "tot": s["total"], "u": f'services/{s["slug"]}.html',
+         "rch": s["covered"] + s["reached"], "unt": s["untestable"]}
         for s in services], ensure_ascii=False)
     crud_states = []
     for id_, kind, st, steps in d["crud_rows"]:
@@ -1281,7 +1290,7 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
 .svc-controls input{width:200px}
 .svcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
 .svc{display:block;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);transition:.12s}
-.svc.unt .svc-n{color:#8b949e}
+.svc.unt .svc-n,.svc.unt .sn{color:#8b949e}
 .svc.unt{background:#fafbfc;border-style:dashed}
 .unt-badge{display:inline-block;font-size:10px;color:#8b949e;border:1px solid #d0d7de;border-radius:8px;padding:0 6px;vertical-align:1px}
 .svc:hover{border-color:var(--blue);text-decoration:none;transform:translateY(-1px)}
@@ -1413,10 +1422,20 @@ var catMeta={};
 SVCS.forEach(function(s){
   s.pct=s.tot?Math.round(s.cov/s.tot*100):0;
   var m=catMeta[s.c]||(catMeta[s.c]={cov:0,tot:0});
+  // untestable 서비스(라이선스/자원 부재)는 커버리지 분모에서 waiver 제외 —
+  // 카테고리 %를 끌어내리거나 '사각지대'로 오인되지 않게 집계에서 뺀다.
+  if(s.unt)return;
   m.cov+=s.cov;m.tot+=s.tot;
 });
 Object.keys(catMeta).forEach(function(c){var m=catMeta[c];m.pct=m.tot?Math.round(m.cov/m.tot*100):0;});
 function svcCard(s){
+  if(s.unt){
+    // 라이선스/자원 부재로 기능 테스트 제외 — 각 API의 접근성(도달)만 확인.
+    return '<a class="svc unt" href="'+s.u+'" title="기능 테스트 제외 — '+s.unt+'">'
+      +'<div class="sh"><span class="sn">'+s.n+'</span><span class="unt-badge">접근성만</span></div>'
+      +'<div class="sbar"><i style="width:100%;background:#d0d7de"></i></div>'
+      +'<div class="sfrac">기능 테스트 제외 · '+s.rch+'/'+s.tot+' API 도달</div></a>';
+  }
   return '<a class="svc" href="'+s.u+'">'
     +'<div class="sh"><span class="sn">'+s.n+'</span><span class="sp" style="color:'+barColor(s.pct)+'">'+s.pct+'%</span></div>'
     +'<div class="sbar"><i style="width:'+s.pct+'%;background:'+barColor(s.pct)+'"></i></div>'
