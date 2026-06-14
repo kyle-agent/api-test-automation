@@ -1,7 +1,8 @@
-# Backup heavy window — agentless VM_IMAGE backup chain (gen-heavy-backup,
-# never run live): VM closure -> backup-target lookup -> policy create/
-# AVAILABLE -> 13 verify sub-ops -> manual full backup + re-poll -> teardown.
+# SKE upgrade heavy window (gen-heavy-ske-upgrade, owner-approved 2026-06-13):
+# cluster+nodepool on v1.33.5 -> control-plane upgrade v1.34.3 -> node roll ->
+# kubeconfig x2 + images -> teardown. Long (~60-90min, billable node). The last
+# major untested capability.
 mutations=true
 destructive=true
 heavy=true
-crud_filter=gen-heavy-backup
+crud_filter=gen-heavy-ske-upgrade
