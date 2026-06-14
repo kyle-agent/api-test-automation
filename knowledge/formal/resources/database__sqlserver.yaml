@@ -1,17 +1,91 @@
 # Resource-task model — database/sqlserver (db-sqlserver group).
-# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · gold reference structure =
+# resources/database__postgresql.yaml. Extracted from the guarded source
 # sqlserver-cluster-subops-guarded (the ONLY source with a sqlserver create —
 # heavy-shared-dbaas EXCLUDES sqlserver because it needs a real license).
 # The guarded source deliberately sends empty ids so its create can only 4xx;
-# this model curates the body to real tokens (subnet/lookup options) but the
-# template has never returned 2xx → docs.
+# this model curates the body to real tokens (subnet/lookup options) but no
+# sqlserver WRITE template has ever returned 2xx → every write is docs/UNPROVEN.
+#
+# userguide confirmed (WebFetch 2026-06-14, /database/mssql/overview +
+# how_to_guides/{secondary,managing}):
+#  - engine catalog = SQL Server 2019/2022, each Enterprise & Standard; edition
+#    is baked into the engine-version id; minor-only upgrade WITHIN a major.
+#  - Secondary (Always On HA standby / read-only replica) REQUIRES a valid
+#    SQL Server License Key + Enterprise Edition + backup enabled, ONLY ONE per
+#    cluster. The license key is an account/vendor credential with NO documented
+#    self-service issuance → ESCALATE (credential gate); modelled as a
+#    {credential: sqlserver-license} requires + required license option.
+#  - additional databases: Enterprise only, ≤100/cluster, add/del via
+#    POST /v1/clusters/{id}/databases {add_databases, del_databases}.
+#
+# sqlserver DIVERGES from the relational template (postgresql/mysql/mariadb/epas):
+# it HAS add-secondary + databases(add/del) but has NO replicas/promote/
+# reset-replica/sync-replica-state/other-region/archive/kernel-upgrade endpoints.
+# switchover applies to the Always On Active↔Standby pair once a Secondary exists.
+# Action nodes follow the SKE upgrade pattern (create=call + ready=RUNNING
+# re-poll, no capture/delete) — same as the postgresql action nodes.
 version: 1
 resources:
+  # 읽기 전용 LOOKUP — GET /v1/engine-versions (sqlserver 호스트). edition이
+  # engine-version id에 녹아 있어 contents[0]는 임의 edition일 수 있음 (생성
+  # 검증엔 충분). sqlserver-read-coverage 소스 list-engine-versions verbatim.
+  ss-engine-version:
+    code: "db-sqlserver-engine-version"
+    service: database/sqlserver
+    requires: []
+    create:
+      endpoint: "GET /v1/engine-versions"
+    capture:
+      engine_version_id: {list: "$.contents", get: "id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/engine-versions", expect_status: [200]}
+      # engine-version properties — dbaas_engine_version_id path param 검증
+      - {name: properties,
+         endpoint: "GET /v1/engine-versions/{engine_version_id}/properties",
+         expect_status: [200]}
+    provenance: VALIDATED
+    source: {lifecycle: sqlserver-read-coverage,
+             steps: [list-engine-versions, get-engine-version-properties]}
+    notes: "EngineListResponse $.contents[] {id, major_version, name, software_version, ...} (api_docs). userguide 확정 (2026-06-14): SQL Server 2019 (Enterprise/Standard, EOS 2029-06) · 2022 (Enterprise/Standard, EOS 2032-06). Edition은 engine-version id에 baked-in — Enterprise edition id를 골라야 add-secondary/databases가 가능. contents[0]는 임의 major/edition (최신 보장 없음, 소스 스텝과 동일 선택). Enterprise 고정이 필요하면 라이브 정제로 별도 필터 노드 분리 (pg-engine-version-16 선례)."
+
+  # 읽기 전용 LOOKUP — GET /v1/server-types (sqlserver 호스트). NAME 소비
+  # (id 아님). userguide naming: [Type][Spec][vCore][Memory] e.g. 'Standard db1v2m4'.
+  ss-server-type:
+    code: "db-sqlserver-server-type"
+    service: database/sqlserver
+    requires: []
+    create:
+      endpoint: "GET /v1/server-types"
+    capture:
+      db_server_type: {list: "$.contents", get: "name"}
+    verify:
+      - {name: read, endpoint: "GET /v1/server-types", expect_status: [200]}
+    provenance: docs
+    notes: "ServerTypeListResponse $.contents[] {name, cpu_core, ...} — DBaaS 전용 타입 목록, NAME으로 소비 (compute server-type 노드와 별개). userguide naming (2026-06-14): name = [Type][Spec][vCore][Memory], e.g. 'Standard db1v2m4' = 2 vCore/4GB; Type=Standard|High Capacity, Spec=db1(standard)|dbh2(large 24+ vCore). contents[0] 선택은 소스 패턴 외삽 (sqlserver server-types에는 라이브 캡처 없음 → docs)."
+
+  # 읽기 전용 LOOKUP — listparametergroups + listparameters 커버리지.
+  # dbaas_parameter_group_id는 GET /v1/parameters의 REQUIRED 쿼리.
+  ss-parameter-group:
+    code: "db-sqlserver-parameter-group"
+    service: database/sqlserver
+    requires: []
+    create:
+      endpoint: "GET /v1/parameter-groups"
+    capture:
+      dbaas_parameter_group_id: {list: "$.contents", get: "id"}
+    verify:
+      - {name: listparameters,
+         endpoint: "GET /v1/parameters?dbaas_parameter_group_id={dbaas_parameter_group_id}&size=20&page=0",
+         expect_status: [200]}
+    provenance: docs
+    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...}. GET /v1/parameters는 dbaas_parameter_group_id REQUIRED query (services/database__sqlserver.yaml list-parameters-needs-group-id). contents[0]는 임의 major group이나 쿼리 검증엔 충분 (pg-parameter-group 선례)."
+
   sqlserver-cluster:
     code: "db-sqlserver-cluster"
     service: database/sqlserver
     heavy: true
-    requires: [subnet]
+    requires: [subnet, ss-engine-version, ss-server-type]
     create:
       endpoint: "POST /v1/clusters"
       body:
@@ -51,14 +125,368 @@ resources:
               - {role_type: ACTIVE, service_ip_address: "", public_ip_id: ""}
       options:
         engine_version_id: {type: string, required: true,
-                            note: "LOOKUP — GET /v1/engine-versions $.contents[0].id (sqlserver 호스트). 소스는 빈 문자열을 보냈다(guarded 4xx 의도) — 실값 주입은 이 모델이 처음"}
+                            default: "{ss-engine-version.engine_version_id}",
+                            note: "기본 = lookup contents[0] id. add-secondary/databases 변형은 Enterprise edition id가 필요 — contents[0]가 Standard이면 합성 시 Enterprise id로 override (라이브 정제). 소스는 빈 문자열을 보냈다(guarded 4xx 의도) — 실값 주입은 이 모델이 처음"}
         server_type: {type: string, required: true,
-                      note: "LOOKUP — GET /v1/server-types $.contents[0].name"}
+                      default: "{ss-server-type.db_server_type}",
+                      note: "기본 = lookup contents[0] NAME (id 아님; [Type][Spec][vCore][Memory] 형식)"}
     capture: {cluster_id: "$.resource.id"}
     ready: {field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 2400, interval: 30}
-    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
+    verify:
+      - {name: read, endpoint: "GET /v1/clusters/{cluster_id}",
+         expect_status: [200]}
+      # setsecuritygrouprules — add/del 둘 다 optional array; 빈 목록 = no-op
+      # (guarded 소스 body verbatim). 비동기 202 가능성 [200,202].
+      - {name: setsecuritygrouprules,
+         endpoint: "POST /v1/clusters/{cluster_id}/security-group-rules",
+         json: {add_ip_addresses: ["10.10.10.10/32"], del_ip_addresses: []},
+         expect_status: [200, 202]}
+      - {name: read-after-sg, endpoint: "GET /v1/clusters/{cluster_id}",
+         expect_status: [200]}
+    delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true,
+             retry_on_status: [400, 401, 409, 500, 503],
+             retries: 20, retry_interval: 60}
     provenance: docs
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [create-cluster-guarded, delete-cluster-guarded]}
-    notes: "KNOWN-BLOCKED: SQL Server는 실제 라이선스가 필요해 heavy-shared-dbaas에서 제외 — 라이선스가 준비되기 전까지 create는 4xx 예상 (라이선스 자격은 archivestorage형 credential 게이트 후보, 단 문서에 발급 절차가 안 잡혀 있어 우선 노트로만). body는 guarded 소스의 빈-id 템플릿을 mysql형 relational 표준값으로 보강한 추정 — capture/ready envelope ($.resource.id, $.service_state)는 타 엔진 검증 패턴의 외삽이며 sqlserver에서 UNPROVEN. sqlserver 발산: add-secondary(HA standby, 라이선스 필요)와 databases(add/del) 보유, archive/replicas/promote/other-region/reset-replica/sync-replica-state 없음. 소스의 delete 스텝은 합성 id만 노린다(실클러스터 보호) — 모델 delete는 표준 경로."
+    notes: "KNOWN-BLOCKED for HA path: cluster create itself does NOT take a license field (a standalone instance can be created without one), but Always On / Secondary does — see ss-add-secondary credential gate. SQL Server is the only DBaaS engine excluded from heavy-shared-dbaas. HEAVY 과금. 소스는 subnet adopt: subnet#db 공유. body는 guarded 소스의 빈-id 템플릿을 relational 표준값으로 보강한 추정 — capture/ready envelope ($.resource.id, $.service_state)는 타 엔진(postgresql VALIDATED) 패턴의 외삽이며 sqlserver에서 UNPROVEN → docs. 비동기 쓰기 AsyncResponse {request_id, resource:{id}} — request_id는 생성 응답에서만 오고 GET /v1/requests/{request_id}(sqlservershowrequest)로만 조회 (services/database__sqlserver.yaml async-writes-return-request-id). delete 재시도 [400,401,409,500,503]×20×60s는 백엔드 auth/race quirk 대비 (postgresql 선례). 소스 delete 스텝은 합성 id만 노린다(실클러스터 보호) — 모델 delete는 표준 경로. requires는 body 소비 기준 subnet + lookup 2종."
+
+  # detail-LOOKUP — 클러스터 상세에서 instance_group/block_storage_group id를
+  # 캡처 (lookup-on-detail: capture는 create 응답에서만 가능 → create=GET detail).
+  # 소스 capture-subop-ids가 같은 envelope을 soft-capture (instance_groups[0]).
+  ss-instance-group:
+    code: "db-sqlserver-instance-group"
+    service: database/sqlserver
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}"
+    capture:
+      instance_group_id: "$.instance_groups[0].id"
+      block_storage_group_id: "$.instance_groups[0].block_storage_groups[0].id"
+    verify:
+      - {name: detail-read,
+         endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+         expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [capture-subop-ids]}
+    notes: "InstanceGroupResponse {id, block_storage_groups[].id, ...}. 소스는 soft-capture (instance_group_id/bsg_id) — sqlserver에 라이브 RUNNING 클러스터가 없어 UNPROVEN → docs (postgresql는 run 27258520218로 VALIDATED). add-block-storages/resize-block-storage/resize-server-type 액션 노드가 여기 매달린다."
+
+  # detail-LOOKUP — 클러스터의 현재 파라미터에서 수정 가능한(is_modifiable)
+  # 첫 항목 id+applied_value를 캡처 → 같은 값으로 set (safe no-op write).
+  ss-parameter:
+    code: "db-sqlserver-parameter"
+    service: database/sqlserver
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}/parameters"
+    capture:
+      param_id:
+        list: "$.contents"
+        where_prefix: {is_modifiable: "True"}
+        get: "id"
+      param_value:
+        list: "$.contents"
+        where_prefix: {is_modifiable: "True"}
+        get: "applied_value"
+    verify:
+      # ParametersRequest {parameters: [{id, new_value, old_value} 전부 REQ]}
+      # — guarded 소스 set-parameters와 동일 shape. 같은-값 set = no-op.
+      - {name: setparametervalues,
+         endpoint: "PUT /v1/clusters/{sqlserver-cluster.cluster_id}/parameters",
+         json: {parameters: [{id: "{param_id}", new_value: "{param_value}",
+                              old_value: "{param_value}"}]},
+         expect_status: [200, 202]}
+      # syncparametervalues — body 없음. 409 = '적용할 변경 없음' (소스 관용 expect)
+      - {name: syncparametervalues,
+         endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/parameters/sync",
+         expect_status: [200, 202, 409]}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [set-parameters, sync-parameters]}
+    notes: "create=GET listparametervalues (per-cluster) — ParametersResponse $.contents[] {id, applied_value, is_modifiable, ...}. where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭. applied_value가 빈 문자열인 첫 매치면 set이 400 날 수 있음 — 라이브 정제 (pg-parameter 선례)."
+
+  # ---- 액션 노드 (SKE upgrade 패턴: create=호출, ready=RUNNING 재폴링,
+  # ---- capture/delete 없음. async reconcile 경합 방지로 각자 재폴링) -------
+  ss-add-block-storage:
+    code: "db-sqlserver-add-block-storage"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster, ss-instance-group]
+    create:
+      endpoint: "POST /v1/instance-groups/{ss-instance-group.instance_group_id}/block-storage-groups"
+      body: {role_type: DATA, size_gb: 104, volume_type: SSD}
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [add-block-storages]}
+    notes: "AddBlockStoragesRequest {role_type REQ, size_gb REQ, volume_type opt SSD} — guarded 소스 body verbatim. userguide (2026-06-14): DATA storage 16–5,120 GB, 8 GB 증분. DATA 볼륨 추가는 비가역(제거 API 없음) — 1회용 클러스터 전용, 클러스터 삭제로 회수."
+
+  ss-resize-block-storage:
+    code: "db-sqlserver-resize-block-storage"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster, ss-instance-group]
+    create:
+      endpoint: "POST /v1/block-storage-groups/{ss-instance-group.block_storage_group_id}/resize"
+      body: {size_gb: 112}
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [resize-block-storage]}
+    notes: "ResizeBlockStorageGroupRequest {size_gb REQ} — 104→112 GB (guarded 소스 body verbatim; userguide 8 GB 증분과 정합). 축소 불가(비가역), 1회용 클러스터 전용."
+
+  ss-resize-server-type:
+    code: "db-sqlserver-resize-server-type"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster, ss-instance-group, ss-server-type]
+    create:
+      endpoint: "POST /v1/instance-groups/{ss-instance-group.instance_group_id}/resize"
+      body: {server_type_name: "{opt.server_type}"}
+      options:
+        server_type: {type: string, required: true,
+                      default: "{ss-server-type.db_server_type}",
+                      note: "기본 = lookup contents[0] = 생성 시 타입과 동일 가능 — same-type resize가 400이면 다른 타입 NAME으로 override (라이브 정제)"}
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [resize-instance-group]}
+    notes: "InstanceGroupResizeRequest {server_type_name REQ} — guarded 소스 body verbatim. composer create expect [200,201,202] 고정이라 same-type 400을 관용 못함 — masked-defect 방지용 의도된 hard (pg 선례)."
+
+  # ---- lifecycle/maintenance/backup/audit 액션 (body 있는 것은 guarded 소스
+  # ---- verbatim; restart/stop/start/sync-state는 body 없음) ----------------
+  ss-restart:
+    code: "db-sqlserver-restart"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/restart"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [restart-cluster]}
+    notes: "body 없음 (api_docs). 재기동 후 RUNNING 재폴링. 409 = 진행 중 작업 경합."
+
+  ss-sync-state:
+    code: "db-sqlserver-sync-state"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/sync-state"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 900, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [sync-cluster-state]}
+    notes: "body 없음. userguide (managing): 패치/업그레이드 전 '서비스 상태 동기화를 통해 서비스 상태를 먼저 조회한 후' 수행 권고 — patch 선행 후보. 202 AsyncResponse."
+
+  ss-set-audit-log:
+    code: "db-sqlserver-set-audit-log"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "PUT /v1/clusters/{sqlserver-cluster.cluster_id}/audit-log"
+      body: {use_audit_log: true}
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 900, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [set-audit-log]}
+    notes: "UpdateAuditLogRequest {use_audit_log bool} — guarded 소스 body verbatim. userguide (overview): Audit로 DB 접근/DDL·DML 모니터링; audit 로그를 Object Storage로 내보내는 log-export 전제. 가역 (false로 되돌릴 수 있음)."
+
+  ss-set-maintenance:
+    code: "db-sqlserver-set-maintenance"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/maintenance"
+      body:
+        start_day_of_week: SUN
+        start_minute: "00"
+        start_time: "03"
+        term_hour: "4"
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 900, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{sqlserver-cluster.cluster_id}/maintenance",
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [set-maintenance, unset-maintenance]}
+    notes: "SetMaintenanceRequest {start_day_of_week, start_minute, start_time, term_hour} — guarded 소스 body verbatim. teardown = unsetmaintenance DELETE .../maintenance (소스 unset-maintenance verbatim). 가역."
+
+  # backup — userguide: 백업은 예약 수행(즉시 아님). create-backup body는
+  # init_config_option.backup_option과 동일 shape (재설정). delete-backup +
+  # remove-backup-histories는 services quirk(401 family) 대상.
+  ss-set-backup:
+    code: "db-sqlserver-set-backup"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/backups"
+      body:
+        archive_frequency_minute: "30"
+        retention_period_day: "8"
+        starting_time_hour: "3"
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 900, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{sqlserver-cluster.cluster_id}/backups",
+             destructive: true,
+             retry_on_status: [400, 401, 409, 500, 503], retries: 4,
+             retry_interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [create-backup, delete-backup]}
+    notes: "BackupOption {archive_frequency_minute, retention_period_day, starting_time_hour} — guarded 소스 body verbatim. userguide (overview/backupandrestore): 백업은 예약 수행 — '백업을 설정한 경우에는 설정한 시간 이후 지정된 시간에 백업이 수행되며' (시작 '시'만 선택, 분은 랜덤); archive 주기가 PITR granularity(5/10/30min·1hr)를 결정. DELETE /backups는 401 quirk family (services backup-subresource-401-family와 동종) — retry_on_status로 흡수. remove-backup-histories (PUT .../backup-histories)는 _note: 빈 backup_history_number 배열 no-op이라 모델 verify에서 SKIP (소스 잔존 커버리지)."
+
+  # ---- restore — 백업으로부터 새 클러스터 생성. 생성 직후 즉시 restore는
+  # ---- 완료 백업 부재로 실패 (userguide) → 별도 윈도우 게이트 ------------
+  ss-restore:
+    code: "db-sqlserver-restore"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster, ss-server-type]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/restore"
+      body:
+        name: "regrrst{ualpha}"
+        instance_name_prefix: regrrst
+        server_type_name: "{opt.server_type}"
+        allowable_ip_addresses: []
+        block_storage_groups: []
+        maintenance_option:
+          period_hour: "5"
+          starting_day_of_week: MON
+          starting_time: "0000"
+        tags: []
+      options:
+        server_type: {type: string, required: true,
+                      default: "{ss-server-type.db_server_type}",
+                      note: "ClusterRestoreRequest.server_type_name REQUIRED — origin과 동일 기본"}
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    capture: {restore_cluster_id: "$.resource.id"}
+    ready: {endpoint: "GET /v1/clusters/{restore_cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    delete: {endpoint: "DELETE /v1/clusters/{restore_cluster_id}",
+             destructive: true,
+             retry_on_status: [400, 401, 409, 500, 503],
+             retries: 20, retry_interval: 60}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [create-restore]}
+    notes: "HEAVY — 백업 기반 새 과금 클러스터. ClusterRestoreRequest verbatim (api_docs, mysql/epas와 동일 shape): name REQ ^[a-zA-Z]*$ 3-20, instance_name_prefix REQ, server_type_name REQ; backup_history_number/backup_recovery_time/block_storage_groups/maintenance_option/tags optional. userguide 확정 (2026-06-14, backupandrestore): 복구 2종 = '백업 시점(권장)'(backup_history_number) / '사용자 지정 시점' PITR(backup_recovery_time, 완료된 첫 백업 선행 필수); '신규 서버가 생성되고' = 새 클러스터(subnet/region 입력 없음, origin 상속); storage 유형 원본과 동일 강제. 생성 직후 즉시 restore는 백업 부재로 실패 → 별도 윈도우 게이트(enabled:false). backup_history_number/backup_recovery_time 둘 다 생략 시 동작 미문서 — 라이브 정제. 응답 AsyncResponse $.resource.id = 신규 클러스터 id. _note: 본 body는 두 백업 키 생략(최신 추정) — 소스 guarded는 backup_history_number '202501010000' 더미를 보냈다."
+
+  # ---- patch (minor, same-major only). userguide: 동일 Major 내 Minor만;
+  # ---- sync-state 선행 권고; backup 설정 필수. target software_version은
+  # ---- 현재보다 높은 마이너 → 기본값 없음(게이트). ------------------------
+  ss-patch:
+    code: "db-sqlserver-patch"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "PUT /v1/clusters/{sqlserver-cluster.cluster_id}/patch"
+      body:
+        backup_before_upgrade: false
+        software_version: "{opt.target_software_version}"
+      options:
+        target_software_version: {type: string, required: true,
+                                  note: "패치 대상 마이너 버전 — 기본값 없음(의도된 게이트): 클러스터 현재 마이너보다 높아야 하며 동일 Major 내(2019→2022 불가). engine-versions가 메이저당 최신 마이너만 노출하면 생성 직후 대상이 없을 수 있다 → 합성 시 명시"}
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 3600, interval: 60}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [patch-minor-version]}
+    notes: "MinorPatchRequest {backup_before_upgrade REQ bool, software_version REQ string} — guarded 소스 body verbatim. userguide 확정 (2026-06-14, managing): '동일한 Major 버전 내에서 Minor 버전 업그레이드 기능만 지원' (2019→2022 불가); 사전 백업 설정 필수 — '백업을 설정하지 않으면 업그레이드 중 문제가 발생했을 때 일부 데이터를 복구하지 못할 수 있습니다'; sync-state 선행 권고; backup_before_upgrade 데이터는 완료 후 자동 삭제. backup_before_upgrade=false: 1회용 클러스터라 사전 백업 불요(+완료 백업 미존재 시 true가 막힐 리스크 회피) — userguide 권고와 충돌하므로 합성 시 ss-set-backup 선행 후 true 검토. sqlserver는 kernel-upgrade 엔드포인트 없음 (relational 발산). IRREVERSIBLE 마이너 롤."
+
+  # ---- switchover — Always On Active↔Standby 전환. Secondary가 있어야 의미.
+  # ---- ha_enabled:false 기본 클러스터에선 4xx 예상 → HA 변형 게이트. ------
+  ss-switchover:
+    code: "db-sqlserver-switchover"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/switchover"
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 30
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded,
+             steps: [switchover-cluster]}
+    notes: "body 없음. userguide (overview): Always On 기반 Primary↔Secondary 수동 switchover. Secondary(ss-add-secondary)가 구성된 HA 클러스터에서만 유효 — ha_enabled:false 기본 body에서는 4xx 예상 → HA 변형 대기 게이트로 남긴다 (sqlserver-cluster body가 ha_enabled true + Secondary를 갖출 때까지 합성 제외). sqlserver는 reset-replica/sync-replica-state가 없어 postgresql식 분기 불가 — switchover가 유일한 HA 전환 동작. path param cluster_id = 해당 HA 클러스터."
+
+  # ---- add-secondary — ESCALATE: SQL Server License Key (계정/벤더 자격,
+  # ---- 자체 발급 절차 미문서) + Enterprise edition + 백업 활성화 필요.
+  # ---- credential 게이트 + required license 옵션 둘 다로 차단. ------------
+  ss-add-secondary:
+    code: "db-sqlserver-add-secondary"
+    service: database/sqlserver
+    heavy: true
+    requires:
+      - sqlserver-cluster
+      - {credential: sqlserver-license,
+         note: "SQL Server License Key — userguide secondary how_to: '입력한 라이선스 key가 유효하지 않을 경우 서비스가 생성되지 않을 수 있음'. 계정/벤더 자격이며 콘솔 자체 발급 절차가 문서에 없음 → ESCALATE (credential gate; archivestorage 전용 인증키 미발급 선례와 동종)"}
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/add-secondary"
+      body:
+        license: "{opt.license}"
+        name: "regrsec{ualpha}"
+        service_ip_address: ""
+      options:
+        license: {type: string, required: true,
+                  note: "SqlserverAddSecondaryRequest.license REQUIRED — SQL Server License Key. 기본값 없음(ESCALATE credential 게이트). 미발급 상태면 4xx 확정"}
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 2400, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [add-secondary]}
+    notes: "ESCALATE — SqlserverAddSecondaryRequest {license REQ string, name REQ ^[a-z][a-z0-9\\-]*[a-z0-9]$ 3-15, service_ip_address opt}. userguide 확정 (2026-06-14, secondary how_to): Secondary는 '이중화 구성(HA) 및 Enterprise Edition으로 생성되어야 하며, 백업 기능이 활성화' 되어야 하고 '하나의 클러스터당 1개만 구성 가능'. 즉 선행: ① Enterprise engine-version id(ss-engine-version override) ② ha_enabled:true 클러스터 ③ 백업 활성 ④ 유효 라이선스 key. name 패턴 ^[a-z]…[a-z0-9]$ 3-15는 relational replica(3-20)와 다름 (regrsec{ualpha} 충족). service_ip_address는 user subnet IP(opt) — 빈 문자열=auto. 라이선스 발급 절차가 문서에 없어 우선 credential 게이트로 차단; 합성은 라이선스 확보 시까지 보류."
+
+  # ---- databases (add/del) — Enterprise only, ≤100/cluster. add/del 모두
+  # ---- optional array → 빈 목록 no-op 검증 가능 (라이선스 불요). ----------
+  ss-databases:
+    code: "db-sqlserver-databases"
+    service: database/sqlserver
+    heavy: true
+    requires: [sqlserver-cluster]
+    create:
+      endpoint: "POST /v1/clusters/{sqlserver-cluster.cluster_id}/databases"
+      body:
+        add_databases:
+          - {database_name: regrdbx, drive_letter: E}
+        del_databases: []
+    ready: {endpoint: "GET /v1/clusters/{sqlserver-cluster.cluster_id}",
+            field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
+            timeout: 1800, interval: 30}
+    provenance: docs
+    source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [set-databases]}
+    notes: "SqlserverUpdateDatabasesRequest {add_databases opt [SqlserverDatabaseOption], del_databases opt [...]}. SqlserverDatabaseOption {database_name REQ ^[a-zA-Z][a-zA-Z0-9._]*$ 3-20, drive_letter opt [E-Z] default E}. userguide 확정 (2026-06-14, managing): Enterprise edition 전용 — 'Microsoft SQL Server Enterprise 버전의 경우, 새로운 Database를 추가할 수 있습니다', '1개의 클러스터당 최대 100개까지 추가 가능'. 즉 Enterprise engine-version id 선행 필요(ss-engine-version override) — Standard 클러스터에선 4xx 예상. 라이선스는 불요(add-secondary와 별개). 소스는 빈 add/del(no-op)를 보냈다 — 본 모델은 1개 추가; del로 정리하거나 클러스터 삭제로 회수 (개별 DB 제거는 del_databases). 비가역 아님."

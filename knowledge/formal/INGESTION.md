@@ -47,7 +47,7 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/database/mariadb/overview/ | database/mariadb |
 | ✅ | P1 | /userguide/database/postgresql/overview/ | database/postgresql |
 | ✅ | P1 | /userguide/database/epas/overview/ | database/epas |
-| — | P1 | /userguide/database/mssql/overview/ | database/sqlserver |
+| ✅ | P1 | /userguide/database/mssql/overview/ | database/sqlserver — Always On Secondary는 SQL Server License Key 필요(owner credential 대기, IB-017) |
 | ✅ | P1 | /userguide/database/cachestore/overview/ | database/cachestore |
 | ✅ | P1 | /userguide/compute/baremetal_server/overview/ | compute/baremetal |
 | ✅ | P1 | /userguide/compute/block_storage_vm/overview/ | compute/virtualserver (volumes) |
