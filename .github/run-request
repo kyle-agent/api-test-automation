@@ -1,7 +1,6 @@
-# SKE upgrade heavy window (gen-heavy-ske-upgrade, owner-approved 2026-06-13):
-# cluster+nodepool on v1.33.5 -> control-plane upgrade v1.34.3 -> node roll ->
-# kubeconfig x2 + images -> teardown. Long (~60-90min, billable node). The last
-# major untested capability.
+# SKE upgrade rev2 — ske-image GET fixed (size/page query). cluster+nodepool
+# v1.33.5 -> control-plane upgrade v1.34.3 -> node roll -> kubeconfig x2 ->
+# teardown. Owner-approved (2026-06-13). ~60-90min, billable node.
 mutations=true
 destructive=true
 heavy=true
