@@ -1,7 +1,9 @@
-# SKE upgrade rev3 — ske-image scp_original_image_type=k8s fixed (the only
-# required listimages query). cluster+nodepool v1.33.5 -> control-plane
-# upgrade v1.34.3 -> node roll -> kubeconfig x2 -> teardown.
+# Light gen-* verification wave (2026-06-14) — re-validate this session's
+# docs-enriched LIGHT nodes against live: queueservice (queue + FIFO),
+# resourcemanager (resource-group + tags), apigateway, financial
+# (cost/budget + pricing). No heavy clusters; mutations+destructive for
+# create->delete teardown. budget 500 is baselined (fail_new unaffected).
 mutations=true
 destructive=true
-heavy=true
-crud_filter=gen-heavy-ske-upgrade
+heavy=false
+crud_filter=gen-wave2-queue or gen-wave3-qfifo or gen-wave2-rg or gen-wave4-rmtags or gen-wave-apigw or gen-wave3-cost or gen-wave3-pricing
