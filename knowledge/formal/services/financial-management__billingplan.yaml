@@ -1,0 +1,55 @@
+# Layer 1 — per-service knowledge: financial-management/billingplan
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: /userguide/financial_management/planned_compute/overview/ +
+#         apireference/financial-management/billingplan/* models (2026-06-14)
+
+version: 1
+service: financial-management/billingplan
+
+constraints:
+  - id: planned-compute-required-fields
+    rule: "POST /v1/planned-computes (PlannedComputeCreateRequest) 필수: contract_type(enum 01/03/05), os_type(enum opensource/rhel/windows/sles), server_type(예 s1v1m2), service_id(예 VIRTUAL_SERVER). service_name·tag 는 선택"
+    provenance: docs
+  - id: planned-compute-commitment
+    rule: "약정 컴퓨트 = 실제 금융 커밋 — 1년/3년 약정으로 최대 40% 할인. 동일 Account·동일 리전 내 무약정 자원에 할인 적용. 자유 취소 불가(아래 해지 수수료 참조)"
+    provenance: docs
+  - id: planned-compute-cancellation-fee
+    rule: "해지 시 잔여기간 이용 금액의 50%가 해지 2개월 후 청구. POST /v1/planned-computes/cancellation-fee (CancellationFeeRequest: planned_compute_id=array[string] 필수, region 선택)로 수수료 견적 조회(read-like)"
+    provenance: docs
+  - id: planned-compute-server-type-upgrade-only
+    rule: "서버타입 변경은 상향(upgrade)만 허용 — 설정 값보다 높은 값으로만 변경 가능. 변경은 PUT /v1/planned-computes/{id} (PlannedComputeChangeRequest: action enum + contract_type/server_type)"
+    provenance: docs
+  - id: planned-compute-settlement-window
+    rule: "신청/변경/coverage 조회는 Asia/Seoul(GMT+9) 기준. 야간 정산 윈도(23:30~23:59)에는 신규 요청 차단. coverage 데이터는 최대 2일 전까지만 제공"
+    provenance: docs
+  - id: os-type-token-casing
+    rule: "create body 의 os_type 은 소문자 enum(opensource/rhel/windows/sles), 그러나 list/coverage 응답·예시는 대문자 표시 토큰 OPEN_SOURCE 사용 — body 에는 소문자 값을 보낼 것"
+    provenance: docs
+
+captures:
+  planned-compute: "$.planned_computes[0].id"
+
+states: {}
+
+quirks:
+  - id: no-prerequisites
+    note: "선행 서비스 없음 — userguide '별도의 선행 서비스 작업이 필요 없습니다'. GLOBAL(account-scoped), 할인은 region별 적용"
+    provenance: docs
+  - id: no-delete-api
+    note: "DELETE API 없음 — 해지 경로는 cancellation-fee 견적(read-like POST)뿐이며 수수료 발생. 합성기는 teardown 없이 다루고, planned-compute 노드는 기본 생성 비대상(heavy + 구매 권한/실 server_type·service_id 필요)"
+    provenance: docs
+  - id: list-envelope-shape
+    note: "GET /v1/planned-computes 응답 envelope = PlannedComputeListResponse.planned_computes[] (id 캡처 $.planned_computes[0].id). 단건 조회 envelope = $.planned_compute.id. 페이지네이션 파라미터는 limit/page (size 아님)"
+    provenance: docs
+  - id: create-body-was-invented
+    note: "종전 resource 모델 body(product_offering/product_category/term_months/quantity/payment_type)는 API Reference 모델에 존재하지 않는 발명값이었음 — 2026-06-14 PlannedComputeCreateRequest 기준으로 정정. 실 2xx 전까지 UNPROVEN(docs)"
+    provenance: docs
+  - id: server-types-500-product-bug
+    note: "GET /v1/planned-computes/server-types → 500 (smoke 'smoke 500!' 의 정체). 쿼리 파라미터(service_id/current_server_type/os_type)는 전부 optional이고 형제 enum 엔드포인트(contract-types/os-types/service-types)는 200을 반환 → 빈 요청에 500은 서버 결함(PRODUCT BUG), 우리 요청 결함 아님. 이미 baselined: data/baselines/known_issues.json (financial-management/billingplan/listplannedcomputeservertypes, type Product Bug, since 2026-06-01). retry-loop 금지"
+    provenance: docs
+  - id: cancellation-fee-method-verb
+    note: "showcancellationfee 는 이름은 read-verb 이나 POST (cancellation-fee). conformance yellow(method-verb, issue 11). 부수효과 없음 = 견적만 반환"
+    provenance: docs
+  - id: list-pagination-ignored
+    note: "다수 list/enum 엔드포인트가 size=1 페이지네이션을 무시(contract-types→4, os-types→4, service-types→12 반환). conformance yellow(pagination, issue 38) — 백엔드 미적용, 우리 결함 아님"
+    provenance: docs

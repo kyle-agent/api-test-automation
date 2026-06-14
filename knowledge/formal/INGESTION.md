@@ -82,7 +82,7 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/ai_ml/ai_ml_ops_platform/overview/ | ai-ml/aimlops-platform (smoke 400s) |
 | ✅ | P1 | /userguide/ai_ml/cloud_ml/overview/ | ai-ml/cloud-ml (smoke 404s) |
 | ✅ | P1 | /userguide/devopstools/devops_service/overview/ | devops-tools/devopsservice (PF-05 fixed: create body needs members+tenant_code+tenant_name, NOT name/description; capture $.devops_service.id; dup-check by tenant; 1/account) |
-| — | P1 | /userguide/financial_management/planned_compute/overview/ | financial-management/billingplan (smoke 500!) |
+| ✅ | P1 | /userguide/financial_management/planned_compute/overview/ | financial-management/billingplan (smoke 500 = GET /v1/planned-computes/server-types backend 500 — Product Bug, baselined since 2026-06-01; create body corrected to PlannedComputeCreateRequest; NOTE lifecycle JSON still carries old invented body — IB-019) |
 | ✅ | P1 | /userguide/financial_management/cost_management/overview/ | financial-management/budget·costexplorer (budget: name≤20, amount+start_month req, currency UNPROVEN, **create 500 = PF-04 baselined product bug**) · (costexplorer: reads-only, 6mo window, smoke 3/3 200) |
 | — | P2 | /userguide/compute/gpu_server/overview/ | compute (gpu types) |
 | — | P2 | /userguide/compute/auto_scaling/overview/ | compute/auto-scaling |

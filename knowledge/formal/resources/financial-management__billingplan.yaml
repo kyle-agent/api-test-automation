@@ -2,7 +2,8 @@
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # billingplan-planned-computes-guarded (enabled, heavy, COVERAGE-ONLY — a
 # planned compute is a RESERVED/COMMITTED purchase, never actually bought by
-# the source lifecycle; body/capture UNPROVEN -> docs).
+# the source lifecycle; create body/capture corrected from the API Reference
+# models 2026-06-14 -> still docs until a real 2xx).
 version: 1
 resources:
   planned-compute:
@@ -12,26 +13,68 @@ resources:
     requires: []
     create:
       endpoint: "POST /v1/planned-computes"
+      # Authoritative body = PlannedComputeCreateRequest (api_docs.json model
+      # financial-management/billingplan/plannedcomputecreaterequest). The
+      # PREVIOUS body (product_offering/product_category/term_months/quantity/
+      # payment_type) was INVENTED and does not exist in the model — replaced.
+      # Required: contract_type, os_type, server_type, service_id. The
+      # validation_findings.json "undiscoverable required fields: server_type,
+      # service_id" finding is satisfied by sending both.
       body:
-        name: "regr-plannedcompute-{unique}"
-        product_offering: "{opt.product_offering}"
-        product_category: compute
-        term_months: 12
-        quantity: 1
-        payment_type: "{opt.payment_type}"
+        contract_type: "{opt.contract_type}"
+        os_type: "{opt.os_type}"
+        server_type: "{opt.server_type}"
+        service_id: "{opt.service_id}"
       options:
-        product_offering: {type: string, required: true, default: virtual_server,
-                           note: "실 product-offering id/spec 필요 — 소스 lifecycle 값 virtual_server는 best-effort(4xx 예상). 실값 출처는 R3 과제"}
-        payment_type: {type: string, required: true, default: ALL_UPFRONT,
-                       note: "결제 방식 — enum 후보군 미문서(docs JS-rendered), 소스 값 ALL_UPFRONT"}
-    capture: {planned_compute_id: "$.id"}
+        contract_type:
+          type: enum
+          required: true
+          default: "01"
+          values: ["01", "03", "05"]
+          # API model enum (01,03,05). userguide: 1년/3년 약정(planned_compute
+          # overview) → 01=1yr, 03=3yr; 05 present in enum (5yr 추정), UNPROVEN.
+          note: "Contract Type — API enum 01/03/05; userguide exposes 1년/3년 약정 (01/03). Term meaning of 05 UNPROVEN."
+        os_type:
+          type: enum
+          required: true
+          default: opensource
+          values: [opensource, rhel, windows, sles]
+          # API model PlannedComputeCreateRequest.os_type enum (lowercase).
+          # NB: list/coverage endpoints use the upcased display token
+          # OPEN_SOURCE; the create body wants the enum value `opensource`.
+          note: "OS Type — create enum opensource/rhel/windows/sles (lowercase). Display token elsewhere is OPEN_SOURCE."
+        server_type:
+          type: string
+          required: true
+          default: s1v1m2
+          # Real spec id; valid set comes from GET /v1/planned-computes/
+          # server-types (which itself 500s — PF, see notes). s1v1m2 is the
+          # docs example; UNPROVEN that it is purchasable for the term.
+          note: "Server Type spec id (e.g. s1v1m2). Authoritative list is GET /v1/planned-computes/server-types — but that endpoint 500s (Product Bug, baselined). Value UNPROVEN."
+        service_id:
+          type: enum
+          required: true
+          default: VIRTUAL_SERVER
+          values: [VIRTUAL_SERVER]
+          # API model example service_id = VIRTUAL_SERVER. userguide: 약정 대상
+          # 서비스군 = Compute/Database/Data Analytics; other service_id tokens
+          # (e.g. Database/DA products) UNPROVEN — discover via
+          # GET /v1/planned-computes/service-types (200) at synth time.
+          note: "Service Id — model example VIRTUAL_SERVER. userguide covers Compute/Database/Data Analytics; full token set from GET /v1/planned-computes/service-types. Only VIRTUAL_SERVER proven-shaped."
+    # List response envelope = PlannedComputeListResponse.planned_computes[].id
+    # (api_docs model). The source lifecycle's soft-capture $.contents[0].id is
+    # WRONG; single-show envelope is $.planned_compute.id.
+    capture: {planned_compute_id: "$.planned_computes[0].id"}
     verify:
+      # CancellationFeeRequest.planned_compute_id is an ARRAY[string] (model),
+      # not a scalar — corrected. region is optional. Returns a fee QUOTE
+      # (read-like), no state change. 50% of remaining-term cost per userguide.
       - {name: show-cancellation-fee,
          endpoint: "POST /v1/planned-computes/cancellation-fee",
-         json: {planned_compute_id: "{planned_compute_id}"},
-         expect_status: [200, 201, 400, 403, 404]}
+         json: {planned_compute_id: ["{planned_compute_id}"]},
+         expect_status: [200, 201, 400, 403, 404, 409, 422]}
     provenance: docs
     source: {lifecycle: billingplan-planned-computes-guarded,
              steps: [list-planned-computes, show-cancellation-fee,
                      create-planned-computes, update-planned-compute]}
-    notes: "GLOBAL(account-scoped) 서비스. 약정 컴퓨트 구매 = 실제 금융 커밋(기간 과금, 자유 취소 불가) — DELETE API가 없어 의도적으로 teardown 없음: 해지는 cancellation-fee 견적(verify의 read-like POST) 경로뿐이며 수수료가 발생한다. 합성기는 이 노드를 기본적으로 생성 비대상(heavy + 구매 권한/실 offering 필요)으로 다뤄야 한다. body와 capture envelope $.id 모두 UNPROVEN(docs) — 소스는 구매가 일어나지 않도록 4xx를 기대하는 coverage probe."
+    notes: "GLOBAL(account-scoped, region별 할인 적용) 서비스. userguide(planned_compute overview, 2026-06-14): 선행 서비스 없음(별도 선행 작업 불필요); 약정 컴퓨트 = 실제 금융 커밋(1년/3년 약정으로 최대 40% 할인, 동일 Account·동일 리전 무약정 자원에 할인 적용). 서버타입은 상향(upgrade)만 변경 가능. 해지 시 잔여기간 이용 금액의 50%가 해지 2개월 후 청구 — 자유 취소 불가. 신청/변경/조회는 Asia/Seoul(GMT+9), 정산 윈도(23:30~23:59)에는 신규 요청 차단. coverage 데이터는 최대 2일 전까지만 제공. DELETE API 없음 → 의도적 teardown 없음(해지는 cancellation-fee 견적 read-like POST 경로뿐, 수수료 발생). 합성기는 이 노드를 기본 생성 비대상(heavy + 구매 권한/실 server_type·service_id 필요)으로 다뤄야 한다. create body는 API Reference 모델(PlannedComputeCreateRequest: contract_type/os_type/server_type/service_id) 기준으로 정정 — 종전 product_offering/term_months/quantity 등은 모델에 없는 발명값이었음. update(PUT)는 PlannedComputeChangeRequest(action enum + contract_type/server_type) = lifecycle 영역. body/capture 모두 2xx 미확인(docs); 소스는 구매가 일어나지 않도록 4xx를 기대하는 coverage probe. PRODUCT BUG (이미 baselined): GET /v1/planned-computes/server-types → 500 (data/baselines/known_issues.json, financial-management/billingplan/listplannedcomputeservertypes, type Product Bug, since 2026-06-01). 이 GET의 쿼리 파라미터(service_id/current_server_type/os_type)는 전부 optional이고 형제 enum 엔드포인트(contract-types/os-types/service-types)는 200을 반환하므로, 빈 요청에 500은 우리 요청 결함이 아니라 서버 결함이다 = 'smoke 500!' 의 정체. retry-loop 금지."

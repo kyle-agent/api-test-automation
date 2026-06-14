@@ -32,6 +32,7 @@
 | IB-016 | loop | 직렬 운영 toil — run 결과를 기다리는 동안 도메인 작업이 멈춰 처리량 저하 | 3-레인 병렬 파이프라인(A 결과대기·B 가이드/도메인·C 합성/준비) 명문화(orchestrator.md), 공유자원 read-before-claim. 후속: 레인 B 상시가동을 세션 부트스트랩에 기본 포함 | M | in-progress (정책 codified) |
 | IB-017 | coverage | sqlserver Always On Secondary(add-secondary) + Enterprise 전용 경로가 **SQL Server License Key**를 요구 — userguide에 자체 발급 절차 없음(archivestorage 전용키 미발급 선례와 동급) | owner가 라이선스 키 발급 → `ss-add-secondary` credential 주입 후 HA/secondary 체인 합성·검증. 그 전까지 해당 노드 gated | M | open (owner credential 대기) |
 | IB-018 | coverage | analytics data-flow(NiFi)/data-ops(Airflow)/quick-query(Trino)는 DBaaS가 아니라 **SKE k8s 엔진 위에 설치** — 기존 create body가 dbaas instance_groups 모양(coverage probe artifact)이라 docs-vs-reality 불일치, 실제 2xx 미검증. quick-query는 추가로 DSC domain 실값 필요, data-flow/ops는 account id/pw 필요 | api_bodies.json에 실제 SKE-엔진 body 작성(ske-cluster+filestorage prereq 배선) → heavy 윈도우 라이브 검증; DSC domain/account 값은 owner 도메인 지식 주입 | L | open (UNPROVEN body + 일부 owner 도메인값) |
+| IB-019 | debt | resource 모델은 정정됐으나 **소스 lifecycle JSON이 옛 발명 body 유지** — `regression/scenarios/lifecycles/financial-management__billingplan.json`이 존재하지 않는 필드(product_offering 등) + 잘못된 capture `$.contents[0].id` 사용(devopsservice도 유사 패턴 점검 필요) | 정정된 resource 모델(PlannedComputeCreateRequest)로 lifecycle JSON 재합성/수정 + capture 정정 → 모델↔lifecycle drift 해소 | S | open |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 

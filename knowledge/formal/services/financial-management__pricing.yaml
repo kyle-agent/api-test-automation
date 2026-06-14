@@ -1,0 +1,28 @@
+# Layer 1 — per-service knowledge: financial-management/pricing
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: apireference/financial-management/pricing/* endpoints (2026-06-14).
+# No dedicated userguide page — pricing/price reports surface inside the Cost
+# Management console (UI: 자원별 금액·사용량·단위 요금 제공), read-only.
+
+version: 1
+service: financial-management/pricing
+
+constraints:
+  - id: pricing-read-only
+    rule: "조회 전용 서비스 — 3개 GET 만 존재(reports/offerings, reports/billing-item-ids, reports/prices). 생성/변경 API 없음. owner 정책 2026-06-12 read-only 범위"
+    provenance: docs
+  - id: prices-optional-filters
+    rule: "GET /v1/reports/prices 쿼리는 전부 선택: size(기본 20)·page(기본 0)·sort(예 created_at:desc)·billing_item_id(예 VIRTUAL_SERVER)·offering(오퍼링 유형 PS/PP/PG). offerings·billing-item-ids 는 문서화된 파라미터 없음"
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: global-account-scoped
+    note: "GLOBAL(account-scoped) 가격/오퍼링 리포트 — region 세그먼트 없음, 자원 미생성. 세 GET 모두 conformance green(2xx)"
+    provenance: docs
+  - id: pagination-ignored
+    note: "list 들이 size=1 페이지네이션 무시(offerings→3, billing-item-ids→232 반환). conformance yellow(pagination, issue 38) — 백엔드 미적용, 우리 요청 결함 아님"
+    provenance: docs

@@ -1,5 +1,6 @@
 # Resource-task model — financial-management/pricing (fm-pricing group).
-# 조회 전용 task (owner 정책 2026-06-12).
+# 조회 전용 task (owner 정책 2026-06-12). GLOBAL(account-scoped) price/offering
+# reports — no resource is ever created, every query param is optional (docs).
 version: 1
 resources:
   pricing-reads:
@@ -7,10 +8,16 @@ resources:
     service: financial-management/pricing
     requires: []
     create:
+      # No-create read bundle: the "create" slot anchors the primary read.
+      # GET /v1/reports/offerings (listoffering) takes no documented params.
       endpoint: "GET /v1/reports/offerings"
     verify:
       - {name: billing-item-ids, endpoint: "GET /v1/reports/billing-item-ids",
          expect_status: [200]}
+      # GET /v1/reports/prices (listreportprice) — ALL query params optional
+      # (api_docs): size/page/sort + filters billing_item_id, offering(PS/PP/PG).
+      # Bare GET returns 200 (conformance green). Filters documented below.
       - {name: prices, endpoint: "GET /v1/reports/prices", expect_status: [200]}
     provenance: docs
-    notes: "조회 전용 reads 묶음 — 쿼리 전부 optional(docs)."
+    notes: "조회 전용 reads 묶음 — GLOBAL(account-scoped) 가격/오퍼링 리포트, 자원 생성 없음(owner 정책 2026-06-12 read-only). 세 GET 모두 conformance green(2xx). GET /v1/reports/prices(listreportprice) 쿼리는 전부 optional(docs): size(기본 20)·page(기본 0)·sort(예 created_at:desc)·billing_item_id(예 VIRTUAL_SERVER)·offering(오퍼링 유형 PS/PP/PG; PP=예). GET /v1/reports/offerings(listoffering)·GET /v1/reports/billing-item-ids(listbillingitemids)는 문서화된 파라미터 없음. KNOWN(conformance yellow, issue 38): 세 list가 size=1 페이지네이션을 무시(offerings→3, billing-item-ids→232 반환) — 백엔드 페이지네이션 미적용, 우리 요청 결함 아님. C4 옵션 변형 단계에서 prices의 offering/billing_item_id 필터를 옵션으로 승격 가능(현재는 docs-only _note로만 기록)."
+    _note: "docs-only param surface (not yet promoted to create.options — reads-only node, no body to template): /v1/reports/prices accepts optional offering∈{PS,PP,PG} and billing_item_id (e.g. VIRTUAL_SERVER) filters plus size/page/sort. All UNPROVEN beyond a bare-GET 200."
