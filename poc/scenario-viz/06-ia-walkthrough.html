@@ -1,0 +1,239 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>통합 IA 워크스루 — 같은 그래프, 단계별 레이어</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="data/model.js"></script><script src="assets/viz.js"></script>
+<style>
+.tabs{display:flex;gap:6px;margin:0 0 16px;border-bottom:1px solid var(--line)}
+.tabs button{background:none;border:none;color:var(--muted);padding:10px 16px;cursor:pointer;
+  font-size:14px;border-bottom:2px solid transparent;font-weight:600}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs button .n{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;
+  border-radius:50%;background:var(--panel2);font-size:11px;margin-right:6px}
+.flow{display:flex;gap:6px;align-items:center;color:var(--muted2);font-size:12px;margin-bottom:14px;flex-wrap:wrap}
+.flow b{color:var(--accent2)} .flow .ar{color:var(--line)}
+.statusdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:0}
+.run-ctl{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.gmini .grow{grid-template-columns:120px 1fr}
+.kpi{display:flex;gap:10px;flex-wrap:wrap}
+.kpi .s{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 12px}
+.kpi .s b{font-size:18px;display:block}.kpi .s span{font-size:11px;color:var(--muted)}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>통합 IA 워크스루</h1>
+  <span class="crumbs"><a href="index.html">홈</a> › 같은 그래프 컴포넌트, 단계별 오버레이만 교체</span>
+  <nav class="nav">
+    <a href="index.html">홈</a><a href="01-compose-canvas.html">①</a>
+    <a href="02-layered-dag.html">②</a><a href="03-closure-overlap.html">③</a>
+    <a href="04-branch-toggle.html">④</a><a href="05-sequence-gantt.html">⑤</a>
+    <a class="active" href="06-ia-walkthrough.html">통합</a><a href="references.html">참고</a>
+  </nav>
+</header>
+
+<div class="flow">
+  <b>Knowledge</b> 정의 <span class="ar">→</span> <b>Overview</b> 전체·건강도 <span class="ar">→</span>
+  <b>Plan</b> 선택·분기·합성 <span class="ar">→</span> <b>Run</b> 실시간 <span class="ar">→</span>
+  <b>Report</b> 결과·커버리지 <span class="ar">↺</span> <span>(피드백 루프 = model-based testing)</span>
+</div>
+
+<div class="tabs">
+  <button data-t="overview" class="on"><span class="n">①</span>Overview</button>
+  <button data-t="plan"><span class="n">①④③</span>Plan</button>
+  <button data-t="run"><span class="n">⑤②</span>Run</button>
+  <button data-t="report"><span class="n">②③</span>Report</button>
+</div>
+
+<div class="cols wide">
+  <div class="panel" id="left"></div>
+  <div class="panel">
+    <h2 id="gtitle"></h2>
+    <div id="legend" class="legend"></div>
+    <div class="svgbox"><svg id="svg"></svg></div>
+    <p class="muted small" id="ghint"></p>
+  </div>
+  <div class="panel" id="right"></div>
+</div>
+
+<div class="foot">목업: 데이터는 실제 모델, 실행 상태/결과는 데모용 시뮬레이션. 같은 <code>viz.js</code> 레이아웃을
+  4개 탭이 공유하고, 노드 색(레이어)만 바꿉니다 — 한 컴포넌트로 Overview/Plan/Run/Report를 모두 그린다는 증명.</div>
+</div>
+<script>
+const V=VIZ,N=V.N,NS="http://www.w3.org/2000/svg";
+let tab="overview";
+// shared working selection used across Plan/Run/Report
+let targets=new Set(["ske-cluster","mysql-cluster","private-nat"].filter(V.exists));
+if(targets.size<2){V.allIds().map(id=>[id,V.closure([id]).size]).sort((a,b)=>b[1]-a[1]).slice(0,2).forEach(x=>targets.add(x[0]));}
+let choices={};
+// overview context set (a believable "whole model" slice)
+const OV=new Set([...V.closure([...["server","ske-cluster","mysql-cluster","load-balancer","scr-registry","kms-key"].filter(V.exists)])]);
+
+// ---- generic renderer: colorOf/strokeOf/badgeOf per node ----
+function renderG(set,opt){
+  opt=opt||{};
+  const L=V.layout(set,opt.choices,{colGap:opt.colGap||190,rowGap:54,bw:160,bh:42});
+  const svg=document.getElementById("svg");
+  svg.setAttribute("viewBox",`0 0 ${L.w} ${L.h}`);svg.setAttribute("width",L.w);svg.setAttribute("height",L.h);
+  let s=`<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="#5b7088"/></marker></defs>`;
+  L.edges.forEach(e=>{const a=L.byId[e.from],b=L.byId[e.to];
+    const x1=a.x+a.w,y1=a.y+a.h/2,x2=b.x,y2=b.y+b.h/2;
+    s+=`<path d="M${x1},${y1} C${x1+46},${y1} ${x2-46},${y2} ${x2},${y2}" fill="none" stroke="#4b5e72" stroke-width="1.3" marker-end="url(#ar)"/>`;});
+  L.nodes.forEach(p=>{const n=N[p.id];
+    const fill=(opt.colorOf&&opt.colorOf(p.id))||"#1c2a3a";
+    const stroke=(opt.strokeOf&&opt.strokeOf(p.id))||V.provColor(n.provenance);
+    const sw=(opt.targets&&opt.targets.has(p.id))?2.6:1.5;
+    const badge=opt.badgeOf?opt.badgeOf(p.id):"";
+    s+=`<g style="cursor:${opt.onClick?'pointer':'default'}" data-id="${p.id}">
+      <title>${p.id} — ${n.service}\nprovenance ${n.provenance}${n.options.length?"\noptions: "+n.options.map(o=>o.name).join(", "):""}</title>
+      <rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
+      <text x="${p.x+9}" y="${p.y+17}" font-size="12" font-weight="600" fill="#e7eef6">${n.heavy?"🜂 ":""}${p.id}</text>
+      <text x="${p.x+9}" y="${p.y+32}" font-size="10" fill="#90a4ba">${n.service.split("/").pop()}${n.quota?" ⛔"+n.quota:""}</text>
+      ${badge?`<text x="${p.x+p.w-8}" y="${p.y+16}" font-size="12" text-anchor="end">${badge}</text>`:""}
+    </g>`;});
+  svg.innerHTML=s;
+  if(opt.onClick)svg.querySelectorAll("g[data-id]").forEach(g=>g.onclick=()=>opt.onClick(g.dataset.id));
+  return L;
+}
+function leg(items){return items.map(i=>`<span><i style="background:${i[0]}"></i>${i[1]}</span>`).join("");}
+
+// ============ TAB: OVERVIEW ============
+function overview(){
+  document.getElementById("gtitle").innerHTML=`전체 모델 그래프 <span class="muted small">· ${OV.size} 노드 (대표 슬라이스)</span>`;
+  document.getElementById("legend").innerHTML=leg([["#3fb27f","VALIDATED"],["#e0922f","docs(미실증)"]])+'<span>🜂 heavy · ⛔ quota</span>';
+  document.getElementById("ghint").textContent="노드 클릭 = Plan으로 그 자원을 타깃으로 넘김. 색 = 검증 상태(건강도 히트맵).";
+  renderG(OV,{colorOf:id=>N[id].provenance==="VALIDATED"?"#14322a":"#33291a",
+    onClick:id=>{targets=new Set([id]);go("plan");}});
+  const nodes=Object.values(N),val=nodes.filter(n=>n.provenance==="VALIDATED").length;
+  const byCat={};nodes.forEach(n=>{byCat[n.category]=byCat[n.category]||[0,0];byCat[n.category][n.provenance==="VALIDATED"?0:1]++;});
+  const worst=Object.entries(byCat).map(([c,v])=>[c,v[0]/(v[0]+v[1])]).sort((a,b)=>a[1]-b[1]).slice(0,4);
+  document.getElementById("left").innerHTML=`<h2>건강도</h2>
+    <div class="kpi">
+      <div class="s"><b>${MODEL.node_count}</b><span>노드</span></div>
+      <div class="s"><b>${Math.round(100*val/nodes.length)}%</b><span>검증율</span></div>
+      <div class="s"><b>${nodes.length-val}</b><span>docs 미실증</span></div>
+    </div>
+    <h3>승격 우선순위 (검증율 낮은 순)</h3>
+    ${worst.map(w=>`<div class="kv"><span>${w[0]}</span><b style="color:${w[1]<.2?'#ff8585':'#e0922f'}">${Math.round(w[1]*100)}%</b></div>`).join("")}
+    <p class="muted small" style="margin-top:8px">Overview = ①의 읽기 모드. "지금 무엇이 검증됐나"를 한 장으로.</p>`;
+  document.getElementById("right").innerHTML=`<h2>이 단계의 역할</h2>
+    <p class="muted small">전체 자원 모델 + 건강도. 여기서 만들고 싶은 자원을 고르면 <b>Plan</b>으로 이어진다.</p>
+    <h3>다음</h3><button class="btn" onclick="go('plan')">Plan에서 합성 시작 →</button>`;
+}
+
+// ============ TAB: PLAN ============
+function planTab(){
+  const p=V.plan([...targets],choices);
+  document.getElementById("gtitle").innerHTML=`합성 폐포 <span class="muted small">· ${p.closure.size} 노드 / 대상 ${targets.size}</span>`;
+  document.getElementById("legend").innerHTML=leg([["#11314f","대상"],["#1c2a3a","선행"]])+
+    '<span><i style="background:#ffd166;border-radius:50%"></i>공유(dedup)</span><span>🔀 분기</span>';
+  document.getElementById("ghint").textContent="노드 클릭 = 대상 토글. 🔀 = one_of 분기(우측에서 선택). 화살표 = 생성 의존.";
+  const branchNodes=[...p.closure].filter(id=>N[id].one_of&&N[id].one_of.length);
+  renderG(p.closure,{choices,targets,
+    colorOf:id=>targets.has(id)?"#11314f":"#1c2a3a",
+    strokeOf:id=>p.shared.has(id)?"#ffd166":targets.has(id)?"#5aa9ff":V.provColor(N[id].provenance),
+    badgeOf:id=>branchNodes.includes(id)?"🔀":(targets.has(id)?"★":""),
+    onClick:id=>{targets.has(id)?targets.delete(id):targets.add(id);if(targets.size)draw();}});
+  // left: target picker (compact)
+  const ids=V.allIds().sort((a,b)=>N[a].category<N[b].category?-1:1);
+  document.getElementById("left").innerHTML=`<h2>대상 선택</h2>
+    <input type="search" id="q" placeholder="검색…" style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 9px;margin-bottom:8px">
+    <div class="scroll" id="list" style="max-height:480px"></div>`;
+  function list(){const q=(document.getElementById("q").value||"").toLowerCase();
+    document.getElementById("list").innerHTML=ids.filter(id=>!q||(id+N[id].service).toLowerCase().includes(q)).map(id=>
+      `<label class="chk"><input type="checkbox" data-id="${id}" ${targets.has(id)?"checked":""}>
+       <span class="dot" style="background:${V.provColor(N[id].provenance)}"></span><b>${id}</b></label>`).join("");
+    document.querySelectorAll('#list input').forEach(cb=>cb.onchange=()=>{cb.checked?targets.add(cb.dataset.id):targets.delete(cb.dataset.id);draw();});}
+  list();document.getElementById("q").oninput=list;
+  // right: branch toggle + plan summary + dedup
+  let bx="";branchNodes.forEach(id=>{N[id].one_of.forEach((g,gi)=>{const key=id+":"+(g.bind||("g"+gi));
+    const valid=g.branches.filter(V.exists),chosen=choices[key]||valid[0];
+    bx+=`<div class="small" style="margin:4px 0">🔀 <code>${id}</code>: `+valid.map(b=>
+      `<label class="chk" style="display:inline-flex"><input type="radio" name="${key}" data-key="${key}" data-b="${b}" ${b===chosen?"checked":""}> ${b}</label>`).join("")+`</div>`;});});
+  document.getElementById("right").innerHTML=`<h2>합성 plan</h2>
+    <div class="kv"><span>폐포 노드</span><b>${p.closure.size}</b></div>
+    <div class="kv"><span>합성 스텝</span><b>${p.steps.length}</b></div>
+    <div class="kv"><span>dedup 절감</span><b>${p.naive_creates}→${p.deduped_creates} (−${p.dedup_saved})</b></div>
+    <div class="kv"><span>peak quota</span><b>${Object.entries(p.quota).map(([k,v])=>k+"×"+v).join(", ")||"—"}</b></div>
+    <div class="kv"><span>heavy</span><b>${p.heavy?"예 🜂":"아니오"}</b></div>
+    ${branchNodes.length?`<h3>④ 분기 선택</h3>${bx}`:""}
+    ${p.shared.size?`<h3>③ 공유 인프라(1회 생성)</h3><p class="small">${[...p.shared].map(s=>`<code>${s}</code>`).join(" ")}</p>`:""}
+    <button class="btn" style="margin-top:10px" onclick="go('run')">이 plan을 Run으로 →</button>`;
+  document.querySelectorAll('#right input[type=radio]').forEach(r=>r.onchange=()=>{choices[r.dataset.key]=r.dataset.b;draw();});
+}
+
+// ============ TAB: RUN (simulated live) ============
+let runTimer=null,runPtr=0,runOrder=[],failId=null;
+function runTab(){
+  const p=V.plan([...targets],choices);
+  runOrder=p.order.slice();
+  failId=runOrder.find(id=>N[id].provenance==="docs")||null; // a docs node "fails" — realistic
+  document.getElementById("gtitle").innerHTML=`실시간 실행 <span class="muted small">· ${runOrder.length} 자원</span>`;
+  document.getElementById("legend").innerHTML=leg([["#3a4654","대기"],["#2c4a73","생성중"],["#14322a","완료"],["#4a1f1f","실패"]]);
+  document.getElementById("ghint").textContent="Play로 합성 plan이 생성 순서대로 실행되는 모습(②) — 같은 그래프에 상태만 색칠.";
+  drawRun();
+  document.getElementById("left").innerHTML=`<h2>실행 (데모)</h2>
+    <div class="run-ctl"><button class="btn" id="play">▶ Play</button>
+      <button class="btn ghost" id="reset">↻ Reset</button></div>
+    <p class="muted small">합성된 plan을 엔진이 실행. 실제로는 <code>ops.html</code>(런별 자원 트리)가 데이터 소스.</p>
+    <h3>⑤ 실행 간트(미니)</h3><div class="gantt gmini" id="gantt"></div>`;
+  document.getElementById("right").innerHTML=`<h2>진행</h2><div id="prog"></div>`;
+  drawGantt(p);updateProg();
+  document.getElementById("play").onclick=()=>{if(runTimer){stopRun();document.getElementById("play").textContent="▶ Play";}
+    else{document.getElementById("play").textContent="⏸ Pause";runTimer=setInterval(tick,700);}};
+  document.getElementById("reset").onclick=()=>{stopRun();runPtr=0;document.getElementById("play").textContent="▶ Play";drawRun();updateProg();};
+}
+function stopRun(){if(runTimer){clearInterval(runTimer);runTimer=null;}}
+function tick(){if(runPtr>=runOrder.length){stopRun();document.getElementById("play").textContent="✓ 완료";return;}runPtr++;drawRun();updateProg();}
+function statusOf(id){const i=runOrder.indexOf(id);if(i<0||i>=runPtr-1)return i===runPtr-1?"active":"queued";
+  return (id===failId)?"fail":"done";}
+function drawRun(){renderG(new Set(runOrder),{
+  colorOf:id=>{const i=runOrder.indexOf(id);if(i>=runPtr)return"#222e3c";if(i===runPtr-1)return"#16314d";return id===failId?"#3a1717":"#14322a";},
+  strokeOf:id=>{const i=runOrder.indexOf(id);if(i>=runPtr)return"#3a4654";if(i===runPtr-1)return"#5aa9ff";return id===failId?"#ff6b6b":"#3fb27f";},
+  badgeOf:id=>{const i=runOrder.indexOf(id);if(i>=runPtr)return"";if(i===runPtr-1)return"⏳";return id===failId?"✕":"✓";}});}
+function drawGantt(p){let t=0;const segs=[];p.steps.forEach(s=>{const d=s.phase==="ready"?(N[s.id].ready_timeout||30):s.phase==="create"?(N[s.id].heavy?20:5):s.phase==="delete"?8:3;segs.push({...s,t0:t,d});t+=d;});
+  const W=560,sc=W/t;let h="";runOrder.forEach(id=>{const mine=segs.filter(s=>s.id===id);
+    let tr=`<div class="gtrack" style="min-width:${W}px">`;mine.forEach(s=>{const c={create:"#3fb27f",ready:"#ffd166",verify:"#9ec5ff",delete:"#ff8585"}[s.phase];
+      tr+=`<div class="seg" style="left:${s.t0*sc}px;width:${Math.max(6,s.d*sc)}px;background:${c}"></div>`;});tr+="</div>";
+    h+=`<div class="grow"><div class="gl small"><code>${id}</code></div>${tr}</div>`;});
+  document.getElementById("gantt").innerHTML=h;}
+function updateProg(){const done=runPtr,total=runOrder.length;const fail=(failId&&runPtr>runOrder.indexOf(failId))?1:0;
+  document.getElementById("prog").innerHTML=`
+    <div class="kpi"><div class="s"><b>${done}/${total}</b><span>자원</span></div>
+    <div class="s"><b style="color:#3fb27f">${Math.max(0,done-fail)}</b><span>pass</span></div>
+    <div class="s"><b style="color:#ff8585">${fail}</b><span>fail</span></div></div>
+    ${runPtr>=total?`<p class="small" style="margin-top:10px">완료 — <button class="btn" onclick="go('report')">Report 보기 →</button></p>`:'<p class="muted small" style="margin-top:10px">▶ Play로 실행을 진행하세요.</p>'}`;}
+
+// ============ TAB: REPORT ============
+function reportTab(){
+  const p=V.plan([...targets],choices);const order=p.order;
+  const fail=order.find(id=>N[id].provenance==="docs")||null;
+  document.getElementById("gtitle").innerHTML=`실행 결과 <span class="muted small">· 직전 런 색칠</span>`;
+  document.getElementById("legend").innerHTML=leg([["#14322a","pass(기검증)"],["#1d3a2a","pass→VALIDATED 승격"],["#4a1f1f","fail"]]);
+  document.getElementById("ghint").textContent="같은 그래프에 결과를 색칠 — 이 합성이 무엇을 실제로 덮었나(①결과 색칠 + ②구조).";
+  renderG(new Set(order),{
+    colorOf:id=>id===fail?"#3a1717":(N[id].provenance==="docs"?"#1d3a2a":"#14322a"),
+    strokeOf:id=>id===fail?"#ff6b6b":(N[id].provenance==="docs"?"#5aa9ff":"#3fb27f"),
+    badgeOf:id=>id===fail?"✕":(N[id].provenance==="docs"?"★":"✓")});
+  const promoted=order.filter(id=>N[id].provenance==="docs"&&id!==fail).length;
+  const passed=order.length-(fail?1:0);
+  document.getElementById("left").innerHTML=`<h2>결과 요약</h2>
+    <div class="kpi"><div class="s"><b>${passed}/${order.length}</b><span>pass</span></div>
+    <div class="s"><b style="color:#5aa9ff">${promoted}</b><span>★ 신규 승격</span></div>
+    <div class="s"><b style="color:#ff8585">${fail?1:0}</b><span>fail</span></div></div>
+    <p class="muted small" style="margin-top:8px">★ = 이번 런으로 docs→VALIDATED로 승격된 노드. 그래프 색이 다음 Overview에 반영된다(피드백 루프).</p>
+    ${fail?`<div class="note"><b>fail:</b> <code>${fail}</code> — docs 본문 미실증이라 4xx 추정. PRODUCT-FINDINGS로 트리아지.</div>`:""}`;
+  document.getElementById("right").innerHTML=`<h2>커버리지(③ 재활용)</h2>
+    <p class="small">이 합성이 덮은 자원 ${order.length}개 / 모델 ${MODEL.node_count}개 =
+      <b>${(100*order.length/MODEL.node_count).toFixed(1)}%</b></p>
+    <div class="barrow"><div class="lab">이 런</div><div class="bar" style="background:#3fb27f;width:${Math.max(8,100*order.length/MODEL.node_count*4)}px">${order.length}</div></div>
+    <h3>다음</h3><button class="btn ghost" onclick="go('overview')">↺ Overview로 (갱신된 건강도)</button>`;
+}
+
+// ---- tab switch ----
+function draw(){({overview,plan:planTab,run:runTab,report:reportTab})[tab]();}
+function go(t){stopRun();if(t==="run")runPtr=0;tab=t;
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));draw();}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>go(b.dataset.t));
+draw();
+</script>
+</body></html>
