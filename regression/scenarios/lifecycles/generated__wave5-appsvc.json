@@ -18,7 +18,11 @@
             "endpoint_type": "REGION",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "api_id": "$.id"
           },
@@ -33,7 +37,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/resources",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture": {
             "root_resource_id": "$.resources[0].id"
           }
@@ -46,7 +52,11 @@
           "json": {
             "path_part": "regr{unique}"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "resource_id": "$.id"
           },
@@ -61,7 +71,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/resources/{resource_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "resource"
         },
         {
@@ -78,7 +90,11 @@
             "query_strings": {},
             "request_headers": {}
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "method_type": "$.methods[0].method_type"
           }
@@ -88,7 +104,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/resources/{resource_id}/methods",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "method"
         },
         {
@@ -96,7 +114,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "method"
         },
         {
@@ -110,7 +130,11 @@
             "stage_name": "dev",
             "stage_type": "new"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "deployment_id": "$.deployment_id"
           }
@@ -121,7 +145,9 @@
           "method": "GET",
           "path": "/v1/apis/{api_id}/stages",
           "_note": "stages are addressed by NAME (no id) — capture the dev stage's name from the list so show-stage resolves to the catalog's {stage_name} wildcard (a literal /stages/dev would not count).",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture": {
             "stage_name": "$.stages[0].name"
           }
@@ -131,7 +157,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/stages/{stage_name}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "stage"
         },
         {
@@ -140,7 +168,10 @@
           "method": "GET",
           "path": "/v1/apis/{api_id}/reports",
           "_note": "listreports — docs model declares no params but a period query may be undocumented-required (apigw-api node R3 note). 400 tolerated so the run survives; if live shows 400, fix the param and tighten.",
-          "expect_status": [200, 400],
+          "expect_status": [
+            200,
+            400
+          ],
           "group": "reports",
           "optional": true
         },
@@ -152,10 +183,16 @@
           "_note": "createauth returns only $.access_token (no id) — auth_id recovered via listauths next step.",
           "json": {
             "name": "regrauth{ualpha}",
-            "connected_stages": ["dev"],
+            "connected_stages": [
+              "dev"
+            ],
             "expiration_period": 90
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "access_token": "$.access_token"
           }
@@ -165,7 +202,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/auths",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture": {
             "auth_id": "$.auths[0].id"
           }
@@ -175,7 +214,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/auths/{auth_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "auth"
         },
         {
@@ -183,7 +224,11 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/auths/{auth_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true
         },
         {
@@ -193,11 +238,19 @@
           "path": "/v1/apis/{api_id}/access-controls",
           "json": {
             "name": "regracl{ualpha}",
-            "allowed_ip_addr": ["10.0.0.0/24"],
-            "connected_stages": ["dev"],
+            "allowed_ip_addr": [
+              "10.0.0.0/24"
+            ],
+            "connected_stages": [
+              "dev"
+            ],
             "description": "API regression wave5 access control"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "access_control_id": "$.id"
           },
@@ -212,7 +265,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/access-controls/{access_control_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "access-control"
         },
         {
@@ -220,7 +275,11 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/access-controls/{access_control_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true
         },
         {
@@ -234,7 +293,11 @@
             "rate": "day",
             "description": "API regression wave5 usage plan"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "usage_plan_id": "$.usage_plan.id"
           },
@@ -249,7 +312,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "usage-plan"
         },
         {
@@ -261,7 +326,11 @@
             "name": "regrkey{ualpha}",
             "description": "API regression wave5 api key"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "api_key_id": "$.api_key.id"
           },
@@ -277,7 +346,9 @@
           "method": "GET",
           "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys",
           "_note": "listapikeys — the per-id GET 403s ('Action definition is not found', product-defect candidate run 27394211896) but the LIST is clean 200.",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "api-key"
         },
         {
@@ -285,7 +356,11 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}/api-keys/{api_key_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true
         },
         {
@@ -293,9 +368,16 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 4,
           "retry_interval": 10
         },
@@ -313,13 +395,22 @@
                   "Sid": "Statement1",
                   "Effect": "Allow",
                   "Principal": "*",
-                  "Action": ["apigateway:InvokeApigatewayRegion"],
-                  "Resource": ["srn:scp::apigateway:api/{api_id}"]
+                  "Action": [
+                    "apigateway:InvokeApigatewayRegion"
+                  ],
+                  "Resource": [
+                    "srn:scp::apigateway:api/{api_id}"
+                  ]
                 }
               ]
             }
           },
-          "expect_status": [200, 201, 202, 500],
+          "expect_status": [
+            200,
+            201,
+            202,
+            500
+          ],
           "group": "resource-policy",
           "cleanup": {
             "method": "DELETE",
@@ -332,7 +423,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/resource-policies",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "resource-policy"
         },
         {
@@ -341,7 +434,12 @@
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/resource-policies",
           "_note": "deleteresourcepolicy — the gap op. 204 documented. With PF-19 the set two steps up may 500 (no policy created), so 404 is tolerated for that case.",
-          "expect_status": [200, 202, 204, 404],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404
+          ],
           "group": "resource-policy",
           "destructive": true
         },
@@ -350,7 +448,11 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true
         },
         {
@@ -358,9 +460,16 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/resources/{resource_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 5,
           "retry_interval": 15
         },
@@ -369,9 +478,17 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}",
-          "expect_status": [200, 202, 204, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 6,
           "retry_interval": 15
         },
@@ -381,7 +498,10 @@
           "method": "GET",
           "path": "/v1/apis/{api_id}",
           "_note": "api delete is async — the VALIDATED source polls GET until 404 (300s/15s).",
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
             "until_status": 404,
             "timeout": 300,
@@ -407,7 +527,11 @@
             "cidr": "10.163.0.0/20",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "vpc_id": "$.vpc.id"
           },
@@ -423,10 +547,14 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/vpcs/{vpc_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.vpc.state",
-            "until": ["ACTIVE"],
+            "until": [
+              "ACTIVE"
+            ],
             "timeout": 180,
             "interval": 10
           }
@@ -444,7 +572,11 @@
             "vpc_id": "{vpc_id}",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "subnet_id": "$.subnet.id"
           },
@@ -460,10 +592,14 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.subnet.state",
-            "until": ["ACTIVE"],
+            "until": [
+              "ACTIVE"
+            ],
             "timeout": 180,
             "interval": 10
           }
@@ -484,7 +620,11 @@
             "subnet_id": "{subnet_id}",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "pls_id": "$.privatelink_service.id"
           },
@@ -499,10 +639,14 @@
           "service": "vpc",
           "method": "GET",
           "path": "/v1/privatelink-services/{pls_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.privatelink_service.state",
-            "until": ["ACTIVE"],
+            "until": [
+              "ACTIVE"
+            ],
             "timeout": 300,
             "interval": 10
           }
@@ -519,7 +663,11 @@
             "endpoint_type": "REGION",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "api_id": "$.id"
           },
@@ -540,7 +688,11 @@
             "privatelink_service_id": "{pls_id}",
             "description": "API regression wave5 privatelink endpoint"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "ple_id": "$.privatelink_endpoint.id"
           },
@@ -555,7 +707,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/privatelink-endpoints/{ple_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "apigw-ple"
         },
         {
@@ -565,9 +719,13 @@
           "path": "/v1/privatelink-endpoints/{ple_id}",
           "_note": "setprivatelinkendpoint — PUT 400 'String should have at most 50 characters' (run 27466988779): the 50-char limit applies to some field on PUT. create+show+delete are the proven path; set tolerates [200,202,400]. Narrow the description under 50 chars next run to recover a strict 2xx.",
           "json": {
-            "description": "API regression wave5 privatelink endpoint (updated)"
+            "description": "API regression privatelink endpoint (updated)"
           },
-          "expect_status": [200, 202, 400],
+          "expect_status": [
+            200,
+            202,
+            400
+          ],
           "group": "apigw-ple"
         },
         {
@@ -580,7 +738,15 @@
             "api_id": "{api_id}",
             "type": "APPROVE"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "apigw-ple-actions"
         },
@@ -594,7 +760,15 @@
             "api_id": "{api_id}",
             "type": "DISCONNECT"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "apigw-ple-actions"
         },
@@ -607,7 +781,15 @@
             "api_id": "{api_id}",
             "type": "RECONNECT"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "apigw-ple-actions"
         },
@@ -620,7 +802,15 @@
           "json": {
             "type": "RE_REQUEST"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "apigw-ple-actions"
         },
@@ -632,7 +822,15 @@
           "json": {
             "type": "CANCEL"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "apigw-ple-actions"
         },
@@ -641,9 +839,16 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/privatelink-endpoints/{ple_id}",
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 4,
           "retry_interval": 15
         },
@@ -659,7 +864,11 @@
             "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "cloud_function_id": "$.id"
           },
@@ -674,10 +883,17 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.cloud_function.state",
-            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
             "timeout": 300,
             "interval": 10
           }
@@ -691,7 +907,13 @@
           "json": {
             "privatelink_service_enabled": false
           },
-          "expect_status": [200, 202, 400, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scf-pl-service"
         },
@@ -701,11 +923,18 @@
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}",
           "_note": "every scf config write flips the state to Deploying — re-poll READY before the next write (deploying-after-every-change quirk).",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "optional": true,
           "poll": {
             "field": "$.cloud_function.state",
-            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
             "timeout": 300,
             "interval": 10
           }
@@ -722,7 +951,16 @@
               "service_id": "{pls_id}"
             }
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scf-ple",
           "capture": {
@@ -739,7 +977,9 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "scf-ple"
         },
         {
@@ -751,7 +991,15 @@
           "json": {
             "type": "RE_REQUEST"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scf-ple-actions"
         },
@@ -763,7 +1011,15 @@
           "json": {
             "type": "APPROVE"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scf-ple-actions"
         },
@@ -775,7 +1031,15 @@
           "json": {
             "type": "DISCONNECT"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scf-ple-actions"
         },
@@ -787,7 +1051,15 @@
           "json": {
             "type": "RECONNECT"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scf-ple-actions"
         },
@@ -799,7 +1071,15 @@
           "json": {
             "type": "CANCEL"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "scf-ple-actions"
         },
@@ -809,7 +1089,13 @@
           "method": "DELETE",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}",
           "_note": "runs even when the create 4xx'd ({endpoint_id} stays literal -> 404, still records); 404 tolerated for exactly that case.",
-          "expect_status": [200, 202, 204, 400, 404],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            404
+          ],
           "optional": true,
           "group": "scf-ple",
           "destructive": true
@@ -819,11 +1105,18 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "optional": true,
           "poll": {
             "field": "$.cloud_function.state",
-            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
             "timeout": 300,
             "interval": 10
           }
@@ -833,9 +1126,17 @@
           "service": "scf",
           "method": "DELETE",
           "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [200, 202, 204, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 6,
           "retry_interval": 20
         },
@@ -844,7 +1145,10 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
             "until_status": 404,
             "timeout": 300,
@@ -856,9 +1160,17 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}",
-          "expect_status": [200, 202, 204, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 6,
           "retry_interval": 15
         },
@@ -868,9 +1180,17 @@
           "method": "DELETE",
           "path": "/v1/privatelink-services/{pls_id}",
           "_note": "must come after both consumer endpoints are gone — 409 retried while endpoint teardown settles.",
-          "expect_status": [200, 202, 204, 404, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409
+          ],
           "destructive": true,
-          "retry_on_status": [409],
+          "retry_on_status": [
+            409
+          ],
           "retries": 20,
           "retry_interval": 15
         },
@@ -879,9 +1199,17 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/subnets/{subnet_id}",
-          "expect_status": [200, 202, 204, 409, 404],
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
           "destructive": true,
-          "retry_on_status": [409],
+          "retry_on_status": [
+            409
+          ],
           "retries": 40,
           "retry_interval": 30,
           "adopt": "subnet"
@@ -891,9 +1219,17 @@
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/vpcs/{vpc_id}",
-          "expect_status": [200, 202, 204, 409, 404],
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
           "destructive": true,
-          "retry_on_status": [409],
+          "retry_on_status": [
+            409
+          ],
           "retries": 40,
           "retry_interval": 30,
           "adopt": "vpc"
@@ -917,7 +1253,11 @@
             "content": "exports.handler = async () => ({ statusCode: 200, body: 'regr' });",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "cloud_function_id": "$.id"
           },
@@ -932,10 +1272,17 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "poll": {
             "field": "$.cloud_function.state",
-            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
             "timeout": 300,
             "interval": 10
           }
@@ -946,7 +1293,10 @@
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}/logs?time=1h",
           "_note": "showcloudfunctionlogs — 'must select either time or period' (run 27399448835, undiscoverable-params class; docs say all optional). time=1h format assumed; 400 tolerated and corrected from the live body if wrong.",
-          "expect_status": [200, 400],
+          "expect_status": [
+            200,
+            400
+          ],
           "optional": true,
           "group": "fn-observability"
         },
@@ -955,7 +1305,10 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}/metrics?time=1h",
-          "expect_status": [200, 400],
+          "expect_status": [
+            200,
+            400
+          ],
           "optional": true,
           "group": "fn-observability"
         },
@@ -969,7 +1322,15 @@
             "class_name": "com.example.Handler",
             "method_name": "handleRequest"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "fn-code"
         },
@@ -978,11 +1339,18 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "optional": true,
           "poll": {
             "field": "$.cloud_function.state",
-            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
             "timeout": 300,
             "interval": 10
           }
@@ -999,7 +1367,11 @@
             "endpoint_type": "REGION",
             "tags": []
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "api_id": "$.id"
           },
@@ -1014,7 +1386,9 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/resources",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "capture": {
             "root_resource_id": "$.resources[0].id"
           }
@@ -1027,7 +1401,11 @@
           "json": {
             "path_part": "regr{unique}"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "resource_id": "$.id"
           }
@@ -1046,7 +1424,11 @@
             "query_strings": {},
             "request_headers": {}
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "method_type": "$.methods[0].method_type"
           }
@@ -1061,7 +1443,11 @@
             "stage_name": "dev",
             "stage_type": "new"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "deployment_id": "$.deployment_id"
           }
@@ -1077,7 +1463,11 @@
             "apigateway_stage_name": "dev",
             "cloud_function_id": "{cloud_function_id}"
           },
-          "expect_status": [200, 201, 202],
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
           "capture": {
             "trigger_id": "$.triggers[0].trigger_id"
           },
@@ -1097,7 +1487,9 @@
           "method": "GET",
           "path": "/v1/triggers?cloud_function_id={cloud_function_id}",
           "_note": "listcloudfunctiontriggers — cloud_function_id query is docs-required (bare GET 4xxs).",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "trigger"
         },
         {
@@ -1105,7 +1497,9 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/triggers/{trigger_id}",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "group": "trigger"
         },
         {
@@ -1118,9 +1512,16 @@
             "cloud_function_id": "{cloud_function_id}",
             "trigger_type": "apigateway"
           },
-          "expect_status": [200, 202, 204],
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 4,
           "retry_interval": 15
         },
@@ -1129,7 +1530,13 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/resources/{resource_id}/methods/{method_type}",
-          "expect_status": [200, 202, 204, 404, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409
+          ],
           "optional": true,
           "destructive": true
         },
@@ -1138,10 +1545,19 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}/resources/{resource_id}",
-          "expect_status": [200, 202, 204, 404, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            404,
+            409
+          ],
           "optional": true,
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 5,
           "retry_interval": 15
         },
@@ -1150,9 +1566,17 @@
           "service": "apigateway",
           "method": "DELETE",
           "path": "/v1/apis/{api_id}",
-          "expect_status": [200, 202, 204, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 6,
           "retry_interval": 15
         },
@@ -1162,11 +1586,18 @@
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}",
           "_note": "trigger writes flip the function to Deploying — re-poll READY before delete (deploying-after-every-change quirk).",
-          "expect_status": [200],
+          "expect_status": [
+            200
+          ],
           "optional": true,
           "poll": {
             "field": "$.cloud_function.state",
-            "until": ["READY", "RUNNING", "ACTIVE", "Running"],
+            "until": [
+              "READY",
+              "RUNNING",
+              "ACTIVE",
+              "Running"
+            ],
             "timeout": 300,
             "interval": 10
           }
@@ -1176,9 +1607,17 @@
           "service": "scf",
           "method": "DELETE",
           "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [200, 202, 204, 409],
+          "expect_status": [
+            200,
+            202,
+            204,
+            409
+          ],
           "destructive": true,
-          "retry_on_status": [409, 500],
+          "retry_on_status": [
+            409,
+            500
+          ],
           "retries": 6,
           "retry_interval": 20
         },
@@ -1187,7 +1626,10 @@
           "service": "scf",
           "method": "GET",
           "path": "/v1/cloud-functions/{cloud_function_id}",
-          "expect_status": [200, 404],
+          "expect_status": [
+            200,
+            404
+          ],
           "poll": {
             "until_status": 404,
             "timeout": 300,

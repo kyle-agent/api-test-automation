@@ -1,1522 +1,1524 @@
 {
- "_comment": "Composed wave 5 — networking enablement batch (docs/SERVICE-GAP-REPORTS.md group 1, 2026-06-13): implicit firewall via IGW firewall_enabled=true + rule chain; vpc-endpoint wired to a real FS volume id; private-nat over the verified transit-gateway branch; LB member/setter/static-NAT coverage (heavy).",
- "lifecycles": [
-  {
-   "id": "gen-wave5-fw",
-   "service": "networking/firewall",
-   "enabled": true,
-   "_note": "composed by regression/scenarios/composer.py — targets: firewall, firewall-rule | adopt stamps stripped on purpose: the firewall lookup (GET /v1/firewalls?vpc_name=regrvpc{unique}&product_type=IGW) only resolves against a self-created VPC, and IGW is 1:1 per VPC — must not collide with the session-shared VPC's IGW.",
-   "steps": [
+  "_comment": "Composed wave 5 — networking enablement batch (docs/SERVICE-GAP-REPORTS.md group 1, 2026-06-13): implicit firewall via IGW firewall_enabled=true + rule chain; vpc-endpoint wired to a real FS volume id; private-nat over the verified transit-gateway branch; LB member/setter/static-NAT coverage (heavy).",
+  "lifecycles": [
     {
-     "name": "create-vpc",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/vpcs",
-     "json": {
-      "name": "regrvpc{unique}",
-      "description": "API regression suite",
-      "cidr": "10.160.0.0/20",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "vpc_id": "$.vpc.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/vpcs/{vpc_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "wait-vpc",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.vpc.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 180,
-      "interval": 10
-     }
-    },
-    {
-     "name": "create-internet-gateway",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/internet-gateways",
-     "json": {
-      "description": "API regression suite",
-      "firewall_enabled": true,
-      "firewall_loggable": false,
-      "type": "IGW",
-      "vpc_id": "{vpc_id}",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "internet_gateway_id": "$.internet_gateway.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/internet-gateways/{internet_gateway_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "wait-internet-gateway",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/internet-gateways/{internet_gateway_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.internet_gateway.state",
-      "until": [
-       "ACTIVE",
-       "ATTACHED",
-       "CREATED",
-       "RUNNING"
-      ],
-      "timeout": 300,
-      "interval": 15
-     }
-    },
-    {
-     "name": "create-firewall",
-     "service": "firewall",
-     "method": "GET",
-     "path": "/v1/firewalls?vpc_name=regrvpc{unique}&product_type=IGW",
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "firewall_id": "$.firewalls[0].id"
-     }
-    },
-    {
-     "name": "wait-firewall",
-     "service": "firewall",
-     "method": "GET",
-     "path": "/v1/firewalls/{firewall_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.firewall.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 600,
-      "interval": 15
-     }
-    },
-    {
-     "name": "verify-firewall-show",
-     "service": "firewall",
-     "method": "GET",
-     "path": "/v1/firewalls/{firewall_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "firewall"
-    },
-    {
-     "name": "verify-firewall-list-rules",
-     "service": "firewall",
-     "method": "GET",
-     "path": "/v1/firewalls/rules?firewall_id={firewall_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "firewall"
-    },
-    {
-     "name": "verify-firewall-set-loggable",
-     "service": "firewall",
-     "method": "PUT",
-     "path": "/v1/firewalls/{firewall_id}",
-     "json": {
-      "loggable": false
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "firewall"
-    },
-    {
-     "name": "create-firewall-rule",
-     "service": "firewall",
-     "method": "POST",
-     "path": "/v1/firewalls/rules",
-     "json": {
-      "firewall_id": "{firewall_id}",
-      "firewall_rule": {
-       "action": "ALLOW",
-       "description": "API regression firewall rule",
-       "destination_address": [
-        "10.0.0.1"
-       ],
-       "direction": "INBOUND",
-       "service": [
+      "id": "gen-wave5-fw",
+      "service": "networking/firewall",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: firewall, firewall-rule | adopt stamps stripped on purpose: the firewall lookup (GET /v1/firewalls?vpc_name=regrvpc{unique}&product_type=IGW) only resolves against a self-created VPC, and IGW is 1:1 per VPC — must not collide with the session-shared VPC's IGW.",
+      "steps": [
         {
-         "service_type": "TCP",
-         "service_value": "443"
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-internet-gateway",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "json": {
+            "description": "API regression suite",
+            "firewall_enabled": true,
+            "firewall_loggable": false,
+            "type": "IGW",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "internet_gateway_id": "$.internet_gateway.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/internet-gateways/{internet_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-internet-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ATTACHED",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-firewall",
+          "service": "firewall",
+          "method": "GET",
+          "path": "/v1/firewalls?vpc_name=regrvpc{unique}&product_type=IGW",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "firewall_id": "$.firewalls[0].id"
+          }
+        },
+        {
+          "name": "wait-firewall",
+          "service": "firewall",
+          "method": "GET",
+          "path": "/v1/firewalls/{firewall_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.firewall.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 600,
+            "interval": 15
+          }
+        },
+        {
+          "name": "verify-firewall-show",
+          "service": "firewall",
+          "method": "GET",
+          "path": "/v1/firewalls/{firewall_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "firewall"
+        },
+        {
+          "name": "verify-firewall-list-rules",
+          "service": "firewall",
+          "method": "GET",
+          "path": "/v1/firewalls/rules?firewall_id={firewall_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "firewall"
+        },
+        {
+          "name": "verify-firewall-set-loggable",
+          "service": "firewall",
+          "method": "PUT",
+          "path": "/v1/firewalls/{firewall_id}",
+          "json": {
+            "loggable": false
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "firewall"
+        },
+        {
+          "name": "create-firewall-rule",
+          "service": "firewall",
+          "method": "POST",
+          "path": "/v1/firewalls/rules",
+          "json": {
+            "firewall_id": "{firewall_id}",
+            "firewall_rule": {
+              "action": "ALLOW",
+              "description": "API regression firewall rule",
+              "destination_address": [
+                "10.0.0.1"
+              ],
+              "direction": "INBOUND",
+              "service": [
+                {
+                  "service_type": "TCP",
+                  "service_value": "443"
+                }
+              ],
+              "source_address": [
+                "192.168.1.1"
+              ],
+              "status": "ENABLE"
+            }
+          },
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15,
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            409
+          ],
+          "capture": {
+            "firewall_rule_id": "$.firewall_rule.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/firewalls/rules/{firewall_rule_id}",
+            "service": "firewall"
+          }
+        },
+        {
+          "name": "wait-firewall-rule",
+          "service": "firewall",
+          "method": "GET",
+          "path": "/v1/firewalls/rules/{firewall_rule_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.firewall_rule.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 600,
+            "interval": 15
+          }
+        },
+        {
+          "name": "verify-firewall-rule-show",
+          "service": "firewall",
+          "method": "GET",
+          "path": "/v1/firewalls/rules/{firewall_rule_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "firewall-rule"
+        },
+        {
+          "name": "verify-firewall-rule-set",
+          "service": "firewall",
+          "method": "PUT",
+          "path": "/v1/firewalls/rules/{firewall_rule_id}",
+          "json": {
+            "action": "ALLOW",
+            "description": "API regression firewall rule (set)",
+            "destination_address": [
+              "10.0.0.1"
+            ],
+            "direction": "INBOUND",
+            "service": [
+              {
+                "service_type": "TCP",
+                "service_value": "443"
+              }
+            ],
+            "source_address": [
+              "192.168.1.1"
+            ]
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "firewall-rule"
+        },
+        {
+          "name": "delete-firewall-rule",
+          "service": "firewall",
+          "method": "DELETE",
+          "path": "/v1/firewalls/rules/{firewall_rule_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            400,
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15
+        },
+        {
+          "name": "delete-internet-gateway",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
         }
-       ],
-       "source_address": [
-        "192.168.1.1"
-       ],
-       "status": "ENABLE"
-      }
-     },
-     "retry_on_status": [
-      400,
-      409
-     ],
-     "retries": 8,
-     "retry_interval": 15,
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "firewall_rule_id": "$.firewall_rule.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/firewalls/rules/{firewall_rule_id}",
-      "service": "firewall"
-     }
-    },
-    {
-     "name": "wait-firewall-rule",
-     "service": "firewall",
-     "method": "GET",
-     "path": "/v1/firewalls/rules/{firewall_rule_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.firewall_rule.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 600,
-      "interval": 15
-     }
-    },
-    {
-     "name": "verify-firewall-rule-show",
-     "service": "firewall",
-     "method": "GET",
-     "path": "/v1/firewalls/rules/{firewall_rule_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "firewall-rule"
-    },
-    {
-     "name": "verify-firewall-rule-set",
-     "service": "firewall",
-     "method": "PUT",
-     "path": "/v1/firewalls/rules/{firewall_rule_id}",
-     "json": {
-      "action": "ALLOW",
-      "description": "API regression firewall rule (set)",
-      "destination_address": [
-       "10.0.0.1"
-      ],
-      "direction": "INBOUND",
-      "service": [
-       {
-        "service_type": "TCP",
-        "service_value": "443"
-       }
-      ],
-      "source_address": [
-       "192.168.1.1"
       ]
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "firewall-rule"
     },
     {
-     "name": "delete-firewall-rule",
-     "service": "firewall",
-     "method": "DELETE",
-     "path": "/v1/firewalls/rules/{firewall_rule_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      400,
-      409
-     ],
-     "retries": 8,
-     "retry_interval": 15
+      "id": "gen-wave5-vpce",
+      "service": "networking/vpc",
+      "enabled": false,
+      "_disabled_reason": "create-vpc-endpoint 400 'scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet not found' (run 27466988779). The endpoint needs a dedicated endpoint-type subnet (subnet created with the right type/role); the FS-volume resource_key wiring is insufficient. Needs an endpoint-type-subnet prerequisite node not yet modeled. Nodes kept.",
+      "_note": "composed by regression/scenarios/composer.py — targets: vpc-endpoint",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-filestorage-volume",
+          "service": "filestorage",
+          "method": "POST",
+          "path": "/v1/volumes",
+          "json": {
+            "name": "regrfs{unique}",
+            "protocol": "NFS",
+            "type_name": "HDD"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "volume_id": "$.volume_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/volumes/{volume_id}",
+            "service": "filestorage"
+          }
+        },
+        {
+          "name": "wait-filestorage-volume",
+          "service": "filestorage",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.state",
+            "until": [
+              "available",
+              "AVAILABLE",
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-vpc-endpoint",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpc-endpoints",
+          "json": {
+            "name": "regrvpce{unique}",
+            "description": "API regression vpc endpoint",
+            "endpoint_ip_address": "10.124.0.20",
+            "resource_info": "regrfs{unique}",
+            "resource_key": "{volume_id}",
+            "resource_type": "FS",
+            "subnet_id": "{subnet_id}",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_endpoint_id": "$.vpc_endpoint.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "verify-vpc-endpoint",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "expect_status": [
+            200
+          ]
+        },
+        {
+          "name": "delete-vpc-endpoint",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-filestorage-volume",
+          "service": "filestorage",
+          "method": "DELETE",
+          "path": "/v1/volumes/{volume_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ]
     },
     {
-     "name": "delete-internet-gateway",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/internet-gateways/{internet_gateway_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
+      "id": "gen-wave5-privnat",
+      "service": "networking/vpc",
+      "enabled": false,
+      "_disabled_reason": "create-private-nat 400 'scp-network.private-nat.connectable-transit-gateway-not-found ... Cannot find the Transit Gateway in Connectable state' (run 27466988779). The TGW is created but not Connectable — private-nat needs a TGW with a VPC attachment/connection in Connectable state, which requires a transit-gateway VPC-connection prerequisite node not yet modeled. Nodes kept.",
+      "_note": "composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {\"private-nat\": \"transit-gateway\"}",
+      "steps": [
+        {
+          "name": "create-transit-gateway",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways",
+          "json": {
+            "name": "regrtgw{ualpha}",
+            "description": "API regression transit gateway",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "transit_gateway_id": "$.transit_gateway.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/transit-gateways/{transit_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-transit-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "verify-transit-gateway-read-routing-rules",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules",
+          "expect_status": [
+            200
+          ],
+          "group": "transit-gateway"
+        },
+        {
+          "name": "verify-transit-gateway-read-vpc-connections",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+          "expect_status": [
+            200
+          ],
+          "group": "transit-gateway"
+        },
+        {
+          "name": "create-private-nat",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/private-nats",
+          "json": {
+            "name": "regrpnat{unique}",
+            "description": "API regression private-nat",
+            "cidr": "192.167.0.0/24",
+            "service_resource_id": "{transit_gateway_id}",
+            "service_type": "TRANSIT_GATEWAY",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "private_nat_id": "$.private_nat.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/private-nats/{private_nat_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "verify-private-nat",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/private-nats/{private_nat_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "private-nat"
+        },
+        {
+          "name": "delete-private-nat",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/private-nats/{private_nat_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-transit-gateway",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        }
+      ]
     },
     {
-     "name": "delete-vpc",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
+      "id": "gen-heavy-lb-members",
+      "service": "networking/loadbalancer",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: lb-health-check, lb-listener, lb-member, lb-member-bulk, lb-server-group, lb-static-nat, load-balancer | heavy: the loadbalancer itself is billable/slow; NO backend VM needed — members register direct in-subnet IPs (10.124.0.101/.102, shared-subnet re-homing rule).",
+      "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "json": {
+            "name": "regrsub{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-lb-health-check",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "json": {
+            "lb_health_check": {
+              "name": "regrhc{ualpha}",
+              "description": "API regression suite",
+              "protocol": "TCP",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "subnet_id": "{subnet_id}",
+              "vpc_id": "{vpc_id}",
+              "tags": []
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "lb_health_check_id": "$.lb_health_check.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-health-checks/{lb_health_check_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-health-check-read",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-health-check"
+        },
+        {
+          "name": "verify-lb-health-check-set",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "json": {
+            "lb_health_check": {
+              "description": "API regression suite (set)",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_timeout": 5
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "lb-health-check"
+        },
+        {
+          "name": "create-load-balancer",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/loadbalancers",
+          "json": {
+            "loadbalancer": {
+              "name": "regrlb{ualpha}",
+              "description": "API regression suite",
+              "layer_type": "L4",
+              "firewall_enabled": false,
+              "firewall_logging_enabled": false,
+              "publicip_id": "",
+              "service_ip": "10.124.0.100",
+              "source_nat_ip": "",
+              "subnet_id": "{subnet_id}",
+              "vpc_id": "{vpc_id}",
+              "tags": []
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "loadbalancer_id": "$.loadbalancer.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/loadbalancers/{loadbalancer_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "wait-load-balancer",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.loadbalancer.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 600,
+            "interval": 20
+          }
+        },
+        {
+          "name": "verify-load-balancer-read-static-nats",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+          "expect_status": [
+            200
+          ],
+          "group": "load-balancer"
+        },
+        {
+          "name": "verify-load-balancer-read-private-static-nats",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
+          "expect_status": [
+            200
+          ],
+          "group": "load-balancer"
+        },
+        {
+          "name": "verify-load-balancer-set",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "json": {
+            "loadbalancer": {
+              "description": "API regression suite (set)"
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "load-balancer"
+        },
+        {
+          "name": "create-lb-server-group",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-server-groups",
+          "json": {
+            "lb_server_group": {
+              "name": "regrsg{ualpha}",
+              "description": "API regression suite",
+              "lb_health_check_id": "{lb_health_check_id}",
+              "lb_method": "ROUND_ROBIN",
+              "protocol": "TCP",
+              "subnet_id": "{subnet_id}",
+              "vpc_id": "{vpc_id}",
+              "tags": []
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "lb_server_group_id": "$.lb_server_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-server-groups/{lb_server_group_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-server-group-read",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-server-group"
+        },
+        {
+          "name": "verify-lb-server-group-read-members",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-server-group"
+        },
+        {
+          "name": "verify-lb-server-group-set",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "json": {
+            "lb_server_group": {
+              "description": "API regression suite (set)",
+              "lb_method": "ROUND_ROBIN"
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "lb-server-group"
+        },
+        {
+          "name": "create-lb-listener",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-listeners",
+          "json": {
+            "listener": {
+              "name": "regrls{ualpha}",
+              "description": "API regression suite",
+              "loadbalancer_id": "{loadbalancer_id}",
+              "protocol": "TCP",
+              "routing_action": "LB_SERVER_GROUP",
+              "server_group_id": "{lb_server_group_id}",
+              "service_port": "80",
+              "session_duration_time": 120,
+              "support_http2": false,
+              "tags": []
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "listener_id": "$.listener.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-listeners/{listener_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-listener-read",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-listeners/{listener_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-listener"
+        },
+        {
+          "name": "verify-lb-listener-set",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-listeners/{listener_id}",
+          "json": {
+            "listener": {
+              "description": "API regression suite (set)",
+              "session_duration_time": 120
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "lb-listener"
+        },
+        {
+          "name": "create-lb-member",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "json": {
+            "members": [
+              {
+                "name": "regrmember1",
+                "member_ip": "10.124.0.101",
+                "member_port": 80,
+                "member_state": "ENABLE",
+                "member_weight": 100,
+                "object_id": "",
+                "object_type": "VM"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "member_id": "$.members[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-member-show",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-member"
+        },
+        {
+          "name": "verify-lb-member-set",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+          "json": {
+            "member": {
+              "member_port": 80,
+              "member_state": "ENABLE",
+              "member_weight": 100
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "lb-member"
+        },
+        {
+          "name": "create-lb-member-bulk",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "json": {
+            "members": [
+              {
+                "name": "regrmember2",
+                "member_ip": "10.124.0.102",
+                "member_port": 80,
+                "member_state": "ENABLE",
+                "member_weight": 100,
+                "object_id": "",
+                "object_type": "VM"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "member_bulk_id": "$.members[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+            "json": {
+              "member_id_list": [
+                "{member_bulk_id}"
+              ]
+            },
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-member-bulk",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-member-bulk"
+        },
+        {
+          "name": "create-internet-gateway",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/internet-gateways",
+          "json": {
+            "description": "API regression suite",
+            "firewall_enabled": false,
+            "firewall_loggable": false,
+            "type": "IGW",
+            "vpc_id": "{vpc_id}",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "internet_gateway_id": "$.internet_gateway.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/internet-gateways/{internet_gateway_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-internet-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ATTACHED",
+              "CREATED",
+              "RUNNING"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-public-ip",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "json": {
+            "description": "API regression suite",
+            "type": "IGW",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "publicip_id": "$.publicip.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/publicips/{publicip_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-public-ip",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.publicip.state",
+            "until": [
+              "ACTIVE",
+              "CREATED",
+              "RUNNING",
+              "AVAILABLE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
+          "name": "create-lb-static-nat",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+          "json": {
+            "static_nat": {
+              "publicip_id": "{publicip_id}"
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "static_nat_id": "$.static_nat.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+            "json": {
+              "static_nat_id_list": [
+                "{static_nat_id}"
+              ]
+            },
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-static-nat-read",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-static-nat"
+        },
+        {
+          "name": "delete-lb-listener",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-listeners/{listener_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-lb-member",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true
+        },
+        {
+          "name": "delete-lb-member-bulk",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "json": {
+            "member_id_list": [
+              "{member_bulk_id}"
+            ]
+          }
+        },
+        {
+          "name": "delete-lb-server-group",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-server-groups/{lb_server_group_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-lb-health-check",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-lb-static-nat",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
+          "expect_status": [
+            200,
+            202,
+            204
+          ],
+          "destructive": true,
+          "json": {
+            "static_nat_id_list": [
+              "{static_nat_id}"
+            ]
+          }
+        },
+        {
+          "name": "delete-public-ip",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/publicips/{publicip_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-internet-gateway",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-load-balancer",
+          "service": "loadbalancer",
+          "method": "DELETE",
+          "path": "/v1/loadbalancers/{loadbalancer_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        }
+      ],
+      "heavy": true
     }
-   ]
-  },
-  {
-   "id": "gen-wave5-vpce",
-   "service": "networking/vpc",
-   "enabled": false,
-   "_disabled_reason": "create-vpc-endpoint 400 'scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet not found' (run 27466988779). The endpoint needs a dedicated endpoint-type subnet (subnet created with the right type/role); the FS-volume resource_key wiring is insufficient. Needs an endpoint-type-subnet prerequisite node not yet modeled. Nodes kept.",
-   "_note": "composed by regression/scenarios/composer.py — targets: vpc-endpoint",
-   "steps": [
-    {
-     "name": "create-vpc",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/vpcs",
-     "json": {
-      "name": "regrvpc{unique}",
-      "description": "API regression suite",
-      "cidr": "10.160.0.0/20",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "vpc_id": "$.vpc.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/vpcs/{vpc_id}",
-      "service": "vpc"
-     },
-     "adopt": "vpc"
-    },
-    {
-     "name": "wait-vpc",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.vpc.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 180,
-      "interval": 10
-     }
-    },
-    {
-     "name": "create-subnet",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/subnets",
-     "json": {
-      "name": "regrsub{unique}",
-      "description": "API regression suite",
-      "cidr": "10.160.8.0/24",
-      "type": "GENERAL",
-      "vpc_id": "{vpc_id}",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "subnet_id": "$.subnet.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/subnets/{subnet_id}",
-      "service": "vpc"
-     },
-     "adopt": "subnet"
-    },
-    {
-     "name": "wait-subnet",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/subnets/{subnet_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.subnet.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 180,
-      "interval": 10
-     }
-    },
-    {
-     "name": "create-filestorage-volume",
-     "service": "filestorage",
-     "method": "POST",
-     "path": "/v1/volumes",
-     "json": {
-      "name": "regrfs{unique}",
-      "protocol": "NFS",
-      "type_name": "HDD"
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "volume_id": "$.volume_id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/volumes/{volume_id}",
-      "service": "filestorage"
-     }
-    },
-    {
-     "name": "wait-filestorage-volume",
-     "service": "filestorage",
-     "method": "GET",
-     "path": "/v1/volumes/{volume_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.state",
-      "until": [
-       "available",
-       "AVAILABLE",
-       "ACTIVE"
-      ],
-      "timeout": 300,
-      "interval": 15
-     }
-    },
-    {
-     "name": "create-vpc-endpoint",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/vpc-endpoints",
-     "json": {
-      "name": "regrvpce{unique}",
-      "description": "API regression vpc endpoint",
-      "endpoint_ip_address": "10.124.0.20",
-      "resource_info": "regrfs{unique}",
-      "resource_key": "{volume_id}",
-      "resource_type": "FS",
-      "subnet_id": "{subnet_id}",
-      "vpc_id": "{vpc_id}",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "vpc_endpoint_id": "$.vpc_endpoint.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "verify-vpc-endpoint",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
-     "expect_status": [
-      200
-     ]
-    },
-    {
-     "name": "delete-vpc-endpoint",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
-    },
-    {
-     "name": "delete-filestorage-volume",
-     "service": "filestorage",
-     "method": "DELETE",
-     "path": "/v1/volumes/{volume_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-subnet",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/subnets/{subnet_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30,
-     "adopt": "subnet"
-    },
-    {
-     "name": "delete-vpc",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30,
-     "adopt": "vpc"
-    }
-   ]
-  },
-  {
-   "id": "gen-wave5-privnat",
-   "service": "networking/vpc",
-   "enabled": false,
-   "_disabled_reason": "create-private-nat 400 'scp-network.private-nat.connectable-transit-gateway-not-found ... Cannot find the Transit Gateway in Connectable state' (run 27466988779). The TGW is created but not Connectable — private-nat needs a TGW with a VPC attachment/connection in Connectable state, which requires a transit-gateway VPC-connection prerequisite node not yet modeled. Nodes kept.",
-   "_note": "composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {\"private-nat\": \"transit-gateway\"}",
-   "steps": [
-    {
-     "name": "create-transit-gateway",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/transit-gateways",
-     "json": {
-      "name": "regrtgw{ualpha}",
-      "description": "API regression transit gateway",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "transit_gateway_id": "$.transit_gateway.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/transit-gateways/{transit_gateway_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "wait-transit-gateway",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/transit-gateways/{transit_gateway_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.transit_gateway.state",
-      "until": [
-       "ACTIVE",
-       "CREATED",
-       "RUNNING",
-       "AVAILABLE"
-      ],
-      "timeout": 300,
-      "interval": 15
-     }
-    },
-    {
-     "name": "verify-transit-gateway-read-routing-rules",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules",
-     "expect_status": [
-      200
-     ],
-     "group": "transit-gateway"
-    },
-    {
-     "name": "verify-transit-gateway-read-vpc-connections",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
-     "expect_status": [
-      200
-     ],
-     "group": "transit-gateway"
-    },
-    {
-     "name": "create-private-nat",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/private-nats",
-     "json": {
-      "name": "regrpnat{unique}",
-      "description": "API regression private-nat",
-      "cidr": "192.167.0.0/24",
-      "service_resource_id": "{transit_gateway_id}",
-      "service_type": "TRANSIT_GATEWAY",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "private_nat_id": "$.private_nat.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/private-nats/{private_nat_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "verify-private-nat",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/private-nats/{private_nat_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "private-nat"
-    },
-    {
-     "name": "delete-private-nat",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/private-nats/{private_nat_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
-    },
-    {
-     "name": "delete-transit-gateway",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/transit-gateways/{transit_gateway_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    }
-   ]
-  },
-  {
-   "id": "gen-heavy-lb-members",
-   "service": "networking/loadbalancer",
-   "enabled": true,
-   "_note": "composed by regression/scenarios/composer.py — targets: lb-health-check, lb-listener, lb-member, lb-member-bulk, lb-server-group, lb-static-nat, load-balancer | heavy: the loadbalancer itself is billable/slow; NO backend VM needed — members register direct in-subnet IPs (10.124.0.101/.102, shared-subnet re-homing rule).",
-   "steps": [
-    {
-     "name": "create-vpc",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/vpcs",
-     "json": {
-      "name": "regrvpc{unique}",
-      "description": "API regression suite",
-      "cidr": "10.160.0.0/20",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "vpc_id": "$.vpc.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/vpcs/{vpc_id}",
-      "service": "vpc"
-     },
-     "adopt": "vpc"
-    },
-    {
-     "name": "wait-vpc",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.vpc.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 180,
-      "interval": 10
-     }
-    },
-    {
-     "name": "create-subnet",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/subnets",
-     "json": {
-      "name": "regrsub{unique}",
-      "description": "API regression suite",
-      "cidr": "10.160.8.0/24",
-      "type": "GENERAL",
-      "vpc_id": "{vpc_id}",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "subnet_id": "$.subnet.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/subnets/{subnet_id}",
-      "service": "vpc"
-     },
-     "adopt": "subnet"
-    },
-    {
-     "name": "wait-subnet",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/subnets/{subnet_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.subnet.state",
-      "until": [
-       "ACTIVE"
-      ],
-      "timeout": 180,
-      "interval": 10
-     }
-    },
-    {
-     "name": "create-lb-health-check",
-     "service": "loadbalancer",
-     "method": "POST",
-     "path": "/v1/lb-health-checks",
-     "json": {
-      "lb_health_check": {
-       "name": "regrhc{ualpha}",
-       "description": "API regression suite",
-       "protocol": "TCP",
-       "health_check_count": 3,
-       "health_check_interval": 5,
-       "health_check_port": 80,
-       "health_check_timeout": 5,
-       "subnet_id": "{subnet_id}",
-       "vpc_id": "{vpc_id}",
-       "tags": []
-      }
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "lb_health_check_id": "$.lb_health_check.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/lb-health-checks/{lb_health_check_id}",
-      "service": "loadbalancer"
-     }
-    },
-    {
-     "name": "verify-lb-health-check-read",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/lb-health-checks/{lb_health_check_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "lb-health-check"
-    },
-    {
-     "name": "verify-lb-health-check-set",
-     "service": "loadbalancer",
-     "method": "PUT",
-     "path": "/v1/lb-health-checks/{lb_health_check_id}",
-     "json": {
-      "lb_health_check": {
-       "description": "API regression suite (set)",
-       "health_check_count": 3,
-       "health_check_interval": 5,
-       "health_check_timeout": 5
-      }
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "lb-health-check"
-    },
-    {
-     "name": "create-load-balancer",
-     "service": "loadbalancer",
-     "method": "POST",
-     "path": "/v1/loadbalancers",
-     "json": {
-      "loadbalancer": {
-       "name": "regrlb{ualpha}",
-       "description": "API regression suite",
-       "layer_type": "L4",
-       "firewall_enabled": false,
-       "firewall_logging_enabled": false,
-       "publicip_id": "",
-       "service_ip": "10.124.0.100",
-       "source_nat_ip": "",
-       "subnet_id": "{subnet_id}",
-       "vpc_id": "{vpc_id}",
-       "tags": []
-      }
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "loadbalancer_id": "$.loadbalancer.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/loadbalancers/{loadbalancer_id}",
-      "service": "loadbalancer"
-     }
-    },
-    {
-     "name": "wait-load-balancer",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/loadbalancers/{loadbalancer_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.loadbalancer.state",
-      "until": [
-       "ACTIVE",
-       "CREATED",
-       "RUNNING",
-       "AVAILABLE"
-      ],
-      "timeout": 600,
-      "interval": 20
-     }
-    },
-    {
-     "name": "verify-load-balancer-read-static-nats",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
-     "expect_status": [
-      200
-     ],
-     "group": "load-balancer"
-    },
-    {
-     "name": "verify-load-balancer-read-private-static-nats",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/loadbalancers/{loadbalancer_id}/private-static-nats",
-     "expect_status": [
-      200
-     ],
-     "group": "load-balancer"
-    },
-    {
-     "name": "verify-load-balancer-set",
-     "service": "loadbalancer",
-     "method": "PUT",
-     "path": "/v1/loadbalancers/{loadbalancer_id}",
-     "json": {
-      "loadbalancer": {
-       "description": "API regression suite (set)"
-      }
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "load-balancer"
-    },
-    {
-     "name": "create-lb-server-group",
-     "service": "loadbalancer",
-     "method": "POST",
-     "path": "/v1/lb-server-groups",
-     "json": {
-      "lb_server_group": {
-       "name": "regrsg{ualpha}",
-       "description": "API regression suite",
-       "lb_health_check_id": "{lb_health_check_id}",
-       "lb_method": "ROUND_ROBIN",
-       "protocol": "TCP",
-       "subnet_id": "{subnet_id}",
-       "vpc_id": "{vpc_id}",
-       "tags": []
-      }
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "lb_server_group_id": "$.lb_server_group.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/lb-server-groups/{lb_server_group_id}",
-      "service": "loadbalancer"
-     }
-    },
-    {
-     "name": "verify-lb-server-group-read",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "lb-server-group"
-    },
-    {
-     "name": "verify-lb-server-group-read-members",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-     "expect_status": [
-      200
-     ],
-     "group": "lb-server-group"
-    },
-    {
-     "name": "verify-lb-server-group-set",
-     "service": "loadbalancer",
-     "method": "PUT",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}",
-     "json": {
-      "lb_server_group": {
-       "description": "API regression suite (set)",
-       "lb_method": "ROUND_ROBIN"
-      }
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "lb-server-group"
-    },
-    {
-     "name": "create-lb-listener",
-     "service": "loadbalancer",
-     "method": "POST",
-     "path": "/v1/lb-listeners",
-     "json": {
-      "listener": {
-       "name": "regrls{ualpha}",
-       "description": "API regression suite",
-       "loadbalancer_id": "{loadbalancer_id}",
-       "protocol": "TCP",
-       "routing_action": "LB_SERVER_GROUP",
-       "server_group_id": "{lb_server_group_id}",
-       "service_port": "80",
-       "session_duration_time": 120,
-       "support_http2": false,
-       "tags": []
-      }
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "listener_id": "$.listener.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/lb-listeners/{listener_id}",
-      "service": "loadbalancer"
-     }
-    },
-    {
-     "name": "verify-lb-listener-read",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/lb-listeners/{listener_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "lb-listener"
-    },
-    {
-     "name": "verify-lb-listener-set",
-     "service": "loadbalancer",
-     "method": "PUT",
-     "path": "/v1/lb-listeners/{listener_id}",
-     "json": {
-      "listener": {
-       "description": "API regression suite (set)",
-       "session_duration_time": 120
-      }
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "lb-listener"
-    },
-    {
-     "name": "create-lb-member",
-     "service": "loadbalancer",
-     "method": "POST",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-     "json": {
-      "members": [
-       {
-        "name": "regrmember1",
-        "member_ip": "10.124.0.101",
-        "member_port": 80,
-        "member_state": "ENABLE",
-        "member_weight": 100,
-        "object_id": "",
-        "object_type": "VM"
-       }
-      ]
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "member_id": "$.members[0].id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
-      "service": "loadbalancer"
-     }
-    },
-    {
-     "name": "verify-lb-member-show",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
-     "expect_status": [
-      200
-     ],
-     "group": "lb-member"
-    },
-    {
-     "name": "verify-lb-member-set",
-     "service": "loadbalancer",
-     "method": "PUT",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
-     "json": {
-      "member": {
-       "member_port": 80,
-       "member_state": "ENABLE",
-       "member_weight": 100
-      }
-     },
-     "expect_status": [
-      200,
-      202
-     ],
-     "group": "lb-member"
-    },
-    {
-     "name": "create-lb-member-bulk",
-     "service": "loadbalancer",
-     "method": "POST",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-     "json": {
-      "members": [
-       {
-        "name": "regrmember2",
-        "member_ip": "10.124.0.102",
-        "member_port": 80,
-        "member_state": "ENABLE",
-        "member_weight": 100,
-        "object_id": "",
-        "object_type": "VM"
-       }
-      ]
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "member_bulk_id": "$.members[0].id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-      "json": {
-       "member_id_list": [
-        "{member_bulk_id}"
-       ]
-      },
-      "service": "loadbalancer"
-     }
-    },
-    {
-     "name": "verify-lb-member-bulk",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-     "expect_status": [
-      200
-     ],
-     "group": "lb-member-bulk"
-    },
-    {
-     "name": "create-internet-gateway",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/internet-gateways",
-     "json": {
-      "description": "API regression suite",
-      "firewall_enabled": false,
-      "firewall_loggable": false,
-      "type": "IGW",
-      "vpc_id": "{vpc_id}",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "internet_gateway_id": "$.internet_gateway.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/internet-gateways/{internet_gateway_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "wait-internet-gateway",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/internet-gateways/{internet_gateway_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.internet_gateway.state",
-      "until": [
-       "ACTIVE",
-       "ATTACHED",
-       "CREATED",
-       "RUNNING"
-      ],
-      "timeout": 300,
-      "interval": 15
-     }
-    },
-    {
-     "name": "create-public-ip",
-     "service": "vpc",
-     "method": "POST",
-     "path": "/v1/publicips",
-     "json": {
-      "description": "API regression suite",
-      "type": "IGW",
-      "tags": []
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "publicip_id": "$.publicip.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/publicips/{publicip_id}",
-      "service": "vpc"
-     }
-    },
-    {
-     "name": "wait-public-ip",
-     "service": "vpc",
-     "method": "GET",
-     "path": "/v1/publicips/{publicip_id}",
-     "expect_status": [
-      200
-     ],
-     "poll": {
-      "field": "$.publicip.state",
-      "until": [
-       "ACTIVE",
-       "CREATED",
-       "RUNNING",
-       "AVAILABLE"
-      ],
-      "timeout": 300,
-      "interval": 15
-     }
-    },
-    {
-     "name": "create-lb-static-nat",
-     "service": "loadbalancer",
-     "method": "POST",
-     "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
-     "json": {
-      "static_nat": {
-       "publicip_id": "{publicip_id}"
-      }
-     },
-     "expect_status": [
-      200,
-      201,
-      202
-     ],
-     "capture": {
-      "static_nat_id": "$.static_nat.id"
-     },
-     "cleanup": {
-      "method": "DELETE",
-      "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
-      "json": {
-       "static_nat_id_list": [
-        "{static_nat_id}"
-       ]
-      },
-      "service": "loadbalancer"
-     }
-    },
-    {
-     "name": "verify-lb-static-nat-read",
-     "service": "loadbalancer",
-     "method": "GET",
-     "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
-     "expect_status": [
-      200
-     ],
-     "group": "lb-static-nat"
-    },
-    {
-     "name": "delete-lb-listener",
-     "service": "loadbalancer",
-     "method": "DELETE",
-     "path": "/v1/lb-listeners/{listener_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
-    },
-    {
-     "name": "delete-lb-member",
-     "service": "loadbalancer",
-     "method": "DELETE",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}/members/{member_id}",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true
-    },
-    {
-     "name": "delete-lb-member-bulk",
-     "service": "loadbalancer",
-     "method": "DELETE",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}/members",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true,
-     "json": {
-      "member_id_list": [
-       "{member_bulk_id}"
-      ]
-     }
-    },
-    {
-     "name": "delete-lb-server-group",
-     "service": "loadbalancer",
-     "method": "DELETE",
-     "path": "/v1/lb-server-groups/{lb_server_group_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-lb-health-check",
-     "service": "loadbalancer",
-     "method": "DELETE",
-     "path": "/v1/lb-health-checks/{lb_health_check_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-lb-static-nat",
-     "service": "loadbalancer",
-     "method": "DELETE",
-     "path": "/v1/loadbalancers/{loadbalancer_id}/static-nats",
-     "expect_status": [
-      200,
-      202,
-      204
-     ],
-     "destructive": true,
-     "json": {
-      "static_nat_id_list": [
-       "{static_nat_id}"
-      ]
-     }
-    },
-    {
-     "name": "delete-public-ip",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/publicips/{publicip_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-internet-gateway",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/internet-gateways/{internet_gateway_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-load-balancer",
-     "service": "loadbalancer",
-     "method": "DELETE",
-     "path": "/v1/loadbalancers/{loadbalancer_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30
-    },
-    {
-     "name": "delete-subnet",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/subnets/{subnet_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30,
-     "adopt": "subnet"
-    },
-    {
-     "name": "delete-vpc",
-     "service": "vpc",
-     "method": "DELETE",
-     "path": "/v1/vpcs/{vpc_id}",
-     "expect_status": [
-      200,
-      202,
-      204,
-      409,
-      404
-     ],
-     "destructive": true,
-     "retry_on_status": [
-      409
-     ],
-     "retries": 40,
-     "retry_interval": 30,
-     "adopt": "vpc"
-    }
-   ],
-   "heavy": true
-  }
- ]
+  ]
 }
