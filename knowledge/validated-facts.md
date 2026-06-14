@@ -361,3 +361,14 @@ sweep 마일스톤만 누락된 원인.)
   401 there may be backend (RBAC/quirk), not this bug. The scoped live run
   decides: if it still 401s with the fix, reclassify the two known_issues
   entries as Product Bug instead of removing them.
+
+## SKE cluster/nodepool upgrade — LIVE-PROVEN (run 27492496266, 2026-06-14)
+- `gen-heavy-ske-upgrade` chain passed end-to-end (1 passed, 35m26s real
+  control-plane + node roll): create old cluster v1.33.5 → `PUT
+  /v1/clusters/{id}/upgrade {kubernetes_version:v1.34.3}` → RUNNING re-poll →
+  `PUT /v1/nodepools/{id}/upgrade {os_version:"22.04"}` (OS version, NOT k8s
+  version — node follows control-plane) → kubeconfig GET ×2 → teardown.
+- **ske-image**: `GET /v1/images?scp_original_image_type=k8s` — the
+  `scp_original_image_type=k8s` query is REQUIRED (api_docs; omission → 400
+  "Field required", runs 27483895557/27491816948). `size`/`page` optional.
+- Nodes promoted to VALIDATED: ske-image, ske-cluster-upgrade, ske-nodepool-upgrade.

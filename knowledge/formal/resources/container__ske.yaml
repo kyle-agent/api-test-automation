@@ -112,7 +112,7 @@ resources:
     verify:
       - {name: images-page, endpoint: "GET /v1/images?scp_original_image_type=k8s&size=20&page=0",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: container-ske-cluster-nodepool, steps: [list-images]}
     notes: "노드 OS 이미지 목록 — scp_original_image_type=k8s가 필수 쿼리 (api_docs required, 누락 시 400 'Field required' runs 27483895557/27491816948). size/page는 optional. capture 불요 — nodepool은 image_os/image_os_version 문자열을 직접 받는다."
 
@@ -133,7 +133,7 @@ resources:
     ready: {endpoint: "GET /v1/clusters/{ske-cluster.cluster_id}",
             field: "$.cluster.status", until: [RUNNING, ACTIVE, Running],
             timeout: 3600, interval: 60}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: ske-upgrade-write-coverage, steps: [upgrade-cluster]}
     notes: "IRREVERSIBLE 컨트롤플레인 롤 — 1회용(합성 생성) 클러스터에서만. ClusterUpgradeSetRequest {kubernetes_version} (api_docs). 업그레이드 완료까지 RUNNING 재폴링 최대 60분. capture/delete 없음 (액션 노드)."
 
@@ -148,6 +148,6 @@ resources:
     ready: {endpoint: "GET /v1/nodepools/{ske-nodepool.nodepool_id}",
             field: "$.nodepool.status", until: [Running, RUNNING, ACTIVE, active],
             timeout: 2400, interval: 30}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: ske-upgrade-write-coverage, steps: [upgrade-nodepool]}
     notes: "노드 롤 — 컨트롤플레인 업그레이드 후에만 (requires로 순서 강제). body는 NodepoolUpgradeSetRequestV1Dot4 {os_version} — k8s 버전이 아니라 OS 버전을 받는다 (api_docs; 노드는 컨트롤플레인 버전을 따라감). scp_gpu_driver는 optional 생략."

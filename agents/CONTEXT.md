@@ -212,6 +212,13 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   excluded; parallel-filestorage reads-only (`owner-exclusion` waivers);
   per-profile baselines file-suffixed (`core/baselines.py`); multi-tenancy
   confirmed required.
+- **SKE upgrade LIVE-PROVEN (run 27492496266, 2026-06-14):** the
+  `gen-heavy-ske-upgrade` chain passed end-to-end (35m real cluster
+  v1.33.5→v1.34.3 control-plane + node roll). Nodes **ske-image /
+  ske-cluster-upgrade / ske-nodepool-upgrade → VALIDATED**
+  (`scp_original_image_type=k8s` listimages query confirmed required; nodepool
+  upgrade takes `os_version`, not k8s version). Triaged green via the escalation
+  ladder (rev1→rev2 ske-image query fixes → rev3 green). fail_new 0 held.
 - **Autonomous-loop hardening + P1 ingestion complete (2026-06-14):** the
   self-driving loop now has explicit **Stop-when** — an L0→L3 **escalation
   ladder** (L2 = userguide WebFetch fallback) with pre-set limits (3 rev/window,
