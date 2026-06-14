@@ -249,8 +249,8 @@
     (docs/RESOURCE-MODEL-PLAN.md). 저장은 기존 authoring 파이프라인
     (검증 → 쓰기 → 로컬 git 커밋)을 그대로 탄다.</p>
   <div class="cards">
-    <div class="card"><div class="num">245</div><div class="lbl">노드</div></div>
-    <div class="card"><div class="num">87</div>
+    <div class="card"><div class="num">270</div><div class="lbl">노드</div></div>
+    <div class="card"><div class="num">91</div>
       <div class="lbl">VALIDATED (역추출 검증)</div></div>
     <div class="card"><div class="num">57</div><div class="lbl">그룹</div></div>
     <div class="card"><div class="num">59</div>
@@ -346,7 +346,7 @@
       <td><a href="resource__apigw-api.html"><code>apigw-api</code></a></td>
       <td class="muted">application-service/apigateway</td>
       <td class="muted">(없음)</td>
-      <td>0</td>
+      <td>1</td>
       <td><span class="status done">
         VALIDATED</span></td>
     </tr>
@@ -386,7 +386,7 @@
       <td><a href="resource__apigw-method.html"><code>apigw-method</code></a></td>
       <td class="muted">application-service/apigateway</td>
       <td class="muted">apigw-api, apigw-resource</td>
-      <td>0</td>
+      <td>3</td>
       <td><span class="status done">
         VALIDATED</span></td>
     </tr>
@@ -406,7 +406,7 @@
       <td><a href="resource__apigw-resource.html"><code>apigw-resource</code></a></td>
       <td class="muted">application-service/apigateway</td>
       <td class="muted">apigw-api, apigw-root-resource</td>
-      <td>0</td>
+      <td>1</td>
       <td><span class="status done">
         VALIDATED</span></td>
     </tr>
@@ -504,17 +504,47 @@
 <section>
   <h2>cp-gpu — 컴퓨트 — Multi-node GPU Cluster
     <span class="cat">compute</span>
-    <span class="muted">(1 노드)</span></h2>
+    <span class="muted">(4 노드)</span></h2>
   
   <table>
     <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
         <th>옵션</th><th>검증상태</th></tr>
     
     <tr>
+      <td class="muted">cp-gpu-fabric-lookup</td>
+      <td><a href="resource__gpu-node-fabric.html"><code>gpu-node-fabric</code></a></td>
+      <td class="muted">compute/multinodegpucluster</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-gpu-image-lookup</td>
+      <td><a href="resource__gpu-node-image.html"><code>gpu-node-image</code></a></td>
+      <td class="muted">compute/multinodegpucluster</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
       <td class="muted">cp-gpu-node</td>
       <td><a href="resource__gpu-node.html"><code>gpu-node</code></a></td>
       <td class="muted">compute/multinodegpucluster</td>
       <td class="muted">vpc, subnet</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">cp-gpu-product-lookup</td>
+      <td><a href="resource__gpu-node-product.html"><code>gpu-node-product</code></a></td>
+      <td class="muted">compute/multinodegpucluster</td>
+      <td class="muted">(없음)</td>
       <td>0</td>
       <td><span class="status dispatched">
         docs</span></td>
@@ -631,7 +661,7 @@
       <td><a href="resource__block-volume.html"><code>block-volume</code></a></td>
       <td class="muted">compute/virtualserver</td>
       <td class="muted">(없음)</td>
-      <td>0</td>
+      <td>1</td>
       <td><span class="status done">
         VALIDATED</span></td>
     </tr>
@@ -741,7 +771,7 @@
       <td><a href="resource__volume-attachment.html"><code>volume-attachment</code></a></td>
       <td class="muted">compute/virtualserver</td>
       <td class="muted">server, block-volume</td>
-      <td>0</td>
+      <td>1</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -848,8 +878,8 @@
       <td class="muted">container/ske</td>
       <td class="muted">ske-cluster</td>
       <td>1</td>
-      <td><span class="status dispatched">
-        docs</span></td>
+      <td><span class="status done">
+        VALIDATED</span></td>
     </tr>
     
     <tr>
@@ -858,8 +888,8 @@
       <td class="muted">container/ske</td>
       <td class="muted">(없음)</td>
       <td>0</td>
-      <td><span class="status dispatched">
-        docs</span></td>
+      <td><span class="status done">
+        VALIDATED</span></td>
     </tr>
     
     <tr>
@@ -878,8 +908,8 @@
       <td class="muted">container/ske</td>
       <td class="muted">ske-nodepool, ske-cluster-upgrade</td>
       <td>0</td>
-      <td><span class="status dispatched">
-        docs</span></td>
+      <td><span class="status done">
+        VALIDATED</span></td>
     </tr>
     
     <tr>
@@ -909,8 +939,8 @@
       <td class="muted">da-df-flow</td>
       <td><a href="resource__data-flow.html"><code>data-flow</code></a></td>
       <td class="muted">data-analytics/data-flow</td>
-      <td class="muted">data-flow-service</td>
-      <td>0</td>
+      <td class="muted">(없음)</td>
+      <td>2</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -919,8 +949,8 @@
       <td class="muted">da-df-service</td>
       <td><a href="resource__data-flow-service.html"><code>data-flow-service</code></a></td>
       <td class="muted">data-analytics/data-flow</td>
-      <td class="muted">subnet</td>
-      <td>2</td>
+      <td class="muted">ske-cluster, filestorage-volume, data-flow</td>
+      <td>4</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -942,8 +972,8 @@
       <td class="muted">da-do-ops</td>
       <td><a href="resource__data-ops.html"><code>data-ops</code></a></td>
       <td class="muted">data-analytics/data-ops</td>
-      <td class="muted">data-ops-service</td>
-      <td>0</td>
+      <td class="muted">(없음)</td>
+      <td>2</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -952,8 +982,8 @@
       <td class="muted">da-do-service</td>
       <td><a href="resource__data-ops-service.html"><code>data-ops-service</code></a></td>
       <td class="muted">data-analytics/data-ops</td>
-      <td class="muted">subnet</td>
-      <td>2</td>
+      <td class="muted">ske-cluster, filestorage-volume, data-ops</td>
+      <td>5</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -988,18 +1018,58 @@
 <section>
   <h2>da-qq — 데이터분석 — Quick Query
     <span class="cat">data-analytics</span>
-    <span class="muted">(1 노드)</span></h2>
+    <span class="muted">(5 노드)</span></h2>
   
   <table>
     <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
         <th>옵션</th><th>검증상태</th></tr>
     
     <tr>
+      <td class="muted">da-qq-image-versions</td>
+      <td><a href="resource__quick-query-image-versions.html"><code>quick-query-image-versions</code></a></td>
+      <td class="muted">data-analytics/quick-query</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">da-qq-list</td>
+      <td><a href="resource__quick-query-list.html"><code>quick-query-list</code></a></td>
+      <td class="muted">data-analytics/quick-query</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
       <td class="muted">da-qq-query</td>
       <td><a href="resource__quick-query.html"><code>quick-query</code></a></td>
       <td class="muted">data-analytics/quick-query</td>
-      <td class="muted">subnet</td>
-      <td>2</td>
+      <td class="muted">vpc, subnet, security-group, filestorage-volume×2</td>
+      <td>10</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">da-qq-set-description</td>
+      <td><a href="resource__quick-query-update-description.html"><code>quick-query-update-description</code></a></td>
+      <td class="muted">data-analytics/quick-query</td>
+      <td class="muted">quick-query</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">da-qq-validate</td>
+      <td><a href="resource__quick-query-validate.html"><code>quick-query-validate</code></a></td>
+      <td class="muted">data-analytics/quick-query</td>
+      <td class="muted">(없음)</td>
+      <td>1</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -1022,7 +1092,7 @@
       <td><a href="resource__searchengine-cluster.html"><code>searchengine-cluster</code></a></td>
       <td class="muted">data-analytics/searchengine</td>
       <td class="muted">subnet</td>
-      <td>4</td>
+      <td>5</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -1045,7 +1115,7 @@
       <td><a href="resource__vertica-cluster.html"><code>vertica-cluster</code></a></td>
       <td class="muted">data-analytics/vertica</td>
       <td class="muted">subnet</td>
-      <td>5</td>
+      <td>6</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -1952,18 +2022,198 @@
 <section>
   <h2>db-sqlserver — 데이터베이스 — SQL Server DBaaS 클러스터 (라이선스 필요)
     <span class="cat">database</span>
-    <span class="muted">(1 노드)</span></h2>
+    <span class="muted">(19 노드)</span></h2>
   
   <table>
     <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
         <th>옵션</th><th>검증상태</th></tr>
     
     <tr>
+      <td class="muted">db-sqlserver-add-block-storage</td>
+      <td><a href="resource__ss-add-block-storage.html"><code>ss-add-block-storage</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster, ss-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-add-secondary</td>
+      <td><a href="resource__ss-add-secondary.html"><code>ss-add-secondary</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
       <td class="muted">db-sqlserver-cluster</td>
       <td><a href="resource__sqlserver-cluster.html"><code>sqlserver-cluster</code></a></td>
       <td class="muted">database/sqlserver</td>
-      <td class="muted">subnet</td>
+      <td class="muted">subnet, ss-engine-version, ss-server-type</td>
       <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-databases</td>
+      <td><a href="resource__ss-databases.html"><code>ss-databases</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-engine-version</td>
+      <td><a href="resource__ss-engine-version.html"><code>ss-engine-version</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status done">
+        VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-instance-group</td>
+      <td><a href="resource__ss-instance-group.html"><code>ss-instance-group</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-parameter</td>
+      <td><a href="resource__ss-parameter.html"><code>ss-parameter</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-parameter-group</td>
+      <td><a href="resource__ss-parameter-group.html"><code>ss-parameter-group</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-patch</td>
+      <td><a href="resource__ss-patch.html"><code>ss-patch</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-resize-block-storage</td>
+      <td><a href="resource__ss-resize-block-storage.html"><code>ss-resize-block-storage</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster, ss-instance-group</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-resize-server-type</td>
+      <td><a href="resource__ss-resize-server-type.html"><code>ss-resize-server-type</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster, ss-instance-group, ss-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-restart</td>
+      <td><a href="resource__ss-restart.html"><code>ss-restart</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-restore</td>
+      <td><a href="resource__ss-restore.html"><code>ss-restore</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster, ss-server-type</td>
+      <td>1</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-server-type</td>
+      <td><a href="resource__ss-server-type.html"><code>ss-server-type</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">(없음)</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-set-audit-log</td>
+      <td><a href="resource__ss-set-audit-log.html"><code>ss-set-audit-log</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-set-backup</td>
+      <td><a href="resource__ss-set-backup.html"><code>ss-set-backup</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-set-maintenance</td>
+      <td><a href="resource__ss-set-maintenance.html"><code>ss-set-maintenance</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-switchover</td>
+      <td><a href="resource__ss-switchover.html"><code>ss-switchover</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">db-sqlserver-sync-state</td>
+      <td><a href="resource__ss-sync-state.html"><code>ss-sync-state</code></a></td>
+      <td class="muted">database/sqlserver</td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>0</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -1986,7 +2236,7 @@
       <td><a href="resource__devops-service.html"><code>devops-service</code></a></td>
       <td class="muted">devops-tools/devopsservice</td>
       <td class="muted">(없음)</td>
-      <td>0</td>
+      <td>4</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -2009,7 +2259,7 @@
       <td><a href="resource__planned-compute.html"><code>planned-compute</code></a></td>
       <td class="muted">financial-management/billingplan</td>
       <td class="muted">(없음)</td>
-      <td>2</td>
+      <td>4</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -2032,7 +2282,7 @@
       <td><a href="resource__account-budget.html"><code>account-budget</code></a></td>
       <td class="muted">financial-management/budget</td>
       <td class="muted">(없음)</td>
-      <td>0</td>
+      <td>3</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -2124,7 +2374,7 @@
       <td><a href="resource__cm-account-resource.html"><code>cm-account-resource</code></a></td>
       <td class="muted">management/cloudmonitoring</td>
       <td class="muted">(없음)</td>
-      <td>0</td>
+      <td>1</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -2134,7 +2384,7 @@
       <td><a href="resource__cm-event-policy.html"><code>cm-event-policy</code></a></td>
       <td class="muted">management/cloudmonitoring</td>
       <td class="muted">cm-account-resource</td>
-      <td>1</td>
+      <td>2</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -2353,7 +2603,7 @@
       <td><a href="resource__trail.html"><code>trail</code></a></td>
       <td class="muted">management/loggingaudit</td>
       <td class="muted">(없음)</td>
-      <td>1</td>
+      <td>6</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>

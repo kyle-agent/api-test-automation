@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-14T07:46:24Z · <b>sha a2cc068</b>
+    2026-06-14T08:52:16Z · <b>sha e41745f</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -449,19 +449,19 @@
     <path d="M202,731 C238,731 228,381 264,381"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
-    <path d="M454,381 C490,381 480,281 516,281"
+    <path d="M454,381 C490,381 480,331 516,331"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
     <path d="M202,731 C238,731 228,331 264,331"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
-    <path d="M202,731 C238,731 480,231 516,231"
+    <path d="M202,731 C238,731 480,281 516,281"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
-    <path d="M454,381 C490,381 480,231 516,231"
+    <path d="M454,381 C490,381 480,281 516,281"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
-    <path d="M706,231 C742,231 732,181 768,181"
+    <path d="M706,281 C742,281 732,181 768,181"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
     <path d="M958,181 C994,181 984,31 1020,31"
@@ -476,7 +476,7 @@
     <path d="M202,681 C238,681 228,431 264,431"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
-    <path d="M454,431 C490,431 480,331 516,331"
+    <path d="M454,431 C490,431 480,381 516,381"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
     <path d="M202,731 C238,731 228,231 264,231"
@@ -518,16 +518,22 @@
     <path d="M202,281 C238,281 228,131 264,131"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
-    <path d="M202,731 C238,731 480,131 516,131"
-          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
-    
-    <path d="M454,381 C490,381 480,131 516,131"
-          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
-    
     <path d="M202,731 C238,731 480,181 516,181"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
     <path d="M454,381 C490,381 480,181 516,181"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 480,231 516,231"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,381 C490,381 480,231 516,231"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M202,731 C238,731 480,131 516,131"
+          fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
+    
+    <path d="M454,381 C490,381 480,131 516,131"
           fill="none" stroke="#9aa7b5" stroke-width="1.2" marker-end="url(#arr)"/>
     
     <path d="M706,31 C742,31 732,231 768,231"
@@ -949,62 +955,74 @@
     </g>
     
     <g>
-      <title>mysql-cluster (database/mysql) — heavy, billable</title>
+      <title>epas-cluster (database/epas) — heavy, billable; Postgres-family (EPAS) cluster (run 27478985079)</title>
       <rect x="516" y="112" width="190" height="38"
             rx="6" fill="#fff"
             stroke="#198754"
             stroke-width="1.4"/>
       <text x="524" y="128" font-size="12" font-weight="600"
-            fill="#1c2733">mysql-cluster</text>
+            fill="#1c2733">epas-cluster</text>
       <text x="524" y="143" font-size="10"
-            fill="#6b7a8d">database/mysql</text>
+            fill="#6b7a8d">database/epas</text>
     </g>
     
     <g>
-      <title>postgresql-cluster (database/postgresql) — heavy, billable</title>
+      <title>mysql-cluster (database/mysql) — heavy, billable</title>
       <rect x="516" y="162" width="190" height="38"
             rx="6" fill="#fff"
             stroke="#198754"
             stroke-width="1.4"/>
       <text x="524" y="178" font-size="12" font-weight="600"
-            fill="#1c2733">postgresql-cluster</text>
+            fill="#1c2733">mysql-cluster</text>
       <text x="524" y="193" font-size="10"
+            fill="#6b7a8d">database/mysql</text>
+    </g>
+    
+    <g>
+      <title>postgresql-cluster (database/postgresql) — heavy, billable</title>
+      <rect x="516" y="212" width="190" height="38"
+            rx="6" fill="#fff"
+            stroke="#198754"
+            stroke-width="1.4"/>
+      <text x="524" y="228" font-size="12" font-weight="600"
+            fill="#1c2733">postgresql-cluster</text>
+      <text x="524" y="243" font-size="10"
             fill="#6b7a8d">database/postgresql</text>
     </g>
     
     <g>
       <title>load-balancer (networking/loadbalancer) — consumes 4 IPs from the service subnet (service + SNAT + 2 health-check); SNAT/HC IPs immutable after create; public NAT additionally needs an internet-gateway on the VPC</title>
-      <rect x="516" y="212" width="190" height="38"
+      <rect x="516" y="262" width="190" height="38"
             rx="6" fill="#fff"
             stroke="#d97706"
             stroke-width="1.4"/>
-      <text x="524" y="228" font-size="12" font-weight="600"
+      <text x="524" y="278" font-size="12" font-weight="600"
             fill="#1c2733">load-balancer</text>
-      <text x="524" y="243" font-size="10"
+      <text x="524" y="293" font-size="10"
             fill="#6b7a8d">networking/loadbalancer</text>
     </g>
     
     <g>
       <title>port (networking/vpc) — security_groups: [] is accepted</title>
-      <rect x="516" y="262" width="190" height="38"
+      <rect x="516" y="312" width="190" height="38"
             rx="6" fill="#fff"
             stroke="#198754"
             stroke-width="1.4"/>
-      <text x="524" y="278" font-size="12" font-weight="600"
+      <text x="524" y="328" font-size="12" font-weight="600"
             fill="#1c2733">port</text>
-      <text x="524" y="293" font-size="10"
+      <text x="524" y="343" font-size="10"
             fill="#6b7a8d">networking/vpc</text>
     </g>
     
     <g>
       <title>vpn-tunnel (networking/vpn) — max 5 per gateway; needs peer GW IP + remote subnet CIDR(s, max 10) + PSK(8-64) + IKE/IPSec/DPD blocks</title>
-      <rect x="516" y="312" width="190" height="38"
+      <rect x="516" y="362" width="190" height="38"
             rx="6" fill="#fff"
             stroke="#d97706"
             stroke-width="1.4"/>
-      <text x="524" y="328" font-size="12" font-weight="600"
+      <text x="524" y="378" font-size="12" font-weight="600"
             fill="#1c2733">vpn-tunnel</text>
-      <text x="524" y="343" font-size="10"
+      <text x="524" y="393" font-size="10"
             fill="#6b7a8d">networking/vpn</text>
     </g>
     

@@ -336,7 +336,12 @@
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">endpoint_type
+          <input type="text" name="opt__apigw-api__endpoint_type" size="10"
+                 value=""
+                 placeholder="REGION, PRIVATE"></label>
+        
       </td>
     </tr>
     
@@ -392,7 +397,22 @@
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">method_type
+          <input type="text" name="opt__apigw-method__method_type" size="10"
+                 value=""
+                 placeholder="GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD, ANY"></label>
+        
+        <label style="white-space:nowrap">integration_type
+          <input type="text" name="opt__apigw-method__integration_type" size="10"
+                 value=""
+                 placeholder="HTTP, Cloud Function, PrivateLink"></label>
+        
+        <label style="white-space:nowrap">endpoint_url
+          <input type="text" name="opt__apigw-method__endpoint_url" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
       </td>
     </tr>
     
@@ -420,7 +440,12 @@
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">path_part
+          <input type="text" name="opt__apigw-resource__path_part" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
       </td>
     </tr>
     
@@ -515,10 +540,57 @@
     
     <tr>
       <td><input type="checkbox" name="targets"
+                 value="gpu-node-fabric"></td>
+      <td class="muted">cp-gpu-fabric-lookup</td>
+      <td><code>gpu-node-fabric</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="gpu-node-image"></td>
+      <td class="muted">cp-gpu-image-lookup</td>
+      <td><code>gpu-node-image</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
                  value="gpu-node"></td>
       <td class="muted">cp-gpu-node</td>
       <td><code>gpu-node</code></td>
       <td class="muted">vpc, subnet</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">nat_enabled
+          <input type="text" name="opt__gpu-node__nat_enabled" size="10"
+                 value=""
+                 placeholder="true, false"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="gpu-node-product"></td>
+      <td class="muted">cp-gpu-product-lookup</td>
+      <td><code>gpu-node-product</code></td>
+      <td class="muted">(없음)</td>
       <td>
         <span class="muted">—</span>
       </td>
@@ -654,7 +726,12 @@
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">volume_type
+          <input type="text" name="opt__block-volume__volume_type" size="10"
+                 value=""
+                 placeholder="SSD, HDD, SSD_Provisioned, SSD_KMS, HDD_KMS, SSD_MultiAttach, HDD_MultiAttach"></label>
+        
       </td>
     </tr>
     
@@ -808,7 +885,12 @@
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">delete_on_termination
+          <input type="text" name="opt__volume-attachment__delete_on_termination" size="10"
+                 value=""
+                 placeholder="true, false"></label>
+        
       </td>
     </tr>
     
@@ -1000,12 +1082,22 @@
                  value="data-flow"></td>
       <td class="muted">da-df-flow</td>
       <td><code>data-flow</code></td>
-      <td class="muted">data-flow-service</td>
+      <td class="muted">(없음)</td>
       <td>
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">name
+          <input type="text" name="opt__data-flow__name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">description
+          <input type="text" name="opt__data-flow__description" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
       </td>
     </tr>
     
@@ -1014,7 +1106,7 @@
                  value="data-flow-service"></td>
       <td class="muted">da-df-service</td>
       <td><code>data-flow-service</code></td>
-      <td class="muted">subnet</td>
+      <td class="muted">ske-cluster, filestorage-volume, data-flow</td>
       <td>
         <span class="muted">—</span>
       </td>
@@ -1030,6 +1122,16 @@
                  value=""
                  placeholder="string"></label>
         
+        <label style="white-space:nowrap">account_id
+          <input type="text" name="opt__data-flow-service__account_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">account_password
+          <input type="text" name="opt__data-flow-service__account_password" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
       </td>
     </tr>
     
@@ -1038,12 +1140,22 @@
                  value="data-ops"></td>
       <td class="muted">da-do-ops</td>
       <td><code>data-ops</code></td>
-      <td class="muted">data-ops-service</td>
+      <td class="muted">(없음)</td>
       <td>
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">name
+          <input type="text" name="opt__data-ops__name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">description
+          <input type="text" name="opt__data-ops__description" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
       </td>
     </tr>
     
@@ -1052,7 +1164,7 @@
                  value="data-ops-service"></td>
       <td class="muted">da-do-service</td>
       <td><code>data-ops-service</code></td>
-      <td class="muted">subnet</td>
+      <td class="muted">ske-cluster, filestorage-volume, data-ops</td>
       <td>
         <span class="muted">—</span>
       </td>
@@ -1065,6 +1177,21 @@
         
         <label style="white-space:nowrap">server_type_name
           <input type="text" name="opt__data-ops-service__server_type_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">executor_type
+          <input type="text" name="opt__data-ops-service__executor_type" size="10"
+                 value=""
+                 placeholder="Kubernetes, Celery"></label>
+        
+        <label style="white-space:nowrap">account_id
+          <input type="text" name="opt__data-ops-service__account_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">account_password
+          <input type="text" name="opt__data-ops-service__account_password" size="10"
                  value=""
                  placeholder="string"></label>
         
@@ -1107,22 +1234,123 @@
     
     <tr>
       <td><input type="checkbox" name="targets"
+                 value="quick-query-image-versions"></td>
+      <td class="muted">da-qq-image-versions</td>
+      <td><code>quick-query-image-versions</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="quick-query-list"></td>
+      <td class="muted">da-qq-list</td>
+      <td><code>quick-query-list</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
                  value="quick-query"></td>
       <td class="muted">da-qq-query</td>
       <td><code>quick-query</code></td>
-      <td class="muted">subnet</td>
+      <td class="muted">vpc, subnet, security-group, filestorage-volume×2</td>
       <td>
         <span class="muted">—</span>
       </td>
       <td>
         
-        <label style="white-space:nowrap">engine_version_id
-          <input type="text" name="opt__quick-query__engine_version_id" size="10"
+        <label style="white-space:nowrap">k8s_version
+          <input type="text" name="opt__quick-query__k8s_version" size="10"
                  value=""
                  placeholder="string"></label>
         
-        <label style="white-space:nowrap">server_type_name
-          <input type="text" name="opt__quick-query__server_type_name" size="10"
+        <label style="white-space:nowrap">image_os
+          <input type="text" name="opt__quick-query__image_os" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">image_os_version
+          <input type="text" name="opt__quick-query__image_os_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">keypair_name
+          <input type="text" name="opt__quick-query__keypair_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">server_type_id
+          <input type="text" name="opt__quick-query__server_type_id" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">version
+          <input type="text" name="opt__quick-query__version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">image_id
+          <input type="text" name="opt__quick-query__image_id" size="10"
+                 value=""
+                 placeholder="ref"></label>
+        
+        <label style="white-space:nowrap">domain
+          <input type="text" name="opt__quick-query__domain" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">dsc_domain
+          <input type="text" name="opt__quick-query__dsc_domain" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">query_engine_spec
+          <input type="text" name="opt__quick-query__query_engine_spec" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="quick-query-update-description"></td>
+      <td class="muted">da-qq-set-description</td>
+      <td><code>quick-query-update-description</code></td>
+      <td class="muted">quick-query</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="quick-query-validate"></td>
+      <td class="muted">da-qq-validate</td>
+      <td><code>quick-query-validate</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">cluster_id
+          <input type="text" name="opt__quick-query-validate__cluster_id" size="10"
                  value=""
                  placeholder="string"></label>
         
@@ -1157,6 +1385,11 @@
         
         <label style="white-space:nowrap">db_user_password
           <input type="text" name="opt__searchengine-cluster__db_user_password" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">license
+          <input type="text" name="opt__searchengine-cluster__license" size="10"
                  value=""
                  placeholder="string"></label>
         
@@ -1196,6 +1429,11 @@
         
         <label style="white-space:nowrap">db_user_password
           <input type="text" name="opt__vertica-cluster__db_user_password" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">license
+          <input type="text" name="opt__vertica-cluster__license" size="10"
                  value=""
                  placeholder="string"></label>
         
@@ -2596,10 +2834,43 @@
     
     <tr>
       <td><input type="checkbox" name="targets"
+                 value="ss-add-block-storage"></td>
+      <td class="muted">db-sqlserver-add-block-storage</td>
+      <td><code>ss-add-block-storage</code></td>
+      <td class="muted">sqlserver-cluster, ss-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-add-secondary"></td>
+      <td class="muted">db-sqlserver-add-secondary</td>
+      <td><code>ss-add-secondary</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">license
+          <input type="text" name="opt__ss-add-secondary__license" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
                  value="sqlserver-cluster"></td>
       <td class="muted">db-sqlserver-cluster</td>
       <td><code>sqlserver-cluster</code></td>
-      <td class="muted">subnet</td>
+      <td class="muted">subnet, ss-engine-version, ss-server-type</td>
       <td>
         <span class="muted">—</span>
       </td>
@@ -2620,6 +2891,245 @@
     
     <tr>
       <td><input type="checkbox" name="targets"
+                 value="ss-databases"></td>
+      <td class="muted">db-sqlserver-databases</td>
+      <td><code>ss-databases</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-engine-version"></td>
+      <td class="muted">db-sqlserver-engine-version</td>
+      <td><code>ss-engine-version</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-instance-group"></td>
+      <td class="muted">db-sqlserver-instance-group</td>
+      <td><code>ss-instance-group</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-parameter"></td>
+      <td class="muted">db-sqlserver-parameter</td>
+      <td><code>ss-parameter</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-parameter-group"></td>
+      <td class="muted">db-sqlserver-parameter-group</td>
+      <td><code>ss-parameter-group</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-patch"></td>
+      <td class="muted">db-sqlserver-patch</td>
+      <td><code>ss-patch</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">target_software_version
+          <input type="text" name="opt__ss-patch__target_software_version" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-resize-block-storage"></td>
+      <td class="muted">db-sqlserver-resize-block-storage</td>
+      <td><code>ss-resize-block-storage</code></td>
+      <td class="muted">sqlserver-cluster, ss-instance-group</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-resize-server-type"></td>
+      <td class="muted">db-sqlserver-resize-server-type</td>
+      <td><code>ss-resize-server-type</code></td>
+      <td class="muted">sqlserver-cluster, ss-instance-group, ss-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__ss-resize-server-type__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-restart"></td>
+      <td class="muted">db-sqlserver-restart</td>
+      <td><code>ss-restart</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-restore"></td>
+      <td class="muted">db-sqlserver-restore</td>
+      <td><code>ss-restore</code></td>
+      <td class="muted">sqlserver-cluster, ss-server-type</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__ss-restore__server_type" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-server-type"></td>
+      <td class="muted">db-sqlserver-server-type</td>
+      <td><code>ss-server-type</code></td>
+      <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-set-audit-log"></td>
+      <td class="muted">db-sqlserver-set-audit-log</td>
+      <td><code>ss-set-audit-log</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-set-backup"></td>
+      <td class="muted">db-sqlserver-set-backup</td>
+      <td><code>ss-set-backup</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-set-maintenance"></td>
+      <td class="muted">db-sqlserver-set-maintenance</td>
+      <td><code>ss-set-maintenance</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-switchover"></td>
+      <td class="muted">db-sqlserver-switchover</td>
+      <td><code>ss-switchover</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="ss-sync-state"></td>
+      <td class="muted">db-sqlserver-sync-state</td>
+      <td><code>ss-sync-state</code></td>
+      <td class="muted">sqlserver-cluster</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
                  value="devops-service"></td>
       <td class="muted">dt-devops-service</td>
       <td><code>devops-service</code></td>
@@ -2628,7 +3138,27 @@
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">tenant_name
+          <input type="text" name="opt__devops-service__tenant_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">tenant_code
+          <input type="text" name="opt__devops-service__tenant_code" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">members
+          <input type="text" name="opt__devops-service__members" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">tags
+          <input type="text" name="opt__devops-service__tags" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
       </td>
     </tr>
     
@@ -2643,15 +3173,25 @@
       </td>
       <td>
         
-        <label style="white-space:nowrap">product_offering
-          <input type="text" name="opt__planned-compute__product_offering" size="10"
+        <label style="white-space:nowrap">contract_type
+          <input type="text" name="opt__planned-compute__contract_type" size="10"
+                 value=""
+                 placeholder="01, 03, 05"></label>
+        
+        <label style="white-space:nowrap">os_type
+          <input type="text" name="opt__planned-compute__os_type" size="10"
+                 value=""
+                 placeholder="opensource, rhel, windows, sles"></label>
+        
+        <label style="white-space:nowrap">server_type
+          <input type="text" name="opt__planned-compute__server_type" size="10"
                  value=""
                  placeholder="string"></label>
         
-        <label style="white-space:nowrap">payment_type
-          <input type="text" name="opt__planned-compute__payment_type" size="10"
+        <label style="white-space:nowrap">service_id
+          <input type="text" name="opt__planned-compute__service_id" size="10"
                  value=""
-                 placeholder="string"></label>
+                 placeholder="VIRTUAL_SERVER"></label>
         
       </td>
     </tr>
@@ -2666,7 +3206,22 @@
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">period_type
+          <input type="text" name="opt__account-budget__period_type" size="10"
+                 value=""
+                 placeholder="MONTHLY, TOTAL"></label>
+        
+        <label style="white-space:nowrap">start_month
+          <input type="text" name="opt__account-budget__start_month" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">threshold_percent
+          <input type="text" name="opt__account-budget__threshold_percent" size="10"
+                 value=""
+                 placeholder="50, 70, 80, 90, 100"></label>
+        
       </td>
     </tr>
     
@@ -2722,7 +3277,12 @@
         <span class="muted">—</span>
       </td>
       <td>
-        <span class="muted">—</span>
+        
+        <label style="white-space:nowrap">size
+          <input type="text" name="opt__cm-account-resource__size" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
       </td>
     </tr>
     
@@ -2740,7 +3300,12 @@
         <label style="white-space:nowrap">eventLevel
           <input type="text" name="opt__cm-event-policy__eventLevel" size="10"
                  value=""
-                 placeholder="WARNING, CRITICAL"></label>
+                 placeholder="WARNING, FATAL, INFORMATION"></label>
+        
+        <label style="white-space:nowrap">comparisonOperator
+          <input type="text" name="opt__cm-event-policy__comparisonOperator" size="10"
+                 value=""
+                 placeholder="GT, GE, LT, LE, EQ, NE"></label>
         
       </td>
     </tr>
@@ -3019,10 +3584,35 @@
       </td>
       <td>
         
-        <label style="white-space:nowrap">object_storage_bucket_name
-          <input type="text" name="opt__trail__object_storage_bucket_name" size="10"
+        <label style="white-space:nowrap">account_id
+          <input type="text" name="opt__trail__account_id" size="10"
                  value=""
                  placeholder="string"></label>
+        
+        <label style="white-space:nowrap">bucket_name
+          <input type="text" name="opt__trail__bucket_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">trail_name
+          <input type="text" name="opt__trail__trail_name" size="10"
+                 value=""
+                 placeholder="string"></label>
+        
+        <label style="white-space:nowrap">trail_save_type
+          <input type="text" name="opt__trail__trail_save_type" size="10"
+                 value=""
+                 placeholder="JSON, CSV"></label>
+        
+        <label style="white-space:nowrap">region_total_yn
+          <input type="text" name="opt__trail__region_total_yn" size="10"
+                 value=""
+                 placeholder="Y, N"></label>
+        
+        <label style="white-space:nowrap">log_verification_yn
+          <input type="text" name="opt__trail__log_verification_yn" size="10"
+                 value=""
+                 placeholder="N, Y"></label>
         
       </td>
     </tr>
