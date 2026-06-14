@@ -212,6 +212,26 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   excluded; parallel-filestorage reads-only (`owner-exclusion` waivers);
   per-profile baselines file-suffixed (`core/baselines.py`); multi-tenancy
   confirmed required.
+- **Autonomous-loop hardening + P1 ingestion complete (2026-06-14):** the
+  self-driving loop now has explicit **Stop-when** — an L0→L3 **escalation
+  ladder** (L2 = userguide WebFetch fallback) with pre-set limits (3 rev/window,
+  no-progress detector) and **6 human-needed STOP criteria**, plus a **3-lane
+  parallel pipeline** (A result-wait/triage · B guide/domain · C compose/prep)
+  with read-before-claim on the shared VPC — codified in
+  `agents/orchestrator.md` (IB-015/016). Lane B ran **3 parallel waves (15
+  services)** that **closed the entire P1 `knowledge/formal/INGESTION.md`
+  backlog** (now 0 `—` P1 rows): mariadb·epas·sqlserver·VS-volume ·
+  searchengine·vertica·quick-query·data-flow·data-ops·cloudmonitoring·
+  loggingaudit·resourcemanager·queueservice · mngc·apigateway·devopsservice·
+  billingplan·pricing·budget·costexplorer. Several smoke-4xx/5xx root-caused
+  via the ladder: quick-query/cloudmonitoring 400 = missing required query
+  params; loggingaudit/devopsservice(PF-05)/billingplan create bodies corrected
+  to the real request models; billingplan 500 confirmed = server bug (baselined,
+  not retried). New tickets: **IB-017** (sqlserver Always On needs SQL Server
+  license — owner credential), **IB-018** (analytics NiFi/Airflow/Trino are
+  SKE-on-k8s, create bodies UNPROVEN), **IB-019** (model↔lifecycle JSON drift:
+  billingplan/devops lifecycles still carry old invented bodies). All R1
+  0-errors; resource model now **270 task nodes / 55 service files**.
 - **What to advance next:** confirm heavy rev 3 (static-NAT `publicip_id`,
   scr/fs recompose, docker-probe borrow), then continue R3 verification
   waves over the 72 remaining docs nodes (compose → scoped
