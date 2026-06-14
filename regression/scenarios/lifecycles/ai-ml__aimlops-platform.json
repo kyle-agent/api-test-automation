@@ -11,7 +11,12 @@
           "name": "list-images",
           "method": "GET",
           "path": "/v1/aimlops-platform/images",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "aimlops",
           "capture_soft": {
@@ -22,7 +27,12 @@
           "name": "list-releases",
           "method": "GET",
           "path": "/v1/aimlops-platform",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
           "optional": true,
           "group": "aimlops",
           "capture_soft": {
@@ -42,7 +52,16 @@
             "namespace": "regr-aimlops-{ualpha}",
             "description": "API regression suite — coverage-only, never provisioned"
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "aimlops-release",
           "_note": "BILLABLE platform release — never actually provisioned. Body (release_name/cluster_id/image_id/namespace) best-effort from field semantics, UNPROVEN; expected 400/422 (needs a real cluster_id/image_id + full resource spec) or 403. Deliberately NOT chained to a delete of a real release."
@@ -54,7 +73,15 @@
           "json": {
             "description": "API regression suite — updated (coverage-only)"
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "group": "aimlops-update",
           "_note": "In-place update (updateaimlopsplatformv1) on the literal {release_id} -> 404. Body UNPROVEN (description-only guess)."
@@ -63,11 +90,28 @@
           "name": "delete-aimlops-platform",
           "method": "DELETE",
           "path": "/v1/aimlops-platform/{release_id}",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [
+            200,
+            202,
+            204,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
           "optional": true,
           "destructive": true,
           "group": "aimlops-delete",
           "_note": "destructive — only runs under SCP_ALLOW_DESTRUCTIVE. Targets the literal {release_id} (no real release) -> expected 404. optional+broad so it records coverage without deleting a real platform."
+        },
+        {
+          "name": "probe-cluster-preconditions",
+          "_note": "Stage A coverage (2026-06-14): the 5 cluster-bound precondition GETs (validate-namespaces/validate-resources/check-version + internal nodes/storageclasses) and GET-by-id need a cluster_id/release_id this coverage-only run never has (empty account -> capture_soft misses -> probe_reads filters the literal {tokens}, so they were NEVER called). Supply concrete NONEXISTENT ids so probe_reads exercises each once (-> 404/400 = endpoint reached, recorded under the catalog key) without provisioning anything. Placed BEFORE the real probe-reads so genuine captured ids, if ever present, overwrite these.",
+          "probe_reads": {
+            "cluster_id": "regrnonexistent{unique}",
+            "release_id": "regrnonexistent{unique}"
+          }
         },
         {
           "name": "probe-reads",
