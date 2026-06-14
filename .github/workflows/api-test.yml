@@ -130,6 +130,14 @@ env:
   SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
   SCP_PROJECT_ID: ${{ secrets.SCP_PROJECT_ID }}
   SCP_AUTH_SCHEME: ${{ vars.SCP_AUTH_SCHEME || 'hmac' }}
+  # --- SCR (Container Registry) credential for cloud-ml, injected into the
+  #     create-cloud-ml body via {env:...}; gen-cloudml-chain env-skips (requires_env)
+  #     until all five are set. Blank when the secrets are absent (no-op for other runs).
+  SCP_SCR_REGISTRY_HOST: ${{ secrets.SCP_SCR_REGISTRY_HOST }}
+  SCP_SCR_ACCESS_KEY: ${{ secrets.SCP_SCR_ACCESS_KEY }}
+  SCP_SCR_ACCESS_SECRET_KEY: ${{ secrets.SCP_SCR_ACCESS_SECRET_KEY }}
+  SCP_SCR_PROJECT_ID: ${{ secrets.SCP_SCR_PROJECT_ID }}
+  SCP_CLOUDML_PRODUCT_GROUP_ID: ${{ secrets.SCP_CLOUDML_PRODUCT_GROUP_ID }}
   # --- run behaviour ---
   SCP_TIMEOUT: ${{ vars.SCP_TIMEOUT || '20' }}
   SCP_MAX_RETRIES: ${{ vars.SCP_MAX_RETRIES || '2' }}

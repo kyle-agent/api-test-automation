@@ -67,7 +67,7 @@ from regression.scenarios.loader import load_lifecycles  # noqa: E402
 
 LIFECYCLES = load_lifecycles()
 DEPENDENCIES = json.loads(DEPENDENCIES_PATH.read_text())
-_PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
+_PLACEHOLDER = re.compile(r"\{(env:[A-Za-z_][A-Za-z0-9_]*|[a-zA-Z0-9_]+)\}")
 
 _SMOKE_TSV = "reports/smoke_status.tsv"
 
@@ -251,7 +251,16 @@ def _capture(body, expr):
 
 
 def _fill(template: str, ctx: dict) -> str:
-    return _PLACEHOLDER.sub(lambda m: str(ctx.get(m.group(1), m.group(0))), template)
+    def _sub(m):
+        key = m.group(1)
+        if key.startswith("env:"):
+            # Secret/config injection: the value comes from the runner
+            # environment (e.g. a GitHub secret), NEVER from git — so real
+            # credentials (SCR registry keys for cloud-ml) stay out of the repo.
+            # Absent -> "" (the lifecycle's requires_env gate skips it upstream).
+            return os.environ.get(key[4:], "")
+        return str(ctx.get(key, m.group(0)))
+    return _PLACEHOLDER.sub(_sub, template)
 
 
 _PEM_BLOCK = re.compile(r"-----BEGIN [^-]+-----.*?-----END [^-]+-----", re.DOTALL)
@@ -497,6 +506,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
     if lifecycle.get("heavy") and not cfg.run_heavy:
         return {"id": lifecycle["id"], "status": "skipped",
                 "reason": "heavy lifecycle — set SCP_RUN_HEAVY=true to run",
+                "failed_groups": [], "created": 0}
+    # Secret-gated lifecycles (e.g. cloud-ml needs the SCR registry credential,
+    # injected via {env:...}). Without the secret(s) set on the runner, env-skip
+    # instead of firing a doomed request — keeps untargeted heavy runs green.
+    missing_env = [v for v in lifecycle.get("requires_env", []) if not os.environ.get(v)]
+    if missing_env:
+        return {"id": lifecycle["id"], "status": "skipped",
+                "reason": f"requires env/secret(s) not set: {', '.join(missing_env)}",
                 "failed_groups": [], "created": 0}
 
     budget = budget if budget is not None else _budgets.Budget()

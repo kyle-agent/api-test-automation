@@ -4,8 +4,8 @@
     {
       "id": "gen-cloudml-chain",
       "service": "ai-ml/cloud-ml",
-      "enabled": false,
-      "_note": "composed cloud-ml full chain — 9-node closure: keypair/registry/k8s-version/sg/vpc/subnet/filestorage -> ske-cluster -> cloud-ml; needs credentials: scr-auth-key",
+      "enabled": true,
+      "_note": "composed cloud-ml full chain — 9-node closure: keypair/registry/k8s-version/sg/vpc/subnet/filestorage -> ske-cluster -> cloud-ml; needs credential scr-auth-key. ENABLED 2026-06-14. The SCR registry credential is injected SECURELY via {env:...} tokens in the create-cloud-ml body (custom_registry_* + product_group_id) -> resolved from runner env vars (GitHub secrets), never committed. requires_env gates the whole lifecycle: if any of SCP_SCR_REGISTRY_HOST / SCP_SCR_ACCESS_KEY / SCP_SCR_ACCESS_SECRET_KEY / SCP_SCR_PROJECT_ID / SCP_CLOUDML_PRODUCT_GROUP_ID is unset, it env-skips instead of firing a doomed request. OWNER must set those 5 GitHub repo secrets (workflow passes them through) before a live run. heavy + billable (~40-60min, own SKE cluster + VPC) — run in a dedicated isolated window (crud_filter=gen-cloudml-chain). Some body fields (cpu/memory/analytics_resource/application_resource) remain UNPROVEN until the first live run.",
       "steps": [
         {
           "name": "create-cloudml-image",
@@ -320,8 +320,14 @@
             "description": "API regression suite",
             "cluster_id": "{cluster_id}",
             "image_id": "{image_id}",
+            "product_group_id": "{env:SCP_CLOUDML_PRODUCT_GROUP_ID}",
             "domain_name": "regr-cloudml-{ualpha}",
             "endpoint_type": "PUBLIC",
+            "custom_registry_host": "{env:SCP_SCR_REGISTRY_HOST}",
+            "custom_registry_access_key": "{env:SCP_SCR_ACCESS_KEY}",
+            "custom_registry_access_secret_key": "{env:SCP_SCR_ACCESS_SECRET_KEY}",
+            "custom_registry_access_project_id": "{env:SCP_SCR_PROJECT_ID}",
+            "custom_registry_access_region": "{region}",
             "use_copilot": false,
             "analytics_resource": {
               "cpu": 1,
@@ -339,6 +345,7 @@
             },
             "tags": []
           },
+          "_note": "product_group_id + custom_registry_* are owner-fill literals — engine has NO env->body substitution (regression/scenarios/engine.py _fill/_fill_obj resolve only builtins + prior captures), and create-container-registry captures only reg_id, so the console-issued SCR auth key cannot be wired automatically. custom_registry_host/access_key/access_secret_key are documented required (data/validation_findings.json:169-181); product_group_id + custom_registry_access_project_id/access_region appear in data/api_bodies.json createcloudml but are UNPROVEN-required (no doc constraint). custom_registry_access_region defaulted to {region}; remove any field the live API rejects as unknown. This key is a step-level sibling of json (NOT in the body) so the engine never sends it.",
           "expect_status": [
             200,
             201,
@@ -514,7 +521,14 @@
         "scr-auth-key"
       ],
       "heavy": true,
-      "_disabled_reason": "READY but gated: (1) SCR 인증키(scr-auth-key)가 테스트 계정에 미설정 — 소유자 콘솔 발급 대기, 없으면 cloud-ml create가 registry-credential 단계에서 실패(소유자 지식); (2) heavy chain — ske-cluster 포함 ~40-60분+과금. 인증키 설정 후 heavy=true scoped run으로 검증"
+      "_disabled_reason": "READY but gated: (1) SCR 인증키(scr-auth-key)가 테스트 계정에 미설정 — 소유자 콘솔 발급 대기, 없으면 cloud-ml create가 registry-credential 단계에서 실패(소유자 지식); (2) heavy chain — ske-cluster 포함 ~40-60분+과금. 인증키 설정 후 heavy=true scoped run으로 검증",
+      "requires_env": [
+        "SCP_SCR_REGISTRY_HOST",
+        "SCP_SCR_ACCESS_KEY",
+        "SCP_SCR_ACCESS_SECRET_KEY",
+        "SCP_SCR_PROJECT_ID",
+        "SCP_CLOUDML_PRODUCT_GROUP_ID"
+      ]
     }
   ]
 }
