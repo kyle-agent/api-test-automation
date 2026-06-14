@@ -1,0 +1,62 @@
+# Layer 1 — per-service knowledge: compute/multinodegpucluster (MNGC)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: /userguide/compute/mngc/{overview,overview/servertype,how_to_guides,
+#         how_to_guides/cluster_fabric,how_to_guides/service_guide} (2026-06-14).
+# Service = non-virtualized (bare-metal) GPU servers clustered (2+ nodes) for
+# large-scale AI; GPU Direct RDMA / NVSwitch / NVLink fabric. provenance: docs
+# (no MNGC body has ever been runtime-confirmed — see resources file).
+
+version: 1
+service: compute/multinodegpucluster
+
+constraints:
+  - id: mngc-min-2-nodes
+    rule: "A GPU cluster needs Bare-Metal-Server count >= 2 at INITIAL creation (clustering requires 2+ nodes). After creation, scaling is +1 server at a time (single-increment). (mngc how_to_guides 2026-06-14)"
+    provenance: docs
+  - id: mngc-server-name-prefix
+    rule: "Server Name Prefix: 3-11 characters, lowercase letters + digits + hyphen, MUST NOT end with a hyphen. Each node is named <prefix>-<n>. (mngc how_to_guides 2026-06-14)"
+    provenance: docs
+  - id: mngc-admin-account-root
+    rule: "Admin OS account for the Ubuntu image is 'root' (os_user_id). Images: Ubuntu 22.04 (NVIDIA driver 535.86.10 / 535.183.06) or Ubuntu 24.04 (driver 580.105.08). (mngc overview 2026-06-14)"
+    provenance: docs
+  - id: mngc-server-type-codes
+    rule: "GPU server (bare-metal) types: g2c96h8_metal = 8x NVIDIA H100 (640 GiB GPU mem total, 80 GiB/GPU, Hopper), 96 vCores, 2 TB RAM, 900 GB/s NVSwitch; g3c128b8_metal = 8x NVIDIA B300 (Blackwell Ultra, 268 GiB/GPU), 128 vCores, 4 TB RAM, 1.8 TB/s NVSwitch. Both: 2x960GB SSD (OS) + 4x3.84TB NVMe, up to 100 Gbps service networking. Code format gNcMhK/bK_metal (gen / cores / GPU-type+count). (mngc overview/servertype 2026-06-14)"
+    provenance: docs
+  - id: mngc-tags-max-50
+    rule: "Maximum 50 tags per resource. (mngc how_to_guides 2026-06-14)"
+    provenance: docs
+  - id: mngc-mig-ecc-reboot
+    rule: "GPU MIG/ECC settings are initialized during creation — reboot a node once and verify settings before production use. (mngc how_to_guides 2026-06-14)"
+    provenance: docs
+  - id: mngc-support-scope-iaas-only
+    rule: "Samsung Cloud Platform supports IaaS/HW-level issues only (IPMI HW fault events, nvidia-smi GPU HW errors, InfiniBand HCA/Switch HW errors). OS kernel updates / application installs are the user's responsibility and void official support due to sensitive Ubuntu/NVIDIA/InfiniBand version compatibility. (mngc how_to_guides/service_guide 2026-06-14)"
+    provenance: docs
+
+# Cluster Fabric is NOT an independently creatable resource (no standalone POST):
+# it is minted WITH the GPU nodes (create body carries cluster_fabric_details)
+# and auto-deleted when all its GPU nodes are released. A node pool is a grouping
+# of nodes that can be bundled into the same Cluster Fabric (RDMA optimization).
+# The catalog exposes only READ paths for fabrics/node-pools + a member-modify op.
+quirks:
+  - id: mngc-fabric-not-standalone
+    note: "Cluster Fabric은 GPU Node 생성 시 함께 생성되며 별도 생성/삭제 불가; GPU Node가 전부 해지되면 Cluster Fabric은 자동 삭제 (mngc how_to_guides/cluster_fabric). Catalog has GET /v1/cluster-fabrics (list), GET /v1/cluster-fabrics/{id} (show), GET /v1/cluster-fabrics/node-pools (list), POST /v1/cluster-fabrics/modify-members (move nodes between pools) — but NO POST/DELETE /v1/cluster-fabrics. The GPU-node create body's cluster_fabric_details {cluster_fabric_id, cluster_fabric_name, node_pool_id} either references an existing fabric or mints a new one."
+    provenance: docs
+  - id: mngc-bulk-delete-no-path-id
+    note: "DELETE /v1/gpu-nodes is a BULK delete with NO path id (body carries gpu_node_id list) — same delete-schema limitation as compute/baremetal's DELETE /v1/baremetals. The §1 resource-model delete cannot carry a body, so composed teardown is effectively blocked until capture + bulk-delete-body support lands (R3)."
+    provenance: docs
+  - id: mngc-public-nat-singular-path
+    note: "Public NAT is per-GPU-node and SINGULAR: POST /v1/gpu-nodes/{gpu_node_id}/public-nat-ip (assign) / DELETE .../public-nat-ip (release) — differs from baremetal's plural form. Requires the node to have a nat_enabled interface and (by analogy to VS/BM) an Internet Gateway on the VPC."
+    provenance: docs
+  - id: mngc-lookup-endpoints
+    note: "Read-only catalog lookups available: GET /v1/gpu-nodes/images (selectable OS images), GET /v1/gpu-nodes/products (server-type/product list — the g2c96h8_metal / g3c128b8_metal codes), GET /v1/gpu-nodes (list), GET /v1/gpu-nodes/{id} (show). image_id/server_type_id literals in coverage bodies should be replaced by these lookups once envelope shapes are observed."
+    provenance: docs
+  - id: mngc-planned-compute-informational
+    note: "The 'Planned Compute' panel during server-count selection is INFORMATIONAL only (사용중/설정/Coverage 미리보기 cost preview) — Planned Compute (확정 컴퓨팅 예약) is an OPTIONAL cost-optimization arranged separately, NOT a hard prerequisite/entitlement for creating GPU nodes (mngc how_to_guides 2026-06-14). So creation is gated by GPU capacity/billing cost, not by a mandatory reservation grant."
+    provenance: docs
+
+states:
+  # how_to_guides node states: Creating, Running, Editing, Unknown, Starting,
+  # Stopping, Stopped, Terminating, Terminated. Poll field unconfirmed live
+  # (no 2xx ever observed) — envelope $.gpu_node.status is a docs-grade guess.
+  gpu-node: {field: $.gpu_node.status, ready: [Running, RUNNING, ACTIVE],
+             stopped: [Stopped, STOPPED], gone: [Terminated, TERMINATED]}

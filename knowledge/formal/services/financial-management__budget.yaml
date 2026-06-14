@@ -1,0 +1,42 @@
+# Layer 1 — per-service knowledge: financial-management/budget
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: /userguide/financial_management/cost_management/{overview,how_to_guides/budget}/ (2026-06-14)
+
+version: 1
+service: financial-management/budget
+
+constraints:
+  - id: budget-name-rule
+    rule: "예산명(name) 최대 20자 — 한글/영문/숫자/공백 및 특수문자 + = . , @ - _ 허용"
+    provenance: docs
+  - id: budget-management-type
+    rule: "관리 유형(period/management type) 2종 — '월별 예산 설정'(매월 사용량 리셋) / '전체 예산 설정'(시작월부터 누적). API enum 토큰 MONTHLY/TOTAL 은 추정(UNPROVEN)"
+    provenance: docs
+  - id: budget-required-fields
+    rule: "필수 입력: 예산명·관리 유형·예산 금액(amount)·시작월(start_month). currency 필드는 userguide 미노출(계정 기본통화 추정 — body의 currency:KRW UNPROVEN)"
+    provenance: docs
+  - id: budget-threshold-alert
+    rule: "임계치 도달 알림(threshold alert)은 선택 — 알림 시점(임계 %)·알림 발송 빈도(최초 1회 / 매일)·알림 수신자(이메일). 문서 구조상 예산당 임계치 1개. 임계치 수정 시 기존 알림 리셋(재발송 가능)"
+    provenance: docs
+  - id: budget-prevent-new-creation
+    rule: "'신규 생성 방지' 옵션 — 임계 % 도달 시 Compute/Database 서비스군 신규 생성 차단. 2025.12 기준 적용 대상: Virtual Server·Databases·Event Streams·Search Engine·Vertica·Oracle Service"
+    provenance: docs
+
+captures:
+  account-budget: "$.budget.id"
+
+states: {}
+
+quirks:
+  - id: no-prerequisites
+    note: "선행 서비스 없음 — GLOBAL(account-scoped, region 세그먼트 없음). 인프라 미생성 → light 자원. 생성 즉시 사용 가능, ready 폴링 불필요"
+    provenance: docs
+  - id: single-budget-per-account
+    note: "계정당 budget 1개로 추정 — 공유 계정에 이미 존재하면 create가 409. 합성 시 env-skip 또는 adopt 후보"
+    provenance: docs
+  - id: delete-permanent
+    note: "DELETE /v1/budgets/account/{budget_id} 는 영구 삭제(복구 불가)"
+    provenance: docs
+  - id: create-500-product-bug
+    note: "POST /v1/budgets/account 가 완성형 body에도 500 ContactAdminForAssistance (run 27395331657) — product bug PF-04, data/baselines/known_issues.json 에 baselined. account-budget 노드는 백엔드 수정 전까지 composed wave에서 제외. apiref가 JS-rendered/console-only 이라 정확한 필드명/enum 토큰은 실 2xx 전까지 UNPROVEN"
+    provenance: docs

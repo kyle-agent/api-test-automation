@@ -52,7 +52,7 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/compute/baremetal_server/overview/ | compute/baremetal |
 | ✅ | P1 | /userguide/compute/block_storage_vm/overview/ | compute/virtualserver (volumes) |
 | ✅ | P1 | /userguide/compute/cloud_functions/overview/ | compute/scf |
-| — | P1 | /userguide/compute/mngc/overview/ | compute/multinodegpucluster |
+| ✅ | P1 | /userguide/compute/mngc/overview/ | compute/multinodegpucluster (bare-metal GPU; VPC prereq; types g2c96h8_metal/g3c128b8_metal; min 2 +1 scale; cluster-fabric companion-minted; Planned Compute optional; all docs/UNPROVEN) |
 | ✅ | P1 | /userguide/storage/archive_storage/overview/ | storage/archivestorage — **대상 영구 제외** (owner 2026-06-11: 전용 인증키 미발급, waiver 25/25; 다시 끌어올리지 말 것) |
 | ✅ | P1 | /userguide/storage/backup/overview/ | storage/backup |
 | ✅ | P1 | /userguide/storage/block_storage_bm/overview/ | storage/baremetal-blockstorage |
@@ -71,7 +71,7 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/management/service_watch/overview/ | management/servicewatch |
 | ✅ | P1 | /userguide/management/resource_groups/overview/ | management/resourcemanager (tags ≤50/resource; RG name-len/quota undocumented — confirm live) |
 | ✅ | P1 | /userguide/management/quota/overview/ | management/quota (verify the VPC 3-vs-5!) |
-| — | P1 | /userguide/application/api_gateway/overview/ | application-service/apigateway |
+| ✅ | P1 | /userguide/application/api_gateway/overview/ | application-service/apigateway (ADD-only deepen — PRIVATE endpoint forces JWT; method ANY + integration HTTP/Cloud Function/PrivateLink; PrivateLink desc ≤50 explains set-PUT 400) |
 | ✅ | P1 | /userguide/application/queue_service/overview/ | application-service/queueservice (name 3-64/.fifo; size ≤256KB; retention ≤14d; kr-west1/east1) |
 | ✅ | P1 | /userguide/analytics/data_flow/overview/ | data-analytics/data-flow — NiFi-on-SKE (ske-cluster+filestorage, ingress 1/cluster; create body UNPROVEN docs-vs-reality, IB-018) |
 | ✅ | P1 | /userguide/analytics/data_ops/overview/ | data-analytics/data-ops — Airflow-on-SKE (executor K8s/Celery; create body UNPROVEN docs-vs-reality, IB-018) |
@@ -83,7 +83,7 @@ knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
 | ✅ | P1 | /userguide/ai_ml/cloud_ml/overview/ | ai-ml/cloud-ml (smoke 404s) |
 | ✅ | P1 | /userguide/devopstools/devops_service/overview/ | devops-tools/devopsservice (PF-05 fixed: create body needs members+tenant_code+tenant_name, NOT name/description; capture $.devops_service.id; dup-check by tenant; 1/account) |
 | — | P1 | /userguide/financial_management/planned_compute/overview/ | financial-management/billingplan (smoke 500!) |
-| — | P1 | /userguide/financial_management/cost_management/overview/ | financial-management/budget·costexplorer |
+| ✅ | P1 | /userguide/financial_management/cost_management/overview/ | financial-management/budget·costexplorer (budget: name≤20, amount+start_month req, currency UNPROVEN, **create 500 = PF-04 baselined product bug**) · (costexplorer: reads-only, 6mo window, smoke 3/3 200) |
 | — | P2 | /userguide/compute/gpu_server/overview/ | compute (gpu types) |
 | — | P2 | /userguide/compute/auto_scaling/overview/ | compute/auto-scaling |
 | — | P2 | /userguide/compute/virtual_server_dr/overview/ | compute (DR) |

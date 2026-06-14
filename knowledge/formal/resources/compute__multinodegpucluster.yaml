@@ -1,9 +1,64 @@
-# Resource-task model — compute/multinodegpucluster (cp-gpu group).
+# Resource-task model — compute/multinodegpucluster (cp-gpu group, MNGC).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # mngc-gpu-node-coverage (enabled+heavy but COVERAGE-ONLY: docs-derived
 # bodies, synthetic ids, no real GPU node ever provisioned -> provenance docs).
+# Enriched from /userguide/compute/mngc/* (2026-06-14): see
+# knowledge/formal/services/compute__multinodegpucluster.yaml for the
+# service-global constraints (naming, min-2-nodes, server-type codes, support
+# scope) and quirks (fabric-not-standalone, bulk-delete, singular public-nat).
+#
+# Cluster Fabric is NOT an independently creatable node — it is minted inside the
+# GPU-node create (cluster_fabric_details) and auto-deleted with its last node;
+# only READ paths exist (gpu-node-fabric lookup below). image / server-type are
+# read-only LOOKUP nodes (GET + capture, no teardown by design — the validator's
+# "create without delete" warning is expected there).
 version: 1
 resources:
+  # read-only LOOKUP — selectable GPU node OS images (Ubuntu 22.04/24.04).
+  gpu-node-image:
+    code: "cp-gpu-image-lookup"
+    service: compute/multinodegpucluster
+    requires: []
+    create:
+      endpoint: "GET /v1/gpu-nodes/images"
+    capture: {image_id: "$.images[0].id"}
+    verify:
+      - {name: list, endpoint: "GET /v1/gpu-nodes/images", expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: mngc-gpu-node-coverage, steps: []}
+    notes: "읽기 전용 LOOKUP 노드 — create가 GET, teardown 없음이 의도. 이미지: Ubuntu 22.04(NVIDIA 535.86.10/535.183.06) / Ubuntu 24.04(580.105.08) (services constraint mngc-admin-account-root). capture envelope $.images[0].id는 docs 추정 — 2xx 미관측이라 라이브에서 확정 필요(R3). 소스 mngc-gpu-node-coverage는 이 lookup을 쓰지 않고 synthetic image literal로 4xx — 실 lookup 배선은 이 모델이 처음 제공."
+
+  # read-only LOOKUP — GPU server-type / product list (g2c96h8_metal etc).
+  gpu-node-product:
+    code: "cp-gpu-product-lookup"
+    service: compute/multinodegpucluster
+    requires: []
+    create:
+      endpoint: "GET /v1/gpu-nodes/products"
+    capture: {server_type_id: "$.products[0].id"}
+    verify:
+      - {name: list, endpoint: "GET /v1/gpu-nodes/products", expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: mngc-gpu-node-coverage, steps: []}
+    notes: "읽기 전용 LOOKUP 노드 — GPU bare-metal 서버 타입 목록. 타입 코드: g2c96h8_metal(8x H100, 96 vCore, 2TB), g3c128b8_metal(8x B300, 128 vCore, 4TB) (services constraint mngc-server-type-codes). capture envelope $.products[0].id는 docs 추정(2xx 미관측). 소스는 synthetic server_type_id literal로 4xx — 실 lookup은 이 모델이 처음."
+
+  # read-only LOOKUP — Cluster Fabric is NOT independently creatable (minted with
+  # GPU nodes, auto-deleted with last node). Only list/show/node-pools exist.
+  gpu-node-fabric:
+    code: "cp-gpu-fabric-lookup"
+    service: compute/multinodegpucluster
+    requires: []
+    create:
+      endpoint: "GET /v1/cluster-fabrics"
+    capture: {cluster_fabric_id: "$.cluster_fabrics[0].id"}
+    verify:
+      - {name: list, endpoint: "GET /v1/cluster-fabrics", expect_status: [200]}
+      - {name: node-pools, endpoint: "GET /v1/cluster-fabrics/node-pools",
+         expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: mngc-gpu-node-coverage, steps: []}
+    notes: "읽기 전용 LOOKUP 노드 — Cluster Fabric은 독립 create/delete 불가(GPU Node 생성 시 함께 minted, 마지막 노드 해지 시 auto-delete; services quirk mngc-fabric-not-standalone). 따라서 별도 create 엔드포인트 없음 — 이 노드는 list/show/node-pools 읽기와 (선택적) 기존 fabric id 공급용. modify-members(POST /v1/cluster-fabrics/modify-members)는 노드를 풀 간 이동시키는 액션 op (별도 모델 미작성, 합성 대상 아님). capture envelope $.cluster_fabrics[0].id는 docs 추정."
+
   gpu-node:
     code: "cp-gpu-node"
     service: compute/multinodegpucluster
@@ -11,12 +66,19 @@ resources:
     requires: [vpc, subnet]
     create:
       endpoint: "POST /v1/gpu-nodes"
+      # mngc how_to_guides (2026-06-14): create fields = image(Ubuntu)+version,
+      # server count(>=2 initial, +1 scale), server type, admin account(root),
+      # server name prefix(3-11 lc/digit/hyphen, no trailing -), network(VPC/
+      # subnet/IP auto|manual/NAT), cluster fabric(new|existing)+node pool,
+      # optional lock/init-script/tags. server_type_id/image_id/cluster_fabric_
+      # id/node_pool_id stay synthetic literals here (lookup envelope shapes
+      # UNPROVEN — gpu-node-image/product/fabric capture not runtime-confirmed).
       body:
         vpc_id: "{vpc.vpc_id}"
         subnet_id: "{subnet.subnet_id}"
         image_id: "IMAGE-regrCoverageProbe000000"
         region_id: "{region}"
-        os_user_id: regruser
+        os_user_id: root
         os_user_password: "RegrCoverageProbe!1"
         lock_enabled: false
         cluster_fabric_details:
@@ -29,8 +91,27 @@ resources:
              nat_enabled: false}
         tags:
           - {key: regr_coverage, value: probe}
+      # admin account is 'root' for the Ubuntu image (services constraint
+      # mngc-admin-account-root) — corrected from the earlier 'regruser' literal.
+      # server count is a create-time integer (>=2) not modeled as an option
+      # (validator option types are cidr|enum|ref|string); the >=2 rule and the
+      # name-prefix rule live in services constraints (mngc-min-2-nodes /
+      # mngc-server-name-prefix). nat_enabled exposed as the one varyable enum.
+      options:
+        nat_enabled: {type: enum, default: "false", values: ["true", "false"],
+                      note: "docs-only: true면 노드에 공인 NAT 부여 가능(POST /v1/gpu-nodes/{id}/public-nat-ip; 단수 경로 + VPC에 IGW 필요, services quirk mngc-public-nat-singular-path). false면 사설 전용. 커버리지 기본은 false(비용/IGW 의존 회피)."}
+    capture: {gpu_node_id: "$.gpu_nodes[0].id"}
+    ready: {endpoint: "GET /v1/gpu-nodes/{gpu_node_id}",
+            field: "$.gpu_node.status", until: [Running, RUNNING, ACTIVE],
+            timeout: 3600, interval: 60}
+    verify:
+      # all docs-grade [200] guesses — no MNGC 2xx ever observed. lock/unlock
+      # leave a billable bare-metal node stuck; start/stop are state ops. These
+      # are C4 verify candidates once a real node is provisioned (HEAVY/gated).
+      - {name: show, endpoint: "GET /v1/gpu-nodes/{gpu_node_id}",
+         expect_status: [200]}
     delete: {endpoint: "DELETE /v1/gpu-nodes", destructive: true}
     provenance: docs
     source: {lifecycle: mngc-gpu-node-coverage,
              steps: [create-gpu-nodes, delete-gpu-nodes]}
-    notes: "UNPROVEN 전체 (api_bodies 엔트리 없음; 소스는 synthetic id 4xx 보장 커버리지 전용 — response envelope 미관측이라 capture 없음). vpc/subnet은 이 모델이 처음 배선; image/server-type/cluster-fabric/node-pool id는 lookup 경로 미확인으로 synthetic literal 유지 (cluster-fabric은 GPU 노드 생성에 끼워 만들어지는 동반 자원으로 보이며 독립 create가 카탈로그에 없다 — R3 확인). 삭제는 path-id 없는 BULK DELETE (body gpu_node_ids — 모델 delete 스키마 한계, baremetal-server와 동일). public NAT 해제는 단수 경로 /public-nat-ip (baremetal의 복수형과 다름). HEAVY: billable + slow."
+    notes: "UNPROVEN 전체 (api_bodies 엔트리 없음; 소스는 synthetic id로 4xx 보장하는 커버리지 전용 — response envelope 미관측이라 capture/ready/verify 전부 docs 추정). HEAVY: non-virtualized bare-metal GPU 노드, billable + slow + GPU 가용성 의존. min 2 노드(services mngc-min-2-nodes) — server_details 배열을 >=2개로 채워야 실제 클러스터링이지만 커버리지 body는 4xx 보장용 단일 엔트리 유지. vpc/subnet은 이 모델이 처음 배선; image/server-type/cluster-fabric/node-pool id는 lookup 노드(gpu-node-image/product/fabric)를 추가했으나 envelope 미관측이라 body는 synthetic literal 유지(R3에서 capture 확정 후 토큰 배선). cluster-fabric은 GPU 노드 생성에 끼워 minted되는 동반 자원 — 독립 create 없음, 마지막 노드 해지 시 auto-delete (services quirk mngc-fabric-not-standalone). 삭제는 path-id 없는 BULK DELETE(body gpu_node_id 목록 — 모델 delete 스키마 한계, baremetal-server와 동일; 합성 teardown은 bulk-delete-body 지원 전까지 막힘, services quirk mngc-bulk-delete-no-path-id). MIG/ECC는 생성 시 초기화 — production 전 1회 reboot 권장(services mngc-mig-ecc-reboot). 추가 op: lock/unlock(PUT /v1/gpu-nodes/{id}/lock·/unlock), start/stop(POST /v1/gpu-nodes/start·/stop — 복수 노드 bulk), public-nat-ip(단수). Planned Compute는 informational/optional이지 필수 entitlement 아님(services quirk mngc-planned-compute-informational)."

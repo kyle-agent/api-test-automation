@@ -11,15 +11,47 @@ resources:
     create:
       endpoint: "POST /v1/budgets/account"
       body:
+        # 예산명(name) — userguide: 최대 20자, 한글/영문/숫자/공백 및 특수문자
+        # + = . , @ - _ 허용. generator {unique} suffix stays within 20.
         name: "regr-budget-{unique}"
         # live 400 "Amount is required." while sending budget_amount
         # (run 27394211896) -> the field name is `amount`
         amount: 1000000
         currency: KRW
-        period_type: MONTHLY
+        period_type: "{opt.period_type}"
+        # 시작월(start_month) — userguide requires picking the month tracking
+        # begins. YYYY-MM shape is inferred (console date-picker); UNPROVEN.
+        start_month: "{opt.start_month}"
         notifications:
           - threshold_percent: 80
             notification_emails: ["kchoic.ai+budget{unique}@gmail.com"]
+      options:
+        period_type:
+          type: enum
+          required: true
+          default: MONTHLY
+          values: [MONTHLY, TOTAL]
+          # userguide 관리 유형: "월별 예산 설정"(monthly reset) / "전체 예산
+          # 설정"(cumulative). API enum tokens MONTHLY/TOTAL are inferred —
+          # docs are console-only (JS-rendered apiref). Unproven until a 2xx.
+          note: "docs-only field — console exposes 관리 유형 월별/전체; API token names MONTHLY/TOTAL UNPROVEN (no 2xx, create is 500-blocked PF-04)"
+        start_month:
+          type: string
+          required: true
+          default: "2026-06"
+          # userguide 시작월: 예산 추적 시작 월 선택. 형식 YYYY-MM 추정 —
+          # console date-picker, API field name/format UNPROVEN.
+          note: "docs-only field — userguide '시작월' (start month of tracking); field name/format YYYY-MM UNPROVEN (create is 500-blocked PF-04)"
+        threshold_percent:
+          type: enum
+          required: false
+          default: 80
+          values: [50, 70, 80, 90, 100]
+          # userguide 임계치 도달 알림(threshold alert) — optional. 알림 발송
+          # 빈도 최초 1회/매일(one-time vs daily). Single threshold per budget
+          # per docs structure. Enum percentages are common console presets —
+          # exact allowed set UNPROVEN.
+          note: "docs-only — userguide '임계치 도달 알림' optional; one threshold per budget (최초 1회/매일 알림 빈도). Allowed percent set UNPROVEN; mapped onto notifications[].threshold_percent"
     capture: {budget_id: "$.budget.id"}
     delete: {endpoint: "DELETE /v1/budgets/account/{budget_id}",
              destructive: true}
@@ -30,4 +62,4 @@ resources:
     source: {lifecycle: budget-account-budget,
              steps: [create-account-budget, show-account-budget,
                      set-account-budget, delete-account-budget]}
-    notes: "GLOBAL(account-scoped, region 세그먼트 없음) 서비스 — 비과금 지출 알림 설정(인프라 없음 → light). 공유 계정에 budget이 이미 있으면 create가 409 — 단일성(계정당 1개 추정) 충돌은 합성 시 env-skip/adopt 후보. body(amount/threshold/notification 필드)와 capture envelope $.budget.id 모두 소스 lifecycle이 best-effort/추측으로 명시 — UNPROVEN(docs), 실 2xx 후 승격. PUT /v1/budgets/account/{id}(setaccountbudget)는 lifecycle 영역."
+    notes: "GLOBAL(account-scoped, region 세그먼트 없음) 서비스 — 비과금 지출 알림 설정(인프라 없음 → light). userguide(how_to_guides/budget, 2026-06-14): 예산명 ≤20자(한글/영문/숫자/공백+ = . , @ - _), 관리 유형 월별/전체, 예산 금액 필수, 시작월 선택; 임계치 도달 알림은 선택(임계치 % + 최초1회/매일 + 알림 수신자 이메일); '신규 생성 방지'는 임계 도달 시 Compute/Database 서비스군 신규 생성 차단(2025.12 기준 적용 대상: Virtual Server·Databases·Event Streams·Search Engine·Vertica·Oracle Service). currency 필드는 userguide에 노출 안 됨(계정 기본통화 추정 — body의 currency:KRW UNPROVEN). 공유 계정에 budget이 이미 있으면 create가 409 — 단일성(계정당 1개 추정) 충돌은 합성 시 env-skip/adopt 후보. body(amount/threshold/notification/start_month 필드)와 capture envelope $.budget.id 모두 소스 lifecycle이 best-effort/추측으로 명시 — UNPROVEN(docs), 실 2xx 후 승격. PUT /v1/budgets/account/{id}(setaccountbudget)는 lifecycle 영역. 삭제는 영구(복구 불가). CONFIRMED: POST /v1/budgets/account → 500 ContactAdminForAssistance on complete-shaped body (run 27395331657) = product bug PF-04, already baselined in data/baselines/known_issues.json; node stays out of composed waves until backend fix."

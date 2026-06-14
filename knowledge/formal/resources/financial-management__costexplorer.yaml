@@ -13,4 +13,23 @@ resources:
       - {name: payments-monthly, endpoint: "GET /v1/payments/monthly",
          expect_status: [200]}
     provenance: docs
-    notes: "조회 전용 reads 묶음 — 쿼리 전부 optional(docs). smoke가 3/3 200 관측 이력 → 라이브 합성 통과 시 승격. capture 불필요(자원 id 없음)."
+    notes: |
+      조회 전용 reads 묶음 — 쿼리 파라미터 전부 optional(docs). smoke가 3/3 200
+      관측 이력 → 라이브 합성 통과 시 승격. capture 불필요(자원 id 없음).
+      userguide(how_to_guides/explorer·usage·payment, 2026-06-14)에서 추출한
+      쿼리 모델 (필드명은 console-rendered이라 UNPROVEN — bare GET는 200이므로
+      파라미터 생략이 안전한 기본값):
+      - time-range: 최대 6개월 추이, '월 1일~말일' 단위. 연/월 드롭다운 →
+        GET /v1/bills·/v1/usages 는 조회 월을 year/month(또는 from/to YYYY-MM)
+        쿼리로 받을 것으로 추정. payments/monthly 는 월 단위 납부 내역.
+      - granularity: 일별(daily)/월별(monthly) 두 가지 시각화. GET 쿼리의
+        granularity 파라미터로 노출될 것으로 추정 — UNPROVEN.
+      - grouping dimensions(그룹화): 서비스군(service group)·서비스(service)·
+        자원명(resource name)·지역(region)·서버 유형·약정 기간; 태그 key-value
+        필터 지원. group_by/filter 쿼리로 노출될 것으로 추정 — UNPROVEN.
+      - 데이터 카테고리: 총 예상 청구 금액·월 평균 청구 금액·비용 Top5·
+        할인 내역(Planned Compute/SLA/Credit). 미정산월=예상, 정산월=실청구.
+      - 타임존 Asia/Seoul(GMT+09:00), 매일 자정 데이터 갱신.
+      모든 쿼리 파라미터는 docs-only(_note); 노드는 파라미터 없는 bare GET로
+      합성하여 3/3 200을 유지한다.
+    _note: "Query params (time-range year/month or from/to, granularity daily|monthly, group_by service-group|service|resource|region, tag filters) are documented in the userguide but field names UNPROVEN — apiref is JS-rendered/console-only. Node intentionally issues param-less GETs (smoke 3/3 200); param variants belong to C4 parameter-coverage, not this reads node."

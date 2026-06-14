@@ -1,0 +1,74 @@
+# Layer 1 — per-service knowledge: application-service/apigateway
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: /userguide/application/api_gateway/{overview,how_to_guides}/ (2026-06-14).
+# The resource-task model (per-resource requires/options/limits) lives in
+# resources/application-service__apigateway.yaml — this file holds only the
+# service-global naming rules, quotas, and prerequisites.
+
+version: 1
+service: application-service/apigateway
+
+constraints:
+  - id: api-name-rule
+    rule: "API명 3~50자, 영문 소문자로 시작, 허용문자 [a-z0-9-], 하이픈(-)으로 끝날 수 없음 (검증된 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$와 일치)"
+    provenance: VALIDATED
+  - id: resource-path-name-rule
+    rule: "리소스명(path_part) 3~50자, 영문 소문자로 시작, 허용문자 [a-z0-9-{}] (API명과 달리 중괄호 {} 허용 — path 변수용)"
+    provenance: docs
+  - id: stage-name-rule
+    rule: "스테이지명 3~30자, 영문 소문자로 시작, [a-z0-9-], 하이픈으로 끝 불가; stage description ≤100자"
+    provenance: docs
+  - id: jwt-auth-name-rule
+    rule: "JWT(인증) 이름 3~50자, 영문 소문자로 시작, [a-z0-9-], 하이픈으로 끝 불가"
+    provenance: docs
+  - id: privatelink-name-rule
+    rule: "PrivateLink 엔드포인트명 영문+숫자 3~20자(하이픈 불가); privatelink_service_id 영문+숫자 3~60자; description ≤50자"
+    provenance: docs
+  - id: per-api-child-limits
+    rule: "API당 한도 — 리소스 ≤300개, 리소스 depth Root 포함 ≤30단계, 메서드 종류별 1개·리소스당 총 ≤7개(GET/POST/PUT/PATCH/DELETE/OPTIONS/HEAD/ANY; ANY는 모든 유형 일괄 생성), 스테이지 ≤10개, 태그 ≤50개"
+    provenance: docs
+  - id: method-endpoint-url-rule
+    rule: "HTTP 통합 메서드 endpoint_url: http:// 또는 https://로 시작, 허용문자 영문+특수문자($-_.+!*':(){}/), 최대 500자; query string 파라미터명 [a-zA-Z0-9_], request header명 [a-zA-Z0-9-]"
+    provenance: docs
+  - id: integration-types
+    rule: "백엔드 통합 유형 — HTTP / Cloud Function / PrivateLink"
+    provenance: docs
+  - id: endpoint-type-private-requires-jwt
+    rule: "엔드포인트 타입 Region / Private. Private는 JWT 인증 활성화를 강제 → PRIVATE API는 JWT(auth) 선행 필요"
+    provenance: docs
+  - id: deployment-description-limit
+    rule: "배포(deployment) description ≤50자; 배포는 불변 리비전, 버전 이력·롤백('배포 변경') 지원"
+    provenance: docs
+  - id: usage-plan-limits
+    rule: "사용량 계획(usage plan) rate enum hour|day|month, limit 1..2000000000 (resources 모델 docs)"
+    provenance: docs
+
+captures:
+  api: "$.id"
+  usage_plan: "$.usage_plan.id"
+  access_control: "$.id"
+  api_key: "$.api_key.id"
+  privatelink_endpoint: "$.privatelink_endpoint.id"
+
+states:
+  privatelink_endpoint: {field: "$.privatelink_endpoint.status", ready: [Active]}
+
+quirks:
+  - id: region-availability
+    note: "kr-west1, kr-east1 에서만 제공. kr-south1/2/3 미제공 (overview 2026-06-14)"
+    provenance: docs
+  - id: monitoring-logging-2025-12
+    note: "API 성능 모니터링·로그 기록은 '25년 12월 제공 예정(overview) — 현재 미연동. ServiceWatch 지표는 일부 제공"
+    provenance: docs
+  - id: optional-cloud-functions-backend
+    note: "선행 서비스 없음(컨트롤플레인, VPC-free). Cloud Functions는 선택적 백엔드(serverless) — method integration_type=Cloud Function으로 연계되는 cross-service edge"
+    provenance: docs
+  - id: method-addressed-by-type
+    note: "메서드는 id가 아니라 method_type으로 주소화(createmethod 응답 $.methods[]에 id 없음); 스테이지는 stage_name으로 주소화(capture 없음)"
+    provenance: VALIDATED
+  - id: auth-token-only-in-response
+    note: "createauth는 $.access_token만 반환(id 없음) — auth_id는 listauths로 회수해야 삭제 가능. access_token은 생성 확인 팝업/파일 다운로드로만 노출(재조회 불가)"
+    provenance: VALIDATED
+  - id: deployment-no-delete
+    note: "deployment DELETE 엔드포인트 없음(불변 리비전 — api 삭제로 회수); 배포는 메서드 ≥1개 선행 필요(NoMethodsExist); stage_type=new는 같은 호출에서 stage `dev`까지 생성"
+    provenance: VALIDATED

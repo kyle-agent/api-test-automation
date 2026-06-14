@@ -19,6 +19,9 @@ resources:
       endpoint: "POST /v1/apis"
       body: {name: "regrapi{unique}", description: "API regression suite",
              endpoint_type: REGION, tags: []}
+      options:
+        endpoint_type: {type: enum, values: [REGION, PRIVATE], default: REGION,
+                        note: "userguide how_to(2026-06-14): 엔드포인트 타입은 Region/Private. PRIVATE은 JWT 인증 활성화를 강제한다('Private enforces JWT activation') → PRIVATE API는 apigw-auth(JWT) 선행 필요. PrivateLink는 apigw-api 본문 옵션이 아니라 별도 privatelink-endpoint 자원/method integration_type으로 다룬다. REGION만 런타임 입증, PRIVATE은 docs 미입증"}
     capture: {api_id: "$.id"}
     verify:
       - {name: read-connected-endpoints,
@@ -39,7 +42,8 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: application-apigateway-api-resource,
              steps: [create, delete, wait-gone]}
-    notes: "VPC-FREE 컨트롤플레인 자원. 삭제는 비동기 — 소스는 GET 폴링 until_status 404 (300s/15s)로 소거 확인 + DELETE에 409/500 재시도 6회 (ready 스키마는 status-폴링을 표현하지 못해 lifecycle 영역으로 남김). name 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$."
+    notes: "VPC-FREE 컨트롤플레인 자원. 삭제는 비동기 — 소스는 GET 폴링 until_status 404 (300s/15s)로 소거 확인 + DELETE에 409/500 재시도 6회 (ready 스키마는 status-폴링을 표현하지 못해 lifecycle 영역으로 남김). name 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$ — userguide how_to(2026-06-14) 'API명 3~50자, 영문 소문자로 시작, [a-z0-9-], 하이픈으로 끝날 수 없음'와 일치(검증된 패턴 유지). 제공 리전: kr-west1·kr-east1 한정 (overview). 모니터링/로깅은 '25.12 제공 예정(overview) — 현재는 미연동."
+    _note: "API당 하위 자원 한도(userguide how_to 2026-06-14, docs-only): resource ≤300개, 리소스 depth Root 포함 ≤30단계, method 종류별 1개·총 ≤7개(GET/POST/PUT/PATCH/DELETE/OPTIONS/HEAD), stage ≤10개, tag ≤50개. 단일 백엔드 통합은 Cloud Functions(선택)와 HTTP — cross-service edge 후보."
 
   # read-only LOOKUP node (server-type pattern): the api's auto-created root
   # resource id, needed as the parent of every child resource. Source step
@@ -65,6 +69,9 @@ resources:
     create:
       endpoint: "POST /v1/apis/{apigw-api.api_id}/resources/{apigw-root-resource.root_resource_id}"
       body: {path_part: "regr{unique}"}
+      options:
+        path_part: {type: string,
+                    note: "리소스명(path_part) 네이밍(userguide how_to 2026-06-14, docs-only): 영문 소문자로 시작, 허용문자 [a-z0-9-{}] (API명과 달리 중괄호 {} 허용 — path 변수 표현용), 3~50자. API당 리소스 ≤300개, Root 포함 depth ≤30단계(apigw-api._note 참조)."}
     capture: {resource_id: "$.id"}
     verify:
       - {name: read,
@@ -91,6 +98,16 @@ resources:
         iam_enabled: false
         query_strings: {}
         request_headers: {}
+      options:
+        method_type: {type: enum,
+                      values: [GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD, ANY],
+                      default: GET,
+                      note: "userguide how_to(2026-06-14, docs-only): 메서드 유형 GET/POST/PUT/PATCH/DELETE/OPTIONS/HEAD/ANY. ANY는 모든 유형을 한 번에 생성. 리소스당 종류별 1개·총 ≤7개 → ANY 선택 시 다른 method_type와 공존 불가(7개를 모두 점유). 검증된 값은 GET."}
+        integration_type: {type: enum, values: [HTTP, "Cloud Function", PrivateLink],
+                           default: HTTP,
+                           note: "userguide how_to(2026-06-14, docs-only): 백엔드 통합 유형 HTTP / Cloud Function / PrivateLink. Cloud Function 통합은 compute/scf cross-service edge, PrivateLink 통합은 apigw-privatelink-endpoint와 연계. 검증된 값은 HTTP."}
+        endpoint_url: {type: string,
+                       note: "HTTP 통합 시 endpoint_url 제약(userguide how_to 2026-06-14, docs-only): http:// 또는 https://로 시작, 허용문자 영문+특수문자($-_.+!*':(){}/), 최대 500자. query string 파라미터명은 [a-zA-Z0-9_], request header명은 [a-zA-Z0-9-]."}
     capture: {method_type: "$.methods[0].method_type"}
     verify:
       - {name: read-list,
@@ -120,7 +137,7 @@ resources:
          expect_status: [200]}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage, steps: [create-deployment]}
-    notes: "deployment DELETE 엔드포인트는 카탈로그에 없다(불변 리비전 — api 삭제로 회수) → 의도적으로 delete 없음. createapideployment(api_bodies): stage_type=new가 같은 호출에서 stage `dev`까지 생성하고 $.deployment_id를 반환. 메서드 ≥1개 선행 필요(NoMethodsExist) → requires에 apigw-method."
+    notes: "deployment DELETE 엔드포인트는 카탈로그에 없다(불변 리비전 — api 삭제로 회수) → 의도적으로 delete 없음. createapideployment(api_bodies): stage_type=new가 같은 호출에서 stage `dev`까지 생성하고 $.deployment_id를 반환. 메서드 ≥1개 선행 필요(NoMethodsExist) → requires에 apigw-method. 배포 description 최대 50자(userguide how_to 2026-06-14, docs-only). 배포는 버전 이력 추적·'배포 변경' 함수로 롤백 가능(콘솔 기능, API 모델 없음)."
 
   apigw-stage:
     code: "ap-apigw-stage"
@@ -138,7 +155,7 @@ resources:
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage,
              steps: [create-stage, delete-stage]}
-    notes: "stage는 id가 아니라 stage_name으로 주소화된다 — capture 없음; delete 경로의 stg{unique}는 create body와 동일 {unique} 전개(런 내 상수)에 의존한다. stage_name 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$ (≥3자). config/active-deployment PUT setter는 lifecycle 영역."
+    notes: "stage는 id가 아니라 stage_name으로 주소화된다 — capture 없음; delete 경로의 stg{unique}는 create body와 동일 {unique} 전개(런 내 상수)에 의존한다. stage_name 패턴 ^[a-z][a-z0-9-]{1,48}[a-z0-9]$ (≥3자). userguide how_to(2026-06-14): stage명은 3~30자(API명의 3~50자보다 짧음 — 검증된 패턴 상한 48은 docs 30 이내로 안전), 영문 소문자 시작·하이픈으로 끝 불가. stage description 최대 100자(docs-only). 스테이지는 캐싱/로깅/제한(rate limit)/스테이지 변수를 환경별로 설정 — config/active-deployment PUT setter는 lifecycle 영역."
 
   apigw-auth:
     code: "ap-apigw-auth"
@@ -152,7 +169,7 @@ resources:
     provenance: docs
     source: {lifecycle: apigateway-api-write-coverage,
              steps: [create-auth, find-auth-id, delete-auth]}
-    notes: "createauth 응답에는 id가 없고 $.access_token뿐 — auth_id는 listauths(GET .../auths $.auths[0].id)로 회수해야 DELETE /v1/apis/{api_id}/auths/{auth_id}가 가능하다. 후속-GET capture는 §1 task 스키마가 표현하지 못해 delete 없음(teardown은 R3에서 list-capture sub-step으로). connected_stages [dev]는 apigw-deployment(stage_type=new)가 만든 stage를 참조 → requires에 포함. expiration_period 단위는 일."
+    notes: "createauth 응답에는 id가 없고 $.access_token뿐 — auth_id는 listauths(GET .../auths $.auths[0].id)로 회수해야 DELETE /v1/apis/{api_id}/auths/{auth_id}가 가능하다. 후속-GET capture는 §1 task 스키마가 표현하지 못해 delete 없음(teardown은 R3에서 list-capture sub-step으로). connected_stages [dev]는 apigw-deployment(stage_type=new)가 만든 stage를 참조 → requires에 포함. expiration_period 단위는 일. JWT(auth) name 패턴(userguide how_to 2026-06-14, docs-only): 영문 소문자 시작, [a-z0-9-], 하이픈으로 끝 불가, 3~50자. JWT는 무상태(stateless) 인증 — access_token은 생성 확인 팝업에서만 노출되며 파일로 다운로드(런타임 재조회 불가). endpoint_type=PRIVATE API는 JWT 활성화 강제."
 
   apigw-access-control:
     code: "ap-apigw-acl"
@@ -240,4 +257,4 @@ resources:
     source: {lifecycle: generated__wave5-appsvc,
              steps: [create-apigw-privatelink-endpoint, show-apigw-privatelink-endpoint,
                      set-apigw-privatelink-endpoint, delete-apigw-privatelink-endpoint]}
-    notes: "컨트롤플레인 객체(시간당 과금 없음). R3 해소: networking privatelink-service 노드(AUTO 승인, IP 타입)가 생겨 합성 id 대신 cross-file ref로 배선 — name 패턴 ^[a-zA-Z0-9]*$ 3..20 (하이픈 불가). request(CANCEL|RE_REQUEST)/connection(api_id+DISCONNECT|RECONNECT)/approval(api_id+APPROVE|REJECT) PUT은 상태기계 의존이라 lifecycle 영역(gen-wave5의 gated probe) — DTO는 PrivateLinkEndpoint{Request,Connection,Approval}Request. capture envelope $.privatelink_endpoint.id는 docs 파생 — UNPROVEN."
+    notes: "컨트롤플레인 객체(시간당 과금 없음). R3 해소: networking privatelink-service 노드(AUTO 승인, IP 타입)가 생겨 합성 id 대신 cross-file ref로 배선 — name 패턴 ^[a-zA-Z0-9]*$ 3..20 (하이픈 불가). request(CANCEL|RE_REQUEST)/connection(api_id+DISCONNECT|RECONNECT)/approval(api_id+APPROVE|REJECT) PUT은 상태기계 의존이라 lifecycle 영역(gen-wave5의 gated probe) — DTO는 PrivateLinkEndpoint{Request,Connection,Approval}Request. capture envelope $.privatelink_endpoint.id는 docs 파생 — UNPROVEN. userguide how_to(2026-06-14) 확정: endpoint name 영문+숫자 3~20자(하이픈 불가, 기존 패턴 일치), privatelink_service_id 영문+숫자 3~60자, description 최대 50자 → set PUT의 'String should have at most 50 characters' 400은 description 50자 초과가 원인으로 확정(48자 미만 description으로 좁히면 200 기대). status 값(상태기계): Requesting/Active/Creating/Deleting/Disconnected/Rejected/Error/Canceled."
