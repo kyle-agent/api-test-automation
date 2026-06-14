@@ -1,0 +1,160 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>참고사례 갤러리</title>
+<link rel="stylesheet" href="assets/style.css">
+</head><body><div class="wrap">
+<header class="top">
+  <h1>참고사례 갤러리</h1>
+  <span class="crumbs"><a href="index.html">홈</a> › 같은 구조를 보여주는 도구들</span>
+  <nav class="nav">
+    <a href="index.html">홈</a><a href="01-compose-canvas.html">①</a>
+    <a href="02-layered-dag.html">②</a><a href="03-closure-overlap.html">③</a>
+    <a href="04-branch-toggle.html">④</a><a href="05-sequence-gantt.html">⑤</a>
+    <a class="active" href="references.html">참고</a>
+  </nav>
+</header>
+<p class="lede">"단위 자원의 의존성을 그래프로 합성"하는 UI는 이미 IaC·워크플로 도구들이 정착시켜
+  두었습니다. 각 카드의 <b>썸네일은 스타일을 모사한 인라인 목업</b>이고, <b>링크</b>를 누르면
+  실제 제품 페이지(스크린샷 포함)가 새 탭에서 열립니다. 우리 PoC가 어디서 무엇을 빌려올지 메모해
+  두었습니다.</p>
+
+<h2 style="margin-top:8px">① IaC · 클라우드 자원 의존 그래프 <span class="muted small">(가장 직접적)</span></h2>
+<div id="iac"></div>
+<h2 style="margin-top:24px">② 워크플로 DAG · 상태 오버레이 <span class="muted small">(provenance/실행결과 색칠 모델)</span></h2>
+<div id="wf"></div>
+<h2 style="margin-top:24px">③ 구현 라이브러리 <span class="muted small">(무빌드/htmx 친화 순)</span></h2>
+<div id="lib"></div>
+<h2 style="margin-top:24px">④ 개념 · 학술 레퍼런스</h2>
+<div id="concept"></div>
+
+<div class="foot">스크린샷은 저작권 때문에 번들하지 않고 외부 링크로 연결합니다(오프라인에선 목업으로 대체).
+  링크는 2026-06 기준 — 제품 리브랜딩으로 URL이 바뀔 수 있습니다.</div>
+</div>
+<script>
+function mock(kind){
+  const A="#5aa9ff",G="#3fb27f",O="#e0922f",P="#b48cff",L="#27384b",bg="#1c2a3a";
+  if(kind==="dag")return `<svg viewBox="0 0 200 120" width="100%" height="118">
+    <rect width="200" height="120" fill="#16212e"/>
+    ${edge(30,60,80,30)}${edge(30,60,80,90)}${edge(80,30,140,30)}${edge(80,90,140,60)}${edge(80,30,140,60)}
+    ${box(10,48,G)}${box(62,18,O)}${box(62,78,G)}${box(122,18,A)}${box(122,48,P)}</svg>`;
+  if(kind==="canvas")return `<svg viewBox="0 0 200 120" width="100%" height="118">
+    <rect width="200" height="120" fill="#16212e"/>
+    <rect x="0" y="0" width="200" height="120" fill="url(#dot)"/>
+    <defs><pattern id="dot" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#223043"/></pattern></defs>
+    ${edge(40,40,110,40)}${edge(110,40,160,75)}${box(18,28,A)}${box(92,28,G)}${box(140,63,P)}</svg>`;
+  if(kind==="gantt")return `<svg viewBox="0 0 200 120" width="100%" height="118">
+    <rect width="200" height="120" fill="#16212e"/>
+    ${bar(20,G,40)}${bar(40,"#ffd166",90)}${bar(60,A,55)}${bar(80,"#ff8585",70)}
+    <line x1="14" y1="14" x2="14" y2="106" stroke="${L}"/></svg>`;
+  if(kind==="matrix")return `<svg viewBox="0 0 200 120" width="100%" height="118">
+    <rect width="200" height="120" fill="#16212e"/>${matrix()}</svg>`;
+  return `<svg viewBox="0 0 200 120" width="100%" height="118"><rect width="200" height="120" fill="#16212e"/>
+    <text x="100" y="64" fill="#5b7088" font-size="11" text-anchor="middle">${kind}</text></svg>`;
+  function box(x,y,c){return `<rect x="${x}" y="${y}" width="48" height="24" rx="5" fill="${bg}" stroke="${c}" stroke-width="1.6"/>`;}
+  function edge(x1,y1,x2,y2){return `<path d="M${x1+48>x2?x1:x1+48},${y1+12} C${x2-20},${y1+12} ${x2-20},${y2+12} ${x2},${y2+12}" fill="none" stroke="#5b7088" stroke-width="1.3"/>`;}
+  function bar(y,c,w){return `<rect x="${20+(y-20)*0.6}" y="${y}" width="${w}" height="12" rx="3" fill="${c}"/>`;}
+  function matrix(){let s="";const cols=["#5aa9ff","#ffd166","#ffd166","#5aa9ff"];
+    for(let r=0;r<4;r++)for(let c=0;c<4;c++){const on=(r+c)%2===0||r===c;
+      s+=`<rect x="${60+c*30}" y="${20+r*22}" width="26" height="18" fill="${on?cols[(r+c)%4]:"#16212e"}" stroke="${L}"/>`;}
+    return s;}
+}
+const DATA={
+ iac:[
+  ["Terraform — terraform graph / Rover","HashiCorp","dag",
+   "선언된 자원의 의존 DAG를 Graphviz로 출력. Rover는 plan을 인터랙티브 그래프로 시각화 — 우리 ②와 가장 닮음.",
+   "자원=노드, requires=엣지, plan diff 색칠. 우리 provenance 색칠과 1:1.",
+   "https://developer.hashicorp.com/terraform/cli/commands/graph"],
+  ["AWS Infrastructure Composer","AWS","canvas",
+   "드래그-드롭 캔버스로 자원을 놓고 연결하면 CloudFormation/SAM이 합성됨. 캔버스↔코드 양방향.",
+   "우리 ①(합성 캔버스)의 UX 레퍼런스 — 선택→연결→코드 생성 흐름.",
+   "https://aws.amazon.com/infrastructure-composer/"],
+  ["CloudFormation Designer","AWS","canvas",
+   "스택 템플릿의 자원과 의존을 시각 편집. 오래됐지만 '자원 그래프 편집'의 원형.",
+   "의존 화살표 + 자원 팔레트 패턴.",
+   "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/working-with-templates-cfn-designer.html"],
+  ["Pulumi — Resource Graph","Pulumi","dag",
+   "스택의 자원 의존 그래프 + Pulumi Insights 자원 검색.",
+   "deployment-time 의존을 보여주는 방식 참고.",
+   "https://www.pulumi.com/docs/iac/concepts/resources/"],
+  ["Cloudcraft","Datadog","canvas",
+   "AWS/Azure 아키텍처를 아이소메트릭 다이어그램으로. 라이브 계정에서 역-그리기.",
+   "'실 자원에서 그래프 역추출' = 우리 extract.py 발상과 동일.",
+   "https://www.cloudcraft.co/"],
+  ["Brainboard","Brainboard","canvas",
+   "Terraform을 비주얼 캔버스로 설계→코드 생성. 모듈 합성 UX.",
+   "묶음/모듈 합성(우리 bundle) UI 참고.",
+   "https://www.brainboard.co/"]],
+ wf:[
+  ["Apache Airflow — Graph View","Apache","dag",
+   "DAG task 의존을 그래프로, 각 노드를 실행 상태(success/running/failed)로 색칠.",
+   "우리 ②에 '실행 결과 오버레이'를 더하는 모델 — provenance + 최근 런 상태.",
+   "https://airflow.apache.org/docs/apache-airflow/stable/ui.html"],
+  ["Dagster — Asset Graph (lineage)","Dagster","dag",
+   "asset 의존 lineage 그래프 + materialization 상태/freshness. '자원=asset' 관점이 우리와 거의 동일.",
+   "노드 메타(최근 검증 시각=VALIDATED 타임스탬프) 패널 레이아웃.",
+   "https://docs.dagster.io/concepts/assets/asset-graph"],
+  ["Argo Workflows — DAG","CNCF","dag",
+   "쿠버네티스 워크플로의 task DAG + 실시간 진행. 합성된 plan 실행 뷰.",
+   "우리 ⑤(간트)+② 실행 오버레이의 결합 사례.",
+   "https://argo-workflows.readthedocs.io/en/latest/walk-through/dag/"],
+  ["n8n","n8n","canvas",
+   "노드 합성 캔버스의 대표 UX — 드래그 연결, 노드 옵션 패널.",
+   "노드 클릭→우측 옵션 패널(우리 options 모델 편집)의 정석.",
+   "https://n8n.io/"],
+  ["Node-RED","OpenJS","canvas",
+   "플로우 기반 노드 합성의 원조. 팔레트+캔버스+배선.",
+   "팔레트(노드 카탈로그) → 캔버스 드롭 패턴.",
+   "https://nodered.org/"]],
+ lib:[
+  ["Cytoscape.js","무빌드 · 단일 JS","dag",
+   "그래프 전용 렌더+레이아웃(dagre/klay/cose). CDN 한 줄, htmx 무빌드 철학에 가장 적합. <b>1순위 추천</b>.",
+   "지금 손-SVG를 대체해 자동 레이아웃+줌/팬+클릭.",
+   "https://js.cytoscape.org/"],
+  ["dagre / dagre-d3","서버측 레이아웃 가능","dag",
+   "방향그래프 레이어드 레이아웃 엔진. 좌표만 계산해 SVG로 그려도 됨(정적 export 친화).",
+   "정적 /platform/ export용 서버측 좌표 계산.",
+   "https://github.com/dagrejs/dagre"],
+  ["Mermaid","마크다운 친화","dag",
+   "텍스트→flowchart 렌더. 문서/README에 의존 그래프 박기 좋음(정적).",
+   "지식 문서 안에 의존 그래프 임베드.",
+   "https://mermaid.js.org/"],
+  ["React Flow","리치 인터랙션","canvas",
+   "노드/엣지 캔버스의 사실상 표준. 커스텀 노드·미니맵·핸들. 빌드 필요(React).",
+   "①합성 캔버스를 본격 제품화할 때.",
+   "https://reactflow.dev/"],
+  ["d3-dag","DAG 전용 레이아웃","dag",
+   "트리 아닌 DAG에 특화된 d3 레이아웃(sugiyama/zherebko).",
+   "복잡 폐포의 깔끔한 레이어링.",
+   "https://github.com/erikbrinkman/d3-dag"],
+  ["vis-network","간단·물리 레이아웃","dag",
+   "물리 시뮬 기반 네트워크 그래프. 빠른 프로토타입.",
+   "탐색형 전체 그래프 뷰.",
+   "https://visjs.github.io/vis-network/examples/"]],
+ concept:[
+  ["Topological sorting","알고리즘","matrix",
+   "의존 폐포→생성 순서. 우리 composer의 핵심 연산.","","https://en.wikipedia.org/wiki/Topological_sorting"],
+  ["Model-Based Testing","테스트","matrix",
+   "모델로부터 테스트 시나리오 생성 — 이 플랫폼이 하는 일의 정식 명칭.","","https://en.wikipedia.org/wiki/Model-based_testing"],
+  ["Automated planning (STRIPS/PDDL)","AI 계획","matrix",
+   "precondition→effect task 합성. requires=precondition, capture=effect.","","https://en.wikipedia.org/wiki/Automated_planning_and_scheduling"],
+  ["Hierarchical Task Network (HTN)","AI 계획","matrix",
+   "묶음/상품(bundle) = task를 하위 task로 분해하는 계층 계획.","","https://en.wikipedia.org/wiki/Hierarchical_task_network"],
+  ["Feature model / Software Product Line","변형 관리","matrix",
+   "requires(필수)·one_of(택일)·options(선택) = 피처 모델. 합성=제품 구성.","","https://en.wikipedia.org/wiki/Feature_model"],
+  ["Web service composition","SOA","matrix",
+   "단위 서비스를 흐름으로 합성/오케스트레이션하는 정식 용어.","","https://en.wikipedia.org/wiki/Service_composability_principle"]]
+};
+function render(id){document.getElementById(id).innerHTML=DATA[id].map(d=>`
+  <div class="ref">
+    <div class="thumb">${mock(d[2])}</div>
+    <div>
+      <div class="tag">${d[1]}</div>
+      <h3>${d[0]}</h3>
+      <p class="take">${d[3]}</p>
+      ${d[4]?`<p class="small" style="margin:0 0 8px"><b style="color:var(--accent2)">빌려올 점:</b> ${d[4]}</p>`:""}
+      <a class="btn ghost" href="${d[5]}" target="_blank" rel="noopener">실제 페이지 열기 ↗</a>
+    </div>
+  </div>`).join("");}
+["iac","wf","lib","concept"].forEach(render);
+</script>
+</body></html>

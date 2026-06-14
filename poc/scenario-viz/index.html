@@ -1,0 +1,84 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>합성 시나리오 시각화 PoC</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="data/model.js"></script>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>합성 시나리오 시각화 — PoC</h1>
+  <span class="crumbs">resource-task model → 시나리오 합성 UI 후보</span>
+  <nav class="nav">
+    <a class="active" href="index.html">홈</a>
+    <a href="01-compose-canvas.html">① 합성 캔버스</a>
+    <a href="02-layered-dag.html">② 레이어드 DAG</a>
+    <a href="03-closure-overlap.html">③ 폐포 오버랩</a>
+    <a href="04-branch-toggle.html">④ 분기 토글</a>
+    <a href="05-sequence-gantt.html">⑤ 시퀀스/간트</a>
+    <a href="references.html">참고사례</a>
+  </nav>
+</header>
+
+<p class="lede">
+  <code>knowledge/formal/resources/*.yaml</code> 의 자원-task 모델(의존 <code>requires</code> +
+  옵션 <code>options</code>)을 입력으로, "단위 서비스의 의존성 합성"을 화면으로 보여주는
+  5가지 UI 아이디어의 동작 샘플입니다. 모든 데이터는 실제 모델에서
+  <code>build_data.py</code> 로 추출했고, 외부 의존성 없이 브라우저에서 바로 열립니다.
+</p>
+
+<div class="stat" id="stat"></div>
+
+<h3 style="margin-top:26px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-size:12px">UI 아이디어 샘플</h3>
+<div class="cards" style="margin-top:10px">
+  <a class="card" href="01-compose-canvas.html">
+    <div class="k">Idea ①</div><h3>인터랙티브 합성 캔버스</h3>
+    <p>대상 노드를 클릭 → 의존 폐포가 그래프에서 켜지고, 합성될 plan(생성→검증→역순삭제)·
+       dedup·peak quota가 실시간으로. <b>플래그십</b>.</p></a>
+  <a class="card" href="02-layered-dag.html">
+    <div class="k">Idea ②</div><h3>레이어드 DAG + 스윔레인</h3>
+    <p>위상 깊이 = 생성 순서(가로축), 카테고리 = 스윔레인. teardown 역방향 오버레이.
+       전체 의존 구조를 한눈에.</p></a>
+  <a class="card" href="03-closure-overlap.html">
+    <div class="k">Idea ③</div><h3>폐포 오버랩 (집합 뷰)</h3>
+    <p>여러 타깃의 의존 폐포가 겹치는 공유 인프라(dedup으로 1회만 생성)를 강조 —
+       합성의 절감 가치를 시각화.</p></a>
+  <a class="card" href="04-branch-toggle.html">
+    <div class="k">Idea ④</div><h3>OR-의존 분기 토글</h3>
+    <p><code>one_of</code>(택일 의존)·<code>count</code>(다중성)을 토글로 바꾸며
+       폐포 비용(<code>_branch_cost</code>)이 갱신되는 비교 뷰.</p></a>
+  <a class="card" href="05-sequence-gantt.html">
+    <div class="k">Idea ⑤</div><h3>시퀀스 / 실행 간트</h3>
+    <p>합성 plan을 실행 타임라인으로 — async <code>ready</code> 대기, heavy 소요,
+       create/delete 페이즈를 막대로.</p></a>
+  <a class="card" href="references.html">
+    <div class="k">참고</div><h3>레퍼런스 갤러리</h3>
+    <p>Terraform graph·CloudFormation Composer·Airflow·Dagster·n8n 등 같은 구조를
+       이미 보여주는 도구들 — 설명 + 외부 링크 + UI 목업.</p></a>
+</div>
+
+<div class="note" style="margin-top:24px">
+  <b>학술/엔지니어 명칭:</b> 이 구조는 ① <b>의존성 DAG의 위상 합성</b>(빌드시스템/패키지매니저의
+  dependency resolution) ② <b>precondition–effect 자동계획</b>(STRIPS/HTN) ③ <b>피처 모델 기반
+  제품 구성</b>(SPL) ④ <b>모델 기반 테스트(MBT)</b> 가 겹친 형태입니다. 한 줄로는
+  <i>"declarative composition over a resource DAG (model-based scenario synthesis)"</i>.
+</div>
+
+<div class="foot">
+  PoC 디렉토리: <code>poc/scenario-viz/</code> · 데이터 재생성:
+  <code>python3 poc/scenario-viz/build_data.py</code> · 방향성 검토 노트:
+  <a href="DIRECTION.md">DIRECTION.md</a>
+</div>
+</div>
+<script>
+(function(){
+  var nodes=Object.values(MODEL.nodes), val=nodes.filter(n=>n.provenance==="VALIDATED").length;
+  var opts=nodes.reduce((a,n)=>a+n.options.length,0);
+  var edges=nodes.reduce((a,n)=>a+(n.and||[]).length+(n.one_of||[]).length,0);
+  var cats=new Set(nodes.map(n=>n.category)).size;
+  document.getElementById("stat").innerHTML=[
+    ["노드",MODEL.node_count],["VALIDATED",val+" ("+Math.round(100*val/nodes.length)+"%)"],
+    ["docs(미실증)",nodes.length-val],["의존 엣지",edges],["옵션",opts],
+    ["카테고리",cats],["서비스 묶음",Object.keys(MODEL.groups).length]
+  ].map(s=>'<div class="s"><b>'+s[1]+'</b><span>'+s[0]+'</span></div>').join("");
+})();
+</script>
+</body></html>

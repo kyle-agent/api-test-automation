@@ -1,0 +1,98 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>③ 폐포 오버랩 (집합 뷰)</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="data/model.js"></script><script src="assets/viz.js"></script>
+<style>
+.mtx{border-collapse:collapse;font-size:12px}
+.mtx th{padding:6px 8px;color:var(--muted);font-size:11px;writing-mode:vertical-rl;
+  transform:rotate(180deg);white-space:nowrap}
+.mtx td{padding:0;border:1px solid var(--line)}
+.mtx td.lab{padding:4px 9px;white-space:nowrap}
+.mtx .cell{width:30px;height:24px}
+.mtx .on{background:var(--accent)} .mtx .on.shared{background:var(--shared)}
+.big{font-size:30px;font-weight:700}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>③ 폐포 오버랩 (집합 뷰)</h1>
+  <span class="crumbs"><a href="index.html">홈</a> › 공유 인프라 dedup 가치 시각화</span>
+  <nav class="nav">
+    <a href="index.html">홈</a><a href="01-compose-canvas.html">①</a>
+    <a href="02-layered-dag.html">②</a><a class="active" href="03-closure-overlap.html">③</a>
+    <a href="04-branch-toggle.html">④</a><a href="05-sequence-gantt.html">⑤</a>
+    <a href="references.html">참고</a>
+  </nav>
+</header>
+<p class="lede">여러 타깃을 한 번에 합성(bundle)할 때, 각 타깃의 의존 폐포가 겹치는 부분은
+  <b>한 번만 생성(dedup)</b>됩니다. UpSet 스타일 멤버십 매트릭스로 "어떤 선행 자원이 몇 개의
+  타깃에 공유되는지"와 절감량을 보여줍니다.</p>
+
+<div class="cols">
+  <div class="panel">
+    <h2>타깃 선택</h2>
+    <p class="muted small">2개 이상 고르면 오버랩이 보입니다.</p>
+    <div class="scroll" id="picker"></div>
+  </div>
+  <div class="grid" style="gap:16px">
+    <div class="panel">
+      <h2>dedup 절감</h2>
+      <div class="stat" id="metric"></div>
+      <p class="muted small" id="savemsg" style="margin-top:8px"></p>
+    </div>
+    <div class="panel">
+      <h2>멤버십 매트릭스 <span class="muted small">(행=선행자원, 열=타깃)</span></h2>
+      <div class="legend"><span><i class="sw-shared"></i>2+ 타깃 공유(1회 생성)</span>
+        <span><i class="sw-target"></i>단일 타깃</span></div>
+      <div style="overflow:auto"><table class="mtx" id="mtx"></table></div>
+    </div>
+  </div>
+</div>
+<div class="foot">절감 = (타깃별 폐포 크기 합) − (합집합 폐포 크기). 합성기는 합집합을 1회 계산해 공유
+  선행자원을 한 번만 생성합니다 (RESOURCE-MODEL-PLAN §2.5).</div>
+</div>
+<script>
+const V=VIZ,N=V.N;
+let targets=new Set(["server","ske-cluster","mysql-cluster"].filter(V.exists));
+if(targets.size<2){ // fallback: pick nodes with largest closures
+  V.allIds().map(id=>[id,V.closure([id]).size]).sort((a,b)=>b[1]-a[1]).slice(0,3).forEach(x=>targets.add(x[0]));
+}
+function picker(){
+  const ids=V.allIds().filter(id=>V.closure([id]).size>1)
+    .sort((a,b)=>N[a].category<N[b].category?-1:1);
+  let cur="";const rows=[];
+  ids.forEach(id=>{const n=N[id];if(n.category!==cur){cur=n.category;rows.push(`<h3>${cur}</h3>`);}
+    rows.push(`<label class="chk"><input type="checkbox" data-id="${id}" ${targets.has(id)?"checked":""}>
+      <span class="dot" style="background:${V.provColor(n.provenance)}"></span>
+      <span><b>${id}</b> <span class="code">폐포 ${V.closure([id]).size}</span></span></label>`);});
+  const el=document.getElementById("picker");el.innerHTML=rows.join("");
+  el.querySelectorAll("input").forEach(cb=>cb.onchange=()=>{
+    cb.checked?targets.add(cb.dataset.id):targets.delete(cb.dataset.id);draw();});
+}
+function draw(){
+  const T=[...targets];
+  const per=T.map(t=>({t,set:V.closure([t])}));
+  const union=new Set(); per.forEach(p=>p.set.forEach(x=>union.add(x)));
+  const naive=per.reduce((a,p)=>a+p.set.size,0);
+  const share={}; union.forEach(id=>share[id]=per.filter(p=>p.set.has(id)).length);
+  const sharedN=[...union].filter(id=>share[id]>1).length;
+  document.getElementById("metric").innerHTML=[
+    ["타깃",T.length],["합집합 폐포",union.size],["순진한 합",naive],
+    ["dedup 절감",`−${naive-union.size}`],["공유 자원",sharedN]
+  ].map(s=>`<div class="s"><b>${s[1]}</b><span>${s[0]}</span></div>`).join("");
+  document.getElementById("savemsg").textContent= T.length<2?"타깃을 2개 이상 선택하세요.":
+    `타깃별로 따로 만들면 ${naive}회 생성, 합성 bundle은 공유분을 1회로 줄여 ${union.size}회 — ${Math.round(100*(naive-union.size)/naive)}% 절감.`;
+  // matrix: rows sorted by share desc then category
+  const rows=[...union].sort((a,b)=>(share[b]-share[a])||(N[a].category<N[b].category?-1:1));
+  let h="<tr><th class='lab' style='writing-mode:initial;transform:none'>선행 자원 \\ 타깃</th>"+
+    T.map(t=>`<th>${t}</th>`).join("")+"<th style='writing-mode:initial;transform:none'>#</th></tr>";
+  rows.forEach(id=>{const sh=share[id]>1;
+    h+=`<tr><td class="lab"><span class="dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${V.provColor(N[id].provenance)};margin-right:6px"></span><code>${id}</code> <span class="muted">${N[id].category}</span></td>`+
+      T.map(t=>{const on=per.find(p=>p.t===t).set.has(id);
+        return `<td class="cell ${on?"on":""} ${on&&sh?"shared":""}"></td>`;}).join("")+
+      `<td style="text-align:center;color:${sh?"var(--shared)":"var(--muted)"};font-weight:700">${share[id]}</td></tr>`;});
+  document.getElementById("mtx").innerHTML=h;
+}
+picker();draw();
+</script>
+</body></html>

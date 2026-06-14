@@ -1,0 +1,99 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>⑤ 시퀀스 / 실행 간트</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="data/model.js"></script><script src="assets/viz.js"></script>
+<style>
+.gantt{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:auto}
+.grow{display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid var(--line)}
+.grow:last-child{border-bottom:none}
+.grow .gl{padding:7px 10px;font-size:12px;border-right:1px solid var(--line);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.gtrack{position:relative;height:30px}
+.seg{position:absolute;top:5px;height:20px;border-radius:4px;font-size:10px;color:#06121f;
+  display:flex;align-items:center;padding:0 5px;white-space:nowrap;overflow:hidden;font-weight:600}
+.seg.create{background:#3fb27f} .seg.ready{background:#ffd166} .seg.verify{background:#9ec5ff}
+.seg.delete{background:#ff8585}
+.axis{display:grid;grid-template-columns:160px 1fr;border-bottom:1px solid var(--line);
+  position:sticky;top:0;background:var(--panel);z-index:2}
+.axis .ticks{position:relative;height:22px}
+.tick{position:absolute;font-size:10px;color:var(--muted);border-left:1px solid var(--line);
+  padding-left:3px;height:100%}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>⑤ 시퀀스 / 실행 간트</h1>
+  <span class="crumbs"><a href="index.html">홈</a> › 합성 plan을 실행 타임라인으로</span>
+  <nav class="nav">
+    <a href="index.html">홈</a><a href="01-compose-canvas.html">①</a>
+    <a href="02-layered-dag.html">②</a><a href="03-closure-overlap.html">③</a>
+    <a href="04-branch-toggle.html">④</a><a class="active" href="05-sequence-gantt.html">⑤</a>
+    <a href="references.html">참고</a>
+  </nav>
+</header>
+<p class="lede">합성된 plan을 실행 관점으로 — 노드별 행(Gantt row)에 create→<b>ready 대기(async)</b>→verify
+  세그먼트를, 그리고 끝에 역순 <b>delete</b> 페이즈를 배치합니다. async <code>ready.timeout</code>
+  대기가 런타임을 지배한다는 점, heavy 시나리오의 소요가 한눈에 보입니다 (ops 뷰의 계획 버전).</p>
+
+<div class="panel">
+  <div class="toolbar">
+    <label>타깃 <select id="target"></select></label>
+    <span class="muted small" id="meta"></span>
+  </div>
+  <div class="legend">
+    <span><i style="background:#3fb27f"></i>create</span>
+    <span><i style="background:#ffd166"></i>ready 대기(async)</span>
+    <span><i style="background:#9ec5ff"></i>verify</span>
+    <span><i style="background:#ff8585"></i>delete(역순)</span>
+  </div>
+  <div class="gantt" id="g"></div>
+</div>
+<div class="foot">추정 소요(worst-case): create 5s(heavy 20s) · ready = <code>ready.timeout</code> · verify 3s ·
+  delete 8s(heavy 15s). 실제 런타임은 ops 뷰가 측정. 시퀀셜 가정(엔진 현행) — 미래 병렬화 여지는
+  같은 깊이 노드를 겹쳐 그리면 표현 가능.</div>
+</div>
+<script>
+const V=VIZ,N=V.N;
+const cands=V.allIds().filter(id=>V.closure([id]).size>=2)
+  .sort((a,b)=>V.closure([b]).size-V.closure([a]).size);
+let cur=["ske-cluster","server","mysql-cluster"].find(V.exists)||cands[0];
+document.getElementById("target").innerHTML=cands.map(id=>
+  `<option value="${id}" ${id===cur?"selected":""}>${id} (폐포 ${V.closure([id]).size}${N[id].heavy?", heavy":""})</option>`).join("");
+document.getElementById("target").onchange=e=>{cur=e.target.value;draw();};
+function dur(step){const n=N[step.id];
+  if(step.phase==="create")return n.heavy?20:5;
+  if(step.phase==="ready")return n.ready_timeout||30;
+  if(step.phase==="verify")return 3;
+  if(step.phase==="delete")return n.heavy?15:8;return 4;}
+function draw(){
+  const p=V.plan([cur]);
+  // assign global start times sequentially
+  let t=0;const segs=[];
+  p.steps.forEach(s=>{const d=dur(s);segs.push({...s,t0:t,t1:t+d,d});t+=d;});
+  const total=t;
+  // rows = nodes in create order, plus they reappear for delete
+  const rows=p.order.slice();
+  const W=Math.max(680,total*1.0); // ~1px/sec min, but cap via scale
+  const scale=W/total;
+  const px=sec=>sec*scale;
+  // axis ticks every ~ nice interval
+  const step=niceStep(total);let ticks="";
+  for(let s=0;s<=total;s+=step)ticks+=`<div class="tick" style="left:${px(s)}px">${fmt(s)}</div>`;
+  let html=`<div class="axis"><div class="gl muted" style="border-right:1px solid var(--line);padding:5px 10px">node \\ time →</div><div class="ticks" style="min-width:${W}px">${ticks}</div></div>`;
+  rows.forEach(id=>{
+    const mine=segs.filter(s=>s.id===id);
+    let track=`<div class="gtrack" style="min-width:${W}px">`;
+    mine.forEach(s=>{const w=Math.max(8,px(s.d));
+      track+=`<div class="seg ${s.phase}" style="left:${px(s.t0)}px;width:${w}px" title="${id} ${s.action} (~${fmt(s.d)})">${w>40?s.action:""}</div>`;});
+    track+="</div>";
+    html+=`<div class="grow"><div class="gl">${N[id].heavy?"🜂 ":""}<code>${id}</code></div>${track}</div>`;
+  });
+  document.getElementById("g").innerHTML=html;
+  document.getElementById("meta").textContent=`· ${p.order.length} 자원 · ${p.steps.length} 스텝 · 추정 worst-case ${fmt(total)} · ${p.heavy?"heavy 🜂":"light"}`;
+}
+function niceStep(t){const raw=t/8;const p=Math.pow(10,Math.floor(Math.log10(raw)));
+  const m=raw/p;return (m<2?2:m<5?5:10)*p;}
+function fmt(s){s=Math.round(s);return s>=60?Math.floor(s/60)+"m"+(s%60?(s%60)+"s":""):s+"s";}
+draw();
+</script>
+</body></html>
