@@ -191,11 +191,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-15 07:54 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-15 07:54 KST · branch <code>claude/autonomous-progress-check-rklsix</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "GET", "p": "/v1/reports/billing-item-ids", "api": "listbillingitemids", "c": "y", "s": 200, "t": 1.4, "src": "", "d": [{"label": "pagination", "issue": "38", "kind": "runtime", "detail": "ignores size=1 (returned 232)", "crit": false}]}, {"m": "GET", "p": "/v1/reports/offerings", "api": "listoffering", "c": "y", "s": 200, "t": 0.7, "src": "", "d": [{"label": "pagination", "issue": "38", "kind": "runtime", "detail": "ignores size=1 (returned 3)", "crit": false}]}, {"m": "GET", "p": "/v1/reports/prices", "api": "listreportprice", "c": "y", "s": 200, "t": 1.9, "src": "", "d": []}];
+var R=[{"m": "GET", "p": "/v1/reports/billing-item-ids", "api": "listbillingitemids", "c": "y", "s": 200, "t": 1.4, "src": "", "d": [{"label": "pagination", "issue": "38", "kind": "runtime", "detail": "ignores size=1 (returned 232)", "crit": false}]}, {"m": "GET", "p": "/v1/reports/offerings", "api": "listoffering", "c": "y", "s": 200, "t": 0.9, "src": "", "d": [{"label": "pagination", "issue": "38", "kind": "runtime", "detail": "ignores size=1 (returned 3)", "crit": false}]}, {"m": "GET", "p": "/v1/reports/prices", "api": "listreportprice", "c": "y", "s": 200, "t": 0.8, "src": "", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
