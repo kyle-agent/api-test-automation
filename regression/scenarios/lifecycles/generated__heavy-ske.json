@@ -5,7 +5,7 @@
       "id": "gen-heavy-ske-upgrade",
       "service": "storage/filestorage",
       "enabled": true,
-      "_note": "owner-approved upgrade flow (2026-06-13): cluster+nodepool at v1.33.5 -> control-plane upgrade v1.34.3 -> node roll -> teardown. Also closes kubeconfig x2 (lowercase 'public' — the legacy probe sent PUBLIC against a lowercase enum) and listimages. Version literals are current live values; re-check the kubernetes-versions lookup if this rots. || run 27483895557 fix: ske-image GET needs size/page query",
+      "_note": "owner-approved upgrade flow (2026-06-13): cluster+nodepool at v1.33.5 -> control-plane upgrade v1.34.3 -> node roll -> teardown. Also closes kubeconfig x2 (lowercase 'public' — the legacy probe sent PUBLIC against a lowercase enum) and listimages. Version literals are current live values; re-check the kubernetes-versions lookup if this rots. || run 27491816948: ske-image needs scp_original_image_type=k8s",
       "steps": [
         {
           "name": "create-keypair",
@@ -102,7 +102,7 @@
           "name": "create-ske-image",
           "service": "ske",
           "method": "GET",
-          "path": "/v1/images?size=20&page=0",
+          "path": "/v1/images?scp_original_image_type=k8s&size=20&page=0",
           "expect_status": [
             200,
             201,
@@ -113,7 +113,7 @@
           "name": "verify-ske-image-images-page",
           "service": "ske",
           "method": "GET",
-          "path": "/v1/images?size=20&page=0",
+          "path": "/v1/images?scp_original_image_type=k8s&size=20&page=0",
           "expect_status": [
             200
           ],
