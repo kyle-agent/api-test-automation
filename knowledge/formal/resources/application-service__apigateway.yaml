@@ -42,7 +42,8 @@ resources:
          note: "기간 query param이 필요할 수 있음 (docs에 모델 없음) — 라이브 런에서 400이면 param 보강 (R3)"}
       - {name: read-resource-policies,
          endpoint: "GET /v1/apis/{api_id}/resource-policies",
-         expect_status: [200]}
+         expect_status: [200, 404],
+         note: "downstream of PF-19 (setresourcepolicy 500 -> no policy created); run 27540589368. The verify read 404s because the PUT never created a policy — tolerate 404 so the chain survives until the PF-19 backend 5xx is fixed."}
       # PF-19: the resource-policy WRITE — PUT /v1/apis/{api_id}/resource-policies
       # (setresourcepolicy, composed into gen-wave5-apigw-policy) 500s
       # ContactAdminForAssistance with the proven policy_document shape

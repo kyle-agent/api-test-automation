@@ -83,6 +83,23 @@ def _norm_path(p: str) -> str:
     return "/".join("*" if "{" in s else s for s in p.split("/"))
 
 
+def _as_status_list(v):
+    """Coerce a status-set config value (expect_status / retry_on_status /
+    until_status / poll.until) into a list before any ``status in <v>`` test.
+
+    Defensive: a scalar like ``until_status: 404`` (a malformed lifecycle/
+    composed-fragment, e.g. gen-wave5-scf-triggers' wait-function-gone, run
+    27540589368) would otherwise raise ``TypeError: argument of type 'int' is
+    not iterable`` on ``resp.status in until_status`` and crash the whole
+    lifecycle. ``None`` -> ``[]``; a scalar -> one-element list; a list passes
+    through unchanged."""
+    if v is None:
+        return []
+    if isinstance(v, (list, tuple, set)):
+        return list(v)
+    return [v]
+
+
 # (METHOD, normalized-path, service) -> catalog endpoint key. Lets a CRUD WRITE
 # step be recorded under its REAL catalog key (not just "lifecycle:step") so its
 # HTTP status + response time show up in the dashboard's per-endpoint column,
@@ -389,7 +406,7 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
         time.sleep(5)
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
-    ros = step.get("retry_on_status")
+    ros = _as_status_list(step.get("retry_on_status"))
     if ros:
         attempts = int(step.get("retries", 4))
         interval = float(step.get("retry_interval", 15))
@@ -401,8 +418,8 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     poll = step.get("poll")
     if not poll:
         return resp
-    until_status = poll.get("until_status")
-    field, until = poll.get("field"), poll.get("until", [])
+    until_status = _as_status_list(poll.get("until_status")) or None
+    field, until = poll.get("field"), _as_status_list(poll.get("until"))
     timeout, interval = float(poll.get("timeout", 300)), float(poll.get("interval", 10))
     # Optional refire: while polling for a teardown to complete, a resource can
     # wedge in a FAILED-delete state (field report: a console delete of a
@@ -722,7 +739,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # so guarded coverage lifecycles don't burn ~1 min per 4xx step.
                 if (step.get("optional") and not step.get("retry_on_status")
                         and resp.status in (400, 409, 429)
-                        and resp.status not in step.get("expect_status", [200])
+                        and resp.status not in (_as_status_list(step.get("expect_status")) or [200])
                         and "{" not in path):
                     for _attempt in range(3):
                         if opt_retry_left < 20:
@@ -770,7 +787,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                                      service=step_service or "",
                                      lifecycle=lifecycle["id"])
 
-            expected = step.get("expect_status", [200])
+            expected = _as_status_list(step.get("expect_status")) or [200]
             _txt = resp.raw_text or ""
             _tl = _txt.lower()
             # Account quota caps are environmental, not regressions. SCP uses

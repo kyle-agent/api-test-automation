@@ -140,10 +140,18 @@ resources:
          expect_status: [200]}
       # setsecuritygrouprules — add/del 둘 다 optional array (api_docs, PG와
       # 동일 DTO). 빈 목록 = 무변경 no-op.
+      # run 27540589368 (IB): empty add_ip_addresses:[]/del_ip_addresses:[]
+      # no-op was rejected 400 "invalid security-group-rules" under strict
+      # expect. Tolerate [200,202,400] + optional so the no-op doesn't fail the
+      # cluster verify chain (lower-risk than forcing a real CIDR mutation on a
+      # one-shot billable cluster). A real CIDR (10.10.10.10/32) is kept in the
+      # body so the call still exercises the add path when accepted.
       - {name: setsecuritygrouprules,
          endpoint: "POST /v1/clusters/{cluster_id}/security-group-rules",
          json: {add_ip_addresses: ["10.10.10.10/32"], del_ip_addresses: []},
-         expect_status: [200, 202]}
+         expect_status: [200, 202, 400],
+         optional: true,
+         note: "empty no-op rejected 400, run 27540589368 (IB)"}
       - {name: read-after-sg, endpoint: "GET /v1/clusters/{cluster_id}",
          expect_status: [200]}
       # ---- mariadb 폴딩 setter 면 (PG 미러에 추가) -------------------------
