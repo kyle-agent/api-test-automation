@@ -529,16 +529,19 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
     # int(time.time()) only has 1-second resolution, so two lifecycles that
     # share a name prefix and start in the same second (routine under
     # pytest-xdist) generate IDENTICAL names — the second create then 400s
-    # ("name already exists", field report run 27500363845: gen-wave2-rg vs
-    # gen-wave4-rmtags). Mix in 3 random bytes so names are unique across
-    # concurrent lifecycles while staying STABLE within this call (computed
-    # once here, reused by every step + its cleanup).
-    _rand = os.urandom(3)
-    _ts_hex = format(int(time.time()), "x")
+    # ("name already exists", run 27500363845: gen-wave2-rg vs gen-wave4-rmtags).
+    # Mix in randomness so names are unique across concurrent lifecycles while
+    # staying STABLE within this call (computed once here, reused by every step +
+    # its cleanup). CRITICAL: keep the total length 8 chars (4 hex of the
+    # low-16-bit timestamp + 4 random hex) — VPC names are capped at 20 chars and
+    # "regrvpc{unique}" must fit (run 27514177331 regressed at 21 chars when this
+    # was timestamp(8)+random(6)=14).
+    _rand_hex = os.urandom(2).hex()                       # 4 hex chars, random
+    _ts_hex = format(int(time.time()) & 0xFFFF, "04x")    # 4 hex chars, low-16-bit time
+    _u = _ts_hex + _rand_hex                              # 8 hex chars total
     ctx: dict[str, str] = {
-        "unique": _ts_hex + _rand.hex(),
-        "ualpha": ("".join(chr(ord("a") + int(c, 16)) for c in _ts_hex)
-                   + "".join(chr(ord("a") + b % 26) for b in _rand)),
+        "unique": _u,
+        "ualpha": "".join(chr(ord("a") + int(c, 16)) for c in _u),  # 8 alpha chars
         "region": cfg.region,
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
