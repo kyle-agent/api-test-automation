@@ -110,8 +110,9 @@ def export(outdir: str | Path) -> Path:
         encoding="utf-8")
     shutil.copyfile(HERE / "static" / "graph.js", out / "graph.js")
     (out / "catalog.html").write_text(_CATALOG_HTML, encoding="utf-8")
+    (out / "plan.html").write_text(_PLAN_HTML, encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
-    print(f"wrote {out}/catalog.html — {data['node_count']} nodes, "
+    print(f"wrote {out}/catalog.html + plan.html — {data['node_count']} nodes, "
           f"{data['validated']} VALIDATED, {len(data['groups'])} groups")
     return out / "catalog.html"
 
@@ -145,7 +146,8 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
 </style></head><body><div class="wrap">
-<h1>자원 카탈로그 <span class="muted" style="font-size:13px">— 읽기 전용 (정적). 정의/수정은 control plane에서.</span></h1>
+<h1>자원 카탈로그 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
+  <a href="plan.html">합성 Plan 미리보기 →</a> · 정의/수정은 control plane.</span></h1>
 <p class="muted" id="sub"></p>
 <div class="cols">
   <div class="panel">
@@ -207,6 +209,114 @@ function refresh(){
 document.getElementById("cat").onchange=function(e){var c=e.target.value;var fs=[...svcOf[c]].sort()[0];sel=Object.keys(N).find(id=>N[id].service===fs);refresh();};
 document.getElementById("svc").onchange=function(e){var s=e.target.value;sel=Object.keys(N).find(id=>N[id].service===s);refresh();};
 refresh();
+</script></body></html>"""
+
+
+_PLAN_HTML = r"""<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>합성 Plan 미리보기 (읽기 전용)</title>
+<style>
+:root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#27384b;--ink:#e7eef6;
+  --muted:#90a4ba;--accent:#5aa9ff;--val:#3fb27f;--docs:#e0922f;--shared:#ffd166}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.5 ui-sans-serif,-apple-system,Segoe UI,"Noto Sans KR",sans-serif}
+a{color:var(--accent);text-decoration:none}.wrap{max-width:1280px;margin:0 auto;padding:20px}
+h1{font-size:18px}.muted{color:var(--muted)}code{font-family:ui-monospace,Consolas,monospace}
+.cols{display:grid;grid-template-columns:300px 1fr 280px;gap:16px;align-items:start}
+@media(max-width:1050px){.cols{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel h2{font-size:14px;margin:0 0 10px}.panel h3{font-size:12px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px}
+input,select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+  border-radius:8px;padding:6px 9px;font-size:13px;margin-bottom:8px}
+.chk{display:flex;align-items:center;gap:7px;padding:3px 4px;border-radius:6px;cursor:pointer}
+.chk:hover{background:var(--panel2)}.chk .dot{width:8px;height:8px;border-radius:50%}
+.scroll{max-height:520px;overflow:auto}.svgbox{background:#0f1720;border:1px solid var(--line);
+  border-radius:10px;overflow:auto}.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;
+  color:var(--muted);margin:6px 0}.legend i{display:inline-block;width:11px;height:11px;border-radius:3px}
+.kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line)}
+.btn{background:var(--accent);color:#06121f;border:none;border-radius:8px;padding:8px 12px;
+  font-weight:600;cursor:pointer;font-size:13px;display:inline-block}.chip{display:inline-block;
+  background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:2px 8px;font-size:11.5px;margin:2px}
+.note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
+  color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
+</style></head><body><div class="wrap">
+<h1>합성 Plan 미리보기 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
+  <a href="catalog.html">← 카탈로그</a> · 실제 합성/실행은 control plane.</span></h1>
+<p class="muted">여러 자원을 고르면 의존 폐포의 합집합과 <b>공통 선행자원(dedup)</b>을 미리 봅니다.
+  실제 compose+draft+실행은 <code>/planning/resources/compose</code>(FastAPI)에서.</p>
+<div class="cols">
+  <div class="panel">
+    <h2>타깃 선택</h2><input type="search" id="q" placeholder="검색…">
+    <div class="scroll" id="list"></div>
+  </div>
+  <div class="panel">
+    <h2 id="gtitle">합성 폐포</h2>
+    <div class="legend"><span><i style="background:#11314f"></i>대상 ★</span>
+      <span><i style="background:#1c2a3a"></i>선행</span>
+      <span><i style="background:#ffd166"></i>공유(dedup)</span>
+      <span style="color:#3fb27f">VALIDATED</span><span style="color:#e0922f">docs</span>
+      <span>세로 띠=level</span></div>
+    <div class="svgbox"><svg id="svg"></svg></div>
+  </div>
+  <div class="panel">
+    <h2>plan 요약</h2><div id="sum"></div>
+    <a class="btn" id="live" href="#" style="margin-top:10px">control plane에서 실행 →</a>
+  </div>
+</div>
+<div class="foot">폐포·dedup·level은 클라이언트가 모델 의존(requires)으로 계산(미리보기). 실제 합성은
+  서버 composer가 동일 규칙으로 수행.</div>
+</div>
+<script src="catalog.js"></script><script src="graph.js"></script>
+<script>
+var C=window.CATALOG,N=C.nodes,T=new Set();
+["ske-cluster","mysql-cluster","private-nat"].forEach(id=>{if(N[id])T.add(id);});
+if(!T.size)Object.keys(N).slice(0,2).forEach(id=>T.add(id));
+function deps(id){var n=N[id];if(!n)return[];var out=[];
+  n.requires.and.forEach(d=>{if(N[d.ref])out.push(d.ref);});
+  n.requires.one_of.forEach(o=>{var b=(o.branches||[]).filter(x=>N[x])[0];if(b)out.push(b);});
+  return out;}
+function closure(ids){var seen=new Set(),st=ids.slice();while(st.length){var x=st.pop();
+  if(!N[x]||seen.has(x))continue;seen.add(x);deps(x).forEach(r=>st.push(r));}return seen;}
+function levels(set){var dep={};function d(n,stk){if(n in dep)return dep[n];if(stk.has(n))return 0;
+  stk.add(n);var ds=deps(n).filter(r=>set.has(r)).map(r=>d(r,stk));stk.delete(n);
+  return dep[n]=ds.length?1+Math.max.apply(0,ds):0;}set.forEach(n=>d(n,new Set()));return dep;}
+function build(){
+  var ids=[...T];var per=ids.map(t=>closure([t]));
+  var union=new Set();per.forEach(s=>s.forEach(x=>union.add(x)));
+  var dep=levels(union);
+  var share={};union.forEach(id=>share[id]=per.filter(s=>s.has(id)).length);
+  var shared=new Set([...union].filter(id=>share[id]>1));
+  var nodes=[...union].map(id=>({id:id,service:N[id].service,provenance:N[id].provenance,
+    quota:N[id].quota,heavy:N[id].heavy,options:N[id].options.map(o=>o.name),
+    level:dep[id],is_target:T.has(id),shared:shared.has(id)}));
+  var edges=[];union.forEach(id=>deps(id).forEach(r=>{if(union.has(r))edges.push({from:r,to:id});}));
+  var quota={};union.forEach(id=>{if(N[id].quota)quota[N[id].quota]=(quota[N[id].quota]||0)+1;});
+  var naive=per.reduce((a,s)=>a+s.size,0);
+  return {graph:{nodes:nodes,edges:edges,levels:[...new Set(Object.values(dep))].sort()},
+    union:union,shared:shared,quota:quota,naive:naive};
+}
+function list(){var q=(document.getElementById("q").value||"").toLowerCase();
+  var ids=Object.keys(N).sort((a,b)=>N[a].category<N[b].category?-1:1)
+    .filter(id=>!q||(id+N[id].service).toLowerCase().includes(q));
+  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="checkbox" '+(T.has(id)?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><b>'+id+'</b></label>').join("");
+  document.querySelectorAll('#list input').forEach(cb=>cb.onchange=function(){cb.checked?T.add(cb.dataset.id):T.delete(cb.dataset.id);draw();});}
+function draw(){
+  if(!T.size){document.getElementById("svg").innerHTML="";document.getElementById("sum").innerHTML='<p class="muted">타깃을 선택하세요.</p>';return;}
+  var b=build();
+  ResourceGraph.render(document.getElementById("svg"),b.graph,{onClick:function(id){T.has(id)?T.delete(id):T.add(id);if(T.size){list();draw();}}});
+  document.getElementById("gtitle").innerHTML='합성 폐포 <span class="muted" style="font-weight:400;font-size:12px">· '+b.union.size+' 노드</span>';
+  var saved=b.naive-b.union.size;
+  document.getElementById("sum").innerHTML=
+    '<div class="kv"><span>대상</span><b>'+T.size+'</b></div>'+
+    '<div class="kv"><span>폐포 노드</span><b>'+b.union.size+'</b></div>'+
+    '<div class="kv"><span>dedup 절감</span><b>'+b.naive+'→'+b.union.size+' (−'+saved+')</b></div>'+
+    '<div class="kv"><span>peak quota</span><b>'+(Object.keys(b.quota).map(k=>k+"×"+b.quota[k]).join(", ")||"—")+'</b></div>'+
+    (b.shared.size?'<h3>공유 인프라(1회)</h3><div>'+[...b.shared].map(s=>'<span class="chip">'+s+'</span>').join("")+'</div>':"");
+  document.getElementById("live").href="/planning/resources/compose?"+[...T].map(t=>"targets="+encodeURIComponent(t)).join("&");
+}
+list();draw();
+document.getElementById("q").oninput=list;
 </script></body></html>"""
 
 
