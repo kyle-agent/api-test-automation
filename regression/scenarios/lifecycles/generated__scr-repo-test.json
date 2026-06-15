@@ -1,0 +1,63 @@
+{
+  "_comment": "SCR repo-create isolation test (owner request 2026-06-15). Purpose: create a repository named 'test' on the EXISTING owner registry sample-nayvugfp (registry_id 'nayvugfp', derived from host [name-id].scr...) and record whether POST /v1/repositories 403s. This bypasses registry-create entirely to isolate the owner's hypothesis ('the 403 is from a disallowed registry-create option'). Uses the standard SCP_ACCESS_KEY/SECRET (no console SCR auth key needed for the SCP REST API). Broad expect_status so the real status/body is recorded even on 4xx; capture_soft + cleanup so a pre-existing 'test' (409, no id) is NOT deleted.",
+  "lifecycles": [
+    {
+      "id": "gen-scr-repo-test",
+      "service": "container/scr",
+      "enabled": true,
+      "_note": "isolation probe — light, no VPC. list-registries first so the artifact shows every visible registry + its real id (safety net if 'nayvugfp' is wrong). Then create repo 'test' on registry_id=nayvugfp. 201/202 => repo-create works with access/secret (owner hypothesis confirmed: the earlier 403 was NOT a repo/registry permission). 403 => permission boundary on repo-create. 404/400 => registry_id wrong (use the id from list-registries).",
+      "steps": [
+        {
+          "name": "list-registries",
+          "service": "scr",
+          "method": "GET",
+          "path": "/v1/container-registries",
+          "expect_status": [200]
+        },
+        {
+          "name": "create-test-repo",
+          "service": "scr",
+          "method": "POST",
+          "path": "/v1/repositories",
+          "json": {
+            "name": "test",
+            "description": "API regression isolation test",
+            "registry_id": "nayvugfp",
+            "lifecycle_policy": {
+              "lifecycle_policy_enabled": false,
+              "outdated_rule_enabled": false,
+              "outdated_rule_duration": 90,
+              "outdated_rule_tag_expression": "*",
+              "untagged_rule_enabled": false,
+              "untagged_rule_duration": 90
+            },
+            "lock_policy": {"locked": false},
+            "pull_policy": {
+              "critical_limit": 0,
+              "high_limit": 0,
+              "unmodified_excepted": false,
+              "unscanned_image_pull_prevented": false,
+              "vulnerable_image_pull_prevented": false
+            },
+            "scan_policy": {
+              "auto_scan_enabled": false,
+              "fixed_version_excepted": false,
+              "language_excepted": false,
+              "scan_policy_enabled": false,
+              "secret_excepted": false,
+              "severity_limit": "High"
+            },
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409],
+          "capture_soft": {"repo_id": "$.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/repositories/{repo_id}",
+            "service": "scr"
+          }
+        }
+      ]
+    }
+  ]
+}
