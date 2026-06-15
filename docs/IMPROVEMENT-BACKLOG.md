@@ -69,6 +69,7 @@ owner가 3개 Claude Code 창을 병렬로 운영: ① 기존 테스트 창 ② 
 | IB-038 | debt | firewall rule quota(EXSMALL=5 기본) service yaml엔 있으나 budget/quotas-and-budgets.md 미기재. Track N | quotas-and-budgets.md에 5-rule 기본 한도 NOTE(현 single-rule 시나리오는 안전, monitored) | S | **done (Q: docs/quotas-and-budgets.md 신규 생성, budget-kind/문서전용 quota 분리 정리)** |
 | IB-039 | debt | hosted-zone quota(20/account·100 records/zone) 미모델 — 스케일 시 한도. Track N | cross-service.yaml에 hosted-zone quota(limit:20) 추가(현재 저위험) | S | **done (Q: inert quota 엔트리, quota_kind 미배선 확인 — 런타임 무영향)** |
 | IB-040 | debt | planned-compute body **console↔API 불일치 의심** — userguide 콘솔 create 폼은 5필드(target/OS/server_type/term/**quantity**)인데 `PlannedComputeCreateRequest` 모델엔 quantity 없음(Track P, billingplan overview 200). | 라이브 2xx 또는 apiref 재확인으로 quantity 필요 여부 검증 → 필요 시 body에 추가. docs 호스트 안정 후 | S | open (검증 필요) |
+| IB-041 | platform | **라이브 run이 docs→VALIDATED 승급을 못 함(검증 병목)** — heavy/ADOPT lifecycle의 create step이 soft/optional(tolerant expect, 4xx 허용)이라 lifecycle "pass"가 실제 2xx를 증명 못 함 + `verified_endpoints.json` 부재. run #108: 9 lifecycle 통과했으나 masked-defect 규칙상 승급 0 (Track R). 즉 heavy run은 "안 깨짐"만 확인, VALIDATED 숫자 못 올림 | publish/엔진이 `reports/results/observations.jsonl`에서 **실제 2xx 받은 endpoint를 `data/baselines/verified_endpoints.json`로 산출·커밋** → 승급에 endpoint별 증거 부여(masked-defect-safe). 또는 승급 목표 노드의 create를 strict화(soft→strict). 그 후 재-run이 VALIDATED를 실제 전진 | M | open (검증 전진의 핵심 차단요인) |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 
