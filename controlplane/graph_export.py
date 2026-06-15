@@ -83,6 +83,7 @@ def build_catalog(model: dict | None = None) -> dict:
             "options": opts,
             "dependents": sorted(dep_index.get(nid, [])),
             "verify_n": len(task.get("verify") or []),
+            "ready_timeout": (task.get("ready") or {}).get("timeout"),
         }
         try:
             focus[nid] = composer.focus_view(nid, model=model)
@@ -171,6 +172,7 @@ def export(outdir: str | Path, observations_path: str | Path | None = None) -> P
     (out / "catalog.html").write_text(_CATALOG_HTML, encoding="utf-8")
     (out / "plan.html").write_text(_PLAN_HTML, encoding="utf-8")
     (out / "report.html").write_text(_REPORT_HTML, encoding="utf-8")
+    (out / "run.html").write_text(_RUN_HTML, encoding="utf-8")
     # optional per-run timing/result overlay (P4) — only when observations exist
     report = None
     if observations_path:
@@ -217,7 +219,7 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
 </style></head><body><div class="wrap">
 <h1>자원 카탈로그 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
-  <a href="plan.html">Plan 미리보기</a> · <a href="report.html">Report</a> · 정의/수정은 control plane.</span></h1>
+  <a href="plan.html">Plan</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 정의/수정은 control plane.</span></h1>
 <p class="muted" id="sub"></p>
 <div class="cols">
   <div class="panel">
@@ -312,7 +314,7 @@ input,select{width:100%;background:var(--panel2);border:1px solid var(--line);co
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
 </style></head><body><div class="wrap">
 <h1>합성 Plan 미리보기 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
-  <a href="catalog.html">← 카탈로그</a> · <a href="report.html">Report</a> · 실제 합성/실행은 control plane.</span></h1>
+  <a href="catalog.html">← 카탈로그</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 실제 합성/실행은 control plane.</span></h1>
 <p class="muted">여러 자원을 고르면 의존 폐포의 합집합과 <b>공통 선행자원(dedup)</b>을 미리 봅니다.
   실제 compose+draft+실행은 <code>/planning/resources/compose</code>(FastAPI)에서.</p>
 <div class="cols">
@@ -419,7 +421,7 @@ input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var
 .foot{margin-top:30px;color:#6b7e93;font-size:12px}
 </style></head><body><div class="wrap">
 <h1>실행 결과 + 수행시간 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
-  <a href="catalog.html">← 카탈로그</a> · <a href="plan.html">Plan</a></span></h1>
+  <a href="catalog.html">← 카탈로그</a> · <a href="plan.html">Plan</a> · <a href="run.html">Run</a></span></h1>
 <p class="muted">최근 런의 <code>observations.jsonl</code>(호출별 <code>elapsed_ms</code>)을
   노드의 create endpoint로 매칭해 <b>단계별 수행시간</b>과 pass/fail을 그래프에 색칠합니다.</p>
 <div id="banner"></div>
@@ -481,6 +483,92 @@ function draw(){
       '<td>'+(r.status||"untested")+'</td><td>'+(r.http||"")+'</td>'+
       '<td>'+(r.elapsed_ms!=null?Math.round(r.elapsed_ms)+" ms":"—")+'</td></tr>';}).join("");
   document.getElementById("tbl").innerHTML='<tr><th>node</th><th>L</th><th>status</th><th>http</th><th>elapsed</th></tr>'+rows;
+}
+list();draw();document.getElementById("q").oninput=list;
+</script></body></html>"""
+
+
+_RUN_HTML = r"""<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>실행 구조 — 레벨 병렬 (읽기 전용)</title>
+<style>
+:root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#27384b;--ink:#e7eef6;
+  --muted:#90a4ba;--accent:#5aa9ff;--val:#3fb27f;--docs:#e0922f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.5 ui-sans-serif,-apple-system,Segoe UI,"Noto Sans KR",sans-serif}
+a{color:var(--accent);text-decoration:none}.wrap{max-width:1280px;margin:0 auto;padding:20px}
+h1{font-size:18px}.muted{color:var(--muted)}code{font-family:ui-monospace,Consolas,monospace}
+.cols{display:grid;grid-template-columns:300px 1fr 300px;gap:16px;align-items:start}
+@media(max-width:1050px){.cols{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel h2{font-size:14px;margin:0 0 10px}.panel h3{font-size:12px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px}
+input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+  border-radius:8px;padding:6px 9px;font-size:13px;margin-bottom:8px}
+.chk{display:flex;align-items:center;gap:7px;padding:3px 4px;border-radius:6px;cursor:pointer}
+.chk:hover{background:var(--panel2)}.chk .dot{width:8px;height:8px;border-radius:50%}
+.scroll{max-height:520px;overflow:auto}.svgbox{background:#0f1720;border:1px solid var(--line);
+  border-radius:10px;overflow:auto}.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;
+  color:var(--muted);margin:6px 0}.legend i{display:inline-block;width:11px;height:11px;border-radius:3px}
+.kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line)}
+.note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
+  color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
+.lvl{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;background:var(--panel2)}
+.lvl b{color:#5aa9ff}.pill{display:inline-block;background:#16212e;border:1px solid var(--line);
+  border-radius:12px;padding:1px 7px;font-size:11px;margin:2px}
+</style></head><body><div class="wrap">
+<h1>실행 구조 — 레벨 병렬 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
+  <a href="catalog.html">← 카탈로그</a> · <a href="plan.html">Plan</a> · <a href="report.html">Report</a></span></h1>
+<p class="muted">합성 plan을 <b>실행 단계(level)</b>로 나눠 보여줍니다 — 같은 단계의 독립 노드는
+  <b>병렬 실행 가능</b>, 다음 단계는 이전 단계가 모두 끝나야 시작(배리어). 실시간 상태(생성중/완료/실패)는
+  control plane <code>/runs/{id}/graph</code>(oplog)에서 이 그래프에 색칠됩니다.</p>
+<div class="cols">
+  <div class="panel"><h2>대상 선택</h2><input type="search" id="q" placeholder="검색…">
+    <div class="scroll" id="list"></div></div>
+  <div class="panel"><h2 id="gtitle">실행 그래프 (level = 세로 띠)</h2>
+    <div class="legend"><span><i style="background:#11314f"></i>대상 ★</span>
+      <span style="color:#3fb27f">VALIDATED</span><span style="color:#e0922f">docs</span>
+      <span>🜂 heavy · 세로 띠=병렬 단계</span></div>
+    <div class="svgbox"><svg id="svg"></svg></div></div>
+  <div class="panel"><h2>단계별 (병렬)</h2><div id="levels"></div>
+    <div id="sum"></div>
+    <div class="note">추정 시간은 모델 <code>ready.timeout</code> 기반(worst-case). 실측은
+      Report(observations)·실시간은 control plane.</div></div>
+</div>
+<div class="foot">레벨 = 위상 깊이(longest-path). 같은 깊이 = 서로 의존 없음 = 병렬 후보.
+  실제 레벨 병렬 실행(엔진)은 별도 트랙(P3b).</div>
+</div>
+<script src="catalog.js"></script><script src="graph.js"></script>
+<script>
+var C=window.CATALOG,N=C.nodes,T=new Set();
+["ske-cluster","mysql-cluster","private-nat"].forEach(id=>{if(N[id])T.add(id);});
+if(!T.size)Object.keys(N).slice(0,2).forEach(id=>T.add(id));
+function deps(id){var n=N[id];if(!n)return[];var o=[];n.requires.and.forEach(d=>{if(N[d.ref])o.push(d.ref);});
+  n.requires.one_of.forEach(g=>{var b=(g.branches||[]).filter(x=>N[x])[0];if(b)o.push(b);});return o;}
+function closure(ids){var s=new Set(),st=ids.slice();while(st.length){var x=st.pop();if(!N[x]||s.has(x))continue;s.add(x);deps(x).forEach(r=>st.push(r));}return s;}
+function levels(set){var d={};function f(n,k){if(n in d)return d[n];if(k.has(n))return 0;k.add(n);
+  var ds=deps(n).filter(r=>set.has(r)).map(r=>f(r,k));k.delete(n);return d[n]=ds.length?1+Math.max.apply(0,ds):0;}set.forEach(n=>f(n,new Set()));return d;}
+function dur(id){var n=N[id];var c=n.heavy?20:5;var r=n.ready_timeout?Math.round(n.ready_timeout*0.5):(n.heavy?45:0);return c+r+(n.verify_n||0)*3;}
+function list(){var q=(document.getElementById("q").value||"").toLowerCase();
+  var ids=Object.keys(N).sort((a,b)=>N[a].category<N[b].category?-1:1).filter(id=>!q||(id+N[id].service).toLowerCase().includes(q));
+  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="checkbox" '+(T.has(id)?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><b>'+id+'</b></label>').join("");
+  document.querySelectorAll('#list input').forEach(cb=>cb.onchange=function(){cb.checked?T.add(cb.dataset.id):T.delete(cb.dataset.id);draw();});}
+function draw(){
+  if(!T.size){document.getElementById("svg").innerHTML="";return;}
+  var set=closure([...T]),dep=levels(set);
+  var nodes=[...set].map(id=>({id:id,service:N[id].service,provenance:N[id].provenance,quota:N[id].quota,heavy:N[id].heavy,level:dep[id],is_target:T.has(id)}));
+  var edges=[];set.forEach(id=>deps(id).forEach(r=>{if(set.has(r))edges.push({from:r,to:id});}));
+  ResourceGraph.render(document.getElementById("svg"),{nodes:nodes,edges:edges,levels:[...new Set(Object.values(dep))].sort()},
+    {onClick:function(id){T.has(id)?T.delete(id):T.add(id);if(T.size){list();draw();}}});
+  var byL={};[...set].forEach(id=>{(byL[dep[id]]=byL[dep[id]]||[]).push(id);});
+  var seq=0,wall=0;var levs=Object.keys(byL).map(Number).sort((a,b)=>a-b);
+  document.getElementById("levels").innerHTML=levs.map(function(l){
+    var mx=0;byL[l].forEach(id=>{var d=dur(id);seq+=d;mx=Math.max(mx,d);});wall+=mx;
+    return '<div class="lvl"><b>L'+l+'</b> <span class="muted">('+byL[l].length+' 동시 · ~'+mx+'s)</span><br>'+byL[l].sort().map(id=>'<span class="pill">'+(N[id].heavy?"🜂":"")+id+'</span>').join("")+'</div>';}).join("");
+  document.getElementById("gtitle").innerHTML='실행 그래프 <span class="muted" style="font-weight:400;font-size:12px">· '+set.size+' 노드 · '+levs.length+' 단계</span>';
+  document.getElementById("sum").innerHTML='<div class="kv"><span>순차 합계(추정)</span><b>'+seq+'s</b></div>'+
+    '<div class="kv"><span>레벨 병렬 wall</span><b style="color:#3fb27f">'+wall+'s</b></div>'+
+    '<div class="kv"><span>가속</span><b>'+(wall?(seq/wall).toFixed(2):"—")+'×</b></div>';
 }
 list();draw();document.getElementById("q").oninput=list;
 </script></body></html>"""
