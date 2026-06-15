@@ -19,6 +19,14 @@ resources:
   lb-health-check:
     code: "nw-lb-health-check"
     service: networking/loadbalancer
+    # DESIGN NOTE (owner 2026-06-15): health-check is a STANDALONE top-level
+    # resource (POST /v1/lb-health-checks, body keyed on vpc/subnet only — no
+    # load_balancer_id), NOT a child of load-balancer. The LB link is INDIRECT:
+    # lb-server-group requires this health-check, and a listener binds the
+    # server-group to the LB. So `subnet` as the direct dependency is correct
+    # (cf. lb-member/lb-static-nat which ARE children — their paths carry
+    # {server_group_id}/{loadbalancer_id}; health-check's does not). AI-usability
+    # quirk: conceptually feels LB-owned, but the API models it independently.
     requires: [vpc, subnet]
     create:
       endpoint: "POST /v1/lb-health-checks"

@@ -110,6 +110,10 @@ resources:
       - {name: read-console-log,
          endpoint: "GET /v1/servers/{server_id}/console-log",
          expect_status: [200]}
+      - {name: list-volumes,
+         endpoint: "GET /v1/servers/{server_id}/volumes",
+         expect_status: [200],
+         note: "listservervolumes — id-bound list-children off server_id (the captured id). The per-id show/update GET /v1/servers/{server_id}/volumes/{volume_id} (showservervolume, gap_getid) is NOT wired: the boot volume is created INLINE in the server body (volumes:[{boot_index:0,...}]) and the create response model servercreateresponseparam carries ONLY {id} (the server id) — no boot-volume id is captured, and `server` requires no separate volume node to source one. Capturing {volume_id} would need a new capture off this list read (e.g. $.volumes[0].id) — left as a gap rather than invented; the list read still exercises the volumes sub-tree."}
       # post-create ops (owner 2026-06-12/13): lock 걸고 즉시 unlock(잠긴 채로
       # teardown 가면 삭제 불가 위험), dump 생성, password는 keypair private_key
       # 를 body로 (api_docs ServerPasswordRequest; lock/unlock/dump는 body 없음)
