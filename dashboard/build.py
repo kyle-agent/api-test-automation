@@ -1357,6 +1357,14 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
   <h1>SCP API Regression</h1>
   @@PILL@@
   <span class="meta">branch <code>@@BRANCH@@</code> · 최근 실행 @@WHEN@@ · @@RUNTYPE@@</span>
+  <div class="links" style="margin-top:7px;font-size:13px">
+    자원 모델:
+    <a href="catalog/catalog.html">카탈로그</a> ·
+    <a href="catalog/plan.html">Plan</a> ·
+    <a href="catalog/run.html">Run</a> ·
+    <a href="catalog/report.html">Report</a>
+    &nbsp;|&nbsp; <a href="ops.html">Ops</a> · <a href="platform/">Platform</a>
+  </div>
 </div>
 
 @@ACTION@@

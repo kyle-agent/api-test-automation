@@ -66,6 +66,30 @@
 </section>
 </form>
 
+{% if selected %}
+<section>
+  <h2>합성 폐포 그래프 <span class="muted" style="font-size:13px;font-weight:400">— 선택 대상의 의존 폐포 (dedup·level)</span></h2>
+  <div style="display:flex;gap:14px;font-size:12px;color:#90a4ba;flex-wrap:wrap;margin-bottom:6px">
+    <span style="color:#5aa9ff">■ 대상 ★</span><span style="color:#ffd166">■ 공유(dedup)</span>
+    <span style="color:#3fb27f">■ VALIDATED</span><span style="color:#e0922f">■ docs</span>
+    <span>🜂 heavy · ⛔ quota · 세로 띠=level</span>
+  </div>
+  <div style="overflow:auto;background:#0f1720;border:1px solid #27384b;border-radius:10px;padding:6px">
+    <svg id="compose-svg"></svg>
+  </div>
+</section>
+<script src="/planning/resources/graph.js"></script>
+<script>
+(function(){
+  var ch = {{ choices|tojson }};
+  var url = "/planning/resources/graph.json?targets={{ selected|join(',') }}";
+  var parts = Object.keys(ch).map(function(k){ return k + "=" + ch[k]; });
+  if (parts.length) url += "&choices=" + encodeURIComponent(parts.join(","));
+  ResourceGraph.load(document.getElementById("compose-svg"), url, {});
+})();
+</script>
+{% endif %}
+
 {% if plan_error %}
 <section><p class="warn">{{ plan_error }}</p></section>
 {% endif %}

@@ -1,0 +1,336 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>통합 IA 워크스루 — Catalog·Plan·Run·Report</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="data/model.js"></script><script src="assets/viz.js"></script>
+<style>
+.tabs{display:flex;gap:6px;margin:0 0 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.tabs button{background:none;border:none;color:var(--muted);padding:10px 16px;cursor:pointer;
+  font-size:14px;border-bottom:2px solid transparent;font-weight:600}
+.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
+.tabs button .n{display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;
+  border-radius:50%;background:var(--panel2);font-size:11px;margin-right:6px}
+.flow{display:flex;gap:6px;align-items:center;color:var(--muted2);font-size:12px;margin-bottom:14px;flex-wrap:wrap}
+.flow b{color:var(--accent2)} .flow .ar{color:var(--line)}
+.kpi{display:flex;gap:10px;flex-wrap:wrap}
+.kpi .s{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:7px 12px}
+.kpi .s b{font-size:18px;display:block}.kpi .s span{font-size:11px;color:var(--muted)}
+.run-ctl{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.gmini .grow{grid-template-columns:118px 1fr}
+.fld{margin:6px 0}.fld label{font-size:11px;color:var(--muted);display:block;margin-bottom:2px}
+.fld input,.fld select{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+  border-radius:7px;padding:5px 8px;font-size:12.5px}
+.chiprow{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:2px 8px;font-size:11.5px;
+  display:inline-flex;align-items:center;gap:5px}
+.chip b{font-weight:600}.chip .x{cursor:pointer;color:#ff8585}
+.lvlband{fill:#10314d22}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>통합 IA 워크스루</h1>
+  <span class="crumbs"><a href="index.html">홈</a> › Catalog → Plan → Run → Report (같은 그래프, 레이어만 교체)</span>
+  <nav class="nav">
+    <a href="index.html">홈</a><a href="01-compose-canvas.html">①</a>
+    <a href="02-layered-dag.html">②</a><a href="03-closure-overlap.html">③</a>
+    <a href="04-branch-toggle.html">④</a><a href="05-sequence-gantt.html">⑤</a>
+    <a class="active" href="06-ia-walkthrough.html">통합</a><a href="references.html">참고</a>
+  </nav>
+</header>
+
+<div class="flow">
+  <b>Catalog</b> 서비스별 의존·옵션 보기/편집 <span class="ar">→</span>
+  <b>Plan</b> 선택·조합·합성 <span class="ar">→</span> <b>Run</b> 레벨 병렬 실행 <span class="ar">→</span>
+  <b>Report</b> 단계별 시간·결과 <span class="ar">↺</span>
+</div>
+
+<div class="tabs">
+  <button data-t="catalog" class="on"><span class="n">1·2</span>Catalog</button>
+  <button data-t="plan"><span class="n">3</span>Plan</button>
+  <button data-t="run"><span class="n">4</span>Run</button>
+  <button data-t="report"><span class="n">5</span>Report</button>
+</div>
+
+<div class="cols wide">
+  <div class="panel" id="left"></div>
+  <div class="panel">
+    <h2 id="gtitle"></h2>
+    <div id="legend" class="legend"></div>
+    <div class="svgbox"><svg id="svg"></svg></div>
+    <p class="muted small" id="ghint"></p>
+  </div>
+  <div class="panel" id="right"></div>
+</div>
+
+<div class="foot">데이터=실제 모델(편집은 메모리상 데모, 저장 안 됨). 실행 상태/시간=시뮬레이션.
+  같은 <code>viz.js</code> 그래프를 4개 탭이 공유.</div>
+</div>
+<script>
+const V=VIZ,N=V.N,NS="http://www.w3.org/2000/svg";
+let tab="catalog";
+let targets=new Set(["ske-cluster","mysql-cluster","private-nat"].filter(V.exists));
+let choices={};
+let selNode=V.exists("vpc")?"vpc":V.allIds()[0];
+
+// ---- shared renderer ----
+function renderG(set,opt){
+  opt=opt||{};
+  const L=V.layout(set,opt.choices,{colGap:opt.colGap||190,rowGap:54,bw:160,bh:42});
+  const svg=document.getElementById("svg");
+  svg.setAttribute("viewBox",`0 0 ${L.w} ${L.h}`);svg.setAttribute("width",L.w);svg.setAttribute("height",L.h);
+  let s=`<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="#5b7088"/></marker></defs>`;
+  (opt.bands||[]).forEach(b=>{s+=`<rect class="lvlband" x="${b.x}" y="0" width="${b.w}" height="${L.h}"/>
+    <text x="${b.x+6}" y="14" font-size="10" fill="#5b7088">${b.label}</text>`;});
+  L.edges.forEach(e=>{const a=L.byId[e.from],b=L.byId[e.to];
+    const x1=a.x+a.w,y1=a.y+a.h/2,x2=b.x,y2=b.y+b.h/2;
+    s+=`<path d="M${x1},${y1} C${x1+46},${y1} ${x2-46},${y2} ${x2},${y2}" fill="none" stroke="#4b5e72" stroke-width="1.3" marker-end="url(#ar)"/>`;});
+  L.nodes.forEach(p=>{const n=N[p.id];
+    const fill=(opt.colorOf&&opt.colorOf(p.id))||"#1c2a3a";
+    const stroke=(opt.strokeOf&&opt.strokeOf(p.id))||V.provColor(n.provenance);
+    const sw=(opt.targets&&opt.targets.has(p.id))?2.6:1.5;
+    const badge=opt.badgeOf?opt.badgeOf(p.id):"";
+    s+=`<g style="cursor:${opt.onClick?'pointer':'default'}" data-id="${p.id}">
+      <title>${p.id} — ${n.service}\nprovenance ${n.provenance}${n.options.length?"\noptions: "+n.options.map(o=>o.name).join(", "):""}</title>
+      <rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
+      <text x="${p.x+9}" y="${p.y+17}" font-size="12" font-weight="600" fill="#e7eef6">${n.heavy?"🜂 ":""}${p.id}</text>
+      <text x="${p.x+9}" y="${p.y+32}" font-size="10" fill="#90a4ba">${n.service.split("/").pop()}${n.quota?" ⛔"+n.quota:""}</text>
+      ${badge?`<text x="${p.x+p.w-8}" y="${p.y+16}" font-size="12" text-anchor="end">${badge}</text>`:""}
+    </g>`;});
+  svg.innerHTML=s;
+  if(opt.onClick)svg.querySelectorAll("g[data-id]").forEach(g=>g.onclick=()=>opt.onClick(g.dataset.id));
+  return L;
+}
+function leg(items){return items.map(i=>`<span><i style="background:${i[0]}"></i>${i[1]}</span>`).join("");}
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+
+// ============ 1·2 CATALOG: 서비스별 의존/옵션 보기 + 편집/생성 ============
+function catTree(){
+  const cats=[...new Set(V.allIds().map(id=>N[id].category))].sort();
+  const svcOf={};V.allIds().forEach(id=>{(svcOf[N[id].category]=svcOf[N[id].category]||new Set()).add(N[id].service);});
+  const selCat=N[selNode].category, selSvc=N[selNode].service;
+  return `<h2>서비스 카탈로그</h2>
+    <div class="fld"><label>① 카테고리</label>
+      <select id="selCat">${cats.map(c=>`<option ${c===selCat?"selected":""}>${c}</option>`).join("")}</select></div>
+    <div class="fld"><label>② 서비스</label>
+      <select id="selSvc">${[...svcOf[selCat]].sort().map(s=>`<option ${s===selSvc?"selected":""}>${s}</option>`).join("")}</select></div>
+    <h3>이 서비스의 자원 노드</h3>
+    <div class="scroll" id="nodeList" style="max-height:300px"></div>`;
+}
+function nodeListHtml(){
+  const svc=N[selNode].service;
+  const ids=V.allIds().filter(id=>N[id].service===svc).sort();
+  return ids.map(id=>`<label class="chk"><input type="radio" name="nd" data-id="${id}" ${id===selNode?"checked":""}>
+    <span class="dot" style="background:${V.provColor(N[id].provenance)}"></span>
+    <span><b>${id}</b> <span class="code">${V.depRefs(id).length}↑ ${V.dependents(id).length}↓</span></span></label>`).join("")
+    ||'<p class="muted small">노드 없음</p>';
+}
+function catalog(){
+  const n=N[selNode];
+  const up=V.closure([selNode]);               // 이 노드가 의존하는 것(upstream)
+  const deps=V.dependents(selNode);            // 이 노드에 의존하는 것(downstream, 직접)
+  const set=new Set([...up,...deps]);
+  document.getElementById("gtitle").innerHTML=`<code>${selNode}</code> 의존 관계 <span class="muted small">· ↑${up.size-1} 의존 · ↓${deps.length} 피의존</span>`;
+  document.getElementById("legend").innerHTML=leg([["#11314f","이 서비스"],["#1c2a3a","의존(선행)"],["#241a33","피의존(후행)"]])+'<span>★ 선택 · ↓ 이걸 필요로 함</span>';
+  document.getElementById("ghint").textContent="왼쪽=먼저 있어야 할 것(의존), 오른쪽=이 자원을 필요로 하는 것(피의존). 노드 클릭=초점 이동.";
+  renderG(set,{targets:new Set([selNode]),
+    colorOf:id=>id===selNode?"#11314f":deps.includes(id)&&!up.has(id)?"#241a33":"#1c2a3a",
+    strokeOf:id=>id===selNode?"#5aa9ff":deps.includes(id)&&!up.has(id)?"#b48cff":V.provColor(N[id].provenance),
+    badgeOf:id=>id===selNode?"★":(deps.includes(id)&&!up.has(id)?"↓":""),
+    onClick:id=>{selNode=id;catalog();}});
+  // left
+  document.getElementById("left").innerHTML=catTree();
+  document.getElementById("nodeList").innerHTML=nodeListHtml();
+  const cats=[...new Set(V.allIds().map(id=>N[id].category))].sort();
+  const svcOf={};V.allIds().forEach(id=>{(svcOf[N[id].category]=svcOf[N[id].category]||new Set()).add(N[id].service);});
+  document.getElementById("selCat").onchange=e=>{const c=e.target.value;
+    const firstSvc=[...svcOf[c]].sort()[0];selNode=V.allIds().find(id=>N[id].service===firstSvc);catalog();};
+  document.getElementById("selSvc").onchange=e=>{const s=e.target.value;selNode=V.allIds().find(id=>N[id].service===s);catalog();};
+  document.querySelectorAll('#nodeList input').forEach(r=>r.onchange=()=>{selNode=r.dataset.id;catalog();});
+  // right: dependency summary + EDIT/CREATE form
+  const reqAnd=(n.and||[]).map(d=>`<span class="chip"><b>${d.ref}</b>${d.count>1?" ×"+d.count:""}<span class="x" data-rm="${d.ref}">✕</span></span>`).join("")||'<span class="muted small">없음</span>';
+  const oneof=(n.one_of||[]).map(g=>`<span class="chip">🔀 ${g.branches.join(" | ")}</span>`).join("");
+  const depList=deps.length?deps.map(d=>`<span class="chip" style="border-color:#3a2c55"><b>${d}</b></span>`).join(""):'<span class="muted small">없음</span>';
+  const optRows=(n.options||[]).map(o=>`<tr><td><code>${o.name}</code></td><td class="muted">${o.type}${o.required?" *":""}</td><td class="muted small">${o.values?esc(JSON.stringify(o.values)):(o.ref_target||"")}</td></tr>`).join("")
+    ||'<tr><td colspan="3" class="muted small">옵션 없음</td></tr>';
+  const addable=V.allIds().filter(id=>id!==selNode&&!(n.and||[]).some(d=>d.ref===id)).sort();
+  document.getElementById("right").innerHTML=`
+    <h2>의존 · 옵션</h2>
+    <h3>requires (의존)</h3><div class="chiprow">${reqAnd}${oneof}</div>
+    <div class="fld" style="display:flex;gap:6px"><select id="addDep" style="flex:1">${addable.slice(0,400).map(id=>`<option>${id}</option>`).join("")}</select>
+      <button class="btn ghost" id="addDepBtn">+ 의존</button></div>
+    <h3>이 자원을 필요로 하는 것 (피의존)</h3><div class="chiprow">${depList}</div>
+    <h3>options (생성 옵션)</h3><table class="tbl">${optRows}</table>
+    <h3>노드 편집 <span class="muted small">(데모)</span></h3>
+    <div class="fld"><label>provenance</label>
+      <select id="edProv"><option ${n.provenance==="VALIDATED"?"selected":""}>VALIDATED</option><option ${n.provenance==="docs"?"selected":""}>docs</option></select></div>
+    <div class="fld"><label>create endpoint</label><input id="edEp" value="${esc(n.endpoint||"")}"></div>
+    <div class="run-ctl"><button class="btn" id="applyBtn">적용</button>
+      <button class="btn ghost" id="newBtn">+ 새 노드 생성</button></div>
+    <h3>바로 다음 단계로</h3>
+    <div class="run-ctl">
+      <button class="btn" id="toRun">이 서비스로 바로 실행 →</button>
+      <button class="btn ghost" id="toPlan">Plan에 추가 →</button></div>`;
+  // wire edit
+  document.querySelectorAll('#right .x[data-rm]').forEach(x=>x.onclick=()=>{
+    N[selNode].and=(N[selNode].and||[]).filter(d=>d.ref!==x.dataset.rm);catalog();});
+  document.getElementById("addDepBtn").onclick=()=>{const v=document.getElementById("addDep").value;
+    if(v){(N[selNode].and=N[selNode].and||[]).push({ref:v,count:1});catalog();}};
+  document.getElementById("applyBtn").onclick=()=>{N[selNode].provenance=document.getElementById("edProv").value;
+    N[selNode].endpoint=document.getElementById("edEp").value;catalog();};
+  document.getElementById("newBtn").onclick=()=>{const id=prompt("새 노드 id (예: my-resource)");if(!id||N[id])return;
+    N[id]={id,code:"",service:N[selNode].service,category:N[selNode].category,provenance:"docs",heavy:false,
+      and:[{ref:selNode,count:1}],one_of:[],creds:[],options:[],verify_n:0,has_delete:true,endpoint:"POST /v1/"+id};
+    selNode=id;catalog();};
+  document.getElementById("toRun").onclick=()=>{targets=new Set([selNode]);go("run");};
+  document.getElementById("toPlan").onclick=()=>{targets.add(selNode);go("plan");};
+}
+
+// ============ 3 PLAN ============
+function planTab(){
+  const p=V.plan([...targets],choices);
+  document.getElementById("gtitle").innerHTML=`합성 폐포 <span class="muted small">· ${p.closure.size} 노드 / 대상 ${targets.size}</span>`;
+  document.getElementById("legend").innerHTML=leg([["#11314f","대상"],["#1c2a3a","선행"]])+
+    '<span><i style="background:#ffd166;border-radius:50%"></i>공유(dedup)</span><span>🔀 분기</span>';
+  document.getElementById("ghint").textContent="노드 클릭=대상 토글. 🔀=one_of 분기(우측 선택). 공통 의존은 1회만 생성(dedup).";
+  const branchNodes=[...p.closure].filter(id=>N[id].one_of&&N[id].one_of.length);
+  renderG(p.closure,{choices,targets,
+    colorOf:id=>targets.has(id)?"#11314f":"#1c2a3a",
+    strokeOf:id=>p.shared.has(id)?"#ffd166":targets.has(id)?"#5aa9ff":V.provColor(N[id].provenance),
+    badgeOf:id=>branchNodes.includes(id)?"🔀":(targets.has(id)?"★":""),
+    onClick:id=>{targets.has(id)?targets.delete(id):targets.add(id);if(targets.size)draw();}});
+  const ids=V.allIds().sort((a,b)=>N[a].category<N[b].category?-1:1);
+  document.getElementById("left").innerHTML=`<h2>대상 선택</h2>
+    <input type="search" id="q" placeholder="검색…" style="width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:6px 9px;margin-bottom:8px">
+    <div class="scroll" id="list" style="max-height:480px"></div>`;
+  function list(){const q=(document.getElementById("q").value||"").toLowerCase();
+    document.getElementById("list").innerHTML=ids.filter(id=>!q||(id+N[id].service).toLowerCase().includes(q)).map(id=>
+      `<label class="chk"><input type="checkbox" data-id="${id}" ${targets.has(id)?"checked":""}>
+       <span class="dot" style="background:${V.provColor(N[id].provenance)}"></span><b>${id}</b></label>`).join("");
+    document.querySelectorAll('#list input').forEach(cb=>cb.onchange=()=>{cb.checked?targets.add(cb.dataset.id):targets.delete(cb.dataset.id);draw();});}
+  list();document.getElementById("q").oninput=list;
+  let bx="";branchNodes.forEach(id=>{N[id].one_of.forEach((g,gi)=>{const key=id+":"+(g.bind||("g"+gi));
+    const valid=g.branches.filter(V.exists),chosen=choices[key]||valid[0];
+    bx+=`<div class="small" style="margin:4px 0">🔀 <code>${id}</code>: `+valid.map(b=>
+      `<label class="chk" style="display:inline-flex"><input type="radio" name="${key}" data-key="${key}" data-b="${b}" ${b===chosen?"checked":""}> ${b}</label>`).join("")+`</div>`;});});
+  document.getElementById("right").innerHTML=`<h2>합성 plan</h2>
+    <div class="kv"><span>폐포 노드</span><b>${p.closure.size}</b></div>
+    <div class="kv"><span>합성 스텝</span><b>${p.steps.length}</b></div>
+    <div class="kv"><span>dedup 절감</span><b>${p.naive_creates}→${p.deduped_creates} (−${p.dedup_saved})</b></div>
+    <div class="kv"><span>peak quota</span><b>${Object.entries(p.quota).map(([k,v])=>k+"×"+v).join(", ")||"—"}</b></div>
+    ${branchNodes.length?`<h3>분기 선택</h3>${bx}`:""}
+    ${p.shared.size?`<h3>공유 인프라(1회)</h3><p class="small">${[...p.shared].map(s=>`<code>${s}</code>`).join(" ")}</p>`:""}
+    <button class="btn" style="margin-top:10px" onclick="go('run')">이 plan을 Run으로 →</button>`;
+  document.querySelectorAll('#right input[type=radio]').forEach(r=>r.onchange=()=>{choices[r.dataset.key]=r.dataset.b;draw();});
+}
+
+// ============ shared schedule (level-parallel) ============
+function schedule(setIds){
+  const levels=V.levels(setIds,choices);
+  let cursor=0;const sched={};const linfo=[];
+  levels.forEach(lv=>{let lmax=0;
+    lv.ids.forEach(id=>{const d=V.dur(id);sched[id]={start:cursor,end:cursor+d.total,d,depth:lv.depth};lmax=Math.max(lmax,d.total);});
+    linfo.push({depth:lv.depth,ids:lv.ids,start:cursor,dur:lmax,end:cursor+lmax});cursor+=lmax;});
+  const seq=Object.values(sched).reduce((a,x)=>a+x.d.total,0);
+  // critical path = max-total node per level
+  const crit=new Set(linfo.map(l=>l.ids.reduce((m,id)=>sched[id].d.total>sched[m].d.total?id:m,l.ids[0])));
+  return {sched,linfo,wall:cursor,seq,crit,levels};
+}
+function bandsFor(setIds){ // vertical level bands (by depth column) for the graph
+  const L=V.layout(setIds,choices,{colGap:190,bw:160});const cols={};
+  L.nodes.forEach(p=>{cols[p.depth]=cols[p.depth]||p.x;});
+  return Object.keys(cols).map(Number).sort((a,b)=>a-b).map(d=>({x:cols[d]-13,w:176,label:"L"+d}));
+}
+
+// ============ 4 RUN: level-parallel ============
+let runTimer=null,clock=0,SC=null,failId=null;
+function runTab(){
+  const p=V.plan([...targets],choices);
+  SC=schedule(p.closure);
+  failId=p.order.find(id=>N[id].provenance==="docs")||null;
+  document.getElementById("gtitle").innerHTML=`레벨 병렬 실행 <span class="muted small">· ${p.closure.size} 노드 / ${SC.linfo.length} 단계</span>`;
+  document.getElementById("legend").innerHTML=leg([["#3a4654","대기"],["#2c4a73","실행중(병렬)"],["#14322a","완료"],["#4a1f1f","실패"]])+'<span>세로 띠 = 단계(L)</span>';
+  document.getElementById("ghint").textContent="같은 단계(세로 띠)의 독립 노드는 동시에 실행, 다음 단계는 이전 단계가 모두 끝나야 시작(배리어).";
+  drawRun();
+  document.getElementById("left").innerHTML=`<h2>실행 (데모)</h2>
+    <div class="run-ctl"><button class="btn" id="play">▶ Play</button><button class="btn ghost" id="reset">↻ Reset</button></div>
+    <div class="note"><b>병렬 모델:</b> depth가 같은(서로 의존 없는) 노드는 <b>동시 실행</b>,
+      한 단계가 끝나야 다음 단계 시작(배리어). 예: vpc 뒤의 subnet·igw·public-ip는 병렬.</div>
+    <h3>단계(level) 진행</h3><div id="levels"></div>`;
+  document.getElementById("right").innerHTML=`<h2>진행</h2><div id="prog"></div>
+    <h3>실행 간트 (병렬)</h3><div class="gantt gmini" id="gantt"></div>`;
+  drawGantt();updateRun();
+  document.getElementById("play").onclick=()=>{if(runTimer){stopRun();document.getElementById("play").textContent="▶ Play";}
+    else{document.getElementById("play").textContent="⏸ Pause";runTimer=setInterval(()=>{clock+=Math.max(1,Math.round(SC.wall/40));if(clock>=SC.wall){clock=SC.wall;stopRun();document.getElementById("play").textContent="✓ 완료";}drawRun();updateRun();},400);}};
+  document.getElementById("reset").onclick=()=>{stopRun();clock=0;document.getElementById("play").textContent="▶ Play";drawRun();updateRun();};
+}
+function stopRun(){if(runTimer){clearInterval(runTimer);runTimer=null;}}
+function nodeStatus(id){const s=SC.sched[id];if(!s)return"queued";
+  if(clock<s.start)return"queued";if(clock<s.end)return"run";return id===failId?"fail":"done";}
+function drawRun(){const set=new Set(Object.keys(SC.sched));
+  renderG(set,{bands:bandsFor(set),
+    colorOf:id=>({queued:"#222e3c",run:"#16314d",done:"#14322a",fail:"#3a1717"})[nodeStatus(id)],
+    strokeOf:id=>({queued:"#3a4654",run:"#5aa9ff",done:"#3fb27f",fail:"#ff6b6b"})[nodeStatus(id)],
+    badgeOf:id=>({queued:"",run:"⏳",done:"✓",fail:"✕"})[nodeStatus(id)]});}
+function drawGantt(){const W=520,sc=W/SC.wall;let h="";
+  Object.keys(SC.sched).sort((a,b)=>SC.sched[a].start-SC.sched[b].start).forEach(id=>{const s=SC.sched[id];
+    h+=`<div class="grow"><div class="gl small"><code>${id}</code></div>
+      <div class="gtrack" style="min-width:${W}px">
+        <div class="seg" style="left:${s.start*sc}px;width:${Math.max(8,s.d.total*sc)}px;background:${SC.crit.has(id)?"#ffb86b":"#3fb27f"}" title="L${s.depth} ~${s.d.total}s"></div>
+      </div></div>`;});
+  // barrier lines
+  let bl="";SC.linfo.forEach(l=>{if(l.start>0)bl+=`<div style="position:absolute;left:${118+l.start*sc}px;top:0;bottom:0;border-left:1px dashed #5b7088"></div>`;});
+  document.getElementById("gantt").innerHTML=`<div style="position:relative">${h}${bl}</div>`;}
+function updateRun(){const done=Object.keys(SC.sched).filter(id=>nodeStatus(id)==="done").length;
+  const running=Object.keys(SC.sched).filter(id=>nodeStatus(id)==="run");
+  const fail=Object.keys(SC.sched).filter(id=>nodeStatus(id)==="fail").length;
+  const curLevel=SC.linfo.findIndex(l=>clock<l.end);const lvl=curLevel<0?SC.linfo.length:curLevel;
+  document.getElementById("prog").innerHTML=`<div class="kpi">
+    <div class="s"><b>${done}/${Object.keys(SC.sched).length}</b><span>완료</span></div>
+    <div class="s"><b style="color:#5aa9ff">${running.length}</b><span>동시 실행중</span></div>
+    <div class="s"><b style="color:#ff8585">${fail}</b><span>fail</span></div>
+    <div class="s"><b>${Math.round(clock)}s</b><span>경과 / ${SC.wall}s</span></div></div>
+    ${clock>=SC.wall?`<p class="small" style="margin-top:8px">완료 — <button class="btn" onclick="go('report')">Report 보기 →</button></p>`:""}`;
+  document.getElementById("levels").innerHTML=SC.linfo.map((l,i)=>{
+    const st=clock>=l.end?"done":clock>=l.start?"run":"wait";
+    return `<div class="kv"><span><span class="statusdot" style="background:${st==="done"?"#3fb27f":st==="run"?"#5aa9ff":"#3a4654"}"></span>L${l.depth} <span class="muted">(${l.ids.length} 동시)</span></span><b class="muted">${l.dur}s</b></div>`;}).join("");}
+
+// ============ 5 REPORT: 단계별 수행시간 ============
+function reportTab(){
+  const p=V.plan([...targets],choices);const sc=schedule(p.closure);
+  const fail=p.order.find(id=>N[id].provenance==="docs")||null;
+  document.getElementById("gtitle").innerHTML=`실행 결과 + 수행시간 <span class="muted small">· 임계경로 강조</span>`;
+  document.getElementById("legend").innerHTML=leg([["#14322a","pass"],["#1d3a2a","★ 승격"],["#4a1f1f","fail"],["#3a2c12","임계경로"]]);
+  document.getElementById("ghint").textContent="노드 테두리=결과, 주황=임계경로(병렬 wall-clock을 결정하는 체인). 우측에 단계별 시간표.";
+  renderG(new Set(p.order),{bands:bandsFor(new Set(p.order)),
+    colorOf:id=>id===fail?"#3a1717":sc.crit.has(id)?"#3a2c12":(N[id].provenance==="docs"?"#1d3a2a":"#14322a"),
+    strokeOf:id=>id===fail?"#ff6b6b":sc.crit.has(id)?"#ffb86b":(N[id].provenance==="docs"?"#5aa9ff":"#3fb27f"),
+    badgeOf:id=>id===fail?"✕":(N[id].provenance==="docs"?"★":"✓")});
+  const speed=(sc.seq/sc.wall);
+  document.getElementById("left").innerHTML=`<h2>결과 요약</h2>
+    <div class="kpi"><div class="s"><b>${p.order.length-(fail?1:0)}/${p.order.length}</b><span>pass</span></div>
+    <div class="s"><b style="color:#ff8585">${fail?1:0}</b><span>fail</span></div></div>
+    <h3>수행시간(시뮬)</h3>
+    <div class="kv"><span>순차 합계</span><b>${sc.seq}s</b></div>
+    <div class="kv"><span>레벨 병렬 wall-clock</span><b style="color:#3fb27f">${sc.wall}s</b></div>
+    <div class="kv"><span>병렬 가속</span><b>${speed.toFixed(2)}×</b></div>
+    <div class="note small"><b>임계 노드(각 단계 최장)</b>: ${[...sc.crit].join(" · ")} — 배리어 스케줄에서 wall-clock = Σ(단계별 최장). 이 노드들을 줄여야 전체가 줄어듦.</div>
+    ${fail?`<div class="note"><b>fail:</b> <code>${fail}</code> (docs 미실증 추정).</div>`:""}`;
+  // per-step timing table (req 5)
+  const rows=p.order.map(id=>{const s=sc.sched[id],d=s.d;
+    return `<tr ${sc.crit.has(id)?'style="background:#241d10"':''}><td><code>${id}</code></td><td class="muted">L${s.depth}</td>
+      <td>${d.create}s</td><td>${d.ready}s</td><td>${d.verify}s</td><td><b>${d.total}s</b></td>
+      <td class="muted small">${s.start}–${s.end}s</td></tr>`;}).join("");
+  document.getElementById("right").innerHTML=`<h2>단계별 수행시간</h2>
+    <div class="scroll"><table class="tbl">
+      <tr><th>node</th><th>L</th><th>create</th><th>ready</th><th>verify</th><th>합</th><th>구간</th></tr>${rows}</table></div>
+    <button class="btn ghost" style="margin-top:10px" onclick="go('catalog')">↺ Catalog로</button>`;
+}
+
+// ---- tab switch ----
+function draw(){({catalog,plan:planTab,run:runTab,report:reportTab})[tab]();}
+function go(t){stopRun();if(t==="run")clock=0;tab=t;
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));draw();}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>go(b.dataset.t));
+draw();
+</script>
+</body></html>

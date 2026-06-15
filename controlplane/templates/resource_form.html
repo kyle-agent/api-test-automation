@@ -15,6 +15,26 @@
     <a href="/planning/edit?path=knowledge/formal/resources/{{ file }}&find={{ node_id }}">원본 YAML 편집기</a>{% endif %}</p>
 </section>
 
+{% if not is_new %}
+<section>
+  <h2>의존 그래프 <span class="muted" style="font-size:13px;font-weight:400">— 이 노드의 의존(좌) · 피의존(우). 클릭=이동</span></h2>
+  <div style="display:flex;gap:14px;font-size:12px;color:#90a4ba;flex-wrap:wrap;margin-bottom:6px">
+    <span style="color:#3fb27f">■ VALIDATED</span><span style="color:#e0922f">■ docs</span>
+    <span style="color:#5aa9ff">■ 이 노드 ★</span><span style="color:#b48cff">■ 피의존 ↓</span>
+    <span style="color:#ffd166">■ 공유</span><span>세로 띠=level</span>
+  </div>
+  <div style="overflow:auto;background:#0f1720;border:1px solid #27384b;border-radius:10px;padding:6px">
+    <svg id="dep-svg"></svg>
+  </div>
+</section>
+<script src="/planning/resources/graph.js"></script>
+<script>
+ResourceGraph.load(document.getElementById("dep-svg"),
+  "/planning/resources/graph.json?focus={{ node_id }}",
+  {onClick:function(id){location.href="/planning/resources/"+encodeURIComponent(id);}});
+</script>
+{% endif %}
+
 <datalist id="node-ids">
   {% for nid in node_ids %}<option value="{{ nid }}">{% endfor %}
 </datalist>

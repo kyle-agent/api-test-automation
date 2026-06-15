@@ -94,7 +94,8 @@ import ipaddress
 import re
 from pathlib import Path
 
-__all__ = ["load_model", "plan", "compose", "ComposeError"]
+__all__ = ["load_model", "plan", "compose", "graph_view", "focus_view",
+           "dependents", "ComposeError"]
 
 DEFAULT_MODEL_DIR = "knowledge/formal/resources"
 
@@ -1022,3 +1023,143 @@ def _validate_composed(lc: dict) -> None:
     if errors:
         raise ComposeError(f"{lc.get('id')}: composed lifecycle failed "
                            "validation:\n  " + "\n  ".join(errors))
+
+
+# ---------------------------------------------------------------------------
+# graph views (R-platform P0) — read-only projections of the model for the
+# control-plane graph UI. Pure: no network, no engine. The composer stays the
+# single source of truth; the UI renders what these return.
+
+def dependents(node_id: str, model: dict | None = None) -> list:
+    """Nodes whose ``requires`` reference *node_id* (AND or any one_of branch).
+
+    The inverse of the dependency edge — "what needs this resource".
+    """
+    if model is None:
+        model = load_model()
+    out = []
+    for nid, task in model.items():
+        and_deps, groups, _ = _norm_requires(task or {})
+        refs = {d["ref"] for d in and_deps}
+        for g in groups:
+            refs.update(b["ref"] for b in g["branches"])
+        if node_id in refs:
+            out.append(nid)
+    return sorted(out)
+
+
+def graph_view(targets: list, choices: dict | None = None,
+               options: dict | None = None, model: dict | None = None) -> dict:
+    """Layout-agnostic graph projection of a target set's dependency closure.
+
+    Returns ``{nodes, edges, levels, shared, peak_quota, order, teardown}``
+    where each node carries ``{id, service, provenance, quota, heavy,
+    options, level, is_target, shared}`` and ``level`` is the longest-path
+    topological depth (level-parallel grouping). Reuses :func:`plan` so the
+    closure/branch/dedup decisions are identical to what gets composed.
+    """
+    if model is None:
+        model = load_model()
+    p = plan(targets, choices, options, model)
+
+    def _base(inst):
+        return inst.split("#", 1)[0]
+
+    nodeset, seen = [], set()
+    for inst in p["order"]:
+        b = _base(inst)
+        if b not in seen:
+            seen.add(b)
+            nodeset.append(b)
+
+    branches = p.get("branches", {})
+
+    def _chosen(node):
+        bt = branches.get(node)
+        if bt is None:
+            return []
+        return list(bt) if isinstance(bt, (list, tuple)) else [bt]
+
+    edges, adj = [], {n: [] for n in nodeset}
+    for node in nodeset:
+        and_deps, _groups, _ = _norm_requires(model.get(node) or {})
+        refs = [d["ref"] for d in and_deps] + _chosen(node)
+        for r in refs:
+            if r in seen and r != node:
+                edges.append({"from": r, "to": node})
+                adj[node].append(r)
+
+    depth: dict = {}
+
+    def _d(n, stack):
+        if n in depth:
+            return depth[n]
+        if n in stack:
+            return 0
+        stack.add(n)
+        ds = [_d(r, stack) for r in adj.get(n, []) if r in adj]
+        v = 0 if not ds else 1 + max(ds)
+        stack.discard(n)
+        depth[n] = v
+        return v
+
+    for n in nodeset:
+        _d(n, set())
+
+    tset, shared = set(targets), set(p.get("dedup", {}).keys())
+    nodes = []
+    for n in nodeset:
+        t = model.get(n) or {}
+        nodes.append({
+            "id": n,
+            "service": t.get("service", ""),
+            "provenance": t.get("provenance", "?"),
+            "quota": t.get("quota"),
+            "heavy": bool(t.get("heavy", False)),
+            "options": list(((t.get("create") or {}).get("options") or {}).keys()),
+            "level": depth.get(n, 0),
+            "is_target": n in tset,
+            "shared": n in shared,
+        })
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "levels": sorted(set(depth.values())) if depth else [0],
+        "shared": sorted(shared),
+        "peak_quota": p.get("peak_quota", {}),
+        "order": p["order"],
+        "teardown": p["teardown"],
+    }
+
+
+def focus_view(focus: str, model: dict | None = None) -> dict:
+    """Graph for ONE node: its upstream closure + direct dependents (downstream).
+
+    Dependents are added as leaf nodes (``is_dependent: true``) one level past
+    the focus so the UI can show "what this needs" (left) and "what needs this"
+    (right) in a single picture.
+    """
+    if model is None:
+        model = load_model()
+    gv = graph_view([focus], model=model)
+    seen = {n["id"] for n in gv["nodes"]}
+    flevel = next((n["level"] for n in gv["nodes"] if n["id"] == focus), 0)
+    for dep in dependents(focus, model):
+        if dep not in seen:
+            t = model.get(dep) or {}
+            gv["nodes"].append({
+                "id": dep,
+                "service": t.get("service", ""),
+                "provenance": t.get("provenance", "?"),
+                "quota": t.get("quota"),
+                "heavy": bool(t.get("heavy", False)),
+                "options": list(((t.get("create") or {}).get("options") or {}).keys()),
+                "level": flevel + 1,
+                "is_target": False,
+                "shared": False,
+                "is_dependent": True,
+            })
+            seen.add(dep)
+        gv["edges"].append({"from": focus, "to": dep})
+    gv["focus"] = focus
+    return gv

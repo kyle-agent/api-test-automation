@@ -1,0 +1,120 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>① 인터랙티브 합성 캔버스</title>
+<link rel="stylesheet" href="assets/style.css">
+<script src="data/model.js"></script><script src="assets/viz.js"></script>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>① 인터랙티브 합성 캔버스</h1>
+  <span class="crumbs"><a href="index.html">홈</a> › 대상 선택 → 폐포 + plan</span>
+  <nav class="nav">
+    <a href="index.html">홈</a><a class="active" href="01-compose-canvas.html">①</a>
+    <a href="02-layered-dag.html">②</a><a href="03-closure-overlap.html">③</a>
+    <a href="04-branch-toggle.html">④</a><a href="05-sequence-gantt.html">⑤</a>
+    <a href="06-ia-walkthrough.html">통합</a><a href="references.html">참고</a>
+  </nav>
+</header>
+<p class="lede">대상 노드를 <b>체크하거나 그래프에서 클릭</b>하면 의존 폐포가 켜지고,
+  오른쪽에 합성될 시나리오(생성→ready→verify→<b>역순 삭제</b>)와 dedup·peak quota가
+  실시간으로 계산됩니다. 현재 Planning UI의 합성 폼(표)을 그래프로 대체하는 후보입니다.</p>
+
+<div class="cols wide">
+  <!-- left: target picker -->
+  <div class="panel">
+    <h2>대상 노드</h2>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="검색 (id/service)…" style="flex:1">
+      <select id="cat"></select>
+    </div>
+    <div class="legend">
+      <span><i class="sw-val"></i>VALIDATED</span><span><i class="sw-docs"></i>docs</span>
+    </div>
+    <div class="scroll" id="list"></div>
+  </div>
+  <!-- center: graph -->
+  <div class="panel">
+    <h2>의존 폐포 그래프 <span class="muted small" id="gcount"></span></h2>
+    <div class="legend">
+      <span><i class="sw-target"></i>대상</span><span><i class="sw-shared"></i>공유(dedup)</span>
+      <span><i class="sw-val"></i>VALIDATED</span><span><i class="sw-docs"></i>docs</span>
+      <span>🜂 heavy · ⛔ quota</span>
+    </div>
+    <div class="svgbox"><svg id="svg"></svg></div>
+    <p class="muted small">노드 클릭 = 대상 토글 · 화살표 = "먼저 있어야 함" · 호버 = 상세</p>
+  </div>
+  <!-- right: plan -->
+  <div class="panel">
+    <h2>합성 plan</h2>
+    <div id="summary"></div>
+    <h3>생성 / 검증 / 삭제 순서</h3>
+    <div class="scroll"><table class="tbl" id="steps"></table></div>
+  </div>
+</div>
+<div class="foot">합성 로직(폐포→위상정렬→역순 teardown)은 <code>composer.py</code>의 단순화 슬라이스
+  (<code>assets/viz.js</code>). 실제 합성은 <code>/planning/resources/compose</code> 서버 경로가 수행.</div>
+</div>
+<script>
+const V=VIZ, N=V.N;
+let targets=new Set();
+(function seed(){
+  ["server","ske-cluster","mysql-cluster","load-balancer"].forEach(id=>{
+    if(V.exists(id)&&targets.size<1) targets.add(id);});
+  if(!targets.size){ // fallback: a node with the deepest closure
+    let best=null,bs=0; V.allIds().forEach(id=>{const s=V.closure([id]).size; if(s>bs){bs=s;best=id;}});
+    if(best) targets.add(best);
+  }
+})();
+
+function buildCatFilter(){
+  const cats=[...new Set(V.allIds().map(id=>N[id].category))].sort();
+  document.getElementById("cat").innerHTML='<option value="">전체 카테고리</option>'+
+    cats.map(c=>`<option value="${c}">${c}</option>`).join("");
+}
+function renderList(){
+  const q=document.getElementById("q").value.toLowerCase();
+  const cat=document.getElementById("cat").value;
+  const ids=V.allIds().filter(id=>{
+    const n=N[id]; if(cat&&n.category!==cat) return false;
+    return !q || (id+" "+n.service).toLowerCase().includes(q);
+  }).sort((a,b)=> N[a].category<N[b].category?-1:N[a].category>N[b].category?1:(a<b?-1:1));
+  let cur="";const rows=[];
+  ids.forEach(id=>{const n=N[id];
+    if(n.category!==cur){cur=n.category;rows.push(`<h3>${cur}</h3>`);}
+    rows.push(`<label class="chk"><input type="checkbox" data-id="${id}" ${targets.has(id)?"checked":""}>
+      <span class="dot" style="background:${V.provColor(n.provenance)}"></span>
+      <span><b>${id}</b> <span class="code">${n.code||""}</span></span></label>`);
+  });
+  const el=document.getElementById("list"); el.innerHTML=rows.join("")||'<p class="muted small">없음</p>';
+  el.querySelectorAll("input").forEach(cb=>cb.onchange=()=>{
+    cb.checked?targets.add(cb.dataset.id):targets.delete(cb.dataset.id); update();});
+}
+function update(){
+  if(!targets.size){document.getElementById("svg").innerHTML="";
+    document.getElementById("summary").innerHTML='<p class="muted small">대상을 선택하세요.</p>';
+    document.getElementById("steps").innerHTML="";document.getElementById("gcount").textContent="";return;}
+  const p=V.plan([...targets]);
+  V.renderGraph(document.getElementById("svg"),p.closure,{targets,shared:p.shared,
+    onClick:id=>{targets.has(id)?targets.delete(id):targets.add(id);renderList();update();}});
+  document.getElementById("gcount").textContent=`· ${p.closure.size} 노드`;
+  // summary
+  const q=Object.entries(p.quota).map(([k,v])=>`<span class="pill q">⛔ ${k} ×${v}</span>`).join(" ")||'<span class="muted small">없음</span>';
+  document.getElementById("summary").innerHTML=`
+    <div class="kv"><span>대상</span><b>${targets.size}</b></div>
+    <div class="kv"><span>폐포 노드</span><b>${p.closure.size}</b></div>
+    <div class="kv"><span>합성 스텝</span><b>${p.steps.length}</b></div>
+    <div class="kv"><span>dedup 절감</span><b>${p.naive_creates}→${p.deduped_creates} (−${p.dedup_saved})</b></div>
+    <div class="kv"><span>heavy</span><b>${p.heavy?"예 🜂":"아니오"}</b></div>
+    <div style="margin-top:8px">peak quota: ${q}</div>
+    ${p.shared.size?`<div style="margin-top:6px" class="small"><span style="color:var(--shared)">공유 인프라(1회 생성):</span> ${[...p.shared].map(s=>`<code>${s}</code>`).join(" ")}</div>`:""}`;
+  // steps
+  const cls={create:"create",ready:"ready",verify:"verify",delete:"delete"};
+  document.getElementById("steps").innerHTML='<tr><th>#</th><th>phase</th><th>node</th><th>detail</th></tr>'+
+    p.steps.map((s,i)=>`<tr><td class="muted">${i+1}</td><td><span class="pill ${cls[s.phase]}">${s.action}</span></td>
+      <td><code>${s.id}</code></td><td class="muted small">${s.detail}</td></tr>`).join("");
+}
+buildCatFilter();
+document.getElementById("q").oninput=renderList;
+document.getElementById("cat").onchange=renderList;
+renderList();update();
+</script>
+</body></html>

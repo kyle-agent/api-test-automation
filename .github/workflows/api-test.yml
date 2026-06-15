@@ -1158,6 +1158,12 @@ jobs:
           cp data/conformance.json "$dd"/ 2>/dev/null || true
           cp data/conformance_baseline.json "$dd"/ 2>/dev/null || true
           cp reports/conformance_new.json "$dd"/ 2>/dev/null || true
+          # read-only resource Catalog + Plan preview + Report (composer.graph_export,
+          # P1/P2/P4) — composer-pure (yaml only); report overlay from this run's
+          # observations when present. Never fails the publish.
+          python -m controlplane.graph_export "$dd/catalog" \
+            reports/results/observations.jsonl 2>/dev/null \
+            || echo "::warning::catalog export skipped"
           # nojekyll so GitHub Pages serves the raw HTML as-is
           touch "$dd/.nojekyll"
           cd "$dd"

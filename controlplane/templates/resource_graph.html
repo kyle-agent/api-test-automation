@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}자원 의존 그래프{% endblock %}
+{% block content %}
+
+<section>
+  <h2><a href="/planning/resources">자원 모델</a> › 의존 그래프 (P0 — 공용 그래프 컴포넌트)</h2>
+  <p class="muted">서버 <code>composer.graph_view/focus_view</code>가 만든
+    <a id="jsonlink" href="#" target="_blank"><code>graph.json</code></a>을
+    공용 렌더러(<code>graph.js</code>)가 그립니다. 같은 컴포넌트를
+    Catalog/Plan/Run/Report가 재사용할 예정입니다.</p>
+  {% if not has_composer %}
+  <p class="warn">합성기 미탑재 — <code>regression/scenarios/composer.py</code> import 실패.</p>
+  {% endif %}
+</section>
+
+<section>
+  <div class="inline" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+    <label>모드
+      <select id="mode">
+        <option value="focus">focus — 한 서비스의 의존/피의존</option>
+        <option value="targets">targets — 조합 합성 폐포</option>
+      </select></label>
+    <label id="focusWrap">노드
+      <select id="focus">
+        {% for n in nodes %}<option value="{{ n }}" {{ 'selected' if n == focus else '' }}>{{ n }}</option>{% endfor %}
+      </select></label>
+    <label id="targetsWrap" style="display:none">타깃(쉼표)
+      <input id="targets" type="text" value="{{ targets }}" placeholder="ske-cluster,mysql-cluster" size="32"></label>
+    <button id="go" class="btn">그리기</button>
+  </div>
+  <div style="display:flex;gap:18px;font-size:12px;color:#90a4ba;flex-wrap:wrap;margin-bottom:8px">
+    <span style="color:#3fb27f">■ VALIDATED</span>
+    <span style="color:#e0922f">■ docs</span>
+    <span style="color:#5aa9ff">■ 초점/타깃 ★</span>
+    <span style="color:#b48cff">■ 피의존 ↓</span>
+    <span style="color:#ffd166">■ 공유(dedup)</span>
+    <span>🜂 heavy · ⛔ quota · 세로 띠 = level</span>
+  </div>
+  <div style="overflow:auto;background:#0f1720;border:1px solid #27384b;border-radius:10px;padding:6px">
+    <svg id="svg"></svg>
+  </div>
+  <p class="muted" id="meta" style="margin-top:8px"></p>
+</section>
+
+<script src="/planning/resources/graph.js"></script>
+<script>
+(function(){
+  var svg=document.getElementById("svg"), meta=document.getElementById("meta");
+  function url(){
+    var mode=document.getElementById("mode").value;
+    if(mode==="focus") return "/planning/resources/graph.json?focus="+encodeURIComponent(document.getElementById("focus").value);
+    return "/planning/resources/graph.json?targets="+encodeURIComponent(document.getElementById("targets").value);
+  }
+  async function draw(){
+    var u=url(); document.getElementById("jsonlink").href=u;
+    var data=await ResourceGraph.load(svg,u,{onClick:function(id){
+      // clicking a node re-focuses (drill-through)
+      document.getElementById("mode").value="focus";
+      sync();
+      var sel=document.getElementById("focus"); if([...sel.options].some(o=>o.value===id)) sel.value=id;
+      draw();
+    }});
+    if(data) meta.textContent="노드 "+data.nodes.length+" · 엣지 "+data.edges.length+
+      " · level "+(data.levels?data.levels.join(","):"")+
+      (data.shared&&data.shared.length?" · 공유 "+data.shared.length:"")+
+      (data.peak_quota&&Object.keys(data.peak_quota).length?" · peak quota "+JSON.stringify(data.peak_quota):"");
+  }
+  function sync(){var m=document.getElementById("mode").value;
+    document.getElementById("focusWrap").style.display=m==="focus"?"":"none";
+    document.getElementById("targetsWrap").style.display=m==="targets"?"":"none";}
+  document.getElementById("mode").onchange=function(){sync();};
+  document.getElementById("go").onclick=draw;
+  document.getElementById("focus").onchange=draw;
+  sync(); draw();
+})();
+</script>
+{% endblock %}
