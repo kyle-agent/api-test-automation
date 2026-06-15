@@ -6,6 +6,21 @@ Dispatch = edit `.github/run-request` (KEY=VALUE, last line wins) and push to **
 (only `branches:[main]` triggers now — see Fixes). One run at a time; wait for the
 whole run incl. its **sweep** job to conclude before the next dispatch.
 
+## 🧹 RESOURCE CLEANUP STATUS (no known leftovers)
+- Last run's tag-scoped **Sweep** (run 27525758064, 2026-06-15 06:24): `sweep done:
+  20 resource(s) deleted`, nothing else deletable (only non-ours dashboards skipped).
+  Sweep is tag-scoped, so it reclaims leftovers from ALL runs, not just the last.
+- All heavy runs this session COMPLETED (not cancelled) → per-lifecycle reverse
+  teardown ran. The aimlops runs each created 7 resources (keypair, sg, vpc, subnet,
+  filestorage volume, SKE cluster, nodepool); teardown + the 06:24 sweep covered them.
+- TTL stamps on every created resource → any straggler is auto-reclaimed by a later sweep.
+- CAVEAT: can't query the live SCP account from the dev sandbox, so this is
+  sweep-log-based, not a direct account scan. SKE cluster deletes are async (a few
+  min "deleting") — in-progress, not permanent leaks.
+- **To double-confirm account-wide:** dispatch a sweep-only run — run-request
+  `sweep_force=true` + `mutations=false` (non-matching crud_filter) → reports
+  "N deleted / 0 remaining". Safe, light, no resource creation.
+
 ---
 
 ## ⏭️ IMMEDIATE NEXT TASK — finish DBaaS minor-version upgrade lifecycles
