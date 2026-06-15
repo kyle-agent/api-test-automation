@@ -65,11 +65,12 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
   async provisioning. `origin_hostname_type=DOMAIN` allows empty protocol/port;
   IP mode requires both.
 
-**Userguide infra note (2026-06-15):** docs.e.samsungsdscloud.com went from a
-`/userguide/security/`-only 503 (mid-afternoon) to a **FULL-HOST 503** (all userguide
-paths, both bases — confirmed by the app-service/financial docs-mapper waves). →
-**suspend ALL `provenance: docs` docs-mapper enrichment until the host recovers**;
-prior-curated constraints stay intact/UNPROVEN.
+**Userguide infra note (2026-06-15):** docs.e.samsungsdscloud.com had **intermittent 503s** —
+`/userguide/security/` first, then briefly full-host, but `/overview/` pages
+(networking, financial) were reachable while most `how_to_guides/` sub-pages 503'd.
+→ docs-mapper is **unreliable this window**; suspend `provenance: docs` deep enrichment
+until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
+**underscore** (`financial_management`, not hyphen — hyphen 404s).
 
 **networking (loadbalancer/gslb/vpn, userguide 2026-06-15, docs/UNPROVEN):**
 - LB **Public NAT IP requires an IGW** on the VPC (docs-confirms PF-13 → justifies

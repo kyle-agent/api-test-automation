@@ -68,6 +68,7 @@ owner가 3개 Claude Code 창을 병렬로 운영: ① 기존 테스트 창 ② 
 | IB-037 | debt | **direct-connect quota 미모델(HIGH)** — docs 5/account + 1:1/VPC인데 `dependencies.json` quota_kinds에 없음 → shared-VPC adopt 시 quota 게이트 부재, 2nd create 409 false-regression. Track N | cross-service.yaml에 direct-connect quota(limit:5) + dependencies.json quota_kinds/budget_paths(`/v1/direct-connects`) 배선 | M | open |
 | IB-038 | debt | firewall rule quota(EXSMALL=5 기본) service yaml엔 있으나 budget/quotas-and-budgets.md 미기재. Track N | quotas-and-budgets.md에 5-rule 기본 한도 NOTE(현 single-rule 시나리오는 안전, monitored) | S | open |
 | IB-039 | debt | hosted-zone quota(20/account·100 records/zone) 미모델 — 스케일 시 한도. Track N | cross-service.yaml에 hosted-zone quota(limit:20) 추가(현재 저위험) | S | open |
+| IB-040 | debt | planned-compute body **console↔API 불일치 의심** — userguide 콘솔 create 폼은 5필드(target/OS/server_type/term/**quantity**)인데 `PlannedComputeCreateRequest` 모델엔 quantity 없음(Track P, billingplan overview 200). | 라이브 2xx 또는 apiref 재확인으로 quantity 필요 여부 검증 → 필요 시 body에 추가. docs 호스트 안정 후 | S | open (검증 필요) |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 

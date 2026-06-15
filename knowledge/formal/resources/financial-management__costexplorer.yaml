@@ -31,6 +31,16 @@ resources:
       - 데이터 카테고리: 총 예상 청구 금액·월 평균 청구 금액·비용 Top5·
         할인 내역(Planned Compute/SLA/Credit). 미정산월=예상, 정산월=실청구.
       - 타임존 Asia/Seoul(GMT+09:00), 매일 자정 데이터 갱신.
+      cost_management overview(2026-06-14, WebFetch 200) 재확인 사항:
+      - 비용 분석은 '월(month) 기준'으로 제공(granularity 월별이 1차 — 일별은
+        탐색 시각화 옵션). 최대 6개월 추이 한도 확정.
+      - 해지 수수료(Planned Compute cancellation fee) 및 Support plan 금액은
+        '청구 정산이 완료된 월'에 조회된다(미정산월에는 미반영) — Top5/할인
+        내역 해석 시 정산월 여부 주의(UNPROVEN field mapping).
+      - 청구 리포트의 태그(tag) 정보는 이메일 발송 시점에만 제공(콘솔 인라인이
+        아니라 리포트 메일 첨부) — group_by=tag 의 가용성과 무관, UNPROVEN.
       모든 쿼리 파라미터는 docs-only(_note); 노드는 파라미터 없는 bare GET로
       합성하여 3/3 200을 유지한다.
+      WebFetch: cost_management/overview/ = 200; cost_management/how_to_guides/
+      {explorer,usage,payment}/ = 503 (skip — 기존 인입분 유지, 재확인 불가).
     _note: "Query params (time-range year/month or from/to, granularity daily|monthly, group_by service-group|service|resource|region, tag filters) are documented in the userguide but field names UNPROVEN — apiref is JS-rendered/console-only. Node intentionally issues param-less GETs (smoke 3/3 200); param variants belong to C4 parameter-coverage, not this reads node."
