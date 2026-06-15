@@ -9,6 +9,21 @@
   - **size**: S/M/L.
   - **status**: open · in-progress(ticket Tn) · done · waived.
 
+## 멀티-윈도우 운영 레인 (2026-06-15, owner)
+
+owner가 3개 Claude Code 창을 병렬로 운영: ① 기존 테스트 창 ② UI 개선 창 ③ 이
+창(멀티에이전트 자율 루프). 창 간 충돌 방지 계약 — **이 창(③)의 행동 규칙**:
+
+- **브랜치**: 이 창은 `claude/work-process-discussion-goub6k`에만 커밋을 쌓는다.
+  당분간 main 통합은 보류(테스트 창이 main을 소유하며 run-request를 push 중).
+- **라이브 run/디스패치는 테스트 창 전용.** 이 창은 `.github/run-request` 등 어떤
+  run-트리거도 push하지 않는다(CI는 main의 run-request push에만 트리거됨 → 피처
+  브랜치 push는 안전).
+- **건드리지 않는 파일**: `agents/CONTEXT.md`(특히 "Current state"/run 결과 =
+  테스트 창 소유), `dashboard/`·`controlplane/`(= UI 창 소유).
+- **이 창의 상태 기록처**: 이 파일(BACKLOG) + `agents/coordination/ledger.json`
+  자기 행(行)만. 그 외 공유 인덱스는 통합 담당이 정리.
+
 ## 백로그
 
 | id | area | problem | proposed-fix | size | status |
