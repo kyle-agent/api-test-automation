@@ -35,6 +35,21 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
 > service. filestorage volume (`$.volume_id`) vs virtualserver volume (`$.id`) is
 > the classic trap.
 
+### networking/vpc — VPC-endpoint & transit-gateway prerequisites (docs, UNPROVEN; IB-012/013)
+
+- **Subnet `type` enum = `(GENERAL, LOCAL, VPC_ENDPOINT)`** (required). A **VPC
+  Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet** — passing a GENERAL
+  subnet yields 400 `scp-network.vpc-endpoint.subnet-not-found` ("VPC Endpoint
+  Type Subnet not found", run 27466988779).
+- A **Transit Gateway is "Connectable" only once it has a VPC connection in
+  ACTIVE state.** `create-private-nat` over the TGW path needs this, else 400
+  `scp-network.private-nat.connectable-transit-gateway-not-found`. VPC-connection
+  state enum = `(CREATING, ACTIVE, DELETING, DELETED, ERROR)`.
+- **TGW VPC-connection has no single-resource GET show** (only POST/DELETE/LIST)
+  → readiness must be polled from the LIST endpoint
+  (`$.transit_gateway_vpc_connections[0].state`). Create body is `{vpc_id}` only.
+- TGW VPC-connection cap: **≤5 per TGW** (same account, userguide).
+
 ## State machines (poll field → ready values)
 
 | Resource | Poll field | Ready value(s) |
