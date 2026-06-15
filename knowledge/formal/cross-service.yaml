@@ -123,9 +123,9 @@ resources:
     notes: "max 5 per gateway; needs peer GW IP + remote subnet CIDR(s, max 10) + PSK(8-64) + IKE/IPSec/DPD blocks"
   direct-connect:
     service: networking/direct-connect
-    requires: [vpc]
+    requires: [vpc, security-group]
     provenance: docs
-    notes: "1:1 per VPC in a service zone (second create on the shared VPC must fail); max 5/account; name 3-20 alnum only; uplink 1G|10G required"
+    notes: "1:1 per VPC in a service zone (second create on the shared VPC must fail); max 5/account; name 3-20 alnum only; uplink 1G|10G required. Security Group is a documented 선행 서비스 (cross_constraints dc-prereq-security-group, validated-facts 2026-06-15); it is not a DC create-body field but DC workloads are SG-protected (IB-035)"
   gslb:
     service: networking/gslb
     requires: []
@@ -306,3 +306,8 @@ quotas:
     limit: 3
     scope: account
     provenance: VALIDATED
+  hosted-zone:
+    limit: 20
+    scope: account
+    provenance: docs
+    notes: "20 zones/account, 100 records/zone (validated-facts 2026-06-15); not yet wired to a lifecycle quota_kind (IB-039, inert documentation entry)"
