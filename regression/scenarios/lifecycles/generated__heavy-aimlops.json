@@ -553,10 +553,10 @@
           "expect_status": [
             200
           ],
-          "capture": {
-            "image_id": "$.images[0].id"
-          },
-          "_note": "image_id = $.images[0].id (same selector as the coverage lifecycle's list-images capture_soft). Required hard-capture: a release needs a real image_id."
+          "_note": "live 27520649710: response wrapper is $.contents[] (not $.images[]); item has base_image/category/created_*; id field assumed 'id'. capture_soft so a wrong field doesn't hard-fail — the guarded release records its real response.",
+          "capture_soft": {
+            "image_id": "$.contents[0].id"
+          }
         },
         {
           "name": "release-aimlops-platform",
