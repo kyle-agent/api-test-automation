@@ -259,7 +259,8 @@ resources:
   privatelink-service:
     code: "nw-vpc-privatelink-service"
     service: networking/vpc
-    requires: [vpc, subnet]
+    # IB-031: dropped redundant `vpc` — reachable transitively via subnet→vpc; body uses {subnet.subnet_id} only, never {vpc...}. Closure unchanged.
+    requires: [subnet]
     create:
       endpoint: "POST /v1/privatelink-services"
       body: {name: "regrpls{ualpha}", description: "API regression suite",

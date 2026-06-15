@@ -54,7 +54,8 @@ resources:
     # controller, modeled as precondition note — no graph node exists). Legacy
     # [subnet] edge mirrored the dbaas body and is docs-only. Divergence from
     # cross-service.yaml (still subnet) is an expected WARNING.
-    requires: [ske-cluster, filestorage-volume, data-ops]
+    # IB-031: dropped redundant `filestorage-volume` — reachable transitively via ske-cluster→filestorage-volume; create body never references {filestorage-volume...}. Closure unchanged.
+    requires: [ske-cluster, data-ops]
     create:
       endpoint: "POST /v1/data-ops-services"
       body:

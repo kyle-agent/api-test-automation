@@ -58,7 +58,8 @@ resources:
     # exists for it). The legacy [subnet] edge mirrored the dbaas body and is
     # docs-only; this requires reflects the NiFi-on-K8s reality. Divergence
     # from cross-service.yaml (which still has subnet) is an expected WARNING.
-    requires: [ske-cluster, filestorage-volume, data-flow]
+    # IB-031: dropped redundant `filestorage-volume` — reachable transitively via ske-cluster→filestorage-volume; create body never references {filestorage-volume...}. Closure unchanged.
+    requires: [ske-cluster, data-flow]
     create:
       endpoint: "POST /v1/data-flow-services"
       body:

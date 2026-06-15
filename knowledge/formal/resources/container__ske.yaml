@@ -70,7 +70,8 @@ resources:
     code: "ct-ske-nodepool"
     service: container/ske
     heavy: true
-    requires: [ske-cluster, kubernetes-version, server-type, keypair]
+    # IB-031: dropped redundant `keypair` — reachable transitively via ske-cluster→keypair; body's keypair_name is the literal regrkey{unique} (run-scoped {unique} share), not a {keypair...} token. Closure unchanged.
+    requires: [ske-cluster, kubernetes-version, server-type]
     create:
       endpoint: "POST /v1/nodepools"
       body:

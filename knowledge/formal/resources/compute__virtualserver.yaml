@@ -80,7 +80,8 @@ resources:
     code: "cp-vs-server"
     service: compute/virtualserver
     heavy: true
-    requires: [vpc, subnet, security-group, keypair, image, server-type]
+    # IB-031: dropped redundant `vpc` — reachable transitively via subnet→vpc; body uses {subnet.subnet_id} only, never {vpc...}. Closure unchanged.
+    requires: [subnet, security-group, keypair, image, server-type]
     create:
       endpoint: "POST /v1/servers"
       body:
