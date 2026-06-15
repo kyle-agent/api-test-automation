@@ -2,6 +2,11 @@
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # baremetal-server-coverage (enabled+heavy but COVERAGE-ONLY: docs-derived
 # bodies, synthetic ids, no real server ever provisioned -> provenance docs).
+#
+# docs-mapper enrichment (UNPROVEN, 2026-06-15) — userguide cites:
+#   overview:       https://docs.e.samsungsdscloud.com/userguide/compute/baremetal_server/overview/
+#   how_to_guides:  https://docs.e.samsungsdscloud.com/userguide/compute/baremetal_server/how_to_guides/
+# Notes/comments enriched only; no requires/create/body/capture/delete shapes changed.
 version: 1
 resources:
   baremetal-server:
@@ -30,4 +35,4 @@ resources:
     provenance: docs
     source: {lifecycle: baremetal-server-coverage,
              steps: [create-baremetals, delete-baremetals]}
-    notes: "UNPROVEN 전체 (api_bodies 엔트리 없음; 소스는 synthetic id로 4xx 보장하는 커버리지 전용 — capture/response envelope 미관측이라 capture 없음). vpc/subnet은 이 모델이 처음 배선; image_id/server_type_id는 BM 전용 카탈로그 lookup 엔드포인트가 미확인이라 synthetic literal 유지 (R3: BM image/server-type lookup 노드 추가 후 배선). 삭제는 path-id 없는 BULK DELETE로 body {baremetal_id_list: [...]}가 필요한데 모델 delete 스키마는 body를 못 싣는다 — capture+bulk-delete-body 지원 전까지 합성 불가에 가깝다. 제약 (services/compute__baremetal.yaml): 서버명 lowercase 3-15자 '-'금지(끝), 계정당 동시 BM 관리작업 1개(병렬 lifecycle 충돌 — 직렬 lane 필수), Security Group 미지원(Firewall+TGW 전용, VS와 별도 VPC), 단일 삭제는 Block Storage(BM) orphan을 남긴다. NAT/Public IP는 서버 1대 + VPC에 IGW 있을 때만. HEAVY: billable + slow."
+    notes: "UNPROVEN 전체 (api_bodies 엔트리 없음; 소스는 synthetic id로 4xx 보장하는 커버리지 전용 — capture/response envelope 미관측이라 capture 없음). vpc/subnet은 이 모델이 처음 배선; image_id/server_type_id는 BM 전용 카탈로그 lookup 엔드포인트가 미확인이라 synthetic literal 유지 (R3: BM image/server-type lookup 노드 추가 후 배선). 삭제는 path-id 없는 BULK DELETE로 body {baremetal_id_list: [...]}가 필요한데 모델 delete 스키마는 body를 못 싣는다 — capture+bulk-delete-body 지원 전까지 합성 불가에 가깝다. 제약 (services/compute__baremetal.yaml): 서버명 lowercase 3-15자 '-'금지(끝), 계정당 동시 BM 관리작업 1개(병렬 lifecycle 충돌 — 직렬 lane 필수), Security Group 미지원(Firewall+TGW 전용, VS와 별도 VPC), 단일 삭제는 Block Storage(BM) orphan을 남긴다. NAT/Public IP는 서버 1대 + VPC에 IGW 있을 때만. HEAVY: billable + slow. [docs-mapper UNPROVEN 2026-06-15, userguide overview+how_to_guides]: server_type_id는 콘솔에서 `s3v{vCore}m{memGB}_metal` 형식 (vCore = 물리코어×2 hyperthreading, 예 s3v16m64_metal=물리 8코어/64GB) — synthetic 'PRODUCT-regrCoverageProbe00'은 자리표시자, 실제는 이 포맷의 카탈로그 id. server_details의 use_hyper_threading=true는 docs 기본값(생성 시 해제 가능)과 정합. OS image(Oracle Linux 9.6, RHEL 8.10/9.4/9.6, Rocky 8.10/9.6, Ubuntu 22.04/24.04, Windows 2019/2022) — image_id 'IMAGE-regrCoverageProbe…'도 자리표시자. Local disk partition 최대 10개 생성 가능 (server_details 모델엔 미노출 — 콘솔/추가 API 영역). 멀티 서버(2대+) 생성 시 bare_metal_server_name은 prefix로 쓰이고 시스템이 prefix-### 자동 생성 — server_details 배열 단건이라 현 모델은 단일 서버 경로. 멀티 서버 + Block Storage(BM) 첨부 시 동시 삭제 차단(먼저 detach 필요)이라 BULK DELETE는 attach된 BM 볼륨 있으면 거부 가능. region 가용성은 overview에 미명시 — R3 live 확인 대상."

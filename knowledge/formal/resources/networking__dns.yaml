@@ -1,6 +1,11 @@
 # Resource-task model — networking/dns (nw-dns group, Private DNS).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # networking-dns-hosted-zone-private (enabled, live-validated).
+#
+# USERGUIDE CITATIONS (docs-mapper enrichment, fetched 2026-06-15, HTTP 200):
+#   dns: https://docs.e.samsungsdscloud.com/userguide/networking/dns/overview/
+# Quota/record-type/region facts below from this page are UNPROVEN (docs-only)
+# unless the node is already provenance: VALIDATED — notes/comments only.
 version: 1
 resources:
   private-dns:
@@ -19,7 +24,7 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: networking-dns-hosted-zone-private,
              steps: [create-private-dns, wait-private-dns-active, delete-private-dns]}
-    notes: "생성/삭제가 매우 느림(시간 단위 관측) — 전용 lane에 격리, 먼저 생성/마지막 삭제 (services/networking__dns.yaml). hosted-zone이 남아 있는 동안 종료 불가. heavy-shared-networking은 별도 activate sub-flow(POST /v1/private-dns/activate)를 끼워 넣지만, 이 소스 lifecycle은 activate 없이 ACTIVE 도달을 검증했다."
+    notes: "생성/삭제가 매우 느림(시간 단위 관측) — 전용 lane에 격리, 먼저 생성/마지막 삭제 (services/networking__dns.yaml). hosted-zone이 남아 있는 동안 종료 불가. heavy-shared-networking은 별도 activate sub-flow(POST /v1/private-dns/activate)를 끼워 넣지만, 이 소스 lifecycle은 activate 없이 ACTIVE 도달을 검증했다. [USERGUIDE 2026-06-15] dns/overview 확인: **계정당 Private DNS 최대 1개** — 이것이 결정적 제약. 회귀 스위트가 이미 Private DNS를 하나 점유하면 두 번째 create는 quota 4xx; quota: private-dns 키의 limit이 1인지 cross-service.yaml에서 확인 권장(LOCK 후보). Private DNS 이름은 계정 내 전 리전 공유 — 한 리전에서 생성하면 다른 리전은 'activate'로 동일 이름 활성화(POST /v1/private-dns/activate sub-flow가 이 멀티리전 활성화 의미). VPC 연결은 리전별로 구성. [UNPROVEN] 이름 길이/charset 규칙은 userguide 미명시 — 라이브 확인 대상."
 
   hosted-zone:
     code: "nw-dns-hosted-zone"
@@ -41,4 +46,4 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: networking-dns-hosted-zone-private,
              steps: [create-hosted-zone, delete-hosted-zone]}
-    notes: "capture envelope은 이 소스에서 $.id — heavy-shared-networking은 $.hosted_zone.id를 쓴다 (응답 envelope 이력 충돌; R3 라이브 런에서 확정). private hosted zone은 Active 상태의 private-dns에 연결된 VPC를 대상으로 한다; 계정당 20 zone."
+    notes: "capture envelope은 이 소스에서 $.id — heavy-shared-networking은 $.hosted_zone.id를 쓴다 (응답 envelope 이력 충돌; R3 라이브 런에서 확정). private hosted zone은 Active 상태의 private-dns에 연결된 VPC를 대상으로 한다; 계정당 20 zone. [USERGUIDE 2026-06-15] dns/overview 확인: 계정당 Hosted Zone 최대 20개(기존 노트와 일치, 확정), **Hosted Zone당 레코드 최대 100개**. type: private 외에 public 존도 존재하나(본 모델은 private만), Public Domain/Public Hosted Zone은 kr-south 리전에서 사용 신청 제한. 지원 레코드 타입: A, AAAA, CNAME, TXT, MX, SPF, NS(자동 생성), SOA(자동 생성) — records 엔드포인트 검증/생성 시 참고. Private Hosted Zone은 반드시 Active 상태 Private DNS에 연결된 VPC 대상(선행조건 정합). [UNPROVEN] hosted zone name(도메인) 길이/charset 규칙은 userguide 미명시."

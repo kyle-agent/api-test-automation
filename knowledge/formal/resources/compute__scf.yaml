@@ -2,6 +2,15 @@
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # compute-scf-cloud-function-cronjob-trigger (enabled, live-validated spine)
 # and scf-privatelink-apigateway-coverage (coverage-only -> docs).
+#
+# docs-mapper enrichment (UNPROVEN, 2026-06-15) — userguide cites:
+#   overview:       https://docs.e.samsungsdscloud.com/userguide/compute/cloud_functions/overview/
+#   how_to_guides:  https://docs.e.samsungsdscloud.com/userguide/compute/cloud_functions/how_to_guides/
+# docs facts: runtimes GO 1.21/1.23/1.25, Java 17, Node.js 18/20/22/24,
+#   PHP 8.1/8.4/8.5, Python 3.9/3.10/3.11/3.14 (body runtime 'Node.js:20' valid);
+#   regions kr-west1/kr-east1 only (kr-south* unavailable); EoTS runtime은 2026.7
+#   이후 신규/수정 불가(기존 함수는 호출만 유지). Notes/comments only — no
+#   requires/create/body/capture/delete shapes changed.
 version: 1
 resources:
   scf-function:
@@ -99,7 +108,7 @@ resources:
     provenance: docs
     source: {lifecycle: generated__wave5-appsvc,
              steps: [create-scf-privatelink-endpoint, delete-scf-privatelink-endpoint]}
-    notes: "UNPROVEN. R3 해소 (2026-06-13): 구 flat body {subnet_id, endpoint_service_id, name}는 docs DTO와 불일치 — 실제 PrivateLinkEndpointCreateRequest는 중첩 {endpoint: EndpointCreateRequest{alias, service_id}} (subnet 없음)라 verbatim으로 교체, service_id는 신설 networking privatelink-service 노드 ref로 배선. 응답 envelope $.endpoint.endpoint_id (PrivateLinkEndpoint{endpoint: Endpoint}) — docs 파생. request/approval/connection PUT({type} 단일 enum: CANCEL|RE_REQUEST / APPROVE|REJECT / DISCONNECT|RECONNECT)은 상태기계 의존 lifecycle 영역(gen-wave5 gated probes). 경고 유지: 함수의 privatelink-SERVICE enable(PUT .../privatelink-services {privatelink_service_enabled: true})은 함수를 Creating에 고착시켜 teardown을 막는다 — endpoint family만 모델링, service enable 금지(disable=false probe만 lifecycle에서). config write 후 READY 재폴링 시맨틱 적용."
+    notes: "UNPROVEN. R3 해소 (2026-06-13): 구 flat body {subnet_id, endpoint_service_id, name}는 docs DTO와 불일치 — 실제 PrivateLinkEndpointCreateRequest는 중첩 {endpoint: EndpointCreateRequest{alias, service_id}} (subnet 없음)라 verbatim으로 교체, service_id는 신설 networking privatelink-service 노드 ref로 배선. 응답 envelope $.endpoint.endpoint_id (PrivateLinkEndpoint{endpoint: Endpoint}) — docs 파생. request/approval/connection PUT({type} 단일 enum: CANCEL|RE_REQUEST / APPROVE|REJECT / DISCONNECT|RECONNECT)은 상태기계 의존 lifecycle 영역(gen-wave5 gated probes). 경고 유지: 함수의 privatelink-SERVICE enable(PUT .../privatelink-services {privatelink_service_enabled: true})은 함수를 Creating에 고착시켜 teardown을 막는다 — endpoint family만 모델링, service enable 금지(disable=false probe만 lifecycle에서). config write 후 READY 재폴링 시맨틱 적용. [docs-mapper UNPROVEN 2026-06-15, userguide how_to_guides '트리거 설정하기'/'Private 연결 구성']: PrivateLink는 '선택적 준비 서비스'로 PrivateLink Service와 연계하여 사용 — overview는 PL Service/API Gateway를 optional prereq로만 기술하고 endpoint create의 구체 제약/네이밍은 overview에 없음(detail은 'PrivateLink 서비스 연계하기' 하위로 defer). Deploying 상태에서는 함수의 트리거/구성 변경이 차단된다는 docs 진술이 'config write 후 READY 재폴링' 시맨틱을 뒷받침."
 
   scf-apigateway-trigger:
     code: "cp-scf-apigateway-trigger"
@@ -129,4 +138,4 @@ resources:
     provenance: docs
     source: {lifecycle: generated__wave5-appsvc,
              steps: [create-apigateway-trigger, delete-apigateway-trigger]}
-    notes: "UNPROVEN body (docs DTO ApigatewayTriggerCreateRequest verbatim — 구 coverage probe의 {api_gateway_id, resource_id, method_type, auth_type} 추측 body는 폐기). apigateway_api_id 패턴 ^[0-9a-f]{24}$ = apigw-api capture와 일치, apigateway_stage_name dev는 apigw-deployment(stage_type=new)가 만든 stage — cross-file requires (ske-cluster→filestorage-volume 패턴). 트리거 write 전 함수 READY 필수 (deploying-after-every-change quirk). capture envelope $.triggers[0].trigger_id는 cronjob 트리거와 동일 ARRAY envelope (TriggerCreateResponse)."
+    notes: "UNPROVEN body (docs DTO ApigatewayTriggerCreateRequest verbatim — 구 coverage probe의 {api_gateway_id, resource_id, method_type, auth_type} 추측 body는 폐기). apigateway_api_id 패턴 ^[0-9a-f]{24}$ = apigw-api capture와 일치, apigateway_stage_name dev는 apigw-deployment(stage_type=new)가 만든 stage — cross-file requires (ske-cluster→filestorage-volume 패턴). 트리거 write 전 함수 READY 필수 (deploying-after-every-change quirk). capture envelope $.triggers[0].trigger_id는 cronjob 트리거와 동일 ARRAY envelope (TriggerCreateResponse). [docs-mapper UNPROVEN 2026-06-15, userguide how_to_guides '트리거 설정하기']: 함수는 Cronjob과 API Gateway 두 가지 트리거 메커니즘만 지원. Deploying 상태(함수 생성/코드(inline·JAR) 수정/트리거 추가·수정/구성 변경 중)에서는 트리거 수정 불가 — 트리거 write 전 READY 재폴링 필수의 docs 근거. Cronjob 경고: 함수 timeout 완료 전 cron이 재호출하면 nested execution으로 실행 횟수·시간 증가 → 고비용 발생 (cost/blast-radius 주의, cronjob 노드 schedule 0 0 * * 0 주1회는 이 위험 낮음)."

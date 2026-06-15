@@ -12,6 +12,30 @@
 # UNCONFIRMED whether it is required at API level). Capture $.trail.id is
 # CONFIRMED against the response model TrailShowResponseV1dot1{trail:
 # Trail1dot1} and Trail1dot1.id. Body rewritten to the real model below.
+#
+# 2026-06-15 docs-mapper enrichment (notes/comments ONLY — no shape change).
+# Userguide cited (constraints UNPROVEN at API level until a live 2xx):
+#   [U1] /userguide/management/logging_audit/overview/
+#   [U2] /userguide/management/logging_audit/how_to_guides/trail/
+#   [U3] /userguide/management/logging_audit/how_to_guides/  (activity history)
+# [U2] Trail console constraints confirmed verbatim:
+#   - trail_name: "영문, 숫자와 특수문자(-)를 사용하여 5~26자로 입력" — 5-26
+#     chars, English letters + digits + hyphen only. (Confirms the prior guess;
+#     API-level required/optional still per spec = optional.)
+#   - bucket: "활동 내역을 저장할 Object Storage 버킷명" required; bucket region
+#     required and IMMUTABLE after creation ("생성 후 변경 불가").
+#   - 대상 리전 (target region): default 전체(All); specific regions selectable;
+#     MODIFIABLE after creation (≠ the immutable bucket region).
+#   - 로그/자원 유형 (log types): default 전체(All); selectable; modifiable.
+#   - 저장할 파일 유형: JSON or CSV.
+#   - 로그파일 검증 (log file validation): optional; when on, stores a Digest
+#     file in the same bucket to detect log file 변경/삭제.
+# [U1] Activity history viewable 90 days; long-term retention requires a Trail
+#      writing to Object Storage.
+# [U3] Activity-history EXPORT (console, not the trail API) offers time-range
+#      presets 전체/최근30분/최근1시간/최근12시간/직접입력 and JSON|CSV download —
+#      this is the console activity-log download, distinct from the trail's
+#      downloadlogs op; do not confuse with listlogs query params.
 version: 1
 resources:
   trail:
@@ -48,18 +72,18 @@ resources:
                      note: "_note: 본문 필수 account_id — 호출 계정 id(ACCOUNT_ID-xxxx). 엔진 builtin {account_id}가 없으면 크리덴셜 컨텍스트에서 채워야 함(라이브 검증 대상)"}
         bucket_name: {type: string, required: true,
                       default: "apitest-logsink",
-                      note: "사전 존재하는 Object Storage 버킷명 (생성 후 변경 불가). 워크플로 ensure-logsink가 만드는 공용 apitest-logsink 사용 — network-logging과 공유 (owner 2026-06-13)"}
+                      note: "사전 존재하는 Object Storage 버킷명. userguide [U2] 확인: 버킷·버킷 리전 모두 필수이며 버킷 리전은 '생성 후 변경 불가'(IMMUTABLE) — bucket_region이 버킷 실제 리전과 불일치하면 생성 실패 예상(UNPROVEN). 워크플로 ensure-logsink가 만드는 공용 apitest-logsink 사용 — network-logging과 공유 (owner 2026-06-13)"}
         trail_name: {type: string, required: false, default: "regrtrail{unique}",
-                     note: "_note: 트레일 표시명. userguide trail 페이지: 5-26자, 영문/숫자/하이픈만. API 레벨 필수 여부는 스펙에 명시 없음(optional 표기) — 라이브 검증 대상"}
+                     note: "_note: 트레일 표시명. userguide trail 페이지 [U2] 정확 문구 '영문, 숫자와 특수문자(-)를 사용하여 5~26자로 입력' — 5-26자, 영문/숫자/하이픈(-)만 (2026-06-15 [U2] 재확인). default regrtrail{unique}는 이 규칙 내. API 레벨 필수 여부는 스펙상 optional 표기 — 라이브 검증 대상(UNPROVEN)"}
         trail_save_type: {type: enum, values: [JSON, CSV], required: false,
                           default: JSON, vary: true,
-                          note: "저장 포맷 — 생성 후 변경 가능. userguide 'Save Format: JSON or CSV'"}
+                          note: "저장 포맷 — 생성 후 변경 가능. userguide [U2] '저장할 파일 유형 (JSON, CSV)' 정확 2값 확인 (2026-06-15)"}
         region_total_yn: {type: enum, values: ["Y", "N"], required: false,
                           default: "Y", vary: false,
-                          note: "대상 리전 전체 여부(default Y). N이면 region_names 목록 필요 — 미모델"}
+                          note: "대상 리전 전체 여부(default Y). userguide [U2]: 대상 리전 default 전체(All), 특정 리전 선택 가능, 생성 후 변경 가능(버킷 리전과 달리 가변). N이면 region_names 목록 필요 — 미모델"}
         log_verification_yn: {type: enum, values: ["N", "Y"], required: false,
                               default: "N", vary: true,
-                              note: "로그파일 검증(digest) 활성 — Y면 무결성 검증용 digest 파일 저장(userguide Log File Validation)"}
+                              note: "로그파일 검증(digest) 활성 — Y면 무결성 검증용 digest 파일을 같은 버킷에 저장해 로그파일 변경/삭제 여부 검출(userguide [U2] 로그파일 검증, 2026-06-15 확인)"}
     capture: {trail_id: "$.trail.id"}
     delete: {endpoint: "DELETE /v1/trails/{trail_id}", destructive: true}
     provenance: docs

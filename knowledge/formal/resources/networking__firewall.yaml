@@ -20,6 +20,11 @@
 # SELF-CREATES its VPC. A composed lifecycle that adopts the session-shared
 # VPC (adopt: vpc) has a different vpc name — compositions of this chain must
 # strip the adopt stamps from the vpc steps (see generated__wave5-net.json).
+#
+# USERGUIDE CITATIONS (docs-mapper enrichment, fetched 2026-06-15, HTTP 200):
+#   firewall: https://docs.e.samsungsdscloud.com/userguide/networking/firewall/overview/
+# All constraints below from this page are UNPROVEN (docs-only) — notes/comments
+# only, no shape changes.
 version: 1
 resources:
   firewall:
@@ -55,7 +60,7 @@ resources:
     # carrier (the IGW) is deleted — the composed teardown deletes the IGW.
     provenance: docs
     source: {lifecycle: networking-firewall-rule, steps: [createfirewallrule]}
-    notes: "암묵 생성 자원의 lookup-on-list 노드 (R3 carrier-capture). 카탈로그의 firewall ops 8개 중 list/show/set을 이 노드가, rules 4종을 firewall-rule 노드가 커버한다. 상태기계 CREATING→ACTIVE (list enum: CREATING, ACTIVE, DELETING, DELETED, EDITING, ERROR, DEPLOYING — api_docs listfirewalls state 파라미터 verbatim); IGW가 ACTIVE여도 firewall은 CREATING일 수 있어 ready가 ACTIVE까지 재폴링한다. 리스트가 IGW-ACTIVE 직후 일시적으로 비어 캡처가 실패할 가능성은 라이브 정제 대상 (IGW ready 300s 윈도우가 보통 흡수). capture envelope $.firewalls[0].id는 api_docs response_example 기반 UNPROVEN — docs."
+    notes: "암묵 생성 자원의 lookup-on-list 노드 (R3 carrier-capture). 카탈로그의 firewall ops 8개 중 list/show/set을 이 노드가, rules 4종을 firewall-rule 노드가 커버한다. 상태기계 CREATING→ACTIVE (list enum: CREATING, ACTIVE, DELETING, DELETED, EDITING, ERROR, DEPLOYING — api_docs listfirewalls state 파라미터 verbatim); IGW가 ACTIVE여도 firewall은 CREATING일 수 있어 ready가 ACTIVE까지 재폴링한다. 리스트가 IGW-ACTIVE 직후 일시적으로 비어 캡처가 실패할 가능성은 라이브 정제 대상 (IGW ready 300s 윈도우가 보통 흡수). capture envelope $.firewalls[0].id는 api_docs response_example 기반 UNPROVEN — docs. [USERGUIDE 2026-06-15, UNPROVEN] firewall/overview 확인: (1) 방화벽은 명시 create API 없음 — 캐리어 자원(Internet Gateway / Direct Connect / Load Balancer) 생성 시 'firewall usage' 옵션 체크하면 함께 암묵 생성됨(cross-service.yaml firewall-implicit-on-gateway-resources와 일치). (2) 적용 가능 캐리어 = IGW/Direct Connect/Load Balancer 정확히 3종 — 우리 IGW(firewall_enabled:true) 경로 검증됨. (3) 생성 시 기본 크기는 Extra Small(EXSMALL) — verify의 set-loggable이 쓰는 flavor_name enum(EXSMALL..EXLARGE)과 정합. 크기 변경은 콘솔 전용(Open API 부재 가능성, set은 flavor_name도 받지만 콘솔 안내). (4) 초기 기본 규칙은 'Any Deny'(인바운드/아웃바운드 전체 차단) — permit 규칙 추가 전엔 통신 불가; firewall-rule 노드의 ALLOW 규칙이 그래서 의미가 있음. (5) 규칙 한도는 크기별: EXSMALL=5, SMALL=100, MEDIUM=200, LARGE=500, EXLARGE=1000 — 기본 EXSMALL이면 최대 5개 규칙(우리 단일 규칙은 안전). (6) 선행조건 = VPC + 캐리어(IGW/DC/LB) 존재."
 
   firewall-rule:
     code: "nw-vpc-firewall-rule"
@@ -110,4 +115,4 @@ resources:
              retry_on_status: [400, 409], retries: 8, retry_interval: 15}
     provenance: docs
     source: {lifecycle: networking-firewall-rule, steps: [createfirewallrule]}
-    notes: "rule 상태기계 CREATING→ACTIVE (listfirewallrules state enum verbatim); set 직후 EDITING에서 delete가 400/409 가능성 → delete retry. 소스 lifecycle은 firewall_id placeholder로 4xx — 실 firewall_id 주입(carrier-capture)은 이 모델이 처음 제공하므로 body/capture 전부 UNPROVEN(docs). 카탈로그 createfirewallrule 201 응답 FirewallRuleShowResponse $.firewall_rule.id."
+    notes: "rule 상태기계 CREATING→ACTIVE (listfirewallrules state enum verbatim); set 직후 EDITING에서 delete가 400/409 가능성 → delete retry. 소스 lifecycle은 firewall_id placeholder로 4xx — 실 firewall_id 주입(carrier-capture)은 이 모델이 처음 제공하므로 body/capture 전부 UNPROVEN(docs). 카탈로그 createfirewallrule 201 응답 FirewallRuleShowResponse $.firewall_rule.id. [USERGUIDE 2026-06-15, UNPROVEN] firewall/overview 확인: 규칙은 destination/source address + protocol + port로 인바운드/아웃바운드 permit/deny를 지정 — body의 destination_address/source_address/service(protocol+port)/direction/action 구조와 정합. 기본 정책이 'Any Deny'이므로 ALLOW 규칙만이 실제 통신을 연다. 한 방화벽의 규칙 총수는 크기별 한도(EXSMALL=5 기본)에 묶임 — 회귀 단일 규칙은 여유. 우선순위/order(order_direction/order_rule_id opt)는 userguide가 명시 수치 없음(라이브 확인 대상)."

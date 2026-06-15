@@ -10,6 +10,23 @@
 #   TagSetRequest{tags[Tag]}, TagsSetRequest/TagDeleteRequest{tags: {srn: [...]}}.)
 # components-주소 per-key 3종(show/update/delete by region/service/type/id/key)은
 # components 주소 스킴 확정 후 2차 (updatecomponentstags(bulk)는 검증됨).
+#
+# 2026-06-15 docs-mapper enrichment (notes/comments ONLY — no shape change).
+# Userguide cited:
+#   [U1] /userguide/management/resource_groups/overview/
+#   [U2] /userguide/management/resource_groups/how_to_guides/
+# [U2] Resource Group console create requires: 그룹명(name), 자원 유형(resource
+#   type — 전체 or multi-select), 그룹핑 기준 태그(grouping tags, key+value).
+#   Optional: 설명(description), Lock(잠금 여부), Init Script(≤45,000 bytes),
+#   그룹 자체 태그. This confirms the existing node note: the verified API create
+#   needs only name+description, and resource_types/grouping-tags land via the
+#   PUT-set verify step (console front-loads them; API splits them). UNPROVEN
+#   whether the API enforces the grouping-tags-required rule that the console does.
+# [U2] 태그는 "자원 당 최대 50개까지 추가 가능" — max 50 tags per resource
+#   (confirms the prior _note; LOCK candidate).
+# [U2/U1] STILL UNSPECIFIED in userguide+overview: resource-group name
+#   length/allowed chars, and max resource groups per account — confirmed absent
+#   on both pages 2026-06-15; must be settled live or from API Reference.
 version: 1
 resources:
   resource-group:
@@ -72,7 +89,7 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: resourcemanager-resource-group, steps: [create, delete]}
     notes: "글로벌(account-scoped) 서비스 — host에 region 세그먼트 없음. 싸고 가역적인 실생성 자원 — tag-write 계열의 실 SRN 공급원 (owner 2026-06-13 계획). rg_srn envelope은 소스 capture_soft에서 하드 승격 — 1차 라이브에서 확정. 콘솔 생성은 name(필수)·description(선택)·resource_types(필수)·그룹핑 기준 태그(필수) 요구 — 검증된 API create 는 name+description 만으로 201, resource_types/tags 는 PUT set 에서 적용(verify set 노드). 삭제는 영구(복구 불가) — destructive 표시와 일치."
-    _note: "docs(how_to_guides 2026-06-14): 태그는 자원당 최대 50개. resource-group 이름 길이/허용문자 및 계정당 그룹 최대 개수는 userguide 에 미명시(API Reference 미확인) — quota/naming 미상, 라이브에서 확정 필요."
+    _note: "docs(how_to_guides 2026-06-14, 재확인 2026-06-15 [U2]): 태그는 자원당 최대 50개('자원 당 최대 50개까지 추가 가능'). 콘솔 create 필수=그룹명+자원유형(전체/멀티선택)+그룹핑 기준 태그(key/value); 선택=설명·Lock·Init Script(≤45,000 bytes). resource-group 이름 길이/허용문자 및 계정당 그룹 최대 개수는 overview+how_to_guides 양쪽 모두 미명시(2026-06-15 재확인, API Reference 미확인) — quota/naming 미상, 라이브에서 확정 필요."
 
   # deleteresourcegroups(벌크) 전용 — 두 번째 rg를 만들고 벌크 DELETE로 지운다
   # (delete.json passthrough). 단일 rg의 teardown과 중복 없이 벌크 경로를 검증.

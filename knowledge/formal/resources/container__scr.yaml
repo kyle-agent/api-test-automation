@@ -8,6 +8,15 @@
 # model uses container-registry (the fan-out contract's key); the validator's
 # scr-repository divergence warning vs the legacy 'scr-registry' edge is the
 # expected alias artifact, reconcile the L2 duplicate during R3.
+#
+# docs-mapper enrichment (UNPROVEN, 2026-06-15) — userguide cites:
+#   overview:       https://docs.e.samsungsdscloud.com/userguide/container/container_registry/overview/
+#   how_to_guides:  https://docs.e.samsungsdscloud.com/userguide/container/container_registry/how_to_guides/
+# docs facts: 레지스트리명은 영문 소문자로 시작, 소문자+숫자, 3~25자 (body
+#   'regrscr{unique}' 정합); Docker Registry V2 API 사양 지원; 이미지 전송은
+#   HTTPS 강제, Object Storage에 암호화 저장; 접근제어는 IAM + 리포지토리별
+#   resource-based 정책; 이미지/태그는 표준 Docker CLI push/pull로 생성.
+#   Notes/comments only — no requires/create/body/capture/delete shapes changed.
 version: 1
 resources:
   container-registry:
@@ -120,7 +129,7 @@ resources:
       - {credential: scr-auth-key}
     provenance: docs
     source: {lifecycle: scr-image-write-coverage, steps: [seed-image-placeholder]}
-    notes: "Open API create 없음: SCR 이미지 id는 repository로의 `docker push`로 태어난다 — REST POST가 존재하지 않는다 (scr-image-write-coverage _note). push에는 레지스트리의 콘솔 발급 인증키가 필요 → {credential: scr-auth-key} 사전조건 (cross-service container-registry note; 환경에 미표시면 env-skip, archivestorage 패턴). 카탈로그에 있는 것은 image의 정책/설명 PUT과 DELETE /v1/images/{id}뿐. 합성 경로는 R3에서 push 가능한 러너가 생겨야 열린다 — 그때까지 그래프 문서화 전용."
+    notes: "Open API create 없음: SCR 이미지 id는 repository로의 `docker push`로 태어난다 — REST POST가 존재하지 않는다 (scr-image-write-coverage _note). push에는 레지스트리의 콘솔 발급 인증키가 필요 → {credential: scr-auth-key} 사전조건 (cross-service container-registry note; 환경에 미표시면 env-skip, archivestorage 패턴). 카탈로그에 있는 것은 image의 정책/설명 PUT과 DELETE /v1/images/{id}뿐. 합성 경로는 R3에서 push 가능한 러너가 생겨야 열린다 — 그때까지 그래프 문서화 전용. [docs-mapper UNPROVEN 2026-06-15, userguide overview+how_to_guides]: 표준 Docker CLI로 push/pull (Docker Registry V2 API 사양), 전송은 HTTPS 강제·Object Storage 암호화 저장으로 docker-push-born no_api 모델을 확증. 자동/수동 취약점 스캔(OS+언어 패키지)과 이미지 내 secret 탐지가 image-레벨 ops — scr-repository scan_policy 블록과 짝. overview/how_to_guides는 리포지토리당 이미지 수·태그 네이밍 등 수치 제약을 명시하지 않음 (API Reference 영역, R3)."
 
   scr-tag:
     code: "ct-scr-tag"
@@ -129,4 +138,4 @@ resources:
     requires: [scr-image]
     provenance: docs
     source: {lifecycle: scr-tags-write-coverage, steps: [seed-tags-placeholder]}
-    notes: "Open API create 없음: 태그(tags/'tagses') 역시 docker push 산물이다. 카탈로그에는 PUT .../check-vulnerability·lock-policy와 DELETE /v1/tagses(BULK, body {ids:[...]})·DELETE /v1/tagses/{tags_id}만 존재. scr-image처럼 R3 push 러너 전까지 composer 대상 불가."
+    notes: "Open API create 없음: 태그(tags/'tagses') 역시 docker push 산물이다. 카탈로그에는 PUT .../check-vulnerability·lock-policy와 DELETE /v1/tagses(BULK, body {ids:[...]})·DELETE /v1/tagses/{tags_id}만 존재. scr-image처럼 R3 push 러너 전까지 composer 대상 불가. [docs-mapper UNPROVEN 2026-06-15, userguide how_to_guides '이미지 및 태그 관리하기'/'이미지 태그 삭제 정책 관리하기']: 태그 삭제 정책(lifecycle: outdated/untagged 규칙)은 scr-repository의 lifecycle_policy 블록이 리포지토리 레벨에서 관할 — 태그 자체의 check-vulnerability/lock-policy PUT는 image-레벨 보안 ops. 태그 네이밍 수치 제약은 overview/how_to_guides에 미명시 (Docker 태그 규칙 + API Reference 영역)."

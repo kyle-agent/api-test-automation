@@ -20,6 +20,28 @@
 # per-endpoint required-param matrix (the 400 fix). Also corrected the
 # X-ResourceType header guess (no such header in the spec) and the eventLevel
 # enum to the docs values. Pending live verification.
+#
+# 2026-06-15 docs-mapper enrichment (notes/comments ONLY — no shape change).
+# Userguide cited (all UNPROVEN until a live 2xx):
+#   [U1] /userguide/management/cloud_monitoring/overview/
+#   [U2] /userguide/management/cloud_monitoring/how_to_guides/event/
+# [U1] EOL: "2026년 9월 릴리스 이후" Cloud Monitoring is discontinued for SCP
+#      resource monitoring; migrate to ServiceWatch (GA Oct 2025). This service
+#      yaml is therefore terminal — do not deepen past coverage closure.
+# [U2] Event policy console constraints confirmed verbatim:
+#   - 이벤트 등급 (event grade): exactly 3 — Fatal(최고위험) / Warning(중간) /
+#     Information(최저·참고). Maps to eventLevel enum [FATAL, WARNING, INFORMATION].
+#   - 비교 방식 (comparison method): 7 values — 구간(Range), 일치(EQ), 상이(NE),
+#     이상(GE), 초과(GT), 이하(LE), 미만(LT). i.e. the 6 SingleThreshold operators
+#     [GT,GE,LT,LE,EQ,NE] PLUS 구간 which is the RANGE_VALUE/RangeThreshold path.
+#   - 임계치 (threshold): "숫자와 소수점만 입력 가능" (numbers/decimals only).
+#   - 지속 발생 횟수 (consecutive-occurrence count) = the ftCount field; tunes
+#     sensitivity so momentary spikes don't fire.
+#   - 모니터링 대상을 지정한 상태에서만 설정 가능 — a monitoring target
+#     (productResourceId) is MANDATORY before a policy can be created; this is the
+#     console-side confirmation of why the cm-account-resource lookup is a hard
+#     prerequisite (and why bare event-policy queries 400 without it). UNPROVEN.
+#   - No documented max on notificationRecipients or monitored resources/policy.
 version: 1
 resources:
   # read-only LOOKUP node (server-type / apigw-root-resource pattern):
@@ -89,10 +111,10 @@ resources:
       options:
         eventLevel: {type: enum, values: [WARNING, FATAL, INFORMATION], required: true,
                      default: WARNING, vary: true,
-                     note: "이벤트 레벨 — docs EventPolicyInfo.eventLevel 예시 WARNING. 콘솔(userguide event 페이지)은 등급을 Fatal/Warning/Information 3단계로 노출하므로 enum을 그 매핑(FATAL/WARNING/INFORMATION)으로 확정. 종전 draft의 CRITICAL은 servicewatch/타서비스 혼동값 — 제거. 전체 집합 라이브 2xx 미확인(UNPROVEN)"}
+                     note: "이벤트 레벨 — docs EventPolicyInfo.eventLevel 예시 WARNING. 콘솔(userguide event 페이지 [U2])은 등급(이벤트 등급)을 정확히 3단계로 노출: Fatal(가장 위험)/Warning(중간)/Information(최저·참고) — enum을 그 매핑(FATAL/WARNING/INFORMATION)으로 확정. 콘솔 3등급 외 값은 없음(2026-06-15 [U2] 확인). 종전 draft의 CRITICAL은 servicewatch/타서비스 혼동값 — 제거. 전체 집합 라이브 2xx 미확인(UNPROVEN)"}
         comparisonOperator: {type: enum, values: [GT, GE, LT, LE, EQ, NE], required: true,
                              default: GT, vary: true,
-                             note: "SingleThreshold.comparisonOperator — docs 예시는 LT만 관측(GE/GT 등은 콘솔 비교연산자 '이상/초과/이하/미만/일치/상이'에서 매핑한 추정). GT 95(CPU)로 사실상 미발화 probe. UNPROVEN"}
+                             note: "SingleThreshold.comparisonOperator — docs 예시는 LT만 관측. 콘솔(userguide event [U2])의 비교 방식 7종 중 구간(Range)을 제외한 6종이 정확히 이 enum에 대응: 이상(GE)/초과(GT)/이하(LE)/미만(LT)/일치(EQ)/상이(NE) (2026-06-15 [U2] 확인). 구간(Range)은 별도 RANGE_VALUE/RangeThreshold 경로 — 이 SingleThreshold enum에는 포함 안 됨. GT 95(CPU)로 사실상 미발화 probe. UNPROVEN"}
     # docs-grounded shape (was COMPOSITION-BLOCKED): create body now mirrors
     # the docs EventPolicyCreateRequest/EventPolicyInfo models verbatim and
     # productResourceId is wired from the cm-account-resource lookup —

@@ -89,6 +89,32 @@ were up — security-service docs-mapper must **re-fetch when the subtree recove
   master) / 1 (combined); ports **9300 & 5301 reserved** (unusable as db port).
 - **vertica**: all field rules userguide-re-confirmed (no drift vs 2026-06-14).
 
+**networking quotas (firewall/dns/direct-connect, userguide 2026-06-15, docs/UNPROVEN):**
+- **Private DNS = 1 per account** (account-wide across regions; `POST /private-dns/activate`
+  = multi-region activation of the same name) → a 2nd create hits quota 4xx. Verify
+  `quota: private-dns == 1` in cross-service.yaml.
+- **Direct Connect = 5 per service-zone, 1:1 per VPC**; prerequisite includes a
+  **Security Group** (candidate missing edge in `dc-prereq`).
+- **Hosted Zone = 20/account, 100 records/zone**; record types A/AAAA/CNAME/TXT/MX/SPF/NS/SOA.
+- **Firewall rule quota by size**: EXSMALL=5 (implicit-create default)/SMALL=100/MEDIUM=200/
+  LARGE=500/EXLARGE=1000; default policy "Any Deny" (ALLOW rule required to pass traffic).
+
+**compute/container (baremetal/scf/scr, userguide 2026-06-15, docs/UNPROVEN):**
+- **baremetal**: server_type `s3v{vCore}m{memGB}_metal` (vCore = physical×2 HT);
+  **Security Group NOT supported** (Firewall + Transit Gateway only); name lowercase
+  3-15, multi-server → `prefix-###`; single-delete leaves BM Block Storage orphan.
+- **SCF**: regions **kr-west1/east1 only**; runtimes Go/Java17/Node18-24/PHP/Python3.9-3.14;
+  triggers only **Cronjob + API Gateway**; Deploying state blocks trigger/config modify.
+- **SCR**: registry name lowercase-start 3-25; **images/tags born via Docker push**
+  (Registry V2, no REST create) → `scr-image`/`scr-tag` correctly `no_api`.
+
+**management (cloudmonitoring/loggingaudit/resourcemanager, userguide 2026-06-15, docs/UNPROVEN):**
+- **Cloud Monitoring is EOL after the 2026-09 release → migrate to ServiceWatch**
+  (deprioritize further cloudmonitoring investment).
+- CM event grades = {Fatal, Warning, Information}; comparison = 7 (GE/GT/LE/LT/EQ/NE + Range).
+- **loggingaudit**: trail_name 5-26 alnum+hyphen; **bucket region immutable** post-create.
+- **resourcemanager**: tags ≤50 per resource.
+
 ## Id / capture shapes (where the id lives in the response)
 
 | Resource | Capture path | Note |
