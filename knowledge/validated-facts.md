@@ -22,8 +22,10 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
   name regex, storage-type-forced-equal — **do not cross-apply mariadb facts**.
 
 **IAM (how_to_guides, 2026-06-15):**
-- **role**: name ≤64 `[a-zA-Z0-9+=\-_@,.]`; max_session_duration 3,200–43,200 s;
-  principals ≤20.
+- **role**: name ≤64 `[a-zA-Z0-9+=\-_@,.]`; max_session_duration **3,600–43,200 s**
+  (userguide writes "3,200초(1시간)" but 3,200 s = 53:20 ≠ 1 h — likely a doc typo;
+  use 3,600 = 1 h as the safe minimum, **UNPROVEN until a live 4xx delimits it**);
+  principals ≤20. [corrected by Watcher output-reviewer, round 2]
 - **policy**: policy_name 3–128 `[한글a-zA-Z0-9+=,.@\-_]` (**Korean allowed**, unlike
   user/role); description ≤1,000; **Deny > Allow** precedence on same target.
 - **user**: user_name ≤64 `[a-zA-Z0-9+=,.@\-_]` (no Korean); password 9–20, all 4

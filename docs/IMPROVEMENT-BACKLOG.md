@@ -54,6 +54,11 @@ owner가 3개 Claude Code 창을 병렬로 운영: ① 기존 테스트 창 ② 
 | IB-023 | debt | 일부 disabled lifecycle의 `_disabled_reason`이 이미 DONE-MODELED 됐는데도 enabled:false 유지(IB-012/013, cm-event-policy 등) — 어떤 게 라이브 ready인지 인벤토리 부재. Watcher drift-detector | `docs/LIVE-READINESS-GATES.md` 생성: 각 disabled lifecycle에 fix_status·ready_for_live·next_window 컬럼 | S | open |
 | IB-024 | coverage | IB-020와 동질 — analytics 5개 서비스의 LIST envelope이 validated-facts.md "Captured-id shapes" 표에 부재 | IB-020 라이브 윈도우에서 함께 검증·등록 | S | open (IB-020와 묶음) |
 | IB-025 | debt | `dashboard/history.jsonl` 부재 — loop_cycle.py의 fail_new TREND 패널이 영구 공란, 추세 분석 불가. Track 1 platform-improver 2026-06-15 | dashboard build/publish 파이프에서 history.jsonl seed/링크; 라이브 run 후 누적 | S | open |
+| IB-026 | debt | `tools/new_service.py`가 capture 봉투를 항상 `$.id`로 가정(line 175-180) — devops/analytics(`$.contents[0].id` 등)에서 깨지는데 scaffold-time 검증 없음. Track4 debt-finder | scaffold가 api_docs.json 응답 샘플을 보고 envelope-relative capture 제안 + validator가 LIST capture를 api_docs schema와 대조(non-blocking warn) | M | open |
+| IB-027 | platform | **CI concurrency 충돌 위험(P0)** — `api-test.yml` concurrency group이 `${{github.run_id}}`를 포함해, 같은 ref에 run-request가 동시에 push되면 그룹이 갈려 중복 동시 run(2배 과금) 가능. 주석에 사례 기록됨(run 27520649710/650231). Track4 debt-finder | group을 `scp-api-test-${{github.ref}}`로 축소 + `cancel-in-progress` 정책 결정, 또는 feature 브랜치 run-request push 차단 게이트. **run 인프라 변경 → owner 결정 필요** | M | open (owner 결정) |
+| IB-028 | debt | scaffold capture 가정과 같은 뿌리(IB-026) — 새 서비스 ~20%(analytics 5+financial+devops)가 post-scaffold 수동 교정 필요 | IB-026과 묶어 처리(validator 규칙 + scaffold envelope 힌트) | M | open (IB-026와 묶음) |
+| IB-029 | debt | (debt-finder가 제안했으나 **이번 라운드 Track1이 해소**) disabled lifecycle 준비상태가 BACKLOG/`_disabled_reason`/RESOURCE-MODEL-PLAN에 흩어짐 | `docs/LIVE-READINESS-GATES.md` 생성 — 26 disabled lifecycle inventory(fix_status·ready_for_live·blocking_IB). **done(IB-023과 동일 산출)** | S | done |
+| IB-030 | debt | disabled lifecycle governance — 'blocked' vs 'waiting-for-testing' 구분이 prose(RESOURCE-MODEL-PLAN §6)에만, 머신리더블 플래그 부재. Track4 debt-finder | scenarios 스키마에 `_status` enum{blocked,done-modeled,gated-ready,timing-gated,triage} 추가 + validator 강제 → 대시보드 'readiness gauge' 가능. LIVE-READINESS-GATES.md(IB-029)의 데이터화 후속 | M | open |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 
