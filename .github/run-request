@@ -1,9 +1,12 @@
-# SCR docker-auth probe (2026-06-15) — owner plan: create a registry via API
-# (random-suffixed host), docker login + pull/push with the SCP access/secret,
-# verdict, then delete. Answers: are the SCP keys themselves the SCR docker
-# credential (PUSH-OK -> cloud-ml custom_registry needs no separate console key),
-# or is a separate console auth key required (LOGIN-FAILED)? One-shot, self-cleaning.
-docker_probe=true
+# Heavy live VALIDATION wave (2026-06-15) — advance the VALIDATED node count.
+# Full CRUD lifecycle run on current main (now includes: graph transitive-reduction
+# fix, IB-022 source wiring, model improvements, AUTONOMOUS-LOOP controller doc).
+# VPC 5-cap is respected by the existing shared-VPC adopt (conftest shared_vpc ->
+# ~1 shared VPC for the 6 heavy chains) + regression/scenarios/dependencies.json
+# vpc_schedule + core.budgets reservation (quota-exhaustion SKIPS, never fails).
+# Goal: promote docs-provenance nodes to VALIDATED from real 2xx; feed fail_new to
+# the Problem-Finder track. The publish step also restores the dashboard index
+# entry-link (build.py on main now emits catalog/platform links).
 mutations=true
 destructive=true
-heavy=false
+heavy=true
