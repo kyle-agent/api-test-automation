@@ -26,10 +26,11 @@ resources:
         description: "API regression suite"
       options:
         image_id: {type: string, required: true,
-                   note: "lookup — GET /v1/aimlops-platform/images $.images[0].id (소스 lifecycle list-images capture_soft)"}
+                   note: "lookup — GET /v1/aimlops-platform/images. LIVE (run 27520649710): response wrapper is $.contents[] NOT $.images[]; item fields seen base_image (e.g. sdskubeflow-enterprise:1.9.2)/category(APP)/created_by(SYSTEM)/created_dt/description — id field assumed $.contents[0].id (truncated past the huge description HTML, unconfirmed)."}
     capture: {release_id: "$.id"}
     delete: {endpoint: "DELETE /v1/aimlops-platform/{release_id}", destructive: true}
     provenance: docs
+    live_preconditions: "run 27520649710 (SKE closure all 2xx, cluster RUNNING): GET .../clusters/{id}/validate-namespaces 200; .../check-version 400; .../validate-resources 400; .../images 200 ($.contents[]); internal .../internal/clusters/{id}/nodes 404 + .../storageclasses 404 (internal path likely wrong or not exposed to this token). release POST not yet reached (blocked on image_id capture, fixed). Next run reaches release — its 4xx body will reveal the real required body (cpu/memory/storage_class/volume_size UNPROVEN)."
     source: {lifecycle: aimlops-platform-release-write-coverage,
              steps: [list-images, release-aimlops-platform, update-aimlops-platform,
                      delete-aimlops-platform]}
