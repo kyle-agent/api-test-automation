@@ -16,6 +16,7 @@ version: 1
 resources:
   # read-only LOOKUP — selectable GPU node OS images (Ubuntu 22.04/24.04).
   gpu-node-image:
+    lookup: true
     code: "cp-gpu-image-lookup"
     service: compute/multinodegpucluster
     requires: []
@@ -30,6 +31,7 @@ resources:
 
   # read-only LOOKUP — GPU server-type / product list (g2c96h8_metal etc).
   gpu-node-product:
+    lookup: true
     code: "cp-gpu-product-lookup"
     service: compute/multinodegpucluster
     requires: []
@@ -45,6 +47,7 @@ resources:
   # read-only LOOKUP — Cluster Fabric is NOT independently creatable (minted with
   # GPU nodes, auto-deleted with last node). Only list/show/node-pools exist.
   gpu-node-fabric:
+    lookup: true
     code: "cp-gpu-fabric-lookup"
     service: compute/multinodegpucluster
     requires: []

@@ -49,6 +49,7 @@ resources:
   # resource id, needed as the parent of every child resource. Source step
   # find-root-resource VALIDATED in application-apigateway-api-resource.
   apigw-root-resource:
+    lookup: true
     code: "ap-apigw-root-lookup"
     service: application-service/apigateway
     requires: [apigw-api]

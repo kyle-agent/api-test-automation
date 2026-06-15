@@ -25,6 +25,10 @@ Layers / checks:
                        (credential names exempt) · body-template tokens point
                        at existing captures/options · quota kinds known to
                        core/budgets or dependencies.json (unknown = warning) ·
+                       nodes flagged `lookup: true` are read-only finds (GET
+                       create, no teardown by design) so the create-without-
+                       delete warning is suppressed for them; a lookup whose
+                       create is NOT a GET is an ERROR (IB-004) ·
                        divergence from the cross-service.yaml requires graph
                        is a WARNING (the two co-exist during R1-R3) ·
                        _groups.yaml = {groups: {"nw-vpc": {label, category}}}
@@ -316,7 +320,8 @@ CIDR_PICKS = {"unique-block", "sub-block-of"}
 REQUIRES_MODES = {"existing_or_create"}
 TASK_KEYS = {"code", "service", "group", "requires", "create", "capture",
              "capture_soft", "ready", "verify", "delete", "quota",
-             "provenance", "adopt", "heavy", "no_api", "needs_cert_material",
+             "provenance", "adopt", "heavy", "no_api", "lookup",
+             "needs_cert_material",
              "notes", "note", "source", "_note"}
 _TOKEN_RE_SRC = r"\{([A-Za-z0-9_][A-Za-z0-9_.\-]*)\}"
 
@@ -555,9 +560,23 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
 
         create = task.get("create") or {}
         no_api = bool(task.get("no_api"))
+        lookup = bool(task.get("lookup"))
         if not isinstance(create, dict):
             err(f"{where}: 'create' must be a mapping")
             create = {}
+        # A lookup node is a read-only find (GET list/detail + capture) with no
+        # teardown by design — it creates nothing, so the create-without-delete
+        # warning is noise for it (IB-004). Guard the flag so it cannot be used
+        # to silence a genuine create-without-teardown leak: a lookup's 'create'
+        # MUST be a GET (or a no_api note), never a mutating POST/PUT/PATCH.
+        if lookup:
+            cep = create.get("endpoint")
+            if cep:
+                cmethod = str(cep).split(" ", 1)[0].strip().upper()
+                if cmethod != "GET":
+                    err(f"{where}: lookup nodes must read (GET); '{cep}' is a "
+                        f"{cmethod} — a node that mutates/creates cannot be a "
+                        "lookup (it would suppress a real teardown warning)")
         if no_api:
             if create.get("endpoint"):
                 err(f"{where}: no_api nodes must not declare a "
@@ -661,7 +680,7 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
             delete = {}
         if delete.get("endpoint"):
             _check_endpoint(f"{where} delete", delete["endpoint"], methods)
-        elif not no_api and create.get("endpoint"):
+        elif not no_api and not lookup and create.get("endpoint"):
             warn(f"{where}: create without delete.endpoint — composed "
                  "lifecycles will have no teardown for it")
         if ready is not None:

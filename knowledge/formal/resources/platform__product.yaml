@@ -3,6 +3,7 @@
 version: 1
 resources:
   product-category:
+    lookup: true
     code: "pf-product-category"
     service: platform/product
     requires: []
@@ -16,6 +17,7 @@ resources:
     notes: "조회 전용 lookup task — category 리스트 envelope 라이브 확인(run 27444823109): product_categories[].category_id."
 
   product:
+    lookup: true
     code: "pf-product-product"
     service: platform/product
     requires: []

@@ -23,6 +23,7 @@
 version: 1
 resources:
   firewall:
+    lookup: true
     code: "nw-vpc-firewall"
     service: networking/firewall
     requires: [internet-gateway]

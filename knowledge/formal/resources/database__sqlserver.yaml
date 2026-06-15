@@ -31,6 +31,7 @@ resources:
   # engine-version id에 녹아 있어 contents[0]는 임의 edition일 수 있음 (생성
   # 검증엔 충분). sqlserver-read-coverage 소스 list-engine-versions verbatim.
   ss-engine-version:
+    lookup: true
     code: "db-sqlserver-engine-version"
     service: database/sqlserver
     requires: []
@@ -52,6 +53,7 @@ resources:
   # 읽기 전용 LOOKUP — GET /v1/server-types (sqlserver 호스트). NAME 소비
   # (id 아님). userguide naming: [Type][Spec][vCore][Memory] e.g. 'Standard db1v2m4'.
   ss-server-type:
+    lookup: true
     code: "db-sqlserver-server-type"
     service: database/sqlserver
     requires: []
@@ -67,6 +69,7 @@ resources:
   # 읽기 전용 LOOKUP — listparametergroups + listparameters 커버리지.
   # dbaas_parameter_group_id는 GET /v1/parameters의 REQUIRED 쿼리.
   ss-parameter-group:
+    lookup: true
     code: "db-sqlserver-parameter-group"
     service: database/sqlserver
     requires: []
@@ -156,6 +159,7 @@ resources:
   # 캡처 (lookup-on-detail: capture는 create 응답에서만 가능 → create=GET detail).
   # 소스 capture-subop-ids가 같은 envelope을 soft-capture (instance_groups[0]).
   ss-instance-group:
+    lookup: true
     code: "db-sqlserver-instance-group"
     service: database/sqlserver
     requires: [sqlserver-cluster]
@@ -176,6 +180,7 @@ resources:
   # detail-LOOKUP — 클러스터의 현재 파라미터에서 수정 가능한(is_modifiable)
   # 첫 항목 id+applied_value를 캡처 → 같은 값으로 set (safe no-op write).
   ss-parameter:
+    lookup: true
     code: "db-sqlserver-parameter"
     service: database/sqlserver
     requires: [sqlserver-cluster]

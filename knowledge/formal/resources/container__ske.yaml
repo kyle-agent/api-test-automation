@@ -9,6 +9,7 @@
 version: 1
 resources:
   kubernetes-version:
+    lookup: true
     code: "ct-ske-version"
     service: container/ske
     requires: []
@@ -104,6 +105,7 @@ resources:
   # 읽기 전용 LOOKUP — listimages는 수작업 체인에서 [200,400]+optional 뒤에
   # 가려져 한 번도 검증 안 됨 (rev6 시점 미검증 5종 중 하나). 하드 [200].
   ske-image:
+    lookup: true
     code: "ct-ske-image"
     service: container/ske
     requires: []

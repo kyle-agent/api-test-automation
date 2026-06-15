@@ -30,6 +30,7 @@ resources:
   # GET create + capture + verify, no delete by design (the validator's
   # "create without delete" warning is expected here).
   cm-account-resource:
+    lookup: true
     code: "mg-cm-account-resource"
     service: management/cloudmonitoring
     requires: []

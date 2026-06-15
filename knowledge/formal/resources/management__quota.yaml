@@ -4,6 +4,7 @@
 version: 1
 resources:
   account-quota:
+    lookup: true
     code: "mg-quota-account"
     service: management/quota
     requires: []
@@ -18,6 +19,7 @@ resources:
     notes: "조회 전용 lookup task — capture는 quota-reads에서 라이브 검증된 envelope verbatim. 계정에 quota 항목이 항상 존재(빈 리스트면 capture 실패로 표면화)."
 
   quota-request:
+    lookup: true
     code: "mg-quota-request"
     service: management/quota
     requires: []

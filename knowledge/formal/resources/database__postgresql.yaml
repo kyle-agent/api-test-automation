@@ -17,6 +17,7 @@ resources:
   # 읽기 전용 LOOKUP — 소스 find-engine-version 스텝 verbatim (필터 객체
   # capture, contents[0]). postgresql-cluster의 engine_version_id 기본값.
   pg-engine-version:
+    lookup: true
     code: "db-postgresql-engine-version"
     service: database/postgresql
     requires: []
@@ -33,6 +34,7 @@ resources:
   # 구버전(16.x) 전용 LOOKUP — kernel-upgrade/patch 체인에서만 ref 옵션으로
   # 끌려 들어온다. where_prefix는 엔진 _capture의 문자열-prefix 매칭.
   pg-engine-version-16:
+    lookup: true
     code: "db-postgresql-engine-version-16"
     service: database/postgresql
     requires: []
@@ -52,6 +54,7 @@ resources:
   # 읽기 전용 LOOKUP — 소스 find-server-type verbatim: 이름(NAME)을 캡처
   # (id 아님). ServerTypeListResponse $.contents[] {name, cpu_core, ...}.
   pg-server-type:
+    lookup: true
     code: "db-postgresql-server-type"
     service: database/postgresql
     requires: []
@@ -146,6 +149,7 @@ resources:
   # create=GET detail). 소스 probe capture-subop-ids가 라이브 RUNNING
   # 클러스터에서 같은 envelope으로 캡처함 (run 27258520218).
   pg-instance-group:
+    lookup: true
     code: "db-postgresql-instance-group"
     service: database/postgresql
     requires: [postgresql-cluster]
@@ -166,6 +170,7 @@ resources:
   # 읽기 전용 LOOKUP — listparametergroups + listparameters 커버리지.
   # dbaas_parameter_group_id는 여기서만 발견 가능 (cluster detail에 없음).
   pg-parameter-group:
+    lookup: true
     code: "db-postgresql-parameter-group"
     service: database/postgresql
     requires: []
@@ -186,6 +191,7 @@ resources:
   # detail-LOOKUP — 클러스터의 현재 파라미터에서 수정 가능한(is_modifiable)
   # 첫 항목의 id+applied_value를 캡처 → 같은 값으로 set (safe no-op write).
   pg-parameter:
+    lookup: true
     code: "db-postgresql-parameter"
     service: database/postgresql
     requires: [postgresql-cluster]

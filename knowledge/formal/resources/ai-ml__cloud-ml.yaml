@@ -13,6 +13,7 @@ version: 1
 resources:
   # read-only LOOKUP node (server-type pattern): cloud-ml base image id.
   cloudml-image:
+    lookup: true
     code: "ai-ml-image-lookup"
     service: ai-ml/cloud-ml
     requires: []

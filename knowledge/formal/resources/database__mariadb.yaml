@@ -29,6 +29,7 @@ version: 1
 resources:
   # 읽기 전용 LOOKUP — 소스 maria-find-version 스텝 verbatim (contents[0]).
   mariadb-engine-version:
+    lookup: true
     code: "db-mariadb-engine-version"
     service: database/mariadb
     requires: []
@@ -45,6 +46,7 @@ resources:
   # 구버전 전용 LOOKUP — PG pg-engine-version-16 미러. mariadb 라이브 구버전
   # 유무 owner 미확인 → 이 노드를 쓰는 체인은 합성만 해두고 비활성.
   mariadb-engine-version-10:
+    lookup: true
     code: "db-mariadb-engine-version-10"
     service: database/mariadb
     requires: []
@@ -63,6 +65,7 @@ resources:
 
   # 읽기 전용 LOOKUP — 소스 maria-find-stype verbatim: NAME 캡처 (id 아님).
   mariadb-server-type:
+    lookup: true
     code: "db-mariadb-server-type"
     service: database/mariadb
     requires: []
@@ -212,6 +215,7 @@ resources:
   # detail-LOOKUP — 클러스터 상세에서 instance_group/block_storage_group id
   # 캡처 (lookup-on-detail 패턴). PG pg-instance-group 미러.
   mariadb-instance-group:
+    lookup: true
     code: "db-mariadb-instance-group"
     service: database/mariadb
     requires: [mariadb-cluster]
@@ -231,6 +235,7 @@ resources:
 
   # 읽기 전용 LOOKUP — listparametergroups + listparameters 커버리지.
   mariadb-parameter-group:
+    lookup: true
     code: "db-mariadb-parameter-group"
     service: database/mariadb
     requires: []
@@ -249,6 +254,7 @@ resources:
   # detail-LOOKUP — 수정 가능한 첫 파라미터의 id+applied_value 캡처 → 같은
   # 값으로 set (safe no-op write). PG pg-parameter 미러.
   mariadb-parameter:
+    lookup: true
     code: "db-mariadb-parameter"
     service: database/mariadb
     requires: [mariadb-cluster]

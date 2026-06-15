@@ -26,6 +26,7 @@ resources:
   # `quick_query_id`, NOT `id` — the pre-ingest draft's "$.contents[0].id"
   # capture assumption was wrong.
   quick-query-list:
+    lookup: true
     code: "da-qq-list"
     service: data-analytics/quick-query
     requires: []
@@ -42,6 +43,7 @@ resources:
   # GET, clean [200]. A create-time lookup: quick_query_create_request.image_id
   # comes from here ($.contents[0].image_id).
   quick-query-image-versions:
+    lookup: true
     code: "da-qq-image-versions"
     service: data-analytics/quick-query
     requires: []

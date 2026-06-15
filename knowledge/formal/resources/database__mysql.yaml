@@ -20,6 +20,7 @@ resources:
   # 읽기 전용 LOOKUP — 소스 find-engine-version 스텝 verbatim (contents[0]).
   # mysql-cluster의 engine_version_id 기본값. PG pg-engine-version 미러.
   mysql-engine-version:
+    lookup: true
     code: "db-mysql-engine-version"
     service: database/mysql
     requires: []
@@ -38,6 +39,7 @@ resources:
   # owner 미확인 (PG만 16.10/17.6 확인됨) → 이 노드를 쓰는 체인은 합성만
   # 해두고 비활성 (_disabled_reason "owner가 콘솔에서 엔진 구버전 유무 확인 대기").
   mysql-engine-version-8:
+    lookup: true
     code: "db-mysql-engine-version-8"
     service: database/mysql
     requires: []
@@ -57,6 +59,7 @@ resources:
   # 읽기 전용 LOOKUP — 소스 find-server-type verbatim: 이름(NAME) 캡처 (id
   # 아님). PG pg-server-type 미러.
   mysql-server-type:
+    lookup: true
     code: "db-mysql-server-type"
     service: database/mysql
     requires: []
@@ -176,6 +179,7 @@ resources:
   # 캡처 (lookup-on-detail 패턴: capture는 create 응답에서만 가능하므로
   # create=GET detail). PG pg-instance-group 미러.
   mysql-instance-group:
+    lookup: true
     code: "db-mysql-instance-group"
     service: database/mysql
     requires: [mysql-cluster]
@@ -197,6 +201,7 @@ resources:
   # dbaas_parameter_group_id는 여기서만 발견 가능 (cluster detail에 없음;
   # services/database__mysql.yaml list-parameters-needs-group-id).
   mysql-parameter-group:
+    lookup: true
     code: "db-mysql-parameter-group"
     service: database/mysql
     requires: []
@@ -218,6 +223,7 @@ resources:
   # 첫 항목의 id+applied_value를 캡처 → 같은 값으로 set (safe no-op write).
   # PG pg-parameter 미러.
   mysql-parameter:
+    lookup: true
     code: "db-mysql-parameter"
     service: database/mysql
     requires: [mysql-cluster]

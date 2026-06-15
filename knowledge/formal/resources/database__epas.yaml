@@ -38,6 +38,7 @@ version: 1
 resources:
   # 읽기 전용 LOOKUP — 소스 epas-find-version 스텝 verbatim (contents[0]).
   epas-engine-version:
+    lookup: true
     code: "db-epas-engine-version"
     service: database/epas
     requires: []
@@ -54,6 +55,7 @@ resources:
   # 구버전 전용 LOOKUP — PG pg-engine-version-16 미러. epas 라이브 구버전
   # 유무 owner 미확인 → 이 노드를 쓰는 체인은 합성만 해두고 비활성.
   epas-engine-version-16:
+    lookup: true
     code: "db-epas-engine-version-16"
     service: database/epas
     requires: []
@@ -72,6 +74,7 @@ resources:
 
   # 읽기 전용 LOOKUP — 소스 epas-find-stype verbatim: NAME 캡처 (id 아님).
   epas-server-type:
+    lookup: true
     code: "db-epas-server-type"
     service: database/epas
     requires: []
@@ -158,6 +161,7 @@ resources:
              steps: [epas-create, epas-wait, epas-delete]}
     notes: "HEAVY 과금. body는 PG형 relational 템플릿 (database_encoding/locale, audit_enabled boolean, service_watch_log_collection 없음, instances에 service_ip_address 없음) — heavy-shared-dbaas verbatim이지만 epas 레그 자체의 2xx 기록이 없어 docs (같은 run에 포함됐으나 optional group이라 성공이 기록으로 안 남음 — R3 scoped run에서 승격). ** gen-heavy-epas-replica가 우선 체인: 이 노드의 첫 라이브 증명 기회 — 성공 시 provenance 승격 + cross-service epas-cluster 승격 트리거. capture 변수는 소스 epas_cid → cluster_id 개명. 주의: epas/mariadb guarded sub-op는 placeholder cluster_id에 500을 던진다(cachestore는 400 soft — HANDOFF-fail-new-triage §B 비대칭). dbaas_parameter_group_id는 cluster detail DTO에 없음 — epas-parameter-group lookup에서만 발견 가능. requires는 body 소비 기준 subnet + lookup 2종 (cross-service 발산 경고 의도). EPAS userguide(2026-06-14 overview) 확정 선행: VPC(+subnet) 필수 — subnet require로 그래프 충족 (VPC는 subnet의 상위, cross-service에 이미 엣지). ha_enabled:false = single-node; HA(Active-Standby 동기복제+자동 failover)는 ha_enabled:true 변형 필요. instances[].service_ip_address 없음(PG와 차이)은 epas body verbatim — _note: docs DTO상 optional이나 epas 레그 라이브 미증명."
   epas-instance-group:
+    lookup: true
     code: "db-epas-instance-group"
     service: database/epas
     requires: [epas-cluster]
@@ -177,6 +181,7 @@ resources:
 
   # 읽기 전용 LOOKUP — listparametergroups + listparameters 커버리지.
   epas-parameter-group:
+    lookup: true
     code: "db-epas-parameter-group"
     service: database/epas
     requires: []
@@ -195,6 +200,7 @@ resources:
   # detail-LOOKUP — 수정 가능한 첫 파라미터의 id+applied_value 캡처 → 같은
   # 값으로 set (safe no-op write). PG pg-parameter 미러.
   epas-parameter:
+    lookup: true
     code: "db-epas-parameter"
     service: database/epas
     requires: [epas-cluster]

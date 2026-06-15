@@ -45,6 +45,7 @@ resources:
   # 경로를 쓴다. server_name 쿼리는 server 노드의 create body name과 동일한
   # run-스코프 {unique} 공유 시맨틱 (keypair_name: regrkey{unique} 선례).
   backup-target:
+    lookup: true
     code: "st-backup-target"
     service: storage/backup
     heavy: true

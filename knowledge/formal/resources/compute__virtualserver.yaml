@@ -43,6 +43,7 @@ resources:
     notes: "compute-virtualserver-full의 COVERAGE EXPANSION 항목 (a) — optional group이며 아직 dispatch-검증 전이라 docs. 자원 자체는 standalone/zero-cost (소스 lifecycle의 heavy는 VM 때문이지 server-group 때문이 아님)."
 
   image:
+    lookup: true
     code: "cp-vs-image-lookup"
     service: compute/virtualserver
     requires: []
@@ -56,6 +57,7 @@ resources:
     notes: "읽기 전용 LOOKUP 노드 (cross-service server.lookups의 image) — create가 GET이고 teardown이 없는 것이 의도. 소스 step의 params(status=active, scp_original_image_type=standard, visibility=public, limit=50 — services/compute__virtualserver.yaml image-lookup-params VALIDATED)를 endpoint 쿼리스트링으로 보존했다. capture envelope $.images[0].id verbatim."
 
   server-type:
+    lookup: true
     code: "cp-vs-server-type"
     service: compute/virtualserver
     requires: []

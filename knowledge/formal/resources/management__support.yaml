@@ -3,6 +3,7 @@
 version: 1
 resources:
   support-inquiry:
+    lookup: true
     code: "mg-support-inquiry"
     service: management/support
     requires: []
@@ -26,6 +27,7 @@ resources:
     notes: "조회 전용 lookup task — 문의 이력 없으면 capture 실패(env 의존, 소스도 SOFT 처리). known_inquiry_id=sr-260613-00001-nuri-scp는 이 계정의 실존 문의 (owner 2026-06-13)."
 
   support-service-request:
+    lookup: true
     code: "mg-support-sr"
     service: management/support
     requires: []
