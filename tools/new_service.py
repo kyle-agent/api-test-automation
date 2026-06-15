@@ -148,9 +148,16 @@ def _envelope_hint(post_doc, models, category, service):
     if not model:
         return None, None
     fields = model.get("fields") or []
-    names = {str(f.get("name")) for f in fields}
-    if "id" in names:
-        return None, None  # flat — current $.id behaviour is correct
+
+    def _id_like(name):
+        n = str(name or "")
+        return n == "id" or n.lower().endswith("id")
+
+    # A top-level id-like scalar => flat/detail envelope ($.<that> is correct).
+    if any(_id_like(f.get("name"))
+           and "array" not in str(f.get("schema") or "").lower()
+           for f in fields):
+        return None, None
     # array field => nested list envelope (contents[], <plural>[], ...).
     # Prefer an array whose element is a defined sub-model (schema_ref) over a
     # bare array[object] (e.g. 'links') — the modelled list is the payload.

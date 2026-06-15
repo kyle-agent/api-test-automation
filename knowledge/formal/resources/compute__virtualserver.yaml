@@ -422,13 +422,13 @@ resources:
       options:
         user_id: {type: string, required: true,
                   note: "알림 받을 계정 사용자 ID — owner가 콘솔에서 확인해 제공 (기본값 없음 = 의도된 게이트)"}
-    capture: {notification_id: "$.id"}
+    capture: {notification_id: "$.notifications[0].id"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}",
              destructive: true}
     provenance: docs
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-asg-notification, delete-asg-notification]}
-    notes: "UNPROVEN body/capture (소스는 literal-seed ASG에 4xx)."
+    notes: "UNPROVEN body/capture (소스는 literal-seed ASG에 4xx). IB-026: capture를 $.id→$.notifications[0].id로 정정 — 응답 모델 autoscalinggroupnotificationlistresponse는 list 봉투(api_docs); 라이브 재검증 대기."
 
   # owner 2026-06-12: 미리 만든 port를 서버에 붙였다 뗐다 할 수 있다 —
   # attach=create / detach=delete 로 §1에 자연 매핑되는 노드.
