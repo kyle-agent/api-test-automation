@@ -328,6 +328,7 @@
       "enabled": false,
       "heavy": true,
       "_disabled_reason": "MODELED, ready for live re-validation (IB-013). Fix: the create now points subnet_id at a DEDICATED VPC_ENDPOINT-type subnet (new endpoint-subnet node, subnet type=VPC_ENDPOINT) instead of a GENERAL subnet — that GENERAL subnet was the root cause of the 400 'scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet not found' (run 27466988779). subnet type enum (GENERAL, LOCAL, VPC_ENDPOINT) confirmed from api_docs subnetcreaterequestv1dot2 + userguide VPC overview. Still UNPROVEN (no live 2xx yet) and heavy/gated; do not flip enabled:true here — a separate window owns live dispatch.",
+      "_status": "done-modeled",
       "_note": "composed by regression/scenarios/composer.py — targets: vpc-endpoint",
       "steps": [
         {
@@ -577,6 +578,7 @@
       "enabled": false,
       "heavy": true,
       "_disabled_reason": "MODELED, ready for live re-validation (IB-012). Fix: the TRANSIT_GATEWAY branch now reaches the TGW through a new tgw-vpc-connection node (POST /v1/transit-gateways/{id}/vpc-connections, waits its connection ACTIVE) so the TGW becomes 'Connectable' before create-private-nat — root cause of the 400 'scp-network.private-nat.connectable-transit-gateway-not-found ... Cannot find the Transit Gateway in Connectable state' (run 27466988779). service_resource_id still resolves to the TGW id (one_of use: transit_gateway_id), not the connection id. Still UNPROVEN (no live 2xx yet) and heavy/gated; do not flip enabled:true here — a separate window owns live dispatch.",
+      "_status": "done-modeled",
       "_note": "composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {\"private-nat\": \"tgw-vpc-connection\"}",
       "steps": [
         {

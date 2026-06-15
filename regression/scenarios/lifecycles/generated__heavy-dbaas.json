@@ -2052,7 +2052,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour)."
+      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour).",
+      "_status": "timing-gated"
     },
     {
       "id": "gen-heavy-mysql-restore",
@@ -2502,7 +2503,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour)."
+      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour).",
+      "_status": "timing-gated"
     },
     {
       "id": "gen-heavy-mariadb-restore",
@@ -3009,7 +3011,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour)."
+      "_disabled_reason": "backup-timing gate (transferred from gen-heavy-pg-restore): backups are SCHEDULED, not taken at creation — proven body schedules the full backup at starting_time_hour=2 (minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Enable for a dedicated post-backup window (cluster that lived past its backup hour).",
+      "_status": "timing-gated"
     },
     {
       "id": "gen-heavy-epas-upgrade",
@@ -3392,7 +3395,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "GATE-0 UNPROVEN: epas cluster CREATE itself has NO recorded live 2xx anywhere (prove via gen-heavy-epas-replica first). GATE-1: where_prefix major_version='16' targets the documented 16.8-16.10 range (userguide 2026-06-14) but live availability of an OLDER minor (16.8/16.9) than latest is owner-UNCONFIRMED; 14.x EOS 2026-05-20 already passed (likely absent). GATE-2 (is_kernel_patchable=true) also applies."
+      "_disabled_reason": "GATE-0 UNPROVEN: epas cluster CREATE itself has NO recorded live 2xx anywhere (prove via gen-heavy-epas-replica first). GATE-1: where_prefix major_version='16' targets the documented 16.8-16.10 range (userguide 2026-06-14) but live availability of an OLDER minor (16.8/16.9) than latest is owner-UNCONFIRMED; 14.x EOS 2026-05-20 already passed (likely absent). GATE-2 (is_kernel_patchable=true) also applies.",
+      "_status": "blocked-owner"
     },
     {
       "id": "gen-heavy-mysql-upgrade",
@@ -3828,7 +3832,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "GATE-1 UNRESOLVED: mysql old engine version not owner-confirmed. where_prefix major_version='8.0' (mysql-engine-version-8) is a docs-level GUESS — if 8.0 is the only/latest mysql major, 'old create -> upgrade' has no older target and capture may select the latest (no real upgrade) or be None. Needs owner console check of live engine-versions for a major older than the latest before enabling. GATE-2 (is_kernel_patchable=true) also applies."
+      "_disabled_reason": "GATE-1 UNRESOLVED: mysql old engine version not owner-confirmed. where_prefix major_version='8.0' (mysql-engine-version-8) is a docs-level GUESS — if 8.0 is the only/latest mysql major, 'old create -> upgrade' has no older target and capture may select the latest (no real upgrade) or be None. Needs owner console check of live engine-versions for a major older than the latest before enabling. GATE-2 (is_kernel_patchable=true) also applies.",
+      "_status": "blocked-owner"
     },
     {
       "id": "gen-heavy-mariadb-upgrade",

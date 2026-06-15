@@ -288,6 +288,7 @@
       "service": "management/iam",
       "enabled": false,
       "_disabled_reason": "PF-20 — POST /v1/roles (createrole) 500s ContactAdminForAssistance even with a self-created policy bound (run 27466988779). The earlier hypothesis that policy_ids: [] caused it was wrong — it 500s with a bound policy too. Product 5xx bug; chain disabled, iam-role node kept modeled. gen-wave5-iam-bindings is separate and stays enabled.",
+      "_status": "blocked-owner",
       "_note": "composed verification wave 5 (iam write-family closure) — role family retry+extension: createrole now binds a self-created policy (DTO rolecreaterequestv1dot3 marks policy_ids REQUIRED; previous live 500 ContactAdminForAssistance was with policy_ids: [] — this is the fix candidate), plus setrole/setroletrustpolicy/removebulkrolepolicybindings verifies and the role-policy-binding node (add/remove with policy#2); composed by regression/scenarios/composer.py — targets: iam-role, iam-role-policy-binding",
       "steps": [
         {
@@ -661,7 +662,8 @@
           }
         }
       ],
-      "_disabled_reason": "run 27452095757: create-iam-saml-provider 400 'Field required'×2 — JSON-without-file 시도 실패. SAML provider는 multipart/form-data(메타데이터 파일) 필요 — 엔진은 JSON 전용. engine-multipart-blocked로 재분류 (owner 질문: 멀티파트 지원 vs waive)"
+      "_disabled_reason": "run 27452095757: create-iam-saml-provider 400 'Field required'×2 — JSON-without-file 시도 실패. SAML provider는 multipart/form-data(메타데이터 파일) 필요 — 엔진은 JSON 전용. engine-multipart-blocked로 재분류 (owner 질문: 멀티파트 지원 vs waive)",
+      "_status": "blocked-engine"
     }
   ]
 }

@@ -1020,7 +1020,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "backup-timing gate: backups are SCHEDULED, not taken at creation — userguide: '백업을 설정한 경우에는 설정한 시간 이후 지정된 시간에 백업이 수행되며' (proven body schedules full backup at starting_time_hour=2, minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Needs its own window: either run after 02:xx KST against a cluster that lived past its backup hour, or pre-create the cluster >=1 backup-cycle earlier. Steps are composed and validator-green; enable for a dedicated post-backup window."
+      "_disabled_reason": "backup-timing gate: backups are SCHEDULED, not taken at creation — userguide: '백업을 설정한 경우에는 설정한 시간 이후 지정된 시간에 백업이 수행되며' (proven body schedules full backup at starting_time_hour=2, minute randomized; archive every 60min thereafter) and the PITR window only opens at the FIRST completed backup. A restore fired right after cluster creation has no backup to restore from -> expected 400. Needs its own window: either run after 02:xx KST against a cluster that lived past its backup hour, or pre-create the cluster >=1 backup-cycle earlier. Steps are composed and validator-green; enable for a dedicated post-backup window.",
+      "_status": "timing-gated"
     },
     {
       "id": "gen-heavy-pg-upgrade",
@@ -1406,7 +1407,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "precondition unproven: kernel-upgrade requires is_kernel_patchable=true (cluster detail v1.1) — a freshly created 16.10 cluster may already run the newest OS kernel, in which case the PUT 4xxes and the composer's fixed [200,201,202] create expect fails the chain. Userguide also warns of service outage during the roll and no kernel downgrade after success. Enable for a probe window once is_kernel_patchable has been read from a live 16.x cluster detail (or wire a pre-check)."
+      "_disabled_reason": "precondition unproven: kernel-upgrade requires is_kernel_patchable=true (cluster detail v1.1) — a freshly created 16.10 cluster may already run the newest OS kernel, in which case the PUT 4xxes and the composer's fixed [200,201,202] create expect fails the chain. Userguide also warns of service outage during the roll and no kernel downgrade after success. Enable for a probe window once is_kernel_patchable has been read from a live 16.x cluster detail (or wire a pre-check).",
+      "_status": "blocked-owner"
     }
   ]
 }

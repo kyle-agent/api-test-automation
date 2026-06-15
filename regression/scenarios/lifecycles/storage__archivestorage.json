@@ -6,6 +6,7 @@
    "enabled": false,
    "heavy": true,
    "_note": "Archive Storage BUCKET lifecycle (billable object storage -> heavy, gated by SCP_RUN_HEAVY). Closes the bucket-side write gap: create bucket (BucketCreateRequest: name + tags) -> capture $.id (BucketCreateResponse.id) -> versioning/encryption setters -> object + object-version deletes + recovers -> delete bucket. Bodies derived from data/api_docs.json model schemas (no data/api_bodies.json entries for archivestorage); provenance DOCS-ONLY (no live 2xx yet). Bucket name pattern not documented beyond Example 'astest' -> we use 'regras{unique}'. recover-objects/recover-object-versions and delete-objects/delete-object-versions target objects that do NOT exist in a freshly-created empty bucket, so they will 4xx (still records coverage); all are optional+grouped so one failing family costs only that group. Object paths/versions are docs-example placeholders. cancel-archiving / cancel-recovery (PUT, no path id, empty body) belong to the archiving-policy family and are exercised in the archivestorage-archiving-policy lifecycle below. | DISABLED 2026-06-10: service excluded from C3 target (separate auth keys; waived in coverage_waivers.json).",
+   "_status": "blocked-owner",
    "steps": [
     {
      "name": "create-bucket",
@@ -237,6 +238,7 @@
    "enabled": false,
    "heavy": true,
    "_note": "Archive Storage ARCHIVING-POLICY lifecycle (heavy). Closes the archiving-policy write gap: create-archiving-policy (ArchivingPolicyCreateRequest: archiving_source_bucket_name, object_lifecycle, object_path='/') -> capture $.id (ArchivingPolicyCreateResponse.id) -> set policy (object_lifecycle) -> set policy state (ACTIVE|INACTIVE) -> cancel-archiving / cancel-recovery (PUT, no path id, empty body). DOCS-ONLY provenance. archiving_source_bucket_name must reference an existing OBS source bucket; on this account none is wired in, so create-policy will likely 4xx (still records coverage) -> optional. cancel-archiving and cancel-recovery have NO documented request body (body=[] in api_docs) -> sent with empty json {}; they cancel an in-flight archiving/recovery history and 4xx when none is running (records coverage). object_lifecycle is documented as a STRING ('Example : 1'). | DISABLED 2026-06-10: service excluded from C3 target (separate auth keys; waived in coverage_waivers.json).",
+   "_status": "blocked-owner",
    "steps": [
     {
      "name": "create-archiving-policy",

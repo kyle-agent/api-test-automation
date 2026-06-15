@@ -32,7 +32,13 @@ _HERE = Path(__file__).parent
 _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 
 LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps", "credentials",
-                  "needs_cert_material", "_note", "_comment", "_disabled_reason"}
+                  "needs_cert_material", "_note", "_comment", "_disabled_reason",
+                  "_status"}
+# Machine-readable disposition for enabled:false lifecycles (IB-030). Derived
+# from docs/LIVE-READINESS-GATES.md. Advisory only — a missing/invalid _status
+# is a WARNING, never an error (must not break the offline gate for others).
+STATUS_ENUM = {"done-modeled", "timing-gated", "blocked-engine",
+               "blocked-owner", "stale"}
 STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
              "expect_status", "capture", "capture_soft", "cleanup", "poll",
              "wait", "retries", "retry_interval", "retry_on_status",
@@ -74,6 +80,7 @@ def _placeholders_in(obj):
 
 def validate(service_filter=None):
     errors, warnings = [], []
+    status_counts = {}  # _status value -> count (IB-030 readiness summary)
     try:
         lifecycles, source = load_lifecycles(with_sources=True)
     except ValueError as exc:
@@ -92,6 +99,20 @@ def validate(service_filter=None):
         for k in lc:
             if k not in LIFECYCLE_KEYS:
                 warnings.append(f"{where}: unknown lifecycle key '{k}'")
+
+        # IB-030: every enabled:false lifecycle SHOULD carry a machine-readable
+        # _status from STATUS_ENUM (advisory — warn only, never error).
+        if lc.get("enabled") is False:
+            st = lc.get("_status")
+            if st is None:
+                warnings.append(f"{where}: disabled lifecycle is missing '_status' "
+                                f"(expected one of {sorted(STATUS_ENUM)}) — IB-030")
+            elif st not in STATUS_ENUM:
+                warnings.append(f"{where}: disabled lifecycle has invalid _status "
+                                f"'{st}' (expected one of {sorted(STATUS_ENUM)}) — IB-030")
+            else:
+                status_counts[st] = status_counts.get(st, 0) + 1
+
         steps = lc.get("steps")
         if not isinstance(steps, list) or not steps:
             errors.append(f"{where}: 'steps' must be a non-empty list")
@@ -167,6 +188,13 @@ def validate(service_filter=None):
         print(f"WARN  {w}")
     for e in errors:
         print(f"ERROR {e}")
+
+    # IB-030: machine-readable readiness summary of disabled lifecycles by _status.
+    n_disabled_tagged = sum(status_counts.values())
+    if status_counts:
+        print(f"\nDisabled-lifecycle _status summary ({n_disabled_tagged} tagged):")
+        for st in sorted(STATUS_ENUM):
+            print(f"  {st:<14} {status_counts.get(st, 0)}")
     n_lc = len([lc for lc in lifecycles
                 if not service_filter
                 or (lc.get("service") or "").split("/")[-1] == service_filter])

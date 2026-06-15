@@ -624,7 +624,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "run 27483004836: backup-target lookup returned {contents:[],count:0} — the just-ACTIVE server isn't yet registered as a backup target (propagation delay). Needs an engine capability: poll a lookup GET until its list populates / capture resolves (IB-014). Backup model otherwise correct (agentless VM_IMAGE, owner-confirmed)."
+      "_disabled_reason": "run 27483004836: backup-target lookup returned {contents:[],count:0} — the just-ACTIVE server isn't yet registered as a backup target (propagation delay). Needs an engine capability: poll a lookup GET until its list populates / capture resolves (IB-014). Backup model otherwise correct (agentless VM_IMAGE, owner-confirmed).",
+      "_status": "blocked-engine"
     },
     {
       "id": "gen-heavy-backup-restore",
@@ -1199,7 +1200,8 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "TIMING-GATED + BLAST RADIUS (modeled per plan, intentionally off): (1) a restore target only appears in GET /v1/backups/{id}/restore-targets after the manual FULL image backup job reaches SUCCESS in backup-histories — job duration unobserved (could exceed the heavy window), so the hard capture of restore_target_id would come up empty right after create-backup-manual; (2) restorebackup creates a NEW billable server (userguide recovery: VM image restore 'creates a new server'; '원본의 Security Group, NAT IP, Delete on termination 설정은 복구되지 않으므로') whose cleanup needs a cross-service DELETE /v1/servers/{id} the model cannot route (node service=backup), and the restore body carries no tags so the reconciler cannot adopt the orphan. Enable after gen-heavy-backup live data shows job duration, via a scoped run with manual cleanup of the restored server."
+      "_disabled_reason": "TIMING-GATED + BLAST RADIUS (modeled per plan, intentionally off): (1) a restore target only appears in GET /v1/backups/{id}/restore-targets after the manual FULL image backup job reaches SUCCESS in backup-histories — job duration unobserved (could exceed the heavy window), so the hard capture of restore_target_id would come up empty right after create-backup-manual; (2) restorebackup creates a NEW billable server (userguide recovery: VM image restore 'creates a new server'; '원본의 Security Group, NAT IP, Delete on termination 설정은 복구되지 않으므로') whose cleanup needs a cross-service DELETE /v1/servers/{id} the model cannot route (node service=backup), and the restore body carries no tags so the reconciler cannot adopt the orphan. Enable after gen-heavy-backup live data shows job duration, via a scoped run with manual cleanup of the restored server.",
+      "_status": "timing-gated"
     }
   ]
 }
