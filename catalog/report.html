@@ -1,0 +1,94 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>실행 결과 + 수행시간 (읽기 전용)</title>
+<style>
+:root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#27384b;--ink:#e7eef6;
+  --muted:#90a4ba;--accent:#5aa9ff;--val:#3fb27f;--docs:#e0922f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.5 ui-sans-serif,-apple-system,Segoe UI,"Noto Sans KR",sans-serif}
+a{color:var(--accent);text-decoration:none}.wrap{max-width:1280px;margin:0 auto;padding:20px}
+h1{font-size:18px}.muted{color:var(--muted)}code{font-family:ui-monospace,Consolas,monospace}
+.cols{display:grid;grid-template-columns:300px 1fr 320px;gap:16px;align-items:start}
+@media(max-width:1050px){.cols{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel h2{font-size:14px;margin:0 0 10px}.panel h3{font-size:12px;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px}
+input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+  border-radius:8px;padding:6px 9px;font-size:13px;margin-bottom:8px}
+.chk{display:flex;align-items:center;gap:7px;padding:3px 4px;border-radius:6px;cursor:pointer}
+.chk:hover{background:var(--panel2)}.chk .dot{width:8px;height:8px;border-radius:50%}
+.scroll{max-height:520px;overflow:auto}.svgbox{background:#0f1720;border:1px solid var(--line);
+  border-radius:10px;overflow:auto}.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;
+  color:var(--muted);margin:6px 0}.legend i{display:inline-block;width:11px;height:11px;border-radius:3px}
+.kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line)}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}.tbl td,.tbl th{text-align:left;padding:4px 6px;
+  border-bottom:1px solid var(--line)}.tbl th{color:var(--muted);font-size:11px}
+.warn{background:#33291a;border:1px solid #6e5a2a;border-radius:8px;padding:10px 12px;color:#ffd9a0;font-size:13px}
+.foot{margin-top:30px;color:#6b7e93;font-size:12px}
+</style></head><body><div class="wrap">
+<h1>실행 결과 + 수행시간 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
+  <a href="catalog.html">← 카탈로그</a> · <a href="plan.html">Plan</a></span></h1>
+<p class="muted">최근 런의 <code>observations.jsonl</code>(호출별 <code>elapsed_ms</code>)을
+  노드의 create endpoint로 매칭해 <b>단계별 수행시간</b>과 pass/fail을 그래프에 색칠합니다.</p>
+<div id="banner"></div>
+<div class="cols">
+  <div class="panel"><h2>대상 선택</h2><input type="search" id="q" placeholder="검색…">
+    <div class="scroll" id="list"></div></div>
+  <div class="panel">
+    <h2 id="gtitle">결과 그래프</h2>
+    <div class="legend"><span><i style="background:#3fb27f"></i>pass</span>
+      <span><i style="background:#ff6b6b"></i>fail</span>
+      <span><i style="background:#3a4654"></i>미측정</span><span>세로 띠=level</span></div>
+    <div class="svgbox"><svg id="svg"></svg></div>
+  </div>
+  <div class="panel"><h2>수행시간</h2><div id="sum"></div>
+    <h3>단계별</h3><div class="scroll"><table class="tbl" id="tbl"></table></div></div>
+</div>
+<div class="foot">측정 시간은 create 호출의 평균 <code>elapsed_ms</code>. level 병렬 wall-clock =
+  Σ(단계별 최장). 데이터원: dashboard-data <code>observations.jsonl</code>(런별).</div>
+</div>
+<script src="catalog.js"></script><script src="report.js"></script><script src="graph.js"></script>
+<script>
+var C=window.CATALOG,N=C.nodes,R=(window.REPORT||{nodes:{},observed:0}),RN=R.nodes||{},T=new Set();
+if(!R.observed){document.getElementById("banner").innerHTML='<div class="warn">아직 측정된 런 데이터가 없습니다 (observed=0). 라이브 CRUD 런 후 자동 채워집니다 — 지금은 구조만 미리보기.</div>';}
+["ske-cluster","mysql-cluster","private-nat"].forEach(id=>{if(N[id])T.add(id);});
+if(!T.size)Object.keys(N).slice(0,2).forEach(id=>T.add(id));
+function deps(id){var n=N[id];if(!n)return[];var o=[];n.requires.and.forEach(d=>{if(N[d.ref])o.push(d.ref);});
+  n.requires.one_of.forEach(g=>{var b=(g.branches||[]).filter(x=>N[x])[0];if(b)o.push(b);});return o;}
+function closure(ids){var s=new Set(),st=ids.slice();while(st.length){var x=st.pop();if(!N[x]||s.has(x))continue;s.add(x);deps(x).forEach(r=>st.push(r));}return s;}
+function levels(set){var d={};function f(n,k){if(n in d)return d[n];if(k.has(n))return 0;k.add(n);
+  var ds=deps(n).filter(r=>set.has(r)).map(r=>f(r,k));k.delete(n);return d[n]=ds.length?1+Math.max.apply(0,ds):0;}set.forEach(n=>f(n,new Set()));return d;}
+var COL={pass:{fill:"#14322a",stroke:"#3fb27f",badge:"✓"},fail:{fill:"#3a1717",stroke:"#ff6b6b",badge:"✕"},
+  untested:{fill:"#222e3c",stroke:"#3a4654",badge:""}};
+function list(){var q=(document.getElementById("q").value||"").toLowerCase();
+  var ids=Object.keys(N).sort((a,b)=>N[a].category<N[b].category?-1:1).filter(id=>!q||(id+N[id].service).toLowerCase().includes(q));
+  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="checkbox" '+(T.has(id)?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><b>'+id+'</b></label>').join("");
+  document.querySelectorAll('#list input').forEach(cb=>cb.onchange=function(){cb.checked?T.add(cb.dataset.id):T.delete(cb.dataset.id);draw();});}
+function draw(){
+  if(!T.size){document.getElementById("svg").innerHTML="";return;}
+  var set=closure([...T]),dep=levels(set);
+  var nodes=[...set].map(id=>({id:id,service:N[id].service,provenance:N[id].provenance,quota:N[id].quota,
+    heavy:N[id].heavy,level:dep[id],is_target:T.has(id)}));
+  var edges=[];set.forEach(id=>deps(id).forEach(r=>{if(set.has(r))edges.push({from:r,to:id});}));
+  ResourceGraph.render(document.getElementById("svg"),{nodes:nodes,edges:edges,levels:[...new Set(Object.values(dep))].sort()},
+    {overlay:function(id){var st=(RN[id]||{}).status||"untested";return COL[st];},
+     onClick:function(id){T.has(id)?T.delete(id):T.add(id);if(T.size){list();draw();}}});
+  // timing: per-level max of measured elapsed
+  var byL={};[...set].forEach(id=>{(byL[dep[id]]=byL[dep[id]]||[]).push(id);});
+  var seq=0,wall=0;Object.keys(byL).sort((a,b)=>a-b).forEach(l=>{var mx=0;byL[l].forEach(id=>{var e=(RN[id]||{}).elapsed_ms||0;seq+=e;mx=Math.max(mx,e);});wall+=mx;});
+  var obs=[...set].filter(id=>(RN[id]||{}).calls).length;
+  document.getElementById("gtitle").innerHTML='결과 그래프 <span class="muted" style="font-weight:400;font-size:12px">· '+set.size+' 노드 · 측정 '+obs+'</span>';
+  document.getElementById("sum").innerHTML=
+    '<div class="kv"><span>폐포 노드</span><b>'+set.size+'</b></div>'+
+    '<div class="kv"><span>측정됨</span><b>'+obs+'</b></div>'+
+    '<div class="kv"><span>순차 합계</span><b>'+Math.round(seq)+' ms</b></div>'+
+    '<div class="kv"><span>레벨 병렬 wall</span><b style="color:#3fb27f">'+Math.round(wall)+' ms</b></div>'+
+    '<div class="kv"><span>가속</span><b>'+(wall?(seq/wall).toFixed(2):"—")+'×</b></div>';
+  var rows=[...set].sort((a,b)=>dep[a]-dep[b]).map(function(id){var r=RN[id]||{};
+    return '<tr><td><code>'+id+'</code></td><td class="muted">L'+dep[id]+'</td>'+
+      '<td>'+(r.status||"untested")+'</td><td>'+(r.http||"")+'</td>'+
+      '<td>'+(r.elapsed_ms!=null?Math.round(r.elapsed_ms)+" ms":"—")+'</td></tr>';}).join("");
+  document.getElementById("tbl").innerHTML='<tr><th>node</th><th>L</th><th>status</th><th>http</th><th>elapsed</th></tr>'+rows;
+}
+list();draw();document.getElementById("q").oninput=list;
+</script></body></html>
