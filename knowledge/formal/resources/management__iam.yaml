@@ -17,6 +17,42 @@
 # node is possible), iam-user (needs an owner-approved account_id; creates a
 # real login principal), iam-resource-policy (attaches to an existing SRN —
 # owner must supply a DISPOSABLE resource).
+#
+# 2026-06-15 userguide WebFetch (how_to_guides: role · policy · user ·
+# identity_provider) — 명시적 naming/limit 사실들. group/access_key 서브페이지는
+# 404 (services/management__iam.yaml의 myinfo overview 기반 사실은 그대로).
+# 직접 확정 사실들:
+#  · iam-role.name: "영문, 숫자, 특수문자(+=-_@,.)를 사용하여 64자 이내".
+#  · iam-role.max_session_duration: "3,200초(1시간)에서 43,200초(12시간)까지"
+#    (★문서 표기 모순: 3,200초는 53분20초로 1시간이 아님 — docs typo 의심,
+#    의도값은 3,600초로 추정; 모델 기본 3600은 안전 범위).
+#  · iam-role principals: "최대 20개까지 연결 추가 가능".
+#  · iam-policy.policy_name: 3-128자, "한글,영문,숫자와 특수문자(+=,.@-_)".
+#  · iam-policy.description: 1,000자 이내.
+#  · iam-policy 의미: "동일 대상에는 거부 정책이 우선 적용됨" (Deny > Allow —
+#    이 모델의 USER_DEFINED Allow policy_document가 기존 Deny와 충돌 시 무효).
+#  · iam-user.user_name: 64자 이내, "영문,숫자와 특수문자(+=,.@-_)" (한글 없음).
+#  · iam-user.password: 9-20자 + 대/소/숫/특(!@#$%&*^), 3+ 동일/4+ 연속/사용자
+#    이름·구사전/이전 비번 재사용 금지, 90일 회전 (services/management__iam.yaml
+#    password-policy와 합치).
+#  · iam-user.temporary_password=true → "최초 로그인 시 비밀번호 변경" 강제;
+#    false → admin reset만 가능.
+#  · iam-user.account_id: 콘솔의 사용자 생성 화면/로그인 정보 팝업에 표시 —
+#    "API retrieval method: not mentioned" → 콘솔 전용 (게이트 의도 확정).
+#  · iam-saml-provider.saml_provider_name: 128자 이내, "영문,숫자와 특수문자
+#    (,-_)" (policy/user보다 좁은 특수문자 셋 — @=. 불가).
+#  · iam-saml-provider.description: 1,000자 이내.
+#  · iam-saml-provider metadata file: UTF-8 XML, ≤10MB, 단일 파일만, 내용 =
+#    "발급자명, 만료 정보 및 IdP로부터 받은 SAML 인증 응답 확인용 키" — 모델
+#    body에는 file이 없어 (engine multipart 미지원, JSON-only) federation
+#    동작 불가 = 인증 무해.
+#  · iam-saml-provider federation: SAML only; "OIDC 유형은 2026년에 제공될
+#    예정" (현재일 2026-06-15 기준 미출시 가능, body federation_type='SAML'
+#    유지).
+#  · iam-saml-provider 콘솔 전용 절차: userguide는 "All documented procedures
+#    are console-based. API/CLI references not provided" — 단, /apireference/
+#    카탈로그에는 createsamlprovider 포함 (multipart 게이트 외 API 자체는
+#    존재). STOP criterion 2 (콘솔 전용 단계)는 적용되지 않음.
 version: 1
 resources:
   iam-group:
@@ -66,7 +102,7 @@ resources:
     delete: {endpoint: "DELETE /v1/policies/{policy_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: iam-policy, steps: [create, delete]}
-    notes: "USER_DEFINED IDENTITY_BASED 정책. create envelope은 FLAT $.id (doc 201 확인 — $.policy.id 아님). 서버 할당 id 필드(default_version_id, policy_version.policy_id/policy_version_id)는 create에서 생략."
+    notes: "USER_DEFINED IDENTITY_BASED 정책. create envelope은 FLAT $.id (doc 201 확인 — $.policy.id 아님). 서버 할당 id 필드(default_version_id, policy_version.policy_id/policy_version_id)는 create에서 생략. userguide(2026-06-15 how_to_guides/policy) 확정: policy_name 3-128자 + '한글/영문/숫자/특수문자(+=,.@-_)' — user/role보다 한글 포함 가능; description 1,000자 이내; 'Deny > Allow 우선' 의미 (이 모델의 Allow Statement는 기존 Deny와 충돌 시 무효). policy_category/policy_type/SRN 형식/services 카탈로그는 userguide 미명시 (api_docs DTO만)."
 
   iam-role:
     code: "mg-iam-role"
@@ -109,7 +145,7 @@ resources:
     delete: {endpoint: "DELETE /v1/roles/{role_id}", destructive: true}
     provenance: docs
     source: {lifecycle: iam-role-full, steps: [create-role, delete-role]}
-    notes: "body는 api_bodies createrole 기반, envelope $.role.id는 doc 202 예제. 이전 라이브 500 ContactAdminForAssistance는 policy_ids: [] 로 보냈을 때 — DTO rolecreaterequestv1dot3는 policy_ids가 REQUIRED(비어있지 않은 정책 연결 기대)라 빈 배열이 validation 미표면화(500)의 유력 원인 → wave5에서 자체 iam-policy를 연결해 재시도. verify가 setrole(RoleSetRequest: description+max_session_duration만)·setroletrustpolicy(roletrustpolicyrequest: assume_role_policy_document 필수, create와 동일 문서 재설정)·removebulkrolepolicybindings(create-시점 바인딩을 body {policy_ids}로 일괄 해제 — 자체 정책만)를 커버. trust policy는 빈 Resource + principal 없음으로 실 SRN 의존 제거. 라이브 2xx 후 VALIDATED 승격(R3). roles는 가상 엔티티 (roles-are-virtual)."
+    notes: "body는 api_bodies createrole 기반, envelope $.role.id는 doc 202 예제. 이전 라이브 500 ContactAdminForAssistance는 policy_ids: [] 로 보냈을 때 — DTO rolecreaterequestv1dot3는 policy_ids가 REQUIRED(비어있지 않은 정책 연결 기대)라 빈 배열이 validation 미표면화(500)의 유력 원인 → wave5에서 자체 iam-policy를 연결해 재시도. verify가 setrole(RoleSetRequest: description+max_session_duration만)·setroletrustpolicy(roletrustpolicyrequest: assume_role_policy_document 필수, create와 동일 문서 재설정)·removebulkrolepolicybindings(create-시점 바인딩을 body {policy_ids}로 일괄 해제 — 자체 정책만)를 커버. trust policy는 빈 Resource + principal 없음으로 실 SRN 의존 제거. 라이브 2xx 후 VALIDATED 승격(R3). roles는 가상 엔티티 (roles-are-virtual). userguide(2026-06-15 how_to_guides/role) 확정: name 64자 이내 + '영문/숫자/특수문자(+=-_@,.)'; max_session_duration 범위 3,200-43,200초 (문서표기 모순: 3,200초≠1시간이라 typo 의심, 모델 기본 3600은 범위 내 안전); 역할당 principals 최대 20개 — 이 모델은 principals:[]로 보내므로 영향 없음 (verify의 trust policy도 비어있어 cross-account 미발현). max policies/삭제 사전조건/sts:AssumeRole 매커닉은 userguide 미명시."
 
   iam-access-key:
     code: "mg-iam-access-key"
@@ -127,7 +163,7 @@ resources:
              destructive: true}
     provenance: docs
     source: {lifecycle: iam-credentials-heavy, steps: [create-access-key, delete-access-key]}
-    notes: "HEAVY — 실제 자격증명(영구 access key) 생성이라 SCP_RUN_HEAVY 게이트 (소스 lifecycle heavy:true). 공유 계정에선 403/400 예상 (소스는 coverage-only optional). capture를 doc 201 예제로 교정: envelope $.access_key.id (이전 FLAT $.access_key_id 추정은 doc과 불일치 — accesskeyresponse = {access_key: AccessKey}, 경로 파라미터 access_key_id = AccessKey.id). SAFETY: 이 노드는 자신이 생성·capture한 키 id에만 set/delete를 보낸다 — runner의 기존 자격증명 키는 어떤 step에도 등장하지 않으므로 잠금 위험 없음. verify set-disable(accesskeyset {is_enabled:false})은 새 키를 비활성화한 뒤 삭제하는 가장 안전한 순서. parent_access_key_id/passcode는 임시키 전용 필드라 생략. 인증키 수 제한 + 임시키 모드 등 보안설정은 services/management__iam.yaml auth-key-limits 참조. accesskeydeletebulk는 bulk-delete 클래스로 미모델."
+    notes: "HEAVY — 실제 자격증명(영구 access key) 생성이라 SCP_RUN_HEAVY 게이트 (소스 lifecycle heavy:true). 공유 계정에선 403/400 예상 (소스는 coverage-only optional). capture를 doc 201 예제로 교정: envelope $.access_key.id (이전 FLAT $.access_key_id 추정은 doc과 불일치 — accesskeyresponse = {access_key: AccessKey}, 경로 파라미터 access_key_id = AccessKey.id). SAFETY: 이 노드는 자신이 생성·capture한 키 id에만 set/delete를 보낸다 — runner의 기존 자격증명 키는 어떤 step에도 등장하지 않으므로 잠금 위험 없음. verify set-disable(accesskeyset {is_enabled:false})은 새 키를 비활성화한 뒤 삭제하는 가장 안전한 순서. parent_access_key_id/passcode는 임시키 전용 필드라 생략. 인증키 수 제한(사용자당 2개) + 임시키 모드 + suspend-before-delete 등 보안설정은 services/management__iam.yaml auth-key-limits(2026-06-11 myinfo userguide) 참조. accesskeydeletebulk는 bulk-delete 클래스로 미모델. 2026-06-15 재WebFetch: access_key 전용 how_to_guides 페이지는 404 — myinfo overview의 사실로 충분."
 
   # --- wave5: 바인딩 노드들 (자체 group/policy/role만 사용 — enabled-safe) ---
 
@@ -204,7 +240,7 @@ resources:
              json: {ids: ["{saml_provider_id}"]}, destructive: true}
     provenance: docs
     source: {docs: "management/iam/createsamlprovider (samlprovidercreaterequest: federation_type+saml_provider_name REQUIRED, file optional) + setsamlprovider + deletesamlproviders"}
-    notes: "RISK(콘텐츠 타입): doc request 예제는 multipart/form-data (file= IdP 메타데이터 XML, DTO상 optional). 엔진은 JSON 전송만 지원 — file 없이 JSON으로 시도하는 라이브 실험이며, 게이트웨이가 multipart를 강제하면 400/415 → 그 경우 disable + 엔진 multipart 지원 필요로 재분류. create envelope FLAT $.id (doc 201 예제). 합성 메타데이터 없이 만든 provider는 federation 불가(아무도 이 IdP로 로그인 못 함) — 계정 인증에 영향 없음(safe). 단건 delete가 카탈로그에 없어 deletesamlproviders(bulk, body {ids})가 유일한 teardown."
+    notes: "RISK(콘텐츠 타입): doc request 예제는 multipart/form-data (file= IdP 메타데이터 XML, DTO상 optional). 엔진은 JSON 전송만 지원 — file 없이 JSON으로 시도하는 라이브 실험이며, 게이트웨이가 multipart를 강제하면 400/415 → 그 경우 disable + 엔진 multipart 지원 필요로 재분류. create envelope FLAT $.id (doc 201 예제). 합성 메타데이터 없이 만든 provider는 federation 불가(아무도 이 IdP로 로그인 못 함) — 계정 인증에 영향 없음(safe). 단건 delete가 카탈로그에 없어 deletesamlproviders(bulk, body {ids})가 유일한 teardown. userguide(2026-06-15 how_to_guides/identity_provider) 확정: saml_provider_name 128자 이내, '영문/숫자/특수문자(,-_)' (policy/user보다 좁은 셋, @=. 금지); description 1,000자; metadata 파일 = UTF-8 XML, 10MB 이하, 단일 파일만, '발급자명·만료 정보·SAML 응답 확인용 키' 포함; federation = SAML only ('OIDC 유형은 2026년에 제공될 예정'). 콘솔 절차로만 문서화됐으나 카탈로그에 createsamlprovider 존재 → STOP-2(콘솔 전용) 미적용; multipart 게이트가 라이브에서 실제 차단인지가 R3 결정점."
 
   # --- wave5: 게이트 노드들 (required no-default 옵션 = 폼-입력 게이트,
   #     asg-notification 패턴 — 합성기는 옵션 미제공 시 ComposeError) ---
@@ -260,7 +296,7 @@ resources:
              destructive: true}
     provenance: docs
     source: {docs: "management/iam/createiamuser (iamusercreaterequest: user_name+password+temporary_password REQUIRED) + getiamuser/listiamuser/updateiamuser/updateiamuserpassword/deleteiamuser"}
-    notes: "실 로그인 가능 principal을 만드는 노드라 게이트 (runner 인증에는 영향 없으나 테넌트-침습적). password는 합성 1회용 + temporary_password:true(첫 로그인 시 변경 강제) + group_ids/policy_ids 빈 배열 = 권한 0인 사용자 → 생성 직후 verify 후 삭제. updateiamuser(iamuserupdaterequest)는 password_reuse_count가 REQUIRED인 특이 DTO — 0 사용 (Maximum 24). create envelope FLAT $.id (iamcreateuserresponse). deletebulkiamuser는 bulk-delete 클래스로 미모델."
+    notes: "실 로그인 가능 principal을 만드는 노드라 게이트 (runner 인증에는 영향 없으나 테넌트-침습적). password는 합성 1회용 + temporary_password:true(첫 로그인 시 변경 강제) + group_ids/policy_ids 빈 배열 = 권한 0인 사용자 → 생성 직후 verify 후 삭제. updateiamuser(iamuserupdaterequest)는 password_reuse_count가 REQUIRED인 특이 DTO — 0 사용 (Maximum 24). create envelope FLAT $.id (iamcreateuserresponse). deletebulkiamuser는 bulk-delete 클래스로 미모델. userguide(2026-06-15 how_to_guides/user) 확정: user_name 64자 이내 + '영문/숫자/특수문자(+=,.@-_)' (한글 없음 — policy_name과 차이); password 9-20자 + 대/소/숫/특(!@#$%&*^) 각 1+ + 3-반복/4-연속/ID포함/사전어/이전키 재사용 금지 + 90일 회전 (model body의 'Regr9x!{ualpha}'는 8+영숫특 조합으로 ualpha:3자 보완 시 9자 충족 — 라이브 정제 시 길이 확인); temporary_password=true는 최초 로그인 시 변경 강제, false면 admin reset만 가능. ★account_id는 콘솔의 사용자 생성 화면/로그인 정보 팝업에 표시 — API 발견 경로 미문서(콘솔 전용) → opt.account_id 게이트 의도 확정(STOP-2가 아니라 owner credential 게이트로 보수적 유지)."
 
   iam-user-policy-binding:
     code: "mg-iam-user-policy-binding"

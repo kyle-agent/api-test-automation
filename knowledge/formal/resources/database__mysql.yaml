@@ -15,6 +15,34 @@
 # 필요로 해서 별도 light 체인 대신 replica 체인이 함께 행사). 검증된 create
 # body는 VERBATIM 유지 (mysql: character_set/case_sensitive +
 # service_watch_log_collection, audit_enabled는 빈 문자열 — PG형과 다름).
+#
+# 2026-06-15 userguide WebFetch (overview) — 1차 ingest. 서브페이지
+# (readreplica/managing/how_to_guides/*)는 404 — mysql는 overview 단일 페이지만
+# 노출 (mariadb/PG와 다른 docs 구조). 직접 확정된 mysql-specific 사실:
+#  · 엔진 버전: 8.0.28~8.0.42 (EOS 2026-03-19, EoTS 2026-04-30 — ★현재일
+#    2026-06-15 기준 두 일자 모두 경과 → 8.0.x 라인은 신규 인스턴스 생성
+#    중단 가능, contents[]에서 사라졌을 수 있음, 라이브 카탈로그 owner 확인);
+#    8.4.5 (EoTS 2032-04-30, 유효), 8.4.7 (2026년 7월 이후 제공 예정).
+#  · Read Replica: "최대 5개의 Read Replica 구성이 가능합니다"; 배치 가능
+#    리전 = "동일/다른 리전" (★PG/mariadb userguide는 표준 Replica를 동일 리전
+#    한정하고 다른 리전은 'Other Region' DR 별도 변형으로 구분 — mysql 문서는
+#    standard와 cross-region을 명시 분리하지 않음, "용도: 읽기 부하 분산 및
+#    재해 복구(DR)용"으로 통합 서술).
+#  · PITR: "5분/10분/30분/1시간 전까지 설정할 수 있습니다" (PG/mariadb와 동일).
+#  · Archive: "Archive 파일 보관 주기(1일~35일) 설정 및 Archive 모드(On/Off)"
+#    (1-35일 range는 PG/mariadb와 동일; 기본 보관일은 mysql overview 미명시).
+#  · Restore: "복구를 수행하면 별도의 DB가 생성되며" (PG/mariadb와 동일 — 신규
+#    클러스터; 네트워크 상속/DATA 디스크 용량 mysql overview 미명시).
+#  · Switchover: "고가용성(HA) 구성된 경우" 한정 — Active-Standby 노드 전환.
+#  · 사전 = VPC ("클라우드 환경에서 독립된 가상 네트워크"); 서브넷은 명시 없으나
+#    VPC 셋업의 일부로 함의 (mysql-cluster body의 subnet_id 필수와 합치).
+#  · Audit: "DB Log 내보내기: Audit 설정을 통해 저장된 Log들을 사용자의 Object
+#    Storage로 내보낼 수 있습니다" — mysql 본체 body의 audit_enabled="" 빈
+#    문자열은 mysql 카탈로그 특이형(PG/mariadb는 bool) verbatim 유지.
+#  · 미명시 (mariadb userguide와 차이): 볼륨 8-배수/총9개 제약, replica name
+#    regex, storage 유형 강제 동일 — mysql overview에 없음. 이런 항목은
+#    mariadb 패턴 미러 노트가 mysql 문서로는 검증 불가 → "mariadb 미러; mysql
+#    문서 미명시"로 표기.
 version: 1
 resources:
   # 읽기 전용 LOOKUP — 소스 find-engine-version 스텝 verbatim (contents[0]).
@@ -35,9 +63,13 @@ resources:
     notes: "EngineListResponse $.contents[] {id, major_version, name, software_version, end_of_service} (api_docs — PG와 동일 DTO). contents[0] 순서 미문서(최신 보장 없음, 소스 스텝과 동일 선택). 구버전 고정이 필요한 업그레이드 체인은 mysql-engine-version-8을 쓴다 (PG pg-engine-version-16 분리 패턴: 버전 rot이 공용 lookup을 오염시키지 않게)."
 
   # 구버전 전용 LOOKUP — kernel-upgrade/patch 체인에서만 ref 옵션으로 끌려
-  # 들어온다. PG pg-engine-version-16 미러 — 단 mysql 라이브 구버전 유무는
-  # owner 미확인 (PG만 16.10/17.6 확인됨) → 이 노드를 쓰는 체인은 합성만
-  # 해두고 비활성 (_disabled_reason "owner가 콘솔에서 엔진 구버전 유무 확인 대기").
+  # 들어온다. PG pg-engine-version-16 미러. mysql userguide(2026-06-15 overview)
+  # 직접 확정: 8.0.x 마이너 10종(8.0.28-8.0.42, EOS 2026-03-19/EoTS 2026-04-30
+  # — 현재일 경과로 신규 생성 중단 가능), 8.4.5(EoTS 2032-04-30, 유효), 8.4.7
+  # (2026-07 이후 예정). prefix '8.0' 필터는 의미상 정확하나 라이브 카탈로그가
+  # 8.0.x 라인을 EoTS 이후 노출하지 않으면 capture None → 8.4.x prefix로 정제
+  # 필요. owner 콘솔 확인 게이트는 docs로 해소된 셈이지만 EoTS rot의 실제
+  # 라이브 노출 여부만 1회 확인.
   mysql-engine-version-8:
     lookup: true
     code: "db-mysql-engine-version-8"
@@ -54,7 +86,7 @@ resources:
       - {name: read, endpoint: "GET /v1/engine-versions?eos_included=false",
          expect_status: [200]}
     provenance: docs
-    notes: "Engine.major_version prefix '8.0' 필터 — MySQL 메이저 표기 추정 (8.0 vs 8.4; api_docs Example 공란, 라이브 카탈로그 owner 미확인). 8.0이 유일/최신 메이저면 '구버전 생성→업그레이드' 전략이 성립하지 않으므로 owner 콘솔 확인 후 prefix 재조정 (의도된 폭발 반경: gen-heavy-mysql-upgrade — capture None이면 엔진 assert로 그 체인만 hard-fail)."
+    notes: "Engine.major_version prefix '8.0' 필터 — mysql userguide(2026-06-15 overview) 확정: 8.0.28-8.0.42 (10종) + 8.4.5 + 8.4.7(2026-07 예정) 공존, 구버전→업그레이드 전략은 8.0.x→8.4.x 경로로 성립. ★단 8.0.x EOS 2026-03-19/EoTS 2026-04-30 — 현재일 2026-06-15 기준 EoTS도 경과 → 라이브 카탈로그가 8.0.x 라인을 더 이상 노출하지 않을 가능성 (신규 인스턴스 생성 중단 정책). capture None 시 prefix '8.4'로 재조정 (8.4.5만 남는 미래 시점에는 메이저 단일 → 업그레이드 체인 불성립, gen-heavy-mysql-upgrade만 hard-fail; 의도된 폭발 반경)."
 
   # 읽기 전용 LOOKUP — 소스 find-server-type verbatim: 이름(NAME) 캡처 (id
   # 아님). PG pg-server-type 미러.
@@ -152,6 +184,9 @@ resources:
       # setarchiveconfig — ArchiveConfigSetRequest {archive_enabled REQ bool,
       # retention_period_day opt int default 1} (api_docs verbatim). body는
       # subops-guarded set-archive probe 초안 verbatim (mariadb/epas와 공유).
+      # userguide(2026-06-15 overview) 확정: Archive 모드 On/Off 토글 + 보관
+      # 주기 1-35일 (기본일 overview 미명시; mariadb managing은 기본 3일이라
+      # mysql 기본도 동일 추정; retention 1은 의도적 축소 변경 = no-op 회피).
       - {name: setarchiveconfig,
          endpoint: "PUT /v1/clusters/{cluster_id}/archive",
          json: {archive_enabled: true, retention_period_day: 1},
@@ -432,7 +467,7 @@ resources:
              retries: 20, retry_interval: 60}
     provenance: VALIDATED  # replica family live-proven — run 27481666055 (family-only chain PASSED)
     source: {lifecycle: mysql-cluster-subops-guarded, steps: [create-replica]}
-    notes: "HEAVY — 두 번째 과금 클러스터. ReplicasCreateRequest verbatim (api_docs — PG와 동일 DTO): allowable_ip_addresses REQ(nullable), replica_count REQ int, replicas REQ [{name REQ ^[a-z][a-z0-9-]*[a-z0-9]$ 3-20, instance_groups REQ}]. instances에 service_ip_address 포함은 mysql 검증 본체 instance 형 미러. 응답 AsyncResponse $.resource.id = replica cluster id (PG 근거 준용). PG userguide 확정 준용: 표준 Replica 동일 리전·동일 subnet(origin 상속), DB당 최대 5개, storage 유형 원본 강제. create 409 재시도는 직전 async setter verify(archive/sync-state 등) reconcile 경합 대비 — mysql은 폴딩 setter가 PG보다 많아 재시도 예산 8×30s 소진 시 라이브 정제. delete 재시도 스택은 PG 수작업 delete-cluster verbatim 승계 (backup 401 quirk family 공유 백엔드)."
+    notes: "HEAVY — 두 번째 과금 클러스터. ReplicasCreateRequest verbatim (api_docs — PG와 동일 DTO): allowable_ip_addresses REQ(nullable), replica_count REQ int, replicas REQ [{name REQ ^[a-z][a-z0-9-]*[a-z0-9]$ 3-20, instance_groups REQ}]. instances에 service_ip_address 포함은 mysql 검증 본체 instance 형 미러. 응답 AsyncResponse $.resource.id = replica cluster id (PG 근거 준용). mysql userguide(2026-06-15 overview) 직접 확정 ★PG/mariadb와 차이★: \"최대 5개의 Read Replica 구성이 가능합니다\" + 배치 가능 리전 = \"동일/다른 리전\" — mysql 문서는 standard replica와 cross-region을 명시 분리하지 않음, 용도는 \"읽기 부하 분산 및 재해 복구(DR)용\"으로 통합 서술 (PG/mariadb는 표준 = 동일리전만, 다른 리전은 'Other Region' 별도 DR 변형). storage 유형 강제 동일·name regex·subnet 상속 등 세부는 mysql overview 미명시 — mariadb userguide(readreplica) 패턴 미러 유지(라이브 정제 예상). create 409 재시도는 직전 async setter verify(archive/sync-state 등) reconcile 경합 대비 — mysql은 폴딩 setter가 PG보다 많아 재시도 예산 8×30s 소진 시 라이브 정제. delete 재시도 스택은 PG 수작업 delete-cluster verbatim 승계 (backup 401 quirk family 공유 백엔드)."
 
   mysql-sync-replica-state:
     code: "db-mysql-sync-replica-state"
@@ -473,7 +508,7 @@ resources:
             timeout: 1800, interval: 30}
     provenance: docs
     source: {lifecycle: mysql-cluster-subops-guarded, steps: [switchover-cluster]}
-    notes: "PG userguide 확정(2026-06-13) 준용: switchover는 HA(Active-Standby) 클러스터의 서버 전환 — replica 토폴로지 동작 아님. ha_enabled:false 본체에서는 4xx 예상 → HA 변형 클러스터가 모델링될 때까지 합성 제외 게이트."
+    notes: "mysql userguide(2026-06-15 overview) 직접 확정: \"고가용성(HA) 구성된 경우\" 한정 — \"Switch-over를 통해 Active-Standby의 노드 전환을 사용자가 직접 수행할 수 있습니다\". replica 토폴로지 동작 아님 (PG userguide 2026-06-13 확정과 일치). ha_enabled:false 본체에서는 4xx 예상 → HA 변형 클러스터가 모델링될 때까지 합성 제외 게이트."
 
   mysql-reset-replica:
     code: "db-mysql-reset-replica"
@@ -544,7 +579,7 @@ resources:
              retries: 20, retry_interval: 60}
     provenance: docs
     source: {lifecycle: mysql-cluster-subops-guarded, steps: [create-restore]}
-    notes: "HEAVY — 백업 기반 새 과금 클러스터. ClusterRestoreRequest verbatim (api_docs — PG와 동일 DTO): name REQ ^[a-zA-Z]*$ 3-20, instance_name_prefix REQ, server_type_name REQ; backup_history_number/backup_recovery_time optional (둘 다 생략 시 동작 미문서). PG userguide 확정 준용: 백업은 예약 수행(02시 full), PITR 윈도우는 첫 완료 백업부터 — 생성 직후 restore는 실패 예상 (gen-heavy-mysql-restore enabled:false 게이트). 응답 AsyncResponse $.resource.id = 신규 클러스터 id."
+    notes: "HEAVY — 백업 기반 새 과금 클러스터. ClusterRestoreRequest verbatim (api_docs — PG와 동일 DTO): name REQ ^[a-zA-Z]*$ 3-20, instance_name_prefix REQ, server_type_name REQ; backup_history_number/backup_recovery_time optional (둘 다 생략 시 동작 미문서). mysql userguide(2026-06-15 overview) 직접 확정: \"복구를 수행하면 별도의 DB가 생성되며\" (신규 클러스터 — PG/mariadb와 동일), PITR \"5분/10분/30분/1시간 전까지 설정할 수 있습니다\"; \"저장된 백업 파일과 아카이브 파일 기준\". ★mysql overview는 '완료된 첫 백업 선행 필수'를 EPAS와 마찬가지로 명시하지 않음 (드롭다운/시점선택 서술) — PG userguide 준용으로 보수적 게이트 유지(gen-heavy-mysql-restore enabled:false). 응답 AsyncResponse $.resource.id = 신규 클러스터 id."
 
   # ---- patch / kernel-upgrade (owner의 PG 전략 미러 — mysql 구버전 라이브
   # ---- 유무 미확인이라 합성 체인은 비활성 게이트) --------------------------

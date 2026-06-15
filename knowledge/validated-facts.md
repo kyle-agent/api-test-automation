@@ -6,6 +6,35 @@ Mirror of the `_note` fields in `regression/scenarios/scenarios.json`; keep both
 in sync. Every entry here is also an **AI-usability gap** (something an AI could
 not infer from the spec) — feed it to the AI-Evaluator agent.
 
+## Constraints from userguide (docs — naming/quota/state; not yet 2xx-confirmed)
+
+**mysql (overview, 2026-06-15):**
+- Engine versions: 8.0.28–8.0.42, 8.4.5, 8.4.7 (8.4.7 GA "2026년 7월 이후"). 8.0.x
+  EOS 2026-03-19 / EoTS 2026-04-30 — both **past 2026-06-15**, so 8.0.x may be
+  sunset for *new* creates (live catalog check needed). 8.4.5 EoTS 2032-04-30.
+- **Read Replica: max 5 per DB, same OR different region** — divergence vs
+  PG/mariadb (standard replica same-region only; cross-region is a separate DR
+  variant). mysql docs don't separate the two.
+- PITR window: 5/10/30 min or 1 h back. Archive retention 1–35 days (On/Off).
+- Restore creates a **separate DB (new cluster)**. Switchover is **HA-only**
+  (mysql docs confirm directly, no longer PG-준용). VPC required (subnet implied).
+- mysql overview does NOT cover: volume 8-byte granularity, 9-volume cap, replica
+  name regex, storage-type-forced-equal — **do not cross-apply mariadb facts**.
+
+**IAM (how_to_guides, 2026-06-15):**
+- **role**: name ≤64 `[a-zA-Z0-9+=\-_@,.]`; max_session_duration 3,200–43,200 s;
+  principals ≤20.
+- **policy**: policy_name 3–128 `[한글a-zA-Z0-9+=,.@\-_]` (**Korean allowed**, unlike
+  user/role); description ≤1,000; **Deny > Allow** precedence on same target.
+- **user**: user_name ≤64 `[a-zA-Z0-9+=,.@\-_]` (no Korean); password 9–20, all 4
+  classes (`!@#$%&*^`), no 3-repeat / 4-sequential / userID / dictionary / reuse,
+  90-day rotation; `temporary_password=true` forces first-login change.
+  **`account_id` is console-only — no API discovery path** (confirms the
+  `opt.account_id` owner-credential gate is correct).
+- **saml-provider**: name ≤128 `[a-zA-Z0-9,\-_]` (narrowest — no `@=.`); metadata =
+  UTF-8 XML ≤10 MB single file; **SAML only** (OIDC "2026년 제공 예정"). API exists
+  in catalog (STOP-2 N/A); the live decision point is **multipart vs JSON** (IB-010).
+
 ## Id / capture shapes (where the id lives in the response)
 
 | Resource | Capture path | Note |
