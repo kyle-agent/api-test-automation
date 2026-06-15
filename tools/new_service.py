@@ -123,6 +123,59 @@ def _lookup_model(models, category, service, ref):
     return None
 
 
+def _resp_ref(ep_doc):
+    """endpoint doc 의 2xx 응답에서 schema_ref(없으면 schema)를 반환."""
+    for r in (ep_doc or {}).get("responses") or []:
+        if str(r.get("code", "")).startswith("2"):
+            return r.get("schema_ref") or (r.get("schema") or "").lower() or None
+    return None
+
+
+def _envelope_hint(post_doc, models, category, service):
+    """create 응답 모델을 보고 capture 봉투를 추정 (IB-026/028).
+
+    반환 (suggested_jsonpath_or_None, human_hint_or_None):
+      - flat (top-level 'id' 필드)         -> (None, None)  현재 $.id 가 맞음
+      - LIST/nested ('contents'/'<plural>' array[...]) -> ("$.<field>[0].id",
+        "docs response shows {<field>:[{...}]}")
+      - single-wrapped (단일 object 필드)  -> ("$.<field>.id",
+        "docs response wraps {<field>:{...}}")
+      - 모델 없음                          -> (None, None)  일반 TODO 만
+    """
+    ref = _resp_ref(post_doc)
+    short = service.split("/")[-1]
+    model = _lookup_model(models, category, short, ref)
+    if not model:
+        return None, None
+    fields = model.get("fields") or []
+    names = {str(f.get("name")) for f in fields}
+    if "id" in names:
+        return None, None  # flat — current $.id behaviour is correct
+    # array field => nested list envelope (contents[], <plural>[], ...).
+    # Prefer an array whose element is a defined sub-model (schema_ref) over a
+    # bare array[object] (e.g. 'links') — the modelled list is the payload.
+    arrays = [f for f in fields
+              if str(f.get("name") or "")
+              and ("array" in str(f.get("schema") or "").lower()
+                   or str(f.get("schema") or "").lower().startswith("["))]
+    if arrays:
+        modelled = [f for f in arrays if f.get("schema_ref")]
+        chosen = (modelled or arrays)[0]
+        fname = str(chosen.get("name"))
+        return (f"$.{fname}[0].id",
+                f"docs response shows {{{fname}:[{{id}}]}}")
+    # exactly one object field that references a sub-model => single wrap
+    obj_fields = [f for f in fields
+                  if f.get("schema_ref")
+                  and "array" not in str(f.get("schema") or "").lower()]
+    if len(obj_fields) == 1:
+        fname = str(obj_fields[0].get("name") or "")
+        if fname:
+            return (f"$.{fname}.id",
+                    f"docs response wraps {{{fname}:{{id}}}}")
+    return None, None
+
+
 def _placeholder(field):
     """required 필드의 placeholder 값. 타입 힌트(schema) 로 추정.
 
@@ -178,6 +231,11 @@ def build_node(family, eps_by_key, models, category, service, abbrev):
     # 파라미터명을, 없으면 <node>_id 를 쓴다.
     cap_var = _path_id_param(family.get("delete_path")) or f"{node_id}_id"
     node["capture"] = {cap_var: "$.id"}
+    # envelope-relative hint (IB-026/028): docs response may wrap the id
+    suggested, hint = _envelope_hint(post_doc, models, category, service)
+    if hint:
+        node["_envelope_hint"] = hint
+        node["_envelope_suggest"] = suggested
 
     # ---- delete (있으면) --------------------------------------------------
     if family.get("delete_path"):
@@ -282,7 +340,7 @@ def scaffold(service, _out_file=None):
             continue
         base = _singular(thing)
         node_id = _uid(base)
-        nodes[node_id] = {
+        lk = {
             "code": f"{abbrev}-{svc}-{base}",
             "service": service,
             "requires": [],
@@ -291,6 +349,13 @@ def scaffold(service, _out_file=None):
             "capture_soft": True,  # lookup — id 를 다른 노드에 먹일 수 없음
             "_lookup": True,
         }
+        # GET list 응답은 거의 항상 봉투(contents[]/<plural>[]) — 힌트 부착
+        suggested, hint = _envelope_hint(e["key"] and eps_doc.get(e["key"]),
+                                          models, category, service)
+        if hint:
+            lk["_envelope_hint"] = hint
+            lk["_envelope_suggest"] = suggested
+        nodes[node_id] = lk
         taken.add(node_id)
         seen_things.add(thing)
 
@@ -346,8 +411,15 @@ def emit_yaml(service, nodes):
         elif not is_lookup:
             out.append("      # TODO owner: create body — DTO had no required "
                        "fields (or no body DTO in docs)")
-        out.append(f"    capture: {_yaml_scalar(node['capture'])}  "
-                   "# TODO verify envelope (response root may wrap the id)")
+        hint = node.get("_envelope_hint")
+        if hint:
+            suggest = node.get("_envelope_suggest")
+            tail = f" → may need {suggest}" if suggest else ""
+            out.append(f"    capture: {_yaml_scalar(node['capture'])}  "
+                       f"# TODO verify envelope — {hint}{tail} (IB-026)")
+        else:
+            out.append(f"    capture: {_yaml_scalar(node['capture'])}  "
+                       "# TODO verify envelope (response root may wrap the id)")
         if node.get("capture_soft"):
             out.append("    capture_soft: true  # lookup node — id not feedable "
                        "to dependents")

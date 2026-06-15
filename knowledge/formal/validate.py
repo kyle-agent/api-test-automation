@@ -361,6 +361,82 @@ def _resources_catalog_index():
              e["service"]) for e in eps}
 
 
+def _api_docs():
+    """data/api_docs.json -> ({(METHOD, norm-path, service): ep_doc}, models).
+
+    Returns ({}, {}) if api_docs.json is unavailable (the envelope warning is
+    then skipped entirely — no schema, no warning)."""
+    _, _, _norm_path = _scenario_helpers()
+    try:
+        d = json.loads(
+            (ROOT / "data" / "api_docs.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, {}
+    eps = d.get("endpoints") or {}
+    by_key = {}
+    for ep in eps.values():
+        m = (ep.get("method") or "").upper()
+        path = ep.get("path") or ""
+        svc = ep.get("service")
+        if m and path and svc:
+            by_key[(m, _norm_path(path), svc)] = ep
+    return by_key, (d.get("models") or {})
+
+
+def _list_envelope_field(ep_doc, models, category, service):
+    """If the 2xx response model is a LIST/nested envelope (no top-level 'id',
+    has an array[...] field e.g. contents[]/<plural>[]), return that array
+    field's name; else None. None => flat or no schema (warning skipped)."""
+    ref = None
+    for r in (ep_doc or {}).get("responses") or []:
+        if str(r.get("code", "")).startswith("2"):
+            ref = r.get("schema_ref") or (r.get("schema") or "").lower() or None
+            break
+    if not ref:
+        return None
+    ref_l = str(ref).lower()
+    short = str(service or "").split("/")[-1]
+    model = None
+    for k in (f"{category}/{short}/{ref_l}", ref_l):
+        if k in models:
+            model = models[k]
+            break
+    if not model:
+        return None
+    fields = model.get("fields") or []
+
+    def _id_like(name: str) -> bool:
+        n = str(name or "")
+        return n == "id" or n.lower().endswith("id")
+
+    # A top-level id-like scalar means this is a flat/detail envelope (e.g.
+    # eventpolicydetailresponse.eventPolicyId) — $.<that> is correct, no warn.
+    if any(_id_like(f.get("name"))
+           and "array" not in str(f.get("schema") or "").lower()
+           for f in fields):
+        return None
+    arrays = [f for f in fields
+              if str(f.get("name") or "")
+              and ("array" in str(f.get("schema") or "").lower()
+                   or str(f.get("schema") or "").lower().startswith("["))]
+    if not arrays:
+        return None
+    modelled = [f for f in arrays if f.get("schema_ref")]
+    chosen = (modelled or arrays)[0]
+    # Only a real list envelope if the element sub-model carries an id-like
+    # field (so $.<field>[0].id is the plausible fix). If we cannot resolve
+    # the element model, stay conservative and warn (the array shape alone is
+    # the IB-019/020 signal).
+    eref = str(chosen.get("schema_ref") or "").lower()
+    if eref:
+        short = str(service or "").split("/")[-1]
+        emodel = models.get(f"{category}/{short}/{eref}") or models.get(eref)
+        if emodel and not any(_id_like(f.get("name"))
+                              for f in emodel.get("fields") or []):
+            return None
+    return str(chosen.get("name"))
+
+
 def _tokens_in(obj) -> set[str]:
     import re as _re
     out: set[str] = set()
@@ -461,6 +537,7 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
         return 0, 0
     builtins_, methods, _norm_path = _scenario_helpers()
     catalog = _resources_catalog_index()
+    docs_by_key, docs_models = _api_docs()
     quota_kinds = known_quota_kinds()
 
     files = [p for p in sorted(RESOURCES_DIR.glob("*.yaml"))
@@ -672,6 +749,27 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
             err(f"{where}: capture must map var -> $.jsonpath or a filter "
                 "object {list, get, where_prefix?, where_not_prefix?}")
             caps = {}
+
+        # envelope drift (IB-026/028) — NON-BLOCKING warning. A capture pinned
+        # to a flat top-level path ($.id or $.<var>_id, no index/nesting) while
+        # the create endpoint's api_docs 2xx response is a LIST/nested envelope
+        # (contents[]/<plural>[]) is the IB-019/020 failure pattern. Skip when
+        # there is no schema for the endpoint (no docs, no warning).
+        if docs_by_key and isinstance(caps, dict) and create.get("endpoint"):
+            import re as _re
+            cm, _, cpath = str(create["endpoint"]).partition(" ")
+            short = str(svc or "").split("/")[-1]
+            cat0 = str(svc or "").split("/")[0]
+            ep_doc = docs_by_key.get(
+                (cm.strip().upper(), _norm_path(cpath.strip()), short))
+            arr = _list_envelope_field(ep_doc, docs_models, cat0, svc)
+            if arr:
+                for var, val in caps.items():
+                    if isinstance(val, str) and _re.fullmatch(
+                            r"\$\.[A-Za-z0-9_]+", val):
+                        warn(f"{where}: capture '{var}: {val}' may not match "
+                             f"response envelope (IB-026) — docs response is a "
+                             f"list (\\$.{arr}[0]...) — verify")
 
         ready = task.get("ready")
         delete = task.get("delete") or {}
