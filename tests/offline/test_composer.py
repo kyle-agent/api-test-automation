@@ -648,9 +648,9 @@ def test_dependents_inverse_edge(model):
     assert "subnet" in deps                            # subnet requires vpc
     assert "vpc" not in deps                            # not its own dependent
     # symmetry: vpc is in subnet's requires
-    assert "vpc" in composer.graph_view(["subnet"], model=model) \
-        and any(e["from"] == "vpc" and e["to"] == "subnet"
-                for e in composer.graph_view(["subnet"], model=model)["edges"])
+    gv = composer.graph_view(["subnet"], model=model)
+    assert "vpc" in {n["id"] for n in gv["nodes"]} \
+        and any(e["from"] == "vpc" and e["to"] == "subnet" for e in gv["edges"])
 
 
 def test_focus_view_marks_dependents(model):
