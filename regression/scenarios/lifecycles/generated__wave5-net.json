@@ -326,7 +326,8 @@
       "id": "gen-wave5-vpce",
       "service": "networking/vpc",
       "enabled": false,
-      "_disabled_reason": "create-vpc-endpoint 400 'scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet not found' (run 27466988779). The endpoint needs a dedicated endpoint-type subnet (subnet created with the right type/role); the FS-volume resource_key wiring is insufficient. Needs an endpoint-type-subnet prerequisite node not yet modeled. Nodes kept.",
+      "heavy": true,
+      "_disabled_reason": "MODELED, ready for live re-validation (IB-013). Fix: the create now points subnet_id at a DEDICATED VPC_ENDPOINT-type subnet (new endpoint-subnet node, subnet type=VPC_ENDPOINT) instead of a GENERAL subnet — that GENERAL subnet was the root cause of the 400 'scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet not found' (run 27466988779). subnet type enum (GENERAL, LOCAL, VPC_ENDPOINT) confirmed from api_docs subnetcreaterequestv1dot2 + userguide VPC overview. Still UNPROVEN (no live 2xx yet) and heavy/gated; do not flip enabled:true here — a separate window owns live dispatch.",
       "_note": "composed by regression/scenarios/composer.py — targets: vpc-endpoint",
       "steps": [
         {
@@ -373,15 +374,15 @@
           }
         },
         {
-          "name": "create-subnet",
+          "name": "create-endpoint-subnet",
           "service": "vpc",
           "method": "POST",
           "path": "/v1/subnets",
           "json": {
-            "name": "regrsub{unique}",
-            "description": "API regression suite",
+            "name": "regrvpces{unique}",
+            "description": "API regression endpoint subnet",
             "cidr": "10.160.8.0/24",
-            "type": "GENERAL",
+            "type": "VPC_ENDPOINT",
             "vpc_id": "{vpc_id}",
             "tags": []
           },
@@ -397,11 +398,10 @@
             "method": "DELETE",
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
-          },
-          "adopt": "subnet"
+          }
         },
         {
-          "name": "wait-subnet",
+          "name": "wait-endpoint-subnet",
           "service": "vpc",
           "method": "GET",
           "path": "/v1/subnets/{subnet_id}",
@@ -468,7 +468,7 @@
           "json": {
             "name": "regrvpce{unique}",
             "description": "API regression vpc endpoint",
-            "endpoint_ip_address": "10.124.0.20",
+            "endpoint_ip_address": "10.160.8.20",
             "resource_info": "regrfs{unique}",
             "resource_key": "{volume_id}",
             "resource_type": "FS",
@@ -531,7 +531,7 @@
           "retry_interval": 30
         },
         {
-          "name": "delete-subnet",
+          "name": "delete-endpoint-subnet",
           "service": "vpc",
           "method": "DELETE",
           "path": "/v1/subnets/{subnet_id}",
@@ -547,8 +547,7 @@
             409
           ],
           "retries": 40,
-          "retry_interval": 30,
-          "adopt": "subnet"
+          "retry_interval": 30
         },
         {
           "name": "delete-vpc",
@@ -576,9 +575,53 @@
       "id": "gen-wave5-privnat",
       "service": "networking/vpc",
       "enabled": false,
-      "_disabled_reason": "create-private-nat 400 'scp-network.private-nat.connectable-transit-gateway-not-found ... Cannot find the Transit Gateway in Connectable state' (run 27466988779). The TGW is created but not Connectable — private-nat needs a TGW with a VPC attachment/connection in Connectable state, which requires a transit-gateway VPC-connection prerequisite node not yet modeled. Nodes kept.",
-      "_note": "composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {\"private-nat\": \"transit-gateway\"}",
+      "heavy": true,
+      "_disabled_reason": "MODELED, ready for live re-validation (IB-012). Fix: the TRANSIT_GATEWAY branch now reaches the TGW through a new tgw-vpc-connection node (POST /v1/transit-gateways/{id}/vpc-connections, waits its connection ACTIVE) so the TGW becomes 'Connectable' before create-private-nat — root cause of the 400 'scp-network.private-nat.connectable-transit-gateway-not-found ... Cannot find the Transit Gateway in Connectable state' (run 27466988779). service_resource_id still resolves to the TGW id (one_of use: transit_gateway_id), not the connection id. Still UNPROVEN (no live 2xx yet) and heavy/gated; do not flip enabled:true here — a separate window owns live dispatch.",
+      "_note": "composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {\"private-nat\": \"tgw-vpc-connection\"}",
       "steps": [
+        {
+          "name": "create-vpc",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "json": {
+            "name": "regrvpc{unique}",
+            "description": "API regression suite",
+            "cidr": "10.160.0.0/20",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
         {
           "name": "create-transit-gateway",
           "service": "vpc",
@@ -644,6 +687,46 @@
           "group": "transit-gateway"
         },
         {
+          "name": "create-tgw-vpc-connection",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+          "json": {
+            "vpc_id": "{vpc_id}"
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "vpc_connection_id": "$.transit_gateway_vpc_connection.id",
+            "transit_gateway_id": "$.transit_gateway_vpc_connection.transit_gateway_id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+            "service": "vpc"
+          }
+        },
+        {
+          "name": "wait-tgw-vpc-connection",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway_vpc_connections[0].state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          }
+        },
+        {
           "name": "create-private-nat",
           "service": "vpc",
           "method": "POST",
@@ -693,6 +776,25 @@
           "destructive": true
         },
         {
+          "name": "delete-tgw-vpc-connection",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 4,
+          "retry_interval": 15
+        },
+        {
           "name": "delete-transit-gateway",
           "service": "vpc",
           "method": "DELETE",
@@ -710,6 +812,26 @@
           ],
           "retries": 40,
           "retry_interval": 30
+        },
+        {
+          "name": "delete-vpc",
+          "service": "vpc",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            202,
+            204,
+            409,
+            404
+          ],
+          "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
         }
       ]
     },

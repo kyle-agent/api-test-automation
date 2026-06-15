@@ -58,6 +58,35 @@ resources:
     provenance: VALIDATED
     source: {lifecycle: networking-vpc-subnet, steps: [create-subnet, get-subnet-active, delete-subnet]}
 
+  endpoint-subnet:
+    code: "nw-vpc-endpoint-subnet"
+    service: networking/vpc
+    requires: [vpc]
+    create:
+      endpoint: "POST /v1/subnets"
+      body: {name: "regrvpces{unique}", description: "API regression endpoint subnet",
+             cidr: "{opt.cidr}", type: VPC_ENDPOINT, vpc_id: "{vpc.vpc_id}", tags: []}
+      options:
+        cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr,
+               note: "VPC cidr 하위 /24 (composer가 부모 블록 8+j번째 /24를 절단; endpoint-subnet은 GENERAL subnet과 공존 시 다른 /24를 받는다)"}
+    capture: {subnet_id: "$.subnet.id"}
+    ready: {field: "$.subnet.state", until: ACTIVE, timeout: 180, interval: 10}
+    delete: {endpoint: "DELETE /v1/subnets/{subnet_id}", destructive: true}
+    provenance: docs
+    source: {lifecycle: gen-wave5-vpce,
+             steps: [create-endpoint-subnet, wait-endpoint-subnet, delete-endpoint-subnet]}
+    notes: >
+      VPC Endpoint 전용 subnet (subnet type=VPC_ENDPOINT). vpc-endpoint create가
+      400 'scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet
+      not found' (run 27466988779)로 실패한 근본 원인 — generic GENERAL subnet으로는
+      불충분하고, subnet을 VPC_ENDPOINT 유형으로 생성해야 VPC Endpoint가 그 subnet에
+      붙는다. subnet type enum (GENERAL, LOCAL, VPC_ENDPOINT)은
+      api_docs subnetcreaterequestv1dot2 / userguide VPC overview('VPC Endpoint
+      Subnet: VPC Endpoint로 활용 가능한 Subnet')에서 확인. type=VPC_ENDPOINT
+      생성 body는 docs-derived(UNPROVEN) — endpoint-subnet 자체 2xx + vpc-endpoint
+      2xx는 라이브 재검증 대기(READY FOR LIVE RE-VALIDATION, IB-013). 다른 subnet
+      유형과 동일하게 standalone subnet 생성/삭제로 teardown.
+
   port:
     code: "nw-vpc-port"
     service: networking/vpc
@@ -144,7 +173,16 @@ resources:
     code: "nw-vpc-private-nat"
     service: networking/vpc
     requires:
-      - one_of: [direct-connect, transit-gateway]
+      # IB-012 (run 27466988779): the TRANSIT_GATEWAY branch must reach the TGW
+      # via the tgw-vpc-connection node (not the bare transit-gateway), because
+      # private-nat needs the TGW in "Connectable" state — which only happens
+      # once a VPC connection on it is ACTIVE. use: transit_gateway_id resolves
+      # service_resource_id to the TGW id (the connection node re-captures it),
+      # while the connection node + its ACTIVE wait are pulled into the closure
+      # ahead of the private-nat create.
+      - one_of:
+          - {ref: direct-connect}
+          - {ref: tgw-vpc-connection, use: transit_gateway_id}
         bind: uplink
     create:
       endpoint: "POST /v1/private-nats"
@@ -154,44 +192,69 @@ resources:
       options:
         service_type: {type: enum, values: [TRANSIT_GATEWAY, DIRECT_CONNECT],
                        required: true,
-                       note: "one_of 분기와 일치해야 한다 (기본 분기 = transit-gateway = 첫 enum 값; direct-connect 분기 선택 시 DIRECT_CONNECT로 지정)"}
+                       note: "선택한 one_of 분기와 일치해야 한다 — tgw-vpc-connection 분기면 TRANSIT_GATEWAY(첫 enum, 기본값), direct-connect 분기면 DIRECT_CONNECT로 override. 합성 시 choices={'private-nat': 'tgw-vpc-connection'}로 TGW 경로를 명시 고정."}
     capture: {private_nat_id: "$.private_nat.id"}
     delete: {endpoint: "DELETE /v1/private-nats/{private_nat_id}", destructive: true}
     provenance: docs
-    source: {lifecycle: vpc-private-nat, steps: [create-private-nat, delete-private-nat]}
-    notes: "§1의 OR-의존 사례 (direct connect OR transit gateway). 소스 lifecycle은 service_resource_id에 {unique} placeholder를 보내 4xx — 실소유 uplink 자원 주입은 이 모델이 처음 제공하므로 body는 UNPROVEN(docs). capture envelope $.private_nat.id UNPROVEN. 분기 결정(2026-06-13, gap report 그룹 1 #2): direct-connect는 물리 회선 의심(owner 확인 대기)이라 transit-gateway 경로로 검증 — composer 기본 분기도 TGW다 (_branch_cost: tgw closure 1 create vs dc 2 [dc+vpc]; 합성 시 choices={'private-nat': 'transit-gateway'}를 명시해 의도를 고정). service_type 기본값 TRANSIT_GATEWAY(첫 enum)와 정합."
+    source: {lifecycle: gen-wave5-privnat, steps: [create-private-nat, delete-private-nat]}
+    notes: >
+      READY FOR LIVE RE-VALIDATION (IB-012). §1의 OR-의존 사례
+      (direct-connect OR tgw-vpc-connection). 핵심 수정: TGW 분기를 bare
+      transit-gateway → tgw-vpc-connection으로 바꿔, private-nat가 요구하는
+      Connectable TGW(=VPC connection ACTIVE 동반)를 선행으로 보장한다
+      (run 27466988779: 400
+      'scp-network.private-nat.connectable-transit-gateway-not-found ... Cannot
+      find the Transit Gateway in Connectable state'). use: transit_gateway_id로
+      service_resource_id에 connection id가 아니라 TGW id를 주입.
+      body/capture($.private_nat.id) UNPROVEN(docs) — 라이브 2xx 미관측, gated 유지.
+      분기 결정(2026-06-13, gap report 그룹 1 #2): direct-connect는 물리 회선
+      의심(owner 확인 대기)이라 TGW 경로로 검증 — 합성 시
+      choices={'private-nat': 'tgw-vpc-connection'}를 명시(branch cost상 dc(2) <
+      tgw-conn(3)이라 기본 분기는 dc로 기울지만, 명시 choice가 우선).
+      service_type 기본값 TRANSIT_GATEWAY(첫 enum)와 정합. heavy(실 TGW+VPC+NAT)."
 
   vpc-endpoint:
     code: "nw-vpc-endpoint"
     service: networking/vpc
-    requires: [vpc, subnet, filestorage-volume]
+    # IB-013 (run 27466988779): the create needs a DEDICATED endpoint-type
+    # subnet (subnet type=VPC_ENDPOINT), not the GENERAL subnet. The earlier
+    # belief that the FS-volume resource_key alone resolves the subnet was
+    # wrong — the 400 'scp-network.vpc-endpoint.subnet-not-found "VPC Endpoint
+    # Type Subnet not found"' fires because subnet_id pointed at a GENERAL
+    # subnet. So require the endpoint-subnet node (type=VPC_ENDPOINT) and wire
+    # subnet_id to it. filestorage-volume stays the FS target resource_key.
+    requires: [vpc, endpoint-subnet, filestorage-volume]
     create:
       endpoint: "POST /v1/vpc-endpoints"
-      # R3 FS wiring (2026-06-13, gap report 그룹 1 #3): resource_key must be a
-      # REAL filestorage volume id (run 27395331657: placeholder -> 400
-      # scp-network.vpc-endpoint.subnet-not-found "VPC Endpoint Type Subnet not
-      # found" — the API resolves the TARGET service's subnet from
-      # resource_key). Cross-file requires on storage__filestorage.yaml's
-      # filestorage-volume injects {volume_id}. resource_info is free text
-      # describing the resource key (api_docs: string, max 200) — use the
-      # volume's name template.
+      # resource_key is the TARGET service resource (an FS volume id here);
+      # resource_info is free text describing it (api_docs: string, max 200).
+      # subnet_id MUST be a VPC_ENDPOINT-type subnet (endpoint-subnet node).
       body: {name: "regrvpce{unique}", description: "API regression vpc endpoint",
              endpoint_ip_address: "{opt.endpoint_ip_address}",
              resource_info: "regrfs{unique}",
              resource_key: "{filestorage-volume.volume_id}",
              resource_type: "{opt.target}",
-             subnet_id: "{subnet.subnet_id}", vpc_id: "{vpc.vpc_id}", tags: []}
+             subnet_id: "{endpoint-subnet.subnet_id}", vpc_id: "{vpc.vpc_id}", tags: []}
       options:
         target: {type: enum, values: [FS, OBS, SCR], default: FS,
                  required: true, vary: true,
                  note: "유효 enum은 라이브 ValidationError가 직접 알려줌(run 27394211896): 'VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)' — dns는 유효 타입이 아님 (VALIDATED enum). resource_key가 FS 볼륨 id로 배선되어 있으므로 OBS/SCR 변형은 각자의 실 자원 키로 재배선 전에는 합성 금지"}
-        endpoint_ip_address: {type: string, required: true, default: "10.124.0.20",
-                              note: "선택한 subnet cidr 내부의 빈 IP여야 한다 — 기본값은 공유 subnet(10.124.0.0/24, engine._SHARED_SUBNET_CIDR) 재호밍 규칙을 따른다; adopt 없이 자가 생성 subnet(10.160.8.0/24)으로 합성 시 override 필요"}
+        endpoint_ip_address: {type: string, required: true, default: "10.160.8.20",
+                              note: "선택한 endpoint-subnet cidr 내부의 빈 IP여야 한다 — 기본값은 endpoint-subnet이 vpc(10.160.0.0/20)의 8번째 /24(10.160.8.0/24)를 받는 합성 기본 배치를 따른다; 공유 subnet 재호밍/다른 cidr로 합성 시 override 필요"}
     capture: {vpc_endpoint_id: "$.vpc_endpoint.id"}
     delete: {endpoint: "DELETE /v1/vpc-endpoints/{vpc_endpoint_id}", destructive: true}
     provenance: docs
-    source: {lifecycle: vpc-endpoint, steps: [create-vpc-endpoint, delete-vpc-endpoint]}
-    notes: "endpoint_type(=resource_type) enum FS/OBS/SCR 라이브 증명; 실 FS volume_id 주입은 이 배선이 처음 제공 — body/capture UNPROVEN(docs). FS 볼륨은 VPC 무관(standalone NFS)이라 'TARGET 서비스 subnet' 해석이 볼륨 쪽에서 어떻게 풀리는지는 라이브 정제 대상."
+    source: {lifecycle: gen-wave5-vpce, steps: [create-vpc-endpoint, delete-vpc-endpoint]}
+    notes: >
+      READY FOR LIVE RE-VALIDATION (IB-013). endpoint_type(=resource_type) enum
+      FS/OBS/SCR 라이브 증명. 핵심 수정: subnet_id가 이제 VPC_ENDPOINT 유형
+      subnet(endpoint-subnet 노드)을 가리킨다 — run 27466988779의 400
+      subnet-not-found('VPC Endpoint Type Subnet not found')는 GENERAL subnet을
+      넘겨 발생했고, 전용 endpoint-type subnet이 선행돼야 한다. 실 FS volume_id +
+      endpoint-subnet 배선까지 합쳐진 body/capture는 아직 라이브 2xx 미관측이라
+      UNPROVEN(docs) — heavy/gated 유지, 라이브 재검증 대기. FS 볼륨은 VPC 무관
+      (standalone NFS)이라 'TARGET 서비스 subnet' 해석이 볼륨 쪽에서 어떻게
+      풀리는지는 라이브 정제 대상."
 
   privatelink-service:
     code: "nw-vpc-privatelink-service"
@@ -272,3 +335,47 @@ resources:
              destructive: true}
     provenance: VALIDATED
     source: {lifecycle: heavy-shared-networking, steps: [tgw-create, tgw-wait, tgw-delete]}
+
+  tgw-vpc-connection:
+    code: "nw-vpc-tgw-vpc-connection"
+    service: networking/vpc
+    requires: [transit-gateway, vpc]
+    create:
+      endpoint: "POST /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections"
+      # TransitGatewayVpcConnectionCreateRequest: vpc_id is the only field
+      # (api_docs networking/vpc/transitgatewayvpcconnectioncreaterequest).
+      body: {vpc_id: "{vpc.vpc_id}"}
+    # capture both the connection id (own delete) and the parent TGW id (so the
+    # private-nat one_of branch can resolve service_resource_id to the TGW via
+    # use: transit_gateway_id). vpc_connection_id is primary (drives delete).
+    capture: {vpc_connection_id: "$.transit_gateway_vpc_connection.id",
+              transit_gateway_id: "$.transit_gateway_vpc_connection.transit_gateway_id"}
+    # No single-connection GET show endpoint exists — only LIST + DELETE. Poll
+    # the LIST and read the (only) connection's state until ACTIVE; that ACTIVE
+    # connection is what makes the TGW "Connectable" for private-nat.
+    ready: {field: "$.transit_gateway_vpc_connections[0].state", until: ACTIVE,
+            timeout: 300, interval: 15,
+            endpoint: "GET /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections"}
+    delete: {endpoint: "DELETE /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections/{vpc_connection_id}",
+             destructive: true,
+             retry_on_status: [409], retries: 4, retry_interval: 15}
+    provenance: docs
+    source: {lifecycle: gen-wave5-privnat,
+             steps: [create-tgw-vpc-connection, wait-tgw-vpc-connection,
+                     delete-tgw-vpc-connection]}
+    notes: >
+      READY FOR LIVE RE-VALIDATION (IB-012). Transit Gateway를 private-nat가
+      요구하는 "Connectable" 상태로 만드는 선행 노드 — TGW에 VPC connection이 붙어
+      ACTIVE가 되면 TGW가 Connectable이 된다(run 27466988779: create-private-nat
+      400 'scp-network.private-nat.connectable-transit-gateway-not-found ...
+      Cannot find the Transit Gateway in Connectable state'). 모델: child 자원이라
+      path가 {transit-gateway.transit_gateway_id}를 포함. 단건 show GET가 없어
+      ready는 LIST(GET .../vpc-connections)를 폴링해 첫 connection의 state ==
+      ACTIVE를 기다린다(상태 enum CREATING/ACTIVE/DELETING/DELETED/ERROR,
+      api_docs transitgatewayvpcconnection). create 응답 envelope는 show 응답
+      (transit_gateway_vpc_connection)을 따른다고 가정 — capture
+      $.transit_gateway_vpc_connection.id/.transit_gateway_id UNPROVEN(docs),
+      라이브에서 정정될 수 있음. transit_gateway_id를 함께 capture해 private-nat의
+      one_of 분기가 use: transit_gateway_id로 TGW id를 service_resource_id에
+      주입한다(connection id가 아니라 TGW id가 필요). TGW당 VPC 연결 ≤5(userguide).
+      heavy(실 TGW+VPC 동반).
