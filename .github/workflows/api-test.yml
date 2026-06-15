@@ -32,6 +32,11 @@ on:
     # commit (including the consume/delete) while a previous workflow run —
     # INCLUDING its sweep job — is still in progress. Wait for the whole run
     # to conclude first.
+    # branches: main ONLY — without this, pushing the run-request to BOTH main
+    # and the feature branch (routine here) fires the workflow on EACH ref =
+    # duplicate concurrent heavy runs (2x cost; found 2026-06-15, runs
+    # 27520649710 + 27520650231). Dispatch is a main-branch action.
+    branches: [main]
     paths: [".github/run-request"]
   workflow_dispatch:
     inputs:
