@@ -28,6 +28,8 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
 | ske cluster | `$.resource_id` | not `$.cluster.id` |
 | ske nodepool | `$.nodepool.id` | nested |
 | custom image (from server) | `$.image_id` | flat |
+| **billingplan planned-compute** | list `$.planned_computes[0].id`, show `$.planned_compute` | from docs — NOT `$.contents[0].id` |
+| **devopsservice** | list `$.devops_services[0].id`, create `$.devops_service.id` | from docs — NOT `$.contents[0].id` |
 
 > Lesson: id shapes are **inconsistent across services** — always confirm per
 > service. filestorage volume (`$.volume_id`) vs virtualserver volume (`$.id`) is

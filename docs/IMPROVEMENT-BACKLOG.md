@@ -16,7 +16,7 @@
 | IB-001 | publish | dashboard-data force-push race(확정): dashboard `git push -f`가 conformance rebase-push를 덮어 드롭, concurrency 그룹 없음 | dashboard publish를 clone+rebase로 통일(M6-DESIGN §D.2 1안) + concurrency 안전벨트 | M | open (ticket T7) |
 | IB-002 | debt | 태그 네임스페이스 부재 — 동시 실행 시 sweep(cleanup.reconciler)이 다른 실행 자원을 교차 삭제할 위험 | run_id별 owner+run 태그를 reconciler 필터에 강제, 동시 실행은 태그 prefix로 격리 | M | open |
 | IB-003 | debt | monitor 재무장 toil — 윈도우마다 발행 감시를 수동 재설정 | controlplane `/schedules` 토글 자동화 또는 CI 후크로 재무장 | S | open |
-| IB-004 | debt | 96건 "create without delete" R1 경고(lookup 노드 노이즈) | lookup 노드를 분류해 R1에서 경고 억제(또는 lookup: true 플래그) | S | open |
+| IB-004 | debt | 96건 "create without delete" R1 경고(lookup 노드 노이즈) | lookup 노드를 분류해 R1에서 경고 억제(또는 lookup: true 플래그) | S | done (51 lookup 노드 `lookup:true`; validate.py 가드 "lookup인데 create가 GET 아니면 ERROR"; 경고 118→67, ERROR 0) |
 | IB-005 | visualize | gen_dep_map.py 출력을 ops.html DEP-MAP 마커 사이에 수동 붙여넣기 — drift 위험 | 발행 빌드 step에서 gen_dep_map.py 출력 자동 주입 | S | open |
 | IB-006 | coverage | restore/upgrade 체인 게이트(위험/과금) — 다수 비활성 | owner 승인 게이트 + heavy/destructive 분리 배치로 단계 활성화 | M | open |
 | IB-007 | debt | second-account backlog(docs/SECOND-ACCOUNT-BACKLOG.md) 미결 | 별도 계정 credential 발급 후 peak_quota 분할을 계정 차원으로 확장 | L | open (owner credential 대기) |
@@ -32,7 +32,7 @@
 | IB-016 | loop | 직렬 운영 toil — run 결과를 기다리는 동안 도메인 작업이 멈춰 처리량 저하 | 3-레인 병렬 파이프라인(A 결과대기·B 가이드/도메인·C 합성/준비) 명문화(orchestrator.md), 공유자원 read-before-claim. 후속: 레인 B 상시가동을 세션 부트스트랩에 기본 포함 | M | in-progress (정책 codified) |
 | IB-017 | coverage | sqlserver Always On Secondary(add-secondary) + Enterprise 전용 경로가 **SQL Server License Key**를 요구 — userguide에 자체 발급 절차 없음(archivestorage 전용키 미발급 선례와 동급) | owner가 라이선스 키 발급 → `ss-add-secondary` credential 주입 후 HA/secondary 체인 합성·검증. 그 전까지 해당 노드 gated | M | open (owner credential 대기) |
 | IB-018 | coverage | analytics data-flow(NiFi)/data-ops(Airflow)/quick-query(Trino)는 DBaaS가 아니라 **SKE k8s 엔진 위에 설치** — 기존 create body가 dbaas instance_groups 모양(coverage probe artifact)이라 docs-vs-reality 불일치, 실제 2xx 미검증. quick-query는 추가로 DSC domain 실값 필요, data-flow/ops는 account id/pw 필요 | api_bodies.json에 실제 SKE-엔진 body 작성(ske-cluster+filestorage prereq 배선) → heavy 윈도우 라이브 검증; DSC domain/account 값은 owner 도메인 지식 주입 | L | open (UNPROVEN body + 일부 owner 도메인값) |
-| IB-019 | debt | resource 모델은 정정됐으나 **소스 lifecycle JSON이 옛 발명 body 유지** — `regression/scenarios/lifecycles/financial-management__billingplan.json`이 존재하지 않는 필드(product_offering 등) + 잘못된 capture `$.contents[0].id` 사용(devopsservice도 유사 패턴 점검 필요) | 정정된 resource 모델(PlannedComputeCreateRequest)로 lifecycle JSON 재합성/수정 + capture 정정 → 모델↔lifecycle drift 해소 | S | open |
+| IB-019 | debt | resource 모델은 정정됐으나 **소스 lifecycle JSON이 옛 발명 body 유지** — `regression/scenarios/lifecycles/financial-management__billingplan.json`이 존재하지 않는 필드(product_offering 등) + 잘못된 capture `$.contents[0].id` 사용(devopsservice도 유사 패턴 점검 필요) | 정정된 resource 모델(PlannedComputeCreateRequest)로 lifecycle JSON 재합성/수정 + capture 정정 → 모델↔lifecycle drift 해소 | S | done (billingplan: PlannedComputeCreateRequest/ChangeRequest/CancellationFeeRequest로 정정, capture `$.planned_computes[0].id`; devopsservice: DevOpsServiceCreateRequest{tenant_name,tenant_code,members}, capture `$.devops_services[0].id`. 둘 다 UNPROVEN docs-derived, write_gap 0) |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 
