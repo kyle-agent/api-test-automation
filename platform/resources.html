@@ -243,13 +243,14 @@
 
 
 <section>
-  <h2>Planning › 자원 모델 (resource task model)</h2>
+  <h2>Planning › 자원 모델 (resource task model)
+    <a href="resource__graph.html" style="font-size:13px;font-weight:600">· 의존 그래프 보기 →</a></h2>
   <p class="muted">서비스별 자원 노드의 <b>최소 의존조건 + 생성 옵션</b>을 폼으로
     입력하면 시나리오는 합성기가 조합으로 만든다
     (docs/RESOURCE-MODEL-PLAN.md). 저장은 기존 authoring 파이프라인
     (검증 → 쓰기 → 로컬 git 커밋)을 그대로 탄다.</p>
   <div class="cards">
-    <div class="card"><div class="num">270</div><div class="lbl">노드</div></div>
+    <div class="card"><div class="num">272</div><div class="lbl">노드</div></div>
     <div class="card"><div class="num">91</div>
       <div class="lbl">VALIDATED (역추출 검증)</div></div>
     <div class="card"><div class="num">57</div><div class="lbl">그룹</div></div>
@@ -3121,7 +3122,7 @@
 <section>
   <h2>nw-vpc — 네트워크 — VPC 묶음 (vpc/subnet/gateway/endpoint/peering)
     <span class="cat">networking</span>
-    <span class="muted">(13 노드)</span></h2>
+    <span class="muted">(15 노드)</span></h2>
   
   <table>
     <tr><th>code</th><th>id</th><th>service</th><th>requires</th>
@@ -3131,8 +3132,18 @@
       <td class="muted">nw-vpc-endpoint</td>
       <td><a href="resource__vpc-endpoint.html"><code>vpc-endpoint</code></a></td>
       <td class="muted">networking/vpc</td>
-      <td class="muted">vpc, subnet, filestorage-volume</td>
+      <td class="muted">vpc, endpoint-subnet, filestorage-volume</td>
       <td>2</td>
+      <td><span class="status dispatched">
+        docs</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-endpoint-subnet</td>
+      <td><a href="resource__endpoint-subnet.html"><code>endpoint-subnet</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">vpc</td>
+      <td>1</td>
       <td><span class="status dispatched">
         docs</span></td>
     </tr>
@@ -3201,7 +3212,7 @@
       <td class="muted">nw-vpc-private-nat</td>
       <td><a href="resource__private-nat.html"><code>private-nat</code></a></td>
       <td class="muted">networking/vpc</td>
-      <td class="muted">direct-connect | transit-gateway</td>
+      <td class="muted">direct-connect | tgw-vpc-connection:transit_gateway_id</td>
       <td>1</td>
       <td><span class="status dispatched">
         docs</span></td>
@@ -3245,6 +3256,16 @@
       <td>0</td>
       <td><span class="status done">
         VALIDATED</span></td>
+    </tr>
+    
+    <tr>
+      <td class="muted">nw-vpc-tgw-vpc-connection</td>
+      <td><a href="resource__tgw-vpc-connection.html"><code>tgw-vpc-connection</code></a></td>
+      <td class="muted">networking/vpc</td>
+      <td class="muted">transit-gateway, vpc</td>
+      <td>0</td>
+      <td><span class="status dispatched">
+        docs</span></td>
     </tr>
     
     <tr>

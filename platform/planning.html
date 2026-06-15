@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-15T04:51:19Z · <b>sha 6b73c4b</b>
+    2026-06-15T06:09:39Z · <b>sha a188745</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -247,10 +247,10 @@
 <div class="pipe">
   <a class="pstage" href="#sec-model">
     <div class="pl">① 자원 모델 <span style="font-weight:400;color:var(--faint)">재료</span></div>
-    <div class="pv">270</div>
+    <div class="pv">272</div>
     <div class="ps">자원별 사실: 의존·생성법·검증·삭제 ·
       <span style="color:var(--green);font-weight:700">검증 91</span> ·
-      문서 179</div>
+      문서 181</div>
     <div class="ps" style="color:var(--blue)">합성기가 의존을 따라 시나리오 생성 →</div>
     <span class="chev">→</span>
   </a>
@@ -288,7 +288,7 @@
 <div class="fchips" id="scenChips">
   <span class="fchip on" data-f="all"><b>189</b> 전체</span>
   <span class="fchip" data-f="enabled"><b>158</b> enabled</span>
-  <span class="fchip" data-f="heavy"><b>75</b> heavy(과금성)</span>
+  <span class="fchip" data-f="heavy"><b>77</b> heavy(과금성)</span>
   <span class="fchip" data-f="gen"><b>61</b> 합성(gen)</span>
   <span class="fchip" data-f="disabled"><b>31</b> disabled</span>
   <input class="search" id="scenSearch" placeholder="서비스·시나리오 검색" style="margin-left:auto">
@@ -1988,7 +1988,7 @@
         <td>
           
           <div class="biz" onclick="this.classList.toggle('open')">billingplan is a GLOBAL (account-scoped) service (CONTEXT.md… <span class="toggle">더보기</span>
-            <div class="more">billingplan is a GLOBAL (account-scoped) service (CONTEXT.md global-services list). &#39;planned-computes&#39; are RESERVED/COMMITTED compute purchases — a real financial commitment that bills the account for a term and is NOT freely reversible. This lifecycle is COVERAGE-ONLY + heavy (gated behind SCP_RUN_</div></div>
+            <div class="more">billingplan is a GLOBAL (account-scoped) service (CONTEXT.md global-services list). &#39;planned-computes&#39; are RESERVED/COMMITTED compute purchases (1년/3년 약정, up to 40% discount) — a real financial commitment that bills the account for a term and is NOT freely reversible (cancellation bills 50% of remai</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/financial-management__billingplan.json">
@@ -3268,14 +3268,14 @@
       
       <tr data-id="gen-wave5-vpce" data-service="networking/vpc"
           data-enabled=""
-          data-heavy=""
+          data-heavy="1"
           data-gen="1">
         <td><code>gen-wave5-vpce</code></td>
         <td><span class="srv">networking/vpc</span></td>
         <td>12</td>
         <td>
           <span class="tag read" title="자원 모델에서 합성기로 생성된 시나리오">합성</span>
-          
+          <span class="tag heavy">heavy</span>
           
           <span class="tag disabled">disabled</span>
         </td>
@@ -3292,21 +3292,21 @@
       
       <tr data-id="gen-wave5-privnat" data-service="networking/vpc"
           data-enabled=""
-          data-heavy=""
+          data-heavy="1"
           data-gen="1">
         <td><code>gen-wave5-privnat</code></td>
         <td><span class="srv">networking/vpc</span></td>
-        <td>8</td>
+        <td>14</td>
         <td>
           <span class="tag read" title="자원 모델에서 합성기로 생성된 시나리오">합성</span>
-          
+          <span class="tag heavy">heavy</span>
           
           <span class="tag disabled">disabled</span>
         </td>
         <td>
           
           <div class="biz" onclick="this.classList.toggle('open')">composed by regression/scenarios/composer.py — targets: priv… <span class="toggle">더보기</span>
-            <div class="more">composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {&#34;private-nat&#34;: &#34;transit-gateway&#34;}</div></div>
+            <div class="more">composed by regression/scenarios/composer.py — targets: private-nat, transit-gateway; branches: {&#34;private-nat&#34;: &#34;tgw-vpc-connection&#34;}</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/generated__wave5-net.json">

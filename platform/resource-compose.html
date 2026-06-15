@@ -4162,7 +4162,7 @@
                  value="vpc-endpoint"></td>
       <td class="muted">nw-vpc-endpoint</td>
       <td><code>vpc-endpoint</code></td>
-      <td class="muted">vpc, subnet, filestorage-volume</td>
+      <td class="muted">vpc, endpoint-subnet, filestorage-volume</td>
       <td>
         <span class="muted">—</span>
       </td>
@@ -4177,6 +4177,25 @@
           <input type="text" name="opt__vpc-endpoint__endpoint_ip_address" size="10"
                  value=""
                  placeholder="string"></label>
+        
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="endpoint-subnet"></td>
+      <td class="muted">nw-vpc-endpoint-subnet</td>
+      <td><code>endpoint-subnet</code></td>
+      <td class="muted">vpc</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        
+        <label style="white-space:nowrap">cidr
+          <input type="text" name="opt__endpoint-subnet__cidr" size="10"
+                 value=""
+                 placeholder="cidr"></label>
         
       </td>
     </tr>
@@ -4280,7 +4299,7 @@
                  value="private-nat"></td>
       <td class="muted">nw-vpc-private-nat</td>
       <td><code>private-nat</code></td>
-      <td class="muted">direct-connect | transit-gateway</td>
+      <td class="muted">direct-connect | tgw-vpc-connection:transit_gateway_id</td>
       <td>
         
         <select name="choice__private-nat">
@@ -4288,7 +4307,7 @@
           
           <option value="direct-connect" >direct-connect</option>
           
-          <option value="transit-gateway" >transit-gateway</option>
+          <option value="tgw-vpc-connection" >tgw-vpc-connection</option>
           
         </select>
         
@@ -4366,6 +4385,20 @@
       <td class="muted">nw-vpc-tgw</td>
       <td><code>transit-gateway</code></td>
       <td class="muted">(없음)</td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+      <td>
+        <span class="muted">—</span>
+      </td>
+    </tr>
+    
+    <tr>
+      <td><input type="checkbox" name="targets"
+                 value="tgw-vpc-connection"></td>
+      <td class="muted">nw-vpc-tgw-vpc-connection</td>
+      <td><code>tgw-vpc-connection</code></td>
+      <td class="muted">transit-gateway, vpc</td>
       <td>
         <span class="muted">—</span>
       </td>
@@ -4881,6 +4914,8 @@
   </p>
 </section>
 </form>
+
+
 
 
 

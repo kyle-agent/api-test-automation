@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-15T04:51:19Z · <b>sha 6b73c4b</b>
+    2026-06-15T06:09:39Z · <b>sha a188745</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -261,44 +261,45 @@
 
   
   
-  <div class="verdict ">
+  <div class="verdict bad">
     <span class="pip"></span>
     <div>
-      <b>HEALTHY — 신규 회귀 0.</b>
-      201 ok · soft 66 ·
-      known-red 1
-      (268 calls · sha 6b73c4b)
+      <b>REGRESSIONS — 신규 fail 40건.</b>
+      
+      1085 ok · soft 1209 ·
+      known-red 3
+      (944 calls · sha a188745)
     </div>
   </div>
 
   <h2>커버리지 사다리 <span class="hint">C1 도달 → C2 호출 → C3 검증</span></h2>
   <div class="card pad">
     <div class="lad"><span class="lv">C3</span>
-      <div class="bar"><i style="width:50.85%;background:var(--green)"></i></div>
-      <span class="pct" style="color:var(--green)">50.85%</span>
+      <div class="bar"><i style="width:51.02%;background:var(--green)"></i></div>
+      <span class="pct" style="color:var(--green)">51.02%</span>
       <span class="desc">검증됨 · 누적 — 동작 확인</span></div>
     
     
     
     <div class="lad"><span class="lv">C2</span>
-      <div class="bar"><i style="width:19.5%;background:var(--amber)"></i></div>
-      <span class="pct" style="color:var(--amber)">19.5%</span>
-      <span class="desc">호출됨 · 이번 run 268/1372</span></div>
+      <div class="bar"><i style="width:68.8%;background:var(--amber)"></i></div>
+      <span class="pct" style="color:var(--amber)">68.8%</span>
+      <span class="desc">호출됨 · 이번 run 944/1372</span></div>
     <div class="lad"><span class="lv">C1</span>
       <div class="bar"><i style="width:91.76%;background:var(--blue)"></i></div>
       <span class="pct" style="color:var(--blue)">91.76%</span>
       <span class="desc">도달가능 · static reachable / 1372 API</span></div>
   </div>
 
-  <h2>이번 스냅샷 <span class="hint">2026-06-15T04:51:19Z</span></h2>
+  <h2>이번 스냅샷 <span class="hint">2026-06-15T06:09:39Z</span></h2>
   <div class="tiles" style="margin-top:6px">
-    <div class="card tile"><div class="v" style="color:var(--amber)">41.69%</div>
+    <div class="card tile"><div class="v" style="color:var(--amber)">41.84%</div>
       <div class="k">write-op (cov_op)</div></div>
     <div class="card tile"><div class="v" style="color:var(--green)">57.12%</div>
       <div class="k">GET (cov_get)</div></div>
-    <div class="card tile"><div class="v">201/268</div>
+    <div class="card tile"><div class="v">1085/944</div>
       <div class="k">ok / 호출</div></div>
-    <div class="card tile"><div class="v" style="color:var(--green)">0</div>
+    <div class="card tile"><div class="v" style="color:var(--red)">40</div>
       <div class="k">신규 fail</div></div>
   </div>
   

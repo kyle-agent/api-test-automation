@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-15T04:51:19Z · <b>sha 6b73c4b</b>
+    2026-06-15T06:09:39Z · <b>sha a188745</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -254,6 +254,58 @@ Runtime-confirmed truths that save the next session hours. Each is **VALIDATED**
 Mirror of the `_note` fields in `regression/scenarios/scenarios.json`; keep both
 in sync. Every entry here is also an **AI-usability gap** (something an AI could
 not infer from the spec) — feed it to the AI-Evaluator agent.
+
+## API design quirks — composite &#34;create-all-in-one&#34; verbs (AXIS-2 / AI-usability)
+
+- **quick-query** — `POST /v1/quick-query` is NOT a thin &#34;create a query&#34; call. It is a
+  **composite verb that provisions a whole SKE k8s engine (cluster + 3-node pool)
+  inline** in the same request (docs model `QuickQueryTotalCreateRequest` =
+  `kubernetes_engine_create_request` + `node_pool_create_requests[]` +
+  `quick_query_create_request`; docs-derived, UNPROVEN). The reference page
+  `.../models/quickquerycreaterequest/` is ONLY the innermost
+  `quick_query_create_request` slice — vpc_id/subnet_id live in the
+  `kubernetes_engine_create_request` block.
+  - **Two dependency kinds collapse into one verb**: vpc/subnet/security-group/
+    filestorage-volume are *referenced* (must pre-exist → real `requires`, ids
+    injected into the inline engine block), but the **k8s engine itself is born
+    inline** (not a separate create→reference node).
+  - **AI-usability gap**: an agent reading &#34;create quick-query&#34; cannot infer it
+    spins up a billable 3-node SKE cluster + full VPC/subnet/SG/volume wiring.
+    Same shape likely recurs in data-flow (NiFi) / data-ops (Airflow) — engines
+    installed on SKE via one composite verb (cf. IB-018). Graph shows vpc as an
+    ancestor correctly; only transitive-reduction *display* cleanup is needed
+    (IB-032), `requires` stays.
+
+## Constraints from userguide (docs — naming/quota/state; not yet 2xx-confirmed)
+
+**mysql (overview, 2026-06-15):**
+- Engine versions: 8.0.28–8.0.42, 8.4.5, 8.4.7 (8.4.7 GA &#34;2026년 7월 이후&#34;). 8.0.x
+  EOS 2026-03-19 / EoTS 2026-04-30 — both **past 2026-06-15**, so 8.0.x may be
+  sunset for *new* creates (live catalog check needed). 8.4.5 EoTS 2032-04-30.
+- **Read Replica: max 5 per DB, same OR different region** — divergence vs
+  PG/mariadb (standard replica same-region only; cross-region is a separate DR
+  variant). mysql docs don&#39;t separate the two.
+- PITR window: 5/10/30 min or 1 h back. Archive retention 1–35 days (On/Off).
+- Restore creates a **separate DB (new cluster)**. Switchover is **HA-only**
+  (mysql docs confirm directly, no longer PG-준용). VPC required (subnet implied).
+- mysql overview does NOT cover: volume 8-byte granularity, 9-volume cap, replica
+  name regex, storage-type-forced-equal — **do not cross-apply mariadb facts**.
+
+**IAM (how_to_guides, 2026-06-15):**
+- **role**: name ≤64 `[a-zA-Z0-9+=\-_@,.]`; max_session_duration **3,600–43,200 s**
+  (userguide writes &#34;3,200초(1시간)&#34; but 3,200 s = 53:20 ≠ 1 h — likely a doc typo;
+  use 3,600 = 1 h as the safe minimum, **UNPROVEN until a live 4xx delimits it**);
+  principals ≤20. [corrected by Watcher output-reviewer, round 2]
+- **policy**: policy_name 3–128 `[한글a-zA-Z0-9+=,.@\-_]` (**Korean allowed**, unlike
+  user/role); description ≤1,000; **Deny &gt; Allow** precedence on same target.
+- **user**: user_name ≤64 `[a-zA-Z0-9+=,.@\-_]` (no Korean); password 9–20, all 4
+  classes (`!@#$%&amp;*^`), no 3-repeat / 4-sequential / userID / dictionary / reuse,
+  90-day rotation; `temporary_password=true` forces first-login change.
+  **`account_id` is console-only — no API discovery path** (confirms the
+  `opt.account_id` owner-credential gate is correct).
+- **saml-provider**: name ≤128 `[a-zA-Z0-9,\-_]` (narrowest — no `@=.`); metadata =
+  UTF-8 XML ≤10 MB single file; **SAML only** (OIDC &#34;2026년 제공 예정&#34;). API exists
+  in catalog (STOP-2 N/A); the live decision point is **multipart vs JSON** (IB-010).
 
 ## Id / capture shapes (where the id lives in the response)
 
@@ -277,10 +329,27 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
 | ske cluster | `$.resource_id` | not `$.cluster.id` |
 | ske nodepool | `$.nodepool.id` | nested |
 | custom image (from server) | `$.image_id` | flat |
+| **billingplan planned-compute** | list `$.planned_computes[0].id`, show `$.planned_compute` | from docs — NOT `$.contents[0].id` |
+| **devopsservice** | list `$.devops_services[0].id`, create `$.devops_service.id` | from docs — NOT `$.contents[0].id` |
 
 &gt; Lesson: id shapes are **inconsistent across services** — always confirm per
 &gt; service. filestorage volume (`$.volume_id`) vs virtualserver volume (`$.id`) is
 &gt; the classic trap.
+
+### networking/vpc — VPC-endpoint &amp; transit-gateway prerequisites (docs, UNPROVEN; IB-012/013)
+
+- **Subnet `type` enum = `(GENERAL, LOCAL, VPC_ENDPOINT)`** (required). A **VPC
+  Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet** — passing a GENERAL
+  subnet yields 400 `scp-network.vpc-endpoint.subnet-not-found` (&#34;VPC Endpoint
+  Type Subnet not found&#34;, run 27466988779).
+- A **Transit Gateway is &#34;Connectable&#34; only once it has a VPC connection in
+  ACTIVE state.** `create-private-nat` over the TGW path needs this, else 400
+  `scp-network.private-nat.connectable-transit-gateway-not-found`. VPC-connection
+  state enum = `(CREATING, ACTIVE, DELETING, DELETED, ERROR)`.
+- **TGW VPC-connection has no single-resource GET show** (only POST/DELETE/LIST)
+  → readiness must be polled from the LIST endpoint
+  (`$.transit_gateway_vpc_connections[0].state`). Create body is `{vpc_id}` only.
+- TGW VPC-connection cap: **≤5 per TGW** (same account, userguide).
 
 ## State machines (poll field → ready values)
 

@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-15T04:51:19Z · <b>sha 6b73c4b</b>
+    2026-06-15T06:09:39Z · <b>sha a188745</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -246,22 +246,21 @@
 
   
   
-  <div class="verdict ">
+  <div class="verdict bad">
     <span class="pip"></span>
     <div>
       
-      <b>HEALTHY — 신규 회귀 0건.</b>
-      마지막 스냅샷에서 새로 깨진 5xx/auth 없음, known-red 1.
-      다음 레버: 쓰기 커버리지(cov_op 41.69%).
+      <b>REGRESSIONS — 신규 fail 40건.</b>
+      마지막 스냅샷에서 새로 깨진 5xx/auth가 있습니다 — Report › Triage에서 분류를 확인하세요.
       
     </div>
   </div>
 
   <div class="tiles">
     <div class="card tile">
-      <div class="v" style="color:var(--amber)">41.69%</div>
+      <div class="v" style="color:var(--amber)">41.84%</div>
       <div class="k">write-op 커버리지 (cov_op)</div>
-      <div class="bar"><i style="width:41.69%;background:var(--amber)"></i></div>
+      <div class="bar"><i style="width:41.84%;background:var(--amber)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
     <div class="card tile">
@@ -271,9 +270,9 @@
       <div class="goal">목표 100%</div>
     </div>
     <div class="card tile">
-      <div class="v">50.85%</div>
+      <div class="v">51.02%</div>
       <div class="k">누적 C3 검증</div>
-      <div class="bar"><i style="width:50.85%;background:var(--blue)"></i></div>
+      <div class="bar"><i style="width:51.02%;background:var(--blue)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
     <div class="card tile">
@@ -283,9 +282,9 @@
       <div class="goal">전체 1372 API</div>
     </div>
     <div class="card tile">
-      <div class="v" style="color:var(--green)">0</div>
+      <div class="v" style="color:var(--red)">40</div>
       <div class="k">신규 fail</div>
-      <div class="goal" style="margin-top:8px">회귀 없음</div>
+      <div class="goal" style="margin-top:8px">회귀 발생 — Triage 확인</div>
     </div>
   </div>
 
@@ -308,8 +307,8 @@
   </a>
   <a class="pstage" href="reporting.html">
     <div class="pl">Report</div>
-    <div class="pv">50.85%</div>
-    <div class="ps">C3 검증 · 신규 회귀 0</div>
+    <div class="pv">51.02%</div>
+    <div class="ps">C3 검증 · 신규 회귀 40</div>
   </a>
 </div>
 
