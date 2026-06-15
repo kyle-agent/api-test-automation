@@ -276,6 +276,11 @@ resources:
     verify:
       # ParametersRequest {parameters: [ParameterRequest {id, new_value,
       #  old_value} 전부 REQUIRED]} (api_docs verbatim). 같은-값 set = no-op.
+      # run #108: 수작업 database-mysql-cluster의 {name, value} 형 set-parameter-
+      # values가 400 value_error → name/value 형은 더 이상 유효하지 않고 api_docs
+      # 트리플렛(id/new_value/old_value)이 맞는 형임이 사실상 확정 (eventstreams /
+      # validated-facts의 'parameters update takes {id, new_value, old_value}
+      # triplets'와 합치). 모델은 이미 트리플렛 형이라 그대로 유지.
       - {name: setparametervalues,
          endpoint: "PUT /v1/clusters/{mysql-cluster.cluster_id}/parameters",
          json: {parameters: [{id: "{param_id}", new_value: "{param_value}",
@@ -288,7 +293,7 @@ resources:
     source: {lifecycle: database-mysql-cluster,
              steps: [list-parameter-values-before, set-parameter-values,
                      verify-parameter-values]}
-    notes: "create=GET listparametervalues — ParametersResponse $.contents[] {id, applied_value, is_modifiable, ...}. 주의: 수작업 set-parameter-values는 {parameters:[{name:'max_connections', value:'256'}]} (name/value형)로 라이브 2xx를 받았다 — api_docs DTO(id/new_value/old_value)와 불일치하는 검증된 변형. 모델은 PG 미러로 docs DTO + 같은-값 set을 따른다 (값 고정 없는 safe no-op); docs DTO가 라이브에서 거부되면 name/value형이 검증된 차순위. where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭."
+    notes: "create=GET listparametervalues — ParametersResponse $.contents[] {id, applied_value, is_modifiable, ...}. 모델은 PG 미러로 api_docs DTO 트리플렛(parameters:[{id, new_value, old_value}]) + 같은-값 set을 따른다 (값 고정 없는 safe no-op). ★run #108 갱신: 과거 수작업 set-parameter-values의 {parameters:[{name:'max_connections', value:'256'}]} (name/value형)은 한때 라이브 2xx를 받았으나 run #108에서 400 value_error → name/value형은 더 이상 유효하지 않고, eventstreams/validated-facts가 기록한 'parameters update = {id, new_value, old_value} triplets' 규칙이 mysql에도 적용됨이 사실상 확정. 따라서 모델의 트리플렛 형이 정답 (차순위 name/value형 폐기). where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭."
 
   # ---- 액션 노드들 (SKE upgrade 패턴: create=호출, ready=재폴링,
   # ---- capture/delete 없음) — PG 미러 ------------------------------------

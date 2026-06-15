@@ -1,5 +1,5 @@
 {
-  "_comment": "Composed wave 5 — application-service/apigateway + compute/scf closure 2026-06-13. gen-wave5-apigw-policy rides the VALIDATED apigw-api chain (gen-wave-apigw 20/20 green) and adds the id-bound GET leftovers + deleteresourcepolicy. gen-wave5-apigw-privatelink is the self-contained privatelink chain: own vpc/subnet (10.163.0.0/20 — unused block) -> networking privatelink-service (AUTO approval, IP type, UNPROVEN docs DTO) -> apigw privatelink-endpoint family AND the scf privatelink-endpoint family against the SAME provider service (one infra chain, all UNPROVEN privatelink risk isolated here; split into a 4th id if the owner prefers). gen-wave5-scf-triggers: apigateway trigger against our own apigw api/stage (verbatim ApigatewayTriggerCreateRequest), listtriggers with the required cloud_function_id query, codes/file + logs/metrics probes. DTOs verbatim from data/api_docs.json; quirks honoured: trigger DELETE needs json {cloud_function_id, trigger_type in [cron, apigateway]} (run 27417986669), scf privatelink-SERVICE enable strands the function in Creating (only disable=false probed), every scf config write flips Deploying -> READY re-poll before the next write/delete.",
+  "_comment": "Composed wave 5 — application-service/apigateway + compute/scf closure 2026-06-13. gen-wave5-apigw-policy rides the VALIDATED apigw-api chain (gen-wave-apigw 20/20 green) and adds the id-bound GET leftovers + deleteresourcepolicy. gen-wave5-apigw-privatelink is the self-contained privatelink chain: own vpc/subnet (10.163.0.0/20 — unused block) -> networking privatelink-service (AUTO approval, IP type, UNPROVEN docs DTO) -> apigw privatelink-endpoint family AND the scf privatelink-endpoint family against the SAME provider service (one infra chain, all UNPROVEN privatelink risk isolated here; split into a 4th id if the owner prefers). gen-wave5-scf-triggers: apigateway trigger against our own apigw api/stage (verbatim ApigatewayTriggerCreateRequest), listtriggers with the required cloud_function_id query, codes/file + logs/metrics probes. DTOs verbatim from data/api_docs.json; quirks honoured: trigger DELETE needs json {cloud_function_id, trigger_type in [cron, apigateway]} (run 27417986669), scf privatelink-SERVICE enable strands the function in Creating (only disable=false probed), every scf config write flips Deploying -> READY re-poll before the next write/delete. NOTE (2026-06-15 hygiene fix): the three wait-*-gone delete-poll steps (wait-api-gone in apigw-policy, wait-function-gone in apigw-privatelink + scf-triggers) had scalar until_status: 404 — corrected to the list form [404] (engine already coerces, this is correctness hygiene per S's triage). The until_status: 404 originates only here (composer-generated delete-gone poll); the apigateway/scf model nodes carry no until_status field. A future re-compose of this file must EMIT until_status as a LIST ([404]) so the scalar does not reappear.",
   "lifecycles": [
     {
       "id": "gen-wave5-apigw-policy",
@@ -503,7 +503,7 @@
             404
           ],
           "poll": {
-            "until_status": 404,
+            "until_status": [404],
             "timeout": 300,
             "interval": 15
           }
@@ -1150,7 +1150,7 @@
             404
           ],
           "poll": {
-            "until_status": 404,
+            "until_status": [404],
             "timeout": 300,
             "interval": 15
           }
@@ -1631,7 +1631,7 @@
             404
           ],
           "poll": {
-            "until_status": 404,
+            "until_status": [404],
             "timeout": 300,
             "interval": 15
           }
