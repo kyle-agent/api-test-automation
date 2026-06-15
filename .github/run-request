@@ -1,11 +1,10 @@
-# aimlops Stage B RE-RUN (2026-06-15) — the prior window (run 27514177331) was
-# wasted by a self-inflicted regression: {unique} grew to 14 chars and
-# 'regrvpc{unique}' (21) blew the 20-char VPC-name cap, so create-vpc 400'd at
-# step 11/44 before the cluster ever built. Fixed in 81d1533 ({unique}/{ualpha}
-# back to 8 chars; all VPC names verified <=20 offline). Re-dispatch to actually
-# exercise the SKE cluster -> aimlops release -> teardown chain. Still exploratory
-# (release body UNPROVEN, guarded). Isolated window (own VPC, 5-VPC cap).
+# SCR repo-create isolation test (2026-06-15) — gen-scr-repo-test. Create repo
+# 'test' on the EXISTING owner registry sample-nayvugfp (registry_id 'nayvugfp')
+# via POST /v1/repositories using the standard SCP access/secret (no console SCR
+# auth key needed for the REST API). Answers: is repo-create still 403, or does
+# it work with full-permission access/secret? Light, no VPC. Broad expect_status
+# records the real status/body; list-registries first shows the true registry id.
 mutations=true
 destructive=true
-heavy=true
-crud_filter=gen-heavy-aimlops
+heavy=false
+crud_filter=gen-scr-repo-test
