@@ -3,6 +3,15 @@
 # security-certificatemanager-selfsign (enabled, live-validated) and
 # security-certificatemanager-import (disabled, needs_cert_material) by
 # extract.py, curated by hand.
+#
+# docs-mapper 2026-06-15 (UNPROVEN re-fetch attempt): tried to re-fetch
+# https://docs.e.samsungsdscloud.com/userguide/security/certificate_manager/
+# {how_to_guides,overview}/ to deepen the certificate-import (provenance:docs)
+# node — server returned HTTP 503 Service Unavailable (security subtree + whole
+# docs host down). No new constraints added; existing notes (self-sign name
+# 3-30 letters/digits/-_., region quota 100 self-signed, LB-listener detach
+# before revoke, import PEM rules + KNOWN-UNSATISFIABLE private-key rejection)
+# stand. Shapes unchanged.
 version: 1
 resources:
   certificate:

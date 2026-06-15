@@ -65,9 +65,11 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
   async provisioning. `origin_hostname_type=DOMAIN` allows empty protocol/port;
   IP mode requires both.
 
-**Userguide infra note (2026-06-15):** the `/userguide/security/` subtree returned
-**503** (secretvault, configinspection, kms, secretsmanager) while networking pages
-were up — security-service docs-mapper must **re-fetch when the subtree recovers**.
+**Userguide infra note (2026-06-15):** docs.e.samsungsdscloud.com went from a
+`/userguide/security/`-only 503 (mid-afternoon) to a **FULL-HOST 503** (all userguide
+paths, both bases — confirmed by the app-service/financial docs-mapper waves). →
+**suspend ALL `provenance: docs` docs-mapper enrichment until the host recovers**;
+prior-curated constraints stay intact/UNPROVEN.
 
 **networking (loadbalancer/gslb/vpn, userguide 2026-06-15, docs/UNPROVEN):**
 - LB **Public NAT IP requires an IGW** on the VPC (docs-confirms PF-13 → justifies

@@ -9,6 +9,16 @@
 # a deployment requires >=1 method (NoMethodsExist), createapideployment with
 # stage_type=new also creates stage `dev`, stages are addressed by NAME, and
 # createauth returns only $.access_token (no id).
+#
+# docs-mapper 2026-06-15 (UNPROVEN re-fetch attempt): tried to re-fetch
+# https://docs.e.samsungsdscloud.com/userguide/application-service/api_gateway/
+# {how_to_guides,overview}/ to deepen the two provenance:docs nodes (apigw-auth,
+# apigw-privatelink-endpoint) — server returned HTTP 503 Service Unavailable
+# (whole docs host down, not just the security subtree). No new constraints
+# added this round; both docs nodes already carry the userguide how_to
+# 2026-06-14 ingestion (name patterns, expiration_period unit=day, access_token
+# stateless/one-time, PRIVATE-forces-JWT, PrivateLink name 3-20/desc<=50/
+# service_id 3-60, PrivateLink status state machine). Shapes unchanged.
 version: 1
 resources:
   apigw-api:

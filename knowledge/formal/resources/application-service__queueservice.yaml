@@ -2,6 +2,14 @@
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
 # application-queueservice-queue (enabled, live-validated) by extract.py,
 # curated by hand. Node id `queue` = cross-service.yaml key.
+#
+# docs-mapper 2026-06-15: no provenance:docs nodes here — both queue and
+# queue-fifo are VALIDATED (live 2xx). Re-fetch of
+# https://docs.e.samsungsdscloud.com/userguide/application-service/queue_service/
+# {how_to_guides,overview}/ returned HTTP 503 (whole docs host down); existing
+# userguide how_to 2026-06-14 limits in the _note blocks (name 3-64/.fifo,
+# retention per-unit ranges, size 1-256KB, dedup-scope MessageGroup<=100 groups,
+# regions kr-west1/east1) stand. No changes this round.
 version: 1
 resources:
   queue:
