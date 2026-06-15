@@ -140,26 +140,19 @@ def section_ledger() -> list[str]:
 
 
 def section_backlog() -> list[str]:
+    """Count IB rows by status. Each row looks like:
+    | IB-NNN | area | problem | fix | size | open|in-progress|done|waived ... |"""
     out = ["[BACKLOG]"]
     path = ROOT / "docs" / "IMPROVEMENT-BACKLOG.md"
     if not path.exists():
         out.append("  (missing)")
         return out
-    text = path.read_text(encoding="utf-8", errors="ignore")
-    # rows look like:  | IB-NNN | area | … | open|in-progress|done|waived |
-    row_re = re.compile(r"^\|\s*IB-\d+\s*\|.*\|\s*([a-z\-]+)\b", re.MULTILINE)
     counts: Counter[str] = Counter()
-    for m in row_re.finditer(text):
-        # status is the last pipe-separated token in the row — re-parse properly
-        pass
-    # robust parse: split by lines
-    for line in text.splitlines():
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
         if not line.startswith("| IB-"):
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if not cells:
-            continue
-        status = cells[-1].split()[0] if cells[-1] else "?"
+        status = cells[-1].split()[0] if cells and cells[-1] else "?"
         counts[status] += 1
     parts = " ".join(f"{k}={v}" for k, v in sorted(counts.items()))
     out.append(f"  total={sum(counts.values())}  {parts}")
