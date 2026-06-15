@@ -218,7 +218,8 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
 </style></head><body><div class="wrap">
-<h1>자원 카탈로그 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
+<h1><a href="../index.html" style="color:#90a4ba">← 대시보드</a> · 자원 카탈로그
+  <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
   <a href="plan.html">Plan</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 정의/수정은 control plane.</span></h1>
 <p class="muted" id="sub"></p>
 <div class="cols">
