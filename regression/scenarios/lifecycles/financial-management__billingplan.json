@@ -5,7 +5,7 @@
       "service": "financial-management/billingplan",
       "enabled": true,
       "heavy": true,
-      "_note": "billingplan is a GLOBAL (account-scoped) service (CONTEXT.md global-services list). 'planned-computes' are RESERVED/COMMITTED compute purchases — a real financial commitment that bills the account for a term and is NOT freely reversible. This lifecycle is COVERAGE-ONLY + heavy (gated behind SCP_RUN_HEAVY): it NEVER actually purchases a plan. Every write is optional + broad expect_status so the expected 400/403/422 (missing/real product-offering ids, or no purchase permission) RECORDS the endpoint as covered WITHOUT buying a commitment. Closes all 3 writes: POST /v1/planned-computes (createplannedcomputes), POST /v1/planned-computes/cancellation-fee (showcancellationfee — returns a fee QUOTE, read-like but modeled POST), PUT /v1/planned-computes/{planned_compute_id} (updateplannedcompute). planned_compute_id soft-captured from the read-only list so the PUT and GAP-get-id show target a real id when one exists. No api_bodies.json entries; bodies best-effort from field semantics, UNPROVEN. NOT chained create->use; create is deliberately expected to 4xx.",
+      "_note": "billingplan is a GLOBAL (account-scoped) service (CONTEXT.md global-services list). 'planned-computes' are RESERVED/COMMITTED compute purchases (1년/3년 약정, up to 40% discount) — a real financial commitment that bills the account for a term and is NOT freely reversible (cancellation bills 50% of remaining-term cost). This lifecycle is COVERAGE-ONLY + heavy (gated behind SCP_RUN_HEAVY): it NEVER actually purchases a plan. Every write is optional + broad expect_status so the expected 400/403/422 (missing purchase permission / unpurchasable server_type for the term) RECORDS the endpoint as covered WITHOUT buying a commitment. Closes all 3 writes: POST /v1/planned-computes (createplannedcomputes), POST /v1/planned-computes/cancellation-fee (showcancellationfee — returns a fee QUOTE, read-like but modeled POST), PUT /v1/planned-computes/{planned_compute_id} (updateplannedcompute). planned_compute_id soft-captured from the read-only list so the PUT and GAP-get-id show target a real id when one exists. No api_bodies.json entries; bodies corrected from the API Reference models (PlannedComputeCreateRequest / PlannedComputeChangeRequest / CancellationFeeRequest) per knowledge/formal/resources/financial-management__billingplan.yaml — replaces the previous INVENTED body (product_offering/product_category/term_months/quantity/payment_type — none of those fields exist in the model). UNPROVEN (no live 2xx yet). NOT chained create->use; create is deliberately expected to 4xx. NB: GET /v1/planned-computes/server-types is a baselined Product Bug (500), so server_type cannot be discovered at runtime — default s1v1m2 (docs example) is UNPROVEN.",
       "steps": [
         {
           "name": "list-planned-computes",
@@ -13,39 +13,38 @@
           "path": "/v1/planned-computes",
           "expect_status": [200, 403, 404],
           "capture_soft": {
-            "planned_compute_id": "$.contents[0].id"
+            "planned_compute_id": "$.planned_computes[0].id"
           },
           "optional": true,
-          "group": "pc"
+          "group": "pc",
+          "_note": "List envelope = PlannedComputeListResponse.planned_computes[] (PlannedComputeDTO.id). Corrected from the previous WRONG capture $.contents[0].id — the response has no `contents` field."
         },
         {
           "name": "show-cancellation-fee",
           "method": "POST",
           "path": "/v1/planned-computes/cancellation-fee",
           "json": {
-            "planned_compute_id": "{planned_compute_id}"
+            "planned_compute_id": ["{planned_compute_id}"]
           },
           "expect_status": [200, 201, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "pc-fee",
-          "_note": "Returns the cancellation FEE quote for a planned compute (read-like, no state change). Body shape {planned_compute_id} UNPROVEN; expected 400/404 when no real plan exists. Isolated group so a missing id doesn't block the create probe."
+          "_note": "Returns the cancellation FEE quote for a planned compute (read-like, no state change). Body = CancellationFeeRequest: planned_compute_id is an ARRAY[string] (corrected from the previous scalar), region optional. Expected 400/404 when no real plan exists. Isolated group so a missing id doesn't block the create probe. UNPROVEN."
         },
         {
           "name": "create-planned-computes",
           "method": "POST",
           "path": "/v1/planned-computes",
           "json": {
-            "name": "regr-plannedcompute-{unique}",
-            "product_offering": "virtual_server",
-            "product_category": "compute",
-            "term_months": 12,
-            "quantity": 1,
-            "payment_type": "ALL_UPFRONT"
+            "contract_type": "01",
+            "os_type": "opensource",
+            "server_type": "s1v1m2",
+            "service_id": "VIRTUAL_SERVER"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "pc-create",
-          "_note": "BILLABLE financial commitment — never actually purchased. Body (product_offering/product_category/term_months/quantity/payment_type) best-effort, UNPROVEN; expected 400/422 (needs a real product-offering id / spec) or 403 (no purchase permission). Deliberately NOT chained to a use/cancel step."
+          "_note": "BILLABLE financial commitment — never actually purchased. Body = PlannedComputeCreateRequest (required: contract_type/os_type/server_type/service_id), replacing the previous INVENTED product_offering/product_category/term_months/quantity/payment_type (none exist in the model). Values are model enum defaults: contract_type 01 (1yr), os_type opensource (lowercase enum), service_id VIRTUAL_SERVER, server_type s1v1m2 (docs example — listplannedcomputeservertypes 500s, baselined Product Bug, so UNPROVEN/undiscoverable). Expected 400/422 (unpurchasable spec) or 403 (no purchase permission). Deliberately NOT chained to a use/cancel step."
         },
         {
           "name": "show-planned-compute",
@@ -54,19 +53,20 @@
           "expect_status": [200, 400, 403, 404],
           "optional": true,
           "group": "pc",
-          "_note": "Read-only id-bound GET on the soft-captured planned-compute id (closes GAP-get-id showplannedcompute)."
+          "_note": "Read-only id-bound GET on the soft-captured planned-compute id (closes GAP-get-id showplannedcompute). Response = PlannedComputeResponse.planned_compute (PlannedComputeDTO)."
         },
         {
           "name": "update-planned-compute",
           "method": "PUT",
           "path": "/v1/planned-computes/{planned_compute_id}",
           "json": {
-            "name": "regr-plannedcompute-{unique}-upd"
+            "action": "SERVER_TYPE_CHANGE",
+            "server_type": "s1v1m2"
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "pc-update",
-          "_note": "In-place update (updateplannedcompute) on the soft-captured id. Body UNPROVEN (name-only guess). optional+broad expect_status so a 4xx records coverage without altering a real commitment."
+          "_note": "In-place change (updateplannedcompute) on the soft-captured id. Body = PlannedComputeChangeRequest: action enum (CHANGE_START_DATE/CONTRACT_CANCEL/EXTEND_APPLY/EXTEND_CANCEL/EXTEND_CHANGE/PLAN_CREATE/PLAN_CANCEL/SERVER_TYPE_CHANGE/CHANGE_END_DATE), with contract_type required for EXTEND_*, server_type required for SERVER_TYPE_CHANGE. Corrected from the previous {name} guess (no `name` field in the model). UNPROVEN — optional+broad expect_status so a 4xx records coverage without altering a real commitment."
         }
       ]
     }

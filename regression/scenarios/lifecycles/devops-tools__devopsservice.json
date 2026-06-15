@@ -4,16 +4,17 @@
       "id": "devopsservice-write-coverage",
       "service": "devops-tools/devopsservice",
       "enabled": true,
-      "_note": "COVERAGE-ONLY guarded, light (NOT yet runtime-proven). Closes both devopsservice writes: POST /v1/devops-services (createdevopsservice) and DELETE /v1/devops-services/{devops_service_id} (deletedevopsservice). A devops-service is a control-plane CI/CD workspace (no obviously-billable infra), so this attempts a guarded REAL create -> capture id -> delete; but because the body is UNPROVEN (no data/api_bodies.json entry; docs JS-rendered) it is coverage-only: the create is optional+broad expect_status so a 400/422 (missing/wrong field) still records coverage without failing the run. devops_service_id is captured from a 2xx create when possible, else soft-captured from the read-only list so the DELETE and id-bound GETs still target a real id. The check-duplication GET pre-checks the chosen name. probe-reads exercises showdevopsservice + checkdeletabledevopsservice. Bodies (name/description) best-effort from field semantics; UNPROVEN.",
+      "_note": "COVERAGE-ONLY guarded, light (NOT yet runtime-proven). Closes both devopsservice writes: POST /v1/devops-services (createdevopsservice) and DELETE /v1/devops-services/{devops_service_id} (deletedevopsservice). A devops-service is a control-plane CI/CD workspace (no obviously-billable infra), so this attempts a guarded REAL create -> capture id -> delete; but because the body needs a live IAM member id (members[]>=1, credential precondition) it is coverage-only: the create is optional+broad expect_status so a 400/422 (missing/wrong field) still records coverage without failing the run. devops_service_id is captured from a 2xx create when possible, else soft-captured from the read-only list so the DELETE and id-bound GETs still target a real id. The check-duplication GET pre-checks the chosen tenant_code/tenant_name. probe-reads exercises showdevopsservice + checkdeletabledevopsservice. 2026-06-14 (IB-019 / PF-05): reconciled with the corrected resource model (knowledge/formal/resources/devops-tools__devopsservice.yaml + data/api_docs.json DevOpsServiceCreateRequest). The previous create body {name, description} was the WRONG SHAPE (caused the live 400 ValidationError ['Field required']x3, run 27394211896) and is replaced by the real required members/tenant_code/tenant_name. check-duplication param was the wrong guess ?name= -> corrected to ?tenant_code=&tenant_name= (both optional query, per api_docs). List soft-capture $.contents[0].id was WRONG -> corrected to $.devops_services[0].id (DevOpsServiceListResponse.devops_services[].id, response_example confirmed). Create capture $.devops_service.id is CONFIRMED against DevOpsServiceShowResponse{devops_service: DevOpsService}.id.",
       "steps": [
         {
           "name": "check-name-duplication",
           "method": "GET",
           "path": "/v1/devops-services/check-duplication",
-          "params": {"name": "regr-devops-{ualpha}"},
+          "params": {"tenant_code": "regrdevops{ualpha}", "tenant_name": "regrdevops{ualpha}"},
           "expect_status": [200, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "devops"
+          "group": "devops",
+          "_note": "checkduplicationdevopsservice: query params tenant_code/tenant_name (both optional, pattern ^[a-z0-9\\-]*$), result:boolean. Corrected from the previous WRONG ?name= param (no `name` query exists on this endpoint)."
         },
         {
           "name": "list-devops-services",
@@ -23,17 +24,18 @@
           "optional": true,
           "group": "devops",
           "capture_soft": {
-            "devops_service_id": "$.contents[0].id"
+            "devops_service_id": "$.devops_services[0].id"
           },
-          "_note": "Soft-capture an existing id so the DELETE / id-bound GETs target a real resource even if the guarded create below 4xx-es."
+          "_note": "Soft-capture an existing id so the DELETE / id-bound GETs target a real resource even if the guarded create below 4xx-es. Corrected from the previous WRONG capture $.contents[0].id — the response envelope is DevOpsServiceListResponse.devops_services[] (DevOpsService.id), confirmed by api_docs response_example."
         },
         {
           "name": "create-devops-service",
           "method": "POST",
           "path": "/v1/devops-services",
           "json": {
-            "name": "regr-devops-{ualpha}",
-            "description": "API regression suite — coverage probe"
+            "tenant_name": "regrdevops{ualpha}",
+            "tenant_code": "regrdevops{ualpha}",
+            "members": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture_soft": {
@@ -41,7 +43,7 @@
           },
           "optional": true,
           "group": "devops-create",
-          "_note": "Guarded create. Body (name/description) best-effort, UNPROVEN. Capture path $.devops_service.id is a guess; soft so a different envelope still records coverage (the list-captured id covers DELETE). Expected 400/422 if a required field is missing or 409 if the name exists."
+          "_note": "Guarded create. Body = DevOpsServiceCreateRequest real required fields members(array[string],>=1)/tenant_code/tenant_name (tags optional, omitted) — replaces the previous INVENTED {name, description} (the PF-05 400 'Field required'x3 cause). tenant_code/tenant_name share pattern ^[a-z0-9\\-]*$ ({ualpha} is lowercase-guaranteed). members[] is a credential precondition: it needs >=1 live IAM user id that this run cannot supply, so it is sent EMPTY — which deterministically yields the expected 400 ('members' Field required) and RECORDS coverage WITHOUT creating a real workspace (the list-captured id covers DELETE). _note: to actually create a devops-service in a credentialed live run, seed members[] with a real IAM user id. Capture $.devops_service.id is CONFIRMED against the create response model DevOpsServiceShowResponse{devops_service: DevOpsService}.id (api_docs response_example)."
         },
         {
           "name": "delete-devops-service",
