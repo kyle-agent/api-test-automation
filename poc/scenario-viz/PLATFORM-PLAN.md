@@ -93,6 +93,17 @@
 - 검증: 실제 270노드 모델 + 픽스처에서 동작 확인(이 환경엔 fastapi/pytest 미설치라 라이브
   구동 대신 함수·문법·어서션 검증). 라이브 확인은 control plane 기동 환경에서 `/planning/resources/graph`.
 
+## P1 상태 — 읽기=정적 / 쓰기=FastAPI 로 분리 (2026-06-15)
+owner 통찰 반영: **정의/수정만 FastAPI, 보기(Catalog)·Report는 정적**으로 충분.
+- **읽기(정적)** `controlplane/graph_export.py` — `python -m controlplane.graph_export <out>`:
+  composer.load_model + **노드별 `focus_view` 미리계산** → `catalog.js`(270 focus, 0 err) +
+  `graph.js` + 자기완결 `catalog.html`(카테고리→서비스 드릴다운 + focus 그래프 + 읽기전용 상세).
+  서버 없이 GitHub Pages에서 열람. Report는 기존 dashboard가 이미 정적이라 그대로 사용.
+- **쓰기(FastAPI)** 기존 `resource_form.html`(+`/{node_id}/save` authoring 파이프라인)에
+  **focus 그래프**(`/graph.json?focus=`)만 얹음 — 편집하며 의존을 본다.
+- 정적 Catalog는 dashboard-data `/catalog/`로 배포(Pages). CI 통합은 1줄
+  (`python -m controlplane.graph_export <pub>/catalog`)로 후속.
+
 ## 권장 순서 / 규모
 `P0(기반) → P1(Catalog) → P2(Plan) → P4(Report, 데이터 보유로 쉬움) → P3a(Run viz)`
 각 ~1 스프린트. **P3b(엔진 병렬)만 별도 트랙.** 전 과정 C4 안전(draft-only, 자동 enable 금지) 유지.
