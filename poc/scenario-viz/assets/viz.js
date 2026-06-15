@@ -203,9 +203,24 @@
     M, N, node, exists, andRefs, andCount, branchRefs, depRefs,
     closure, depths, topoOrder, layout, renderGraph, plan, provColor,
     allIds: () => Object.keys(N),
-    targetsOnly: () => Object.keys(N).filter(id => {
-      // "leaf-ish" nodes nobody else requires make good default targets
-      return true;
-    }),
+    // direct dependents: nodes whose requires reference `id`
+    dependents: (id, choices) => Object.keys(N).filter(o => depRefs(o, choices).includes(id)),
+    // depth-grouped levels for a node set (level k = all nodes at topo depth k)
+    levels(setIds, choices) {
+      const dep = depths(setIds, choices); const lv = {};
+      setIds.forEach(id => { (lv[dep[id]] = lv[dep[id]] || []).push(id); });
+      return Object.keys(lv).map(Number).sort((a, b) => a - b)
+        .map(d => ({ depth: d, ids: lv[d].sort() }));
+    },
+    // deterministic simulated durations (Run + Report share these, in seconds)
+    dur(id) {
+      const n = N[id];
+      const create = n.heavy ? 20 : 5;
+      const ready = n.ready_timeout ? Math.round(n.ready_timeout * 0.5) : (n.heavy ? 45 : 0);
+      const verify = (n.verify_n || 0) * 3;
+      const del = n.heavy ? 15 : 8;
+      return { create, ready, verify, del, total: create + ready + verify };
+    },
+    targetsOnly: () => Object.keys(N),
   };
 })(window);
