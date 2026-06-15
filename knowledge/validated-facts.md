@@ -69,6 +69,26 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
 **503** (secretvault, configinspection, kms, secretsmanager) while networking pages
 were up — security-service docs-mapper must **re-fetch when the subtree recovers**.
 
+**networking (loadbalancer/gslb/vpn, userguide 2026-06-15, docs/UNPROVEN):**
+- LB **Public NAT IP requires an IGW** on the VPC (docs-confirms PF-13 → justifies
+  `lb-static-nat requires internet-gateway`). LB quotas/region: 50 LB · 1000
+  listeners · 1000 server-groups · 3 service-subnets/VPC.
+- **GSLB**: monitoring needs **Firewall + Security Group allow-rules on the target**
+  (HC fails otherwise); `env_usage=PUBLIC` is the only documented value; region
+  kr-west1/east1 only; FQDN label 4-40 lowercase+digits.
+- **VPN gateway is NOT deletable while tunnels are attached** (teardown order —
+  explains the 409-retry); 3 gw/account, 5 tunnels/gw; IKE phase1/2 specifics are
+  NOT in the userguide (PSK/DH/lifetimes stay UNPROVEN docs-examples).
+
+**database/analytics (cachestore/searchengine/vertica, userguide 2026-06-15, docs/UNPROVEN):**
+- **cachestore**: both ports 1200-65535; password 8-30 excluding `$ " '`; block
+  storage 16-5120 GB (×8). **Docs prescribe HA replica 1-2, but `replica_count:0`
+  is LIVE-PROVEN (202, run 27258520218)** — keep the live value; conflict noted
+  (masked-defect avoidance).
+- **searchengine**: dedicated-master = **exactly 3**; data nodes min 2 (separate
+  master) / 1 (combined); ports **9300 & 5301 reserved** (unusable as db port).
+- **vertica**: all field rules userguide-re-confirmed (no drift vs 2026-06-14).
+
 ## Id / capture shapes (where the id lives in the response)
 
 | Resource | Capture path | Note |

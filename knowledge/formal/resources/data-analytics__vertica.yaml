@@ -5,6 +5,18 @@
 # vertica-read-coverage) are COVERAGE-ONLY: they adopt an existing cluster and
 # never create one, so the create below comes from data/api_bodies.json
 # verticacreatecluster (docs provenance, UNPROVEN).
+#
+# Userguide enrichment (docs-mapper, 2026-06-15, UNPROVEN). Cited pages:
+#   - https://docs.e.samsungsdscloud.com/userguide/analytics/vertica/overview/
+#   - https://docs.e.samsungsdscloud.com/userguide/analytics/vertica/how_to_guides/
+# how_to_guides re-confirms the field rules already captured 2026-06-14
+# (name 영문 3-20; instance_name_prefix 영문 소문자 시작/소문자·숫자·'-' 3-13;
+# database_name 영문 시작/영문·숫자 3-20; db_user_name 영문 소문자 2-20;
+# database_port 1200-65535; password 영문+숫자+특수문자('"'/' 제외) 8-30;
+# storage 16-5120 GB 8의 배수, 추가 디스크 최대 9개; backup retention 7-35일;
+# tags 최대 50; node 1-10, 2+ for HA). No NEW field constraints surfaced beyond
+# what is already in option notes below; engine version 24.2.0-2 single, masterless
+# MPP, VPC/Subnet prereq all re-confirmed.
 version: 1
 resources:
   vertica-cluster:

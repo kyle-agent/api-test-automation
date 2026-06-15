@@ -9,6 +9,14 @@
 # {vpn-gateway.vpn_gateway_id}. Delete retry semantics copied from the source
 # steps (tunnel 409x6, gateway 409x8 — gateway is not deletable while tunnels
 # exist or while Creating/Editing, services quirk vpn-gateway-delete-blocked).
+#
+# docs-mapper enrichment (2026-06-15, networking subtree UP). Sources cited:
+#   - https://docs.e.samsungsdscloud.com/userguide/networking/vpn/overview/
+#   - https://docs.e.samsungsdscloud.com/userguide/networking/vpn/how_to_guides/
+# Userguide-derived constraints below are UNPROVEN (notes only). The userguide
+# confirms quotas/naming/region/delete-precondition but does NOT document the
+# Phase1/Phase2 IKE specifics (encryption/DH/lifetime/PSK-length/DPD/remote-
+# subnet-max), so those stay UNPROVEN docs-example estimates as before.
 version: 1
 resources:
   vpn-gateway:
@@ -40,7 +48,14 @@ resources:
       delete 409-재시도로 흡수하므로 모델도 ready 없이 동일 재시도 시맨틱 유지
       ($.vpn_gateway.state 필드 경로는 UNPROVEN이라 ready 선언 보류). capture는
       소스에서 capture_soft($.vpn_gateway.id) — envelope UNPROVEN이라 docs.
-      verify GET가 vpn gap_getid 중 showvpngateway를 닫는다."
+      verify GET가 vpn gap_getid 중 showvpngateway를 닫는다.
+      userguide 확증 (overview + how_to_guides, 2026-06-15, UNPROVEN):
+      이름 '영문,숫자 3~20자' 재확인(vpn-gateway-name-rules — 하이픈/언더스코어
+      금지가 charset 'English+digits only'와 일치). 계정당 3개 cap 재확인.
+      region kr-west1/kr-east1/kr-south3 전용(kr-south1/2 불가) 재확인.
+      delete precondition 문서 확증: '연결된 VPN Tunnel이 있으면 종료 불가' —
+      vpn-gateway-delete-blocked의 docs 근거(이전엔 소스 lifecycle 409-재시도
+      관찰뿐). IPsec Gateway 이중화(active/standby auto-failover) 지원."
 
   vpn-tunnel:
     code: "nw-vpn-tunnel"
@@ -101,4 +116,12 @@ resources:
       teardown은 tunnel 먼저, gateway 나중 (vpn-gateway-delete-blocked) — composer의
       interval-scheduled teardown이 보장. capture는 소스에서
       capture_soft($.vpn_tunnel.id) — envelope UNPROVEN이라 docs. verify GET가
-      vpn gap_getid 중 showvpntunnel을 닫는다."
+      vpn gap_getid 중 showvpntunnel을 닫는다.
+      userguide 확증 (vpn/overview + how_to_guides, 2026-06-15, UNPROVEN):
+      gateway당 tunnel 5개 cap 재확인. 그러나 userguide는 Phase1/Phase2 IKE 세부
+      (ike_version, phase1/2_encryptions, diffie_hellman_groups, life_time,
+      pre_shared_key 길이, dpd_retry_interval, remote_subnets 최대수)를 수치로
+      문서화하지 않음 — 따라서 이 노드 body/options의 IKE enum·범위 값은 여전히
+      docs-example 추정(UNPROVEN), 라이브 패스 전까지 미확정. vpn-tunnel-psk-length
+      (8-64자), vpn-tunnel-dpd-interval-range(1-3600s), vpn-tunnel-remote-subnet-
+      max-10은 services-layer constraint 출처(userguide 미확증)임을 명시."

@@ -5,6 +5,14 @@
 # searchengine-read-coverage) are COVERAGE-ONLY: they adopt an existing cluster
 # and never create one, so the create below comes from data/api_bodies.json
 # searchenginecreatecluster (docs provenance, UNPROVEN).
+#
+# Userguide enrichment (docs-mapper, 2026-06-15, UNPROVEN). Cited pages:
+#   - https://docs.e.samsungsdscloud.com/userguide/analytics/search_engine/overview/
+#   - https://docs.e.samsungsdscloud.com/userguide/analytics/search_engine/how_to_guides/
+# New/refined facts folded into option + main notes below: dedicated-master
+# count is FIXED at 3 (not "3+"); data node min = 2 when master separate else 1;
+# database_port 1200-65535 but 9300 (internal) and 5301 (Kibana) are reserved;
+# db_user_name excludes reserved names; max 9 additional disks per node type.
 version: 1
 resources:
   searchengine-cluster:
@@ -46,7 +54,7 @@ resources:
         server_type_name: {type: string, required: true,
                            note: "lookup — DBaaS server-type 목록; api_bodies sample은 빈 문자열. userguide 확정 (2026-06-14, overview/servertype): Standard(ses1/ses2, 최대 16 vCore/256GB) · High Capacity(seh2, 24+ vCore, 최대 72 vCore/288GB). 최소 ses1v1m2 (1 vCore/2GB)"}
         db_user_name: {type: string, required: true,
-                       note: "OpenSearch/Elasticsearch 관리자 계정명. userguide 확정 (2026-06-14) + api_docs SearchEngineInitConfigOptionRequest.database_user_name: 영문 소문자만 ^[a-z]*$ 2-20자"}
+                       note: "OpenSearch/Elasticsearch 관리자 계정명. userguide 확정 (2026-06-14) + api_docs SearchEngineInitConfigOptionRequest.database_user_name: 영문 소문자만 ^[a-z]*$ 2-20자. userguide how_to_guides 추가 (2026-06-15, UNPROVEN): 예약어(reserved names)는 사용 불가"}
         db_user_password: {type: string, required: true,
                            note: "관리자 비밀번호. userguide 확정 (2026-06-14): 영문·숫자·특수문자(\\\", ', \\ 제외) 포함 8-30자 (api_docs도 length 8-30)"}
         license: {type: string, default: "",
@@ -56,4 +64,4 @@ resources:
     provenance: docs
     source: {lifecycle: searchengine-cluster-subops-guarded,
              steps: [list-clusters, capture-subop-ids, add-instances]}
-    notes: "소스 lifecycle은 기존 cluster adopt형 coverage probe — create body는 api_bodies searchenginecreatecluster 형상의 UNPROVEN(docs) 템플릿 (role_type ACTIVE는 doc sample 그대로; subops의 add-instances도 ACTIVE를 보냈다). backup_option 값은 se-backup 스텝의 값(7일/02시)을 재사용. capture envelope $.resource.id는 DBaaS AsyncResponse 패턴 추론(eventstreams quirk와 동일 프레임워크) — UNPROVEN. userguide 확정 (2026-06-14, overview + how_to_guides): 선행=VPC/Subnet (전용 가상망 필수); 노드 구성=master+data, data 노드 최소1/최대10(전용 master 없을 때)·최대50(전용 master 설치 시), is_combined=false면 master/data 분리, dual-role은 is_combined 변형; cluster name ^[a-zA-Z]*$ 3-20 (api_docs), instance_name_prefix ^[a-z][a-zA-Z0-9\\-]*$ 3-13 (api_docs, postfix 001/002 자동), database_port 9200 기본; storage block_storage_groups[].size_gb 16-5120 GB 8의 배수, tags 최대 50; default port 9200. add-instances는 SearchEngineClusterAddInstancesRequest {instance_count REQ, service_ip_addresses REQ, public_ip_ids opt} (eventstreams add-instances 모델과 동일 — instances[] 배열 아님). 대시보드 재시작(dashboard-restart) 등 sub-op은 task가 아닌 lifecycle 영역. 라이프사이클: create→(modify: add-instances/resize-server-type/resize-block-storage)·start/stop/restart→backup/restore·patch(minor)→delete."
+    notes: "소스 lifecycle은 기존 cluster adopt형 coverage probe — create body는 api_bodies searchenginecreatecluster 형상의 UNPROVEN(docs) 템플릿 (role_type ACTIVE는 doc sample 그대로; subops의 add-instances도 ACTIVE를 보냈다). backup_option 값은 se-backup 스텝의 값(7일/02시)을 재사용. capture envelope $.resource.id는 DBaaS AsyncResponse 패턴 추론(eventstreams quirk와 동일 프레임워크) — UNPROVEN. userguide 확정 (2026-06-14, overview + how_to_guides): 선행=VPC/Subnet (전용 가상망 필수); 노드 구성=master+data, data 노드 최소1/최대10(전용 master 없을 때)·최대50(전용 master 설치 시), is_combined=false면 master/data 분리, dual-role은 is_combined 변형; cluster name ^[a-zA-Z]*$ 3-20 (api_docs), instance_name_prefix ^[a-z][a-zA-Z0-9\\-]*$ 3-13 (api_docs, postfix 001/002 자동), database_port 9200 기본 (허용 범위 1200-65535, 단 9300=내부통신·5301=Kibana 예약 불가 — how_to_guides 2026-06-15, UNPROVEN); storage block_storage_groups[].size_gb 16-5120 GB 8의 배수 (노드 타입당 추가 디스크 최대 9개 — how_to_guides 2026-06-15, UNPROVEN), tags 최대 50; 전용 master 설치 시 master 노드 수는 3개 고정(FIXED at 3 — 종전 노트의 3-plus 표현 정정), data 노드 최소 2(전용 master 분리 시)·최소 1(미분리 시) — how_to_guides 2026-06-15, UNPROVEN. add-instances는 SearchEngineClusterAddInstancesRequest {instance_count REQ, service_ip_addresses REQ, public_ip_ids opt} (eventstreams add-instances 모델과 동일 — instances[] 배열 아님). 대시보드 재시작(dashboard-restart) 등 sub-op은 task가 아닌 lifecycle 영역. 라이프사이클: create→(modify: add-instances/resize-server-type/resize-block-storage)·start/stop/restart→backup/restore·patch(minor)→delete."

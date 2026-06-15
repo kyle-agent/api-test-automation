@@ -6,6 +6,14 @@
 # vpc_id fields), which diverges from cross-service.yaml's coarser edges for
 # lb-health-check ([], region-scoped) and lb-server-group ([load-balancer]) —
 # the validator reports those as reconcile-during-R3 warnings by design.
+#
+# docs-mapper enrichment (2026-06-15, networking subtree UP). Sources cited:
+#   - https://docs.e.samsungsdscloud.com/userguide/networking/load_balancer/overview/
+#   - https://docs.e.samsungsdscloud.com/userguide/networking/load_balancer/how_to_guides/
+# Userguide-derived constraints below are UNPROVEN (notes only — no body/requires
+# /capture shape changed). Quotas per REGION (overview): load-balancer 50,
+# listener 1000, lb-server-group 1000, members 1000 total, lb-health-check 500,
+# service subnets per VPC 3.
 version: 1
 resources:
   lb-health-check:
@@ -201,7 +209,13 @@ resources:
     provenance: docs
     source: {lifecycle: networking-loadbalancer-members-nat,
              steps: [members-add, members-set, members-remove-single]}
-    notes: "capture는 소스에서 capture_soft($.members[0].id, envelope UNPROVEN) — docs 유지. delete = removelbservergroupmember(단건); bulk 삭제는 lb-member-bulk 노드가 커버"
+    notes: "capture는 소스에서 capture_soft($.members[0].id, envelope UNPROVEN) — docs 유지. delete = removelbservergroupmember(단건); bulk 삭제는 lb-member-bulk 노드가 커버.
+      userguide(load_balancer/overview, UNPROVEN): member의 object_type은
+      VM(Virtual Server)/BM(Bare Metal, 동일 VPC) 또는 직접 입력 IP 중 선택 —
+      직접 입력 IP는 백엔드 서버 불필요 (수작업 _note 'no backend VM required'와
+      일치). member_state는 활성/비활성 수정 가능(Healthy/Unhealthy는 HC가
+      판정하는 관측 상태이지 입력 필드 아님). member_port/member_weight 범위는
+      userguide에 수치 미명시 (UNPROVEN). 리전당 member 총합 1000 cap."
 
   # 두 번째 member — 같은 add API로 생성하되 teardown이 BULK 삭제
   # (DELETE .../members + member_id_list body = removelbservergroupmembers)를
@@ -262,4 +276,10 @@ resources:
     provenance: docs
     source: {lifecycle: networking-loadbalancer-members-nat,
              steps: [static-nat-create, static-nat-delete]}
-    notes: "createloadbalancerpublicnatip/deleteloadbalancerpublicnatip 커버. capture envelope $.static_nat.id는 api_docs response_example 기반 UNPROVEN. private-static-nats(createloadbalancerprivatenatip)는 private_nat_id + private_nat_ip_id가 필요 — private-nat IP 하위자원 모델이 없어 미배선 (owner 질문: private NAT IP 발급 경로)"
+    notes: "createloadbalancerpublicnatip/deleteloadbalancerpublicnatip 커버. capture envelope $.static_nat.id는 api_docs response_example 기반 UNPROVEN. private-static-nats(createloadbalancerprivatenatip)는 private_nat_id + private_nat_ip_id가 필요 — private-nat IP 하위자원 모델이 없어 미배선 (owner 질문: private NAT IP 발급 경로).
+      userguide(load_balancer/how_to_guides, UNPROVEN)가 IGW precondition을
+      문서로 확증: Public NAT IP는 '선택한 VPC에 Internet Gateway가 연결된 경우'
+      에만 구성 가능 — PF-13 lifecycle 교훈(IGW 없는 VPC에서 4xx)과 일치하므로
+      requires에 internet-gateway 유지가 옳다. publicip_id는 기존 Public IP
+      목록에서 선택(또는 신규 생성). Private NAT IP는 생성 후 수정 가능(modifiable
+      post-create)."

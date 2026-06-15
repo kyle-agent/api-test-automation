@@ -3,6 +3,15 @@
 # heavy-shared-dbaas (live-proven: cache-create got 202 in run 27258520218
 # with the engine version captured dynamically — knowledge/validated-facts.md
 # 2026-06-10 + services/database__cachestore.yaml engine-versions constraint).
+#
+# Userguide enrichment (docs-mapper, 2026-06-15; ALL UNPROVEN unless field
+# already VALIDATED by the run above):
+#   - https://docs.e.samsungsdscloud.com/userguide/database/cachestore/overview/
+#   - https://docs.e.samsungsdscloud.com/userguide/database/cachestore/how_to_guides/
+# overview confirms: engine Redis OSS Sentinel 7.2.11 (EoS 2029-06 / EoTS
+# 2029-12-01) + Valkey Sentinel 8.1.4; topology = 1 Master + 1-2 Replica with
+# Sentinel failover; VPC prereq; recovery creates a separate instance (point-in-
+# time). how_to_guides confirms the field-level rules folded into notes below.
 version: 1
 resources:
   cachestore-cluster:
@@ -47,6 +56,21 @@ resources:
                             note: "LOOKUP — GET /v1/engine-versions $.contents[0].id (cachestore 호스트; 소스 cache-find-version 스텝). 동적 조회가 202로 라이브 증명됨 — 버전 추측 금지 (지원 엔진: Redis OSS Sentinel 7.2.11, Valkey Sentinel 8.1.4)"}
         server_type: {type: string, required: true,
                       note: "LOOKUP — GET /v1/server-types $.contents[0].name (예: redis1v2m4 = redis1/2vCore/4GB; 소스 cache-find-stype 스텝)"}
+      # userguide field rules (how_to_guides, 2026-06-15, UNPROVEN). These
+      # govern the create body literals above; do not change shapes, only note:
+      #   name: 영문만 3-20자 (English only, 3-20 chars). 'regrc{ualpha}' OK.
+      #   instance_name_prefix: 영문 소문자 시작 + 소문자/숫자/'-' 3-13자
+      #     (^[a-z][a-z0-9-]*$). 'regrc' OK.
+      #   database_port / sentinel_port: each 1200-65535. Body uses 6378/26378
+      #     (in range; live-proven). allowable_ip_addresses: 개별 IP 또는 CIDR.
+      #   database_user_password: 영문+숫자+특수문자(단 $ " ' 제외) 포함 8-30자.
+      #     Body 'Regr1ss@2026' is valid (12 chars, '@' allowed, no $/"/').
+      #   backup_option.retention_period_day: 7-35 (body '7' in range).
+      #   block_storage size_gb: 16-5120, 8의 배수 (multiple of 8). Body OS=104,
+      #     DATA=56 both multiples of 8 + in range. types SSD/HDD/SSD_KMS/HDD_KMS.
+      #   tags: 최대 50개 (max 50). replica_count for HA: userguide says 1 or 2
+      #     replicas (Sentinel topology); body uses 0 which is live-proven (202,
+      #     run 27258520218) — docs-vs-reality conflict already tracked in notes.
     capture: {cluster_id: "$.resource.id"}
     ready: {field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 2400, interval: 30}
