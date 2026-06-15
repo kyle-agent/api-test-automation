@@ -74,6 +74,25 @@
 2. **Run 실제 병렬(3b)을 이번 범위에 포함?** — 추천: **아니오. 3a 시각화까지만.**
    3b는 엔진 변경이라 별도 분기에서 PoC.
 
+## 결정 (owner, 2026-06-15)
+- **렌더 스택 = 둘 다.** 인터랙티브 화면 Cytoscape.js, `/platform/` 정적 export 서버 SVG,
+  같은 `graph.json` 공유. (P0는 우선 무-CDN SVG 렌더러로 착륙 — Cytoscape 업그레이드는 후속)
+- **Run 병렬 = 3a 시각화만.** 실제 레벨 병렬 executor(3b)는 별도 트랙(이번 범위 밖).
+- **다음 = P0 기반공사.**
+
+## P0 상태 — 구현됨 (2026-06-15)
+- `regression/scenarios/composer.py`: `graph_view()` · `focus_view()` · `dependents()`
+  (순수 함수, 네트워크 없음; `__all__` 노출).
+- `controlplane/resource_routes.py`: `GET /planning/resources/graph.json`
+  (`?focus=` / `?targets=&choices=`), `/graph.js`(파일 서빙, 정적 마운트 불필요),
+  `/graph`(데모 페이지) — 모두 `/{node_id}` 앞에 선언.
+- `controlplane/static/graph.js`: 공용 SVG 렌더러(레벨 띠·dedup·focus 색칠, 무빌드/오프라인).
+- `controlplane/templates/resource_graph.html`: 데모(`/planning/resources/graph`),
+  `resource_list.html`에 진입 링크.
+- `tests/offline/test_composer.py`: graph_view/focus_view/dependents 회귀 5건.
+- 검증: 실제 270노드 모델 + 픽스처에서 동작 확인(이 환경엔 fastapi/pytest 미설치라 라이브
+  구동 대신 함수·문법·어서션 검증). 라이브 확인은 control plane 기동 환경에서 `/planning/resources/graph`.
+
 ## 권장 순서 / 규모
 `P0(기반) → P1(Catalog) → P2(Plan) → P4(Report, 데이터 보유로 쉬움) → P3a(Run viz)`
 각 ~1 스프린트. **P3b(엔진 병렬)만 별도 트랙.** 전 과정 C4 안전(draft-only, 자동 enable 금지) 유지.

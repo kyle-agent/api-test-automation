@@ -616,3 +616,60 @@ def test_load_model_parses_real_resources():
     assert m, "real resource model directory exists but is empty"
     for node_id, task in m.items():
         assert isinstance(task, dict), node_id
+
+
+# --- graph views (R-platform P0): graph_view / focus_view / dependents -------
+
+def test_graph_view_nodes_edges_levels(model):
+    gv = composer.graph_view(["server"], model=model)
+    ids = {n["id"] for n in gv["nodes"]}
+    assert "server" in ids and "vpc" in ids            # closure pulled the deps
+    assert any(n["is_target"] for n in gv["nodes"] if n["id"] == "server")
+    # every edge endpoint is a node in the set; edges are dep -> node
+    for e in gv["edges"]:
+        assert e["from"] in ids and e["to"] in ids
+    # vpc (a prerequisite) sits at a lower level than server (a target)
+    lvl = {n["id"]: n["level"] for n in gv["nodes"]}
+    assert lvl["vpc"] < lvl["server"]
+    assert gv["levels"] == sorted(set(lvl.values()))
+
+
+def test_graph_view_matches_plan_closure(model):
+    gv = composer.graph_view(["server"], model=model)
+    p = plan(["server"], model=model)
+    base = {i.split("#", 1)[0] for i in p["order"]}
+    assert {n["id"] for n in gv["nodes"]} == base
+    # shared/dedup carried through
+    assert set(gv["shared"]) == set(p.get("dedup", {}))
+
+
+def test_dependents_inverse_edge(model):
+    deps = composer.dependents("vpc", model)
+    assert "subnet" in deps                            # subnet requires vpc
+    assert "vpc" not in deps                            # not its own dependent
+    # symmetry: vpc is in subnet's requires
+    assert "vpc" in composer.graph_view(["subnet"], model=model) \
+        and any(e["from"] == "vpc" and e["to"] == "subnet"
+                for e in composer.graph_view(["subnet"], model=model)["edges"])
+
+
+def test_focus_view_marks_dependents(model):
+    fv = composer.focus_view("vpc", model=model)
+    assert fv["focus"] == "vpc"
+    marked = {n["id"] for n in fv["nodes"] if n.get("is_dependent")}
+    assert "subnet" in marked
+    # focus -> dependent edges exist
+    assert any(e["from"] == "vpc" and e["to"] == "subnet" for e in fv["edges"])
+
+
+def test_graph_view_branch_choice_changes_closure(model):
+    """one_of choice flips which branch enters the graph (disjunctive dep).
+
+    The fixture's `nat` has a cost-asymmetric one_of: the cheap default is
+    `igw`; choosing `load-balancer` pulls a different (larger) closure.
+    """
+    default = {n["id"] for n in composer.graph_view(["nat"], model=model)["nodes"]}
+    assert "igw" in default and "load-balancer" not in default
+    lb = {n["id"] for n in composer.graph_view(
+        ["nat"], choices={"nat": "load-balancer"}, model=model)["nodes"]}
+    assert "load-balancer" in lb and "igw" not in lb

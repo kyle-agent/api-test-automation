@@ -20,7 +20,7 @@ import importlib
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from controlplane import dispatch, resource_model, triage
@@ -171,6 +171,76 @@ def _compose_ctx(request: Request, *, selected=None, choices=None, options=None,
                 plan_rows=_plan_rows(plan) if plan else [],
                 plan_error=plan_error, saved=saved,
                 targets_error=targets_error)
+
+
+# --- graph views (R-platform P0) — JSON contract + shared renderer + demo.
+#     Declared before /{node_id} so "graph.json"/"graph.js"/"graph" don't route
+#     as a node id. The composer stays the single source of truth (graph_view /
+#     focus_view); these routes only project + serve. -----------------------------
+
+def _parse_choices(raw: str) -> dict:
+    """`a=b,c=d` (or JSON) -> {node: branch} for the one_of branch selection."""
+    if not raw:
+        return {}
+    raw = raw.strip()
+    if raw.startswith("{"):
+        import json
+        try:
+            return json.loads(raw)
+        except Exception:
+            return {}
+    out = {}
+    for pair in raw.split(","):
+        if "=" in pair:
+            k, _, v = pair.partition("=")
+            out[k.strip()] = v.strip()
+    return out
+
+
+@router.get("/graph.json")
+def graph_json(request: Request, targets: str = "", focus: str = "",
+               choices: str = ""):
+    """Layout-agnostic dependency-graph JSON for the graph UI.
+
+    `?focus=<node>` -> that node's upstream closure + direct dependents.
+    `?targets=a,b,c[&choices=node=branch,...]` -> the composed closure.
+    """
+    mod = _composer()
+    if mod is None:
+        return JSONResponse({"error": "합성기 미탑재 (composer.py)"}, status_code=503)
+    model = resource_model.load_model()
+    try:
+        if focus:
+            if focus not in model:
+                return JSONResponse({"error": f"unknown node '{focus}'"}, status_code=404)
+            return JSONResponse(mod.focus_view(focus, model=model))
+        tlist = [t for t in (targets or "").split(",") if t.strip()]
+        if not tlist:
+            return JSONResponse({"error": "targets 또는 focus 가 필요합니다"}, status_code=400)
+        return JSONResponse(mod.graph_view(tlist, _parse_choices(choices) or None,
+                                           None, model))
+    except Exception as exc:  # ComposeError or bad input -> 400, never 500
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@router.get("/graph.js")
+def graph_js():
+    """Serve the shared SVG renderer (no static mount needed)."""
+    path = HERE / "static" / "graph.js"
+    return Response(path.read_text(encoding="utf-8"),
+                    media_type="application/javascript")
+
+
+@router.get("/graph", response_class=HTMLResponse)
+def graph_demo(request: Request, focus: str = "", targets: str = ""):
+    """P0 demo page — the shared graph component against live model data."""
+    model = resource_model.load_model()
+    if not focus and not targets:
+        focus = "vpc" if "vpc" in model else next(iter(model), "")
+    return _render(request, "resource_graph.html",
+                   focus=focus, targets=targets,
+                   nodes=sorted(model.keys()),
+                   has_composer=_composer() is not None)
 
 
 @router.get("/compose", response_class=HTMLResponse)
