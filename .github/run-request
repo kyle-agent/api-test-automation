@@ -1,10 +1,11 @@
-# SCR repo-create isolation test (2026-06-15) — gen-scr-repo-test. Create repo
-# 'test' on the EXISTING owner registry sample-nayvugfp (registry_id 'nayvugfp')
-# via POST /v1/repositories using the standard SCP access/secret (no console SCR
-# auth key needed for the REST API). Answers: is repo-create still 403, or does
-# it work with full-permission access/secret? Light, no VPC. Broad expect_status
-# records the real status/body; list-registries first shows the true registry id.
-mutations=true
-destructive=true
+# AXIS2 conformance sweep (2026-06-15) — re-run conformance over ALL covered
+# endpoints (hasn't run in a while; newly-reachable endpoints may surface design
+# /behaviour defects). conformance=true -> static analysis + runtime probes
+# (--probe all, read-only / empty-body): documented-vs-actual status, 4xx that
+# return 500, error-envelope shape, pagination, options, l10n, schema, validation.
+# NON-billable: no schema-live (no real resource creation), mutations off so AXIS1
+# is smoke-only.
+conformance=true
+mutations=false
+destructive=false
 heavy=false
-crud_filter=gen-scr-repo-test
