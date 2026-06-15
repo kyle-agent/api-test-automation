@@ -37,9 +37,11 @@ resources:
       - {name: read-connected-endpoints,
          endpoint: "GET /v1/apis/{api_id}/connected-endpoints",
          expect_status: [200]}
-      - {name: read-reports, endpoint: "GET /v1/apis/{api_id}/reports",
-         expect_status: [200],
-         note: "기간 query param이 필요할 수 있음 (docs에 모델 없음) — 라이브 런에서 400이면 param 보강 (R3)"}
+      # listreports는 stage_name + start_date + end_date 3개 query param이 모두
+      # required (data/api_docs.json 확인, 2026-06-15) — api 노드 단계에는 아직
+      # stage가 없으므로 여기서는 배선하지 않는다. stage `dev`가 존재하는
+      # apigw-deployment 노드의 verify(read-reports)에서 실제 query param과 함께
+      # 운용한다.
       - {name: read-resource-policies,
          endpoint: "GET /v1/apis/{api_id}/resource-policies",
          expect_status: [200, 404],
@@ -147,6 +149,10 @@ resources:
     verify:
       - {name: read-list, endpoint: "GET /v1/apis/{apigw-api.api_id}/deployments",
          expect_status: [200]}
+      - {name: read-reports,
+         endpoint: "GET /v1/apis/{apigw-api.api_id}/reports?stage_name=dev&start_date=2025-01-01&end_date=2025-12-31",
+         expect_status: [200, 400, 404],
+         note: "listreports — UNPROVEN. data/api_docs.json(2026-06-15): stage_name/start_date/end_date 3개가 모두 required query param(이전에 의심하던 단일 'period'가 아님). stage_name=dev는 deployment(stage_type=new)가 생성한 스테이지. 날짜창은 넉넉한 기본값(YYYY-MM-DD 포맷, docs example 2025-07-01 형식) — 데이터 없는 신규 api라 빈 리포트 200 또는 날짜/형식 거부 400 가능 → [200,400,404] 관용. 라이브에서 400이면 응답 본문으로 포맷/창 보정."}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
     source: {lifecycle: apigateway-api-write-coverage, steps: [create-deployment]}
     notes: "deployment DELETE 엔드포인트는 카탈로그에 없다(불변 리비전 — api 삭제로 회수) → 의도적으로 delete 없음. createapideployment(api_bodies): stage_type=new가 같은 호출에서 stage `dev`까지 생성하고 $.deployment_id를 반환. 메서드 ≥1개 선행 필요(NoMethodsExist) → requires에 apigw-method. 배포 description 최대 50자(userguide how_to 2026-06-14, docs-only). 배포는 버전 이력 추적·'배포 변경' 함수로 롤백 가능(콘솔 기능, API 모델 없음)."
@@ -162,6 +168,10 @@ resources:
     verify:
       - {name: read-list, endpoint: "GET /v1/apis/{apigw-api.api_id}/stages",
          expect_status: [200]}
+      - {name: read,
+         endpoint: "GET /v1/apis/{apigw-api.api_id}/stages/stg{unique}",
+         expect_status: [200],
+         note: "showstage — stage는 id가 아니라 stage_name으로 주소화되므로 capture 없이 create body의 stg{unique}(런 내 상수) 리터럴을 그대로 쓴다. 합성 lifecycle은 stages 목록에서 stage_name을 capture해 와일드카드 {stage_name}로 풀지만, 모델 레벨에서는 create와 같은 {unique} 전개에 의존(delete 경로와 동일 규약)."}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/stages/stg{unique}",
              destructive: true}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
@@ -215,6 +225,10 @@ resources:
     verify:
       - {name: read-list, endpoint: "GET /v1/apis/{apigw-api.api_id}/usage-plans",
          expect_status: [200]}
+      - {name: read,
+         endpoint: "GET /v1/apis/{apigw-api.api_id}/usage-plans/{usage_plan_id}",
+         expect_status: [200],
+         note: "showusageplan — create 응답 $.usage_plan.id로 capture한 usage_plan_id로 상세조회."}
     delete: {endpoint: "DELETE /v1/apis/{apigw-api.api_id}/usage-plans/{usage_plan_id}",
              destructive: true}
     provenance: VALIDATED  # create 2xx live — run 27394211896 (gen-wave-apigw)
