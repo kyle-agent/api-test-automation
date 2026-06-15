@@ -6,6 +6,27 @@ Mirror of the `_note` fields in `regression/scenarios/scenarios.json`; keep both
 in sync. Every entry here is also an **AI-usability gap** (something an AI could
 not infer from the spec) — feed it to the AI-Evaluator agent.
 
+## API design quirks — composite "create-all-in-one" verbs (AXIS-2 / AI-usability)
+
+- **quick-query** — `POST /v1/quick-query` is NOT a thin "create a query" call. It is a
+  **composite verb that provisions a whole SKE k8s engine (cluster + 3-node pool)
+  inline** in the same request (docs model `QuickQueryTotalCreateRequest` =
+  `kubernetes_engine_create_request` + `node_pool_create_requests[]` +
+  `quick_query_create_request`; docs-derived, UNPROVEN). The reference page
+  `.../models/quickquerycreaterequest/` is ONLY the innermost
+  `quick_query_create_request` slice — vpc_id/subnet_id live in the
+  `kubernetes_engine_create_request` block.
+  - **Two dependency kinds collapse into one verb**: vpc/subnet/security-group/
+    filestorage-volume are *referenced* (must pre-exist → real `requires`, ids
+    injected into the inline engine block), but the **k8s engine itself is born
+    inline** (not a separate create→reference node).
+  - **AI-usability gap**: an agent reading "create quick-query" cannot infer it
+    spins up a billable 3-node SKE cluster + full VPC/subnet/SG/volume wiring.
+    Same shape likely recurs in data-flow (NiFi) / data-ops (Airflow) — engines
+    installed on SKE via one composite verb (cf. IB-018). Graph shows vpc as an
+    ancestor correctly; only transitive-reduction *display* cleanup is needed
+    (IB-032), `requires` stays.
+
 ## Constraints from userguide (docs — naming/quota/state; not yet 2xx-confirmed)
 
 **mysql (overview, 2026-06-15):**

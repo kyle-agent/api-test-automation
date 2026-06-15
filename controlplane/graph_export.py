@@ -34,6 +34,69 @@ def _requires_summary(task: dict) -> dict:
     }
 
 
+def _focus_display_edges(fv: dict, model: dict) -> dict:
+    """Make a focus graph's *displayed* edges accurate enough to transitively reduce.
+
+    :func:`composer.focus_view` adds every direct dependent of the focus as a
+    flat leaf with a ``focus->dep`` edge, but it does NOT add the edges *between*
+    those dependents (e.g. ``subnet->quick-query``). So the longer path
+    ``vpc->subnet->quick-query`` is not present in the rendered set, and a
+    render-time transitive reduction would have nothing to reduce against (and
+    must not drop ``vpc->quick-query`` without it — that would orphan the node).
+
+    This enriches the focus graph, touching ONLY the exported display data (never
+    the model), by:
+      1. adding the real ``requires`` (AND + one_of branches) edges that exist
+         *between nodes already in the focus set*, and
+      2. recomputing each node's ``level`` as longest-path depth over the
+         enriched edge set, so dependents nest under their true parent
+         (quick-query under subnet, with vpc a grandparent).
+
+    The actual transitive reduction then happens client-side in
+    ``ResourceGraph.render`` (graph.js), uniformly for every view.
+    """
+    if not fv or fv.get("error"):
+        return fv
+    nodeset = {n["id"] for n in fv["nodes"]}
+    have = {(e["from"], e["to"]) for e in fv["edges"]}
+    for nid in nodeset:
+        and_deps, groups, _ = composer._norm_requires(model.get(nid) or {})
+        refs = [d["ref"] for d in and_deps]
+        # preserve one_of: include every branch ref that is present in the set;
+        # the renderer's reduction keeps a branch edge unless it is itself
+        # redundant, so we never drop a genuine alternative.
+        for g in groups:
+            refs.extend(b["ref"] for b in g["branches"])
+        for r in refs:
+            if r in nodeset and r != nid and (r, nid) not in have:
+                fv["edges"].append({"from": r, "to": nid})
+                have.add((r, nid))
+
+    # longest-path level over the enriched (full) edge set
+    adj: dict[str, list] = {n: [] for n in nodeset}
+    for e in fv["edges"]:
+        if e["to"] in adj and e["from"] in nodeset:
+            adj[e["to"]].append(e["from"])
+    depth: dict[str, int] = {}
+
+    def _d(n, stack):
+        if n in depth:
+            return depth[n]
+        if n in stack:
+            return 0
+        stack.add(n)
+        ds = [_d(r, stack) for r in adj.get(n, []) if r in adj]
+        depth[n] = 0 if not ds else 1 + max(ds)
+        stack.discard(n)
+        return depth[n]
+
+    for n in nodeset:
+        _d(n, set())
+    for node in fv["nodes"]:
+        node["level"] = depth.get(node["id"], node.get("level", 0))
+    return fv
+
+
 def build_catalog(model: dict | None = None) -> dict:
     if model is None:
         model = composer.load_model()
@@ -86,7 +149,7 @@ def build_catalog(model: dict | None = None) -> dict:
             "ready_timeout": (task.get("ready") or {}).get("timeout"),
         }
         try:
-            focus[nid] = composer.focus_view(nid, model=model)
+            focus[nid] = _focus_display_edges(composer.focus_view(nid, model=model), model)
         except Exception as exc:  # never let one bad node fail the export
             focus[nid] = {"error": str(exc), "nodes": [], "edges": [], "focus": nid}
 
@@ -236,6 +299,7 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
       <span><i style="background:var(--docs)"></i>docs</span>
       <span><i style="background:#5aa9ff"></i>초점 ★</span>
       <span><i style="background:#b48cff"></i>피의존 ↓</span></div>
+    <label class="chk" style="display:inline-flex;margin:4px 0"><input type="checkbox" id="reduce" checked><span>transitive reduction <span class="muted" style="font-size:11px">(끄면 모든 직접 의존 표시)</span></span></label>
     <div class="svgbox"><svg id="svg"></svg></div>
     <p class="muted" id="ghint" style="font-size:12px"></p>
   </div>
@@ -264,7 +328,7 @@ function refresh(){
   var g=C.focus[sel];
   document.getElementById("gtitle").innerHTML="<code>"+sel+"</code> 의존 관계";
   document.getElementById("ghint").textContent="왼쪽=의존(선행), 오른쪽=피의존(후행). 노드 클릭=초점 이동.";
-  if(g&&!g.error)ResourceGraph.render(document.getElementById("svg"),g,{onClick:function(id){if(N[id]){sel=id;refresh();}}});
+  if(g&&!g.error)ResourceGraph.render(document.getElementById("svg"),g,{reduce:document.getElementById("reduce").checked,onClick:function(id){if(N[id]){sel=id;refresh();}}});
   else document.getElementById("svg").innerHTML='<text x="12" y="24" fill="#ff8585">'+(g&&g.error||"no graph")+'</text>';
   // detail
   var req=n.requires,reqHtml=req.and.map(d=>'<span class="chip">'+d.ref+(d.count>1?" ×"+d.count:"")+'</span>').join("")+req.one_of.map(o=>'<span class="chip">🔀 '+o.branches.join(" | ")+'</span>').join("")||'<span class="muted">없음</span>';
@@ -280,6 +344,7 @@ function refresh(){
     '<h3>options</h3>'+optHtml+
     '<div class="note">이 화면은 읽기 전용입니다. 정의/수정은 control plane <code>/planning/resources/'+sel+'</code> 에서.</div>';
 }
+document.getElementById("reduce").onchange=refresh;
 document.getElementById("cat").onchange=function(e){var c=e.target.value;var fs=[...svcOf[c]].sort()[0];sel=Object.keys(N).find(id=>N[id].service===fs);refresh();};
 document.getElementById("svc").onchange=function(e){var s=e.target.value;sel=Object.keys(N).find(id=>N[id].service===s);refresh();};
 refresh();

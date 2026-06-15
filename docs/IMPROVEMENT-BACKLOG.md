@@ -59,6 +59,8 @@ owner가 3개 Claude Code 창을 병렬로 운영: ① 기존 테스트 창 ② 
 | IB-028 | debt | scaffold capture 가정과 같은 뿌리(IB-026) — 새 서비스 ~20%(analytics 5+financial+devops)가 post-scaffold 수동 교정 필요 | IB-026과 묶어 처리(validator 규칙 + scaffold envelope 힌트) | M | open (IB-026와 묶음) |
 | IB-029 | debt | (debt-finder가 제안했으나 **이번 라운드 Track1이 해소**) disabled lifecycle 준비상태가 BACKLOG/`_disabled_reason`/RESOURCE-MODEL-PLAN에 흩어짐 | `docs/LIVE-READINESS-GATES.md` 생성 — 26 disabled lifecycle inventory(fix_status·ready_for_live·blocking_IB). **done(IB-023과 동일 산출)** | S | done |
 | IB-030 | debt | disabled lifecycle governance — 'blocked' vs 'waiting-for-testing' 구분이 prose(RESOURCE-MODEL-PLAN §6)에만, 머신리더블 플래그 부재. Track4 debt-finder | scenarios 스키마에 `_status` enum{blocked,done-modeled,gated-ready,timing-gated,triage} 추가 + validator 강제 → 대시보드 'readiness gauge' 가능. LIVE-READINESS-GATES.md(IB-029)의 데이터화 후속 | M | open |
+| IB-031 | debt | **진짜 모델 중복 requires 6건** — sibling dep을 통해 전이로 도달되고 body에서도 안 쓰이는 dead-weight `requires`: `vpc`@server(subnet으로 도달, body subnet_id만), `vpc`@privatelink-service, `server`@backup-policy(backup-target 경유), `filestorage-volume`@data-flow-service·data-ops-service(ske-cluster 경유), `keypair`@ske-nodepool(ske-cluster 경유). Track4 전수 스캔(67노드/78엣지 중 graph-only 72 + true 6). owner도 server→vpc 직접 지적 | 해당 6개 노드 yaml에서 redundant `requires` 항목 삭제(합성 closure 불변 — 전이 경로가 여전히 끌어옴). offline-gate-only | S | open |
+| IB-032 | visualize | 의존 그래프에 transitive reduction 부재 — N→d 엣지가 다른 직접 dep d'를 통해 도달 가능해도 그대로 그려, 노드가 조상 직속처럼 보임(owner: quick-query/server가 vpc 직속). 67노드 영향 | focus-graph 렌더러(graph.js + graph_export.py)에 transitive reduction: 표시 엣지에서 중복 엣지 숨김(requires/모델 불변), 토글 기본 ON. **done(Track1 Platform: 272 그래프 고아 0, pytest 89 passed)** | M | done |
 
 ## 진행 중 티켓 (M6-DESIGN §F)
 
