@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-14T22:54:17Z · <b>sha 0c12843</b>
+    2026-06-15T03:10:26Z · <b>sha 40982e3</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -256,9 +256,9 @@
   </a>
   <a class="pstage" href="#sec-scen">
     <div class="pl">② 시나리오 <span style="font-weight:400;color:var(--faint)">실행 단위</span></div>
-    <div class="pv">188</div>
+    <div class="pv">189</div>
     <div class="ps">생성→검증→역순 정리 스텝 ·
-      합성 <b>60</b> · 수작업 128</div>
+      합성 <b>61</b> · 수작업 128</div>
     <div class="ps" style="color:var(--blue)">속성(mutation·destructive·heavy)이 게이트 통과해야 실행 →</div>
     <span class="chev">→</span>
   </a>
@@ -286,10 +286,10 @@
 
 <h2 id="sec-scen">② 시나리오 카탈로그 <span class="hint">실행되는 테스트 전체 목록 — ①에서 합성된 gen-* 와 수작업이 함께 (비고 클릭 = 전체 보기)</span></h2>
 <div class="fchips" id="scenChips">
-  <span class="fchip on" data-f="all"><b>188</b> 전체</span>
-  <span class="fchip" data-f="enabled"><b>157</b> enabled</span>
+  <span class="fchip on" data-f="all"><b>189</b> 전체</span>
+  <span class="fchip" data-f="enabled"><b>158</b> enabled</span>
   <span class="fchip" data-f="heavy"><b>75</b> heavy(과금성)</span>
-  <span class="fchip" data-f="gen"><b>60</b> 합성(gen)</span>
+  <span class="fchip" data-f="gen"><b>61</b> 합성(gen)</span>
   <span class="fchip" data-f="disabled"><b>31</b> disabled</span>
   <input class="search" id="scenSearch" placeholder="서비스·시나리오 검색" style="margin-left:auto">
 </div>
@@ -2472,6 +2472,30 @@
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/generated__pilot.json">
+          <a href="#">보기</a> ·
+          <a href="#">편집</a></td>
+      </tr>
+      
+      <tr data-id="gen-scr-repo-test" data-service="container/scr"
+          data-enabled="1"
+          data-heavy=""
+          data-gen="1">
+        <td><code>gen-scr-repo-test</code></td>
+        <td><span class="srv">container/scr</span></td>
+        <td>2</td>
+        <td>
+          <span class="tag read" title="자원 모델에서 합성기로 생성된 시나리오">합성</span>
+          
+          
+          
+        </td>
+        <td>
+          
+          <div class="biz" onclick="this.classList.toggle('open')">isolation probe — light, no VPC. list-registries first so th… <span class="toggle">더보기</span>
+            <div class="more">isolation probe — light, no VPC. list-registries first so the artifact shows every visible registry + its real id (safety net if &#39;nayvugfp&#39; is wrong). Then create repo &#39;test&#39; on registry_id=nayvugfp. 201/202 =&gt; repo-create works with access/secret (owner hypothesis confirmed: the earlier 403 was NOT</div></div>
+          
+        </td>
+        <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/generated__scr-repo-test.json">
           <a href="#">보기</a> ·
           <a href="#">편집</a></td>
       </tr>
