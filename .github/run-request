@@ -1,12 +1,13 @@
-# Heavy live VALIDATION wave (2026-06-15) — advance the VALIDATED node count.
-# Full CRUD lifecycle run on current main (now includes: graph transitive-reduction
-# fix, IB-022 source wiring, model improvements, AUTONOMOUS-LOOP controller doc).
-# VPC 5-cap is respected by the existing shared-VPC adopt (conftest shared_vpc ->
-# ~1 shared VPC for the 6 heavy chains) + regression/scenarios/dependencies.json
-# vpc_schedule + core.budgets reservation (quota-exhaustion SKIPS, never fails).
-# Goal: promote docs-provenance nodes to VALIDATED from real 2xx; feed fail_new to
-# the Problem-Finder track. The publish step also restores the dashboard index
-# entry-link (build.py on main now emits catalog/platform links).
+# Wave A LIGHT validation run (2026-06-15) — first validation-loop cycle.
+# heavy=false: smoke + read-chains + LIGHT CRUD only (NO billable VM/DB/heavy clusters).
+# Purpose:
+#  (1) exercise newly-wired id-bound GET probe-reads (apigw tree showstage/showusageplan/
+#      listreports, vs servers/{id}/volumes, vpc tgw/peering routing-rules, dns hosted-zone)
+#      -> raise cov_getid;
+#  (2) produce IB-041 verified_endpoints_evidence.json (per-endpoint real 2xx) -> unlock
+#      docs->VALIDATED promotion next cycle;
+#  (3) validate light-service creates (servicewatch/iam/queue/etc).
+# VPC 5-cap: light networking self-creates 1-2 VPCs (well under the cap).
 mutations=true
 destructive=true
-heavy=true
+heavy=false
