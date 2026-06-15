@@ -377,6 +377,8 @@ resources:
                dimensions: []}
         expect_status: [200]
     provenance: docs
+    source: {lifecycle: servicewatch-custom-ingest, steps: [create-custom-metric-meta],
+             notes: "also exercised by gen-wave5-swatch-custom-metric (IB-022: missing source wired)"}
     notes: "docs 모델 verbatim(UNPROVEN, 라이브 미관측). unit 표기는 docs가 자기모순 — MetricMetaDto 허용 목록은 대문자(SECONDS…COUNT, NONE)인데 예시는 'Bytes' → 예시 표기('Count')를 따르고 400이면 'COUNT'로 정정(error-driven). resource.attributes의 key 'namespace'는 추정 — doc 예시는 key가 빈 문자열인 placeholder뿐(routing 단서 없음); 400/유실 시 후보는 meta의 namespace 문자열 매칭. time_unix_nano는 고정값(2026-06-01) — 오래된 타임스탬프 거부 정책이 있으면 적재가 무시될 수 있으나 202 수신 자체가 커버리지 목적엔 충분. 메트릭명/네임스페이스 고정 재사용: 커스텀 지표는 삭제 API가 없고 월 10개 초과분 과금."
 
   # custom log collect registration — createcustomlogstream registers an
@@ -423,4 +425,6 @@ resources:
                       timeUnixNano: 1780272000000000000
         expect_status: [202]
     provenance: docs
+    source: {lifecycle: servicewatch-custom-ingest, steps: [create-custom-log-stream],
+             notes: "also exercised by gen-wave5-swatch-custom-log (IB-022: missing source wired)"}
     notes: "docs 모델 verbatim(UNPROVEN, 라이브 미관측). 로그 이벤트 최대 1MB(유저가이드 overview) — probe는 한 줄. timeUnixNano는 고정값(2026-06-01); 모델 타입은 integer인데 doc 예시는 문자열 — integer로 전송, 400이면 문자열로 정정(error-driven). 유저가이드 로그 페이지의 위계(로그 그룹 → '로그 스트림을 생성할 로그 그룹명을 클릭하세요' → 스트림) 그대로 log-stream을 선행 — collect 등록은 기존 그룹/스트림 이름을 참조하므로 생성 후에만 유효."

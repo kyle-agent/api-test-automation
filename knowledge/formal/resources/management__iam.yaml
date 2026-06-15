@@ -181,7 +181,8 @@ resources:
     delete: {endpoint: "DELETE /v1/groups/{iam-group.group_id}/policy-bindings/{iam-policy.policy_id}",
              destructive: true}
     provenance: docs
-    source: {docs: "management/iam/addgrouppolicybinding (grouppolicybindingrequest: policy_ids REQUIRED) + removegrouppolicybinding"}
+    source: {lifecycle: iam-group-bindings, steps: [add-group-policy-binding, remove-group-policy-binding],
+             docs: "management/iam/addgrouppolicybinding (grouppolicybindingrequest: policy_ids REQUIRED) + removegrouppolicybinding"}
     notes: "그룹↔정책 바인딩 — 자체 iam-group/iam-policy만 사용 (policies-attach-to-groups-not-users). create 응답은 {policies:[...]} 목록이라 capture 불필요 — delete 경로가 prereq 토큰을 그대로 쓴다 (dotted-prereq-token-in-delete, server-interface 패턴). removegrouppolicybinding은 라이브 검증 이력 있음(verified set) — add 쪽이 wave5의 신규 커버."
 
   iam-policy-binding-set:
@@ -201,7 +202,8 @@ resources:
                     remove_ids: ["{iam-group.group_id}"]},
              expect_status: [200], destructive: true}
     provenance: docs
-    source: {docs: "management/iam/setpolicygroupbinding (policybindingsetrequest: identity_type REQUIRED, add_ids/remove_ids optional)"}
+    source: {lifecycle: iam-policy-extra-writes, steps: [set-policy-bindings],
+             docs: "management/iam/setpolicygroupbinding (policybindingsetrequest: identity_type REQUIRED, add_ids/remove_ids optional)"}
     notes: "정책 쪽에서 본 바인딩 설정 (PUT add_ids/remove_ids) — create=PUT add, teardown=같은 PUT의 remove_ids (비-DELETE teardown passthrough). iam-policy.2 (두 번째 인스턴스)를 쓰는 이유: 묶음 합성 시 iam-group-policy-binding이 policy#1을 같은 그룹에 이미 바인딩하므로 중복 바인딩 충돌을 피한다. 응답은 group 페이지 목록 — capture 불필요."
 
   iam-role-policy-binding:
@@ -218,7 +220,8 @@ resources:
     delete: {endpoint: "DELETE /v1/roles/{iam-role.role_id}/policy-bindings/{iam-policy.2.policy_id}",
              destructive: true}
     provenance: docs
-    source: {docs: "management/iam/addrolepolicybindings (rolepolicybindingrequest: policy_ids REQUIRED) + removerolepolicybinding"}
+    source: {lifecycle: iam-role-full, steps: [add-role-policy-bindings, remove-role-policy-binding],
+             docs: "management/iam/addrolepolicybindings (rolepolicybindingrequest: policy_ids REQUIRED) + removerolepolicybinding"}
     notes: "역할↔정책 바인딩 — iam-role이 create 시점에 policy#1을 연결하므로(필수 policy_ids) 이 노드는 policy#2를 추가 바인딩/단건 해제한다. removebulkrolepolicybindings(동일 경로 DELETE+body)는 iam-role의 unbind-bulk verify가 커버. 응답 {policies:[...]} — capture 불필요."
 
   iam-saml-provider:
@@ -239,7 +242,8 @@ resources:
     delete: {endpoint: "DELETE /v1/saml-providers/bulk",
              json: {ids: ["{saml_provider_id}"]}, destructive: true}
     provenance: docs
-    source: {docs: "management/iam/createsamlprovider (samlprovidercreaterequest: federation_type+saml_provider_name REQUIRED, file optional) + setsamlprovider + deletesamlproviders"}
+    source: {lifecycle: iam-credentials-heavy, steps: [create-saml-provider, set-saml-provider, delete-saml-providers-bulk],
+             docs: "management/iam/createsamlprovider (samlprovidercreaterequest: federation_type+saml_provider_name REQUIRED, file optional) + setsamlprovider + deletesamlproviders"}
     notes: "RISK(콘텐츠 타입): doc request 예제는 multipart/form-data (file= IdP 메타데이터 XML, DTO상 optional). 엔진은 JSON 전송만 지원 — file 없이 JSON으로 시도하는 라이브 실험이며, 게이트웨이가 multipart를 강제하면 400/415 → 그 경우 disable + 엔진 multipart 지원 필요로 재분류. create envelope FLAT $.id (doc 201 예제). 합성 메타데이터 없이 만든 provider는 federation 불가(아무도 이 IdP로 로그인 못 함) — 계정 인증에 영향 없음(safe). 단건 delete가 카탈로그에 없어 deletesamlproviders(bulk, body {ids})가 유일한 teardown. userguide(2026-06-15 how_to_guides/identity_provider) 확정: saml_provider_name 128자 이내, '영문/숫자/특수문자(,-_)' (policy/user보다 좁은 셋, @=. 금지); description 1,000자; metadata 파일 = UTF-8 XML, 10MB 이하, 단일 파일만, '발급자명·만료 정보·SAML 응답 확인용 키' 포함; federation = SAML only ('OIDC 유형은 2026년에 제공될 예정'). 콘솔 절차로만 문서화됐으나 카탈로그에 createsamlprovider 존재 → STOP-2(콘솔 전용) 미적용; multipart 게이트가 라이브에서 실제 차단인지가 R3 결정점."
 
   # --- wave5: 게이트 노드들 (required no-default 옵션 = 폼-입력 게이트,
@@ -261,7 +265,8 @@ resources:
     delete: {endpoint: "DELETE /v1/groups/{iam-group.group_id}/members/{opt.user_id}",
              destructive: true}
     provenance: docs
-    source: {docs: "management/iam/addgroupmember (groupmembercreaterequest: user_id REQUIRED) + removegroupmember"}
+    source: {lifecycle: iam-group-bindings, steps: [add-group-member, remove-group-member],
+             docs: "management/iam/addgroupmember (groupmembercreaterequest: user_id REQUIRED) + removegroupmember"}
     notes: "자체 그룹에 owner 제공 user_id를 추가/제거 — 그룹은 우리가 만들고 지우므로 사용자 권한에 미치는 순효과 0 (멤버십은 teardown에서 제거, 그룹 자체도 삭제). 응답 $.group_member.user_id — capture 불필요 (경로가 opt 토큰 재사용)."
 
   iam-user:
@@ -295,7 +300,8 @@ resources:
     delete: {endpoint: "DELETE /v1/accounts/{opt.account_id}/users/{user_id}",
              destructive: true}
     provenance: docs
-    source: {docs: "management/iam/createiamuser (iamusercreaterequest: user_name+password+temporary_password REQUIRED) + getiamuser/listiamuser/updateiamuser/updateiamuserpassword/deleteiamuser"}
+    source: {lifecycle: iam-credentials-heavy, steps: [create-account-user, update-account-user, set-account-user-password, delete-account-user],
+             docs: "management/iam/createiamuser (iamusercreaterequest: user_name+password+temporary_password REQUIRED) + getiamuser/listiamuser/updateiamuser/updateiamuserpassword/deleteiamuser"}
     notes: "실 로그인 가능 principal을 만드는 노드라 게이트 (runner 인증에는 영향 없으나 테넌트-침습적). password는 합성 1회용 + temporary_password:true(첫 로그인 시 변경 강제) + group_ids/policy_ids 빈 배열 = 권한 0인 사용자 → 생성 직후 verify 후 삭제. updateiamuser(iamuserupdaterequest)는 password_reuse_count가 REQUIRED인 특이 DTO — 0 사용 (Maximum 24). create envelope FLAT $.id (iamcreateuserresponse). deletebulkiamuser는 bulk-delete 클래스로 미모델. userguide(2026-06-15 how_to_guides/user) 확정: user_name 64자 이내 + '영문/숫자/특수문자(+=,.@-_)' (한글 없음 — policy_name과 차이); password 9-20자 + 대/소/숫/특(!@#$%&*^) 각 1+ + 3-반복/4-연속/ID포함/사전어/이전키 재사용 금지 + 90일 회전 (model body의 'Regr9x!{ualpha}'는 8+영숫특 조합으로 ualpha:3자 보완 시 9자 충족 — 라이브 정제 시 길이 확인); temporary_password=true는 최초 로그인 시 변경 강제, false면 admin reset만 가능. ★account_id는 콘솔의 사용자 생성 화면/로그인 정보 팝업에 표시 — API 발견 경로 미문서(콘솔 전용) → opt.account_id 게이트 의도 확정(STOP-2가 아니라 owner credential 게이트로 보수적 유지)."
 
   iam-user-policy-binding:
@@ -314,7 +320,8 @@ resources:
     delete: {endpoint: "DELETE /v1/users/{opt.user_id}/policy-bindings/{iam-policy.policy_id}",
              destructive: true}
     provenance: docs
-    source: {docs: "management/iam/adduserpolicybinding (userpolicyrequest: policy_ids) + removeuserpolicybinding + listuserpolicybindings"}
+    source: {lifecycle: iam-user-policy-bindings, steps: [add-user-policy-binding, remove-user-policy-binding],
+             docs: "management/iam/adduserpolicybinding (userpolicyrequest: policy_ids) + removeuserpolicybinding + listuserpolicybindings"}
     notes: "자체 iam-policy를 owner 제공 사용자에 바인딩/해제 — teardown이 우리가 추가한 바인딩만 제거하므로 사용자의 기존 권한은 불변. 정책 내용은 iam:* Allow지만 USER_DEFINED 신규 정책이라 기존 거동과 무관하며 체인 종료 시 정책 자체가 삭제된다. owner가 account_id를 제공하면 iam-user 노드 capture(user_id)를 ref 옵션으로 배선하는 무게이트 변형도 가능 (R4 후보)."
 
   iam-resource-policy:
@@ -356,5 +363,6 @@ resources:
     delete: {endpoint: "DELETE /v1/resource-policies/{opt.srn}",
              destructive: true}
     provenance: docs
-    source: {docs: "management/iam/setresourcepolicy (resourcepolicysetrequest: policy_version REQUIRED → resourcepolicyversioncreaterequest: policy_document REQUIRED) + showresourcepolicy/deleteresourcepolicy + addpermission/setpermission/removepermission (statementcreaterequest: Effect REQUIRED, Sid 경로 파라미터)"}
+    source: {lifecycle: iam-resource-policy, steps: [set-resource-policy, add-resource-policy-statement, set-resource-policy-statement, remove-resource-policy-statement, delete-resource-policy],
+             docs: "management/iam/setresourcepolicy (resourcepolicysetrequest: policy_version REQUIRED → resourcepolicyversioncreaterequest: policy_document REQUIRED) + showresourcepolicy/deleteresourcepolicy + addpermission/setpermission/removepermission (statementcreaterequest: Effect REQUIRED, Sid 경로 파라미터)"}
     notes: "SAFETY(정책 내용): Statement는 의도적으로 Deny + 좁은 단일 액션(virtualserver:ShowVirtualServer) — Principal '*' + Allow로 자원 접근을 '여는' 정책은 절대 쓰지 않는다. Deny라도 대상 자원의 해당 읽기를 막으므로 owner는 버려도 되는 자원만 제공할 것; teardown이 정책 전체를 제거해 원상복구. create가 PUT(set)인 upsert형 — capture 불필요 (경로가 opt 토큰 재사용). statements의 {sid}는 body Sid와 동일 리터럴 Statement2 사용."

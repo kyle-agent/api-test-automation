@@ -149,6 +149,7 @@ resources:
         cluster_id: {type: string, required: false,
                      note: "기존 엔진 수정 검증 시에만; 신규 생성 검증은 생략 (api_docs required:false)"}
     provenance: docs
+    source: {lifecycle: quick-query-lifecycle-guarded, steps: [validate-resources]}
     notes: "dry-run preflight (수정/생성 전 자원 검증). node_pool_validation_request + quick_query_engine_request 필수(api_docs). cluster_id는 optional. 비파괴, id 미생성 — capture 불요. 200 QuickQueryValidateResourceResponse."
 
   # In-place setters on an existing engine (PUT .../{id}/<field>). All require a
@@ -162,4 +163,5 @@ resources:
       endpoint: "PUT /v1/quick-query/{quick-query.quick_query_id}/description"
       body: {description: "API regression suite (updated)"}
     provenance: docs
+    source: {lifecycle: quick-query-lifecycle-guarded, steps: [update-description]}
     notes: "in-place setter (QuickQueryDescriptionRequest). 살아있는 quick_query_id 필요 → coverage-only(soft) 또는 실엔진 생성 후. 나머지 4 setter(domain/dsc-domain/engine/host-alias)는 실 DSC/엔진 값 필요 — domain/dsc-domain은 실 DSC 값, engine은 QuickQueryUpdateEngineRequest, host-alias는 array — R3."

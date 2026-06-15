@@ -320,7 +320,9 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
-    notes: "ResizeBlockStorageGroupRequest {size_gb REQ} (api_docs — PG와 동일 DTO). 104→112 GB 증설 (PG 수작업 body verbatim) — 축소 불가(비가역), 1회용 클러스터 전용. mysql guarded probe에는 이 스텝이 없어 source 생략 (mariadb/epas guarded resize-block-storage와 동일 면)."
+    source: {lifecycle: postgresql-cluster-subops-guarded, steps: [resize-block-storage],
+             notes: "shared DBaaS endpoint (POST /v1/block-storage-groups/{id}/resize) — realized by every engine's *-cluster-subops-guarded (cachestore/epas/mariadb/postgresql/sqlserver/vertica/searchengine/eventstreams) and database-postgresql-cluster; mysql-cluster-subops-guarded itself omits resize, so the canonical realization is PG (IB-022: missing source wired)"}
+    notes: "ResizeBlockStorageGroupRequest {size_gb REQ} (api_docs — PG와 동일 DTO). 104→112 GB 증설 (PG 수작업 body verbatim) — 축소 불가(비가역), 1회용 클러스터 전용. mysql guarded probe에는 이 스텝이 없어 공유 DBaaS 엔드포인트의 정규 실현(PG subops)을 source로 배선 (mariadb/epas guarded resize-block-storage와 동일 면)."
 
   mysql-resize-server-type:
     code: "db-mysql-resize-server-type"
@@ -338,7 +340,9 @@ resources:
             field: "$.service_state", until: [RUNNING, ACTIVE, AVAILABLE],
             timeout: 1800, interval: 30}
     provenance: docs
-    notes: "InstanceGroupResizeRequest {server_type_name REQ} (api_docs verbatim — PG와 동일 DTO). composer create expect [200,201,202] 고정이라 same-type 400은 hard — masked-defect 방지 의도. mysql guarded probe에 resize-instance-group 스텝이 없어 source 생략."
+    source: {lifecycle: postgresql-cluster-subops-guarded, steps: [resize-instance-group],
+             notes: "shared DBaaS endpoint (POST /v1/instance-groups/{id}/resize) — realized by every engine's *-cluster-subops-guarded and database-postgresql-cluster (resize-server-type); mysql-cluster-subops-guarded itself omits resize, so the canonical realization is PG (IB-022: missing source wired)"}
+    notes: "InstanceGroupResizeRequest {server_type_name REQ} (api_docs verbatim — PG와 동일 DTO). composer create expect [200,201,202] 고정이라 same-type 400은 hard — masked-defect 방지 의도. mysql guarded probe에 resize-instance-group 스텝이 없어 공유 DBaaS 엔드포인트의 정규 실현(PG subops)을 source로 배선."
 
   # log-export — access_key/secret_key는 계정 자격(콘솔/IAM 발급)이라 모델
   # 기본값 불가 → required 옵션 게이트. PG pg-log-export-config 미러.
