@@ -27,6 +27,27 @@ def sh(*cmd: str, timeout: int = 120) -> tuple[int, str]:
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
+def _runrequest_host() -> str:
+    """An override SCR host to probe instead of creating a fresh registry.
+    A just-created registry's .scr.public. subdomain can take >4 min to
+    propagate (run 27525758064: runner DNS still empty after the wait), so a
+    fresh registry gives a false NETWORK-UNREACHABLE. Pointing at an EXISTING,
+    long-propagated registry (owner: sample-nayvugfp resolves to 123.41.33.137
+    from a PC) isolates 'can the runner resolve SCR at all' from propagation.
+    Source: SCR_PROBE_HOST env, else `scr_probe_host=` in .github/run-request."""
+    h = os.environ.get("SCR_PROBE_HOST", "").strip()
+    if not h:
+        try:
+            for line in open(".github/run-request", encoding="utf-8"):
+                line = line.strip()
+                if line.startswith("scr_probe_host="):
+                    h = line.split("=", 1)[1].strip()
+                    break
+        except OSError:
+            pass
+    return h.replace("https://", "").replace("http://", "").rstrip("/")
+
+
 def main() -> int:
     from core.config import Settings
     from core.http_client import ApiClient
@@ -49,6 +70,43 @@ def main() -> int:
     name = f"regrdkr{suffix}"
     reg_id = ""
     try:
+        host_override = _runrequest_host()
+        if host_override:
+            host = host_override
+            print(f"{VERDICT} OVERRIDE — probing EXISTING registry {host} "
+                  f"(no create/delete; isolates runner DNS from new-subdomain "
+                  f"propagation)")
+            import socket
+            dns_ok = False
+            for _ in range(8):  # ~2 min; an established host should resolve fast
+                try:
+                    socket.getaddrinfo(host, 443); dns_ok = True; break
+                except OSError:
+                    time.sleep(15)
+            print(f"{VERDICT} dns({host}) resolvable={dns_ok}")
+            ak, sk = os.environ["SCP_ACCESS_KEY"], os.environ["SCP_SECRET_KEY"]
+            r = subprocess.run(["docker", "login", host, "-u", ak,
+                                "--password-stdin"],
+                               input=sk, capture_output=True, text=True, timeout=60)
+            out = (r.stdout + r.stderr).strip()
+            print(f"{VERDICT} docker login({host}, user=access-key) "
+                  f"rc={r.returncode} {out[:200]}")
+            if r.returncode == 0:
+                sh("docker", "pull", "hello-world")
+                tag = f"{host}/regrprobe/hello:{suffix}"
+                sh("docker", "tag", "hello-world", tag)
+                rc, pout = sh("docker", "push", tag, timeout=180)
+                print(f"{VERDICT} docker push rc={rc} {pout[:300]}")
+                print(f"{VERDICT} " + ("PUSH-OK — SCP keys ARE the SCR docker "
+                      "credential; cloud-ml custom_registry can reuse them"
+                      if rc == 0 else "LOGIN-OK-PUSH-FAILED — check repo/perms"))
+            elif any(k in out for k in ("dial", "lookup", "no such host")):
+                print(f"{VERDICT} NETWORK-UNREACHABLE — runner cannot reach even "
+                      f"the established host (egress/DNS blocked, not propagation)")
+            else:
+                print(f"{VERDICT} LOGIN-FAILED — SCP keys are NOT the docker "
+                      f"credential (separate console auth key required)")
+            return 0
         # the model's VALIDATED create body (container-registry node)
         # public registry on purpose (run 27444823109 lesson): a private one
         # has empty public_domain, and docker login from a GitHub runner needs
