@@ -1,12 +1,10 @@
-# aimlops Stage B (2026-06-14) — gen-heavy-aimlops: real SKE cluster create
-# (keypair->sg->vpc->subnet->filestorage->cluster RUNNING->nodepool) then aimlops
-# preconditions against the REAL cluster_id, POST /v1/aimlops-platform release,
-# update, delete, full reverse teardown. Owner-approved cost + dedicated window.
-# FIRST LIVE RUN IS EXPLORATORY: the release body is UNPROVEN (no api_bodies
-# entry; cpu/memory/storage_class/volume_size are guesses) — broad expect_status
-# + capture_soft release_id + 409-retry teardown make a wrong-body 4xx record the
-# real response without leaking the cluster. Isolated window: creates its own VPC
-# (5-VPC cap) — must NOT run concurrently with other VPC-creating heavy chains.
+# aimlops Stage B RE-RUN (2026-06-15) — the prior window (run 27514177331) was
+# wasted by a self-inflicted regression: {unique} grew to 14 chars and
+# 'regrvpc{unique}' (21) blew the 20-char VPC-name cap, so create-vpc 400'd at
+# step 11/44 before the cluster ever built. Fixed in 81d1533 ({unique}/{ualpha}
+# back to 8 chars; all VPC names verified <=20 offline). Re-dispatch to actually
+# exercise the SKE cluster -> aimlops release -> teardown chain. Still exploratory
+# (release body UNPROVEN, guarded). Isolated window (own VPC, 5-VPC cap).
 mutations=true
 destructive=true
 heavy=true
