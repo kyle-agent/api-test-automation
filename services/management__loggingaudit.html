@@ -136,17 +136,17 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 <div class="hero">
   <div class="gauge">
     <div class="ring"><span>10%</span></div>
-    <div class="lbl">검증(2xx) 커버<br><b>1 / 10</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 1</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>1 / 10</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 3</span></div>
   </div>
   <h1>loggingaudit <span class="tag">management</span></h1>
   <div class="split">
     <div><div class="k">읽기 GET</div><div class="v" style="color:var(--amber)">25% <span class="sub">1/4</span></div></div>
     <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--red)">0% <span class="sub">0/6</span></div></div>
-    <div><div class="k">설계/동작 결함</div><div class="v">8 <span class="sub">개선 · 결함 0</span></div></div>
+    <div><div class="k">설계/동작 결함</div><div class="v">2 <span class="sub">개선 · 결함 0</span></div></div>
   </div>
 </div>
 
-<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0). 문서/설계 결함 중 가장 흔한 건 <b>undiscoverable-params(4)</b>와 <b>l10n-not-localized(2)</b>.</div></div>
+<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0). 문서/설계 결함 중 가장 흔한 건 <b>undiscoverable-params(2)</b>.</div></div>
 
 <div class="controls">
   <div class="row1">
@@ -191,11 +191,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-15 13:51 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-15 15:09 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/trails/{trail_id}", "api": "deletetrail", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/logs", "api": "listlogs", "c": "p", "s": 400, "t": 2.2, "src": "", "d": [{"label": "cors-missing", "issue": "", "kind": "runtime", "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)", "crit": false}]}, {"m": "GET", "p": "/v1/logs/{logging_id}", "api": "showlog", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/trails", "api": "listtrails", "c": "y", "s": 200, "t": 1.0, "src": "", "d": [{"label": "unauth-non-401", "issue": "", "kind": "runtime", "detail": "unauthenticated request -> 404 (not 401)", "crit": false}]}, {"m": "GET", "p": "/v1/trails/{trail_id}", "api": "showtrail", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/logs/download", "api": "downloadlogs", "c": "n", "s": 400, "t": 1.2, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: end_at, time_zone_info", "crit": false}, {"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: end_at, time_zone_info", "crit": false}, {"label": "l10n-not-localized", "issue": "", "kind": "runtime", "detail": "error message does not change with Accept-Language (ko-KR vs en-US)", "crit": false}]}, {"m": "POST", "p": "/v1/trails", "api": "createtrail", "c": "n", "s": 400, "t": 1.2, "src": "a357115", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: account_id, bucket_name, bucket_region, trail_name", "crit": false}, {"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: account_id, bucket_name, bucket_region, trail_name", "crit": false}, {"label": "l10n-not-localized", "issue": "", "kind": "runtime", "detail": "error message does not change with Accept-Language (ko-KR vs en-US)", "crit": false}]}, {"m": "POST", "p": "/v1/trails/{trail_id}/start", "api": "starttrail", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/trails/{trail_id}/stop", "api": "stoptrail", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "PUT", "p": "/v1/trails/{trail_id}", "api": "settrail", "c": "n", "s": null, "t": null, "src": "", "d": []}];
+var R=[{"m": "DELETE", "p": "/v1/trails/{trail_id}", "api": "deletetrail", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/logs", "api": "listlogs", "c": "p", "s": 400, "t": 1.7, "src": "", "d": []}, {"m": "GET", "p": "/v1/logs/{logging_id}", "api": "showlog", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/trails", "api": "listtrails", "c": "y", "s": 200, "t": 1.2, "src": "", "d": []}, {"m": "GET", "p": "/v1/trails/{trail_id}", "api": "showtrail", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/logs/download", "api": "downloadlogs", "c": "p", "s": 400, "t": 1.9, "src": "", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: end_at, time_zone_info", "crit": false}]}, {"m": "POST", "p": "/v1/trails", "api": "createtrail", "c": "p", "s": 400, "t": 1.0, "src": "", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: account_id, bucket_name, bucket_region, trail_name", "crit": false}]}, {"m": "POST", "p": "/v1/trails/{trail_id}/start", "api": "starttrail", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/trails/{trail_id}/stop", "api": "stoptrail", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "PUT", "p": "/v1/trails/{trail_id}", "api": "settrail", "c": "n", "s": null, "t": null, "src": "", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');

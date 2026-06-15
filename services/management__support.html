@@ -142,11 +142,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
   <div class="split">
     <div><div class="k">읽기 GET</div><div class="v" style="color:var(--green)">100% <span class="sub">4/4</span></div></div>
     <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--red)">0% <span class="sub">0/0</span></div></div>
-    <div><div class="k">설계/동작 결함</div><div class="v">2 <span class="sub">개선 · 결함 0</span></div></div>
+    <div><div class="k">설계/동작 결함</div><div class="v">0 <span class="sub">개선 · 결함 0</span></div></div>
   </div>
 </div>
 
-<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0). 문서/설계 결함 중 가장 흔한 건 <b>unauth-non-401(1)</b>와 <b>cors-missing(1)</b>.</div></div>
+<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0).</div></div>
 
 <div class="controls">
   <div class="row1">
@@ -191,11 +191,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-15 13:51 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-15 15:09 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "GET", "p": "/v1/inquiries", "api": "getinquirylist", "c": "y", "s": 200, "t": 1.5, "src": "", "d": [{"label": "unauth-non-401", "issue": "", "kind": "runtime", "detail": "unauthenticated request -> 404 (not 401)", "crit": false}, {"label": "cors-missing", "issue": "", "kind": "runtime", "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)", "crit": false}]}, {"m": "GET", "p": "/v1/inquiries/{inquiry_id}", "api": "showinquiry", "c": "y", "s": 200, "t": 1.0, "src": "", "d": []}, {"m": "GET", "p": "/v1/service-requests", "api": "getservicerequestlist", "c": "y", "s": 200, "t": 0.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/service-requests/{service_request_id}", "api": "showservicerequest", "c": "y", "s": 200, "t": 1.0, "src": "", "d": []}];
+var R=[{"m": "GET", "p": "/v1/inquiries", "api": "getinquirylist", "c": "y", "s": 200, "t": 1.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/inquiries/{inquiry_id}", "api": "showinquiry", "c": "y", "s": 200, "t": 2.4, "src": "", "d": []}, {"m": "GET", "p": "/v1/service-requests", "api": "getservicerequestlist", "c": "y", "s": 200, "t": 0.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/service-requests/{service_request_id}", "api": "showservicerequest", "c": "y", "s": 200, "t": 1.1, "src": "", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
