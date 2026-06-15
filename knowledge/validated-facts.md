@@ -58,6 +58,17 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
   UTF-8 XML ≤10 MB single file; **SAML only** (OIDC "2026년 제공 예정"). API exists
   in catalog (STOP-2 N/A); the live decision point is **multipart vs JSON** (IB-010).
 
+**CDN (global_cdn overview, 2026-06-15, docs/UNPROVEN):**
+- Global CDN is offered **only in kr-west1/kr-east1** — explicitly NOT in
+  kr-south1/2/3 → **region-gate any CDN lifecycle**.
+- **20 domains/account** cap. Origin protocols HTTP/HTTPS/HTTP2. Akamai-backed →
+  async provisioning. `origin_hostname_type=DOMAIN` allows empty protocol/port;
+  IP mode requires both.
+
+**Userguide infra note (2026-06-15):** the `/userguide/security/` subtree returned
+**503** (secretvault, configinspection, kms, secretsmanager) while networking pages
+were up — security-service docs-mapper must **re-fetch when the subtree recovers**.
+
 ## Id / capture shapes (where the id lives in the response)
 
 | Resource | Capture path | Note |

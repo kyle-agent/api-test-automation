@@ -4,6 +4,16 @@
 # extract.py, curated by hand. Config Inspection은 클라우드 계정을 진단하는
 # 서비스 — 진단 대상 계정의 실제 인증키가 필요해 credential 사전조건으로
 # 모델링한다 (§1 credential 케이스).
+# Userguide source (INGESTION.md):
+#   /userguide/security/config_inspection_enterprise/overview/
+#   base https://docs.e.samsungsdscloud.com/userguide/security/config_inspection_enterprise/overview/
+# RE-FETCH 2026-06-15 (docs-mapper): the entire /userguide/security/ subtree
+#   returned HTTP 503 (verified across config_inspection_enterprise, kms,
+#   secret_vault, secrets_manager over ~3min of spaced retries; networking pages
+#   were reachable in the same window — server-side security-category outage,
+#   not a 404). Could NOT re-confirm constraints from the live page this round.
+#   The constraints already recorded below are prior-curated (provenance: docs)
+#   and remain UNPROVEN (no live 2xx). Re-fetch when the subtree recovers.
 version: 1
 resources:
   diagnosis:

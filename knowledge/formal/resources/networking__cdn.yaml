@@ -3,6 +3,11 @@
 # (light + enabled, but per its _note "NOT runtime-proven … pending live
 # validation" and the capture is capture_soft — so C5 keeps everything docs
 # until a live pass upgrades it; body copied verbatim from the lifecycle).
+# Userguide cited (re-fetched 2026-06-15, docs-mapper):
+#   https://docs.e.samsungsdscloud.com/userguide/networking/global_cdn/overview/
+#   Confirmed (docs, UNPROVEN — no live 2xx): 20 domains/account cap;
+#   region kr-west1/kr-east1 only (NOT kr-south1/kr-south2/kr-south3);
+#   origin protocols HTTP/HTTPS/HTTP2; Akamai-backed async provisioning.
 version: 1
 resources:
   cdn:
@@ -37,7 +42,11 @@ resources:
                           note: "원본(origin) 도메인 — 기본값은 소스 lifecycle의
                             placeholder (도메인명 방식 권장; 공인 IP 방식이면
                             protocol/port도 필요, cdn-create-required-fields).
-                            실서빙 검증에는 실존 origin이 필요하다"}
+                            실서빙 검증에는 실존 origin이 필요하다. userguide
+                            2026-06-15: origin protocol는 HTTP/HTTPS/HTTP2 지원
+                            (UNPROVEN — docs only). origin_hostname_type=DOMAIN이면
+                            cdn_origin_protocol/cdn_origin_port는 비워둘 수 있고,
+                            IP 방식이면 둘 다 필수 (cdn-create-required-fields)."}
     capture: {cdn_id: "$.cdn.resource_id"}
     verify:
       - {name: read, endpoint: "GET /v1/cdns/{cdn_id}", expect_status: [200]}
@@ -57,4 +66,8 @@ resources:
       name/domain prefix는 전역 유일해야 한다 (cdn-domain-prefix-globally-unique;
       계정당 도메인 20개 cap). capture는 소스에서 capture_soft — envelope은 docs
       response_example 근거라 docs 유지. verify GET가 cdn의 gap_getid 1건
-      (detailcdnservice)을 닫는다."
+      (detailcdnservice)을 닫는다. userguide 재확인 (2026-06-15, UNPROVEN —
+      no live 2xx): REGION GATE는 kr-west1/kr-east1 전용이며 kr-south1/kr-south2/
+      kr-south3에서는 미제공 (명시적 제외 리전 확인); origin protocol는 HTTP/HTTPS/
+      HTTP2 지원; 계정당 도메인 20개 cap 재확인 (cdn-domain-quota-20-per-account);
+      Akamai 인프라 기반이라 콘솔/백엔드 워크플로가 비동기."
