@@ -142,11 +142,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
   <div class="split">
     <div><div class="k">읽기 GET</div><div class="v" style="color:var(--amber)">50% <span class="sub">2/4</span></div></div>
     <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--green)">100% <span class="sub">4/4</span></div></div>
-    <div><div class="k">설계/동작 결함</div><div class="v">2 <span class="sub">개선 · 결함 0</span></div></div>
+    <div><div class="k">설계/동작 결함</div><div class="v">7 <span class="sub">개선 · 결함 0</span></div></div>
   </div>
 </div>
 
-<div class="action"><div><b>다음 작업 후보:</b> 읽기 커버리지 50%가 약점 — read-chain/probe 보강 대상. 회귀 위험은 없음(신규 5xx/auth 0). 문서/설계 결함 중 가장 흔한 건 <b>pagination(1)</b>와 <b>undiscoverable-params(1)</b>.</div></div>
+<div class="action"><div><b>다음 작업 후보:</b> 읽기 커버리지 50%가 약점 — read-chain/probe 보강 대상. 회귀 위험은 없음(신규 5xx/auth 0). 문서/설계 결함 중 가장 흔한 건 <b>undiscoverable-params(2)</b>와 <b>pagination(1)</b>.</div></div>
 
 <div class="controls">
   <div class="row1">
@@ -191,11 +191,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-15 12:57 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-15 13:51 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/firewalls/rules/{firewall_rule_id}", "api": "deletefirewallrule", "c": "y", "s": 204, "t": 2.9, "src": "f9392c8", "d": []}, {"m": "GET", "p": "/v1/firewalls", "api": "listfirewalls", "c": "y", "s": 200, "t": 0.8, "src": "", "d": [{"label": "pagination", "issue": "38", "kind": "runtime", "detail": "ignores size=1 (returned 2)", "crit": false}]}, {"m": "GET", "p": "/v1/firewalls/{firewall_id}", "api": "showfirewall", "c": "y", "s": 200, "t": 1.0, "src": "22a3b22", "d": []}, {"m": "GET", "p": "/v1/firewalls/rules", "api": "listfirewallrules", "c": "p", "s": 400, "t": 2.0, "src": "", "d": []}, {"m": "GET", "p": "/v1/firewalls/rules/{firewall_rule_id}", "api": "showfirewallrule", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/firewalls/rules", "api": "createfirewallrule", "c": "y", "s": 201, "t": 3.6, "src": "f9392c8", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: firewall_id", "crit": false}]}, {"m": "PUT", "p": "/v1/firewalls/{firewall_id}", "api": "setfirewall", "c": "y", "s": 200, "t": 1.9, "src": "f9392c8", "d": []}, {"m": "PUT", "p": "/v1/firewalls/rules/{firewall_rule_id}", "api": "setfirewallrule", "c": "y", "s": 200, "t": 3.9, "src": "f9392c8", "d": []}];
+var R=[{"m": "DELETE", "p": "/v1/firewalls/rules/{firewall_rule_id}", "api": "deletefirewallrule", "c": "y", "s": 204, "t": 2.9, "src": "f9392c8", "d": []}, {"m": "GET", "p": "/v1/firewalls", "api": "listfirewalls", "c": "y", "s": 200, "t": 1.1, "src": "", "d": [{"label": "pagination", "issue": "38", "kind": "runtime", "detail": "ignores size=1 (returned 2)", "crit": false}, {"label": "unauth-non-401", "issue": "", "kind": "runtime", "detail": "unauthenticated request -> 404 (not 401)", "crit": false}, {"label": "pagination-ignores-size", "issue": "", "kind": "runtime", "detail": "requested size=1 but response returned 2 items", "crit": false}]}, {"m": "GET", "p": "/v1/firewalls/{firewall_id}", "api": "showfirewall", "c": "y", "s": 200, "t": 1.0, "src": "22a3b22", "d": []}, {"m": "GET", "p": "/v1/firewalls/rules", "api": "listfirewallrules", "c": "p", "s": 400, "t": 1.5, "src": "", "d": [{"label": "cors-missing", "issue": "", "kind": "runtime", "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)", "crit": false}]}, {"m": "GET", "p": "/v1/firewalls/rules/{firewall_rule_id}", "api": "showfirewallrule", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/firewalls/rules", "api": "createfirewallrule", "c": "y", "s": 201, "t": 3.6, "src": "f9392c8", "d": [{"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: firewall_id", "crit": false}, {"label": "undiscoverable-params", "issue": "19", "kind": "static", "detail": "required fields with no documented constraint: firewall_id", "crit": false}, {"label": "l10n-not-localized", "issue": "", "kind": "runtime", "detail": "error message does not change with Accept-Language (ko-KR vs en-US)", "crit": false}]}, {"m": "PUT", "p": "/v1/firewalls/{firewall_id}", "api": "setfirewall", "c": "y", "s": 200, "t": 1.9, "src": "f9392c8", "d": []}, {"m": "PUT", "p": "/v1/firewalls/rules/{firewall_rule_id}", "api": "setfirewallrule", "c": "y", "s": 200, "t": 3.9, "src": "f9392c8", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
