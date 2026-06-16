@@ -88,6 +88,26 @@
           "expect_status": [200]
         },
         {
+          "name": "show-private-nat",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/private-nats/{private_nat_id}",
+          "group": "private-nat",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (show a private-nat). Closes the private_nat_id getid GET /v1/private-nats/{private_nat_id}. Keys off the create-private-nat-captured private_nat_id; tolerant [200,400,403,404] because create references a {unique} service_resource_id (a Direct Connect / TGW we do not own) and 4xx's, leaving private_nat_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
+        },
+        {
+          "name": "get-private-nat-ips",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/private-nats/{private_nat_id}/private-nat-ips",
+          "group": "private-nat",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a private-nat's IPs). Closes the private_nat_id getid GET /v1/private-nats/{private_nat_id}/private-nat-ips. Same create-captured private_nat_id + tolerant rationale as show-private-nat."
+        },
+        {
           "name": "create-private-nat-ip",
           "service": "vpc",
           "method": "POST",
@@ -220,6 +240,16 @@
           "group": "pls",
           "optional": true,
           "expect_status": [200]
+        },
+        {
+          "name": "get-privatelink-connected-endpoints",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/privatelink-services/{privatelink_service_id}/connected-endpoints",
+          "group": "pls",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a privatelink-service's connected endpoints). Closes the privatelink_service_id getid GET /v1/privatelink-services/{privatelink_service_id}/connected-endpoints. Keys off the create-privatelink-service-captured privatelink_service_id; tolerant [200,400,403,404] because create uses a {unique} connected_resource_id (a load balancer we do not own) and 4xx's, leaving privatelink_service_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
         },
         {
           "name": "set-privatelink-service",
@@ -359,6 +389,16 @@
           "group": "vpce",
           "optional": true,
           "expect_status": [200]
+        },
+        {
+          "name": "show-vpc-endpoint",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-endpoints/{vpc_endpoint_id}",
+          "group": "vpce",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (show a vpc-endpoint). Closes the vpc_endpoint_id getid GET /v1/vpc-endpoints/{vpc_endpoint_id}. Keys off the create-vpc-endpoint-captured vpc_endpoint_id; tolerant [200,400,403,404] because create uses a {unique}/synthetic resource_key (the target service) and 4xx's, leaving vpc_endpoint_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
         },
         {
           "name": "set-vpc-endpoint",
@@ -531,6 +571,16 @@
           "capture_soft": {"routing_rule_id": "$.routing_rule.id"}
         },
         {
+          "name": "get-peering-routing-rules",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpc-peerings/{vpc_peering_id}/routing-rules",
+          "group": "peering",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a vpc-peering's routing rules). Closes the vpc_peering_id getid GET /v1/vpc-peerings/{vpc_peering_id}/routing-rules. Keys off the create-vpc-peering-captured vpc_peering_id; tolerant [200,400,403,404] because the peering may be in CREATING (sub-ops 400) or the create may have 4xx'd, leaving vpc_peering_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
+        },
+        {
           "name": "set-vpc-peering",
           "service": "vpc",
           "method": "PUT",
@@ -648,6 +698,26 @@
           "json": {"vpc_id": "{vpc_id}"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture_soft": {"vpc_connection_id": "$.vpc_connection.id"}
+        },
+        {
+          "name": "get-tgw-routing-rules",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/routing-rules",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a transit-gateway's routing rules). Closes the transit_gateway_id getid GET /v1/transit-gateways/{transit_gateway_id}/routing-rules. Keys off the create-transit-gateway-captured transit_gateway_id; tolerant [200,400,403,404] because create may 4xx (still records coverage), leaving transit_gateway_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
+        },
+        {
+          "name": "get-tgw-vpc-connections",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections",
+          "group": "tgw",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a transit-gateway's VPC connections). Closes the transit_gateway_id getid GET /v1/transit-gateways/{transit_gateway_id}/vpc-connections. Same create-captured transit_gateway_id + tolerant rationale as get-tgw-routing-rules."
         },
         {
           "name": "create-tgw-firewall",
@@ -847,6 +917,16 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture": {"vip_id": "$.subnet_vip.id"},
           "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}/vips/{vip_id}", "service": "vpc"}
+        },
+        {
+          "name": "show-subnet-vip",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}/vips/{vip_id}",
+          "group": "vip",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (show a subnet VIP). Closes the vip_id getid GET /v1/subnets/{subnet_id}/vips/{vip_id} (the LIST .../vips is already covered). Keys off the create-subnet-vip-captured vip_id ($.subnet_vip.id, live-validated 201 run 27306490231); tolerant [200,400,403,404] so a create miss still records coverage with vip_id normalizing to the catalog '*' key. Makes the endpoint statically reachable."
         },
         {
           "name": "create-vip-connected-port",

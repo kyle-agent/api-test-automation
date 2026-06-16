@@ -85,6 +85,15 @@ resources:
                               default: "N", vary: true,
                               note: "로그파일 검증(digest) 활성 — Y면 무결성 검증용 digest 파일을 같은 버킷에 저장해 로그파일 변경/삭제 여부 검출(userguide [U2] 로그파일 검증, 2026-06-15 확인)"}
     capture: {trail_id: "$.trail.id"}
+    # showlog (GET /v1/logs/{logging_id}) is NOT a verify on this trail node: the
+    # trail captures trail_id, not logging_id, and a log entry is not a property
+    # of a trail (it's an account-wide activity record). Documented for
+    # traceability: GET /v1/logs/{logging_id} (showlog) is exercised READ-ONLY by
+    # the loggingaudit-logs-readonly lifecycle via listlogs (GET /v1/logs, which
+    # REQUIRES start_at+end_at ISO-8601 UTC per constraint listlogs-needs-time-
+    # window; LogListResponse.logs[].id) -> soft-capture logs[0].id -> show,
+    # tolerant [200,400,403,404] (a fresh account may have no logs in the window).
+    # Closes the static id-bound GET gap GET /v1/logs/{logging_id}.
     delete: {endpoint: "DELETE /v1/trails/{trail_id}", destructive: true}
     provenance: docs
     source: {lifecycle: loggingaudit-trail, steps: [create-trail, delete-trail]}

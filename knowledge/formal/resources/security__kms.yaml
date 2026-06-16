@@ -26,6 +26,15 @@ resources:
     verify:
       - {name: read-users, endpoint: "GET /v1/kms/transit/{key_id}/users",
          expect_status: [200]}
+      # managed-kms keys are SYSTEM-managed (NO create — no node of their own,
+      # so this can't be a verify here: the path-param would not resolve to a
+      # capture of this user-managed kms-key node). Documented for traceability:
+      # GET /v1/managed-kms/transit/{key_id} (showmanagedkey) is exercised
+      # READ-ONLY by the security-kms-managed-readonly lifecycle via
+      # listmanagedkeys (GET /v1/managed-kms/transit, ManagedKeyPageResponse
+      # keys[].id) -> soft-capture keys[0].id -> show, tolerant [200,400,403,404]
+      # (a bare account may have zero managed keys). Closes the static id-bound
+      # GET gap GET /v1/managed-kms/transit/{key_id}.
     delete: {endpoint: "DELETE /v1/kms/transit/{key_id}", destructive: true}
     provenance: VALIDATED
     source: {lifecycle: security-kms-key, steps: [create, delete]}

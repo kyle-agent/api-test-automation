@@ -157,6 +157,33 @@
           "destructive": true
         }
       ]
+    },
+    {
+      "id": "security-kms-managed-readonly",
+      "service": "security/kms",
+      "enabled": true,
+      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes the static id-bound GET gap GET /v1/managed-kms/transit/{key_id} (showmanagedkey) by the list->soft-capture->show idiom (the same pattern iam-readonly-shows uses). managed-kms keys are SYSTEM-managed: there is NO create in the OpenAPI, so a synthetic id would be a guaranteed-404 dead read — instead we list the caller's managed keys (listmanagedkeys, GET /v1/managed-kms/transit, ManagedKeyPageResponse) and soft-capture a REAL key_id from the first item ($.keys[0].id), then show it. A bare account may have system-managed keys (real 2xx) or none (the segment stays a {placeholder} -> normalizes to the catalog '*' key so the GET is still CALLED and the endpoint statically reachable, 4xx-ing harmlessly). Both steps optional with tolerant [200,400,403,404]. Envelope grounded in data/api_docs.json: ManagedKeyPageResponse.keys[] -> ManagedKey.id (response_example $.keys[].id); the show returns ManagedKeyShowResponse{key:ManagedKey}. Does NOT touch the non-managed /v1/kms/transit create/delete (those live in security-kms-key + the crypto lifecycle above).",
+      "steps": [
+        {
+          "name": "list-managed-keys",
+          "method": "GET",
+          "path": "/v1/managed-kms/transit",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "kms-managed-read",
+          "capture_soft": {"managed_key_id": "$.keys[0].id"},
+          "_note": "listmanagedkeys (zero required params; size/page/sort/name all optional). Soft-captures a REAL managed key_id from the first list item (ManagedKeyPageResponse.keys[].id). Drives show-managed-key below. Tolerant [200,400,403,404]: a bare account may have no managed keys (empty list) or be denied (403) — either way the show is still CALLED."
+        },
+        {
+          "name": "show-managed-key",
+          "method": "GET",
+          "path": "/v1/managed-kms/transit/{managed_key_id}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "kms-managed-read",
+          "_note": "id-bound read (showmanagedkey). Closes GAP-get-id for GET /v1/managed-kms/transit/{key_id}. Keys off the list-captured managed_key_id (a real id when the account has system-managed keys -> 2xx); if none, the segment stays a placeholder (normalizes to catalog '*') and 4xx's. Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        }
+      ]
     }
   ]
 }

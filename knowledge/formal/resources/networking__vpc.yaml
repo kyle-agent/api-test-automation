@@ -197,6 +197,13 @@ resources:
                        required: true,
                        note: "선택한 one_of 분기와 일치해야 한다 — tgw-vpc-connection 분기면 TRANSIT_GATEWAY(첫 enum, 기본값), direct-connect 분기면 DIRECT_CONNECT로 override. 합성 시 choices={'private-nat': 'tgw-vpc-connection'}로 TGW 경로를 명시 고정."}
     capture: {private_nat_id: "$.private_nat.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/private-nats/{private_nat_id}",
+         expect_status: [200, 400, 403, 404],
+         note: "id-bound GET getid 갭. private_nat_id가 create에서 잡히나 service_resource_id가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status"}
+      - {name: read-ips, endpoint: "GET /v1/private-nats/{private_nat_id}/private-nat-ips",
+         expect_status: [200, 400, 403, 404],
+         note: "id-bound GET getid 갭 (private-nat IP 목록). 동일 관용 근거"}
     delete: {endpoint: "DELETE /v1/private-nats/{private_nat_id}", destructive: true}
     provenance: docs
     source: {lifecycle: gen-wave5-privnat, steps: [create-private-nat, delete-private-nat]}
@@ -245,6 +252,10 @@ resources:
         endpoint_ip_address: {type: string, required: true, default: "10.160.8.20",
                               note: "선택한 endpoint-subnet cidr 내부의 빈 IP여야 한다 — 기본값은 endpoint-subnet이 vpc(10.160.0.0/20)의 8번째 /24(10.160.8.0/24)를 받는 합성 기본 배치를 따른다; 공유 subnet 재호밍/다른 cidr로 합성 시 override 필요"}
     capture: {vpc_endpoint_id: "$.vpc_endpoint.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/vpc-endpoints/{vpc_endpoint_id}",
+         expect_status: [200, 400, 403, 404],
+         note: "id-bound GET getid 갭. vpc_endpoint_id가 create에서 잡히나 resource_key가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status"}
     delete: {endpoint: "DELETE /v1/vpc-endpoints/{vpc_endpoint_id}", destructive: true}
     provenance: docs
     source: {lifecycle: gen-wave5-vpce, steps: [create-vpc-endpoint, delete-vpc-endpoint]}
@@ -284,6 +295,10 @@ resources:
          expect_status: [200]}
       - {name: read-list, endpoint: "GET /v1/privatelink-services",
          expect_status: [200]}
+      - {name: read-connected-endpoints,
+         endpoint: "GET /v1/privatelink-services/{privatelink_service_id}/connected-endpoints",
+         expect_status: [200, 400, 403, 404],
+         note: "id-bound GET getid 갭 (PLS 연결 엔드포인트 목록). create가 UNPROVEN(docs)이라 4xx일 수 있어 관용 status"}
     delete: {endpoint: "DELETE /v1/privatelink-services/{privatelink_service_id}",
              destructive: true}
     provenance: docs

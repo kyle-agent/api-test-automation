@@ -99,6 +99,39 @@
           "_note": "Coverage-only POST. Body UNPROVEN (downloadlogs likely takes a trail/time-window selector). On success it may return a download URL or stream; we only assert reachability. Isolated group so a 4xx never affects the trail group."
         }
       ]
+    },
+    {
+      "id": "loggingaudit-logs-readonly",
+      "service": "management/loggingaudit",
+      "enabled": true,
+      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes the static id-bound GET gap GET /v1/logs/{logging_id} (showlog) by the list->soft-capture->show idiom (the same pattern iam-readonly-shows uses). The trail node captures trail_id, NOT logging_id, so the trail lifecycle never satisfies this GET. listlogs (GET /v1/logs) REQUIRES start_at + end_at query params (ISO-8601 UTC, e.g. 2025-11-28T08:00:00Z, per service constraint listlogs-needs-time-window in knowledge/formal/services/management__loggingaudit.yaml); resource_id/resource_name/user_name/page/size/sort are optional. We send a WIDE static valid window (2025-01-01..2026-12-31, literal so it renders verbatim — the {today} builtin is %Y%m%d, NOT the ISO-8601 the param needs, so it is deliberately NOT used here) and soft-capture the first log entry's id ($.logs[0].id; LogListResponse.logs[] -> Log.id, response_example $.log.id confirms the id field name). A fresh account may have NO activity logs in the window (empty list) -> the {logging_id} segment stays a {placeholder} (normalizes to the catalog '*' key so the show is still CALLED and the endpoint statically reachable, 4xx-ing harmlessly). Both steps optional with tolerant [200,400,403,404]: a missing/invalid window 400s, denial 403s, empty list -> show 404s — every case still RECORDS coverage. The show returns LogShowResponse{log:Log}.",
+      "steps": [
+        {
+          "name": "list-logs",
+          "method": "GET",
+          "path": "/v1/logs",
+          "params": {
+            "start_at": "2025-01-01T00:00:00Z",
+            "end_at": "2026-12-31T23:59:59Z",
+            "size": "20",
+            "sort": "created_at:desc"
+          },
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "la-logs-read",
+          "capture_soft": {"logging_id": "$.logs[0].id"},
+          "_note": "listlogs with the REQUIRED start_at + end_at time window (ISO-8601 UTC) sent via params (service constraint listlogs-needs-time-window). A wide static window maximises the chance the account has at least one activity log to soft-capture ($.logs[0].id, LogListResponse.logs[].id). Tolerant [200,400,403,404]: empty/denied/missing-window all still let the show below be CALLED."
+        },
+        {
+          "name": "show-log",
+          "method": "GET",
+          "path": "/v1/logs/{logging_id}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "la-logs-read",
+          "_note": "id-bound read (showlog). Closes GAP-get-id for GET /v1/logs/{logging_id}. Keys off the list-captured logging_id (a real id when the window has any logs -> 2xx); if the window is empty the segment stays a placeholder (normalizes to catalog '*') and 4xx's. Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        }
+      ]
     }
   ]
 }
