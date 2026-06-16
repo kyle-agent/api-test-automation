@@ -54,6 +54,16 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
+          "name": "get-diagnosis-detail",
+          "service": "configinspection",
+          "method": "GET",
+          "path": "/v1/configinspection/diagnosis/detail/{diagnosis_id}",
+          "group": "xcov-config-read",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (show diagnosis detail). Closes the diagnosis_id getid GET /v1/configinspection/diagnosis/detail/{diagnosis_id}. Keys off the save-captured diagnosis_id ($.diagnosis_id, flat); tolerant [200,400,403,404] because save needs a real inspectable-account auth_key and 4xx's in a LIGHT run, leaving the id a doc-sample placeholder (normalizes to catalog '*'). Makes the endpoint statically reachable in a LIGHT run (complements probe-reads)."
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {"diagnosis_id": "{diagnosis_id}"}
         },

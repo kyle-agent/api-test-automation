@@ -76,6 +76,21 @@ resources:
     source: {lifecycle: compute-virtualserver-full, steps: [find-server-type]}
     notes: "읽기 전용 LOOKUP 노드. capture는 소스 find-server-type의 필터 셀렉터 verbatim(s-타입만, g-타입 거부 — services constraint server-type-prefix-s VALIDATED). 필터 capture는 engine._capture 네이티브 지원, composer/validator도 dict capture 통과 (R2a 반영)."
 
+  volume-type:
+    lookup: true
+    code: "cp-vs-volume-type"
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: "GET /v1/volume-types"
+    capture: {volume_type_id: "$.volume_types[0].id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/volume-types/{volume_type_id}",
+         expect_status: [200, 404]}
+    provenance: docs
+    source: {lifecycle: vs-volume-transfer-coverage, steps: [list-volume-types, read-volume-type]}
+    notes: "읽기 전용 LOOKUP 노드 (image/server-type와 동형) — create가 GET이고 teardown 없음이 의도. 응답 봉투 VolumeTypeListResponse = {volume_types:[{id,name,extra_specs,...}]} (api_docs listvolumetypes), capture $.volume_types[0].id verbatim. showvolumetype(GET /v1/volume-types/{volume_type_id})은 gap_getid였던 마지막 볼륨 카탈로그 read — 이 lookup이 list+show로 닫는다. /v1/volume-types/default(showdefaultvolumetype)은 path-param 없는 GET이라 smoke floor가 이미 커버. UNPROVEN(docs) — 라이브 GET 후 VALIDATED 승급."
+
   server:
     code: "cp-vs-server"
     service: compute/virtualserver
@@ -242,6 +257,13 @@ resources:
       - {name: volume-shows-attachment,
          endpoint: "GET /v1/volumes/{block-volume.vol_id}",
          expect_status: [200]}
+      # showservervolume — server_id × attached vol_id 두 토큰이 모두 잡혀 있는
+      # 유일한 노드라 여기서 닫는다 (server 노드는 inline boot-volume의 id를
+      # capture하지 않아 gap으로 남겨둔 GET; attach가 알려진 vol_id를 붙이므로
+      # 여기서 id-bound show가 가능). server 토큰은 server-attach 폐포에서 공급.
+      - {name: server-volume-show,
+         endpoint: "GET /v1/servers/{server.server_id}/volumes/{block-volume.vol_id}",
+         expect_status: [200]}
     provenance: docs
     source: {lifecycle: compute-virtualserver-full, steps: []}
     notes: "VolumeServerAttachRequest {server_id, delete_on_termination} (api_docs). capture 없음 — detach가 prereq 토큰만 사용 (dotted-prereq-token-in-delete). delete_on_termination false: 볼륨 수명은 우리가 관리(역순 teardown이 detach 후 volume 삭제). [block_storage_vm userguide 2026-06-14] attach 게이트: 볼륨 Available 상태 + VM과 동일 location(블록 스토리지와 서버가 같은 location이어야 연결 대상). VM당 OS(basic) 볼륨 외에 추가 데이터 볼륨 최대 26개. running/stopped VM 모두 온라인 attach 지원(docs는 VM 상태 게이트 명시 안 함). detach는 게스트 OS에서 umount(Linux)/disk-offline(Windows)을 먼저 해야 연결 서버 hang(상태 에러)을 피함 — 우리 합성은 OS 미진입이라 데이터 볼륨(boot 아님)을 빈 채로 detach(안전). OS/boot 볼륨은 detach 불가(termination 차단 조건). _MultiAttach 타입만 다중 서버 동시 attach(Windows VM 불가)."
@@ -390,11 +412,18 @@ resources:
              evaluation_minutes: 5, scale_type: SCALE_OUT, scale_method: AMOUNT,
              scale_value: 1, cooldown_seconds: 300}
     capture: {policy_id: "$.id"}
+    verify:
+      # id-bound reads off the captured policy_id (FORMAT.md complete-lifecycle):
+      # parent-rooted list (listautoscalinggrouppolicy) + per-id show.
+      - {name: list, expect_status: [200],
+         endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies"}
+      - {name: read, expect_status: [200],
+         endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}",
              destructive: true}
     provenance: docs
     source: {lifecycle: vs-autoscaling-coverage,
-             steps: [create-asg-policy, delete-asg-policy]}
+             steps: [create-asg-policy, list-asg-policies, read-asg-policy, delete-asg-policy]}
     notes: "comparison_operator=ge VERIFIED (run 27466988779). UNVERIFIED enums — metric_type CPU, metric_method AVG, scale_type SCALE_OUT, scale_method AMOUNT — NOT flagged by the API (comparison_operator validated first); may also need short-code values, error-driven on the next run. 정책 자체는 무자원이지만 부모 ASG가 billable — auto-scaling-group 노트 참조."
 
   asg-schedule:
@@ -409,11 +438,18 @@ resources:
              start_date: "{today_plus_5y}", hour: 3, minute: 0,
              timezone: "Asia/Seoul", desired_server_count: 0}
     capture: {schedule_id: "$.id"}
+    verify:
+      # id-bound reads off the captured schedule_id (FORMAT.md complete-lifecycle):
+      # parent-rooted list (listautoscalinggroupschedule) + per-id show.
+      - {name: list, expect_status: [200],
+         endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules"}
+      - {name: read, expect_status: [200],
+         endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}",
              destructive: true}
     provenance: docs
     source: {lifecycle: vs-autoscaling-coverage,
-             steps: [create-asg-schedule, delete-asg-schedule]}
+             steps: [create-asg-schedule, list-asg-schedules, read-asg-schedule, delete-asg-schedule]}
     notes: "UNPROVEN. start_time은 {today_plus_5y} builtin으로 원샷 스케줄을 먼 미래에 묶는다 (소스 verbatim — 실제로 스케일이 발화하지 않게 하는 안전장치)."
 
   asg-notification:
@@ -431,11 +467,19 @@ resources:
         user_id: {type: string, required: true,
                   note: "알림 받을 계정 사용자 ID — owner가 콘솔에서 확인해 제공 (기본값 없음 = 의도된 게이트)"}
     capture: {notification_id: "$.notifications[0].id"}
+    verify:
+      # id-bound reads off the captured notification_id (FORMAT.md complete-lifecycle):
+      # parent-rooted list (listautoscalinggroupnotification) + per-id show. These two
+      # GETs are the last unreachable id-bound reads on the ASG sub-tree (coverage_gap).
+      - {name: list, expect_status: [200],
+         endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications"}
+      - {name: read, expect_status: [200],
+         endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}",
              destructive: true}
     provenance: docs
     source: {lifecycle: vs-autoscaling-coverage,
-             steps: [create-asg-notification, delete-asg-notification]}
+             steps: [create-asg-notification, list-asg-notifications, read-asg-notification, delete-asg-notification]}
     notes: "UNPROVEN body/capture (소스는 literal-seed ASG에 4xx). IB-026: capture를 $.id→$.notifications[0].id로 정정 — 응답 모델 autoscalinggroupnotificationlistresponse는 list 봉투(api_docs); 라이브 재검증 대기."
 
   # owner 2026-06-12: 미리 만든 port를 서버에 붙였다 뗐다 할 수 있다 —

@@ -311,6 +311,57 @@
           }
         },
         {
+          "name": "cloudml-cluster-readable",
+          "service": "cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "cloud-ml-precond",
+          "_note": "id-bound cluster precondition GET against the REAL RUNNING cluster_id — expect 200; tolerate 4xx (optional+grouped) so a precondition hiccup does not abandon the live cluster before teardown. Closes coverage_gap GAP-get-id GET /v1/cloud-ml/clusters/{cluster_id}."
+        },
+        {
+          "name": "cloudml-cluster-check-releasable",
+          "service": "cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml/clusters/{cluster_id}/check-releasable",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "cloud-ml-precond",
+          "_note": "id-bound cluster precondition GET — is the cluster releasable for a cloud-ml stack? expect 200; tolerate 4xx. Closes GAP-get-id GET /v1/cloud-ml/clusters/{cluster_id}/check-releasable."
+        },
+        {
+          "name": "cloudml-cluster-estimate",
+          "service": "cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml/clusters/{cluster_id}/estimate",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "cloud-ml-precond",
+          "_note": "id-bound cluster precondition GET — cost/resource estimate for a cloud-ml stack on this cluster. expect 200; tolerate 4xx (may need query params, UNPROVEN). Closes GAP-get-id GET /v1/cloud-ml/clusters/{cluster_id}/estimate."
+        },
+        {
           "name": "create-cloud-ml",
           "service": "cloud-ml",
           "method": "POST",

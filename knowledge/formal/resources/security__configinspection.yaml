@@ -47,6 +47,11 @@ resources:
                    default: SCP, vary: true,
                    note: "진단 대상 CSP. SCP만 소스에서 전송됨(2xx 미확인); 외부 CSP 코드값(AWS/AZURE)은 docs 추정 UNPROVEN — R3 검증 과제"}
     capture: {diagnosis_id: "$.diagnosis_id"}
+    verify:
+      - {name: get-diagnosis-detail,
+         endpoint: "GET /v1/configinspection/diagnosis/detail/{diagnosis_id}",
+         expect_status: [200, 400, 403, 404],
+         note: "id-bound 진단 상세 조회. save가 inspectable-account auth_key를 요구해 LIGHT run에선 4xx — diagnosis_id가 doc-sample placeholder라 catalog '*' 매칭으로 커버리지 기록 (probe-reads 보완, 정적 LIGHT 도달성 확보)"}
     delete: {endpoint: "DELETE /v1/configinspection/diagnosis/terminate/{diagnosis_id}",
              destructive: true}
     provenance: docs

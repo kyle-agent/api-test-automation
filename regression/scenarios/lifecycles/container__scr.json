@@ -282,6 +282,15 @@
           }
         },
         {
+          "name": "get-image",
+          "method": "GET",
+          "path": "/v1/images/{image_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read",
+          "_note": "id-bound read (show image). Closes the image_id getid GET /v1/images/{image_id}. Keys off the list-images-harvest soft-captured image_id ($.images[0].id, a REAL existing image id when the account has any repository images); tolerant [200,400,403,404] because on an empty repo the id stays a placeholder (normalizes to catalog '*'). Makes the show-image endpoint statically reachable in a LIGHT run (complements probe-reads-all)."
+        },
+        {
           "name": "get-image-lifecycle-policy-preview",
           "method": "GET",
           "path": "/v1/images/{image_id}/lifecycle-policy/preview",

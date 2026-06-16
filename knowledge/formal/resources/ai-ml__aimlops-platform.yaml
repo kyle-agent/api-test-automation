@@ -28,8 +28,12 @@ resources:
         image_id: {type: string, required: true,
                    note: "lookup — GET /v1/aimlops-platform/images. LIVE (run 27520649710): response wrapper is $.contents[] NOT $.images[]; item fields seen base_image (e.g. sdskubeflow-enterprise:1.9.2)/category(APP)/created_by(SYSTEM)/created_dt/description — id field assumed $.contents[0].id (truncated past the huge description HTML, unconfirmed)."}
     capture: {release_id: "$.id"}
+    verify:
+      - {name: read, endpoint: "GET /v1/aimlops-platform/{release_id}", expect_status: [200], optional: true,
+         note: "id-bound show off release_id (getaimlopsplatformv1) — the only release_id-bound GET in the catalog. optional: a 4xx release POST yields no $.id -> literal {release_id} 404s harmlessly. UNPROVEN until first live 2xx (gen-heavy-aimlops wait-aimlops-release exercises it against the real release_id)."}
     delete: {endpoint: "DELETE /v1/aimlops-platform/{release_id}", destructive: true}
     provenance: docs
+    cluster_precondition_reads: "Complete-lifecycle (FORMAT.md): aimlops-platform has 5 id-bound GETs that key off the ske-cluster PREREQUISITE's cluster_id (NOT release_id) — check-version, validate-namespaces, validate-resources, internal/.../nodes, internal/.../storageclasses — so they are precondition reads on the cluster, not verify reads on this node (the composer grafts verify off the node's OWN capture only). They are wired explicitly in the lifecycle JSONs: gen-heavy-aimlops hits them against the REAL RUNNING cluster_id (expect 200, tolerate 4xx); aimlops-platform-release-write-coverage hits them against a NONEXISTENT cluster_id literal via probe-cluster-preconditions (offline-safe coverage). coverage_gap = 0 (free-text doc key, see live_preconditions)."
     live_preconditions: "run 27520649710 (SKE closure all 2xx, cluster RUNNING): GET .../clusters/{id}/validate-namespaces 200; .../check-version 400; .../validate-resources 400; .../images 200 ($.contents[]); internal .../internal/clusters/{id}/nodes 404 + .../storageclasses 404 (internal path likely wrong or not exposed to this token). release POST not yet reached (blocked on image_id capture, fixed). Next run reaches release — its 4xx body will reveal the real required body (cpu/memory/storage_class/volume_size UNPROVEN)."
     source: {lifecycle: aimlops-platform-release-write-coverage,
              steps: [list-images, release-aimlops-platform, update-aimlops-platform,

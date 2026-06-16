@@ -110,6 +110,15 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
+          "name": "get-gslb-resources",
+          "method": "GET",
+          "path": "/v1/gslbs/{gslb_id}/resources",
+          "group": "gslb",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read of the gslb's connected resources (listgslbresources). Closes the gslb_id getid GET /v1/gslbs/{gslb_id}/resources. Keys off the create-captured gslb_id; tolerant [200,400,403,404] because on a 4xx create the id stays a placeholder (normalizes to the catalog '*' key, still records coverage). Complements the runtime probe-gslb-reads below — this explicit step also makes the endpoint statically reachable in a LIGHT run."
+        },
+        {
           "name": "probe-gslb-reads",
           "probe_reads": {"gslb_id": "{gslb_id}"}
         },

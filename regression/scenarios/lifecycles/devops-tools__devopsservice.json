@@ -46,6 +46,24 @@
           "_note": "Guarded create. Body = DevOpsServiceCreateRequest real required fields members(array[string],>=1)/tenant_code/tenant_name (tags optional, omitted) — replaces the previous INVENTED {name, description} (the PF-05 400 'Field required'x3 cause). tenant_code/tenant_name share pattern ^[a-z0-9\\-]*$ ({ualpha} is lowercase-guaranteed). members[] is a credential precondition: it needs >=1 live IAM user id that this run cannot supply, so it is sent EMPTY — which deterministically yields the expected 400 ('members' Field required) and RECORDS coverage WITHOUT creating a real workspace (the list-captured id covers DELETE). _note: to actually create a devops-service in a credentialed live run, seed members[] with a real IAM user id. Capture $.devops_service.id is CONFIRMED against the create response model DevOpsServiceShowResponse{devops_service: DevOpsService}.id (api_docs response_example)."
         },
         {
+          "name": "get-devops-service",
+          "method": "GET",
+          "path": "/v1/devops-services/{devops_service_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "devops",
+          "_note": "id-bound read (showdevopsservice). Closes the devops_service_id getid GET /v1/devops-services/{devops_service_id}. Keys off the create/list-captured devops_service_id; tolerant [200,400,403,404] because the guarded create sends empty members[] and 4xx's, leaving devops_service_id as the soft list-captured id (or a placeholder) — still records the catalog '*' coverage. Makes the show endpoint statically reachable in a LIGHT run (complements probe-reads)."
+        },
+        {
+          "name": "check-deletable-devops-service",
+          "method": "GET",
+          "path": "/v1/devops-services/{devops_service_id}/check-deletable",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "devops",
+          "_note": "id-bound pre-delete read (checkdeletabledevopsservice, result:boolean). Closes the devops_service_id getid GET /v1/devops-services/{devops_service_id}/check-deletable. Runs before the DELETE per the complete-lifecycle order (create -> reads -> writes -> delete). Tolerant [200,400,403,404] for the placeholder-id case."
+        },
+        {
           "name": "delete-devops-service",
           "method": "DELETE",
           "path": "/v1/devops-services/{devops_service_id}",

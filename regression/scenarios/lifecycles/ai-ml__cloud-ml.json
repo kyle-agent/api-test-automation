@@ -76,6 +76,31 @@
           "_note": "destructive — only runs under SCP_ALLOW_DESTRUCTIVE. Targets the literal {cloud_ml_id} (no real resource) -> expected 404. optional+broad so it records coverage without deleting a real resource."
         },
         {
+          "name": "probe-cluster-preconditions",
+          "_note": "Coverage (2026-06-16): the 3 cluster-bound precondition GETs (GET /v1/cloud-ml/clusters/{cluster_id} + /check-releasable + /estimate) key off a REAL ske cluster_id this coverage-only run never has (empty account -> list-cloud-ml capture_soft misses -> the {cluster_id} placeholder stays literal -> probe_reads filters literal {tokens}, so they were NEVER reached -> coverage_gap GAP-get-id x3). Mirror aimlops-platform-release-write-coverage: CALL each explicitly against a deliberately-NONEXISTENT cluster_id literal so each endpoint is REACHED once (-> 404/400 = endpoint hit, recorded under its catalog key) WITHOUT provisioning any cluster. optional+grouped+broad expect_status: a 4xx records coverage without hard-failing. The live gen-cloudml-chain exercises the same 3 against the REAL cluster_id (expect 200).",
+          "method": "GET",
+          "path": "/v1/cloud-ml/clusters/regrnonexistent{unique}",
+          "expect_status": [200, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cloud-ml-precond"
+        },
+        {
+          "name": "probe-cluster-check-releasable",
+          "method": "GET",
+          "path": "/v1/cloud-ml/clusters/regrnonexistent{unique}/check-releasable",
+          "expect_status": [200, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cloud-ml-precond"
+        },
+        {
+          "name": "probe-cluster-estimate",
+          "method": "GET",
+          "path": "/v1/cloud-ml/clusters/regrnonexistent{unique}/estimate",
+          "expect_status": [200, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cloud-ml-precond"
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "cloud_ml_id": "{cloud_ml_id}",

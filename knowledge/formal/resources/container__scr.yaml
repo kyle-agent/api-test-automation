@@ -129,6 +129,9 @@ resources:
       - {credential: scr-auth-key}
     provenance: docs
     source: {lifecycle: scr-image-write-coverage, steps: [seed-image-placeholder]}
+    # show-image (GET /v1/images/{image_id}) getid는 scr-read-coverage 라이프사이클의
+    # get-image 스텝이 닫는다 — list-images-harvest가 캡처한 실 image_id($.images[0].id)에
+    # 키잉(no_api 노드라 자체 create-verify가 아님). LIGHT run 정적 도달 + 런타임 probe-reads-all 보완.
     notes: "Open API create 없음: SCR 이미지 id는 repository로의 `docker push`로 태어난다 — REST POST가 존재하지 않는다 (scr-image-write-coverage _note). push에는 레지스트리의 콘솔 발급 인증키가 필요 → {credential: scr-auth-key} 사전조건 (cross-service container-registry note; 환경에 미표시면 env-skip, archivestorage 패턴). 카탈로그에 있는 것은 image의 정책/설명 PUT과 DELETE /v1/images/{id}뿐. 합성 경로는 R3에서 push 가능한 러너가 생겨야 열린다 — 그때까지 그래프 문서화 전용. [docs-mapper UNPROVEN 2026-06-15, userguide overview+how_to_guides]: 표준 Docker CLI로 push/pull (Docker Registry V2 API 사양), 전송은 HTTPS 강제·Object Storage 암호화 저장으로 docker-push-born no_api 모델을 확증. 자동/수동 취약점 스캔(OS+언어 패키지)과 이미지 내 secret 탐지가 image-레벨 ops — scr-repository scan_policy 블록과 짝. overview/how_to_guides는 리포지토리당 이미지 수·태그 네이밍 등 수치 제약을 명시하지 않음 (API Reference 영역, R3)."
 
   scr-tag:

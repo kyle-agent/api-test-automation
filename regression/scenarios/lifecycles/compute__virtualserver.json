@@ -155,6 +155,24 @@
           }
         },
         {
+          "name": "list-asg-policies",
+          "_note": "id-bound read off auto_scaling_group_id (listautoscalinggrouppolicy) — closes gap_getid GET .../policies. 404 tolerated when the literal seed asg id is non-existent.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "asg-policy"
+        },
+        {
+          "name": "read-asg-policy",
+          "_note": "id-bound show off policy_id (showautoscalinggrouppolicy).",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "asg-policy"
+        },
+        {
           "name": "update-asg-policy",
           "method": "PUT",
           "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
@@ -201,6 +219,24 @@
           }
         },
         {
+          "name": "list-asg-schedules",
+          "_note": "id-bound read off auto_scaling_group_id (listautoscalinggroupschedule) — closes gap_getid GET .../schedules.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "asg-schedule"
+        },
+        {
+          "name": "read-asg-schedule",
+          "_note": "id-bound show off schedule_id (showautoscalinggroupschedule).",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "asg-schedule"
+        },
+        {
           "name": "update-asg-schedule",
           "method": "PUT",
           "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
@@ -242,6 +278,24 @@
             "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
             "service": "virtualserver"
           }
+        },
+        {
+          "name": "list-asg-notifications",
+          "_note": "id-bound read off auto_scaling_group_id (listautoscalinggroupnotification) — closes gap_getid GET .../notifications (one of the last 2 unreachable id-bound reads on the ASG sub-tree).",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "asg-notify"
+        },
+        {
+          "name": "read-asg-notification",
+          "_note": "id-bound show off notification_id (showautoscalinggroupnotification) — closes gap_getid GET .../notifications/{notification_id}.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "asg-notify"
         },
         {
           "name": "update-asg-notification",
@@ -367,6 +421,15 @@
           }
         },
         {
+          "name": "read-image-member",
+          "_note": "id-bound show off member_id (showimagemember) — closes gap_getid GET /v1/images/{image_id}/members/{member_id}. member_id soft-seeded/captured or literal -> 404 when not real; tolerated so the cascade is not a TEST FAILURE.",
+          "method": "GET",
+          "path": "/v1/images/{image_id}/members/{member_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "img-member"
+        },
+        {
           "name": "update-image-member",
           "_note": "UNPROVEN. PUT accepts/rejects a member share (status=accepted). member_id soft-seeded or literal when not captured.",
           "method": "PUT",
@@ -411,6 +474,28 @@
             "server_id": "$.volumes[0].nonexistent_server_seed",
             "transfer_id": "$.volumes[0].nonexistent_transfer_seed"
           }
+        },
+        {
+          "name": "list-volume-types",
+          "_note": "Read-only volume-type catalog lookup (listvolumetypes). Captures a real volume_type_id from the account's catalog so the show below exercises a real id. VolumeTypeListResponse envelope {volume_types:[{id,name,...}]}.",
+          "method": "GET",
+          "path": "/v1/volume-types",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {
+            "limit": 1
+          },
+          "capture_soft": {
+            "volume_type_id": "$.volume_types[0].id"
+          }
+        },
+        {
+          "name": "read-volume-type",
+          "_note": "id-bound show off volume_type_id (showvolumetype) — closes gap_getid GET /v1/volume-types/{volume_type_id}, the last unreachable id-bound read in the volume catalog. 404 tolerated when the soft-capture found nothing.",
+          "method": "GET",
+          "path": "/v1/volume-types/{volume_type_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true
         },
         {
           "name": "create-volume-transfer",
@@ -522,8 +607,28 @@
           "capture_soft": {
             "server_id": "$.servers[0].nonexistent_server_seed",
             "port_id": "$.servers[0].nonexistent_port_seed",
-            "nat_id": "$.servers[0].nonexistent_nat_seed"
+            "nat_id": "$.servers[0].nonexistent_nat_seed",
+            "volume_id": "$.servers[0].nonexistent_volume_seed"
           }
+        },
+        {
+          "name": "list-server-volumes",
+          "_note": "id-bound list off server_id (listservervolumes). Soft-captures a volume_id from the seeded server's attached volumes so the per-id show below exercises a real id when a server exists; literal -> 404 otherwise (cost-safe, never a real VM).",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/volumes",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {
+            "volume_id": "$.volumes[0].id"
+          }
+        },
+        {
+          "name": "read-server-volume",
+          "_note": "id-bound show off server_id x volume_id (showservervolume) — closes gap_getid GET /v1/servers/{server_id}/volumes/{volume_id}, the inline boot-volume read the heavy server node leaves as a gap (its create captures no volume id). 404 tolerated.",
+          "method": "GET",
+          "path": "/v1/servers/{server_id}/volumes/{volume_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true
         },
         {
           "name": "get-server-password",

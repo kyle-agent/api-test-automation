@@ -41,6 +41,13 @@ resources:
         tags: {type: string, required: false,
                note: "_note: 선택 태그 array[Tag{key,value}], 자원당 최대 50개. 기본 미전송 — C4 변형 후보"}
     capture: {devops_service_id: "$.devops_service.id"}
+    verify:
+      - {name: get-devops-service, endpoint: "GET /v1/devops-services/{devops_service_id}",
+         expect_status: [200, 400, 403, 404],
+         note: "id-bound show (showdevopsservice). create가 빈 members[]로 4xx(credential 사전조건)면 id는 list soft-capture 또는 placeholder — catalog '*' 매칭으로 커버리지 기록. probe-reads 보완, 정적 LIGHT 도달성 확보"}
+      - {name: check-deletable, endpoint: "GET /v1/devops-services/{devops_service_id}/check-deletable",
+         expect_status: [200, 400, 403, 404],
+         note: "id-bound 삭제 가능 여부 read (result:boolean). DELETE 직전 — complete-lifecycle 순서(create→reads→writes→delete) 준수"}
     delete: {endpoint: "DELETE /v1/devops-services/{devops_service_id}",
              destructive: true}
     provenance: docs
