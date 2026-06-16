@@ -398,7 +398,18 @@ jobs:
           SCP_SWEEP_IGNORE_TTL: "true"
         run: |
           mkdir -p reports
-          python -u -m cleanup.reconciler 2>&1 | tee reports/pre-reclaim.log
+          # IB-053 (2026-06-16): TIME-BOX the pre-run reclaim so a large leftover
+          # backlog can't starve the run. Wave G (run 27626396618): the broadened
+          # regr* prefix (6b87007) + SCP_SWEEP_IGNORE_TTL matched a months-deep
+          # backlog; the reconciler deletes SERIALLY with a 150s _wait_gone per
+          # resource, so the reclaim ran 3.5h and pushed ADOPT-class CRUD into the
+          # 5h job timeout -> cancelled before the heavy adopters could validate.
+          # The cap frees the VPC slot well within 30m in the common (small-backlog)
+          # case; a pathological backlog is bounded here and finished off by the
+          # post-run sweep job (which runs after the tests, so it never starves them).
+          set -o pipefail
+          timeout 1800 python -u -m cleanup.reconciler 2>&1 | tee reports/pre-reclaim.log \
+            || echo "::warning::pre-run reclaim exceeded the 30m time-box or errored (rc above) — proceeding to provision; the post-run sweep job will finish cleanup"
 
       - name: Provision shared VPC + subnet (BEFORE smoke, with retry)
         # Creates ONE shared VPC + ONE shared subnet and appends SCP_SHARED_* to
