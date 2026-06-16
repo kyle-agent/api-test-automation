@@ -214,7 +214,12 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   archiving-policy enabled heavy reachability-only, gap 19→0); parallel-filestorage
   + iam-identity-center also reachability-only (owner override 2026-06-16: pfs gap→0;
   IdC 32/32 with synthetic/all-zero-id safety rail = no real account-level mutation;
-  +39 waivers dropped → 185 total). **Repo write-op gap now 0; static ceiling 95.0%
+  +39 waivers dropped → 185 total). **searchengine/vertica/sqlserver also
+  reachability-only (owner override 2026-06-16: license-gated engines, access-check
+  only — endpoints CALLED with license/4xx/5xx tolerated, synthetic bodies, no real
+  license consumed; reachability-TERMINAL, NOT held; 74 entitlement waivers dropped
+  → 111 total; gap=0 each; IB-017 → deferred functional-HA, not blocking coverage).**
+  **Repo write-op gap now 0; static ceiling 95.0%
   (1303/1372), remaining gap 69 = all id-bound GETs.** per-profile baselines file-suffixed
   (`core/baselines.py`); multi-tenancy confirmed required.
 - **SKE upgrade LIVE-PROVEN (run 27492496266, 2026-06-14):** the

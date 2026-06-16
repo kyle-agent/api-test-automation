@@ -5,7 +5,7 @@
       "service": "data-analytics/vertica",
       "enabled": true,
       "heavy": true,
-      "_note": "COVERAGE-ONLY guarded lifecycle for the vertica (analytics DB DBaaS) cluster sub-op WRITE endpoints. vertica has ZERO GAP-write endpoints in spec.coverage_gap because every write shares a /v1/clusters/* or /v1/instance-groups/* path already matched by the shared DBaaS scenarios (the gap analyzer matches path-only, ignoring service). This lifecycle re-exercises those writes (add-block-storages/resize/restart/start/stop/sync-state/maintenance/backup/security-group-rules/patch/restore/remove-backup-histories/set-block-storage-size) so they ALSO record under vertica's OWN catalog keys in the dashboard (the engine records WRITE steps per (method,path,service)), and includes a probe-reads step to exercise vertica's two id-bound GETs (verticashowrequest, verticalistengineversionproperties via the engine-version list). Does NOT provision a real billable cluster: soft-captures an EXISTING cluster_id/engine_version_id from the read-only lists; when none exists the {cluster_id}/{instance_group_id}/{block_storage_group_id} tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 4xx counts as covered). Every mutating step optional + grouped + broad expect_status; DELETEs destructive:true. heavy:true gates behind SCP_RUN_HEAVY. Bodies best-effort from path/field semantics + data/api_bodies.json verticacreatecluster shape — UNPROVEN, promote after a real 2xx.",
+      "_note": "reachability-only (owner 2026-06-16): license-gated engine (Vertica DBaaS, create takes a license field), access-tested, license/4xx/5xx tolerated, no functional validation; this is the engine's reachability-TERMINAL final state (NOT held/blocked-owner). Every endpoint is CALLED with optional:true + tolerant expect_status [200,201,202,400,401,403,404,409,422,500]; any 2xx is torn down (DELETEs destructive:true); no real license consumed, no billable-persistent cluster created. COVERAGE-ONLY guarded lifecycle for the vertica (analytics DB DBaaS) cluster sub-op WRITE endpoints. vertica has ZERO GAP-write endpoints in spec.coverage_gap because every write shares a /v1/clusters/* or /v1/instance-groups/* path already matched by the shared DBaaS scenarios (the gap analyzer matches path-only, ignoring service). This lifecycle re-exercises those writes (add-block-storages/resize/restart/start/stop/sync-state/maintenance/backup/security-group-rules/patch/restore/remove-backup-histories/set-block-storage-size) so they ALSO record under vertica's OWN catalog keys in the dashboard (the engine records WRITE steps per (method,path,service)), and includes a probe-reads step to exercise vertica's two id-bound GETs (verticashowrequest, verticalistengineversionproperties via the engine-version list). Does NOT provision a real billable cluster: soft-captures an EXISTING cluster_id/engine_version_id from the read-only lists; when none exists the {cluster_id}/{instance_group_id}/{block_storage_group_id} tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 4xx counts as covered). Every mutating step optional + grouped + broad expect_status; DELETEs destructive:true. heavy:true gates behind SCP_RUN_HEAVY. Bodies best-effort from path/field semantics + data/api_bodies.json verticacreatecluster shape — UNPROVEN, promote after a real 2xx.",
       "steps": [
         {
           "name": "list-clusters",
@@ -32,7 +32,7 @@
           "name": "capture-subop-ids",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}",
-          "expect_status": [200, 400, 403, 404],
+          "expect_status": [200, 400, 401, 403, 404, 500],
           "optional": true,
           "capture_soft": {
             "instance_group_id": "$.instance_groups[0].id",
@@ -44,7 +44,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
           "json": {"security_group_rules": [{"direction": "INBOUND", "protocol": "TCP", "port_min": 5433, "port_max": 5433, "remote_ip_prefix": "10.0.0.0/8", "description": "regr coverage probe"}]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-sg-rules"
         },
@@ -53,7 +53,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
           "json": {"period_hour": "5", "starting_day_of_week": "MON", "starting_time": "0000"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-maintenance"
         },
@@ -61,7 +61,7 @@
           "name": "unset-maintenance",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/maintenance",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [200, 202, 204, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "destructive": true,
           "group": "vt-maintenance"
@@ -71,7 +71,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/backups",
           "json": {"retention_period_day": "7", "starting_time_hour": "2"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-backup"
         },
@@ -79,7 +79,7 @@
           "name": "unset-backup",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/backups",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "expect_status": [200, 202, 204, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "destructive": true,
           "group": "vt-backup"
@@ -89,7 +89,7 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
           "json": {"backup_history_ids": []},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-backup-hist"
         },
@@ -98,7 +98,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/restore",
           "json": {"name": "regrrst{ualpha}", "instance_name_prefix": "regrrst", "subnet_id": "", "restore_option": {"restore_type": "DATETIME", "restore_dt": "{today}"}, "tags": []},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-restore"
         },
@@ -107,7 +107,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/restart",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-power"
         },
@@ -116,7 +116,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/stop",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-power"
         },
@@ -125,7 +125,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/start",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-power"
         },
@@ -134,7 +134,7 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
           "json": {},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-power"
         },
@@ -143,7 +143,7 @@
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/resize",
           "json": {"server_type_name": ""},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-resize"
         },
@@ -152,7 +152,7 @@
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
           "json": {"block_storage_groups": [{"role_type": "DATA", "size_gb": 10, "volume_type": "SSD"}]},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-resize"
         },
@@ -161,7 +161,7 @@
           "method": "POST",
           "path": "/v1/block-storage-groups/{block_storage_group_id}/resize",
           "json": {"size_gb": 20},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 401, 403, 404, 409, 422, 500],
           "optional": true,
           "group": "vt-resize"
         }
@@ -172,13 +172,13 @@
       "service": "data-analytics/vertica",
       "enabled": true,
       "heavy": false,
-      "_note": "COVERAGE-ONLY read lifecycle for vertica's two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-param name (dbaas_engine_version_id) so the final probe-reads step exercises verticalistengineversionproperties (/v1/engine-versions/{dbaas_engine_version_id}/properties). KNOWN-HARD: verticashowrequest (/v1/requests/{request_id}) — request_id is only returned by async write ops and is NOT exposed by any list/collection GET, so it cannot be harvested in a read-only run; it is called with a literal placeholder id so the endpoint is at least CALLED and RECORDED (a 404 counts as reached/covered per the engine). When the engine-versions collection is empty the {dbaas_engine_version_id} normalizes to the catalog '*' key so the properties endpoint is still CALLED. Every step optional + grouped + broad expect_status so an isolated failure never fails the run.",
+      "_note": "reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for vertica's two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-param name (dbaas_engine_version_id) so the final probe-reads step exercises verticalistengineversionproperties (/v1/engine-versions/{dbaas_engine_version_id}/properties). KNOWN-HARD: verticashowrequest (/v1/requests/{request_id}) — request_id is only returned by async write ops and is NOT exposed by any list/collection GET, so it cannot be harvested in a read-only run; it is called with a literal placeholder id so the endpoint is at least CALLED and RECORDED (a 404 counts as reached/covered per the engine). When the engine-versions collection is empty the {dbaas_engine_version_id} normalizes to the catalog '*' key so the properties endpoint is still CALLED. Every step optional + grouped + broad expect_status so an isolated failure never fails the run.",
       "steps": [
         {
           "name": "list-engine-versions",
           "method": "GET",
           "path": "/v1/engine-versions",
-          "expect_status": [200, 400, 404],
+          "expect_status": [200, 400, 401, 403, 404, 500],
           "optional": true,
           "group": "vt-read",
           "capture_soft": {"dbaas_engine_version_id": "$.contents[0].id"}
@@ -187,7 +187,7 @@
           "name": "get-engine-version-properties",
           "method": "GET",
           "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
-          "expect_status": [200, 400, 404],
+          "expect_status": [200, 400, 401, 403, 404, 500],
           "optional": true,
           "group": "vt-read"
         },
@@ -195,7 +195,7 @@
           "name": "get-request",
           "method": "GET",
           "path": "/v1/requests/00000000-0000-0000-0000-000000000000",
-          "expect_status": [200, 400, 404],
+          "expect_status": [200, 400, 401, 403, 404, 500],
           "optional": true,
           "group": "vt-read"
         },

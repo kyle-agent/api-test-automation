@@ -30,6 +30,9 @@ captures:
 states: {}
 
 quirks:
+  - id: reachability-only-license-gated
+    note: "reachability-only (owner 2026-06-16): Vertica is a license-gated DBaaS engine (VerticaClusterCreateRequest carries a license field, max 5000) we do NOT hold a license for, so vertica CANNOT be functionally validated — it is an access-check-only (reachability-TERMINAL) coverage target. Reachability is its FINAL state, NOT a held/blocked-owner state: every endpoint (cluster create + sub-ops + id-bound GETs) is CALLED with optional:true and a tolerant expect_status [200,201,202,400,401,403,404,409,422,500], so license/auth/validation/server errors are tolerated as access evidence. No functional validation, no real license consumed, no billable-persistent cluster created (the lifecycle soft-adopts an existing cluster_id or normalizes to the catalog '*' key; any 2xx is torn down). Provenance stays docs."
+    provenance: docs
   - id: async-writes-return-request-id
     note: "create + write calls answer 202 AsyncResponse {request_id, resource:{id}}; request_id appears ONLY in those write envelopes — GET /v1/requests/{request_id} (verticashowrequest) is unreachable from any list (read-only run can only C2 it via literal-token 404). Same DBaaS framework as postgresql/searchengine"
     provenance: docs

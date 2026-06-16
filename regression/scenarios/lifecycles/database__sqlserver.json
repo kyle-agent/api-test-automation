@@ -5,7 +5,7 @@
       "service": "database/sqlserver",
       "enabled": true,
       "heavy": true,
-      "_note": "COVERAGE-ONLY guarded lifecycle for the sqlserver DBaaS cluster sub-op WRITE endpoints (incl. the sqlserver-only create/delete cluster which the shared heavy-shared-dbaas lifecycle EXCLUDES because SQL Server needs a real license). Soft-captures an existing cluster_id (+ instance_group_id/bsg_id/log_type) from read-only calls; absent that, tokens normalize to the catalog '*' key so every endpoint is CALLED+RECORDED (4xx counts). All mutating steps optional+grouped+broad-expect_status; heavy:true (SCP_RUN_HEAVY); DELETEs destructive:true. Bodies from api_docs request_example, UNPROVEN. sqlserver DIVERGES from the relational template: it has add-secondary (HA standby, needs a license) and databases (add/del DB list) and has NO archive/replicas/promote/other-region/reset-replica/sync-replica-state endpoints.",
+      "_note": "reachability-only (owner 2026-06-16): license-gated engine (MS SQL Server, Always On secondary needs a license key), access-tested, license/4xx/5xx tolerated, no functional validation; this is the engine's reachability-TERMINAL final state (NOT held/blocked-owner). Every endpoint is CALLED with optional:true + tolerant expect_status [200,201,202,400,401,403,404,409,422,500]; any 2xx is torn down (DELETEs destructive:true, the cluster delete targets a SYNTHETIC non-existent id); no real license consumed, no billable-persistent cluster created. Functional HA/secondary validation stays owner-license-gated (IB-017, deferred not blocking). COVERAGE-ONLY guarded lifecycle for the sqlserver DBaaS cluster sub-op WRITE endpoints (incl. the sqlserver-only create/delete cluster which the shared heavy-shared-dbaas lifecycle EXCLUDES because SQL Server needs a real license). Soft-captures an existing cluster_id (+ instance_group_id/bsg_id/log_type) from read-only calls; absent that, tokens normalize to the catalog '*' key so every endpoint is CALLED+RECORDED (4xx counts). All mutating steps optional+grouped+broad-expect_status; heavy:true (SCP_RUN_HEAVY); DELETEs destructive:true. Bodies from api_docs request_example, UNPROVEN. sqlserver DIVERGES from the relational template: it has add-secondary (HA standby, needs a license) and databases (add/del DB list) and has NO archive/replicas/promote/other-region/reset-replica/sync-replica-state endpoints.",
       "steps": [
         {
           "name": "list-clusters",
@@ -31,8 +31,10 @@
           "expect_status": [
             200,
             400,
+            401,
             403,
-            404
+            404,
+            500
           ],
           "optional": true,
           "capture_soft": {
@@ -47,8 +49,10 @@
           "expect_status": [
             200,
             400,
+            401,
             403,
-            404
+            404,
+            500
           ],
           "optional": true,
           "capture_soft": {
@@ -116,10 +120,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "create-delete"
@@ -139,10 +145,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "maint"
@@ -156,10 +164,12 @@
             202,
             204,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "destructive": true,
@@ -179,10 +189,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "backup"
@@ -199,10 +211,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "backup"
@@ -216,10 +230,12 @@
             202,
             204,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "destructive": true,
@@ -243,10 +259,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "param"
@@ -260,10 +278,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "param"
@@ -280,10 +300,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "audit"
@@ -308,10 +330,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "log-export"
@@ -334,10 +358,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "log-export"
@@ -351,10 +377,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "log-export"
@@ -368,10 +396,12 @@
             202,
             204,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "destructive": true,
@@ -390,10 +420,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "sg-rules"
@@ -407,10 +439,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "lifecycle"
@@ -424,10 +458,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "lifecycle"
@@ -441,10 +477,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "lifecycle"
@@ -458,10 +496,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "lifecycle"
@@ -475,10 +515,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "ha"
@@ -496,10 +538,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "patch"
@@ -516,10 +560,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "resize"
@@ -538,10 +584,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "resize"
@@ -558,10 +606,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "resize"
@@ -580,10 +630,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "secondary"
@@ -601,10 +653,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "databases"
@@ -633,10 +687,12 @@
             201,
             202,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "group": "restore"
@@ -651,10 +707,12 @@
             202,
             204,
             400,
+            401,
             403,
             404,
             409,
-            422
+            422,
+            500
           ],
           "optional": true,
           "destructive": true,
@@ -667,7 +725,7 @@
       "service": "database/sqlserver",
       "enabled": true,
       "heavy": false,
-      "_note": "COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY sqlserver catalog GET whose path params are satisfied (engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). sqlserver has NO clusters/{cluster_id}/replicas endpoint. 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected).",
+      "_note": "reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY sqlserver catalog GET whose path params are satisfied (engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). sqlserver has NO clusters/{cluster_id}/replicas endpoint. 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected).",
       "steps": [
         {
           "name": "list-engine-versions",
@@ -676,7 +734,10 @@
           "expect_status": [
             200,
             400,
-            404
+            401,
+            403,
+            404,
+            500
           ],
           "optional": true,
           "group": "read-cov",
@@ -691,7 +752,10 @@
           "expect_status": [
             200,
             400,
-            404
+            401,
+            403,
+            404,
+            500
           ],
           "optional": true,
           "group": "read-cov"
