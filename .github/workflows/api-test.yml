@@ -382,11 +382,20 @@ jobs:
         # step below can't win a slot, SCP_SHARED_VPC_ID is never exported, and
         # every adopter falls back to self-create (the IB-047 cascade). Run the
         # SAME tag-scoped reconciler the sweep job uses, ONCE before provisioning,
-        # to clear leftovers so provision wins its slot. Tag-scoped (owner+run /
-        # expired) — never nukes cross-run live resources. Best-effort: a failed
-        # reclaim never fails the job (the post-run sweep is the backstop).
+        # to clear leftovers so provision wins its slot. Tag-scoped (owner-tag) —
+        # never touches non-owned resources. Best-effort: a failed reclaim never
+        # fails the job (the post-run sweep is the backstop).
+        # IB-047 FIX (2026-06-16): the reconciler SKIPS owner-tagged-but-UNEXPIRED
+        # resources (treats them as a live run's). A prior FAILED run's leftover
+        # VPCs are usually not yet TTL-expired, so a plain reclaim leaves them and
+        # the 5-cap stays full (Wave C: provision lost its slot). SCP_SWEEP_IGNORE_TTL
+        # force-clears our unexpired leftovers too — SAFE here because the constant
+        # concurrency.group (one run per ref, cancel-in-progress:false) guarantees
+        # no other mutating run of ours is live at pre-run time.
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         continue-on-error: true
+        env:
+          SCP_SWEEP_IGNORE_TTL: "true"
         run: |
           mkdir -p reports
           python -u -m cleanup.reconciler 2>&1 | tee reports/pre-reclaim.log
