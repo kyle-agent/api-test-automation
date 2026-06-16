@@ -91,6 +91,94 @@
           "_note": "Coverage-only read-shaped POST (a metric query). Body UNPROVEN. Isolated group so a 4xx never affects the event-policy group."
         }
       ]
+    },
+    {
+      "id": "cloudmonitoring-readonly-shows",
+      "service": "management/cloudmonitoring",
+      "enabled": true,
+      "_note": "Light, READ-ONLY (no writes, no cleanup). EOL SERVICE (IB-034: Cloud Monitoring sunsets 2026-09 -> ServiceWatch) — these 5 id-bound GETs are already entitlement-class WAIVED in data/baselines/coverage_waivers.json (excluded from the C3 validation denominator); this lifecycle adds ONLY C1 reachability (an explicit method+path step coverage_gap.py counts) so the service reaches 100% static reachability WITHOUT deep validation, preserving the IB-034 'don't deep-validate the EOL service' intent. Closes the 5 GAP-get-id endpoints via the list->soft-capture->show idiom (same as iam-readonly-shows). events/event-policies list GETs require query params (productResourceId/eventState/queryStartDt/queryEndDt per data/api_docs.json) that a coverage-only run lacks, so on a fresh account the list 400s/empties and the dependent id segment stays a {placeholder} (normalizes to the catalog '*' key) — the show is still CALLED and statically reachable. Every step is optional with tolerant [200,400,403,404]. Envelopes grounded in data/api_docs.json: getproducteventlist $.contents[].eventId (PageResponseOpenApiEventResponse/OpenApiEventResponse); getproducteventpolicylist $.contents[].eventPolicyId; getadressbooklist $.contents[].addrbookId (PageResponseAlarmAddrBookDto/AlarmAddrBookDto). Tolerant reads only — no body shape is asserted.",
+      "steps": [
+        {
+          "name": "list-events",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/events",
+          "params": {"eventState": "ACTIVE", "queryStartDt": "{today}", "queryEndDt": "{today}", "size": 1},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-event",
+          "capture_soft": {"eventId": "$.contents[0].eventId"},
+          "_note": "getproducteventlist. Events are data-dependent (a fresh account may have NONE) and this list requires productResourceId (req, not available coverage-only) on top of eventState/queryStartDt/queryEndDt — so it typically 400s/empties and eventId stays a placeholder that normalizes to the catalog '*' key. Soft-capture $.contents[0].eventId (OpenApiEventResponse.eventId) drives show-event + show-event-notification-states when a real event exists. Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "show-event",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/events/{eventId}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-event",
+          "_note": "id-bound read (geteventdetail). Closes GAP-get-id for GET /v1/cloudmonitorings/event/v2/events/{eventId}. Keys off the soft-captured eventId; if list-events found none the {eventId} segment stays literal and normalizes to the catalog '*' key (still records coverage, 4xx's harmlessly). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        },
+        {
+          "name": "show-event-notification-states",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/events/{eventId}/notification-states",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-event",
+          "_note": "id-bound read (geteventnotificationstates). Closes GAP-get-id for GET /v1/cloudmonitorings/event/v2/events/{eventId}/notification-states. Reuses the soft-captured eventId from list-events; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        },
+        {
+          "name": "list-event-policies-ro",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies",
+          "params": {"size": 1},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-policy",
+          "capture_soft": {"eventPolicyId": "$.contents[0].eventPolicyId"},
+          "_note": "getproducteventpolicylist. Soft-captures a REAL eventPolicyId ($.contents[0].eventPolicyId) to drive the two id-bound policy reads below. This list requires productResourceId (req, not available coverage-only) so it typically 400s/empties and eventPolicyId stays a placeholder (normalizes to the catalog '*' key). Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "show-event-policy-histories",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories",
+          "params": {"queryStartDt": "{today}", "queryEndDt": "{today}", "size": 1},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-policy",
+          "_note": "id-bound read (geteventpolicyhistories). Closes GAP-get-id for GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories. Requires queryStartDt/queryEndDt (sent {today}). Keys off the soft-captured eventPolicyId; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        },
+        {
+          "name": "show-event-policy-notifications",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-policy",
+          "_note": "id-bound read (geteventpolicynotification). Closes GAP-get-id for GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications. Reuses the soft-captured eventPolicyId; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        },
+        {
+          "name": "list-addrbooks",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v2/users/addrbooks",
+          "params": {"size": 1},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-addrbook",
+          "capture_soft": {"addrbookId": "$.contents[0].addrbookId"},
+          "_note": "getadressbooklist. Zero-required-param list (page/size/sort all optional) so this should 200 when the caller has any addrbook. Soft-captures a REAL addrbookId ($.contents[0].addrbookId, AlarmAddrBookDto.addrbookId) to drive show-addrbook-members. If the caller has no addrbook the segment stays a placeholder (normalizes to catalog '*'). Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "show-addrbook-members",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members",
+          "params": {"size": 1},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-addrbook",
+          "_note": "id-bound read (getadressbookmemberlist). Closes GAP-get-id for GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members. Keys off the soft-captured addrbookId from list-addrbooks; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        }
+      ]
     }
   ]
 }

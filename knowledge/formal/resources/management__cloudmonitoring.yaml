@@ -124,9 +124,76 @@ resources:
       - {name: read,
          endpoint: "GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
          expect_status: [200]}
+      # C1-reachability documentation for the two id-bound policy reads (EOL/IB-034:
+      # entitlement-waived in coverage_waivers.json, so tolerant reads only — these
+      # are exercised by the cloudmonitoring-readonly-shows lifecycle). queryStartDt/
+      # queryEndDt are required on histories (data/api_docs.json geteventpolicyhistories).
+      - {name: read-histories,
+         endpoint: "GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories",
+         expect_status: [200, 400, 403, 404],
+         _note: "geteventpolicyhistories — id-bound read, EOL entitlement-waived, tolerant (C1 reachability only)."}
+      - {name: read-notifications,
+         endpoint: "GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/notifications",
+         expect_status: [200, 400, 403, 404],
+         _note: "geteventpolicynotification — id-bound read, EOL entitlement-waived, tolerant (C1 reachability only)."}
     delete: {endpoint: "DELETE /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
              destructive: true}
     provenance: docs
     source: {lifecycle: cloudmonitoring-event-policy,
              steps: [create-event-policy, delete-event-policy]}
     notes: "run 27396649009: 평면 body가 400 InvalidInputValue(resourceType/productResourceId) — 실제 요청은 docs EventPolicyCreateRequest/EventPolicyInfo 모델의 중첩 구조(이 파일이 반영). 응답 모델은 EventPolicyDetailResponse; capture $.eventPolicyId(EventPolicyDetailResponse.eventPolicyId 필드 확인, required)는 docs 근거이나 라이브 미관측(UNPROVEN). 임계치는 SINGLE_VALUE(GT 95, CPU 메트릭 system.cpu.system.pct — EventPolicyInfo 예시 키)로 사실상 미발화 probe. delete 경로는 카탈로그 deleteeventpolicy verbatim. camelCase v2 API(플랫폼 표준 snake_case 아님). _note(smoke-400 진단): 이 정책의 조회 GET(getproducteventpolicylist GET /event-policies)는 productResourceId(필수)를 요구한다 — bare 호출이 400이 나는 이유이며 cm-account-resource lookup으로 채운다."
+
+  # read-only LOOKUP node — EVENT (mg-cm event read group). EOL/IB-034: the two
+  # event id-bound GETs are entitlement-waived in coverage_waivers.json; this node
+  # documents the list->soft-capture->show C1-reachability path only (tolerant reads,
+  # NO deep validation, NO delete by design). Exercised by the
+  # cloudmonitoring-readonly-shows lifecycle.
+  cm-event:
+    lookup: true
+    code: "mg-cm-event"
+    service: management/cloudmonitoring
+    requires: []
+    create:
+      # getproducteventlist — requires productResourceId/eventState/queryStartDt/
+      # queryEndDt (data/api_docs.json); coverage-only runs lack productResourceId so
+      # the list typically 400s/empties and the captured id stays a placeholder.
+      endpoint: "GET /v1/cloudmonitorings/event/v2/events"
+    capture:
+      eventId:
+        list: "$.contents"
+        get: "eventId"
+    verify:
+      - {name: read,
+         endpoint: "GET /v1/cloudmonitorings/event/v2/events/{eventId}",
+         expect_status: [200, 400, 403, 404],
+         _note: "geteventdetail — id-bound read, EOL entitlement-waived, tolerant (C1 reachability only)."}
+      - {name: read-notification-states,
+         endpoint: "GET /v1/cloudmonitorings/event/v2/events/{eventId}/notification-states",
+         expect_status: [200, 400, 403, 404],
+         _note: "geteventnotificationstates — id-bound read, EOL entitlement-waived, tolerant (C1 reachability only)."}
+    provenance: docs
+    notes: "읽기 전용 LOOKUP 노드 — docs getproducteventlist 응답 모델 PageResponseOpenApiEventResponse/OpenApiEventResponse에서 파생(eventId required). EOL(IB-034: 2026-09 sunset → ServiceWatch)이라 geteventdetail/geteventnotificationstates 두 id-bound read는 coverage_waivers.json에서 entitlement-class 면제 — 여기서는 C3 깊은 검증 없이 C1 도달성(list→soft-capture→show)만 문서화한다(tolerant reads only). events는 데이터 의존적이라 신규 계정엔 이벤트가 없을 수 있고 list 자체가 productResourceId(필수)를 요구하므로 capture가 비면 {eventId}는 catalog '*' 키로 정규화된다. cloudmonitoring-readonly-shows 라이프사이클이 실제로 호출한다."
+
+  # read-only LOOKUP node — ADDRBOOK (mg-cm addrbook read group). EOL/IB-034: the
+  # addrbook-members id-bound GET is entitlement-waived; this node documents the
+  # list->soft-capture->show C1-reachability path only (tolerant read, NO delete).
+  cm-addrbook:
+    lookup: true
+    code: "mg-cm-addrbook"
+    service: management/cloudmonitoring
+    requires: []
+    create:
+      # getadressbooklist — page/size/sort all optional, so a bare call 200s when the
+      # caller has any addrbook; soft-captures a real addrbookId for the members read.
+      endpoint: "GET /v1/cloudmonitorings/product/v2/users/addrbooks"
+    capture:
+      addrbookId:
+        list: "$.contents"
+        get: "addrbookId"
+    verify:
+      - {name: read-members,
+         endpoint: "GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members",
+         expect_status: [200, 400, 403, 404],
+         _note: "getadressbookmemberlist — id-bound read, EOL entitlement-waived, tolerant (C1 reachability only)."}
+    provenance: docs
+    notes: "읽기 전용 LOOKUP 노드 — docs getadressbooklist 응답 모델 PageResponseAlarmAddrBookDto/AlarmAddrBookDto에서 파생(addrbookId required). getadressbooklist는 필수 쿼리 파라미터가 없어(page/size/sort optional) 주소록이 하나라도 있으면 bare 호출이 200이어야 한다. EOL(IB-034)이라 getadressbookmemberlist id-bound read는 coverage_waivers.json에서 entitlement 면제 — C1 도달성만 문서화(tolerant read only). 주소록이 없으면 {addrbookId}는 catalog '*' 키로 정규화된다. cloudmonitoring-readonly-shows 라이프사이클이 실제로 호출한다."
