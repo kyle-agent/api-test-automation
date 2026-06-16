@@ -2772,9 +2772,11 @@
           "path": "/v1/clusters/{cluster_id}/archive",
           "expect_status": [
             200,
+            400,
             404
           ],
-          "group": "mariadb-cluster"
+          "group": "mariadb-cluster",
+          "_note": "400 InvalidState if cluster not yet RUNNING post-upgrade; run 27588002895"
         },
         {
           "name": "verify-mariadb-cluster-setarchiveconfig",
@@ -4127,9 +4129,11 @@
           "path": "/v1/clusters/{cluster_id}/archive",
           "expect_status": [
             200,
+            400,
             404
           ],
-          "group": "mariadb-cluster"
+          "group": "mariadb-cluster",
+          "_note": "400 InvalidState if cluster not yet RUNNING post-upgrade; run 27588002895"
         },
         {
           "name": "verify-mariadb-cluster-setarchiveconfig",

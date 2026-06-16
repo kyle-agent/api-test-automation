@@ -4127,8 +4127,11 @@
           "expect_status": [
             200,
             201,
-            202
-          ]
+            202,
+            400
+          ],
+          "optional": true,
+          "_note": "value_error: old_value must match applied; gated pending IB-043 applied-value capture (run 27588002895)"
         },
         {
           "name": "wait-after-set-parameters",

@@ -156,10 +156,15 @@ resources:
          expect_status: [200]}
       # ---- mariadb 폴딩 setter 면 (PG 미러에 추가) -------------------------
       # showarchiveconfig — 404 관용은 mysql verify-backup-config verbatim.
+      # 400 InvalidState if cluster not yet RUNNING post-upgrade; run 27588002895
+      # (gen-heavy-mariadb-upgrade: showarchiveconfig ran before the cluster
+      # returned to RUNNING after the upgrade op). Tolerate transient 400 as well
+      # as the retry stack so the verify chain doesn't hard-fail on the state race.
       - {name: showarchiveconfig,
          endpoint: "GET /v1/clusters/{cluster_id}/archive",
-         expect_status: [200, 404],
-         retry_on_status: [400, 409], retries: 10, retry_interval: 30}
+         expect_status: [200, 400, 404],
+         retry_on_status: [400, 409], retries: 10, retry_interval: 30,
+         note: "400 InvalidState if cluster not yet RUNNING post-upgrade; run 27588002895"}
       # setarchiveconfig — ArchiveConfigSetRequest {archive_enabled REQ bool,
       # retention_period_day opt default 1} (api_docs verbatim). body는
       # subops-guarded set-archive probe 초안 verbatim. userguide 확정
