@@ -1,13 +1,39 @@
 # Resource-task model — management/iam-identity-center (mg-idc group, SSO).
-# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from the idc-* lifecycles
-# (ALL disabled 2026-06-10 — service excluded from the C3 target, waived in
-# coverage_waivers.json — and heavy: SSO structure is account-structural on a
-# shared account) by extract.py, curated by hand: the literal ssoins-12345
-# placeholders became {iam-identity-center.instance_id} wiring, and the
-# account-assignment's all-zero ids became real node references. Everything
-# here is provenance docs (disabled sources, soft captures, UNPROVEN bodies);
-# the model documents the dependency shape for a future dedicated
-# org-management test account (R3+).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from the idc-* lifecycles.
+#
+# REACHABILITY-ONLY COVERAGE WITH A SAFETY RAIL (owner override, 2026-06-16).
+# IdC was previously ALL-disabled (service excluded from the C3 target, waived in
+# coverage_waivers.json). The owner has now reframed it as a REACHABILITY-ONLY
+# target (same shape as storage/archivestorage): every IdC write + id-bound GET
+# is CALLED regardless of the result — the point is to test ACCESS/REACHABILITY,
+# not real SSO config. So each write/GET below is an `optional` step with a
+# tolerant `expect_status` ([...,400,403,404,409,422]); a 4xx is EXPECTED and
+# TOLERATED (reachability = the endpoint RESPONDED, even 4xx, NOT a successful
+# grant). provenance stays `docs` — these are reachability probes, NOT validated.
+#
+# CRITICAL SAFETY — IdC writes can mutate ACCOUNT-LEVEL SSO config IF they
+# succeed. The reachability calls MUST 4xx WITHOUT creating/granting real config:
+#   * create-instance: the body is the docs-sample LDAP bind to a NON-EXISTENT
+#     test directory (bind_dn/connection_url point at test.subdomain.company.com)
+#     so it ValidationErrors/403s rather than persisting a real SSO instance; it
+#     carries a tolerant teardown DELETE so any stray 2xx is torn down.
+#   * users/groups/permission-sets: instance_id is the SYNTHETIC placeholder
+#     ssoins-12345 (NO real instance) so creates 4xx; by-id GET/PATCH/PUT/DELETE
+#     key off captured-soft ids that never resolve to real objects (4xx). Group
+#     add/remove-users send EMPTY user_uuids[]; policy arrays are EMPTY.
+#   * account-assignment (MOST SENSITIVE — grants a principal a permission-set on
+#     a target account): the body uses ALL-ZERO synthetic ids
+#     (target_account_id/permission_set_id/principal_id = 32 zeros) + synthetic
+#     instance_id so it CANNOT create a real grant. We deliberately do NOT wire
+#     real node ids into the live account-assignment create.
+# NO real SSO instance and NO real account assignment is created. The entitlement
+# (owner-exclusion) waivers were dropped from data/baselines/coverage_waivers.json
+# and the idc-* lifecycles were enabled in the same unit.
+#
+# NOTE: the model below keeps the curated {iam-identity-center.instance_id} /
+# node-reference wiring as the DEPENDENCY-SHAPE documentation for a future
+# dedicated org-management test account (R3+); the ENABLED lifecycles use the
+# synthetic/all-zero ids described above for safe reachability.
 version: 1
 resources:
   iam-identity-center:

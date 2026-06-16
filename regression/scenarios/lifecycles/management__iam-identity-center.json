@@ -3,10 +3,9 @@
   {
    "id": "idc-instance",
    "service": "management/iam-identity-center",
-   "enabled": false,
+   "enabled": true,
    "heavy": true,
-   "_note": "SSO (IAM Identity Center) INSTANCE lifecycle. BLAST RADIUS: an SSO instance is account-structural — creating/patching/deleting one on a shared account is sensitive and may be irreversible (it backs all SSO users/groups/permission-sets). Therefore heavy + every mutating step optional with broad expect_status so an expected 403/400/409/422 RECORDS coverage WITHOUT creating real SSO structure or failing the run. POST body from data/api_bodies.json (createinstance, ACTIVE_DIRECTORY identity_store_config). PATCH body from setinstance (method confirmed PATCH from catalog). instance_id captured from create if it ever succeeds; otherwise PATCH/DELETE fire against the captured id only when present (group isolation). The single-instance show GET is probed. Response envelope for the instance id is UNPROVEN — guessed $.instance.id with soft fallbacks; mark unverified. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
-   "_status": "blocked-owner",
+   "_note": "REACHABILITY-ONLY (owner override 2026-06-16): SSO (IAM Identity Center) INSTANCE lifecycle. Every IdC write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reachable). CRITICAL SAFETY: IdC writes can mutate ACCOUNT-LEVEL SSO config if they succeed, so reachability calls are deliberately shaped to 4xx WITHOUT creating/granting real SSO config — the create POST body is the docs sample (an LDAP bind to a non-existent test directory) so it ValidationErrors/403s rather than persisting a real SSO instance; the by-id PATCH/GET/DELETE key off a captured-soft id that, when the create does not 2xx, never resolves to a real instance (4xx). Reachability = the endpoint RESPONDED (even 4xx), NOT a successful create. BLAST RADIUS: an SSO instance is account-structural; create carries a tolerant teardown DELETE (cleanup) so any stray 2xx is immediately torn down. heavy + every mutating step optional with broad expect_status. instance_id captured-soft ($.instance.id UNPROVEN). | ENABLED 2026-06-16 (owner), entitlement waivers dropped.",
    "steps": [
     {
      "name": "create-instance",
@@ -46,7 +45,7 @@
       "path": "/v1/instances/{instance_id}",
       "service": "iam-identity-center"
      },
-     "_note": "Capture is SOFT: if the create is denied (likely on a shared account) the lifecycle still records the POST and moves on without a real id."
+     "_note": "REACHABILITY-ONLY: capture is SOFT and the create is shaped to 4xx (docs-sample LDAP bind to a non-existent test directory) so NO real SSO instance is created; the POST is still RECORDED for coverage. cleanup DELETE tears down any stray 2xx. No real account-level mutation."
     },
     {
      "name": "list-instances",
@@ -59,6 +58,21 @@
       403,
       404
      ]
+    },
+    {
+     "name": "show-instance",
+     "method": "GET",
+     "path": "/v1/instances/{instance_id}",
+     "service": "iam-identity-center",
+     "group": "idc-instance",
+     "optional": true,
+     "expect_status": [
+      200,
+      400,
+      403,
+      404
+     ],
+     "_note": "REACHABILITY-ONLY id-bound GET (owner): access-tested off the captured-soft instance_id (synthetic/absent when create did not 2xx) so it 4xx's without touching real SSO config. 4xx tolerated."
     },
     {
      "name": "patch-instance",
@@ -81,7 +95,7 @@
       409,
       422
      ],
-     "_note": "Fires only if create captured an instance_id (group isolated); records the PATCH /v1/instances/{instance_id} write either way once called."
+     "_note": "REACHABILITY-ONLY: fires against the captured-soft instance_id (synthetic/absent when create 4xx'd) so the PATCH 4xx's WITHOUT mutating a real SSO instance; the write is RECORDED either way once called."
     },
     {
      "name": "probe-reads",
@@ -113,10 +127,9 @@
   {
    "id": "idc-user",
    "service": "management/iam-identity-center",
-   "enabled": false,
+   "enabled": true,
    "heavy": true,
-   "_note": "SSO USER lifecycle: create -> patch -> delete (single) -> delete (bulk). BLAST RADIUS: SSO users are tied to an SSO instance/identity store; creating them on a shared account is sensitive. heavy + all mutating steps optional with broad expect_status so a denial RECORDS coverage without creating real principals. Bodies from createuser / setuser (api_bodies.json). instance_id is a docs placeholder (ssoins-12345) — UNPROVEN; on a real run with no valid instance the create returns 4xx (still recorded). user_uuid captured-soft from create ($.user.id guessed, UNPROVEN) else falls back to a placeholder uuid for the by-id PATCH/DELETE so those endpoints are still exercised. Bulk DELETE /v1/users body shape (user_uuids) inferred from createbulkgroupusers — UNPROVEN. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
-   "_status": "blocked-owner",
+   "_note": "REACHABILITY-ONLY (owner override 2026-06-16): SSO USER lifecycle: create -> show -> patch -> delete (single) -> delete (bulk). Every write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reachable). CRITICAL SAFETY: the create's instance_id is the SYNTHETIC placeholder ssoins-12345 (no real SSO instance) so the POST 4xx's (ValidationError/404) WITHOUT creating a real principal; the by-id show/PATCH/DELETE key off a captured-soft user_uuid that, when the create did not 2xx, never resolves to a real user (4xx). Reachability = the endpoint RESPONDED, NOT a successful create. create carries a tolerant teardown DELETE (cleanup) so any stray 2xx is torn down. heavy + all mutating optional/broad. Bodies from createuser/setuser (api_bodies.json), user_uuid $.user.id UNPROVEN. Bulk DELETE body inferred. | ENABLED 2026-06-16 (owner), entitlement waivers dropped.",
    "steps": [
     {
      "name": "create-user",
@@ -170,6 +183,21 @@
       403,
       404
      ]
+    },
+    {
+     "name": "show-user",
+     "method": "GET",
+     "path": "/v1/users/{user_uuid}",
+     "service": "iam-identity-center",
+     "group": "idc-user",
+     "optional": true,
+     "expect_status": [
+      200,
+      400,
+      403,
+      404
+     ],
+     "_note": "REACHABILITY-ONLY id-bound GET (owner): access-tested off the captured-soft user_uuid (synthetic/absent when create did not 2xx) so it 4xx's without touching a real principal. 4xx tolerated."
     },
     {
      "name": "patch-user",
@@ -256,10 +284,9 @@
   {
    "id": "idc-group",
    "service": "management/iam-identity-center",
-   "enabled": false,
+   "enabled": true,
    "heavy": true,
-   "_note": "SSO GROUP + GROUP-USERS lifecycle: create group -> patch group -> add users (bulk) -> remove users (bulk) -> delete group -> delete groups (bulk). BLAST RADIUS: SSO groups belong to an SSO instance; sensitive on a shared account. heavy + all mutating optional/broad so denials RECORD coverage without real structure. Bodies from creategroup / setgroup / createbulkgroupusers (api_bodies.json). instance_id placeholder ssoins-12345 (UNPROVEN). group_id captured-soft ($.group.id guessed, UNPROVEN); PATCH/POST-users/DELETE-users/DELETE fire against it when present. Bulk DELETE /v1/groups body (instance_id + group_ids[]) and DELETE /v1/groups/{id}/users body inferred — UNPROVEN. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
-   "_status": "blocked-owner",
+   "_note": "REACHABILITY-ONLY (owner override 2026-06-16): SSO GROUP + GROUP-USERS lifecycle: create group -> list group-users (id-bound GET) -> patch group -> add users (bulk) -> remove users (bulk) -> delete group -> delete groups (bulk). Every write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reachable). CRITICAL SAFETY: the create's instance_id is the SYNTHETIC placeholder ssoins-12345 so the POST 4xx's WITHOUT creating real structure; add/remove-users send EMPTY user_uuids[] so no real principals are referenced; the by-id GET/PATCH/DELETE key off a captured-soft group_id that 4xx's when the create did not 2xx. Reachability = the endpoint RESPONDED, NOT a successful create. create carries a tolerant teardown DELETE (cleanup). heavy + all mutating optional/broad. Bodies from creategroup/setgroup/createbulkgroupusers, group_id $.group.id UNPROVEN; bulk/remove-users bodies inferred. | ENABLED 2026-06-16 (owner), entitlement waivers dropped.",
    "steps": [
     {
      "name": "create-group",
@@ -303,6 +330,21 @@
       403,
       404
      ]
+    },
+    {
+     "name": "list-group-users",
+     "method": "GET",
+     "path": "/v1/groups/{group_id}/users",
+     "service": "iam-identity-center",
+     "group": "idc-group",
+     "optional": true,
+     "expect_status": [
+      200,
+      400,
+      403,
+      404
+     ],
+     "_note": "REACHABILITY-ONLY id-bound GET (owner): access-tested off the captured-soft group_id (synthetic/absent when create did not 2xx) so it 4xx's without touching real SSO structure. 4xx tolerated."
     },
     {
      "name": "patch-group",
@@ -429,10 +471,9 @@
   {
    "id": "idc-permission-set",
    "service": "management/iam-identity-center",
-   "enabled": false,
+   "enabled": true,
    "heavy": true,
-   "_note": "SSO PERMISSION-SET + its POLICIES lifecycle: create -> patch -> set policies (PUT) -> delete policies -> delete permission-set. BLAST RADIUS: permission-sets define SSO access on accounts — sensitive/structural on a shared account. heavy + all mutating optional/broad so denials RECORD coverage without granting real access. Bodies from createpermissionset / setpermissionset / setpermissionsetpolicies (api_bodies.json). instance_id placeholder ssoins-12345 (UNPROVEN). permission_set_id captured-soft ($.permission_set.id guessed, UNPROVEN). DELETE /v1/permission-sets/{id}/policies body reuses setpermissionsetpolicies shape with empty arrays — UNPROVEN. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
-   "_status": "blocked-owner",
+   "_note": "REACHABILITY-ONLY (owner override 2026-06-16): SSO PERMISSION-SET + its POLICIES lifecycle: create -> show -> list policies (id-bound GETs) -> patch -> set policies (PUT) -> delete policies -> delete permission-set. Every write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reachable). CRITICAL SAFETY: the create's instance_id is the SYNTHETIC placeholder ssoins-12345 so the POST 4xx's WITHOUT defining real SSO access; policy arrays are EMPTY so no real policy is attached; the by-id GET/PATCH/PUT/DELETE key off a captured-soft permission_set_id that 4xx's when the create did not 2xx. Reachability = the endpoint RESPONDED, NOT a successful create. create carries a tolerant teardown DELETE (cleanup). heavy + all mutating optional/broad. Bodies from createpermissionset/setpermissionset/setpermissionsetpolicies, permission_set_id $.permission_set.id UNPROVEN. | ENABLED 2026-06-16 (owner), entitlement waivers dropped.",
    "steps": [
     {
      "name": "create-permission-set",
@@ -479,6 +520,36 @@
       403,
       404
      ]
+    },
+    {
+     "name": "show-permission-set",
+     "method": "GET",
+     "path": "/v1/permission-sets/{permission_set_id}",
+     "service": "iam-identity-center",
+     "group": "idc-permission-set",
+     "optional": true,
+     "expect_status": [
+      200,
+      400,
+      403,
+      404
+     ],
+     "_note": "REACHABILITY-ONLY id-bound GET (owner): access-tested off the captured-soft permission_set_id (synthetic/absent when create did not 2xx) so it 4xx's without touching real SSO access. 4xx tolerated."
+    },
+    {
+     "name": "list-permission-set-policies",
+     "method": "GET",
+     "path": "/v1/permission-sets/{permission_set_id}/policies",
+     "service": "iam-identity-center",
+     "group": "idc-permission-set",
+     "optional": true,
+     "expect_status": [
+      200,
+      400,
+      403,
+      404
+     ],
+     "_note": "REACHABILITY-ONLY id-bound GET (owner): access-tested off the captured-soft permission_set_id (synthetic/absent when create did not 2xx) so it 4xx's without touching real SSO policies. 4xx tolerated."
     },
     {
      "name": "patch-permission-set",
@@ -583,10 +654,9 @@
   {
    "id": "idc-account-assignment",
    "service": "management/iam-identity-center",
-   "enabled": false,
+   "enabled": true,
    "heavy": true,
-   "_note": "SSO ACCOUNT-ASSIGNMENT lifecycle: create -> delete (single by id) -> delete (bulk). BLAST RADIUS: an account-assignment grants a principal a permission-set ON A TARGET ACCOUNT — the most sensitive SSO write; never create a real one on a shared account. heavy + all mutating optional with broad expect_status so the expected 403/400 RECORDS coverage WITHOUT granting access. Body from createaccountassignment (api_bodies.json) using docs placeholder ids (instance/permission-set/principal/target-account) so the call is well-formed but denied/not-found. account_assignment_id captured-soft ($.account_assignment.id guessed, UNPROVEN) else a placeholder id exercises the by-id DELETE. Bulk DELETE /v1/account-assignments body inferred — UNPROVEN. | DISABLED 2026-06-10: service excluded from C3 target (owner decision; waived in coverage_waivers.json).",
-   "_status": "blocked-owner",
+   "_note": "REACHABILITY-ONLY (owner override 2026-06-16): SSO ACCOUNT-ASSIGNMENT lifecycle: create -> delete (single by id) -> delete (bulk). Every write is ACCESS-TESTED (called regardless of 4xx, counted reachable). CRITICAL SAFETY — THE MOST SENSITIVE IdC WRITE: an account-assignment grants a principal a permission-set ON A TARGET ACCOUNT. The create body uses ALL-ZERO synthetic ids (instance_id ssoins-12345, target_account_id / permission_set_id / principal_id all 32 zeros) so the call is well-formed but ValidationErrors/NotFounds — it CANNOT create a real grant. We deliberately do NOT wire real permission-set/principal/account node ids here. Reachability = the endpoint RESPONDED (4xx), NOT a successful grant. account_assignment_id captured-soft; if a stray 2xx ever occurred the cleanup DELETE + by-id/bulk DELETE steps tear it down. NO real account-level mutation. heavy + all mutating optional/broad. Bulk DELETE body inferred. | ENABLED 2026-06-16 (owner), entitlement waivers dropped.",
    "steps": [
     {
      "name": "create-account-assignment",

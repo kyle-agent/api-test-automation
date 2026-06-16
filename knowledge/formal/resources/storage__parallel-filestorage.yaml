@@ -1,10 +1,23 @@
 # Resource-task model — storage/parallel-filestorage (st-pfs group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
-# parallel-filestorage-capacity-restore (enabled+heavy; source _note says
-# bodies are DOCS-ONLY, no live 2xx → all nodes docs until an R3 scoped run).
-# OWNER SCOPE (2026-06-12): Parallel File Storage is READS-ONLY in testing —
-# 사용(쓰기) 제외. These nodes stay as documentation; do NOT compose them
-# (writes are coverage-waived, the write lifecycle is disabled).
+# parallel-filestorage-capacity-restore (enabled+heavy).
+#
+# REACHABILITY-ONLY COVERAGE (owner override, 2026-06-16). Parallel File Storage
+# was previously READS-ONLY owner-exclusion (writes coverage-waived, write
+# lifecycle disabled). The owner has now reframed it as a REACHABILITY-ONLY
+# target (same shape as storage/archivestorage): every uncovered write + id-bound
+# GET is CALLED regardless of the result — the point is to test
+# ACCESS/REACHABILITY, not real resource creation. So each write/GET below is an
+# `optional` step with a tolerant `expect_status` ([...,400,403,404,409,422]); a
+# 4xx is EXPECTED and TOLERATED (reachability = the endpoint responded). Any
+# create that COULD 2xx carries a tolerant teardown delete so a stray success
+# never leaks (cleanup on create-volume / create-snapshot in the lifecycle).
+# provenance stays `docs` — these are reachability probes, NOT 2xx-validated.
+# The owner-exclusion waivers were dropped from data/baselines/coverage_waivers.json
+# in the same unit; the write lifecycle parallel-filestorage-capacity-restore was
+# enabled. NOTE: most PFS endpoints already counted reachable via shared
+# /v1/volumes·/v1/snapshots path lifecycles; the one true gap closed here is
+# PUT /v1/volumes/{volume_id}/capacity (set-capacity).
 version: 1
 resources:
   pfs-volume:
@@ -15,14 +28,24 @@ resources:
     create:
       endpoint: "POST /v1/volumes"
       body: {name: "regrpfs{ualpha}", capacity_tb: 1, tags: []}
+      optional: true
+      expect_status: [200, 201, 202, 400, 403, 404, 409, 422]
+      note: "reachability-only (owner): access-tested, 4xx tolerated, no real creation expected. body VolumeCreateRequest (docs), capture $.id UNPROVEN."
     capture: {volume_id: "$.id"}
     ready: {field: "$.state", until: [available, AVAILABLE, ACTIVE],
             timeout: 300, interval: 15}
-    delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true}
+    verify:
+      # ---- id-bound write setter (reachability) — closes the one real PFS gap ----
+      - {name: set-capacity, endpoint: "PUT /v1/volumes/{volume_id}/capacity",
+         json: {capacity_tb: 2},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated (synthetic/absent volume). body VolumeCapacityRequest (docs). This is the only PFS endpoint not already reachable via shared /v1/volumes path lifecycles."}
+    delete: {endpoint: "DELETE /v1/volumes/{volume_id}", destructive: true,
+             expect_status: [200, 202, 204, 400, 403, 404, 409], optional: true}
     provenance: docs
     source: {lifecycle: parallel-filestorage-capacity-restore,
-             steps: [create-volume, wait-volume-available, delete-volume]}
-    notes: "capacity_tb 1은 문서상 최소값(min 1 / max 1000), BILLABLE → heavy. capture envelope $.id (Volume.id, filestorage의 flat $.volume_id와 다름) — UNPROVEN. 이름 규칙은 filestorage와 동일 (^[a-z]([a-z0-9_]){2,20}$). 연결(attach)은 Multi-node GPU Cluster에서만 가능 — 풀 lifecycle 검증이 고가의 MNGC에 게이트됨 (services/storage__parallel-filestorage.yaml mngc-prereq). 용량 증설은 PUT /v1/volumes/{volume_id}/capacity (verify 후보, 소스 set-volume-capacity)."
+             steps: [create-volume, wait-volume-available, set-volume-capacity, delete-volume]}
+    notes: "REACHABILITY-COVERAGE (not functional validation). 모든 write/GET access-tested, 4xx 관용, 2xx 미기대. capacity_tb 1은 문서상 최소값(min 1 / max 1000), BILLABLE → heavy. teardown delete-volume은 stray 2xx 정리용(관용 expect로 누수 방지). capture envelope $.id (Volume.id, filestorage의 flat $.volume_id와 다름) — UNPROVEN. 이름 규칙은 filestorage와 동일 (^[a-z]([a-z0-9_]){2,20}$). 연결(attach)은 Multi-node GPU Cluster에서만 가능 (services/storage__parallel-filestorage.yaml mngc-prereq). 용량 증설 PUT /v1/volumes/{volume_id}/capacity가 set-capacity verify로 reachable."
 
   pfs-snapshot:
     code: "st-pfs-snapshot"
@@ -31,9 +54,19 @@ resources:
     create:
       endpoint: "POST /v1/snapshots"
       body: {volume_id: "{pfs-volume.volume_id}"}
+      optional: true
+      expect_status: [200, 201, 202, 400, 403, 404, 409, 422]
+      note: "reachability-only (owner): access-tested, 4xx tolerated, no real creation expected. capture $.snapshot.id UNPROVEN."
     capture: {snapshot_id: "$.snapshot.id"}
-    delete: {endpoint: "DELETE /v1/snapshots/{snapshot_id}", destructive: true}
+    verify:
+      # ---- id-bound write (reachability) — restore is 'not yet released' so 4xx tolerated ----
+      - {name: restore, endpoint: "PUT /v1/snapshots/{snapshot_id}/restore",
+         json: {},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated. RESTORE is '추후 제공될 예정' (services quirk snapshot-restore-not-released) — 404/400 expected. Already reachable via filestorage-replication-schedule too."}
+    delete: {endpoint: "DELETE /v1/snapshots/{snapshot_id}", destructive: true,
+             expect_status: [200, 202, 204, 400, 403, 404, 409, 422], optional: true}
     provenance: docs
     source: {lifecycle: parallel-filestorage-capacity-restore,
-             steps: [create-snapshot, delete-snapshot]}
-    notes: "볼륨당 최대 50 스냅샷. snapshot RESTORE(PUT /v1/snapshots/{snapshot_id}/restore)는 '추후 제공될 예정' — 릴리스 전까지 404/400 가능 (services quirk snapshot-restore-not-released); 오늘의 복구 = 스냅샷에서 새 볼륨 생성. 삭제는 소스에서 409/500 재시도 4×15s."
+             steps: [create-snapshot, restore-snapshot, delete-snapshot]}
+    notes: "REACHABILITY-COVERAGE (not functional validation). access-tested, 4xx 관용. 볼륨당 최대 50 스냅샷. snapshot RESTORE는 '추후 제공될 예정' — 릴리스 전까지 404/400 가능 (services quirk snapshot-restore-not-released). teardown delete-snapshot은 stray 2xx 정리용 (409/500 재시도 4×15s, 관용 expect로 누수 방지)."

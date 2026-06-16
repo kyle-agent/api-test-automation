@@ -3,9 +3,9 @@
     {
       "id": "parallel-filestorage-capacity-restore",
       "service": "storage/parallel-filestorage",
-      "enabled": false,
+      "enabled": true,
       "heavy": true,
-      "_note": "Parallel FileStorage CAPACITY + SNAPSHOT-RESTORE lifecycle (billable parallel volume -> heavy, gated by SCP_RUN_HEAVY). Closes the 2 remaining write gaps: PUT /v1/volumes/{volume_id}/capacity and PUT /v1/snapshots/{snapshot_id}/restore. Flow: create a parallel volume (VolumeCreateRequest: name pattern ^[a-z]([a-z0-9_]){2,20}$, capacity_tb min 1, tags) -> capture $.id (Volume.id) -> set-capacity (VolumeCapacityRequest capacity_tb, min 1 max 1000 -> we send 2 to exercise a grow) -> create snapshot (capture $.snapshot.id from SnapshotCreateResponse.snapshot.id) -> restore snapshot (empty body) -> tear down snapshot + volume. Volume create/snapshot create/delete are already covered by an existing parallel-filestorage scenario surface; here they are the anchors required to reach the two uncovered PUTs. capacity_tb of 1 TB is the documented minimum; this is BILLABLE -> heavy. Bodies from data/api_docs.json model schemas; provenance DOCS-ONLY (no live 2xx). All steps optional+grouped so a failing family is isolated.",
+      "_note": "REACHABILITY-ONLY (owner override 2026-06-16): Parallel FileStorage was previously reads-only owner-exclusion; now reframed so every uncovered write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reachable). Billable parallel volume -> heavy. Closes the remaining write gap PUT /v1/volumes/{volume_id}/capacity (and exercises restore). Flow: create a parallel volume (VolumeCreateRequest: name pattern ^[a-z]([a-z0-9_]){2,20}$, capacity_tb min 1, tags) -> capture $.id (Volume.id) -> set-capacity (VolumeCapacityRequest capacity_tb, min 1 max 1000 -> we send 2 to exercise a grow) -> create snapshot (capture $.snapshot.id) -> restore snapshot (empty body) -> tear down snapshot + volume. Every write/GET is optional + tolerant expect_status [...,400,403,404,409,422], 4xx is EXPECTED and TOLERATED (reachability = the endpoint responded). Volume/snapshot creates carry cleanup deletes so any stray 2xx is torn down. capacity_tb of 1 TB is the documented minimum; BILLABLE -> heavy. Bodies from data/api_docs.json model schemas; provenance DOCS-ONLY (no live 2xx). All steps optional+grouped so a failing family is isolated.",
       "steps": [
         {
           "name": "create-volume",
@@ -189,9 +189,7 @@
             "interval": 15
           }
         }
-      ],
-      "_disabled_reason": "Parallel File Storage 쓰기는 테스트 대상 제외 (owner 2026-06-12) — 읽기 GET만 smoke로 커버",
-      "_status": "blocked-owner"
+      ]
     }
   ]
 }

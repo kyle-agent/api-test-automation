@@ -212,7 +212,10 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   coverage (owner override 2026-06-16)** — every endpoint called regardless of 4xx
   (access-tested, 25 owner-exclusion waivers dropped, gen archivestorage-bucket/
   archiving-policy enabled heavy reachability-only, gap 19→0); parallel-filestorage
-  reads-only (`owner-exclusion` waivers); per-profile baselines file-suffixed
+  + iam-identity-center also reachability-only (owner override 2026-06-16: pfs gap→0;
+  IdC 32/32 with synthetic/all-zero-id safety rail = no real account-level mutation;
+  +39 waivers dropped → 185 total). **Repo write-op gap now 0; static ceiling 95.0%
+  (1303/1372), remaining gap 69 = all id-bound GETs.** per-profile baselines file-suffixed
   (`core/baselines.py`); multi-tenancy confirmed required.
 - **SKE upgrade LIVE-PROVEN (run 27492496266, 2026-06-14):** the
   `gen-heavy-ske-upgrade` chain passed end-to-end (35m real cluster
