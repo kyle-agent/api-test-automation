@@ -1,13 +1,12 @@
-# Wave A LIGHT validation run (2026-06-15) — first validation-loop cycle.
-# heavy=false: smoke + read-chains + LIGHT CRUD only (NO billable VM/DB/heavy clusters).
-# Purpose:
-#  (1) exercise newly-wired id-bound GET probe-reads (apigw tree showstage/showusageplan/
-#      listreports, vs servers/{id}/volumes, vpc tgw/peering routing-rules, dns hosted-zone)
-#      -> raise cov_getid;
-#  (2) produce IB-041 verified_endpoints_evidence.json (per-endpoint real 2xx) -> unlock
-#      docs->VALIDATED promotion next cycle;
-#  (3) validate light-service creates (servicewatch/iam/queue/etc).
-# VPC 5-cap: light networking self-creates 1-2 VPCs (well under the cap).
+# Wave B HEAVY validation run (2026-06-16) — advance VALIDATED via heavy creates.
+# heavy=true: full CRUD incl. DBaaS clusters (eventstreams/searchengine/vertica/sqlserver/
+# mysql/mariadb/epas/postgresql), SKE, VM, storage volumes — so the 17 held shared-path
+# nodes (POST /v1/clusters, /v1/volumes, /v1/groups) get SERVICE-ATTRIBUTED 2xx evidence
+# -> the next promotion pass can disambiguate + promote them.
+# Now with IB-042 composer passthrough live: model tolerances (PF-21 500, apigw [200,404],
+# mariadb [200,202,400]) propagate to composed steps -> fewer spurious fail_new than run #108.
+# verified_endpoints_evidence.json accumulates across runs (IB-041).
+# VPC 5-cap: shared-adopt (~1 shared VPC for the 6 heavy chains) + vpc_schedule -> <=3 VPCs.
 mutations=true
 destructive=true
-heavy=false
+heavy=true
