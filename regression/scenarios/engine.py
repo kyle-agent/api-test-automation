@@ -1015,9 +1015,16 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     uniq = format(int(time.time()), "x")
     body = _inject_owner_tags({
         # 'regrvpc' prefix (not 'regrshared') so the reconciler's VPC sweep AND
-        # its LB/NAT-by-vpc_id sweep (name_prefixes=('regrvpc','zznetvpc')) reclaim
+        # its LB/NAT-by-vpc_id sweep (name_prefixes=('regr','zznet')) reclaim
         # this shared VPC + its children even if a VPC list response omits tags.
-        "name": f"regrvpcshared{uniq}", "description": "API regression shared VPC",
+        # IB-051 (Wave E): the SCP /v1/vpcs API enforces name length 3..20; the
+        # old 'regrvpcshared'+8-hex name was 21 chars -> POST returned HTTP 400
+        # ValidationError ("VPC name should have 3 to 20 digits long ...") on
+        # every attempt, so no SCP_SHARED_VPC_ID was ever exported and all
+        # {"adopt":"vpc"} lifecycles IB-049-skipped. Shortened the stem to
+        # 'regrvpcsh' (9) so 'regrvpcsh'+8-hex == 17 chars stays under the cap
+        # while keeping the 'regr' family root the reconciler matches on.
+        "name": f"regrvpcsh{uniq}", "description": "API regression shared VPC",
         "cidr": _SHARED_VPC_CIDR, "tags": [],
     }, axis="regression")
     create = {"name": "create-shared-vpc", "method": "POST", "service": "vpc"}
@@ -1046,7 +1053,9 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     #    from the first /24 of the VPC's /20.
     subnet_id = None
     sub_body = _inject_owner_tags({
-        "name": f"regrsubshared{uniq}", "description": "API regression shared subnet",
+        # IB-051: subnet name length 3..20 too; 'regrsubsh'+8-hex == 17 chars,
+        # keeps the 'regrsub' prefix the reconciler's subnet sweep matches on.
+        "name": f"regrsubsh{uniq}", "description": "API regression shared subnet",
         "cidr": _SHARED_SUBNET_CIDR, "type": "GENERAL", "vpc_id": vpc_id, "tags": [],
     }, axis="regression")
     sub_create = {"name": "create-shared-subnet", "method": "POST", "service": "vpc"}
@@ -1075,7 +1084,9 @@ def provision_shared_vpc(client, cfg, *, resource_registry: ResourceRegistry | N
     #    VM/SKE/networking adopters on the main shared subnet.
     db_subnet_id = None
     db_body = _inject_owner_tags({
-        "name": f"regrsubshareddb{uniq}", "description": "API regression shared DB subnet",
+        # IB-051: 'regrsubshdb'+8-hex == 19 chars, under the 20-char cap; still
+        # 'regrsub'-prefixed so the reconciler's subnet sweep reclaims it.
+        "name": f"regrsubshdb{uniq}", "description": "API regression shared DB subnet",
         "cidr": _SHARED_DB_SUBNET_CIDR, "type": "GENERAL", "vpc_id": vpc_id, "tags": [],
     }, axis="regression")
     db_create = {"name": "create-shared-db-subnet", "method": "POST", "service": "vpc"}
