@@ -86,6 +86,27 @@
  .pstep.p-next .dot{background:#2563c9;animation:pulse 1.4s infinite}
  .parrow{color:#c8d0d8;font-size:11px;padding:0 1px}
  .ptd{color:#9aa3ad;font-size:11px;margin:0 5px} .ptd b{color:#b5740b;font-weight:700}
+ /* execution gantt (adapted from poc/scenario-viz/05-sequence-gantt.html, fed by oplog res/lc timing) */
+ .ogantt{position:relative;background:#fbfcfd;border:1px solid #d0d7de;border-radius:8px;overflow:auto;max-height:540px}
+ .ogrow{display:grid;grid-template-columns:180px 1fr;border-bottom:1px solid #eaeef2}
+ .ogrow:last-child{border-bottom:none}
+ .ogrow:hover{background:#f6f8fa}
+ .ogrow .ogl{padding:6px 10px;font-size:12px;border-right:1px solid #eaeef2;white-space:nowrap;
+   overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+ .ogrow .ogl .gk{color:#8a929b;font-size:10.5px}
+ .ogtrack{position:relative;height:28px}
+ .oseg{position:absolute;top:5px;height:18px;border-radius:4px;font-size:10px;
+   display:flex;align-items:center;padding:0 6px;white-space:nowrap;overflow:hidden;font-weight:600;color:#06121f}
+ .oseg.s-testing{background:#2da44e;color:#06281a;animation:pulse 1.4s infinite}
+ .oseg.s-leaked{background:#b5740b;color:#fff} .oseg.s-failed{background:#cf222e;color:#fff}
+ .oseg.s-deleted{background:#a5b0bb;color:#1f2328}
+ .oseg.lc{background:#2563c9;color:#fff;height:20px;top:4px} .oseg.lc.s-failed{background:#cf222e}
+ .oseg.lc.s-running{background:#2563c9;animation:pulse 1.4s infinite}
+ .oaxis{display:grid;grid-template-columns:180px 1fr;border-bottom:1px solid #d0d7de;
+   position:sticky;top:0;background:#fff;z-index:2}
+ .oaxis .oticks{position:relative;height:20px}
+ .otick{position:absolute;font-size:10px;color:#8a929b;border-left:1px solid #eaeef2;padding-left:3px;height:100%}
+ .ogantt-empty{padding:24px;text-align:center;color:#656d76;font-size:13px}
 </style>
 </head>
 <body><div class="wrap">
@@ -125,6 +146,19 @@
   <div id="resBody" class="mut">런 선택…</div>
   <div class="t-grp" style="margin-top:14px">Lifecycle 수행시간 <span class="mut" style="font-weight:400">— 느린 순 · ≥5분 <span style="color:#cf222e;font-weight:700">빨강</span> · ≥1분 <span style="color:#b5740b;font-weight:700">주황</span></span></div>
   <table id="lcTbl" style="display:none"><thead><tr><th>Lifecycle</th><th style="width:90px;text-align:right">수행시간</th><th></th></tr></thead><tbody id="lcBody"></tbody></table></div>
+
+<div class="panel" id="gantt"><b>실행 타임라인 (Gantt)</b>
+  <span class="mut">— 각 막대 = 실행 구간(시작→끝), 타임라인 위 배치 · 색=상태
+  (<span style="color:#2da44e">● 테스트 중</span> <span style="color:#b5740b">● 잔존</span>
+  <span style="color:#a5b0bb">● 정상 삭제</span> <span style="color:#cf222e">● 실패</span>)</span>
+  <div class="rtools">
+    <div class="seg" id="ganttSeg">
+      <button data-g="lifecycle" class="on">Lifecycle별</button>
+      <button data-g="resource">자원별</button>
+    </div>
+    <span class="mut" id="ganttMeta" style="font-size:12px;margin-left:auto"></span>
+  </div>
+  <div class="ogantt" id="ganttBody"><div class="ogantt-empty">런 선택…</div></div></div>
 
 <div class="panel"><b>런 이력</b> <span class="mut">(최신순 · 행 클릭 = 그 런의 자원 상태 보기)</span>
 <table id="hist"><thead><tr>
@@ -435,7 +469,7 @@ function renderPlanOverlay(man,res){
 function renderTree(res,lcs){
   const fin=window.DONE_RUNS.has(String(SELECTED_RUN));
   renderPlanOverlay(window.PLAN_MAN,res);   // additive overlay; no-op when no manifest
-  if(!res.length&&!lcs.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; $("#resVerdict").innerHTML=""; return; }
+  if(!res.length&&!lcs.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; $("#resVerdict").innerHTML=""; renderGantt([],[],fin); return; }
   attachByDep(res);
   // ---- verdict (끝난 run = 정리 무결성 판정) ----
   const cnt={testing:0,leaked:0,failed:0,deleted:0};
@@ -534,7 +568,64 @@ function renderTree(res,lcs){
     }).join("");
     $("#lcTbl").style.display="";
   }else{ $("#lcTbl").style.display="none"; }
+  // ---- execution gantt (additive; same folded data, same run/in-flight handling) ----
+  renderGantt(res,lcs,fin);
 }
+// ---------------- execution gantt (adapted from poc 05-sequence-gantt) ----------------
+// Driven entirely by REAL oplog timing already folded by foldResources():
+//   lifecycle mode → one bar per lifecycle (lifecycle-start.t → lifecycle-end.t)
+//   resource  mode → one bar per resource  (created.t → deleted/delete-failed.t)
+// In-flight bars (no end yet) run to the run-finish time (done run) or now (live),
+// matching nodeHtml()'s clock-freeze rule. Colors reuse statusOf() vocabulary.
+let GMODE="lifecycle";
+function gNiceStep(t){const raw=t/8||1;const p=Math.pow(10,Math.floor(Math.log10(raw)));
+  const m=raw/p;return (m<2?2:m<5?5:10)*p;}
+function renderGantt(res,lcs,fin){
+  const host=$("#ganttBody"); if(!host) return;
+  const endClock=fin?(window.RUN_FINISH[String(SELECTED_RUN)]||Date.now()):Date.now();
+  let bars;
+  if(GMODE==="lifecycle"){
+    bars=(lcs||[]).map(l=>({label:l.name,kind:l.svc||"",t0:l.start,
+      t1:l.end||endClock,open:!l.end,
+      st:l.status==="failed"?"failed":(l.end?"lc-done":"running"),lc:true}));
+  }else{
+    bars=(res||[]).map(r=>{const st=statusOf(r,fin);
+      return {label:r.name||r.res_id||r.lifecycle||"?",kind:kindLabel(r),
+        t0:r.start,t1:r.end||endClock,open:!r.end,st,lc:false};});
+  }
+  bars=bars.filter(b=>b.t0).sort((a,b)=>a.t0-b.t0);
+  if(!bars.length){ host.innerHTML='<div class="ogantt-empty">'+
+    (GMODE==="lifecycle"?"lifecycle 이벤트 없음 (read-only 런)":"자원 이벤트 없음")+"</div>";
+    $("#ganttMeta").textContent=""; return; }
+  const t0=Math.min(...bars.map(b=>b.t0)), t1=Math.max(...bars.map(b=>b.t1));
+  const total=Math.max(1000,t1-t0);                  // ms span
+  const W=Math.max(640,Math.min(2400,total/1000*4)); // ~4px/sec, clamped
+  const px=ms=>(ms-t0)/total*W;
+  const step=gNiceStep(total/1000)*1000;             // tick interval in ms
+  let ticks="";
+  for(let s=0;s<=total+1;s+=step)
+    ticks+=`<div class="otick" style="left:${px(t0+s)}px">${fmtDur(s||1)}</div>`;
+  let html=`<div class="oaxis"><div class="ogl gk" style="color:#8a929b">${GMODE==="lifecycle"?"lifecycle":"자원"} \\ 경과 →</div>`+
+    `<div class="oticks" style="min-width:${W}px">${ticks}</div></div>`;
+  for(const b of bars){
+    const w=Math.max(6,px(t0+(b.t1-b.t0)));            // width in px
+    const dur=fmtDur(Math.max(1000,b.t1-b.t0));
+    const cls=b.lc?("lc s-"+(b.st==="running"?"running":b.st==="failed"?"failed":"done")):("s-"+b.st);
+    const lab=w>46?(b.open?"… "+dur:dur):"";
+    const tip=`${b.label}${b.kind?" · "+b.kind:""} · ${dur}${b.open?" (진행/미정리)":""}`;
+    html+=`<div class="ogrow"><div class="ogl" title="${b.label}">`+
+      `${b.lc?"":'<span class="gk">'+b.kind+'</span>'}<b style="font-weight:600">${b.label}</b></div>`+
+      `<div class="ogtrack" style="min-width:${W}px">`+
+      `<div class="oseg ${cls}" style="left:${px(b.t0)}px;width:${w}px" title="${tip}">${lab}</div></div></div>`;
+  }
+  host.innerHTML=html;
+  $("#ganttMeta").textContent=`${bars.length}개 · 총 경과 ${fmtDur(total)}`+(fin?"":" · 진행 중");
+}
+document.querySelectorAll("#ganttSeg button").forEach(b=>b.onclick=()=>{
+  GMODE=b.dataset.g;
+  document.querySelectorAll("#ganttSeg button").forEach(x=>x.classList.toggle("on",x===b));
+  renderRes(true);     // re-render from FOLD_CACHE (no refetch)
+});
 document.querySelectorAll("#resSeg button").forEach(b=>b.onclick=()=>{
   RFILTER.mode=b.dataset.s;
   document.querySelectorAll("#resSeg button").forEach(x=>x.classList.toggle("on",x===b));

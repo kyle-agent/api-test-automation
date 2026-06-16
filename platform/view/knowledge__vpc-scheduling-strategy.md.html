@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T00:28:54Z · <b>sha 182618f</b>
+    2026-06-16T02:30:12Z · <b>sha 483835f</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -353,6 +353,81 @@ Pick one (in order of robustness):
    conformance/dashboard long after its VPCs are swept) before starting the next.
 3. **Per-run VPC lane budget**: cap each run to ≤2 of the 5 VPCs and only allow two
    such runs at once. Needs the live-sync engine work below to be enforceable.
+
+## IB-047 root cause (CONFIRMED 2026-06-16, offline analysis of run 27588002895)
+
+**Symptom.** Wave B (= the A∥B-split CI; the skips were in job A&#39;s adopt pass)
+recorded 25 skips, **23 of them at `create-vpc: scp-network.vpc.exceed-max-count`**.
+eventstreams/searchengine/vertica/pg-full DBaaS creates never ran, so those nodes
+could not be promoted. heavy-shared-dbaas *also* skipped at create-vpc.
+
+**It is NOT a missing-adopt bug.** All **25** enabled VPC-creating lifecycles in
+CI job A (the `regression` job, ADOPT class = `PARALLEL_K`) already carry
+`{&#34;adopt&#34;:&#34;vpc&#34;}` on their `create-vpc`/`delete-vpc` steps — verified offline for
+`heavy-shared-dbaas`, `gen-heavy-pg-replica` (pg-full), and
+`gen-heavy-{epas,mysql,mariadb}-replica`. If the shared VPC exists they all adopt
+it → the suite holds **1** VPC. So IB-047 fix-(a) &#34;extend adopt to the DBaaS
+heavy chains&#34; was **already done**; there is nothing to add at the data level.
+
+&gt; Clarification: the `*-subops-guarded` eventstreams/searchengine/vertica
+&gt; lifecycles have **no `create-vpc` step at all** — they are coverage-only and
+&gt; soft-adopt an *existing* `cluster_id`. The &#34;DBaaS creates that never ran&#34; are
+&gt; the VPC-creating cluster chains (gen-heavy-pg/epas/mysql/mariadb-replica and
+&gt; heavy-shared-dbaas&#39;s 5 in-flow engine legs).
+
+**The actual failure is a provision-failure cascade under xdist.** Two
+unenforced invariants let the account sit at the 5-VPC cap when the run started:
+
+1. **Cross-run exclusion (Rule B) is NOT enforced** — `concurrency.group` in
+   `.github/workflows/api-test.yml` is keyed on `github.run_id` (per-run,
+   `cancel-in-progress:false`), so a prior/overlapping mutating run can still hold
+   VPCs.
+2. **There is no pre-run stale-VPC reclaim** — `cleanup.reconciler` runs only
+   *after* both regression jobs, never before. Leftover VPCs persist into the
+   next run.
+
+With the account already at the cap, job A&#39;s *&#34;Provision shared VPC&#34;* step
+(10×45s retry) cannot win a slot, so **`SCP_SHARED_VPC_ID` is never exported**.
+The `conftest.py` `shared_vpc` fixture then takes its xdist-without-env branch and
+yields `{}` → **every adopter falls back to self-create** (the deliberate
+no-regression fallback). Job A runs `pytest -n 6`, so 6 worker *processes* fire
+`POST /v1/vpcs` concurrently and instantly saturate the 5-cap; each worker has its
+own in-memory `Budget` (phantom-5, never live-synced) so the budget gate offers
+**zero** cross-worker protection. 23/25 then skip at `create-vpc`.
+
+**Fix disposition.**
+
+- **(a) adopt the DBaaS heavy chains** — *already done* (no edit).
+- **(b) serialize / cap concurrent VPC self-creates** — *out of my edit scope →
+  HANDOFF*:
+  - **(b1) engine** (`regression/scenarios/engine.py`): when an `{&#34;adopt&#34;:&#34;vpc&#34;}`
+    create step finds no shared id **and** `PYTEST_XDIST_WORKER` is set,
+    `LifecycleSkip` instead of self-creating — a failed provision then degrades to
+    &#34;skip all adopters&#34; (recoverable, no cap trample) instead of a 25-way race.
+    Keep the single-process self-create fallback (so
+    `test_no_shared_vpc_falls_back_to_self_create` stays green — gate the new
+    behaviour on the xdist env var).
+  - **(b2) workflow**: lower job A&#39;s adopt-pass parallelism (`-n 6` → `-n 1..2`),
+    and/or fail the run loudly when provision yields no id under `run_heavy`
+    (so the cascade can&#39;t silently eat coverage).
+  - **(b3) workflow**: enforce Rule B — set `concurrency.group` to the constant
+    `scp-api-test-mutating` for mutating runs.
+- **(c) pre-run stale-VPC reclaim / VPC quota increase** — **LIVE + owner/console
+  = STOP-1, DO NOT run offline**: either run `cleanup.reconciler` (tag-scoped,
+  optionally `sweep_force`) *before* the provision step, or raise the account VPC
+  quota above 5 (console).
+- **Latent leak to flag**: `gen-wave5-fw` (`lifecycles/generated__wave5.json`, a
+  generated JSON — out of edit scope) self-creates a VPC in job A with **no adopt
+  flag**, burning a slot in parallel with the adopters even when adoption works.
+  Add `adopt:&#34;vpc&#34;` to its create-vpc/delete-vpc when that generated file is next
+  recomposed.
+
+**Would eventstreams/searchengine/vertica run under (a) alone?** No — they were
+never blocked by a missing adopt flag (they have no VPC step / already adopt). The
+VPC-creating DBaaS chains (pg-full etc.) will run only once the *provision
+succeeds*, which needs (b)+(c). The single highest-leverage unblock is **(c) a
+pre-run reclaim** (clears the leftover VPCs so provision wins its slot) combined
+with **(b1)** (so a future provision miss degrades safely instead of cascading).
 
 ## IMPLEMENTED: shared-VPC adoption for heavy lifecycles
 
