@@ -49,6 +49,36 @@
           "_note": "Soft-capture a REAL (region/service/resource_type/resource_identifier) addressing tuple + a tag key from an existing resource, used to exercise the component-tags PUT/DELETE family below. Capture paths ($.contents[0].*) are BEST-GUESS for the resources list envelope and UNPROVEN. If any segment is not captured the placeholder stays literal at runtime (the call 404s harmlessly) but the step still RECORDS coverage via the catalog '*' norm. tag_key falls back to a builtin if absent (see set-component-tag-value)."
         },
         {
+          "name": "show-resource-component",
+          "method": "GET",
+          "path": "/v1/resources/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}",
+          "service": "resourcemanager",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "rm-component-tags",
+          "_note": "id-bound read (showcomponent) on the region/service/resource_type/resource_identifier addressing scheme. Closes GAP-get-id for GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}. Every variable segment is a {placeholder} (soft-captured in discover-resource-addressing) so it normalizes to v1/resources/*/*/*/* and matches the catalog. Tolerant [200,400,403,404]: if the discover step captured no real tuple the segments stay literal and 404 harmlessly while still recording coverage. Complements the runtime probe-reads step below; this explicit step makes the endpoint statically reachable in a LIGHT run."
+        },
+        {
+          "name": "list-component-tags",
+          "method": "GET",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}",
+          "service": "resourcemanager",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "rm-component-tags",
+          "_note": "id-bound read (listcomponentstags) — all tags on the resource tuple. Closes GAP-get-id for GET /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}. All variable segments are {placeholders} -> normalizes to v1/tags/*/*/*/* matching the catalog. Same tolerant rationale as show-resource-component."
+        },
+        {
+          "name": "show-component-tag",
+          "method": "GET",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{tag_key}",
+          "service": "resourcemanager",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "rm-component-tags",
+          "_note": "id-bound read (showcomponentstag) — a single tag by key on the resource tuple. Closes GAP-get-id for GET /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}. All variable segments are {placeholders} -> normalizes to v1/tags/*/*/*/*/* matching the catalog. {tag_key} falls back to literal if not soft-captured; tolerant [200,400,403,404] records coverage regardless."
+        },
+        {
           "name": "seed-component-tags",
           "method": "PUT",
           "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/bulk",

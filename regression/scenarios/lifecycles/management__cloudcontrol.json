@@ -40,6 +40,15 @@
           "_note": "Closes GAP-get-id for the guardrail show endpoint when a guardrail exists; if guardrail_id was not soft-captured the segment stays literal and 404s while still normalizing to the catalog '*' key."
         },
         {
+          "name": "show-landing-zone",
+          "method": "GET",
+          "path": "/v1/landing-zones/{landing_zone_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cc-read",
+          "_note": "id-bound read (showlandingzone). Closes GAP-get-id for GET /v1/landing-zones/{landing_zone_id}. Keys off landing_zone_id soft-captured from list-landing-zones (or, on a successful but-unlikely create, the create capture). Tolerant [200,400,403,404]: on a shared/non-admin account the list returns no landing zone (403/empty) so the segment stays a placeholder (normalizes to the catalog '*' key, still records coverage). Makes the endpoint statically reachable in a LIGHT run (complements the runtime list capture)."
+        },
+        {
           "name": "create-landing-zone",
           "method": "POST",
           "path": "/v1/landing-zones",

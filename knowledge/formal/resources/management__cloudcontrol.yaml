@@ -23,6 +23,10 @@ resources:
              description: "API regression coverage probe — DO NOT promote to a real landing zone",
              region: "{region}"}
     capture: {landing_zone_id: "$.landing_zone.id"}
+    verify:
+      - {name: show-landing-zone, endpoint: "GET /v1/landing-zones/{landing_zone_id}",
+         expect_status: [200, 400, 403, 404],
+         note: "id-bound show (showlandingzone). landing_zone_id는 list-landing-zones에서 soft-capture (공유/비-admin 계정에선 목록이 비거나 403이라 segment가 placeholder로 남아 catalog '*' 매칭 → 커버리지만 기록). LIGHT run에서 정적 도달성 확보."}
     delete: {endpoint: "DELETE /v1/landing-zones/{landing_zone_id}", destructive: true}
     provenance: docs
     source: {lifecycle: cloudcontrol-landing-zone-guarded,

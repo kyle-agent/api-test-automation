@@ -81,6 +81,15 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
+          "name": "get-role-policy-bindings",
+          "method": "GET",
+          "path": "/v1/roles/{role_id}/policy-bindings",
+          "group": "role-real",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (listrolepolicybindings). Closes GAP-get-id for GET /v1/roles/{role_id}/policy-bindings. Keys off the create-role-captured role_id; tolerant [200,400,403,404] because create-role may 500/4xx on this account (the prior iam-role saw POST /v1/roles -> 500), leaving role_id a placeholder (normalizes to the catalog '*' key, still records coverage). Complements probe-role-reads; this explicit step makes the endpoint statically reachable."
+        },
+        {
           "name": "probe-role-reads",
           "group": "role-real",
           "probe_reads": {"role_id": "{role_id}"}
@@ -305,6 +314,14 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
+          "name": "get-user-policy-bindings",
+          "method": "GET",
+          "path": "/v1/users/{unique}/policy-bindings",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (listuserpolicybindings). Closes GAP-get-id for GET /v1/users/{user_id}/policy-bindings. {unique} is a synthetic user id (no live user-id capture source — listiamuser needs an {account_id} path so there is no ungated user lookup; same convention as the add/remove writes here), so the segment normalizes to the catalog '*' key and 4xx's (user not found). Tolerant [200,400,403,404]; the GET is still CALLED so the endpoint is statically reachable."
+        },
+        {
           "name": "remove-user-policy-binding",
           "method": "DELETE",
           "path": "/v1/users/{unique}/policy-bindings/{unique}",
@@ -337,6 +354,14 @@
             }
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "show-resource-policy",
+          "method": "GET",
+          "path": "/v1/resource-policies/srn:e:0000:::iam:resource-policy~regr{unique}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (showresourcepolicy). Closes GAP-get-id for GET /v1/resource-policies/{srn}. Uses the same synthetic SRN as the write steps (no real target-resource SRN the test account owns — same convention as set-resource-policy); the single srn segment contains ':' and a {unique} token and normalizes to the catalog '*' key. Tolerant [200,400,403,404]: the synthetic SRN 4xx's (resource not found / invalid srn) but the GET is CALLED so the endpoint is statically reachable."
         },
         {
           "name": "add-resource-policy-statement",
@@ -494,9 +519,18 @@
           "method": "POST",
           "path": "/v1/saml-providers",
           "optional": true,
-          "_note": "createsamlprovider: api_bodies.json entry is corrupt (_raw). Best-effort JSON guess (name + metadata_document placeholder); NOT runtime-proven. Likely 400 on invalid metadata, which still records coverage.",
+          "_note": "createsamlprovider: api_bodies.json entry is corrupt (_raw). Best-effort JSON guess (name + metadata_document placeholder); NOT runtime-proven. Likely 400 on invalid metadata, which still records coverage. Soft-captures saml_provider_id ($.id, FLAT envelope per the doc 201 example) to drive the id-bound show below; on the expected 4xx nothing is captured and the show segment stays a placeholder.",
           "json": {"name": "regrsaml{ualpha}", "metadata_document": "PLACEHOLDER_SAML_METADATA", "tags": []},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"saml_provider_id": "$.id"}
+        },
+        {
+          "name": "show-saml-provider",
+          "method": "GET",
+          "path": "/v1/saml-providers/{saml_provider_id}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (showsamlprovider). Closes GAP-get-id for GET /v1/saml-providers/{saml_provider_id}. Keys off the create-soft-captured saml_provider_id; tolerant [200,400,403,404] because the create body is UNPROVEN (corrupt api_bodies.json entry) and 4xx's, leaving saml_provider_id a placeholder (normalizes to the catalog '*' key, still records coverage). HEAVY-gated with the rest of this lifecycle; the GET is CALLED so the endpoint is statically reachable."
         },
         {
           "name": "set-saml-provider",
@@ -516,6 +550,65 @@
           "_note": "Body saml_provider_ids from convention (no confirmed example) -> synthetic id.",
           "json": {"saml_provider_ids": ["00000000000000000000000000000000"]},
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "iam-readonly-shows",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes 4 static id-bound GET gaps for read-only / list-discoverable IAM resources by the list->soft-capture->show idiom (the same pattern cloudcontrol uses for its list-discovered ids). access-keys and service-accounts have only list+show in the catalog (no create), so a synthetic id would be a guaranteed-404 dead read — instead we soft-capture a REAL id from the caller's own list and show it. account-users is shown via the account_id soft-captured from the caller's access-keys list (access_key.account_id) + a user id from the account-users list itself. Every step is optional with tolerant [200,400,403,404]: on an account with no access keys / service accounts the list is empty/403 and the dependent id segment stays a {placeholder} (normalizes to the catalog '*' key) so the show is still CALLED and the endpoint statically reachable. Envelopes grounded in data/api_docs.json response examples: accesskeylist $.access_keys[].{id,account_id}; listserviceaccount $.service_accounts[].id; listiamuser $.users[].id.",
+      "steps": [
+        {
+          "name": "list-access-keys",
+          "method": "GET",
+          "path": "/v1/access-keys",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {"access_key_id": "$.access_keys[0].id", "account_id": "$.access_keys[0].account_id"},
+          "_note": "Zero-param list (already in the smoke GET floor) reused here to soft-capture a REAL access_key_id + the caller's account_id (accesskeylist envelope $.access_keys[]). Drives the two id-bound shows below."
+        },
+        {
+          "name": "show-access-key",
+          "method": "GET",
+          "path": "/v1/access-keys/{access_key_id}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (accesskeyshow). Closes GAP-get-id for GET /v1/access-keys/{access_key_id}. Keys off the list-captured access_key_id (a real id when the caller has any key); if none, the segment stays a placeholder (normalizes to catalog '*') and 4xx's. Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        },
+        {
+          "name": "list-account-users",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}/users",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {"account_user_id": "$.users[0].id"},
+          "_note": "id-bound read (listiamuser) — Closes GAP-get-id for GET /v1/accounts/{account_id}/users. account_id is soft-captured from list-access-keys (the caller's own account); the segment normalizes to catalog '*'. Also soft-captures a real user id ($.users[].id) to drive show-account-user. Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "show-account-user",
+          "method": "GET",
+          "path": "/v1/accounts/{account_id}/users/{account_user_id}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (showiamuser). Closes GAP-get-id for GET /v1/accounts/{account_id}/users/{user_id}. Both segments are placeholders (account_id from list-access-keys, account_user_id from list-account-users) -> normalizes to v1/accounts/*/users/* matching the catalog. If either is uncaptured the show 4xx's harmlessly while still recording coverage. Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "list-service-accounts",
+          "method": "GET",
+          "path": "/v1/service-accounts",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {"service_account_id": "$.service_accounts[0].id"},
+          "_note": "Zero-param list (smoke GET floor) reused to soft-capture a REAL service_account_id (listserviceaccount envelope $.service_accounts[]). Drives show-service-account."
+        },
+        {
+          "name": "show-service-account",
+          "method": "GET",
+          "path": "/v1/service-accounts/{service_account_id}",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (showserviceaccount). Closes GAP-get-id for GET /v1/service-accounts/{service_account_id}. service-accounts is read-only in the catalog (list+show only, no create), so a synthetic id would be a guaranteed-404 dead read — instead this keys off the list-captured real service_account_id. If the caller has no service accounts the segment stays a placeholder (normalizes to catalog '*') and 4xx's. Tolerant [200,400,403,404]."
         }
       ]
     }
