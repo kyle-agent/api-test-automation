@@ -1,36 +1,98 @@
 # Resource-task model — storage/archivestorage (st-as group).
 # Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from archivestorage-bucket +
-# archivestorage-archiving-policy (both DISABLED 2026-06-10).
+# archivestorage-archiving-policy.
 #
-# PERMANENT EXCLUSION: archivestorage needs its OWN console-issued 인증키 (IAM
-# My Info > 인증키 관리) and none will be issued for the test account — every
-# call 401s with platform HMAC creds alone (coverage_waivers.json). Modeled
-# docs-provenance with a {credential: ...} requires per §1 (cloud-ml pattern):
-# the composer must env-skip these nodes unless the credential is flagged
-# present in the environment.
+# REACHABILITY-ONLY COVERAGE (owner override, 2026-06-16). archivestorage was
+# previously PERMANENTLY EXCLUDED (needs its OWN console-issued 인증키 — IAM My
+# Info > 인증키 관리 — that this test account will never have; every call 401s
+# with platform HMAC creds alone). The owner has now reframed it as a
+# REACHABILITY-ONLY target: every endpoint is CALLED regardless of the result —
+# the point is to test ACCESS/REACHABILITY, not real resource creation. So the
+# nodes below are coverage-only (mirroring the management/organization
+# org-*-guarded pattern): every write/GET is `optional` with a tolerant
+# `expect_status`, 4xx is EXPECTED and TOLERATED, no real creation is expected
+# (no archivestorage key), and any write that COULD 2xx carries a tolerant
+# teardown delete so a stray success never leaks. provenance stays `docs` — these
+# are NOT 2xx-validated; they are reachability probes.
+#
+# CHANGED vs the prior model: the `{credential: archivestorage-auth-key}`
+# requires gates were REMOVED — reachability deliberately calls WITHOUT the key
+# (the no-key 4xx IS the evidence the endpoint is reachable). The owner-exclusion
+# waivers were dropped from data/baselines/coverage_waivers.json in the same unit.
 version: 1
 resources:
   archive-bucket:
     code: "st-as-bucket"
     service: storage/archivestorage
-    requires:
-      - {credential: archivestorage-auth-key,
-         note: "콘솔 발급 전용 인증키 (사용자당 최대 2개, 만료 1-365일/영구) — 만료·사용중지 즉시 401. 이 계정에는 영구 미발급 → 합성기는 env-skip"}
+    requires: []
     create:
       endpoint: "POST /v1/buckets"
       body: {name: "regras{unique}", tags: []}
+      optional: true
+      expect_status: [200, 201, 202, 400, 403, 404, 409, 422]
+      note: "reachability-only (owner): access-tested, 4xx tolerated, no real creation expected (no archivestorage key). body는 api_docs BucketCreateRequest, capture $.id (BucketCreateResponse) UNPROVEN."
     capture: {bucket_id: "$.id"}
-    delete: {endpoint: "DELETE /v1/buckets/{bucket_id}", destructive: true}
+    verify:
+      # ---- id-bound GET reads (reachability) — placeholder/real bucket_id, [200,404] ----
+      - {name: show, endpoint: "GET /v1/buckets/{bucket_id}",
+         expect_status: [200, 404], optional: true,
+         note: "reachability-only (owner): id-bound read off bucket_id (synthetic if create did not 2xx). [200,404] tolerated."}
+      - {name: show-versioning, endpoint: "GET /v1/buckets/{bucket_id}/versioning",
+         expect_status: [200, 400, 403, 404], optional: true,
+         note: "reachability-only (owner): id-bound read, 4xx tolerated (no real bucket)."}
+      - {name: show-encryption, endpoint: "GET /v1/buckets/{bucket_id}/encryption",
+         expect_status: [200, 400, 403, 404], optional: true,
+         note: "reachability-only (owner): id-bound read, 4xx tolerated (no real bucket)."}
+      - {name: list-objects, endpoint: "GET /v1/buckets/{bucket_id}/objects",
+         expect_status: [200, 400, 403, 404], optional: true,
+         note: "reachability-only (owner): id-bound list, 4xx tolerated (empty/absent bucket)."}
+      - {name: list-object-versions, endpoint: "GET /v1/buckets/{bucket_id}/object-versions",
+         expect_status: [200, 400, 403, 404], optional: true,
+         note: "reachability-only (owner): id-bound list, 4xx tolerated (empty/absent bucket)."}
+      # ---- id-bound write setters (reachability) — tolerant + optional ----
+      - {name: set-versioning, endpoint: "PUT /v1/buckets/{bucket_id}/versioning",
+         json: {enabled: true},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated, no real creation expected (no archivestorage key). body = VersioningPutRequest (docs)."}
+      - {name: set-encryption, endpoint: "PUT /v1/buckets/{bucket_id}/encryption",
+         json: {enabled: true},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated, no real creation expected (no archivestorage key). body = EncryptionPutRequest (docs)."}
+      - {name: recover-objects, endpoint: "PUT /v1/buckets/{bucket_id}/recover-objects",
+         json: {recovery_target_bucket_name: "regras{unique}",
+                recovery_infos: [{source_object_path: "/", object_type: "FILE"}],
+                overwrite: true},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated, targets objects that do not exist (no real bucket). body = RecoverObjectsRequest (docs)."}
+      - {name: recover-object-versions, endpoint: "PUT /v1/buckets/{bucket_id}/recover-object-versions",
+         json: {recovery_target_bucket_name: "regras{unique}",
+                source_object_path: "/",
+                source_object_version: "Oc9nEYWV.6VjzsIMXFZWM1zL8HcYvKl",
+                overwrite: true},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated, no real version to recover. body = RecoverObjectVersionsRequest (docs)."}
+      # ---- id-bound destructive object deletes (reachability) — tolerant + optional ----
+      - {name: delete-objects, endpoint: "DELETE /v1/buckets/{bucket_id}/objects",
+         json: {paths: ["test/"]},
+         expect_status: [200, 202, 204, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated, no objects to delete (no real bucket). body = DeleteObjectsRequest (docs)."}
+      - {name: delete-object-versions, endpoint: "DELETE /v1/buckets/{bucket_id}/object-versions",
+         json: {path: "hello/my_file.txt", versions: ["Oc9nEYWV.6VjzsIMXFZWM1zL8HcYvKl"]},
+         expect_status: [200, 202, 204, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated, no versions to delete (no real bucket). body = DeleteObjectVersionsRequest (docs)."}
+    delete: {endpoint: "DELETE /v1/buckets/{bucket_id}", destructive: true,
+             expect_status: [200, 202, 204, 400, 403, 404, 409], optional: true}
     provenance: docs
-    source: {lifecycle: archivestorage-bucket, steps: [create-bucket, delete-bucket]}
-    notes: "서비스 영구 제외 (전용 인증키 미발급, C3 waiver) — 그래프 문서화 + credential 게이트 시연용. body는 api_docs BucketCreateRequest, capture $.id (BucketCreateResponse) UNPROVEN. 버킷 이름 규칙: 3-63자, 소문자/숫자/./-, 소문자나 숫자로 시작, IP 형태 금지, 'admin' 금지, Account/Region 유일, 재사용은 1시간 후 (services constraint bucket-name-rule). versioning/encryption은 생성 후 별도 PUT."
+    source: {lifecycle: archivestorage-bucket,
+             steps: [create-bucket, show-bucket, set-bucket-versioning, set-bucket-encryption,
+                     recover-objects, recover-object-versions, delete-bucket-objects,
+                     delete-bucket-object-versions, delete-bucket]}
+    notes: "REACHABILITY-COVERAGE (not functional validation). 모든 write/GET가 access-tested, 4xx 관용 — 전용 인증키가 없어 2xx는 기대하지 않음. teardown delete-bucket은 stray 2xx 정리용(관용 expect로 누수 방지). 버킷 이름 규칙: 3-63자, 소문자/숫자/./-, 소문자나 숫자로 시작, IP 형태 금지, 'admin' 금지, Account/Region 유일, 재사용은 1시간 후 (services constraint bucket-name-rule). versioning/encryption은 생성 후 별도 PUT. capture $.id UNPROVEN (no live 2xx)."
 
   archiving-policy:
     code: "st-as-archiving-policy"
     service: storage/archivestorage
-    requires:
-      - {credential: archivestorage-auth-key,
-         note: "archive-bucket과 동일한 콘솔 발급 인증키 게이트"}
+    requires: []
     create:
       endpoint: "POST /v1/archiving-policies"
       body:
@@ -39,8 +101,36 @@ resources:
         object_path: "/"
       options:
         source_bucket: {type: string, required: true, default: "obs-bucket-name",
-                        note: "아카이빙 원본 Object Storage 버킷 이름 — 실재 OBS 버킷 필요 (objectstorage 미모델; 기본값은 소스의 문서 placeholder → 4xx). 대상은 한 번 설정하면 영구 불변"}
+                        note: "아카이빙 원본 Object Storage 버킷 이름 — 실재 OBS 버킷 필요 (objectstorage 미모델; 기본값은 문서 placeholder → 4xx, reachability에선 관용). 대상은 한 번 설정하면 영구 불변"}
+      optional: true
+      expect_status: [200, 201, 202, 400, 403, 404, 409, 422]
+      note: "reachability-only (owner): access-tested, 4xx tolerated, no real creation expected (no archivestorage key + no real OBS source bucket). body는 api_docs ArchivingPolicyCreateRequest, capture $.id UNPROVEN. object_lifecycle은 문서상 STRING ('1')."
     capture: {archiving_policy_id: "$.id"}
+    verify:
+      # ---- id-bound GET read (reachability) ----
+      - {name: show, endpoint: "GET /v1/archiving-policies/{archiving_policy_id}",
+         expect_status: [200, 404], optional: true,
+         note: "reachability-only (owner): id-bound read off archiving_policy_id (synthetic if create did not 2xx). [200,404] tolerated."}
+      # ---- id-bound write setters (reachability) ----
+      - {name: set-policy, endpoint: "PUT /v1/archiving-policies/{archiving_policy_id}",
+         json: {object_lifecycle: "2"},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated, no real policy (no archivestorage key). body = ArchivingPolicyPutRequest (docs)."}
+      - {name: set-policy-state, endpoint: "PUT /v1/archiving-policies/{archiving_policy_id}/state",
+         json: {state: "INACTIVE"},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated, no real policy. body = ArchivingPolicyStatePutRequest (docs). INACTIVE도 teardown-best-effort 역할(정책은 영구삭제 불가, 비활성만 가능 — services quirk archiving-target-immutable)."}
+      # ---- standalone (no path id) cancel ops (reachability) — empty body ----
+      - {name: cancel-archiving, endpoint: "PUT /v1/archiving-histories/cancel-archiving",
+         json: {},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated. PUT, no path id, no documented body (api_docs body=[]) → empty {}; cancels an in-flight archiving history, 4xx when none running."}
+      - {name: cancel-recovery, endpoint: "PUT /v1/recovery-histories/cancel-recovery",
+         json: {},
+         expect_status: [200, 201, 202, 400, 403, 404, 409, 422], optional: true,
+         note: "reachability-only (owner): access-tested, 4xx tolerated. PUT, no path id, no documented body (api_docs body=[]) → empty {}; cancels an in-flight recovery history, 4xx when none running."}
     provenance: docs
-    source: {lifecycle: archivestorage-archiving-policy, steps: [create-archiving-policy]}
-    notes: "DELETE 없음: archiving policy는 수정/비활성만 가능하고 영구 삭제 불가 (services quirk archiving-target-immutable) — teardown은 PUT /v1/archiving-policies/{id}/state {state: INACTIVE}로 비활성화가 최선 (검증기 no-teardown 경고는 의도). object_lifecycle은 문서상 STRING ('1'). 정책은 추가 시각 기준 1일 1회 실행."
+    source: {lifecycle: archivestorage-archiving-policy,
+             steps: [create-archiving-policy, show-archiving-policy, set-archiving-policy,
+                     set-archiving-policy-state, cancel-archiving, cancel-recovery]}
+    notes: "REACHABILITY-COVERAGE (not functional validation). DELETE 없음: archiving policy는 수정/비활성만 가능하고 영구 삭제 불가 (services quirk archiving-target-immutable) — teardown은 set-policy-state {state: INACTIVE}로 비활성화가 최선(stray 2xx 정리 best-effort; 검증기 no-teardown 경고는 의도). 정책은 추가 시각 기준 1일 1회 실행. 모든 step access-tested, 4xx 관용, 2xx 미기대 (no archivestorage key)."

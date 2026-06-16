@@ -208,10 +208,12 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   `python -m spec.coverage_gap`; gap_getid 151→**130**, gap_write 33 —
   `docs/COVERAGE-GETID-PLAN.md`); latest published run **C3 44.79%**
   (cov_op 36.73), **fail_new 0 policy holding**, 249 approved waivers
-  (incl. 7 PFS `owner-exclusion`). Owner scope: archivestorage permanently
-  excluded; parallel-filestorage reads-only (`owner-exclusion` waivers);
-  per-profile baselines file-suffixed (`core/baselines.py`); multi-tenancy
-  confirmed required.
+  (incl. 7 PFS `owner-exclusion`). Owner scope: **archivestorage = reachability-only
+  coverage (owner override 2026-06-16)** — every endpoint called regardless of 4xx
+  (access-tested, 25 owner-exclusion waivers dropped, gen archivestorage-bucket/
+  archiving-policy enabled heavy reachability-only, gap 19→0); parallel-filestorage
+  reads-only (`owner-exclusion` waivers); per-profile baselines file-suffixed
+  (`core/baselines.py`); multi-tenancy confirmed required.
 - **SKE upgrade LIVE-PROVEN (run 27492496266, 2026-06-14):** the
   `gen-heavy-ske-upgrade` chain passed end-to-end (35m real cluster
   v1.33.5→v1.34.3 control-plane + node roll). Nodes **ske-image /
