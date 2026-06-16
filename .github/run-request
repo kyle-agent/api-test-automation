@@ -1,10 +1,12 @@
-# Wave D HEAVY validation run (2026-06-16) — confirm the IB-047 pre-reclaim TTL-override fix.
-# Now: pre-reclaim runs with SCP_SWEEP_IGNORE_TTL=true -> force-clears our UNEXPIRED leftover
-# VPCs (the reconciler previously SKIPPED them) -> the 5-VPC cap is freed -> shared-VPC provision
-# should WIN its slot -> SCP_SHARED_VPC_ID exported -> adopters adopt (not skip) -> held DBaaS
-# creates (eventstreams/epas/postgresql) RUN -> service-attributed 2xx -> next promotion unblocks.
-# Expected vs Wave C: create-vpc exceed-max-count skips ~0; provision succeeds; verified endpoints up.
-# (Account has 0 standing VPCs, owner-confirmed; only OUR leftovers occupied the cap.)
+# Wave E HEAVY validation run (2026-06-16) — payoff of the VPC saga.
+# Full chain now fixed: IB-049 (xdist graceful-skip), IB-050 (pre-reclaim + concurrency + -n2),
+# IB-047 (SCP_SWEEP_IGNORE_TTL clears unexpired leftovers -> provision wins), + the env-handoff
+# fix (provision_shared_vpc post-create crash no longer eats SCP_SHARED_VPC_ID; workflow gates
+# on a non-empty id). Expected: pre-reclaim frees cap -> provision creates VPC+subnet AND exports
+# SCP_SHARED_VPC_ID/SUBNET_ID -> conftest shared_vpc populated -> adopters ADOPT (not skip) ->
+# heavy-shared-dbaas runs -> eventstreams/epas/postgresql cluster CREATE executes -> first
+# service-attributed 2xx on POST /v1/clusters -> next promotion unblocks them.
+# If provision still yields no id, the new ::warning:: + shared-infra.log will say why.
 mutations=true
 destructive=true
 heavy=true
