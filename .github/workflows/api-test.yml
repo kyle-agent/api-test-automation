@@ -412,17 +412,37 @@ jobs:
         # Only well-formed SCP_SHARED_*= lines reach $GITHUB_ENV.
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         run: |
+          mkdir -p reports
+          provisioned=0
           for i in $(seq 1 10); do
-            python -m regression.scenarios.shared_infra --provision > shared_ids.txt || true
+            # Capture ONLY stdout (machine-parseable SCP_SHARED_*= lines); the
+            # provisioner's human diagnostics go to stderr -> the runner log via
+            # tee, so a failed/empty attempt is always explainable. `|| true` so a
+            # non-zero exit (e.g. transient API error) just triggers the retry.
+            python -m regression.scenarios.shared_infra --provision \
+              > shared_ids.txt 2> >(tee -a reports/shared-infra.log >&2) || true
+            echo "--- shared_ids.txt (attempt $i) ---"
             cat shared_ids.txt
-            if grep -qE '^SCP_SHARED_VPC_ID=' shared_ids.txt; then
-              grep -E '^SCP_SHARED_[A-Za-z0-9_]+=' shared_ids.txt >> "$GITHUB_ENV"
-              echo "provisioned shared VPC/subnet on attempt $i"
+            # Append ONLY well-formed SCP_SHARED_*= lines to $GITHUB_ENV. Gate on
+            # the VPC id specifically: the vpc id is what every {"adopt":"vpc"}
+            # lifecycle needs to clear the IB-049 guard; subnet ids are optional.
+            if grep -qE '^SCP_SHARED_VPC_ID=.+' shared_ids.txt; then
+              exported="$(grep -E '^SCP_SHARED_[A-Za-z0-9_]+=.+' shared_ids.txt)"
+              printf '%s\n' "$exported" >> "$GITHUB_ENV"
+              echo "provisioned shared VPC/subnet on attempt $i; exported to \$GITHUB_ENV:"
+              printf '  %s\n' "$exported"
+              provisioned=1
               break
             fi
-            echo "provision attempt $i got no ids (likely VPC cap while job B churns) — retry in 45s"
+            echo "provision attempt $i got no SCP_SHARED_VPC_ID (VPC cap while job B churns, or async-create without id) — retry in 45s"
             sleep 45
           done
+          # Be loud (but do NOT fail the job) when no shared VPC could be exported:
+          # adopters then self-create / IB-049-skip, which is the correct, safe
+          # failure-path behavior. A non-fatal warning keeps the cause visible.
+          if [ "$provisioned" != "1" ]; then
+            echo "::warning title=shared-vpc::No SCP_SHARED_VPC_ID exported after 10 attempts; {\"adopt\":\"vpc\"} lifecycles will self-create or IB-049-skip."
+          fi
 
       - name: Run read-only smoke + read-chains regression
         # Read-only — runs once for every event (PR/smoke-only and CRUD runs).

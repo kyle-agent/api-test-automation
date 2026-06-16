@@ -102,15 +102,38 @@ def provision():
     # "Invalid format". So capture the engine's stdout onto STDERR and let ONLY
     # our explicit SCP_SHARED_*= lines below reach STDOUT.
     import contextlib
-    with contextlib.redirect_stdout(sys.stderr):
-        shared_ctx, _teardown = engine.provision_shared_vpc(client, cfg)
+    shared_ctx = {}
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            shared_ctx, _teardown = engine.provision_shared_vpc(client, cfg)
+    except Exception as exc:
+        # Wave D root cause: provision_shared_vpc CREATED the VPC (slot won,
+        # counts against the 5-cap) but a *post-create* step inside it raised —
+        # e.g. the poll-to-ACTIVE or a subnet create blew up. Without this guard
+        # the exception propagated out of provision(), the subprocess died, the
+        # workflow's `> shared_ids.txt` was left EMPTY, `|| true` swallowed the
+        # non-zero exit, the step still "concluded SUCCESS" (a VPC existed), but
+        # NO `SCP_SHARED_VPC_ID=` line ever reached stdout → never reached
+        # $GITHUB_ENV → every {"adopt":"vpc"} lifecycle hit the IB-049 guard and
+        # skipped. Demote to a diagnostic so the (already-created) id, if any, is
+        # still emitted below instead of being lost to a silent crash.
+        _eprint(f"[shared_infra] provision_shared_vpc raised after entry "
+                f"({type(exc).__name__}: {exc}); recovering any captured ids.")
     if not shared_ctx:
-        _eprint("[shared_infra] could not provision shared VPC; adopters will "
-                "self-create.")
+        # allow_mutations is ON here (checked above) yet we got nothing back. This
+        # is NOT the benign "mutations off" no-op: either the create lost the
+        # 5-VPC slot, or it succeeded async (202) without an id in the body. Make
+        # the distinction loud in the runner log; adopters will self-create (or,
+        # under xdist, IB-049-skip — which is the correct failure-path behavior).
+        _eprint("[shared_infra] could not provision shared VPC (empty ctx with "
+                "mutations ON — VPC-cap loss or async-create without id); adopters "
+                "will self-create / IB-049-skip. NO SCP_SHARED_* emitted.")
         return 0
     vpc_id = shared_ctx.get("shared_vpc_id")
     subnet_id = shared_ctx.get("shared_subnet_id")
     db_subnet_id = shared_ctx.get("shared_db_subnet_id")
+    # ONLY well-formed `KEY=VALUE` lines may reach stdout (the workflow appends
+    # them to $GITHUB_ENV, which rejects anything else with "Invalid format").
     if vpc_id:
         print(f"SCP_SHARED_VPC_ID={vpc_id}")
     if subnet_id:
@@ -119,6 +142,11 @@ def provision():
         print(f"SCP_SHARED_DB_SUBNET_ID={db_subnet_id}")
     _eprint(f"[shared_infra] provisioned vpc={vpc_id} subnet={subnet_id} "
             f"db_subnet={db_subnet_id}")
+    if not vpc_id:
+        # ctx came back truthy but with no vpc id (should not happen) — be loud so
+        # the missing $GITHUB_ENV export is diagnosable from the runner log.
+        _eprint("[shared_infra] WARNING: shared ctx has NO shared_vpc_id; "
+                "nothing emitted for SCP_SHARED_VPC_ID.")
     return 0
 
 
