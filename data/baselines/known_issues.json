@@ -35,6 +35,13 @@
       "classification": "Product Bug",
       "note": "PF-19 — PUT /v1/apis/{api_id}/resource-policies -> 500 ContactAdminForAssistance with the proven policy_document shape (run 27466988779, gen-wave5-apigw-policy). Previously thought VERIFIED; a write that worked before now 5xxes. Muted pending backend fix; the composed step tolerates 500 so the chain survives.",
       "added": "2026-06-13"
+    },
+    {
+      "key": "compute/virtualserver/createvolumetransfer",
+      "status": 500,
+      "type": "Product Bug",
+      "since": "2026-06-15",
+      "note": "500 on POST /v1/volume-transfer; 2 repros runs 27540589368/27583285457 (req-bc27a3b6, req-78aec306); compute/virtualserver volume-transfer create"
     }
   ]
 }

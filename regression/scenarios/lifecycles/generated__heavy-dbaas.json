@@ -2739,8 +2739,11 @@
           "service": "mariadb",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "_note": "run 27583285457; no-op {add:[],del:[]} 400s — give it a real CIDR to mirror the passing epas/postgres sibling. durable fix via model+IB-042 recompose.",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.10.10.10/32"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [
@@ -4089,8 +4092,11 @@
           "service": "mariadb",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/security-group-rules",
+          "_note": "run 27583285457; no-op {add:[],del:[]} 400s — give it a real CIDR to mirror the passing epas/postgres sibling. durable fix via model+IB-042 recompose.",
           "json": {
-            "add_ip_addresses": [],
+            "add_ip_addresses": [
+              "10.10.10.10/32"
+            ],
             "del_ip_addresses": []
           },
           "expect_status": [

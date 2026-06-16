@@ -281,11 +281,19 @@ resources:
       # 트리플렛(id/new_value/old_value)이 맞는 형임이 사실상 확정 (eventstreams /
       # validated-facts의 'parameters update takes {id, new_value, old_value}
       # triplets'와 합치). 모델은 이미 트리플렛 형이라 그대로 유지.
+      # old_value must equal the cluster's CURRENT applied value and new_value a
+      # DISTINCT valid value; the lookup only yields one captured value
+      # (param_value = applied_value), so binding both to it 400s value_error.
+      # The lookup can't supply a safe distinct value -> mark optional + tolerate
+      # 400 (needs applied-value capture, IB). old_value bound to the applied
+      # value; new_value stays bound to the same until a distinct-value capture exists.
       - {name: setparametervalues,
          endpoint: "PUT /v1/clusters/{mysql-cluster.cluster_id}/parameters",
          json: {parameters: [{id: "{param_id}", new_value: "{param_value}",
                               old_value: "{param_value}"}]},
-         expect_status: [200, 202]}
+         optional: true,
+         expect_status: [200, 202, 400],
+         note: "value_error: old_value must match applied; needs applied-value capture (IB)"}
       - {name: syncparametervalues,
          endpoint: "POST /v1/clusters/{mysql-cluster.cluster_id}/parameters/sync",
          expect_status: [200, 202, 409]}

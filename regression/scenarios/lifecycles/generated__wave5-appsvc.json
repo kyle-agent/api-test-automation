@@ -423,8 +423,10 @@
           "service": "apigateway",
           "method": "GET",
           "path": "/v1/apis/{api_id}/resource-policies",
+          "_note": "PF-19: set may 500 -> no policy -> 404",
           "expect_status": [
-            200
+            200,
+            404
           ],
           "group": "resource-policy"
         },

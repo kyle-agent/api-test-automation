@@ -289,7 +289,7 @@ resources:
       body: {name: "regrvt{unique}", volume_id: "{block-volume.vol_id}"}
       optional: true
       expect_status: [200, 202, 500]
-      note: "PF-21 candidate (500 InternalServerError, run 27540589368) — UNCONFIRMED, tolerated pending 2nd repro; still records the 500 in observations"
+      note: "PF-21 CONFIRMED product bug (500 InternalServerError, runs 27540589368/27583285457, req-bc27a3b6/req-78aec306) — baselined in known_issues.json (compute/virtualserver/createvolumetransfer); 500 tolerated so the chain survives, still records the 500 in observations"
     capture: {transfer_id: "$.id"}
     verify:
       - {name: read, endpoint: "GET /v1/volume-transfer/{transfer_id}",
