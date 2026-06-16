@@ -320,10 +320,10 @@ resources:
     capture: {launch_configuration_id: "$.id"}
     delete: {endpoint: "DELETE /v1/launch-configurations/{launch_configuration_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-launch-configuration, delete-launch-configuration]}
-    notes: "소스는 synthetic image/keypair id로 4xx 예상 (api_bodies 엔트리 없음, UNPROVEN) — 실자원 배선(image/server-type lookup + keypair)은 이 모델이 처음 제공. capture envelope $.id 미관측."
+    notes: "소스는 synthetic image/keypair id로 4xx 예상 (api_bodies 엔트리 없음, UNPROVEN) — 실자원 배선(image/server-type lookup + keypair)은 이 모델이 처음 제공. capture envelope $.id 미관측. live-validated run 27583285457 (2026-06-15)"
 
   auto-scaling-group:
     code: "cp-vs-asg"

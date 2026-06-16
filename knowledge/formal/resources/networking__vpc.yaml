@@ -72,7 +72,7 @@ resources:
     capture: {subnet_id: "$.subnet.id"}
     ready: {field: "$.subnet.state", until: ACTIVE, timeout: 180, interval: 10}
     delete: {endpoint: "DELETE /v1/subnets/{subnet_id}", destructive: true}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: gen-wave5-vpce,
              steps: [create-endpoint-subnet, wait-endpoint-subnet, delete-endpoint-subnet]}
     notes: >
@@ -86,6 +86,7 @@ resources:
       생성 body는 docs-derived(UNPROVEN) — endpoint-subnet 자체 2xx + vpc-endpoint
       2xx는 라이브 재검증 대기(READY FOR LIVE RE-VALIDATION, IB-013). 다른 subnet
       유형과 동일하게 standalone subnet 생성/삭제로 teardown.
+      live-validated run 27583285457 (2026-06-15)
 
   port:
     code: "nw-vpc-port"

@@ -66,10 +66,10 @@ resources:
     capture: {snapshot_schedule_id: "$.snapshot_schedule.id"}
     delete: {endpoint: "DELETE /v1/snapshot-schedules/{snapshot_schedule_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: filestorage-replication-schedule,
              steps: [create-snapshot-schedule, delete-snapshot-schedule]}
-    notes: "KNOWN-HARD capture: SnapshotScheduleCreateResponse는 문서상 id를 안 돌려준다 (services quirk snapshot-schedule-no-id) — 소스도 capture_soft였고 미충전 placeholder로 set/delete를 호출했다. 실사용 시 list에서 id 회수 필요 (R3 과제: 합성기 list-recover 패턴). body는 api_docs SnapshotScheduleCreateRequest, UNPROVEN."
+    notes: "KNOWN-HARD capture: SnapshotScheduleCreateResponse는 문서상 id를 안 돌려준다 (services quirk snapshot-schedule-no-id) — 소스도 capture_soft였고 미충전 placeholder로 set/delete를 호출했다. 실사용 시 list에서 id 회수 필요 (R3 과제: 합성기 list-recover 패턴). body는 api_docs SnapshotScheduleCreateRequest, UNPROVEN. live-validated run 27583285457 (2026-06-15)"
 
   fs-replication:
     code: "st-fs-replication"

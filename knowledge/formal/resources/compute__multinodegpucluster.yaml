@@ -40,9 +40,9 @@ resources:
     capture: {server_type_id: "$.products[0].id"}
     verify:
       - {name: list, endpoint: "GET /v1/gpu-nodes/products", expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: mngc-gpu-node-coverage, steps: []}
-    notes: "읽기 전용 LOOKUP 노드 — GPU bare-metal 서버 타입 목록. 타입 코드: g2c96h8_metal(8x H100, 96 vCore, 2TB), g3c128b8_metal(8x B300, 128 vCore, 4TB) (services constraint mngc-server-type-codes). capture envelope $.products[0].id는 docs 추정(2xx 미관측). 소스는 synthetic server_type_id literal로 4xx — 실 lookup은 이 모델이 처음."
+    notes: "읽기 전용 LOOKUP 노드 — GPU bare-metal 서버 타입 목록. 타입 코드: g2c96h8_metal(8x H100, 96 vCore, 2TB), g3c128b8_metal(8x B300, 128 vCore, 4TB) (services constraint mngc-server-type-codes). capture envelope $.products[0].id는 docs 추정(2xx 미관측). 소스는 synthetic server_type_id literal로 4xx — 실 lookup은 이 모델이 처음. live-validated run 27583285457 (2026-06-15)"
 
   # read-only LOOKUP — Cluster Fabric is NOT independently creatable (minted with
   # GPU nodes, auto-deleted with last node). Only list/show/node-pools exist.
@@ -58,9 +58,9 @@ resources:
       - {name: list, endpoint: "GET /v1/cluster-fabrics", expect_status: [200]}
       - {name: node-pools, endpoint: "GET /v1/cluster-fabrics/node-pools",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: mngc-gpu-node-coverage, steps: []}
-    notes: "읽기 전용 LOOKUP 노드 — Cluster Fabric은 독립 create/delete 불가(GPU Node 생성 시 함께 minted, 마지막 노드 해지 시 auto-delete; services quirk mngc-fabric-not-standalone). 따라서 별도 create 엔드포인트 없음 — 이 노드는 list/show/node-pools 읽기와 (선택적) 기존 fabric id 공급용. modify-members(POST /v1/cluster-fabrics/modify-members)는 노드를 풀 간 이동시키는 액션 op (별도 모델 미작성, 합성 대상 아님). capture envelope $.cluster_fabrics[0].id는 docs 추정."
+    notes: "읽기 전용 LOOKUP 노드 — Cluster Fabric은 독립 create/delete 불가(GPU Node 생성 시 함께 minted, 마지막 노드 해지 시 auto-delete; services quirk mngc-fabric-not-standalone). 따라서 별도 create 엔드포인트 없음 — 이 노드는 list/show/node-pools 읽기와 (선택적) 기존 fabric id 공급용. modify-members(POST /v1/cluster-fabrics/modify-members)는 노드를 풀 간 이동시키는 액션 op (별도 모델 미작성, 합성 대상 아님). capture envelope $.cluster_fabrics[0].id는 docs 추정. live-validated run 27583285457 (2026-06-15)"
 
   gpu-node:
     code: "cp-gpu-node"

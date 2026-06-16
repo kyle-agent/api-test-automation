@@ -60,8 +60,8 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/engine-versions?eos_included=false",
          expect_status: [200]}
-    provenance: docs
-    notes: "Engine.major_version prefix '10' 필터 — userguide overview 확정 (2026-06-14): 10.6.x(10종)·10.11.x(3종)·11.4.7 공존하므로 10.x 구버전→업그레이드 전략 성립. 단 10.6.x EoTS 2026-07-06 임박 → 그 뒤 prefix '10' 매치는 10.11.x만 남는다(여전히 유효). 11.4.7만 남는 미래 시점에는 이 필터가 None → gen-heavy-mariadb-upgrade만 hard-fail (의도된 폭발 반경). owner 콘솔 확인은 더 이상 차단 아님 — 라이브 카탈로그 EoTS rot만 주기 점검."
+    provenance: VALIDATED
+    notes: "Engine.major_version prefix '10' 필터 — userguide overview 확정 (2026-06-14): 10.6.x(10종)·10.11.x(3종)·11.4.7 공존하므로 10.x 구버전→업그레이드 전략 성립. 단 10.6.x EoTS 2026-07-06 임박 → 그 뒤 prefix '10' 매치는 10.11.x만 남는다(여전히 유효). 11.4.7만 남는 미래 시점에는 이 필터가 None → gen-heavy-mariadb-upgrade만 hard-fail (의도된 폭발 반경). owner 콘솔 확인은 더 이상 차단 아님 — 라이브 카탈로그 EoTS rot만 주기 점검. live-validated run 27583285457 (2026-06-15)"
 
   # 읽기 전용 LOOKUP — 소스 maria-find-stype verbatim: NAME 캡처 (id 아님).
   mariadb-server-type:
@@ -256,8 +256,8 @@ resources:
       - {name: listparameters,
          endpoint: "GET /v1/parameters?dbaas_parameter_group_id={dbaas_parameter_group_id}&size=20&page=0",
          expect_status: [200]}
-    provenance: docs
-    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...} (api_docs — PG와 동일 DTO). dbaas_parameter_group_id는 cluster detail DTO에 없어 여기서만 발견 가능 (PG와 동일). guarded probe에 동등 스텝이 없어 source 생략."
+    provenance: VALIDATED
+    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...} (api_docs — PG와 동일 DTO). dbaas_parameter_group_id는 cluster detail DTO에 없어 여기서만 발견 가능 (PG와 동일). guarded probe에 동등 스텝이 없어 source 생략. live-validated run 27583285457 (2026-06-15)"
 
   # detail-LOOKUP — 수정 가능한 첫 파라미터의 id+applied_value 캡처 → 같은
   # 값으로 set (safe no-op write). PG pg-parameter 미러.

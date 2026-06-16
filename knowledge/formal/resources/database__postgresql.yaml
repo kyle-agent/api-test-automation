@@ -48,8 +48,8 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/engine-versions?eos_included=false",
          expect_status: [200]}
-    provenance: docs
-    notes: "Engine.major_version prefix '16' 필터 (라이브 현황 owner 2026-06-13: 17.6 최신, 16.10 가용). 16.x가 카탈로그에서 사라지면 capture가 None → 엔진 assert로 이 노드를 쓰는 lifecycle만 hard-fail (의도된 폭발 반경: gen-heavy-pg-upgrade). 버전 rot 시 이 필터를 재확인."
+    provenance: VALIDATED
+    notes: "Engine.major_version prefix '16' 필터 (라이브 현황 owner 2026-06-13: 17.6 최신, 16.10 가용). 16.x가 카탈로그에서 사라지면 capture가 None → 엔진 assert로 이 노드를 쓰는 lifecycle만 hard-fail (의도된 폭발 반경: gen-heavy-pg-upgrade). 버전 rot 시 이 필터를 재확인. live-validated run 27583285457 (2026-06-15)"
 
   # 읽기 전용 LOOKUP — 소스 find-server-type verbatim: 이름(NAME)을 캡처
   # (id 아님). ServerTypeListResponse $.contents[] {name, cpu_core, ...}.
@@ -183,10 +183,10 @@ resources:
       - {name: listparameters,
          endpoint: "GET /v1/parameters?dbaas_parameter_group_id={dbaas_parameter_group_id}&size=20&page=0",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: database-postgresql-cluster,
              steps: [list-parameter-groups, list-parameters]}
-    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...}. contents[0]는 임의 메이저 버전 그룹일 수 있으나 listparameters 쿼리 검증에는 충분. major_version 쿼리는 optional."
+    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...}. contents[0]는 임의 메이저 버전 그룹일 수 있으나 listparameters 쿼리 검증에는 충분. major_version 쿼리는 optional. live-validated run 27583285457 (2026-06-15)"
 
   # detail-LOOKUP — 클러스터의 현재 파라미터에서 수정 가능한(is_modifiable)
   # 첫 항목의 id+applied_value를 캡처 → 같은 값으로 set (safe no-op write).

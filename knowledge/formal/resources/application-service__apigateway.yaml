@@ -188,10 +188,10 @@ resources:
       body: {name: "regrauth{ualpha}", connected_stages: [dev],
              expiration_period: 90}
     capture: {access_token: "$.access_token"}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: apigateway-api-write-coverage,
              steps: [create-auth, find-auth-id, delete-auth]}
-    notes: "createauth 응답에는 id가 없고 $.access_token뿐 — auth_id는 listauths(GET .../auths $.auths[0].id)로 회수해야 DELETE /v1/apis/{api_id}/auths/{auth_id}가 가능하다. 후속-GET capture는 §1 task 스키마가 표현하지 못해 delete 없음(teardown은 R3에서 list-capture sub-step으로). connected_stages [dev]는 apigw-deployment(stage_type=new)가 만든 stage를 참조 → requires에 포함. expiration_period 단위는 일. JWT(auth) name 패턴(userguide how_to 2026-06-14, docs-only): 영문 소문자 시작, [a-z0-9-], 하이픈으로 끝 불가, 3~50자. JWT는 무상태(stateless) 인증 — access_token은 생성 확인 팝업에서만 노출되며 파일로 다운로드(런타임 재조회 불가). endpoint_type=PRIVATE API는 JWT 활성화 강제."
+    notes: "createauth 응답에는 id가 없고 $.access_token뿐 — auth_id는 listauths(GET .../auths $.auths[0].id)로 회수해야 DELETE /v1/apis/{api_id}/auths/{auth_id}가 가능하다. 후속-GET capture는 §1 task 스키마가 표현하지 못해 delete 없음(teardown은 R3에서 list-capture sub-step으로). connected_stages [dev]는 apigw-deployment(stage_type=new)가 만든 stage를 참조 → requires에 포함. expiration_period 단위는 일. JWT(auth) name 패턴(userguide how_to 2026-06-14, docs-only): 영문 소문자 시작, [a-z0-9-], 하이픈으로 끝 불가, 3~50자. JWT는 무상태(stateless) 인증 — access_token은 생성 확인 팝업에서만 노출되며 파일로 다운로드(런타임 재조회 불가). endpoint_type=PRIVATE API는 JWT 활성화 강제. live-validated run 27583285457 (2026-06-15)"
 
   apigw-access-control:
     code: "ap-apigw-acl"

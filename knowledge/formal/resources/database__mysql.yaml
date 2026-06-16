@@ -85,8 +85,8 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/engine-versions?eos_included=false",
          expect_status: [200]}
-    provenance: docs
-    notes: "Engine.major_version prefix '8.0' 필터 — mysql userguide(2026-06-15 overview) 확정: 8.0.28-8.0.42 (10종) + 8.4.5 + 8.4.7(2026-07 예정) 공존, 구버전→업그레이드 전략은 8.0.x→8.4.x 경로로 성립. ★단 8.0.x EOS 2026-03-19/EoTS 2026-04-30 — 현재일 2026-06-15 기준 EoTS도 경과 → 라이브 카탈로그가 8.0.x 라인을 더 이상 노출하지 않을 가능성 (신규 인스턴스 생성 중단 정책). capture None 시 prefix '8.4'로 재조정 (8.4.5만 남는 미래 시점에는 메이저 단일 → 업그레이드 체인 불성립, gen-heavy-mysql-upgrade만 hard-fail; 의도된 폭발 반경)."
+    provenance: VALIDATED
+    notes: "Engine.major_version prefix '8.0' 필터 — mysql userguide(2026-06-15 overview) 확정: 8.0.28-8.0.42 (10종) + 8.4.5 + 8.4.7(2026-07 예정) 공존, 구버전→업그레이드 전략은 8.0.x→8.4.x 경로로 성립. ★단 8.0.x EOS 2026-03-19/EoTS 2026-04-30 — 현재일 2026-06-15 기준 EoTS도 경과 → 라이브 카탈로그가 8.0.x 라인을 더 이상 노출하지 않을 가능성 (신규 인스턴스 생성 중단 정책). capture None 시 prefix '8.4'로 재조정 (8.4.5만 남는 미래 시점에는 메이저 단일 → 업그레이드 체인 불성립, gen-heavy-mysql-upgrade만 hard-fail; 의도된 폭발 반경). live-validated run 27583285457 (2026-06-15)"
 
   # 읽기 전용 LOOKUP — 소스 find-server-type verbatim: 이름(NAME) 캡처 (id
   # 아님). PG pg-server-type 미러.
@@ -227,10 +227,10 @@ resources:
       - {name: detail-read,
          endpoint: "GET /v1/clusters/{mysql-cluster.cluster_id}",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: mysql-cluster-subops-guarded,
              steps: [capture-subop-ids]}
-    notes: "InstanceGroupResponse {id, block_storage_groups[].id, ...} (api_docs show DTO — PG와 동일 envelope; PG는 run 27258520218에서 라이브 캡처). mysql guarded probe는 instance_group_id만 캡처했고 block_storage_group_id jsonpath는 docs 미러 — 라이브 정제 예상. addblockstorages/setblockstoragesize/setservertype 액션 노드들이 여기 매달린다."
+    notes: "InstanceGroupResponse {id, block_storage_groups[].id, ...} (api_docs show DTO — PG와 동일 envelope; PG는 run 27258520218에서 라이브 캡처). mysql guarded probe는 instance_group_id만 캡처했고 block_storage_group_id jsonpath는 docs 미러 — 라이브 정제 예상. addblockstorages/setblockstoragesize/setservertype 액션 노드들이 여기 매달린다. live-validated run 27583285457 (2026-06-15)"
 
   # 읽기 전용 LOOKUP — listparametergroups + listparameters 커버리지.
   # dbaas_parameter_group_id는 여기서만 발견 가능 (cluster detail에 없음;
@@ -249,10 +249,10 @@ resources:
       - {name: listparameters,
          endpoint: "GET /v1/parameters?dbaas_parameter_group_id={dbaas_parameter_group_id}&size=20&page=0",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: database-mysql-cluster,
              steps: [list-parameter-groups, list-parameters]}
-    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...} (PG와 동일 DTO). contents[0]는 임의 메이저 그룹일 수 있으나 listparameters 쿼리 검증에는 충분. 소스 스텝들은 optional이라 라이브 2xx 기록 없음 → docs."
+    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...} (PG와 동일 DTO). contents[0]는 임의 메이저 그룹일 수 있으나 listparameters 쿼리 검증에는 충분. 소스 스텝들은 optional이라 라이브 2xx 기록 없음 → docs. live-validated run 27583285457 (2026-06-15)"
 
   # detail-LOOKUP — 클러스터의 현재 파라미터에서 수정 가능한(is_modifiable)
   # 첫 항목의 id+applied_value를 캡처 → 같은 값으로 set (safe no-op write).
@@ -289,11 +289,11 @@ resources:
       - {name: syncparametervalues,
          endpoint: "POST /v1/clusters/{mysql-cluster.cluster_id}/parameters/sync",
          expect_status: [200, 202, 409]}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: database-mysql-cluster,
              steps: [list-parameter-values-before, set-parameter-values,
                      verify-parameter-values]}
-    notes: "create=GET listparametervalues — ParametersResponse $.contents[] {id, applied_value, is_modifiable, ...}. 모델은 PG 미러로 api_docs DTO 트리플렛(parameters:[{id, new_value, old_value}]) + 같은-값 set을 따른다 (값 고정 없는 safe no-op). ★run #108 갱신: 과거 수작업 set-parameter-values의 {parameters:[{name:'max_connections', value:'256'}]} (name/value형)은 한때 라이브 2xx를 받았으나 run #108에서 400 value_error → name/value형은 더 이상 유효하지 않고, eventstreams/validated-facts가 기록한 'parameters update = {id, new_value, old_value} triplets' 규칙이 mysql에도 적용됨이 사실상 확정. 따라서 모델의 트리플렛 형이 정답 (차순위 name/value형 폐기). where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭."
+    notes: "create=GET listparametervalues — ParametersResponse $.contents[] {id, applied_value, is_modifiable, ...}. 모델은 PG 미러로 api_docs DTO 트리플렛(parameters:[{id, new_value, old_value}]) + 같은-값 set을 따른다 (값 고정 없는 safe no-op). ★run #108 갱신: 과거 수작업 set-parameter-values의 {parameters:[{name:'max_connections', value:'256'}]} (name/value형)은 한때 라이브 2xx를 받았으나 run #108에서 400 value_error → name/value형은 더 이상 유효하지 않고, eventstreams/validated-facts가 기록한 'parameters update = {id, new_value, old_value} triplets' 규칙이 mysql에도 적용됨이 사실상 확정. 따라서 모델의 트리플렛 형이 정답 (차순위 name/value형 폐기). where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭. live-validated run 27583285457 (2026-06-15)"
 
   # ---- 액션 노드들 (SKE upgrade 패턴: create=호출, ready=재폴링,
   # ---- capture/delete 없음) — PG 미러 ------------------------------------

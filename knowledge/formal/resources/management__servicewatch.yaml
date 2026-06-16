@@ -116,8 +116,8 @@ resources:
                namespace_name: "{self.namespace_name}",
                dimensions: []}
         expect_status: [200]
-    provenance: docs
-    notes: "읽기 전용 LOOKUP 노드 — docs listmetricinfos/MetricsResponseV1Dot1 모델 파생(UNPROVEN, 라이브 미관측). capture는 의도적 fail-fast: 계정에 지표를 내는 자원이 하나도 없으면 $.namespaces[0].dimensions[0].metrics[0]가 비어 capture가 실패한다(cm-account-resource 패턴 — compute 자원을 requires로 끌어오면 HEAVY 체인이 되어 배제). start/end는 고정 epoch(2026-06-01 UTC, 1780272000) — 유저가이드 '지표 15개월(455일) 보존' 기준 2027-08까지 유효, 그 후 재생성 필요. 유저가이드 지표 페이지: Object Storage 차트 내보내기 제약 '지표 개수: 10개 이내'·'조회 기간: 2개월(63일) 이내' — image/data verify는 지표 1개·15분 윈도우로 한계 내."
+    provenance: VALIDATED
+    notes: "읽기 전용 LOOKUP 노드 — docs listmetricinfos/MetricsResponseV1Dot1 모델 파생(UNPROVEN, 라이브 미관측). capture는 의도적 fail-fast: 계정에 지표를 내는 자원이 하나도 없으면 $.namespaces[0].dimensions[0].metrics[0]가 비어 capture가 실패한다(cm-account-resource 패턴 — compute 자원을 requires로 끌어오면 HEAVY 체인이 되어 배제). start/end는 고정 epoch(2026-06-01 UTC, 1780272000) — 유저가이드 '지표 15개월(455일) 보존' 기준 2027-08까지 유효, 그 후 재생성 필요. 유저가이드 지표 페이지: Object Storage 차트 내보내기 제약 '지표 개수: 10개 이내'·'조회 기간: 2개월(63일) 이내' — image/data verify는 지표 1개·15분 윈도우로 한계 내. live-validated run 27583285457 (2026-06-15)"
 
   alert:
     code: "mg-sw-alert"
@@ -270,9 +270,9 @@ resources:
       # collection delete들의 ids와 다름 (run 27398084089: ids로 400)
       json: {dashboard_ids: ["{dashboard_id}"]}
       destructive: true
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: servicewatch-dashboard, steps: [create-dashboard, delete-dashboard]}
-    notes: "body는 api_bodies createdashboard 기반. create 201 라이브 확인(run 27396649009) — 응답은 DashboardDetailResponseV1Dot1, id가 FLAT 최상위($.id; 초기 추정 $.dashboard.id는 오류). 당시 캡처 실패로 dashboard 1건 누수 가능(레지스트리 sweep 대상). wave5: verify read+set 추가 — setdashboard(PUT)가 마지막 미검증 dashboard op. 위젯의 doc 샘플 dimension uuid는 create 201 라이브 증거상 검증 없이 수용됨 → PUT에도 그대로 사용."
+    notes: "body는 api_bodies createdashboard 기반. create 201 라이브 확인(run 27396649009) — 응답은 DashboardDetailResponseV1Dot1, id가 FLAT 최상위($.id; 초기 추정 $.dashboard.id는 오류). 당시 캡처 실패로 dashboard 1건 누수 가능(레지스트리 sweep 대상). wave5: verify read+set 추가 — setdashboard(PUT)가 마지막 미검증 dashboard op. 위젯의 doc 샘플 dimension uuid는 create 201 라이브 증거상 검증 없이 수용됨 → PUT에도 그대로 사용. live-validated run 27583285457 (2026-06-15)"
 
   event-rule:
     code: "mg-sw-event-rule"
@@ -376,10 +376,10 @@ resources:
             - {name: "Custom_regr_probe_count", namespace_name: "MyCustom/regr",
                dimensions: []}
         expect_status: [200]
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: servicewatch-custom-ingest, steps: [create-custom-metric-meta],
              notes: "also exercised by gen-wave5-swatch-custom-metric (IB-022: missing source wired)"}
-    notes: "docs 모델 verbatim(UNPROVEN, 라이브 미관측). unit 표기는 docs가 자기모순 — MetricMetaDto 허용 목록은 대문자(SECONDS…COUNT, NONE)인데 예시는 'Bytes' → 예시 표기('Count')를 따르고 400이면 'COUNT'로 정정(error-driven). resource.attributes의 key 'namespace'는 추정 — doc 예시는 key가 빈 문자열인 placeholder뿐(routing 단서 없음); 400/유실 시 후보는 meta의 namespace 문자열 매칭. time_unix_nano는 고정값(2026-06-01) — 오래된 타임스탬프 거부 정책이 있으면 적재가 무시될 수 있으나 202 수신 자체가 커버리지 목적엔 충분. 메트릭명/네임스페이스 고정 재사용: 커스텀 지표는 삭제 API가 없고 월 10개 초과분 과금."
+    notes: "docs 모델 verbatim(UNPROVEN, 라이브 미관측). unit 표기는 docs가 자기모순 — MetricMetaDto 허용 목록은 대문자(SECONDS…COUNT, NONE)인데 예시는 'Bytes' → 예시 표기('Count')를 따르고 400이면 'COUNT'로 정정(error-driven). resource.attributes의 key 'namespace'는 추정 — doc 예시는 key가 빈 문자열인 placeholder뿐(routing 단서 없음); 400/유실 시 후보는 meta의 namespace 문자열 매칭. time_unix_nano는 고정값(2026-06-01) — 오래된 타임스탬프 거부 정책이 있으면 적재가 무시될 수 있으나 202 수신 자체가 커버리지 목적엔 충분. 메트릭명/네임스페이스 고정 재사용: 커스텀 지표는 삭제 API가 없고 월 10개 초과분 과금. live-validated run 27583285457 (2026-06-15)"
 
   # custom log collect registration — createcustomlogstream registers an
   # EXISTING log-group/log-stream pair (by NAME) for custom (OTLP) log
@@ -424,7 +424,7 @@ resources:
                     - body: {stringValue: "level=info regr otlp test log"}
                       timeUnixNano: 1780272000000000000
         expect_status: [202]
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: servicewatch-custom-ingest, steps: [create-custom-log-stream],
              notes: "also exercised by gen-wave5-swatch-custom-log (IB-022: missing source wired)"}
-    notes: "docs 모델 verbatim(UNPROVEN, 라이브 미관측). 로그 이벤트 최대 1MB(유저가이드 overview) — probe는 한 줄. timeUnixNano는 고정값(2026-06-01); 모델 타입은 integer인데 doc 예시는 문자열 — integer로 전송, 400이면 문자열로 정정(error-driven). 유저가이드 로그 페이지의 위계(로그 그룹 → '로그 스트림을 생성할 로그 그룹명을 클릭하세요' → 스트림) 그대로 log-stream을 선행 — collect 등록은 기존 그룹/스트림 이름을 참조하므로 생성 후에만 유효."
+    notes: "docs 모델 verbatim(UNPROVEN, 라이브 미관측). 로그 이벤트 최대 1MB(유저가이드 overview) — probe는 한 줄. timeUnixNano는 고정값(2026-06-01); 모델 타입은 integer인데 doc 예시는 문자열 — integer로 전송, 400이면 문자열로 정정(error-driven). 유저가이드 로그 페이지의 위계(로그 그룹 → '로그 스트림을 생성할 로그 그룹명을 클릭하세요' → 스트림) 그대로 log-stream을 선행 — collect 등록은 기존 그룹/스트림 이름을 참조하므로 생성 후에만 유효. live-validated run 27583285457 (2026-06-15)"

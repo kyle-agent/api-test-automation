@@ -105,6 +105,6 @@ resources:
       endpoint: "DELETE /v1/resource-groups"
       json: {ids: ["{rgb_id}"]}
       destructive: true
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: resourcemanager-resource-group, steps: [create]}
-    notes: "ResourceGroupsDeleteRequest {ids:[...]} (api_docs). create는 검증된 rg body와 동일 — 벌크 DELETE 경로만 신규."
+    notes: "ResourceGroupsDeleteRequest {ids:[...]} (api_docs). create는 검증된 rg body와 동일 — 벌크 DELETE 경로만 신규. live-validated run 27583285457 (2026-06-15)"

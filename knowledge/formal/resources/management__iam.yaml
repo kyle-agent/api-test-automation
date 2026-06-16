@@ -180,10 +180,10 @@ resources:
          expect_status: [200]}
     delete: {endpoint: "DELETE /v1/groups/{iam-group.group_id}/policy-bindings/{iam-policy.policy_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: iam-group-bindings, steps: [add-group-policy-binding, remove-group-policy-binding],
              docs: "management/iam/addgrouppolicybinding (grouppolicybindingrequest: policy_ids REQUIRED) + removegrouppolicybinding"}
-    notes: "그룹↔정책 바인딩 — 자체 iam-group/iam-policy만 사용 (policies-attach-to-groups-not-users). create 응답은 {policies:[...]} 목록이라 capture 불필요 — delete 경로가 prereq 토큰을 그대로 쓴다 (dotted-prereq-token-in-delete, server-interface 패턴). removegrouppolicybinding은 라이브 검증 이력 있음(verified set) — add 쪽이 wave5의 신규 커버."
+    notes: "그룹↔정책 바인딩 — 자체 iam-group/iam-policy만 사용 (policies-attach-to-groups-not-users). create 응답은 {policies:[...]} 목록이라 capture 불필요 — delete 경로가 prereq 토큰을 그대로 쓴다 (dotted-prereq-token-in-delete, server-interface 패턴). removegrouppolicybinding은 라이브 검증 이력 있음(verified set) — add 쪽이 wave5의 신규 커버. live-validated run 27583285457 (2026-06-15)"
 
   iam-policy-binding-set:
     code: "mg-iam-policy-binding-set"
@@ -201,10 +201,10 @@ resources:
              json: {identity_type: GROUP, add_ids: [],
                     remove_ids: ["{iam-group.group_id}"]},
              expect_status: [200], destructive: true}
-    provenance: docs
+    provenance: VALIDATED
     source: {lifecycle: iam-policy-extra-writes, steps: [set-policy-bindings],
              docs: "management/iam/setpolicygroupbinding (policybindingsetrequest: identity_type REQUIRED, add_ids/remove_ids optional)"}
-    notes: "정책 쪽에서 본 바인딩 설정 (PUT add_ids/remove_ids) — create=PUT add, teardown=같은 PUT의 remove_ids (비-DELETE teardown passthrough). iam-policy.2 (두 번째 인스턴스)를 쓰는 이유: 묶음 합성 시 iam-group-policy-binding이 policy#1을 같은 그룹에 이미 바인딩하므로 중복 바인딩 충돌을 피한다. 응답은 group 페이지 목록 — capture 불필요."
+    notes: "정책 쪽에서 본 바인딩 설정 (PUT add_ids/remove_ids) — create=PUT add, teardown=같은 PUT의 remove_ids (비-DELETE teardown passthrough). iam-policy.2 (두 번째 인스턴스)를 쓰는 이유: 묶음 합성 시 iam-group-policy-binding이 policy#1을 같은 그룹에 이미 바인딩하므로 중복 바인딩 충돌을 피한다. 응답은 group 페이지 목록 — capture 불필요. live-validated run 27583285457 (2026-06-15)"
 
   iam-role-policy-binding:
     code: "mg-iam-role-policy-binding"

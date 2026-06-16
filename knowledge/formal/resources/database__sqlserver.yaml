@@ -63,8 +63,8 @@ resources:
       db_server_type: {list: "$.contents", get: "name"}
     verify:
       - {name: read, endpoint: "GET /v1/server-types", expect_status: [200]}
-    provenance: docs
-    notes: "ServerTypeListResponse $.contents[] {name, cpu_core, ...} — DBaaS 전용 타입 목록, NAME으로 소비 (compute server-type 노드와 별개). userguide naming (2026-06-14): name = [Type][Spec][vCore][Memory], e.g. 'Standard db1v2m4' = 2 vCore/4GB; Type=Standard|High Capacity, Spec=db1(standard)|dbh2(large 24+ vCore). contents[0] 선택은 소스 패턴 외삽 (sqlserver server-types에는 라이브 캡처 없음 → docs)."
+    provenance: VALIDATED
+    notes: "ServerTypeListResponse $.contents[] {name, cpu_core, ...} — DBaaS 전용 타입 목록, NAME으로 소비 (compute server-type 노드와 별개). userguide naming (2026-06-14): name = [Type][Spec][vCore][Memory], e.g. 'Standard db1v2m4' = 2 vCore/4GB; Type=Standard|High Capacity, Spec=db1(standard)|dbh2(large 24+ vCore). contents[0] 선택은 소스 패턴 외삽 (sqlserver server-types에는 라이브 캡처 없음 → docs). live-validated run 27583285457 (2026-06-15)"
 
   # 읽기 전용 LOOKUP — listparametergroups + listparameters 커버리지.
   # dbaas_parameter_group_id는 GET /v1/parameters의 REQUIRED 쿼리.
@@ -81,8 +81,8 @@ resources:
       - {name: listparameters,
          endpoint: "GET /v1/parameters?dbaas_parameter_group_id={dbaas_parameter_group_id}&size=20&page=0",
          expect_status: [200]}
-    provenance: docs
-    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...}. GET /v1/parameters는 dbaas_parameter_group_id REQUIRED query (services/database__sqlserver.yaml list-parameters-needs-group-id). contents[0]는 임의 major group이나 쿼리 검증엔 충분 (pg-parameter-group 선례)."
+    provenance: VALIDATED
+    notes: "ParameterGroupListResponse $.contents[] {id, major_version, name, ...}. GET /v1/parameters는 dbaas_parameter_group_id REQUIRED query (services/database__sqlserver.yaml list-parameters-needs-group-id). contents[0]는 임의 major group이나 쿼리 검증엔 충분 (pg-parameter-group 선례). live-validated run 27583285457 (2026-06-15)"
 
   sqlserver-cluster:
     code: "db-sqlserver-cluster"

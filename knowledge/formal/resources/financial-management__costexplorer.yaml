@@ -13,7 +13,7 @@ resources:
       - {name: usages, endpoint: "GET /v1/usages", expect_status: [200]}
       - {name: payments-monthly, endpoint: "GET /v1/payments/monthly",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED
     notes: |
       조회 전용 reads 묶음 — 쿼리 파라미터 전부 optional(docs). smoke가 3/3 200
       관측 이력 → 라이브 합성 통과 시 승격. capture 불필요(자원 id 없음).
@@ -43,4 +43,5 @@ resources:
       합성하여 3/3 200을 유지한다.
       WebFetch: cost_management/overview/ = 200; cost_management/how_to_guides/
       {explorer,usage,payment}/ = 503 (skip — 기존 인입분 유지, 재확인 불가).
+      live-validated run 27583285457 (2026-06-15)
     _note: "Query params (time-range year/month or from/to, granularity daily|monthly, group_by service-group|service|resource|region, tag filters) are documented in the userguide but field names UNPROVEN — apiref is JS-rendered/console-only. Node intentionally issues param-less GETs (smoke 3/3 200); param variants belong to C4 parameter-coverage, not this reads node."
