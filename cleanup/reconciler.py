@@ -57,6 +57,26 @@ from core.registry import is_owned, is_expired
 # Ownership / expiry helpers
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Per-collection name-prefix families
+# ---------------------------------------------------------------------------
+# The /v1/vpcs collection holds ONLY VPCs, and every VPC a run creates is named
+# from one of our run-stamped families. The old narrow ("regrvpc","zznetvpc")
+# list missed shapes that don't put "vpc" right after "regr": the wave-5
+# privatelink/firewall chains name their VPC ``regrw5vpc{unique}`` (field sweep,
+# Wave E: ``regrw5vpc6a2d542e`` skipped as "name-mismatch" → never reclaimed →
+# occupied the 5-VPC account cap → provision-failure cascade, IB-051).
+#
+# Broaden to the ``regr``/``zznet`` FAMILY roots so ALL our VPC name shapes
+# (regrvpc*, regrvpcb*, regrw5vpc*, zznetvpc*, …) are recognised as owned +
+# reclaimable. This stays SAFE against reclaiming non-owned VPCs because:
+#   * the owner TAG is still the primary signal (is_owned checks it first), and
+#   * SCP account built-ins (BillingplanFullAccess policy, "Cloud Functions" /
+#     "File Storage" dashboards, …) are NOT VPCs and never carry a regr/zznet
+#     name — nothing in this account names a VPC ``regr*``/``zznet*`` but us.
+_VPC_NAME_PREFIXES = ("regr", "zznet")
+
+
 def _extra_names() -> tuple[str, ...]:
     """SCP_SWEEP_EXTRA_NAMES — comma-separated EXACT resource names the
     operator wants reclaimed once (e.g. the pre-platform 'selftest' VPC that
@@ -421,7 +441,7 @@ def run_sweep(client) -> int:
     regr_vpc_ids = {
         v["id"]
         for v in _select(c, "vpc", "/v1/vpcs",
-                         name_prefixes=("regrvpc", "zznetvpc"))
+                         name_prefixes=_VPC_NAME_PREFIXES)
         if v.get("id")
     }
     if regr_vpc_ids:
@@ -441,7 +461,7 @@ def run_sweep(client) -> int:
     # 4. vpcs — retry on 409 (lingering child), deleting any stray subnets
     deleted_vpc_ids = []
     for it in _select(c, "vpc", "/v1/vpcs",
-                      name_prefixes=("regrvpc", "zznetvpc")):
+                      name_prefixes=_VPC_NAME_PREFIXES):
         vid = it["id"]
         for attempt in range(6):
             st = _delete(c, "vpc", f"/v1/vpcs/{vid}")
