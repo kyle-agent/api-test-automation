@@ -315,7 +315,8 @@
           "path": "/v1/queues/{queue_id}/attributes?attributes=All&name=regrqf{unique}.fifo",
           "expect_status": [
             200
-          ]
+          ],
+          "_note": "표준 queue 노드의 [200,400] 관용은 가림 위험 — FIFO 노드는 200 강제, 400이면 본문이 attributes 유효값을 알려줄 것"
         },
         {
           "name": "verify-queue-fifo-dedup-content",
@@ -327,7 +328,8 @@
           },
           "expect_status": [
             200
-          ]
+          ],
+          "_note": "DeduplicationSetRequest: content_based_deduplication bool required (api_docs). FIFO 전용 — create false -> true 토글"
         },
         {
           "name": "verify-queue-fifo-dedup-scope",
@@ -339,7 +341,8 @@
           },
           "expect_status": [
             200
-          ]
+          ],
+          "_note": "DeduplicationScopeSetRequest: enum (Queue, MessageGroup). create Queue -> MessageGroup 토글"
         },
         {
           "name": "delete-queue-fifo",

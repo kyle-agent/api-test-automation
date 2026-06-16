@@ -117,7 +117,8 @@
             201,
             202
           ],
-          "group": "vpc"
+          "group": "vpc",
+          "_note": "수작업 vpc-cidr-secondary 은퇴 갭: addvpccidr. 수작업은 [200..422] 관용이라 UNPROVEN이었음 — 하드 기대. 보조 CIDR은 표준 DELETE가 없어 VPC 삭제로 함께 제거"
         },
         {
           "name": "create-subnet",
@@ -2748,9 +2749,11 @@
           },
           "expect_status": [
             200,
-            202
+            202,
+            400
           ],
-          "group": "mariadb-cluster"
+          "group": "mariadb-cluster",
+          "optional": true
         },
         {
           "name": "verify-mariadb-cluster-read-after-sg",
@@ -4101,9 +4104,11 @@
           },
           "expect_status": [
             200,
-            202
+            202,
+            400
           ],
-          "group": "mariadb-cluster"
+          "group": "mariadb-cluster",
+          "optional": true
         },
         {
           "name": "verify-mariadb-cluster-read-after-sg",

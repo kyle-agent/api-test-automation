@@ -585,7 +585,8 @@
           "path": "/v1/network-logging/configurations?resource_type=SECURITY_GROUP",
           "expect_status": [
             200
-          ]
+          ],
+          "_note": "configuration 행은 loggable=true 리소스(sg/fw/nat)가 생기면 나타난다 — storage만 있으면 빈 목록 200"
         },
         {
           "name": "delete-network-logging-storage",
@@ -774,7 +775,8 @@
             200,
             202
           ],
-          "group": "resource-group"
+          "group": "resource-group",
+          "_note": "set은 tags 비어있으면 400 'tags must not be empty' (run 27452095757) — 비어있지 않은 태그 필수"
         },
         {
           "name": "verify-resource-group-show-resource",
@@ -871,7 +873,8 @@
             404
           ],
           "group": "resource-group",
-          "optional": true
+          "optional": true,
+          "_note": "TagValue DTO는 {value} 단일 필드"
         },
         {
           "name": "verify-resource-group-tags-global-bulk-set",
@@ -898,7 +901,8 @@
             404
           ],
           "group": "resource-group",
-          "optional": true
+          "optional": true,
+          "_note": "TagsSetRequest: {srn: [Tag]} 맵 — dict KEY 자리의 placeholder는 엔진 _fill_obj가 키도 치환하는지 라이브로 확인 (실패 시 본문이 알려줌)"
         },
         {
           "name": "verify-resource-group-tag-delete-one",
@@ -939,7 +943,8 @@
             404
           ],
           "group": "resource-group",
-          "optional": true
+          "optional": true,
+          "_note": "TagDeleteRequest: {srn: [key,...]} 맵"
         },
         {
           "name": "verify-resource-group-tags-delete-all",

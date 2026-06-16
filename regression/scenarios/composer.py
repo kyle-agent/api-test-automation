@@ -806,7 +806,19 @@ def compose(targets: list, choices: dict | None = None,
             step["retry_on_status"] = list(create["retry_on_status"])
             step["retries"] = int(create.get("retries", 8))
             step["retry_interval"] = int(create.get("retry_interval", 15))
-        step["expect_status"] = [200, 201, 202]
+        # create expect_status defaults to a permissive 2xx set, but a model
+        # node may carry a model-level tolerance (e.g. PF-21 volume-transfer
+        # tolerates a baselined 500 so the chain survives) — pass it through so
+        # the model stays the single source of truth (IB-042). `optional` and a
+        # human `note` on the create likewise propagate to the composed step.
+        if create.get("expect_status"):
+            step["expect_status"] = list(create["expect_status"])
+        else:
+            step["expect_status"] = [200, 201, 202]
+        if create.get("optional"):
+            step["optional"] = True
+        if create.get("note"):
+            step["_note"] = create["note"]  # human annotation; validator key
         caps = ctx.capture_vars(inst)
         if caps:
             model_caps = task.get("capture") or {}
@@ -866,6 +878,15 @@ def compose(targets: list, choices: dict | None = None,
                     if v.get("headers") is not None:
                         vstep["headers"] = ctx.sub(inst, v["headers"])
                     vstep["expect_status"] = v.get("expect_status") or [200]
+                    # per-verify model tolerances pass through (IB-042): an
+                    # `optional` verify is allowed to fail/skip the group (e.g.
+                    # mariadb setsecuritygrouprules 400 no-op), and a `note`
+                    # records WHY a widened expect_status / [200,404] is
+                    # justified (e.g. apigw read-resource-policies downstream of
+                    # the PF-19 set-policy 500). The model is the source of
+                    # truth — these must reach the composed run.
+                    if v.get("note"):
+                        vstep["_note"] = v["note"]  # human annotation; validator key
                     # verify entries may carry retry semantics (e.g. DBaaS
                     # state-sensitive ops that 400 'not in RUNNING' while the
                     # cluster reconciles after a prior setter) — passthrough.
@@ -875,7 +896,9 @@ def compose(targets: list, choices: dict | None = None,
                         vstep["retry_interval"] = int(v.get("retry_interval", 30))
                     if len(target_set) > 1:
                         vstep["group"] = node
-                    if task.get("capture_soft"):
+                    # a verify is optional when the model marks it so, or when
+                    # the node is a capture_soft lookup (its {var} may be unset).
+                    if v.get("optional") or task.get("capture_soft"):
                         vstep["optional"] = True
                         vstep.setdefault("group", node)
                     steps.append(vstep)

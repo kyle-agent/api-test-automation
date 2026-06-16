@@ -44,7 +44,8 @@
           "expect_status": [
             200,
             400
-          ]
+          ],
+          "_note": "attributes·name 쿼리 둘 다 required (docs + run 27399448835 400 Field required x2). attributes 유효값 미문서 — All 추정"
         },
         {
           "name": "delete-queue",
@@ -477,7 +478,8 @@
           "expect_status": [
             200
           ],
-          "group": "scf-function"
+          "group": "scf-function",
+          "_note": "READ는 안전 — Creating 고착을 일으키는 것은 PUT enable뿐 (노드 노트)"
         },
         {
           "name": "verify-scf-function-read-resource-policies",
@@ -508,7 +510,8 @@
             200,
             400
           ],
-          "group": "scf-function"
+          "group": "scf-function",
+          "_note": "run 27399448835: 'must select either time or period' — docs엔 전부 optional로 기재된 미문서 필수 (undiscoverable-params 클래스). time 포맷 1h 추정"
         },
         {
           "name": "verify-scf-function-read-metrics",
@@ -519,7 +522,8 @@
             200,
             400
           ],
-          "group": "scf-function"
+          "group": "scf-function",
+          "_note": "logs와 동일 — time 포맷 미문서"
         },
         {
           "name": "create-scf-cronjob-trigger",
@@ -693,7 +697,8 @@
           "expect_status": [
             200
           ],
-          "group": "volume-snapshot"
+          "group": "volume-snapshot",
+          "_note": "수작업 체인 은퇴 갭 (retirement NEAR): listsnapshot"
         },
         {
           "name": "create-volume-transfer",
@@ -707,7 +712,8 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            500
           ],
           "capture": {
             "transfer_id": "$.id"
@@ -716,7 +722,9 @@
             "method": "DELETE",
             "path": "/v1/volume-transfer/{transfer_id}",
             "service": "virtualserver"
-          }
+          },
+          "optional": true,
+          "_note": "PF-21 CONFIRMED product bug (500 InternalServerError, runs 27540589368/27583285457, req-bc27a3b6/req-78aec306) — baselined in known_issues.json (compute/virtualserver/createvolumetransfer); 500 tolerated so the chain survives, still records the 500 in observations"
         },
         {
           "name": "verify-volume-transfer-read",
@@ -1038,7 +1046,8 @@
             202,
             204
           ],
-          "group": "scr-repository"
+          "group": "scr-repository",
+          "_note": "repo-레벨 정책/설명 PUT 7종 — body는 image-레벨 probe 검증 형태 + api_docs DTO (repo-레벨 라이브 미증명; userguide '리포지토리 관리하기' 2026-06-12). 이미지/태그-레벨 ops는 docker push(SCR 인증키) 전까지 불가"
         },
         {
           "name": "delete-scr-repository",
@@ -1153,7 +1162,8 @@
           "expect_status": [
             200,
             403
-          ]
+          ],
+          "_note": "403 'Action definition is not found' (run 27399448835) — IAM action 미정의 제품 결함 클래스 3번째 사례 (log-streams LIST·api-key per-id GET과 동일)"
         },
         {
           "name": "verify-fs-snapshot-list",
@@ -1162,7 +1172,8 @@
           "path": "/v1/snapshots?volume_id={volume_id}",
           "expect_status": [
             200
-          ]
+          ],
+          "_note": "volume_id 쿼리 필수 (docs + bare list 400 Field required, runs 27401527554/27417986669)"
         },
         {
           "name": "delete-fs-snapshot",

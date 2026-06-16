@@ -375,7 +375,8 @@
             200,
             400
           ],
-          "group": "server"
+          "group": "server",
+          "_note": "live 400 VirtualServer.InvalidPrivateKeyValue 'Failed to decrypt' (run 27452095757) — Linux/ubuntu 서버는 복호화할 암호화된 관리자 패스워드가 없음(Windows 전용 기능 추정). private_key capture 자체는 정상. [200,400] 관용 + PF-17"
         },
         {
           "name": "create-volume-attachment",
@@ -442,7 +443,8 @@
           "expect_status": [
             200
           ],
-          "group": "custom-image"
+          "group": "custom-image",
+          "_note": "공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)"
         },
         {
           "name": "create-port",
@@ -646,7 +648,8 @@
             200,
             403
           ],
-          "group": "server-static-nat"
+          "group": "server-static-nat",
+          "_note": "403 'Action definition is not found' (run 27450089575) — 미정의 IAM action 제품 결함 클래스 4번째 사례 (PF-15; log-streams·api-key·fs-snapshot read와 동일)"
         },
         {
           "name": "delete-volume-attachment",
