@@ -1,12 +1,11 @@
-# Wave B HEAVY validation run (2026-06-16) — advance VALIDATED via heavy creates.
-# heavy=true: full CRUD incl. DBaaS clusters (eventstreams/searchengine/vertica/sqlserver/
-# mysql/mariadb/epas/postgresql), SKE, VM, storage volumes — so the 17 held shared-path
-# nodes (POST /v1/clusters, /v1/volumes, /v1/groups) get SERVICE-ATTRIBUTED 2xx evidence
-# -> the next promotion pass can disambiguate + promote them.
-# Now with IB-042 composer passthrough live: model tolerances (PF-21 500, apigw [200,404],
-# mariadb [200,202,400]) propagate to composed steps -> fewer spurious fail_new than run #108.
-# verified_endpoints_evidence.json accumulates across runs (IB-041).
-# VPC 5-cap: shared-adopt (~1 shared VPC for the 6 heavy chains) + vpc_schedule -> <=3 VPCs.
+# Wave C HEAVY validation run (2026-06-16) — confirm IB-049/050 VPC fix + unblock held-17.
+# Now live: engine xdist graceful-skip (IB-049), pre-run reclaim + constant concurrency.group +
+# adopt-pass -n2 (IB-050), apigw probe tree, IB-042 composer passthrough, mariadb/mysql L1 fixes.
+# Expected chain: pre-reclaim clears leftover VPCs -> shared-VPC provision wins its slot ->
+# adopters adopt the shared VPC (no -n6 self-create race) -> held-17 heavy DBaaS creates
+# (eventstreams/searchengine/vertica/postgresql-full) RUN -> service-attributed 2xx evidence ->
+# next promotion sweep unblocks them. Also populates the new ops.html sequence-gantt view.
+# VPC 5-cap respected by the shared-adopt + pre-reclaim.
 mutations=true
 destructive=true
 heavy=true
