@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T10:31:30Z · <b>sha 4708ce6</b>
+    2026-06-16T12:48:21Z · <b>sha ec5c87c</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -247,18 +247,18 @@
 <div class="pipe">
   <a class="pstage" href="#sec-model">
     <div class="pl">① 자원 모델 <span style="font-weight:400;color:var(--faint)">재료</span></div>
-    <div class="pv">272</div>
+    <div class="pv">273</div>
     <div class="ps">자원별 사실: 의존·생성법·검증·삭제 ·
       <span style="color:var(--green);font-weight:700">검증 131</span> ·
-      문서 141</div>
+      문서 142</div>
     <div class="ps" style="color:var(--blue)">합성기가 의존을 따라 시나리오 생성 →</div>
     <span class="chev">→</span>
   </a>
   <a class="pstage" href="#sec-scen">
     <div class="pl">② 시나리오 <span style="font-weight:400;color:var(--faint)">실행 단위</span></div>
-    <div class="pv">189</div>
+    <div class="pv">190</div>
     <div class="ps">생성→검증→역순 정리 스텝 ·
-      합성 <b>61</b> · 수작업 128</div>
+      합성 <b>61</b> · 수작업 129</div>
     <div class="ps" style="color:var(--blue)">속성(mutation·destructive·heavy)이 게이트 통과해야 실행 →</div>
     <span class="chev">→</span>
   </a>
@@ -286,8 +286,8 @@
 
 <h2 id="sec-scen">② 시나리오 카탈로그 <span class="hint">실행되는 테스트 전체 목록 — ①에서 합성된 gen-* 와 수작업이 함께 (비고 클릭 = 전체 보기)</span></h2>
 <div class="fchips" id="scenChips">
-  <span class="fchip on" data-f="all"><b>189</b> 전체</span>
-  <span class="fchip" data-f="enabled"><b>166</b> enabled</span>
+  <span class="fchip on" data-f="all"><b>190</b> 전체</span>
+  <span class="fchip" data-f="enabled"><b>167</b> enabled</span>
   <span class="fchip" data-f="heavy"><b>77</b> heavy(과금성)</span>
   <span class="fchip" data-f="gen"><b>61</b> 합성(gen)</span>
   <span class="fchip" data-f="disabled"><b>23</b> disabled</span>
@@ -1018,7 +1018,7 @@
           data-gen="">
         <td><code>cloud-ml-write-coverage</code></td>
         <td><span class="srv">ai-ml/cloud-ml</span></td>
-        <td>6</td>
+        <td>9</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -1042,7 +1042,7 @@
           data-gen="">
         <td><code>apigateway-api-write-coverage</code></td>
         <td><span class="srv">application-service/apigateway</span></td>
-        <td>31</td>
+        <td>33</td>
         <td>
           
           
@@ -1090,7 +1090,7 @@
           data-gen="">
         <td><code>baremetal-server-coverage</code></td>
         <td><span class="srv">compute/baremetal</span></td>
-        <td>13</td>
+        <td>14</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -1114,7 +1114,7 @@
           data-gen="">
         <td><code>mngc-gpu-node-coverage</code></td>
         <td><span class="srv">compute/multinodegpucluster</span></td>
-        <td>10</td>
+        <td>12</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -1162,7 +1162,7 @@
           data-gen="">
         <td><code>vs-autoscaling-coverage</code></td>
         <td><span class="srv">compute/virtualserver</span></td>
-        <td>17</td>
+        <td>23</td>
         <td>
           
           
@@ -1186,7 +1186,7 @@
           data-gen="">
         <td><code>vs-image-write-coverage</code></td>
         <td><span class="srv">compute/virtualserver</span></td>
-        <td>7</td>
+        <td>8</td>
         <td>
           
           
@@ -1210,7 +1210,7 @@
           data-gen="">
         <td><code>vs-volume-transfer-coverage</code></td>
         <td><span class="srv">compute/virtualserver</span></td>
-        <td>8</td>
+        <td>10</td>
         <td>
           
           
@@ -1234,7 +1234,7 @@
           data-gen="">
         <td><code>vs-server-action-coverage</code></td>
         <td><span class="srv">compute/virtualserver</span></td>
-        <td>13</td>
+        <td>15</td>
         <td>
           
           
@@ -1306,7 +1306,7 @@
           data-gen="">
         <td><code>scr-read-coverage</code></td>
         <td><span class="srv">container/scr</span></td>
-        <td>13</td>
+        <td>14</td>
         <td>
           
           
@@ -1954,7 +1954,7 @@
           data-gen="">
         <td><code>devopsservice-write-coverage</code></td>
         <td><span class="srv">devops-tools/devopsservice</span></td>
-        <td>5</td>
+        <td>7</td>
         <td>
           
           
@@ -2026,7 +2026,7 @@
           data-gen="1">
         <td><code>gen-cloudml-chain</code></td>
         <td><span class="srv">ai-ml/cloud-ml</span></td>
-        <td>24</td>
+        <td>27</td>
         <td>
           <span class="tag read" title="자원 모델에서 합성기로 생성된 시나리오">합성</span>
           <span class="tag heavy">heavy</span>
@@ -3488,7 +3488,7 @@
           data-gen="">
         <td><code>cloudcontrol-landing-zone-guarded</code></td>
         <td><span class="srv">management/cloudcontrol</span></td>
-        <td>13</td>
+        <td>14</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -3656,7 +3656,7 @@
           data-gen="">
         <td><code>iam-role-full</code></td>
         <td><span class="srv">management/iam</span></td>
-        <td>10</td>
+        <td>11</td>
         <td>
           
           
@@ -3728,7 +3728,7 @@
           data-gen="">
         <td><code>iam-user-policy-bindings</code></td>
         <td><span class="srv">management/iam</span></td>
-        <td>2</td>
+        <td>3</td>
         <td>
           
           
@@ -3752,7 +3752,7 @@
           data-gen="">
         <td><code>iam-resource-policy</code></td>
         <td><span class="srv">management/iam</span></td>
-        <td>5</td>
+        <td>6</td>
         <td>
           
           
@@ -3776,7 +3776,7 @@
           data-gen="">
         <td><code>iam-credentials-heavy</code></td>
         <td><span class="srv">management/iam</span></td>
-        <td>13</td>
+        <td>14</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -3787,6 +3787,30 @@
           
           <div class="biz" onclick="this.classList.toggle('open')">HEAVY (irreversible/credential + account-user + SAML ops). R… <span class="toggle">더보기</span>
             <div class="more">HEAVY (irreversible/credential + account-user + SAML ops). Runs only under SCP_RUN_HEAVY. Covers: POST/PUT/DELETE /v1/access-keys (+ bulk + send-otp); POST/PUT/DELETE /v1/accounts/{account_id}/users (+ bulk) and PUT .../password; POST/PUT/DELETE /v1/saml-providers (+ bulk). These create real credent</div></div>
+          
+        </td>
+        <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__iam.json">
+          <a href="#">보기</a> ·
+          <a href="#">편집</a></td>
+      </tr>
+      
+      <tr data-id="iam-readonly-shows" data-service="management/iam"
+          data-enabled="1"
+          data-heavy=""
+          data-gen="">
+        <td><code>iam-readonly-shows</code></td>
+        <td><span class="srv">management/iam</span></td>
+        <td>6</td>
+        <td>
+          
+          
+          
+          
+        </td>
+        <td>
+          
+          <div class="biz" onclick="this.classList.toggle('open')">Light, READ-ONLY (no writes, no cleanup). Closes 4 static id… <span class="toggle">더보기</span>
+            <div class="more">Light, READ-ONLY (no writes, no cleanup). Closes 4 static id-bound GET gaps for read-only / list-discoverable IAM resources by the list-&gt;soft-capture-&gt;show idiom (the same pattern cloudcontrol uses for its list-discovered ids). access-keys and service-accounts have only list+show in the catalog (no </div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__iam.json">
@@ -3992,7 +4016,7 @@
           data-gen="">
         <td><code>resourcemanager-tag-lifecycle</code></td>
         <td><span class="srv">management/resourcemanager</span></td>
-        <td>13</td>
+        <td>16</td>
         <td>
           
           
@@ -4160,7 +4184,7 @@
           data-gen="">
         <td><code>networking-dns-public-domain</code></td>
         <td><span class="srv">networking/dns</span></td>
-        <td>6</td>
+        <td>7</td>
         <td>
           
           
@@ -4184,7 +4208,7 @@
           data-gen="">
         <td><code>networking-dns-hosted-zone-private</code></td>
         <td><span class="srv">networking/dns</span></td>
-        <td>13</td>
+        <td>16</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4232,7 +4256,7 @@
           data-gen="">
         <td><code>networking-gslb-service</code></td>
         <td><span class="srv">networking/gslb</span></td>
-        <td>8</td>
+        <td>9</td>
         <td>
           
           
@@ -4256,7 +4280,7 @@
           data-gen="">
         <td><code>networking-loadbalancer-members-nat</code></td>
         <td><span class="srv">networking/loadbalancer</span></td>
-        <td>24</td>
+        <td>26</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4544,7 +4568,7 @@
           data-gen="">
         <td><code>security-configinspection-diagnosis</code></td>
         <td><span class="srv">security/configinspection</span></td>
-        <td>4</td>
+        <td>5</td>
         <td>
           
           
@@ -4616,7 +4640,7 @@
           data-gen="">
         <td><code>security-secretvault-vault</code></td>
         <td><span class="srv">security/secretvault</span></td>
-        <td>3</td>
+        <td>5</td>
         <td>
           
           
@@ -4688,7 +4712,7 @@
           data-gen="">
         <td><code>backup-agent</code></td>
         <td><span class="srv">storage/backup</span></td>
-        <td>5</td>
+        <td>6</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4712,7 +4736,7 @@
           data-gen="">
         <td><code>backup-job</code></td>
         <td><span class="srv">storage/backup</span></td>
-        <td>14</td>
+        <td>21</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4736,7 +4760,7 @@
           data-gen="">
         <td><code>blockstorage-volume</code></td>
         <td><span class="srv">storage/baremetal-blockstorage</span></td>
-        <td>23</td>
+        <td>24</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4760,7 +4784,7 @@
           data-gen="">
         <td><code>blockstorage-volume-group</code></td>
         <td><span class="srv">storage/baremetal-blockstorage</span></td>
-        <td>22</td>
+        <td>23</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4784,7 +4808,7 @@
           data-gen="">
         <td><code>filestorage-replication-schedule</code></td>
         <td><span class="srv">storage/filestorage</span></td>
-        <td>14</td>
+        <td>15</td>
         <td>
           
           <span class="tag heavy">heavy</span>

@@ -371,6 +371,30 @@ function statusOf(r,fin){
   if(r.state==="alive")return fin?"leaked":"testing";
   return"deleted";
 }
+// ---- ownership: a resource is OURS iff it carries the owner tag OR its name is
+// run-stamped with the regr*/zznet* families. SCP account BUILT-INS (the
+// reconciler's "name-mismatch" skips — BillingplanFullAccess policy, the
+// "Cloud Functions"/"File Storage" dashboards, …) are permanent account
+// resources we never created; counting them as 잔존(leftover) over-stated the
+// cleanup-integrity verdict ("25 잔존" was mostly built-ins). The leftover
+// verdict must reflect REAL leaks (resources our run owns but left alive), so
+// non-owned alive resources are excluded from the 잔존/leaked tally.
+const OWNER_NAME_RE=/^(regr|zznet)/i;
+function resOwned(r){
+  // owner tag (if the event stream carried tags) is the primary signal …
+  const tags=r.tags||r.owner_tags;
+  if(Array.isArray(tags)&&tags.some(t=>t&&t.key==="owner"&&t.value==="apitest"))return true;
+  if(r.owner==="apitest")return true;
+  // … else fall back to the run-stamped name prefix (mirrors core.registry.is_owned).
+  return OWNER_NAME_RE.test(String(r.name||r.res_id||""));
+}
+// verdict status: a leak we don't own is NOT a real leftover — bucket it as
+// "builtin" so it drops out of the 잔존 count (still shown in the tree as alive).
+function verdictStatusOf(r,fin){
+  const st=statusOf(r,fin);
+  if(st==="leaked"&&!resOwned(r))return"builtin";
+  return st;
+}
 function nodeHtml(r,fin){
   const st=statusOf(r,fin);
   const cls={testing:"st-alive",leaked:"st-leak",failed:"st-fail",deleted:"st-done"}[st];
@@ -472,9 +496,13 @@ function renderTree(res,lcs){
   if(!res.length&&!lcs.length){ $("#resBody").textContent="자원 이벤트 없음"; $("#resChips").innerHTML=""; $("#resVerdict").innerHTML=""; renderGantt([],[],fin); return; }
   attachByDep(res);
   // ---- verdict (끝난 run = 정리 무결성 판정) ----
-  const cnt={testing:0,leaked:0,failed:0,deleted:0};
-  for(const r of res)cnt[statusOf(r,fin)]++;
+  // 잔존(leaked) = 우리 run이 OWN 한 자원 중 끝났는데 살아있는 것만. 계정
+  // 빌트인(SCP 정책/대시보드 등 name-mismatch)은 우리가 만든 게 아니므로
+  // 'builtin' 으로 분리해 잔존 집계에서 제외한다(이전엔 "25 잔존"처럼 부풀려짐).
+  const cnt={testing:0,leaked:0,failed:0,deleted:0,builtin:0};
+  for(const r of res)cnt[verdictStatusOf(r,fin)]++;
   $("#cOpen").textContent=cnt.leaked+cnt.testing; $("#cFail").textContent=cnt.failed; $("#cDel").textContent=cnt.deleted;
+  const biNote=cnt.builtin?` · 계정 빌트인 ${cnt.builtin}건 제외(우리 소유 아님)`:"";
   let v;
   if(!fin){
     v=`<div class="verdict run"><div class="big">${cnt.testing}</div><div><b>RUN 진행 중</b> — 살아있는 자원 ${cnt.testing}개 테스트 중 · 삭제 ${cnt.deleted} · 정리실패 ${cnt.failed}</div>
@@ -482,10 +510,11 @@ function renderTree(res,lcs){
        <div><div class="n nfail">${cnt.failed}</div><div class="l">정리 실패</div></div>
        <div><div class="n ndel">${cnt.deleted}</div><div class="l">삭제됨</div></div></div></div>`;
   }else if(cnt.leaked+cnt.failed===0){
-    v=`<div class="verdict ok"><div class="big">✓</div><div><b>RUN 종료 — 깨끗하게 정리됨.</b> 잔존 0 · 정리실패 0 · 정상 삭제 ${cnt.deleted}건</div></div>`;
+    v=`<div class="verdict ok"><div class="big">✓</div><div><b>RUN 종료 — 깨끗하게 정리됨.</b> 잔존 0 · 정리실패 0 · 정상 삭제 ${cnt.deleted}건${biNote}</div></div>`;
   }else{
     v=`<div class="verdict warn"><div class="big">${cnt.leaked+cnt.failed}</div>
        <div><b>RUN 종료 — 이벤트상 미정리 ${cnt.leaked}건${cnt.failed?` · 정리실패 ${cnt.failed}건`:""}.</b>
+       우리 run이 소유한(owner-tag/regr*·zznet* 이름) 자원만 집계 — 계정 빌트인은 제외${biNote}.
        대부분 tag-scoped sweep이 회수하지만 reconciler 회수분은 삭제 이벤트가 기록되지 않아 여기 남습니다 — 실제 잔존 여부는 콘솔/다음 런 기준.</div>
        <div class="split"><div><div class="n nleak">${cnt.leaked}</div><div class="l">잔존</div></div>
        <div><div class="n nfail">${cnt.failed}</div><div class="l">정리 실패</div></div>
@@ -495,7 +524,8 @@ function renderTree(res,lcs){
   // ---- type chips (잔존 많은 순) ----
   const agg={};
   for(const r of res){ (agg[r.kind]=agg[r.kind]||{n:0,leak:0,del:0,fail:0,label:kindLabel(r)}); const a=agg[r.kind]; a.n++;
-    const st=statusOf(r,fin); if(st==="leaked"||st==="testing")a.leak++; else if(st==="failed")a.fail++; else a.del++; }
+    // verdictStatusOf: non-owned alive = "builtin" → counted as 삭제/중립, not 잔존
+    const st=verdictStatusOf(r,fin); if(st==="leaked"||st==="testing")a.leak++; else if(st==="failed")a.fail++; else a.del++; }
   const tOrder=Object.keys(agg).sort((a,b)=>(agg[b].leak-agg[a].leak)||(agg[b].n-agg[a].n));
   $("#resChips").innerHTML=tOrder.map(k=>{const x=agg[k];
     return `<span class="tchip${RFILTER.type===k?" on":""}" data-type="${k}"><b>${x.label}</b> ${x.n}`+

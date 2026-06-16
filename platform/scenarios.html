@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T10:31:30Z · <b>sha 4708ce6</b>
+    2026-06-16T12:48:21Z · <b>sha ec5c87c</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -244,7 +244,7 @@
 
 
 <section>
-  <h2>시나리오 카탈로그 (189건)</h2>
+  <h2>시나리오 카탈로그 (190건)</h2>
   <form class="inline" method="get" action="/planning/scenarios">
     <input type="text" name="service" value=""
            placeholder="서비스 필터 (예: networking)">
@@ -710,7 +710,7 @@
     <tr>
       <td><code>cloud-ml-write-coverage</code></td>
       <td>ai-ml/cloud-ml</td>
-      <td>6</td>
+      <td>9</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -725,7 +725,7 @@
     <tr>
       <td><code>apigateway-api-write-coverage</code></td>
       <td>application-service/apigateway</td>
-      <td>31</td>
+      <td>33</td>
       <td>
         
         
@@ -755,7 +755,7 @@
     <tr>
       <td><code>baremetal-server-coverage</code></td>
       <td>compute/baremetal</td>
-      <td>13</td>
+      <td>14</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -770,7 +770,7 @@
     <tr>
       <td><code>mngc-gpu-node-coverage</code></td>
       <td>compute/multinodegpucluster</td>
-      <td>10</td>
+      <td>12</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -800,7 +800,7 @@
     <tr>
       <td><code>vs-autoscaling-coverage</code></td>
       <td>compute/virtualserver</td>
-      <td>17</td>
+      <td>23</td>
       <td>
         
         
@@ -815,7 +815,7 @@
     <tr>
       <td><code>vs-image-write-coverage</code></td>
       <td>compute/virtualserver</td>
-      <td>7</td>
+      <td>8</td>
       <td>
         
         
@@ -830,7 +830,7 @@
     <tr>
       <td><code>vs-volume-transfer-coverage</code></td>
       <td>compute/virtualserver</td>
-      <td>8</td>
+      <td>10</td>
       <td>
         
         
@@ -845,7 +845,7 @@
     <tr>
       <td><code>vs-server-action-coverage</code></td>
       <td>compute/virtualserver</td>
-      <td>13</td>
+      <td>15</td>
       <td>
         
         
@@ -890,7 +890,7 @@
     <tr>
       <td><code>scr-read-coverage</code></td>
       <td>container/scr</td>
-      <td>13</td>
+      <td>14</td>
       <td>
         
         
@@ -1295,7 +1295,7 @@
     <tr>
       <td><code>devopsservice-write-coverage</code></td>
       <td>devops-tools/devopsservice</td>
-      <td>5</td>
+      <td>7</td>
       <td>
         
         
@@ -1340,7 +1340,7 @@
     <tr>
       <td><code>gen-cloudml-chain</code></td>
       <td>ai-ml/cloud-ml</td>
-      <td>24</td>
+      <td>27</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2255,7 +2255,7 @@
     <tr>
       <td><code>cloudcontrol-landing-zone-guarded</code></td>
       <td>management/cloudcontrol</td>
-      <td>13</td>
+      <td>14</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2360,7 +2360,7 @@
     <tr>
       <td><code>iam-role-full</code></td>
       <td>management/iam</td>
-      <td>10</td>
+      <td>11</td>
       <td>
         
         
@@ -2405,7 +2405,7 @@
     <tr>
       <td><code>iam-user-policy-bindings</code></td>
       <td>management/iam</td>
-      <td>2</td>
+      <td>3</td>
       <td>
         
         
@@ -2420,7 +2420,7 @@
     <tr>
       <td><code>iam-resource-policy</code></td>
       <td>management/iam</td>
-      <td>5</td>
+      <td>6</td>
       <td>
         
         
@@ -2435,13 +2435,28 @@
     <tr>
       <td><code>iam-credentials-heavy</code></td>
       <td>management/iam</td>
-      <td>13</td>
+      <td>14</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
         
       </td>
       <td class="muted">HEAVY (irreversible/credential + account-user + SAML ops). Runs only under SCP_RUN_HEAVY. Covers: POST/PUT/DELETE /v1/access-keys (+ bulk + send-otp); POST/PUT/</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>iam-readonly-shows</code></td>
+      <td>management/iam</td>
+      <td>6</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, READ-ONLY (no writes, no cleanup). Closes 4 static id-bound GET gaps for read-only / list-discoverable IAM resources by the list-&gt;soft-capture-&gt;show idio</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2570,7 +2585,7 @@
     <tr>
       <td><code>resourcemanager-tag-lifecycle</code></td>
       <td>management/resourcemanager</td>
-      <td>13</td>
+      <td>16</td>
       <td>
         
         
@@ -2675,7 +2690,7 @@
     <tr>
       <td><code>networking-dns-public-domain</code></td>
       <td>networking/dns</td>
-      <td>6</td>
+      <td>7</td>
       <td>
         
         
@@ -2690,7 +2705,7 @@
     <tr>
       <td><code>networking-dns-hosted-zone-private</code></td>
       <td>networking/dns</td>
-      <td>13</td>
+      <td>16</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2720,7 +2735,7 @@
     <tr>
       <td><code>networking-gslb-service</code></td>
       <td>networking/gslb</td>
-      <td>8</td>
+      <td>9</td>
       <td>
         
         
@@ -2735,7 +2750,7 @@
     <tr>
       <td><code>networking-loadbalancer-members-nat</code></td>
       <td>networking/loadbalancer</td>
-      <td>24</td>
+      <td>26</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2915,7 +2930,7 @@
     <tr>
       <td><code>security-configinspection-diagnosis</code></td>
       <td>security/configinspection</td>
-      <td>4</td>
+      <td>5</td>
       <td>
         
         
@@ -2960,7 +2975,7 @@
     <tr>
       <td><code>security-secretvault-vault</code></td>
       <td>security/secretvault</td>
-      <td>3</td>
+      <td>5</td>
       <td>
         
         
@@ -3005,7 +3020,7 @@
     <tr>
       <td><code>backup-agent</code></td>
       <td>storage/backup</td>
-      <td>5</td>
+      <td>6</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -3020,7 +3035,7 @@
     <tr>
       <td><code>backup-job</code></td>
       <td>storage/backup</td>
-      <td>14</td>
+      <td>21</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -3035,7 +3050,7 @@
     <tr>
       <td><code>blockstorage-volume</code></td>
       <td>storage/baremetal-blockstorage</td>
-      <td>23</td>
+      <td>24</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -3050,7 +3065,7 @@
     <tr>
       <td><code>blockstorage-volume-group</code></td>
       <td>storage/baremetal-blockstorage</td>
-      <td>22</td>
+      <td>23</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -3065,7 +3080,7 @@
     <tr>
       <td><code>filestorage-replication-schedule</code></td>
       <td>storage/filestorage</td>
-      <td>14</td>
+      <td>15</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
