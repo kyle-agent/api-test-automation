@@ -117,10 +117,13 @@ on:
         type: boolean
         default: false
 
-# One concurrency group per ref+run keeps the two axes from colliding while
-# still letting independent runs proceed (no single global group).
+# IB-050/IB-047 (Rule B cross-run exclusion): one concurrency group per REF
+# (constant, NOT per-run — github.run_id dropped) so a second run on the same
+# ref queues behind the first instead of overlapping. With cancel-in-progress
+# false, an in-flight mutating run is never cancelled and a new one waits its
+# turn — so two runs can't both hold VPCs against the 5-VPC account cap.
 concurrency:
-  group: scp-api-test-${{ github.ref }}-${{ github.run_id }}
+  group: scp-api-test-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -319,7 +322,8 @@ jobs:
     # one shared VPC + one shared subnet provisioned ONCE, every lifecycle
     # adopts them (SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env so every xdist
     # worker adopts the SAME live infra) and creates only its own child ->
-    # safe with pytest-xdist `-n 6`.
+    # safe with pytest-xdist `-n 2` (IB-050: lowered from -n 6 so a provision
+    # miss can't fan out into a 6-worker create-VPC race against the 5-VPC cap).
     # The complementary VPC-CRUD class (VPC_CRUD_K — lifecycles that MUST
     # self-create/mutate/peer VPCs) runs in the PARALLEL `regression-vpc-crud`
     # job (B) so the full run's wall-clock is max(A, B), not A+B.
@@ -371,6 +375,21 @@ jobs:
         run: |
           python -m regression.scenarios.shared_infra --print-filters >> "$GITHUB_ENV"
           echo "derived ADOPT_K / VPC_CRUD_K / PARALLEL_K -> \$GITHUB_ENV"
+
+      - name: Pre-run reclaim leftover resources (tag-scoped, BEFORE provision)
+        # IB-050/IB-047: a prior/overlapping run's leftover VPCs can sit at the
+        # 5-VPC account cap when this run starts, so the "Provision shared VPC"
+        # step below can't win a slot, SCP_SHARED_VPC_ID is never exported, and
+        # every adopter falls back to self-create (the IB-047 cascade). Run the
+        # SAME tag-scoped reconciler the sweep job uses, ONCE before provisioning,
+        # to clear leftovers so provision wins its slot. Tag-scoped (owner+run /
+        # expired) — never nukes cross-run live resources. Best-effort: a failed
+        # reclaim never fails the job (the post-run sweep is the backstop).
+        if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
+        continue-on-error: true
+        run: |
+          mkdir -p reports
+          python -u -m cleanup.reconciler 2>&1 | tee reports/pre-reclaim.log
 
       - name: Provision shared VPC + subnet (BEFORE smoke, with retry)
         # Creates ONE shared VPC + ONE shared subnet and appends SCP_SHARED_* to
@@ -495,17 +514,17 @@ jobs:
         # PARALLEL_K selects every CRUD lifecycle that is NOT a vpc-crud one (the
         # adopt-class + all non-VPC CRUD). They adopt the shared VPC+subnet via
         # env ids, so they only create their own child resource -> safe to run in
-        # parallel with pytest-xdist -n 6. A manual crud_filter (dispatch) or the
+        # parallel with pytest-xdist -n 2. A manual crud_filter (dispatch) or the
         # heavy.txt self-trigger filter is ANDed in to NARROW within the pass.
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}
         run: |
-          echo "Running ADOPT-class CRUD in parallel (-n 6)" | tee reports/crud.log
+          echo "Running ADOPT-class CRUD in parallel (-n 2)" | tee reports/crud.log
           MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
           if [ -n "$MANUAL" ]; then FILTER="($PARALLEL_K) and ($MANUAL)"; else FILTER="$PARALLEL_K"; fi
           echo "adopt-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
-          ARGS=(tests/crud -m crud -n 6 --junitxml=reports/junit-crud-parallel.xml)
+          ARGS=(tests/crud -m crud -n 2 --junitxml=reports/junit-crud-parallel.xml)
           [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
           set -o pipefail
           rc=0; python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log || rc=$?

@@ -659,6 +659,26 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # provisioner predates the two-subnet design (graceful degrade).
                 if not _shared_val and _adopt == "subnet#db":
                     _shared_val = ctx.get("shared_subnet_id")
+                # IB-049: a {"adopt":"vpc"} create that finds NO shared id while
+                # running under pytest-xdist must NOT self-create. With N worker
+                # processes each falling back to self-create, a failed shared-VPC
+                # provision turns into an N-way `POST /v1/vpcs` race that saturates
+                # the 5-VPC account cap (IB-047 confirmed cascade). Degrade instead
+                # to an environmental skip — "all adopters skip" is recoverable
+                # (the next run's pre-reclaim + provision lets them adopt). Gated
+                # STRICTLY on the xdist worker env var so the single-process
+                # fallback (test_no_shared_vpc_falls_back_to_self_create) keeps
+                # self-creating exactly as before.
+                if (not _shared_val and _adopt == "vpc"
+                        and step.get("method", "").upper() == "POST"
+                        and os.environ.get("PYTEST_XDIST_WORKER")):
+                    _teardown()
+                    raise LifecycleSkip(
+                        f"[{lifecycle['id']}] no shared VPC and running under "
+                        f"xdist worker {os.environ['PYTEST_XDIST_WORKER']} — "
+                        f"skipping adopter instead of self-creating a VPC "
+                        f"(IB-049: avoid the multi-worker create-VPC race that "
+                        f"saturates the account cap)")
                 if _shared_val:
                     _m = step.get("method", "").upper()
                     if _m == "POST":  # adopt: skip the create, seed its capture vars
