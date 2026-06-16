@@ -36,8 +36,8 @@ resources:
     verify:
       - {name: list-page, endpoint: "GET /v1/quick-query?size=20&page=0",
          expect_status: [200]}
-    provenance: VALIDATED
-    notes: "SMOKE 400 FIX — bare GET /v1/quick-query는 400 (api_docs: size,page 둘 다 required:true). ?size=20&page=0 필수. 응답 envelope = {contents:[{quick_query_id, quick_query_name, quick_query_state, cluster_id, ...}], page, size, total_count} → id 필드는 quick_query_id (NOT .id). 기타 optional 필터: sort(default created_dt:desc), cluster_name, created_by, quick_query_state(enum), version, quick_query_name. 빈 계정에서도 200(contents 빈배열)이라야 정상. live-validated run 27583285457 (2026-06-15)"
+    provenance: docs
+    notes: "SMOKE 400 FIX — bare GET /v1/quick-query는 400 (api_docs: size,page 둘 다 required:true). ?size=20&page=0 필수. 응답 envelope = {contents:[{quick_query_id, quick_query_name, quick_query_state, cluster_id, ...}], page, size, total_count} → id 필드는 quick_query_id (NOT .id). 기타 optional 필터: sort(default created_dt:desc), cluster_name, created_by, quick_query_state(enum), version, quick_query_name. 빈 계정에서도 200(contents 빈배열)이라야 정상. (REVERTED from VALIDATED by Watcher Z2: run 27583285457 evidence for /v1/quick-query lacks a service-prefixed key — can't disambiguate; IB-045)"
 
   # Image versions list — NO query params (api_docs parameters:[]) → safe bare
   # GET, clean [200]. A create-time lookup: quick_query_create_request.image_id
