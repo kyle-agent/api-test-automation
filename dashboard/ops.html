@@ -536,6 +536,11 @@ function renderTree(res,lcs){
     RFILTER.type=(RFILTER.type===c.dataset.type)?null:c.dataset.type; renderTree(res,lcs);});
   // ---- body ----
   let shown=0;
+  // group key: clusters are split per-service (SKE vs each DBaaS engine are
+  // distinct resources that share kind="clusters") so they don't collapse into
+  // one group mislabelled with the first cluster's service. Other kinds group
+  // by kind as before. Depth/label always come from the group's own members.
+  const gkey=r=>(r.kind==="clusters"&&r.service)?`clusters ${r.service}`:r.kind;
   if(RFILTER.mode==="tree"){
     const byId={}; for(const r of res) if(r.res_id) byId[r.res_id]=r;
     const kids={}; const roots=[];
@@ -558,10 +563,10 @@ function renderTree(res,lcs){
     let html="";
     if(vpcs.length){ html+=`<div class="t-grp">네트워크 계층 <span class="mut">(VM·DB 등은 자기 subnet 아래 중첩)</span></div>`+vpcs.map(renderNode).join(""); }
     const grp={};
-    for(const r of rest){ (grp[r.kind]=grp[r.kind]||[]).push(r); }
-    const kinds=Object.keys(grp).sort((a,b)=>(DEP.depth[a]??99)-(DEP.depth[b]??99)||a.localeCompare(b));
+    for(const r of rest){ const gk=gkey(r); (grp[gk]=grp[gk]||[]).push(r); }
+    const kinds=Object.keys(grp).sort((a,b)=>(DEP.depth[grp[a][0].kind]??99)-(DEP.depth[grp[b][0].kind]??99)||a.localeCompare(b));
     for(const k of kinds){
-      const lbl=kindLabel(grp[k][0]); const d=DEP.depth[k];
+      const lbl=kindLabel(grp[k][0]); const d=DEP.depth[grp[k][0].kind];
       html+=`<div class="t-grp">${lbl} <span class="mut">(${grp[k].length}${d!=null?` · 의존단계 ${d}`:""})</span></div>`
           + grp[k].sort((a,b)=>a.start-b.start).map(renderNode).join(" ");
     }
@@ -575,7 +580,7 @@ function renderTree(res,lcs){
         ?'<div style="padding:12px;color:#15924f">✓ 잔존/테스트중 자원 없음 — 모두 정상 삭제되었습니다.</div>'
         :'<div class="mut" style="padding:10px">해당 상태의 자원이 없습니다.</div>';
     }else{
-      const g={}; list.forEach(r=>{(g[r.kind]=g[r.kind]||[]).push(r);});
+      const g={}; list.forEach(r=>{const gk=gkey(r);(g[gk]=g[gk]||[]).push(r);});
       const order=Object.keys(g).sort((a,b)=>g[b].length-g[a].length);
       $("#resBody").innerHTML=order.map(k=>{
         return `<div class="t-grp">${kindLabel(g[k][0])} <span class="mut">(${g[k].length})</span></div>`
