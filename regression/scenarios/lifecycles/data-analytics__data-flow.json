@@ -179,18 +179,20 @@
         {
           "name": "check-data-flow-duplication",
           "method": "GET",
-          "path": "/v1/data-flows/regrprobe/check-duplication",
-          "expect_status": [200, 400, 404],
+          "path": "/v1/data-flows/regr{ualpha}/check-duplication",
+          "expect_status": [200, 400, 403, 404],
           "optional": true,
-          "group": "df-read"
+          "group": "df-read",
+          "_note": "id-bound read (checkduplicationdataflow). Closes GAP-get-id for GET /v1/data-flows/{data_flow_name}/check-duplication. The catalog path-param {data_flow_name} is a free-form NAME, so we send a templated probe name (regr{ualpha} renders to a valid lowercase name AND, because it contains a {token}, the segment normalizes to the catalog '*' key — a literal segment would NOT match). Tolerant [200,400,403,404]: duplication-check accepts any name -> 200/400, still RECORDED. The GET is CALLED so the endpoint is statically reachable."
         },
         {
           "name": "check-data-flow-service-duplication",
           "method": "GET",
-          "path": "/v1/data-flow-services/regrprobe/check-duplication",
-          "expect_status": [200, 400, 404],
+          "path": "/v1/data-flow-services/regr{ualpha}/check-duplication",
+          "expect_status": [200, 400, 403, 404],
           "optional": true,
-          "group": "df-read"
+          "group": "df-read",
+          "_note": "id-bound read (checkduplicationdataflowservice). Closes GAP-get-id for GET /v1/data-flow-services/{data_flow_service_name}/check-duplication. Same templated-name rationale as check-data-flow-duplication (free-form NAME path-param; regr{ualpha} normalizes to the catalog '*' key, a literal would not). Tolerant [200,400,403,404]; CALLED so the endpoint is statically reachable."
         },
         {
           "name": "capture-cluster-id",

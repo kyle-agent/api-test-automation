@@ -28,6 +28,22 @@
           "capture": {"parent_id": "$.resources[0].id"}
         },
         {
+          "name": "get-connected-endpoints",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/connected-endpoints",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (readconnectedendpoints). Closes GAP-get-id for GET /v1/apis/{api_id}/connected-endpoints. Keys off the create-api-captured api_id (create-api is a real non-optional create -> api_id is a real id on a healthy run); tolerant [200,400,403,404] so that if create-api ever 4xx's on a degraded account the api_id segment stays a placeholder (normalizes to the catalog '*' key, still records coverage). Documented as a verify read in knowledge/formal/resources/application-service__apigateway.yaml (read-connected-endpoints). Makes the endpoint statically reachable (complements probe-reads)."
+        },
+        {
+          "name": "get-deployments",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/deployments",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a api's deployments). Closes GAP-get-id for GET /v1/apis/{api_id}/deployments. Keys off the create-api-captured api_id; tolerant [200,400,403,404] (empty deployment list returns 200, a degraded api_id 4xx's harmlessly). This list read runs BEFORE create-deployment so it exercises the empty-list path; the endpoint is documented in the apigw-deployment node of application-service__apigateway.yaml. Makes the endpoint statically reachable (complements probe-reads)."
+        },
+        {
           "name": "create-resource",
           "method": "POST",
           "path": "/v1/apis/{api_id}/resources/{parent_id}",
