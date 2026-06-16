@@ -22,7 +22,10 @@ derived read can never by itself turn the regression gate red.
 """
 from __future__ import annotations
 
+import json
 import re
+from functools import lru_cache
+from pathlib import Path
 
 from core import results
 from core.results import Observation
@@ -31,6 +34,65 @@ from core.catalog import endpoints
 # None = all services. Pass a list to scope (e.g. ["virtualserver"]).
 SMOKE_TSV = "reports/smoke_status.tsv"
 _PLACEHOLDER = re.compile(r"\{([^}]+)\}")
+
+_DOCS_PATH = Path(__file__).resolve().parent.parent / "data" / "api_docs.json"
+
+# Known-safe values for required query params on id-bound GETs, so the read
+# chain exercises the real 2xx path instead of emitting a spurious 400 from a
+# bare call (the lifecycle step for getqueueattributes already proves these).
+# Keyed by query-param NAME (applies wherever that param is required and a value
+# can't be derived from the list item). Read-only / non-mutating only.
+#   attributes=All — getqueueattributes (queue/queue-fifo); api_docs example "All".
+_KNOWN_QUERY_VALUES = {
+    "attributes": "All",
+}
+
+
+@lru_cache(maxsize=1)
+def _docs() -> dict:
+    """api_docs endpoints keyed by catalog key (best-effort; {} if missing)."""
+    try:
+        return json.loads(_DOCS_PATH.read_text()).get("endpoints", {})
+    except (OSError, ValueError):
+        return {}
+
+
+def required_query_params(endpoint) -> list[str]:
+    """Names of `required: true` query params api_docs declares for this endpoint
+    (empty if none / endpoint unknown). These are NOT path params — they must be
+    supplied as a query string or the call 400s 'Field required'."""
+    d = _docs().get(getattr(endpoint, "key", ""), {})
+    return [p["name"] for p in d.get("parameters", [])
+            if p.get("in") == "query" and p.get("required") and p.get("name")]
+
+
+def resolve_required_query(endpoint, item: dict | None):
+    """Build the query dict for an id-bound GET's required query params.
+
+    For each required param try, in order: a known-safe constant
+    (`_KNOWN_QUERY_VALUES`), then a value carried by the same list `item` (e.g.
+    a queue's `name`). Returns ``(query_dict, None)`` when every required param
+    is satisfied, or ``(None, reason)`` when one can't be — the caller then
+    SKIPS the probe rather than firing a guaranteed 400 (dashboard noise)."""
+    needed = required_query_params(endpoint)
+    if not needed:
+        return {}, None
+    query: dict = {}
+    for name in needed:
+        if name in _KNOWN_QUERY_VALUES:
+            query[name] = _KNOWN_QUERY_VALUES[name]
+            continue
+        if item is not None:
+            # Only an EXACT field match — never fall back to the item's own `id`
+            # for a foreign key (e.g. `instance_id` is the IdC instance, not the
+            # group), which would fire a wrong-resource call instead of 400ing.
+            v = item.get(name)
+            if isinstance(v, (str, int)) and str(v).strip():
+                query[name] = str(v)
+                continue
+        return None, (f"required query param '{name}' for {endpoint.http_path} "
+                      f"not derivable (would 400) — skipped")
+    return query, None
 
 
 def categorize(status: int, text: str) -> str:
@@ -127,7 +189,9 @@ def two_param_chains(services: list[str] | None = None):
 
 
 def _derive_id(client, cache, service, list_path, param):
-    """List `list_path` (cached) and return (id, None) or (None, skip_reason)."""
+    """List `list_path` (cached) and return (id, item, None) or
+    (None, None, skip_reason). `item` is the source list dict the id came from,
+    so callers can also pull required query-param values (e.g. `name`) from it."""
     ck = (service, list_path)
     if ck not in cache:
         try:
@@ -136,25 +200,27 @@ def _derive_id(client, cache, service, list_path, param):
             cache[ck] = exc
     lst = cache[ck]
     if isinstance(lst, Exception):
-        return None, f"list {list_path} unreachable: {lst}"
+        return None, None, f"list {list_path} unreachable: {lst}"
     if not lst.ok:
-        return None, f"list {list_path} -> {lst.status}; no id to derive"
-    rid = next((_id_from(it, param) for it in _list_items(lst.body)
-                if _id_from(it, param)), None)
-    if rid is None:
-        return None, f"no {param} available from {list_path} (empty/no id field)"
-    return rid, None
+        return None, None, f"list {list_path} -> {lst.status}; no id to derive"
+    item = next((it for it in _list_items(lst.body) if _id_from(it, param)), None)
+    if item is None:
+        return None, None, f"no {param} available from {list_path} (empty/no id field)"
+    return _id_from(item, param), item, None
 
 
 def run_chain(endpoint, param, list_path, client, cache) -> dict:
     """1-param chain: derive the id from the sibling list, exercise the show GET.
     Record-only; returns ``{recorded, category?, skipped?, reason?}``."""
-    rid, why = _derive_id(client, cache, endpoint.service, list_path, param)
+    rid, item, why = _derive_id(client, cache, endpoint.service, list_path, param)
     if rid is None:
         return {"recorded": False, "skipped": True, "reason": why}
+    query, qwhy = resolve_required_query(endpoint, item)
+    if query is None:
+        return {"recorded": False, "skipped": True, "reason": qwhy}
     path = endpoint.http_path.replace("{%s}" % param, rid)
     try:
-        resp = client.get(path, service=endpoint.service)
+        resp = client.get(path, service=endpoint.service, params=query or None)
     except Exception as exc:
         _record(0, results.FAIL, endpoint.key, "GET", endpoint.http_path)
         return {"recorded": True, "skipped": True, "reason": f"{path} unreachable: {exc}"}
@@ -167,16 +233,19 @@ def run_chain(endpoint, param, list_path, client, cache) -> dict:
 def run_chain_2p(endpoint, p1, list1, p2, sublist_tmpl, client, cache) -> dict:
     """2-param chain: derive param1 from the parent list, param2 from the
     sub-list (param1 filled), then exercise the two-param show GET. Record-only."""
-    id1, why = _derive_id(client, cache, endpoint.service, list1, p1)
+    id1, _item1, why = _derive_id(client, cache, endpoint.service, list1, p1)
     if id1 is None:
         return {"recorded": False, "skipped": True, "reason": why}
     sublist = sublist_tmpl.replace("{%s}" % p1, id1)
-    id2, why = _derive_id(client, cache, endpoint.service, sublist, p2)
+    id2, item2, why = _derive_id(client, cache, endpoint.service, sublist, p2)
     if id2 is None:
         return {"recorded": False, "skipped": True, "reason": why}
+    query, qwhy = resolve_required_query(endpoint, item2)
+    if query is None:
+        return {"recorded": False, "skipped": True, "reason": qwhy}
     path = endpoint.http_path.replace("{%s}" % p1, id1).replace("{%s}" % p2, id2)
     try:
-        resp = client.get(path, service=endpoint.service)
+        resp = client.get(path, service=endpoint.service, params=query or None)
     except Exception as exc:
         _record(0, results.FAIL, endpoint.key, "GET", endpoint.http_path)
         return {"recorded": True, "skipped": True, "reason": f"{path} unreachable: {exc}"}
