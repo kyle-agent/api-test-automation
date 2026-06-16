@@ -151,6 +151,15 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
+          "name": "list-volume-replications",
+          "method": "GET",
+          "path": "/v1/volumes/{volume_id}/replications",
+          "group": "vol-replication",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a volume's replications). Closes the volume_id getid GET /v1/volumes/{volume_id}/replications. Keys off the create-volume-captured volume_id; tolerant [200,400,403,404] because in a LIGHT run the volume create 4xx's (REQUIRED attachments to a Bare Metal Server, none on this account) leaving volume_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
+        },
+        {
           "name": "set-replication-cycle",
           "method": "PUT",
           "path": "/v1/volumes/{volume_id}/replications/cycle",
@@ -407,6 +416,15 @@
             "replication_volume_name_prefix": "dr"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "list-group-replications",
+          "method": "GET",
+          "path": "/v1/volume-groups/{volume_group_id}/replications",
+          "group": "vg-replication",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a volume-group's replications). Closes the volume_group_id getid GET /v1/volume-groups/{volume_group_id}/replications. Keys off the create-volume-group-captured volume_group_id; tolerant [200,400,403,404] because in a LIGHT run the member-volume/group create 4xx's (same REQUIRED-attachments gap) leaving volume_group_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
         },
         {
           "name": "set-group-replication-cycle",

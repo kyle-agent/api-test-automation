@@ -115,6 +115,15 @@
           "capture_soft": {"replication_id": "$.replication_id"}
         },
         {
+          "name": "get-replication",
+          "method": "GET",
+          "path": "/v1/replications/{replication_id}",
+          "group": "fs-replication",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (show replication). Closes the replication_id getid GET /v1/replications/{replication_id}. Keys off the create-replication-captured replication_id; tolerant [200,400,403,404] because replication create targets a remote DR region (kr-west1) and may 4xx (DR/region unavailable), leaving replication_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
+        },
+        {
           "name": "set-replication",
           "method": "PUT",
           "path": "/v1/replications/{replication_id}",

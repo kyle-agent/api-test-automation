@@ -16,8 +16,27 @@
           "optional": true,
           "params": {"limit": 1},
           "capture_soft": {
-            "gpu_node_id": "$.gpu_nodes[0].nonexistent_gpu_seed"
+            "gpu_node_id": "$.gpu_nodes[0].nonexistent_gpu_seed",
+            "cluster_fabric_id": "$.gpu_nodes[0].nonexistent_cf_seed"
           }
+        },
+        {
+          "name": "show-gpu-node",
+          "_note": "id-bound read (show a GPU node). Closes the gpu_node_id getid GET /v1/gpu-nodes/{gpu_node_id}. Keys off the seed NO-OP soft-capture so {gpu_node_id} stays LITERAL at runtime -> a non-existent literal id 404s (never touches a real billable node) while the catalog normalizes {..} to '*' so the endpoint is RECORDED. Tolerant [200,400,403,404].",
+          "method": "GET",
+          "path": "/v1/gpu-nodes/{gpu_node_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "gpu-read"
+        },
+        {
+          "name": "show-cluster-fabric",
+          "_note": "id-bound read (show a cluster-fabric). Closes the cluster_fabric_id getid GET /v1/cluster-fabrics/{cluster_fabric_id}. No real cluster_fabric_id capture source exists in this coverage-only chain (create uses a synthetic fabric and 4xx's), so {cluster_fabric_id} is declared as a NO-OP soft-capture in the seed step and stays LITERAL at runtime -> 404 (never touches a real fabric) while the catalog normalizes {..} to '*' so the endpoint is RECORDED. Tolerant [200,400,403,404].",
+          "method": "GET",
+          "path": "/v1/cluster-fabrics/{cluster_fabric_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "gpu-read"
         },
         {
           "name": "create-gpu-nodes",

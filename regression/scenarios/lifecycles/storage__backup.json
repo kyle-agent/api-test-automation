@@ -42,6 +42,15 @@
           "expect_status": [200]
         },
         {
+          "name": "check-backup-agent-connection-state",
+          "method": "GET",
+          "path": "/v1/backup-agents/{backup_agent_id}/check-connection-state",
+          "group": "bk-agent",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (check backup-agent connection state). Closes the backup_agent_id getid GET /v1/backup-agents/{backup_agent_id}/check-connection-state. Keys off the create-backup-agent-captured backup_agent_id; tolerant [200,400,403,404] because create references a docs-example server_uuid/subnet_id that do NOT exist on this account and 4xx's, leaving backup_agent_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
+        },
+        {
           "name": "probe-reads-agent",
           "probe_reads": {"backup_agent_id": "{backup_agent_id}"}
         },
@@ -110,6 +119,69 @@
           "path": "/v1/backups",
           "optional": true,
           "expect_status": [200]
+        },
+        {
+          "name": "get-backup-schedules",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/schedules",
+          "group": "bk-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a backup's schedules). Closes the backup_id getid GET /v1/backups/{backup_id}/schedules. Keys off the create-backup-captured backup_id; tolerant [200,400,403,404] because create references a docs-example server that does NOT exist on this account and 4xx's, leaving backup_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
+        },
+        {
+          "name": "get-backup-filesystem-path",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/filesystem-path",
+          "group": "bk-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (show a backup's filesystem path). Closes the backup_id getid GET /v1/backups/{backup_id}/filesystem-path. Same create-captured backup_id + tolerant rationale as get-backup-schedules."
+        },
+        {
+          "name": "get-backup-histories",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/backup-histories",
+          "group": "bk-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a backup's backup histories). Closes the backup_id getid GET /v1/backups/{backup_id}/backup-histories. Same create-captured backup_id + tolerant rationale as get-backup-schedules."
+        },
+        {
+          "name": "get-backup-restore-histories",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/restore-histories",
+          "group": "bk-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a backup's restore histories). Closes the backup_id getid GET /v1/backups/{backup_id}/restore-histories. Same create-captured backup_id + tolerant rationale as get-backup-schedules."
+        },
+        {
+          "name": "get-backup-restore-targets",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/restore-targets",
+          "group": "bk-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a backup's restore targets). Closes the backup_id getid GET /v1/backups/{backup_id}/restore-targets. Same create-captured backup_id + tolerant rationale as get-backup-schedules."
+        },
+        {
+          "name": "get-backup-agent-restore-targets",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/agent-backup-restore-targets",
+          "group": "bk-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list a backup's agent-backup restore targets). Closes the backup_id getid GET /v1/backups/{backup_id}/agent-backup-restore-targets. Same create-captured backup_id + tolerant rationale as get-backup-schedules."
+        },
+        {
+          "name": "get-backup-restorable-subnets",
+          "method": "GET",
+          "path": "/v1/backups/{backup_id}/restore/restorable-subnets",
+          "group": "bk-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (list restorable subnets for a backup restore). Closes the backup_id getid GET /v1/backups/{backup_id}/restore/restorable-subnets. Same create-captured backup_id + tolerant rationale as get-backup-schedules."
         },
         {
           "name": "set-backup-schedules",

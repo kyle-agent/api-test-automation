@@ -48,6 +48,15 @@
           "group": "bm-create"
         },
         {
+          "name": "show-baremetal",
+          "_note": "id-bound read (show a bare-metal server). Closes the baremetal_id getid GET /v1/baremetals/{baremetal_id}. Keys off the seed-baremetal-placeholders NO-OP soft-capture so {baremetal_id} stays LITERAL at runtime -> a non-existent literal id 404s (never touches a real billable server) while the catalog normalizes {..} to '*' so the endpoint is RECORDED. Tolerant [200,400,403,404].",
+          "method": "GET",
+          "path": "/v1/baremetals/{baremetal_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "bm-read"
+        },
+        {
           "name": "start-baremetals",
           "_note": "UNPROVEN body (docs baremetalsoperationrequest). POST /v1/baremetals/start powers on a list of bare-metal servers by id. Synthetic id -> 4xx; still records.",
           "method": "POST",
