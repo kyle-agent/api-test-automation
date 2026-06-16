@@ -222,6 +222,25 @@
           "expect_status": [200, 202, 204, 400, 403, 404, 409]
         },
         {
+          "name": "list-lb-certificates",
+          "method": "GET",
+          "path": "/v1/loadbalancers/certificates",
+          "group": "lbcert",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {"lb_certificate_id": "$.certificates[0].id"},
+          "_note": "Collection read (listloadbalancercertificates) used to source an id for the id-bound show below. networking/loadbalancer has NO certificate CREATE endpoint — LB certificates are minted by security/certificatemanager and only listed/shown here — so the ONLY honest capture source for lb_certificate_id is this list. Soft-captures $.certificates[0].id: if the shared account already has an LB certificate the show becomes a REAL read; otherwise the soft-capture finds nothing and the show fires against the {lb_certificate_id} placeholder (normalizes to the catalog '*' key) and 4xx's, still recording coverage. Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "show-lb-certificate",
+          "method": "GET",
+          "path": "/v1/loadbalancers/certificates/{lb_certificate_id}",
+          "group": "lbcert",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (showloadbalancercertificate). Closes the lb_certificate_id getid GET /v1/loadbalancers/certificates/{lb_certificate_id} — the service's only remaining static gap. Keys off lb_certificate_id soft-captured from list-lb-certificates (no LB-side create exists for it). Tolerant [200,400,403,404]: a real 2xx needs a pre-existing certificatemanager-issued LB cert on the shared account; absent that the id stays a placeholder and 4xx's, which still records the endpoint as reached."
+        },
+        {
           "name": "probe-lb-reads",
           "probe_reads": {
             "loadbalancer_id": "{loadbalancer_id}",

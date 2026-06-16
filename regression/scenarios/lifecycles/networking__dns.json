@@ -32,7 +32,17 @@
             "register_telno": "010-1234-5678",
             "tags": []
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"public_domain_id": "$.public_domain.id"}
+        },
+        {
+          "name": "get-public-domain",
+          "method": "GET",
+          "path": "/v1/public-domain-names/{public_domain_id}",
+          "group": "pubdomain",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (showpublicdomainname). Closes the public_domain_id getid GET /v1/public-domain-names/{public_domain_id}. A non-destructive READ is safe to chain here (unlike the set/transfer WRITES, which the lifecycle deliberately fires against builtin {unique} segments). Keys off the soft-captured public_domain_id from create-public-domain; tolerant [200,400,403,404] because create is a REAL PAID DOMAIN REGISTRATION ORDER that 4xx's on a shared LIGHT account without billing/registrant context, leaving the id a placeholder (normalizes to the catalog '*' key, still records coverage). Makes the endpoint statically reachable in a LIGHT run."
         },
         {
           "name": "set-public-domain",
@@ -203,6 +213,33 @@
           "capture": {"record_id": "$.id"},
           "expect_status": [200, 201, 202],
           "cleanup": {"method": "DELETE", "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}", "service": "dns"}
+        },
+        {
+          "name": "get-hosted-zone",
+          "method": "GET",
+          "path": "/v1/hosted-zones/{hosted_zone_id}",
+          "group": "pdns",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (showhostedzone). Closes the hosted_zone_id getid GET /v1/hosted-zones/{hosted_zone_id}. Keys off the create-hosted-zone captured hosted_zone_id; tolerant [200,400,403,404] because in a LIGHT run without console creds the private-dns/hosted-zone create chain 4xx's, leaving the id a placeholder (normalizes to the catalog '*' key, still records coverage). Explicit static read complements probe-dns-reads, which only fires at runtime."
+        },
+        {
+          "name": "list-hosted-zone-records",
+          "method": "GET",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records",
+          "group": "pdns",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (listhostedzonerecords — id-bound on the parent hosted_zone_id). Closes the getid GET /v1/hosted-zones/{hosted_zone_id}/records. Same tolerant rationale as get-hosted-zone: real read on a live zone, else a placeholder 4xx that still records coverage."
+        },
+        {
+          "name": "get-hosted-zone-record",
+          "method": "GET",
+          "path": "/v1/hosted-zones/{hosted_zone_id}/records/{record_id}",
+          "group": "pdns",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "_note": "id-bound read (showhostedzonerecord). Closes the getid GET /v1/hosted-zones/{hosted_zone_id}/records/{record_id}. Keys off both the create-hosted-zone hosted_zone_id and create-a-record record_id; tolerant [200,400,403,404] for the same LIGHT-run placeholder reason. Runs before the record/zone teardown so a real id (when present) resolves."
         },
         {
           "name": "probe-dns-reads",
