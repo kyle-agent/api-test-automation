@@ -103,7 +103,9 @@ resources:
     capture: {port_id: "$.port.id"}
     ready: {field: "$.port.state", until: [ACTIVE, CREATED, RUNNING, DOWN],
             timeout: 180, interval: 10}
-    delete: {endpoint: "DELETE /v1/ports/{port_id}", destructive: true}
+    delete: {endpoint: "DELETE /v1/ports/{port_id}", destructive: true,
+             expect_status: [200, 202, 204, 404],
+             note: "idempotent delete: 404 = port already gone. 404 = port already deleted upstream (an earlier optional setport had 404'd); run 27593608514"}
     provenance: VALIDATED
     source: {lifecycle: networking-vpc-subnet, steps: [create-port, delete-port]}
     notes: "ready until 목록은 heavy-shared-networking port-wait의 validated 관측값"
