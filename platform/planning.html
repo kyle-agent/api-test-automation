@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T02:30:12Z · <b>sha 483835f</b>
+    2026-06-16T05:44:44Z · <b>sha 2f600a8</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -249,8 +249,8 @@
     <div class="pl">① 자원 모델 <span style="font-weight:400;color:var(--faint)">재료</span></div>
     <div class="pv">272</div>
     <div class="ps">자원별 사실: 의존·생성법·검증·삭제 ·
-      <span style="color:var(--green);font-weight:700">검증 129</span> ·
-      문서 143</div>
+      <span style="color:var(--green);font-weight:700">검증 131</span> ·
+      문서 141</div>
     <div class="ps" style="color:var(--blue)">합성기가 의존을 따라 시나리오 생성 →</div>
     <span class="chev">→</span>
   </a>
@@ -287,10 +287,10 @@
 <h2 id="sec-scen">② 시나리오 카탈로그 <span class="hint">실행되는 테스트 전체 목록 — ①에서 합성된 gen-* 와 수작업이 함께 (비고 클릭 = 전체 보기)</span></h2>
 <div class="fchips" id="scenChips">
   <span class="fchip on" data-f="all"><b>189</b> 전체</span>
-  <span class="fchip" data-f="enabled"><b>158</b> enabled</span>
+  <span class="fchip" data-f="enabled"><b>166</b> enabled</span>
   <span class="fchip" data-f="heavy"><b>77</b> heavy(과금성)</span>
   <span class="fchip" data-f="gen"><b>61</b> 합성(gen)</span>
-  <span class="fchip" data-f="disabled"><b>31</b> disabled</span>
+  <span class="fchip" data-f="disabled"><b>23</b> disabled</span>
   <input class="search" id="scenSearch" placeholder="서비스·시나리오 검색" style="margin-left:auto">
 </div>
 <div class="card pad" style="padding-top:4px">
@@ -1579,8 +1579,8 @@
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">COVERAGE-ONLY guarded lifecycle for the searchengine (OpenSe… <span class="toggle">더보기</span>
-            <div class="more">COVERAGE-ONLY guarded lifecycle for the searchengine (OpenSearch DBaaS) WRITE endpoints not already reachable via the shared /v1/clusters/* DBaaS scenarios. Primary targets (the service&#39;s own GAP-write set): searchengineaddinstances (POST /v1/clusters/{cluster_id}/add-instances) and searchenginerest</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">reachability-only (owner 2026-06-16): license-gated engine (… <span class="toggle">더보기</span>
+            <div class="more">reachability-only (owner 2026-06-16): license-gated engine (Elasticsearch Enterprise BYOL), access-tested, license/4xx/5xx tolerated, no functional validation; this is the engine&#39;s reachability-TERMINAL final state (NOT held/blocked-owner). Every endpoint is CALLED with optional:true + tolerant expe</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/data-analytics__searchengine.json">
@@ -1603,8 +1603,8 @@
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">COVERAGE-ONLY read lifecycle for searchengine&#39;s two id-bound… <span class="toggle">더보기</span>
-            <div class="more">COVERAGE-ONLY read lifecycle for searchengine&#39;s two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-param name (dbaas_engine_version_id) so the final probe-reads step exercises searchenginelistengineversionproperties (/v1/engi</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">reachability-only (owner 2026-06-16): license-gated engine, … <span class="toggle">더보기</span>
+            <div class="more">reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for searchengine&#39;s two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog pat</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/data-analytics__searchengine.json">
@@ -1627,8 +1627,8 @@
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">COVERAGE-ONLY guarded lifecycle for the vertica (analytics D… <span class="toggle">더보기</span>
-            <div class="more">COVERAGE-ONLY guarded lifecycle for the vertica (analytics DB DBaaS) cluster sub-op WRITE endpoints. vertica has ZERO GAP-write endpoints in spec.coverage_gap because every write shares a /v1/clusters/* or /v1/instance-groups/* path already matched by the shared DBaaS scenarios (the gap analyzer mat</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">reachability-only (owner 2026-06-16): license-gated engine (… <span class="toggle">더보기</span>
+            <div class="more">reachability-only (owner 2026-06-16): license-gated engine (Vertica DBaaS, create takes a license field), access-tested, license/4xx/5xx tolerated, no functional validation; this is the engine&#39;s reachability-TERMINAL final state (NOT held/blocked-owner). Every endpoint is CALLED with optional:true +</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/data-analytics__vertica.json">
@@ -1651,8 +1651,8 @@
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">COVERAGE-ONLY read lifecycle for vertica&#39;s two id-bound GETs… <span class="toggle">더보기</span>
-            <div class="more">COVERAGE-ONLY read lifecycle for vertica&#39;s two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-param name (dbaas_engine_version_id) so the final probe-reads step exercises verticalistengineversionproperties (/v1/engine-version</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">reachability-only (owner 2026-06-16): license-gated engine, … <span class="toggle">더보기</span>
+            <div class="more">reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for vertica&#39;s two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT catalog path-par</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/data-analytics__vertica.json">
@@ -1915,8 +1915,8 @@
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">COVERAGE-ONLY guarded lifecycle for the sqlserver DBaaS clus… <span class="toggle">더보기</span>
-            <div class="more">COVERAGE-ONLY guarded lifecycle for the sqlserver DBaaS cluster sub-op WRITE endpoints (incl. the sqlserver-only create/delete cluster which the shared heavy-shared-dbaas lifecycle EXCLUDES because SQL Server needs a real license). Soft-captures an existing cluster_id (+ instance_group_id/bsg_id/log</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">reachability-only (owner 2026-06-16): license-gated engine (… <span class="toggle">더보기</span>
+            <div class="more">reachability-only (owner 2026-06-16): license-gated engine (MS SQL Server, Always On secondary needs a license key), access-tested, license/4xx/5xx tolerated, no functional validation; this is the engine&#39;s reachability-TERMINAL final state (NOT held/blocked-owner). Every endpoint is CALLED with opti</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/database__sqlserver.json">
@@ -1939,8 +1939,8 @@
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. So… <span class="toggle">더보기</span>
-            <div class="more">COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY sqlserver catalog GET whose path params are satisfied (engine-version properties via dbaas_engine_version_id, requests via a</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">reachability-only (owner 2026-06-16): license-gated engine, … <span class="toggle">더보기</span>
+            <div class="more">reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EV</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/database__sqlserver.json">
@@ -3531,22 +3531,22 @@
       </tr>
       
       <tr data-id="idc-instance" data-service="management/iam-identity-center"
-          data-enabled=""
+          data-enabled="1"
           data-heavy="1"
           data-gen="">
         <td><code>idc-instance</code></td>
         <td><span class="srv">management/iam-identity-center</span></td>
-        <td>5</td>
+        <td>6</td>
         <td>
           
           <span class="tag heavy">heavy</span>
           
-          <span class="tag disabled">disabled</span>
+          
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">SSO (IAM Identity Center) INSTANCE lifecycle. BLAST RADIUS: … <span class="toggle">더보기</span>
-            <div class="more">SSO (IAM Identity Center) INSTANCE lifecycle. BLAST RADIUS: an SSO instance is account-structural — creating/patching/deleting one on a shared account is sensitive and may be irreversible (it backs all SSO users/groups/permission-sets). Therefore heavy + every mutating step optional with broad expec</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">REACHABILITY-ONLY (owner override 2026-06-16): SSO (IAM Iden… <span class="toggle">더보기</span>
+            <div class="more">REACHABILITY-ONLY (owner override 2026-06-16): SSO (IAM Identity Center) INSTANCE lifecycle. Every IdC write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reachable). CRITICAL SAFETY: IdC writes can mutate ACCOUNT-LEVEL SSO config if they succeed, so reachability calls are delib</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
@@ -3555,22 +3555,22 @@
       </tr>
       
       <tr data-id="idc-user" data-service="management/iam-identity-center"
-          data-enabled=""
+          data-enabled="1"
           data-heavy="1"
           data-gen="">
         <td><code>idc-user</code></td>
         <td><span class="srv">management/iam-identity-center</span></td>
-        <td>6</td>
+        <td>7</td>
         <td>
           
           <span class="tag heavy">heavy</span>
           
-          <span class="tag disabled">disabled</span>
+          
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">SSO USER lifecycle: create -&gt; patch -&gt; delete (single) -&gt; de… <span class="toggle">더보기</span>
-            <div class="more">SSO USER lifecycle: create -&gt; patch -&gt; delete (single) -&gt; delete (bulk). BLAST RADIUS: SSO users are tied to an SSO instance/identity store; creating them on a shared account is sensitive. heavy + all mutating steps optional with broad expect_status so a denial RECORDS coverage without creating real</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">REACHABILITY-ONLY (owner override 2026-06-16): SSO USER life… <span class="toggle">더보기</span>
+            <div class="more">REACHABILITY-ONLY (owner override 2026-06-16): SSO USER lifecycle: create -&gt; show -&gt; patch -&gt; delete (single) -&gt; delete (bulk). Every write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reachable). CRITICAL SAFETY: the create&#39;s instance_id is the SYNTHETIC placeholder ssoins-123</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
@@ -3579,22 +3579,22 @@
       </tr>
       
       <tr data-id="idc-group" data-service="management/iam-identity-center"
-          data-enabled=""
+          data-enabled="1"
           data-heavy="1"
           data-gen="">
         <td><code>idc-group</code></td>
         <td><span class="srv">management/iam-identity-center</span></td>
-        <td>8</td>
+        <td>9</td>
         <td>
           
           <span class="tag heavy">heavy</span>
           
-          <span class="tag disabled">disabled</span>
+          
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">SSO GROUP + GROUP-USERS lifecycle: create group -&gt; patch gro… <span class="toggle">더보기</span>
-            <div class="more">SSO GROUP + GROUP-USERS lifecycle: create group -&gt; patch group -&gt; add users (bulk) -&gt; remove users (bulk) -&gt; delete group -&gt; delete groups (bulk). BLAST RADIUS: SSO groups belong to an SSO instance; sensitive on a shared account. heavy + all mutating optional/broad so denials RECORD coverage without</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">REACHABILITY-ONLY (owner override 2026-06-16): SSO GROUP + G… <span class="toggle">더보기</span>
+            <div class="more">REACHABILITY-ONLY (owner override 2026-06-16): SSO GROUP + GROUP-USERS lifecycle: create group -&gt; list group-users (id-bound GET) -&gt; patch group -&gt; add users (bulk) -&gt; remove users (bulk) -&gt; delete group -&gt; delete groups (bulk). Every write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, </div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
@@ -3603,22 +3603,22 @@
       </tr>
       
       <tr data-id="idc-permission-set" data-service="management/iam-identity-center"
-          data-enabled=""
+          data-enabled="1"
           data-heavy="1"
           data-gen="">
         <td><code>idc-permission-set</code></td>
         <td><span class="srv">management/iam-identity-center</span></td>
-        <td>7</td>
+        <td>9</td>
         <td>
           
           <span class="tag heavy">heavy</span>
           
-          <span class="tag disabled">disabled</span>
+          
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">SSO PERMISSION-SET + its POLICIES lifecycle: create -&gt; patch… <span class="toggle">더보기</span>
-            <div class="more">SSO PERMISSION-SET + its POLICIES lifecycle: create -&gt; patch -&gt; set policies (PUT) -&gt; delete policies -&gt; delete permission-set. BLAST RADIUS: permission-sets define SSO access on accounts — sensitive/structural on a shared account. heavy + all mutating optional/broad so denials RECORD coverage witho</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">REACHABILITY-ONLY (owner override 2026-06-16): SSO PERMISSIO… <span class="toggle">더보기</span>
+            <div class="more">REACHABILITY-ONLY (owner override 2026-06-16): SSO PERMISSION-SET + its POLICIES lifecycle: create -&gt; show -&gt; list policies (id-bound GETs) -&gt; patch -&gt; set policies (PUT) -&gt; delete policies -&gt; delete permission-set. Every write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reach</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
@@ -3627,7 +3627,7 @@
       </tr>
       
       <tr data-id="idc-account-assignment" data-service="management/iam-identity-center"
-          data-enabled=""
+          data-enabled="1"
           data-heavy="1"
           data-gen="">
         <td><code>idc-account-assignment</code></td>
@@ -3637,12 +3637,12 @@
           
           <span class="tag heavy">heavy</span>
           
-          <span class="tag disabled">disabled</span>
+          
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">SSO ACCOUNT-ASSIGNMENT lifecycle: create -&gt; delete (single b… <span class="toggle">더보기</span>
-            <div class="more">SSO ACCOUNT-ASSIGNMENT lifecycle: create -&gt; delete (single by id) -&gt; delete (bulk). BLAST RADIUS: an account-assignment grants a principal a permission-set ON A TARGET ACCOUNT — the most sensitive SSO write; never create a real one on a shared account. heavy + all mutating optional with broad expect</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">REACHABILITY-ONLY (owner override 2026-06-16): SSO ACCOUNT-A… <span class="toggle">더보기</span>
+            <div class="more">REACHABILITY-ONLY (owner override 2026-06-16): SSO ACCOUNT-ASSIGNMENT lifecycle: create -&gt; delete (single by id) -&gt; delete (bulk). Every write is ACCESS-TESTED (called regardless of 4xx, counted reachable). CRITICAL SAFETY — THE MOST SENSITIVE IdC WRITE: an account-assignment grants a principal a pe</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
@@ -4635,22 +4635,22 @@
       </tr>
       
       <tr data-id="archivestorage-bucket" data-service="storage/archivestorage"
-          data-enabled=""
+          data-enabled="1"
           data-heavy="1"
           data-gen="">
         <td><code>archivestorage-bucket</code></td>
         <td><span class="srv">storage/archivestorage</span></td>
-        <td>12</td>
+        <td>16</td>
         <td>
           
           <span class="tag heavy">heavy</span>
           
-          <span class="tag disabled">disabled</span>
+          
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">Archive Storage BUCKET lifecycle (billable object storage -&gt;… <span class="toggle">더보기</span>
-            <div class="more">Archive Storage BUCKET lifecycle (billable object storage -&gt; heavy, gated by SCP_RUN_HEAVY). Closes the bucket-side write gap: create bucket (BucketCreateRequest: name + tags) -&gt; capture $.id (BucketCreateResponse.id) -&gt; versioning/encryption setters -&gt; object + object-version deletes + recovers -&gt; </div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">reachability-only (owner override 2026-06-16): archivestorag… <span class="toggle">더보기</span>
+            <div class="more">reachability-only (owner override 2026-06-16): archivestorage endpoints access-tested, 4xx tolerated, no real creation expected (no archivestorage key); heavy.</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/storage__archivestorage.json">
@@ -4659,7 +4659,7 @@
       </tr>
       
       <tr data-id="archivestorage-archiving-policy" data-service="storage/archivestorage"
-          data-enabled=""
+          data-enabled="1"
           data-heavy="1"
           data-gen="">
         <td><code>archivestorage-archiving-policy</code></td>
@@ -4669,12 +4669,12 @@
           
           <span class="tag heavy">heavy</span>
           
-          <span class="tag disabled">disabled</span>
+          
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">Archive Storage ARCHIVING-POLICY lifecycle (heavy). Closes t… <span class="toggle">더보기</span>
-            <div class="more">Archive Storage ARCHIVING-POLICY lifecycle (heavy). Closes the archiving-policy write gap: create-archiving-policy (ArchivingPolicyCreateRequest: archiving_source_bucket_name, object_lifecycle, object_path=&#39;/&#39;) -&gt; capture $.id (ArchivingPolicyCreateResponse.id) -&gt; set policy (object_lifecycle) -&gt; se</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">reachability-only (owner override 2026-06-16): archivestorag… <span class="toggle">더보기</span>
+            <div class="more">reachability-only (owner override 2026-06-16): archivestorage endpoints access-tested, 4xx tolerated, no real creation expected (no archivestorage key); heavy.</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/storage__archivestorage.json">
@@ -4803,7 +4803,7 @@
       </tr>
       
       <tr data-id="parallel-filestorage-capacity-restore" data-service="storage/parallel-filestorage"
-          data-enabled=""
+          data-enabled="1"
           data-heavy="1"
           data-gen="">
         <td><code>parallel-filestorage-capacity-restore</code></td>
@@ -4813,12 +4813,12 @@
           
           <span class="tag heavy">heavy</span>
           
-          <span class="tag disabled">disabled</span>
+          
         </td>
         <td>
           
-          <div class="biz" onclick="this.classList.toggle('open')">Parallel FileStorage CAPACITY + SNAPSHOT-RESTORE lifecycle (… <span class="toggle">더보기</span>
-            <div class="more">Parallel FileStorage CAPACITY + SNAPSHOT-RESTORE lifecycle (billable parallel volume -&gt; heavy, gated by SCP_RUN_HEAVY). Closes the 2 remaining write gaps: PUT /v1/volumes/{volume_id}/capacity and PUT /v1/snapshots/{snapshot_id}/restore. Flow: create a parallel volume (VolumeCreateRequest: name patte</div></div>
+          <div class="biz" onclick="this.classList.toggle('open')">REACHABILITY-ONLY (owner override 2026-06-16): Parallel File… <span class="toggle">더보기</span>
+            <div class="more">REACHABILITY-ONLY (owner override 2026-06-16): Parallel FileStorage was previously reads-only owner-exclusion; now reframed so every uncovered write + id-bound GET is ACCESS-TESTED (called regardless of 4xx, counted reachable). Billable parallel volume -&gt; heavy. Closes the remaining write gap PUT /v</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/storage__parallel-filestorage.json">

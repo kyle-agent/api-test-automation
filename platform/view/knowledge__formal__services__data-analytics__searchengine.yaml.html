@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T02:30:12Z · <b>sha 483835f</b>
+    2026-06-16T05:44:44Z · <b>sha 2f600a8</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -282,6 +282,9 @@ captures:
 states: {}
 
 quirks:
+  - id: reachability-only-license-gated
+    note: &#34;reachability-only (owner 2026-06-16): Elasticsearch Enterprise BYOL is a license-gated engine we do NOT hold a license for, so searchengine CANNOT be functionally validated — it is an access-check-only (reachability-TERMINAL) coverage target. Reachability is its FINAL state, NOT a held/blocked-owner state: every endpoint (cluster create + sub-ops + id-bound GETs) is CALLED with optional:true and a tolerant expect_status [200,201,202,400,401,403,404,409,422,500], so license/auth/validation/server errors are tolerated as access evidence. No functional validation, no real license consumed, no billable-persistent cluster created (the lifecycle soft-adopts an existing cluster_id or normalizes to the catalog &#39;*&#39; key; any 2xx is torn down). Provenance stays docs.&#34;
+    provenance: docs
   - id: async-writes-return-request-id
     note: &#34;create + write calls answer 202 AsyncResponse {request_id, resource:{id}}; request_id appears ONLY in those write envelopes — GET /v1/requests/{request_id} (searchengineshowrequest) cannot be reached from any list (a read-only run can only C2 it via literal-token 404). Same DBaaS framework as postgresql/eventstreams&#34;
     provenance: docs

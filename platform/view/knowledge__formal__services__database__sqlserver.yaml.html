@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T02:30:12Z · <b>sha 483835f</b>
+    2026-06-16T05:44:44Z · <b>sha 2f600a8</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -254,6 +254,11 @@
 # SQL Server is the ONE DBaaS engine the shared heavy-shared-dbaas lifecycle
 # EXCLUDES — it needs a real Microsoft license. No live 2xx has been observed
 # for any sqlserver WRITE → every write is provenance: docs.
+# reachability-only (owner 2026-06-16): sqlserver is a license-gated engine we do
+# NOT hold a license for → it is an access-check-only (reachability-TERMINAL)
+# coverage target. Endpoints are CALLED + 4xx/5xx tolerated as access evidence;
+# functional validation (Always On HA/secondary) stays owner-license-gated and is
+# NOT a coverage blocker. No real license consumed, no billable-persistent cluster.
 version: 1
 service: database/sqlserver
 
@@ -268,7 +273,7 @@ constraints:
     rule: &#34;engine catalog = SQL Server 2019 (Enterprise/Standard, EOS 2029-06, EoTS 2030-01) and SQL Server 2022 (Enterprise/Standard, EOS 2032-06, EoTS 2033-01) (userguide overview). Edition is baked into the engine-version id; minor-only upgrade WITHIN a major (no 2019→2022) — &#39;동일한 Major 버전 내에서 Minor 버전 업그레이드 기능만 지원합니다&#39; (managing)&#34;
     provenance: docs
   - id: secondary-needs-license-and-enterprise
-    rule: &#34;Secondary (Always On HA standby / read-only replica) REQUIRES a valid SQL Server License Key input + Enterprise Edition + backup enabled, and ONLY ONE per cluster — &#39;하나의 클러스터당 1개만 구성 가능&#39;, &#39;입력한 라이선스 key가 유효하지 않을 경우 서비스가 생성되지 않을 수 있음&#39; (secondary how_to). The license key is an account/vendor credential with NO documented self-service issuance — ESCALATE (credential gate)&#34;
+    rule: &#34;Secondary (Always On HA standby / read-only replica) REQUIRES a valid SQL Server License Key input + Enterprise Edition + backup enabled, and ONLY ONE per cluster — &#39;하나의 클러스터당 1개만 구성 가능&#39;, &#39;입력한 라이선스 key가 유효하지 않을 경우 서비스가 생성되지 않을 수 있음&#39; (secondary how_to). The license key is an account/vendor credential with NO documented self-service issuance. reachability-only (owner 2026-06-16): the add-secondary endpoint is access-TESTED (CALLED with an empty license, tolerant expect including 400/401/403/422/500) so reachability is covered; functional HA/secondary validation remains owner-license-gated (deferred, NOT blocking coverage — see IB-017)&#34;
     provenance: docs
   - id: additional-databases-enterprise-100
     rule: &#34;Enterprise edition supports up to 100 additional databases per cluster, added/removed via POST /v1/clusters/{id}/databases {add_databases, del_databases} (managing). Standard edition limit not documented&#34;
@@ -291,6 +296,9 @@ captures: {}
 states: {}
 
 quirks:
+  - id: reachability-only-license-gated
+    note: &#34;reachability-only (owner 2026-06-16): sqlserver is a license-gated engine we do NOT hold a license for, so it CANNOT be functionally validated — it is an access-check-only (reachability-TERMINAL) coverage target. Reachability is its FINAL state, NOT a held/blocked-owner state: every endpoint (cluster create + sub-ops incl. add-secondary + id-bound GETs) is CALLED with optional:true and a tolerant expect_status [200,201,202,400,401,403,404,409,422,500], so license/auth/validation/server errors are tolerated as access evidence. No functional validation, no real license consumed, no billable-persistent cluster created (sub-ops soft-adopt an existing cluster_id or normalize to the catalog &#39;*&#39; key; the guarded delete targets a SYNTHETIC non-existent id; any 2xx is torn down). Functional HA/secondary validation stays owner-license-gated (IB-017, deferred not blocking). Provenance stays docs.&#34;
+    provenance: docs
   - id: license-excludes-from-shared-heavy
     note: &#34;SQL Server is the only DBaaS engine excluded from heavy-shared-dbaas: cluster create itself does NOT take a license field (instance create can be tested without one), but Secondary/Always On HA does. The guarded source sends empty ids so create can only 4xx; this model curates real tokens but the cluster create template has NEVER returned 2xx → docs/UNPROVEN&#34;
     provenance: docs

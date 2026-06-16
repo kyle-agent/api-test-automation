@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T02:30:12Z · <b>sha 483835f</b>
+    2026-06-16T05:44:44Z · <b>sha 2f600a8</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -1061,7 +1061,7 @@
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">COVERAGE-ONLY guarded lifecycle for the searchengine (OpenSearch DBaaS) WRITE endpoints not already reachable via the shared /v1/clusters/* DBaaS scenarios. Pri</td>
+      <td class="muted">reachability-only (owner 2026-06-16): license-gated engine (Elasticsearch Enterprise BYOL), access-tested, license/4xx/5xx tolerated, no functional validation; </td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__searchengine.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -1076,7 +1076,7 @@
         
         
       </td>
-      <td class="muted">COVERAGE-ONLY read lifecycle for searchengine&#39;s two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT</td>
+      <td class="muted">reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__searchengine.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -1091,7 +1091,7 @@
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">COVERAGE-ONLY guarded lifecycle for the vertica (analytics DB DBaaS) cluster sub-op WRITE endpoints. vertica has ZERO GAP-write endpoints in spec.coverage_gap b</td>
+      <td class="muted">reachability-only (owner 2026-06-16): license-gated engine (Vertica DBaaS, create takes a license field), access-tested, license/4xx/5xx tolerated, no functiona</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__vertica.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -1106,7 +1106,7 @@
         
         
       </td>
-      <td class="muted">COVERAGE-ONLY read lifecycle for vertica&#39;s two id-bound GETs (READ-ONLY, never mutates). Lists /v1/engine-versions and soft-captures the id under the EXACT cata</td>
+      <td class="muted">reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/data-analytics__vertica.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -1271,7 +1271,7 @@
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">COVERAGE-ONLY guarded lifecycle for the sqlserver DBaaS cluster sub-op WRITE endpoints (incl. the sqlserver-only create/delete cluster which the shared heavy-sh</td>
+      <td class="muted">reachability-only (owner 2026-06-16): license-gated engine (MS SQL Server, Always On secondary needs a license key), access-tested, license/4xx/5xx tolerated, n</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__sqlserver.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -1286,7 +1286,7 @@
         
         
       </td>
-      <td class="muted">COVERAGE-ONLY read lifecycle for sqlserver id-bound GETs. Soft-captures an existing dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step </td>
+      <td class="muted">reachability-only (owner 2026-06-16): license-gated engine, access-tested, license/4xx/5xx tolerated, no functional validation. COVERAGE-ONLY read lifecycle for</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/database__sqlserver.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2285,13 +2285,13 @@
     <tr>
       <td><code>idc-instance</code></td>
       <td>management/iam-identity-center</td>
-      <td>5</td>
+      <td>6</td>
       <td>
-        <span class="cat">disabled</span>
+        
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">SSO (IAM Identity Center) INSTANCE lifecycle. BLAST RADIUS: an SSO instance is account-structural — creating/patching/deleting one on a shared account is sensit</td>
+      <td class="muted">REACHABILITY-ONLY (owner override 2026-06-16): SSO (IAM Identity Center) INSTANCE lifecycle. Every IdC write + id-bound GET is ACCESS-TESTED (called regardless </td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2300,13 +2300,13 @@
     <tr>
       <td><code>idc-user</code></td>
       <td>management/iam-identity-center</td>
-      <td>6</td>
+      <td>7</td>
       <td>
-        <span class="cat">disabled</span>
+        
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">SSO USER lifecycle: create -&gt; patch -&gt; delete (single) -&gt; delete (bulk). BLAST RADIUS: SSO users are tied to an SSO instance/identity store; creating them on a </td>
+      <td class="muted">REACHABILITY-ONLY (owner override 2026-06-16): SSO USER lifecycle: create -&gt; show -&gt; patch -&gt; delete (single) -&gt; delete (bulk). Every write + id-bound GET is AC</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2315,13 +2315,13 @@
     <tr>
       <td><code>idc-group</code></td>
       <td>management/iam-identity-center</td>
-      <td>8</td>
+      <td>9</td>
       <td>
-        <span class="cat">disabled</span>
+        
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">SSO GROUP + GROUP-USERS lifecycle: create group -&gt; patch group -&gt; add users (bulk) -&gt; remove users (bulk) -&gt; delete group -&gt; delete groups (bulk). BLAST RADIUS:</td>
+      <td class="muted">REACHABILITY-ONLY (owner override 2026-06-16): SSO GROUP + GROUP-USERS lifecycle: create group -&gt; list group-users (id-bound GET) -&gt; patch group -&gt; add users (b</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2330,13 +2330,13 @@
     <tr>
       <td><code>idc-permission-set</code></td>
       <td>management/iam-identity-center</td>
-      <td>7</td>
+      <td>9</td>
       <td>
-        <span class="cat">disabled</span>
+        
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">SSO PERMISSION-SET + its POLICIES lifecycle: create -&gt; patch -&gt; set policies (PUT) -&gt; delete policies -&gt; delete permission-set. BLAST RADIUS: permission-sets de</td>
+      <td class="muted">REACHABILITY-ONLY (owner override 2026-06-16): SSO PERMISSION-SET + its POLICIES lifecycle: create -&gt; show -&gt; list policies (id-bound GETs) -&gt; patch -&gt; set poli</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2347,11 +2347,11 @@
       <td>management/iam-identity-center</td>
       <td>4</td>
       <td>
-        <span class="cat">disabled</span>
+        
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">SSO ACCOUNT-ASSIGNMENT lifecycle: create -&gt; delete (single by id) -&gt; delete (bulk). BLAST RADIUS: an account-assignment grants a principal a permission-set ON A</td>
+      <td class="muted">REACHABILITY-ONLY (owner override 2026-06-16): SSO ACCOUNT-ASSIGNMENT lifecycle: create -&gt; delete (single by id) -&gt; delete (bulk). Every write is ACCESS-TESTED </td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__iam-identity-center.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2975,13 +2975,13 @@
     <tr>
       <td><code>archivestorage-bucket</code></td>
       <td>storage/archivestorage</td>
-      <td>12</td>
+      <td>16</td>
       <td>
-        <span class="cat">disabled</span>
+        
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">Archive Storage BUCKET lifecycle (billable object storage -&gt; heavy, gated by SCP_RUN_HEAVY). Closes the bucket-side write gap: create bucket (BucketCreateReques</td>
+      <td class="muted">reachability-only (owner override 2026-06-16): archivestorage endpoints access-tested, 4xx tolerated, no real creation expected (no archivestorage key); heavy.</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__archivestorage.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2992,11 +2992,11 @@
       <td>storage/archivestorage</td>
       <td>6</td>
       <td>
-        <span class="cat">disabled</span>
+        
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">Archive Storage ARCHIVING-POLICY lifecycle (heavy). Closes the archiving-policy write gap: create-archiving-policy (ArchivingPolicyCreateRequest: archiving_sour</td>
+      <td class="muted">reachability-only (owner override 2026-06-16): archivestorage endpoints access-tested, 4xx tolerated, no real creation expected (no archivestorage key); heavy.</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__archivestorage.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -3082,11 +3082,11 @@
       <td>storage/parallel-filestorage</td>
       <td>9</td>
       <td>
-        <span class="cat">disabled</span>
+        
         <span class="cat test_bug">heavy</span>
         
       </td>
-      <td class="muted">Parallel FileStorage CAPACITY + SNAPSHOT-RESTORE lifecycle (billable parallel volume -&gt; heavy, gated by SCP_RUN_HEAVY). Closes the 2 remaining write gaps: PUT /</td>
+      <td class="muted">REACHABILITY-ONLY (owner override 2026-06-16): Parallel FileStorage was previously reads-only owner-exclusion; now reframed so every uncovered write + id-bound </td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/storage__parallel-filestorage.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
