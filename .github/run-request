@@ -1,16 +1,15 @@
-# Wave G HEAVY validation run (2026-06-16) — TRUE payoff of the VPC saga.
-# Root cause finally fixed in 7648dbc: provision_shared_vpc names were 21>20 chars
-# (regrvpcshared{8hex}) -> SCP 400 -> no SCP_SHARED_VPC_ID -> every heavy adopter skipped.
-# Now regrvpcsh{uniq}=17 / regrsubsh{uniq}=17 / regrsubshdb{uniq}=19 (all <=20) -> provision 2xx.
-# Plus 6b87007 broadens reconciler reclaim prefix regrvpc->regr (catches the regrw5vpc leak) and
-# this run also names it explicitly (sweep_extra_names) as belt-and-suspenders.
-# Expected chain: pre-reclaim frees cap (incl. regrw5vpc leak) -> provision creates VPC+subnet AND
-# exports SCP_SHARED_VPC_ID/SUBNET_ID -> conftest shared_vpc populated -> adopters ADOPT (not skip)
-# -> heavy chains run: gen-heavy-aimlops (SKE cluster -> aimlops release POST), heavy-shared-dbaas
-# (eventstreams/epas/postgresql cluster CREATE), VM-full + the new B/C id-bound reads -> first
-# service-attributed 2xx promotes the held nodes docs->VALIDATED.
-# Also validates this branch's coverage work landed in 03f4e03 (VM gap7->0, ai-ml, 5 LIGHT non-DB).
+# Wave H HEAVY validation run (2026-06-16) — finish the payoff Wave G's timeout cut short.
+# Wave G (run 27626396618) PROVED the VPC root-cause fix: shared-VPC provision 2xx'd (18:22→18:26)
+# and the VPC-CRUD serial class PASSED (was failing in Wave F). BUT the broadened regr* reclaim
+# prefix + IGNORE_TTL matched a months-deep leftover backlog, and the reconciler deletes serially
+# with a 150s _wait_gone each, so the pre-run reclaim ran 3.5h and pushed ADOPT-class CRUD into the
+# 5h job timeout -> CANCELLED before the heavy adopters (aimlops/DBaaS/VM-full) could validate.
+# Two things changed since: (1) Wave G's 3.5h reclaim + post-run sweep CLEARED the backlog, so this
+# reclaim is small/fast; (2) IB-053 (a122f4d) TIME-BOXES the pre-run reclaim at 30m so it can never
+# starve the run again. Net: reclaim finishes fast -> provision 2xx (proven) -> ADOPT-class CRUD now
+# has ~4h budget -> gen-heavy-aimlops (SKE cluster -> aimlops release POST), heavy-shared-dbaas
+# (eventstreams/epas/postgresql cluster CREATE), VM-full + B/C id-bound reads RUN TO COMPLETION ->
+# first service-attributed 2xx promotes the held nodes docs->VALIDATED. C2 call-coverage recovers.
 mutations=true
 destructive=true
 heavy=true
-sweep_extra_names=regrw5vpc6a2d542e
