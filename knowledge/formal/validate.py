@@ -274,7 +274,16 @@ WAIVER_CLASSES = {"blast-radius", "entitlement", "unsatisfiable-flow",
                   "billing-prohibitive",
                   # owner-decided scope exclusion (e.g. PFS reads-only,
                   # owner 2026-06-12) — not an account/entitlement limit
-                  "owner-exclusion"}
+                  "owner-exclusion",
+                  # reachability-only services (owner 2026-06-16): license/
+                  # entitlement-gated so a real 2xx is impossible, but the
+                  # owner definition-of-done is "endpoint REACHED" (any
+                  # response incl. 4xx = access confirmed). Unlike the EXCLUDED
+                  # classes above, a reachability waiver STAYS in the C3 target
+                  # and counts as covered-when-reached (dashboard/build.py),
+                  # tracked in a separate reachability-covered bucket so a 4xx
+                  # is never mislabeled as a verified-2xx.
+                  "reachability"}
 
 
 def check_waivers() -> int:

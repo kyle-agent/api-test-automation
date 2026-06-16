@@ -390,16 +390,48 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None,
     cov_write = len(write_verified) / nonget_total * 100 if nonget_total else 0
 
     # C0-C4 ladder (docs/COVERAGE-CRITERIA.md): the 100% goal is C3 (verified)
-    # for every endpoint EXCEPT the explicit, human-approved waiver list, which
-    # must still be C2 (called). Waived endpoints leave both numerator and
-    # denominator of the headline; a verified waived endpoint means the waiver
-    # is obsolete (surfaced separately).
-    waived = {w["key"] for w in (waivers or {}).get("waivers", [])} & cat_keys_all
-    c3_denom = total - len(waived)
-    c3_verified = verified - waived
+    # for every endpoint EXCEPT the explicit, human-approved waiver list. Two
+    # waiver dispositions exist (the ``class`` field decides which):
+    #
+    #   * EXCLUDED waivers (blast-radius | entitlement | unsatisfiable-flow |
+    #     billing-prohibitive | owner-exclusion): the endpoint can NEVER 2xx on
+    #     the shared account by design, AND verifying it isn't the goal — it
+    #     leaves BOTH the C3 numerator and denominator. It must still be C2
+    #     (called); a verified excluded-waiver means the waiver is obsolete
+    #     (surfaced separately as a removal candidate).
+    #
+    #   * REACHABILITY waivers (class: "reachability"): for owner-designated
+    #     reachability-only services (archivestorage / iam-identity-center /
+    #     parallel-filestorage / searchengine / vertica / sqlserver — license/
+    #     entitlement-gated so a real 2xx is impossible without a key) the owner
+    #     definition-of-done is "the endpoint is REACHED" (any response incl.
+    #     4xx = access confirmed). These STAY in the C3 denominator and count as
+    #     COVERED-WHEN-REACHED: a reachability waiver that was touched (any
+    #     status) is added to the C3 numerator. This is tracked in a SEPARATE
+    #     bucket (reach_covered) and is NEVER folded into ``verified`` — a 4xx is
+    #     reported as "reachability-covered", honestly distinct from verified-2xx.
+    by_key = {w["key"]: w for w in (waivers or {}).get("waivers", [])}
+    waived = set(by_key) & cat_keys_all
+    reach_waived = {k for k in waived if by_key[k].get("class") == "reachability"}
+    excl_waived = waived - reach_waived          # excluded from C3 entirely
+
+    # reachability-covered = reachability waiver that was REACHED (any status,
+    # incl. 4xx). Verified-2xx reachability waivers also count (a real 2xx
+    # trivially satisfies "reached") but are still NOT promoted into `verified`.
+    reach_covered = reach_waived & touched
+    reach_uncovered = reach_waived - touched     # not yet reached → still a gap
+
+    # C3 denominator drops only the EXCLUDED waivers; reachability waivers remain
+    # in the target. C3 numerator = verified-2xx (minus excluded waivers) PLUS
+    # the reachability-covered set (honest distinct disposition, same target).
+    c3_denom = total - len(excl_waived)
+    c3_verified = (verified - excl_waived) | reach_covered
     cov_c3 = len(c3_verified) / c3_denom * 100 if c3_denom else 0
-    waived_called = len(waived & touched)
-    waived_verified = len(waived & verified)   # waiver candidates for removal
+    # "waived" reporting below covers the EXCLUDED waivers (the obsolete-removal
+    # candidate logic only makes sense for those); reachability waivers report
+    # via reach_* keys.
+    waived_called = len(excl_waived & touched)
+    waived_verified = len(excl_waived & verified)   # waiver candidates for removal
 
     param_attempted = len(param_rows)
     param_accepted = sum(1 for r in param_rows if 200 <= r[0] < 300)
@@ -421,8 +453,12 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None,
         "write_verified": len(write_verified), "write_reached": len(write_reached),
         "cov_op": cov_op, "cov_get": cov_get, "cov_write": cov_write,
         "cov_c3": cov_c3, "c3_denom": c3_denom, "c3_verified": len(c3_verified),
+        # honest split of the C3 numerator: verified-2xx vs reachability-covered
+        "c3_verified_2xx": len((verified - excl_waived)),
+        "reach_covered": len(reach_covered), "reach_waived": len(reach_waived),
+        "reach_uncovered": len(reach_uncovered),
         "verified_keys": sorted(verified),
-        "waived_total": len(waived), "waived_called": waived_called,
+        "waived_total": len(excl_waived), "waived_called": waived_called,
         "waived_verified": waived_verified,
         "get_total": get_total, "nonget_total": nonget_total,
         "write_hit": len(write_verified),
@@ -452,6 +488,8 @@ def append_history(path, d, run_type, sha):
         "cov_op": round(d["cov_op"], 2), "cov_get": round(d["cov_get"], 2),
         "cov_c3": round(d.get("cov_c3", d["cov_op"]), 2),
         "waived": d.get("waived_total", 0),
+        "reach_covered": d.get("reach_covered", 0),
+        "reach_waived": d.get("reach_waived", 0),
         "tested": d["tested"], "total": d["total"],
         # (2) stable ceiling + (1) run-scope so the trend reflects authoring
         # progress (monotonic), not live measurement noise.
@@ -1128,14 +1166,19 @@ def render(d, hist, meta, services):
     c3p = d.get("cov_c3", 0)
     c2p = d.get("reach_measured_pct", 0)
     c1p = d.get("reachable_pct", 0)
+    rc = d.get("reach_covered", 0)
+    # honest C3 sub-label: of the C3-satisfied set, how many are verified-2xx
+    # vs reachability-covered (reached-only, license-gated services).
+    c3_split = (f' (검증2xx {d.get("c3_verified_2xx", d.get("c3_verified", 0))} '
+                f'+ 도달충족 {rc})' if rc else '')
     ladder = f'''
     <div class="lad"><span class="lv">C3</span><div class="bar"><i style="width:{c3p:.1f}%;background:var(--green)"></i></div><span class="pct" style="color:var(--green)">{c3p:.1f}%</span>
-      <span class="desc"><b class="tip" title="2xx 동작 확인 — GET 200, 쓰기 2xx. 이 API는 동작한다">검증됨</b> · {d.get("c3_verified", 0)}/{d.get("c3_denom", d["total"])} · {run_scope} · 목표 100%</span></div>
+      <span class="desc"><b class="tip" title="2xx 동작 확인(검증) 또는 reachability-only 서비스의 도달충족(4xx 포함 응답=접근 확인). 도달충족은 검증2xx로 둔갑하지 않고 별도 집계.">충족</b> · {d.get("c3_verified", 0)}/{d.get("c3_denom", d["total"])}{c3_split} · {run_scope} · 목표 100%</span></div>
     <div class="lad"><span class="lv">C2</span><div class="bar"><i style="width:{c2p:.1f}%;background:var(--amber)"></i></div><span class="pct" style="color:var(--amber)">{c2p:.1f}%</span>
       <span class="desc"><b class="tip" title="4xx 포함 응답 수신 — 호출은 된다(404 POST/DELETE는 생성/삭제 안 함)">호출됨</b> · {d["tested"]}/{d["total"]} (이번 run)</span></div>
     <div class="lad"><span class="lv">C1</span><div class="bar"><i style="width:{c1p:.1f}%;background:var(--blue)"></i></div><span class="pct" style="color:var(--blue)">{c1p:.1f}%</span>
       <span class="desc"><b class="tip" title="시나리오 정적 도달 가능">도달가능</b> · {d.get("reachable", 0)}/{d["total"]}</span></div>
-    <div class="lad-foot">읽기 GET 2xx <b>{d["cov_get"]:.1f}%</b> ({d["get_verified"]}/{d["get_total"]}) · 쓰기 2xx <b>{d["cov_write"]:.1f}%</b> ({d["write_hit"]}/{d["nonget_total"]}) · C2뿐인 write {d["write_reached"]} · waiver {d.get("waived_total", 0)}개(C2 충족 {d.get("waived_called", 0)}, 해제 후보 {d.get("waived_verified", 0)}) · 남은 gap → write <b>{d.get("gap_write", 0)}</b> · id-bound GET <b>{d.get("gap_getid", 0)}</b></div>'''
+    <div class="lad-foot">읽기 GET 2xx <b>{d["cov_get"]:.1f}%</b> ({d["get_verified"]}/{d["get_total"]}) · 쓰기 2xx <b>{d["cov_write"]:.1f}%</b> ({d["write_hit"]}/{d["nonget_total"]}) · C2뿐인 write {d["write_reached"]} · waiver {d.get("waived_total", 0)}개(C2 충족 {d.get("waived_called", 0)}, 해제 후보 {d.get("waived_verified", 0)}) · reachability-only 도달충족 <b>{rc}</b>/{d.get("reach_waived", 0)}(미도달 {d.get("reach_uncovered", 0)}, 검증2xx 아님) · 남은 gap → write <b>{d.get("gap_write", 0)}</b> · id-bound GET <b>{d.get("gap_getid", 0)}</b></div>'''
 
     # ---- response code distribution ----
     segs = sorted(d["dist"].items())
@@ -1693,8 +1736,10 @@ def build(
         f"dashboard -> {out}  "
         f"(source: {source_label}; "
         f"reachable {d.get('reachable_pct', 0):.1f}% ceiling (gap write {d.get('gap_write', 0)} / id-GET {d.get('gap_getid', 0)}); "
-        f"C3-verified {d.get('cov_c3', 0):.1f}% ({d.get('c3_verified', 0)}/{d.get('c3_denom', 0)}, "
-        f"waived {d.get('waived_total', 0)}, {'full CRUD' if d.get('crud_ran') else 'read-only'}), "
+        f"C3 {d.get('cov_c3', 0):.1f}% ({d.get('c3_verified', 0)}/{d.get('c3_denom', 0)} "
+        f"= verified-2xx {d.get('c3_verified_2xx', 0)} + reachability-covered {d.get('reach_covered', 0)}"
+        f"/{d.get('reach_waived', 0)}, excl-waived {d.get('waived_total', 0)}, "
+        f"{'full CRUD' if d.get('crud_ran') else 'read-only'}), "
         f"C2-called {d['reach_measured_pct']:.1f}% ({d['tested']}/{d['total']}); "
         f"{d['cov_get']:.1f}% GET-verified, {d['cov_write']:.1f}% write-verified (write reached-but-unverified {d['write_reached']}); "
         f"ok {d['ok']} soft {d['soft']} new {d['fail_new']} known {d['fail_known']}; "
