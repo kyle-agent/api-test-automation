@@ -367,7 +367,7 @@ ResourceGraph.load(document.getElementById("dep-svg"),
                    list="node-ids" size="12"></td>
         <td><input type="text" name="opt_pick" value="" size="10"></td>
         <td><input type="text" name="opt_of" value="" size="8"></td>
-        <td><input type="text" name="opt_note" value="원본(origin) 도메인 — 기본값은 소스 lifecycle의 placeholder (도메인명 방식 권장; 공인 IP 방식이면 protocol/port도 필요, cdn-create-required-fields). 실서빙 검증에는 실존 origin이 필요하다" size="14"></td>
+        <td><input type="text" name="opt_note" value="원본(origin) 도메인 — 기본값은 소스 lifecycle의 placeholder (도메인명 방식 권장; 공인 IP 방식이면 protocol/port도 필요, cdn-create-required-fields). 실서빙 검증에는 실존 origin이 필요하다. userguide 2026-06-15: origin protocol는 HTTP/HTTPS/HTTP2 지원 (UNPROVEN — docs only). origin_hostname_type=DOMAIN이면 cdn_origin_protocol/cdn_origin_port는 비워둘 수 있고, IP 방식이면 둘 다 필수 (cdn-create-required-fields)." size="14"></td>
       </tr>
       
       <tr class="proto">

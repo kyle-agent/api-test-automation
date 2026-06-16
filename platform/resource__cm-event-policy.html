@@ -381,7 +381,7 @@ ResourceGraph.load(document.getElementById("dep-svg"),
                    list="node-ids" size="12"></td>
         <td><input type="text" name="opt_pick" value="" size="10"></td>
         <td><input type="text" name="opt_of" value="" size="8"></td>
-        <td><input type="text" name="opt_note" value="이벤트 레벨 — docs EventPolicyInfo.eventLevel 예시 WARNING. 콘솔(userguide event 페이지)은 등급을 Fatal/Warning/Information 3단계로 노출하므로 enum을 그 매핑(FATAL/WARNING/INFORMATION)으로 확정. 종전 draft의 CRITICAL은 servicewatch/타서비스 혼동값 — 제거. 전체 집합 라이브 2xx 미확인(UNPROVEN)" size="14"></td>
+        <td><input type="text" name="opt_note" value="이벤트 레벨 — docs EventPolicyInfo.eventLevel 예시 WARNING. 콘솔(userguide event 페이지 [U2])은 등급(이벤트 등급)을 정확히 3단계로 노출: Fatal(가장 위험)/Warning(중간)/Information(최저·참고) — enum을 그 매핑(FATAL/WARNING/INFORMATION)으로 확정. 콘솔 3등급 외 값은 없음(2026-06-15 [U2] 확인). 종전 draft의 CRITICAL은 servicewatch/타서비스 혼동값 — 제거. 전체 집합 라이브 2xx 미확인(UNPROVEN)" size="14"></td>
       </tr>
       
       <tr>
@@ -408,7 +408,7 @@ ResourceGraph.load(document.getElementById("dep-svg"),
                    list="node-ids" size="12"></td>
         <td><input type="text" name="opt_pick" value="" size="10"></td>
         <td><input type="text" name="opt_of" value="" size="8"></td>
-        <td><input type="text" name="opt_note" value="SingleThreshold.comparisonOperator — docs 예시는 LT만 관측(GE/GT 등은 콘솔 비교연산자 &#39;이상/초과/이하/미만/일치/상이&#39;에서 매핑한 추정). GT 95(CPU)로 사실상 미발화 probe. UNPROVEN" size="14"></td>
+        <td><input type="text" name="opt_note" value="SingleThreshold.comparisonOperator — docs 예시는 LT만 관측. 콘솔(userguide event [U2])의 비교 방식 7종 중 구간(Range)을 제외한 6종이 정확히 이 enum에 대응: 이상(GE)/초과(GT)/이하(LE)/미만(LT)/일치(EQ)/상이(NE) (2026-06-15 [U2] 확인). 구간(Range)은 별도 RANGE_VALUE/RangeThreshold 경로 — 이 SingleThreshold enum에는 포함 안 됨. GT 95(CPU)로 사실상 미발화 probe. UNPROVEN" size="14"></td>
       </tr>
       
       <tr class="proto">
