@@ -770,6 +770,9 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 .wrap{max-width:1240px;margin:0 auto;padding:20px 22px 80px}
 .crumb{color:var(--muted);font-size:12.5px;margin-bottom:14px}
 .crumb b{color:var(--text)}
+.crumb .catlink{margin-left:12px;font-weight:600;color:var(--blue);background:var(--blue-bg);
+  border:1px solid #cfe0fb;border-radius:8px;padding:3px 10px;white-space:nowrap}
+.crumb .catlink:hover{text-decoration:none;filter:brightness(.97)}
 .hero{background:var(--surface);border:1px solid var(--border);border-radius:14px;
   box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px;
   display:flex;flex-wrap:wrap;gap:22px;align-items:center}
@@ -890,7 +893,8 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 }
 </style></head><body><div class="wrap">
 
-<div class="crumb"><a href="../index.html">← 대시보드</a> / @@CAT@@ / <b>@@SVC@@</b></div>
+<div class="crumb"><a href="../index.html">← 대시보드</a> / @@CAT@@ / <b>@@SVC@@</b>
+  <a class="catlink" href="../catalog/catalog.html#@@CAT@@/@@SVC@@" title="이 서비스를 플랫폼 카탈로그에서 열어 자원 선택 → 합성 → plan으로 커버리지 채우기">🗂 카탈로그에서 보기 / 커버리지 채우기 →</a></div>
 
 <div class="hero">
   <div class="gauge">
@@ -1300,6 +1304,10 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
 .svc-controls select,.svc-controls input{border:1px solid var(--border);border-radius:9px;background:var(--surface);padding:6px 10px;font-size:12.5px;font-family:inherit;color:var(--text)}
 .svc-controls input{width:200px}
 .svcgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
+.svc-cell{display:flex;flex-direction:column}
+.svc-cat-link{align-self:flex-start;margin-top:5px;font-size:11px;font-weight:600;color:var(--blue);
+  background:var(--blue-bg);border:1px solid #cfe0fb;border-radius:8px;padding:2px 9px}
+.svc-cat-link:hover{text-decoration:none;filter:brightness(.97)}
 .svc{display:block;padding:11px 13px;background:var(--surface);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);transition:.12s}
 .svc.unt .svc-n,.svc.unt .sn{color:#8b949e}
 .svc.unt{background:#fafbfc;border-style:dashed}
@@ -1370,7 +1378,7 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
   <span class="meta">branch <code>@@BRANCH@@</code> · 최근 실행 @@WHEN@@ · @@RUNTYPE@@</span>
   <div class="links" style="margin-top:7px;font-size:13px">
     자원 모델:
-    <a href="catalog/catalog.html">카탈로그</a> ·
+    <a href="catalog/catalog.html" title="플랫폼 카탈로그로 진입 → 자원 선택·합성·plan으로 커버리지 채우기">🗂 카탈로그(커버리지 채우기 →)</a> ·
     <a href="catalog/plan.html">Plan</a> ·
     <a href="catalog/run.html">Run</a> ·
     <a href="catalog/report.html">Report</a>
@@ -1447,18 +1455,27 @@ SVCS.forEach(function(s){
   m.cov+=s.cov;m.tot+=s.tot;
 });
 Object.keys(catMeta).forEach(function(c){var m=catMeta[c];m.pct=m.tot?Math.round(m.cov/m.tot*100):0;});
+function catLink(s){
+  // DOWN into this service's platform catalog (자원 선택 → 합성 → plan). The
+  // catalog lands on its drilldown; the #cat/svc anchor names the service.
+  return '<a class="svc-cat-link" href="catalog/catalog.html#'+s.c+'/'+s.n+'"'
+    +' title="플랫폼 카탈로그에서 '+s.n+' 자원 선택 → 합성 → plan으로 커버리지 채우기">'
+    +'🗂 카탈로그 →</a>';
+}
 function svcCard(s){
   if(s.unt){
     // 라이선스/자원 부재로 기능 테스트 제외 — 각 API의 접근성(도달)만 확인.
-    return '<a class="svc unt" href="'+s.u+'" title="기능 테스트 제외 — '+s.unt+'">'
+    return '<div class="svc-cell"><a class="svc unt" href="'+s.u+'" title="기능 테스트 제외 — '+s.unt+'">'
       +'<div class="sh"><span class="sn">'+s.n+'</span><span class="unt-badge">접근성만</span></div>'
       +'<div class="sbar"><i style="width:100%;background:#d0d7de"></i></div>'
-      +'<div class="sfrac">기능 테스트 제외 · '+s.rch+'/'+s.tot+' API 도달</div></a>';
+      +'<div class="sfrac">기능 테스트 제외 · '+s.rch+'/'+s.tot+' API 도달</div></a>'
+      +catLink(s)+'</div>';
   }
-  return '<a class="svc" href="'+s.u+'">'
+  return '<div class="svc-cell"><a class="svc" href="'+s.u+'">'
     +'<div class="sh"><span class="sn">'+s.n+'</span><span class="sp" style="color:'+barColor(s.pct)+'">'+s.pct+'%</span></div>'
     +'<div class="sbar"><i style="width:'+s.pct+'%;background:'+barColor(s.pct)+'"></i></div>'
-    +'<div class="sfrac">'+s.cov+'/'+s.tot+' ops 검증</div></a>';
+    +'<div class="sfrac">'+s.cov+'/'+s.tot+' ops 검증</div></a>'
+    +catLink(s)+'</div>';
 }
 function renderSvcs(){
   var q=document.getElementById('svcSearch').value.toLowerCase();
