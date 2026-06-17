@@ -583,3 +583,44 @@ sweep 마일스톤만 누락된 원인.)
   `scp_original_image_type=k8s` query is REQUIRED (api_docs; omission → 400
   "Field required", runs 27483895557/27491816948). `size`/`page` optional.
 - Nodes promoted to VALIDATED: ske-image, ske-cluster-upgrade, ske-nodepool-upgrade.
+
+## Resource-model ↔ cross-service.yaml requires reconciliation (R1 validator WARNs, 2026-06-17)
+> conf: 0.6 · seen: 2026-06-17 · obs: 1 (offline reconciliation against VALIDATED create bodies)
+Five "requires diverges" WARNs resolved by aligning cross-service.yaml (the coarse
+L2 graph) to the resource-model node's VALIDATED create body — the body is the API
+truth for create-order:
+- **lb-health-check** requires **[vpc, subnet]** (was [] in L2). POST /v1/lb-health-checks
+  body keys on vpc_id + subnet_id — it is a STANDALONE top-level resource (no
+  loadbalancer_id), region-scoped/reusable but still needs vpc+subnet live first.
+- **lb-server-group** requires **[vpc, subnet, lb-health-check]** (was [load-balancer]
+  + lookups:[lb-health-check] in L2). POST /v1/lb-server-groups body keys on vpc_id +
+  subnet_id + lb_health_check_id — NOT loadbalancer_id. The LB link is INDIRECT: a
+  listener binds the server-group to the LB. health-check is a HARD prereq, not a lookup.
+- **direct-connect** requires **[vpc]** (was [vpc, security-group] in L2). POST
+  /v1/direct-connects body carries vpc_id ONLY. Security Group is a documented 선행
+  서비스 for the WORKLOAD behind the DC, not a DC create-body field → it stays as the
+  cross_constraint `dc-prereq-security-group`, NOT a create-order requires (IB-035).
+- **secret** (secretsmanager) requires **[kms-key]** (was [] on the top `secret` L2
+  node — the sibling docs node `secretsmanager-secret` already had [kms-key]). POST
+  /v1/secrets body sends kms_id = an encrypt-capable KMS key id.
+- **backup-policy** requires **[backup-target]** (was [server] in L2). POST /v1/backups
+  consumes server_uuid/server_guid DISCOVERED via the backup-target LOOKUP (GET
+  /v1/backups/backup-targets), which itself requires a live server. Added a
+  `backup-target` lookup node to cross-service.yaml so the L2 graph carries the same
+  edge (IB-031: closure unchanged, body uses {backup-target.*} only).
+
+**create-without-delete WARNs confirmed NO-TEARDOWN-BY-DESIGN** (not modeling gaps;
+SCP API exposes no DELETE — parent/cluster delete reclaims, or op is fire-and-forget):
+- sqlserver ss-* family (add-block-storage, resize-block-storage, resize-server-type,
+  restart, sync-state, set-audit-log, patch, switchover, add-secondary, databases) —
+  cluster sub-ops; parent sqlserver-cluster DELETE reclaims everything.
+- storage/backup backup-manual (manual-backup trigger) & backup-restore (creates a NEW
+  billable server reclaimed via compute DELETE — cross-service teardown unsupported,
+  node kept enabled:false).
+- billingplan planned-compute (no DELETE API; cancellation is a fee-incurring read-like
+  POST), storage/archivestorage archiving-policy (policy is immutable/deactivate-only),
+  storage/baremetal-blockstorage bm-volume-group (no DELETE /v1/volume-groups/{id} in
+  catalog; teardown via member-volume removal).
+- platform/sts sts-token & management/servicewatch sw-* are owned by other agents —
+  their create-without-delete WARNs are likewise expected-by-design (expiring token /
+  catalog-read / fire-and-forget sub-ops).
