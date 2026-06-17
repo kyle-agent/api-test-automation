@@ -6,7 +6,21 @@ Mirror of the `_note` fields in `regression/scenarios/scenarios.json`; keep both
 in sync. Every entry here is also an **AI-usability gap** (something an AI could
 not infer from the spec) — feed it to the AI-Evaluator agent.
 
+> **Confidence metadata convention.** Each fact entry carries a lightweight meta line:
+> `> conf: 0.3–0.9 · seen: YYYY-MM-DD · obs: N` where
+> - **conf** = confidence: `0.3` tentative (docs-derived, UNPROVEN) → `0.5` moderate
+>   (partial/offline evidence) → `0.7+` verified (live 2xx / runtime-proven).
+> - **seen** = the last date this fact was confirmed still relevant (YYYY-MM-DD).
+> - **obs** = number of times the fact was observed/confirmed.
+>
+> This lets **session-start surface only high-confidence, recently-seen facts**
+> (e.g. `conf ≥ 0.7` and `seen` within N days) instead of re-reading the whole
+> store every session. Bump `conf`/`obs` and refresh `seen` when a fact re-confirms;
+> lower `conf` (or prune) when a fact drifts or is contradicted by current state.
+
 ## API design quirks — composite "create-all-in-one" verbs (AXIS-2 / AI-usability)
+
+> conf: 0.3 · seen: 2026-06-17 · obs: 1
 
 - **quick-query** — `POST /v1/quick-query` is NOT a thin "create a query" call. It is a
   **composite verb that provisions a whole SKE k8s engine (cluster + 3-node pool)
@@ -30,6 +44,7 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
 ## Constraints from userguide (docs — naming/quota/state; not yet 2xx-confirmed)
 
 **mysql (overview, 2026-06-15):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
 - Engine versions: 8.0.28–8.0.42, 8.4.5, 8.4.7 (8.4.7 GA "2026년 7월 이후"). 8.0.x
   EOS 2026-03-19 / EoTS 2026-04-30 — both **past 2026-06-15**, so 8.0.x may be
   sunset for *new* creates (live catalog check needed). 8.4.5 EoTS 2032-04-30.
@@ -43,6 +58,7 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
   name regex, storage-type-forced-equal — **do not cross-apply mariadb facts**.
 
 **IAM (how_to_guides, 2026-06-15):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
 - **role**: name ≤64 `[a-zA-Z0-9+=\-_@,.]`; max_session_duration **3,600–43,200 s**
   (userguide writes "3,200초(1시간)" but 3,200 s = 53:20 ≠ 1 h — likely a doc typo;
   use 3,600 = 1 h as the safe minimum, **UNPROVEN until a live 4xx delimits it**);
@@ -59,13 +75,16 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
   in catalog (STOP-2 N/A); the live decision point is **multipart vs JSON** (IB-010).
 
 **CDN (global_cdn overview, 2026-06-15, docs/UNPROVEN):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
 - Global CDN is offered **only in kr-west1/kr-east1** — explicitly NOT in
   kr-south1/2/3 → **region-gate any CDN lifecycle**.
 - **20 domains/account** cap. Origin protocols HTTP/HTTPS/HTTP2. Akamai-backed →
   async provisioning. `origin_hostname_type=DOMAIN` allows empty protocol/port;
   IP mode requires both.
 
-**Userguide infra note (2026-06-15):** docs.e.samsungsdscloud.com had **intermittent 503s** —
+**Userguide infra note (2026-06-15):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
+docs.e.samsungsdscloud.com had **intermittent 503s** —
 `/userguide/security/` first, then briefly full-host, but `/overview/` pages
 (networking, financial) were reachable while most `how_to_guides/` sub-pages 503'd.
 → docs-mapper is **unreliable this window**; suspend `provenance: docs` deep enrichment
@@ -73,6 +92,7 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
 **underscore** (`financial_management`, not hyphen — hyphen 404s).
 
 **networking (loadbalancer/gslb/vpn, userguide 2026-06-15, docs/UNPROVEN):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
 - LB **Public NAT IP requires an IGW** on the VPC (docs-confirms PF-13 → justifies
   `lb-static-nat requires internet-gateway`). LB quotas/region: 50 LB · 1000
   listeners · 1000 server-groups · 3 service-subnets/VPC.
@@ -84,6 +104,7 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
   NOT in the userguide (PSK/DH/lifetimes stay UNPROVEN docs-examples).
 
 **database/analytics (cachestore/searchengine/vertica, userguide 2026-06-15, docs/UNPROVEN):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
 - **cachestore**: both ports 1200-65535; password 8-30 excluding `$ " '`; block
   storage 16-5120 GB (×8). **Docs prescribe HA replica 1-2, but `replica_count:0`
   is LIVE-PROVEN (202, run 27258520218)** — keep the live value; conflict noted
@@ -93,6 +114,7 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
 - **vertica**: all field rules userguide-re-confirmed (no drift vs 2026-06-14).
 
 **networking quotas (firewall/dns/direct-connect, userguide 2026-06-15, docs/UNPROVEN):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
 - **Private DNS = 1 per account** (account-wide across regions; `POST /private-dns/activate`
   = multi-region activation of the same name) → a 2nd create hits quota 4xx. Verify
   `quota: private-dns == 1` in cross-service.yaml.
@@ -103,6 +125,7 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
   LARGE=500/EXLARGE=1000; default policy "Any Deny" (ALLOW rule required to pass traffic).
 
 **compute/container (baremetal/scf/scr, userguide 2026-06-15, docs/UNPROVEN):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
 - **baremetal**: server_type `s3v{vCore}m{memGB}_metal` (vCore = physical×2 HT);
   **Security Group NOT supported** (Firewall + Transit Gateway only); name lowercase
   3-15, multi-server → `prefix-###`; single-delete leaves BM Block Storage orphan.
@@ -112,6 +135,7 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
   (Registry V2, no REST create) → `scr-image`/`scr-tag` correctly `no_api`.
 
 **management (cloudmonitoring/loggingaudit/resourcemanager, userguide 2026-06-15, docs/UNPROVEN):**
+> conf: 0.5 · seen: 2026-06-15 · obs: 1
 - **Cloud Monitoring is EOL after the 2026-09 release → migrate to ServiceWatch**
   (deprioritize further cloudmonitoring investment).
 - CM event grades = {Fatal, Warning, Information}; comparison = 7 (GE/GT/LE/LT/EQ/NE + Range).
@@ -119,6 +143,8 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
 - **resourcemanager**: tags ≤50 per resource.
 
 ## Id / capture shapes (where the id lives in the response)
+
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
 
 | Resource | Capture path | Note |
 |----------|--------------|------|
@@ -149,6 +175,8 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
 
 ### networking/vpc — VPC-endpoint & transit-gateway prerequisites (docs, UNPROVEN; IB-012/013)
 
+> conf: 0.3 · seen: 2026-06-17 · obs: 1
+
 - **Subnet `type` enum = `(GENERAL, LOCAL, VPC_ENDPOINT)`** (required). A **VPC
   Endpoint needs a dedicated `VPC_ENDPOINT`-type subnet** — passing a GENERAL
   subnet yields 400 `scp-network.vpc-endpoint.subnet-not-found` ("VPC Endpoint
@@ -163,6 +191,8 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
 - TGW VPC-connection cap: **≤5 per TGW** (same account, userguide).
 
 ## State machines (poll field → ready values)
+
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
 
 | Resource | Poll field | Ready value(s) |
 |----------|-----------|----------------|
@@ -183,6 +213,7 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
 ## Required / undocumented fields & quirks (per service)
 
 **virtualserver (VM) — `compute-virtualserver-full`:**
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
 - Block-volume field is **`volume_type`**, NOT `type` (e.g. `SSD_Provisioned`);
   the inline boot volume in create-server uses `type: "SSD"` with `boot_index: 0`,
   `delete_on_termination: true`.
@@ -200,43 +231,60 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
   (`/dev/vdb`); detach before delete.
 
 **ske (K8s) — `container-ske-cluster-nodepool` (heavy, ~27 min, billable):**
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
 - v1.4 schema: cluster `volume_id` is a **string** (a filestorage volume);
   `service_watch_logging_enabled` is **required** (sent as `"true"`).
 - nodepool with `volume_type_name: SSD_Provisioned` requires `volume_max_iops`
   and `volume_max_throughput`.
 - k8s version from `/v1/kubernetes-versions` → `$.kubernetes_versions[0].kubernetes_version`.
 
-**filestorage — `filestorage-volume`:** create needs `protocol: NFS`,
+**filestorage — `filestorage-volume`:**
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
+create needs `protocol: NFS`,
 `type_name: HDD`. (Contrast block volume: `volume_type`, `max_iops`,
 `max_throughput`.)
 
-**scr — `container-scr-registry`:** registry **DELETE returns 500 for a few
+**scr — `container-scr-registry`:**
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
+registry **DELETE returns 500 for a few
 minutes right after creation** (provisioning race), then succeeds — retry the
 delete on 500 for ~6 min. Repository delete retries 409/500.
 
-**virtualserver keypair — `virtualserver-keypair`:** omit `public_key` and SCP
+**virtualserver keypair — `virtualserver-keypair`:**
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
+omit `public_key` and SCP
 **generates** one. Keypairs are addressed **by name** (get/delete
 `/v1/keypairs/{name}`), not by id. Zero-cost, synchronous.
 
-**security-group — `networking-security-group`:** account/region-scoped — **no
+**security-group — `networking-security-group`:**
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
+account/region-scoped — **no
 VPC needed** (confirmed via the VM/ske lifecycles). Rule create uses
 `direction`, `ethertype: IPv4`, `protocol`, `port_range_min/max`,
 `remote_ip_prefix`.
 
-**certificatemanager — self-sign:** body needs `cn`, `not_before_dt` (`{today}`),
+**certificatemanager — self-sign:**
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
+body needs `cn`, `not_before_dt` (`{today}`),
 `not_after_dt` (`{today_plus_5y}`), `organization`, `region`, `timezone`
 (`Asia/Seoul`). Synchronous.
 
-**public-ip / internet-gateway (from docs, best-effort):** public-ip `type: IGW`;
+**public-ip / internet-gateway (from docs, best-effort):**
+> conf: 0.5 · seen: 2026-06-17 · obs: 1
+public-ip `type: IGW`;
 igw needs `vpc_id`, `firewall_enabled`, `type: IGW`.
 
 ## Placeholders the engine seeds automatically
+
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
 
 `{unique}` (collision-free token), `{ualpha}` (alpha-only unique), `{region}`,
 `{today}`, `{today_plus_5y}`. Use these instead of hardcoding values, so runs
 don't collide and resources are attributable.
 
 ## Teardown races
+
+> conf: 0.7 · seen: 2026-06-17 · obs: 1
 
 Deletes that touch a resource still releasing a dependency return `409` (or `500`
 for scr/snapshot/igw) — retry with backoff (`retry_on_status`, `retries`,
@@ -250,24 +298,32 @@ deleting its parent (e.g. subnet 404 before vpc delete).
 > Authored by parallel service-agents (see `agents/CAMPAIGN.md`). Bodies/envelopes
 > below are docs-derived best-effort; promote to "validated" only after a live 2xx.
 
-**Engine coverage-matching gotcha (confirmed, applies to all authors):** the
+**Engine coverage-matching gotcha (confirmed, applies to all authors):**
+> conf: 0.7 · seen: 2026-06-08 · obs: 1
+the
 catalog match normalizes only `{...}` path segments to `*`; a *literal* id
 segment in a step path (e.g. `/v1/roles/0000`) does NOT match the catalog and so
 records ZERO write coverage. Always use `{placeholder}` tokens for id segments
 (`{unique}` works) so the step both resolves to the catalog key and still fires
 when its capture is absent.
 
-**iam** — role create returns `$.role.id`, group `$.group.id`, policy FLAT `$.id`.
+**iam** —
+> conf: 0.3 · seen: 2026-06-08 · obs: 1
+role create returns `$.role.id`, group `$.group.id`, policy FLAT `$.id`.
 `POST /v1/roles` is known to 500 `ContactAdminForAssistance` on the shared account
 (pre-existing). `data/api_bodies.json` `createsamlprovider`/`setsamlprovider` are
 **corrupt** (`{"_raw":"{'key':'company',...}"}`) — needs a real SAML metadata doc.
 
-**iam-identity-center (SSO)** — uses **PATCH** for in-place updates
+**iam-identity-center (SSO)** —
+> conf: 0.3 · seen: 2026-06-08 · obs: 1
+uses **PATCH** for in-place updates
 (setinstance/setuser/setgroup/setpermissionset), unlike iam (PUT). `instance_id`
 is a hard dependency for nearly every write. Envelopes (unproven): `$.instance.id`,
 `$.user.id`, `$.group.id`, `$.permission_set.id`, `$.account_assignment.id`.
 
-**organization (HIGHEST blast radius)** — organizations / organization-accounts /
+**organization (HIGHEST blast radius)** —
+> conf: 0.3 · seen: 2026-06-08 · obs: 1
+organizations / organization-accounts /
 **service-control-policies (SCPs)** / delegation-policies / policy-bindings /
 invitations can sever or DENY the entire account hierarchy account-wide and are
 largely irreversible. All org lifecycles are **coverage-only**: heavy + every
@@ -275,7 +331,9 @@ write `optional` + expecting 403/400, never chaining create→attach/accept. No
 `api_bodies.json` entries exist; all bodies guessed. NEVER weaken to real
 create/delete on a shared account.
 
-**storage/baremetal-blockstorage** — volume create returns `$.result.id`
+**storage/baremetal-blockstorage** —
+> conf: 0.3 · seen: 2026-06-08 · obs: 1
+volume create returns `$.result.id`
 (`result`-wrapped), snapshot create returns FLAT `$.snapshot_id`. State machine
 `CREATING→AVAILABLE/IN_USE→DELETING→DELETED` (poll `$.result.state`). Volume create
 requires `attachments:[{object_id,object_type:BM|MNGC}]` (sent `[]`, may reject).
@@ -283,7 +341,9 @@ There is **no** `DELETE /v1/volume-groups/{id}` — a group is torn down via its
 member volume. Enums: replication cycle {5MIN,HOURLY,DAILY,WEEKLY,MONTHLY}, policy
 {RESYNC,BREAK}; disk_type {SSD,HDD}.
 
-**application-service/apigateway** — VPC-free control-plane. A deployment needs ≥1
+**application-service/apigateway** —
+> conf: 0.3 · seen: 2026-06-08 · obs: 1
+VPC-free control-plane. A deployment needs ≥1
 method first (`NoMethodsExist`); `createapideployment stage_type:new` creates the
 stage and returns `$.deployment_id`. `createauth` returns ONLY `$.access_token`
 (no id) → recover `auth_id` via `listauths $.auths[0].id`. Methods addressed by
@@ -291,7 +351,9 @@ stage and returns `$.deployment_id`. `createauth` returns ONLY `$.access_token`
 `^[a-z][a-z0-9-]{1,48}[a-z0-9]$`. privatelink-endpoint needs a real
 `privatelink_service_id` (synthetic → 4xx, optional).
 
-**servicewatch** — bulk-delete (`DELETE /v1/alerts|dashboards|event-rules`, no path
+**servicewatch** —
+> conf: 0.3 · seen: 2026-06-08 · obs: 1
+bulk-delete (`DELETE /v1/alerts|dashboards|event-rules`, no path
 id) modeled as `{"ids":[...]}` (unproven, mirrors proven `deleteloggroups`).
 Create envelopes `$.alert.id`/`$.dashboard.id`/`$.event_rule.id` (unproven).
 createalert needs real `metric_id`/`namespace_id`; createeventrule needs real
@@ -304,7 +366,9 @@ event/resource/service ids — doc-sample ids used, 4xx expected (still records)
 > 7 cluster-agents authored 36 fragment files / 49 lifecycles closing 302 write
 > ops. Static ceiling 55.4% → 78.6%. All bodies docs-derived; promote after a live 2xx.
 
-**Static coverage matching is PATH-only (service-agnostic).** `spec.coverage_gap`
+**Static coverage matching is PATH-only (service-agnostic).**
+> conf: 0.7 · seen: 2026-06-08 · obs: 1
+`spec.coverage_gap`
 and the dashboard match `(method, norm_path)` ignoring service, but the engine
 RECORDS under `(method, norm_path, service)`. Consequence: DBaaS-family services
 sharing `/v1/clusters/*` roots (mysql/mariadb/epas/postgresql/sqlserver/cachestore
@@ -312,23 +376,30 @@ sharing `/v1/clusters/*` roots (mysql/mariadb/epas/postgresql/sqlserver/cachesto
 engine covers the path — but each still needs its own fragment to record under its
 own host/keys at runtime. All such per-engine fragments were authored.
 
-**Cost-safe coverage-only pattern (virtualserver, databases, org, analytics):** for
+**Cost-safe coverage-only pattern (virtualserver, databases, org, analytics):**
+> conf: 0.7 · seen: 2026-06-08 · obs: 1
+for
 billable/destructive resources, do NOT provision — soft-capture an existing id (or
 a deliberately-empty JSONPath so the `{id}` stays literal → guaranteed 404), fire
 every write `optional`+`group`+broad `expect_status:[200,201,202,400,403,404,409,422]`.
 The endpoint is CALLED+recorded (counts as covered) without touching real resources.
 
-**VPC reuse extended:** loadbalancer, vpn, direct-connect, and the 6 vpc-extra
+**VPC reuse extended:**
+> conf: 0.7 · seen: 2026-06-08 · obs: 1
+loadbalancer, vpn, direct-connect, and the 6 vpc-extra
 lifecycles adopt the session-shared VPC via `{"adopt":"vpc"}` (registered in
 `dependencies.json:quota_kinds` as `["vpc"]`). The "VPC consumers" set in
 `vpc-scheduling-strategy.md` is now larger but all heavy adopters share the one VPC.
 
 **Corrupt `data/api_bodies.json` entries found (TODO fix):**
+> conf: 0.7 · seen: 2026-06-08 · obs: 1
 `security/iam createsamlprovider`/`setsamlprovider` (`{"_raw":"{'key':'company',...}"}`)
 and `networking/vpc createtransitgatewayfirewallconnection` (`{"_raw":"{transit_gateway_id}"}`).
 Agents worked around with best-guess bodies; the source entries should be re-extracted.
 
-**Per-family capture/body notes** (unproven): block-volume `$.result.id` + flat
+**Per-family capture/body notes** (unproven):
+> conf: 0.3 · seen: 2026-06-08 · obs: 1
+block-volume `$.result.id` + flat
 `$.snapshot_id`; backup `$.resource.id`; filestorage snapshot `$.snapshot.id`,
 snapshot-schedule create returns NO id (use list); cdn `$.cdn.resource_id`; gslb
 `$.gslb.id`; vpn `$.vpn_gateway.id`/`$.vpn_tunnel.id`; dc `$.direct_connect.id`.
@@ -340,6 +411,8 @@ secretvault has no hard DELETE (PUT .../terminated); secretsmanager
 (coverage-only); firewall has no `POST /v1/firewalls` (implicit on igw/dc/vpc).
 
 ## 2026-06-10 — full heavy run 27258520218 + post-run force-cleanup evidence
+
+> conf: 0.7 · seen: 2026-06-10 · obs: 1
 
 **cachestore create VALIDATED:** `heavy-shared-dbaas` cache-create got **202**
 (cluster created → waited → 202 delete) with `dbaas_engine_version_id` captured
@@ -375,6 +448,8 @@ the ~40-endpoint chain stays called-only without a BM server. Full constraints:
 
 ## 2026-06-10 — A∥B split run 27306490231 (job B evidence, mid-run)
 
+> conf: 0.7 · seen: 2026-06-10 · obs: 1
+
 - **VPC account cap is 5, not 3** — live error `scp-network.vpc.exceed-max-count:
   "The number(5) of VPCs ... has been exceeded"`. The long-standing "3 VALIDATED"
   was wrong; budgets/dependencies/cross-service updated to 5 (per-run cap 4).
@@ -393,6 +468,8 @@ the ~40-endpoint chain stays called-only without a BM server. Full constraints:
   not yet fixed).
 
 ## 2026-06-11 — runs #3~#5 + oplog 구축에서 VALIDATED된 사실들
+
+> conf: 0.7 · seen: 2026-06-11 · obs: 1
 
 **런 시간/커버리지 추이 (풀 헤비):** #1 e3ba190 3h49m (fail_new 52) → #2 84df549
 2h11m (50) → #3 3f59837 1h21m (50, C3 43.27%/분모 1130) → #4 63a139f 51m (48,
@@ -434,6 +511,8 @@ sweep 마일스톤만 누락된 원인.)
 
 ## 2026-06-11 — coverage-expansion authoring (docs-derived, NOT yet runtime-proven)
 
+> conf: 0.3 · seen: 2026-06-11 · obs: 1
+
 > Levers ①③④ of `docs/SESSION-HANDOFF-run6-and-ops.md`; full analysis in
 > `docs/COVERAGE-WAVE-PLAN.md`. Promote after a live 2xx.
 
@@ -464,6 +543,8 @@ sweep 마일스톤만 누락된 원인.)
 
 ## 2026-06-11 — query-string HMAC 401: root cause found OFFLINE (fix landed, live-verify pending)
 
+> conf: 0.5 · seen: 2026-06-11 · obs: 1
+
 > Offline-proven in `tests/offline/test_hmac_signing.py` (21 tests); promote to
 > validated after the scoped live run 2xxes. Do NOT remove the two
 > `known_issues.json` unset-backup entries until then.
@@ -492,6 +573,7 @@ sweep 마일스톤만 누락된 원인.)
   entries as Product Bug instead of removing them.
 
 ## SKE cluster/nodepool upgrade — LIVE-PROVEN (run 27492496266, 2026-06-14)
+> conf: 0.7 · seen: 2026-06-14 · obs: 1
 - `gen-heavy-ske-upgrade` chain passed end-to-end (1 passed, 35m26s real
   control-plane + node roll): create old cluster v1.33.5 → `PUT
   /v1/clusters/{id}/upgrade {kubernetes_version:v1.34.3}` → RUNNING re-poll →

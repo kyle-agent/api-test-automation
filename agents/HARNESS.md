@@ -108,3 +108,13 @@ when repo var `SCP_RUN_CRUD=true`. Every job exports `APITEST_RUN_ID` so
 4. Persist hard-won facts to `knowledge/` + scenario `_note`s and commit them.
 5. Commit to the assigned branch with clear messages; push when done; no PR
    unless asked.
+
+### Memory discipline
+
+Memory/notes are **HINTS, not ground truth**. Any cross-session memory entry
+(`agents/CONTEXT.md`, `knowledge/`, `agents/coordination/ledger.json`, a handoff)
+that names a concrete file path, env flag, endpoint, run-id, or coverage number
+MUST be re-verified before you act on it — Glob/Grep the path, re-run
+`python -m spec.summary` for coverage, check the catalog. On any conflict,
+CURRENT observed state wins over the remembered value (catalog/coverage numbers
+and run-ids drift between sessions here).

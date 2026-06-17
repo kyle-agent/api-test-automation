@@ -40,15 +40,28 @@ not duplicate them.
    (goals, current coverage, safety gates, where results live).
 2. Read [`agents/README.md`](agents/README.md) — the agent roster and how the
    orchestrator delegates.
-3. Open the agent doc for your task (e.g. running CRUD = `agents/regression-agent.md`;
+3. **Spot-check the handoff before trusting it.** Before acting on the current
+   handoff (`docs/SESSION-HANDOFF*.md`) / `agents/CONTEXT.md`, verify 1–2 concrete
+   references it names — a file/fragment path (Glob/Grep), a run-id, or a coverage
+   number (`python -m spec.summary`) — to confirm they still exist / still hold.
+   핸드오프는 run-id·SHA·fragment 경로를 인용하는데 이것들은 금방 stale 됩니다. If a
+   cited path, run-id, or number is stale, **flag it and trust current observed
+   state over the handoff.**
+4. Open the agent doc for your task (e.g. running CRUD = `agents/regression-agent.md`;
    teaching the suite a new service order = `agents/domain-knowledge-agent.md`).
-4. Consult [`knowledge/`](knowledge/) before inventing API call orders or request
+5. Consult [`knowledge/`](knowledge/) before inventing API call orders or request
    bodies — most of it is already captured (and hard-won). Add what you learn back.
 
 > **Kicking off a fresh session?** The minimum prompt is literally:
 > *"Read `START_HERE.md` and continue per its instructions."* Ready-to-paste
 > kickoff prompts for specific goals (advance coverage, run conformance, curate
 > domain knowledge) live in [`agents/PROMPTS.md`](agents/PROMPTS.md#starting-a-new-session-copy-paste-kickoffs).
+
+> **Handoff convention (when you write/end a session handoff):** the **TOP /
+> current in-progress item** MUST carry a literal, copy-pasteable **resume
+> command** — the exact `pytest …` / dispatch / `grep` / `python -m …` to run
+> next — not just a prose description of the next candidate. 다음 세션이 핸드오프를
+> 열자마자 그 명령어를 그대로 복사·실행할 수 있어야 합니다.
 
 ## Golden rules (do not break these)
 

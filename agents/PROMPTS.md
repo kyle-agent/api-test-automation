@@ -32,7 +32,11 @@ When the orchestrator delegates, the prompt should contain, in order:
 5. **Definition of done** — the artifact + how it's verified (e.g. "scenario
    added, `python -m spec.summary` unaffected, static validation clean, committed").
 6. **Report format** — "Return: changed files, new facts for `knowledge/`,
-   coverage delta, open questions."
+   coverage delta, open questions." Every subagent report MUST start with a
+   STATUS line — one of `DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED` —
+   and MUST include a `changed-files:` list (empty if none). If the orchestrator
+   receives a report missing the STATUS line or `changed-files:`, it re-requests
+   them (max 2 times) and then treats the result as `BLOCKED`.
 
 ## Standing objectives (what agents optimize for)
 

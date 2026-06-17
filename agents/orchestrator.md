@@ -91,6 +91,25 @@ the next obvious objective is named for the following session.
 4. Coordinator가 cp-머지 → 게이트 재확인 → 커밋/푸시. 파일 영역이 겹치지
    않게 배치를 구성(겹치면 diff/3way 머지).
 
+#### Output-drift 체크 (머지 전 필수)
+
+머지 전, Executor가 **실제로 바꾼 파일**을 그 Executor에게 **배정된 슬라이스**
+(`resources/<cat>__<svc>.yaml` + 관련 scenario/coverage 파일)와 대조한다.
+메커니즘: `git diff --stat`(worktree) ↔ 보고된 `changed-files:` 목록.
+배정 슬라이스 **밖**의 파일이 바뀌었으면(예: `resources/storage__backup.yaml`
+배정 agent가 무관한 파일까지 편집) **EXTRA-drift로 FLAG** — 조용히 머지하지
+말고 검토·정당화 후 커밋(정당화 안 되면 해당 변경 되돌리고 재배정).
+
+#### 심각도 → 머지 액션 매핑
+
+validation/conformance agent의 finding은 severity에 따라 **결정론적으로** 처리한다.
+
+| severity | Coordinator 액션 |
+|---|---|
+| **CRITICAL / HIGH** | 머지 차단(block) — 머지 전 수정 위해 재배정 |
+| **MEDIUM** | 싸게 고쳐지면 fix, 아니면 추적 TODO/backlog 등록 후 진행 |
+| **LOW / INFO** | advisory — 머지하고 보고서에 기록 |
+
 ### Done-when (루프)
 
 backlog가 `dashboard/history.jsonl`·PF 원장·retirement 매트릭스를 반영해
