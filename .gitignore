@@ -7,7 +7,9 @@ __pycache__/
 dashboard/index.html
 dashboard/history.jsonl
 dashboard/services/
-.claude/
+.claude/*
+# but DO track vendored Claude Code skills (see .claude/skills/README.md)
+!.claude/skills/
 
 # control plane runtime state (controlplane/README.md)
 controlplane/data/
