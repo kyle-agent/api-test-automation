@@ -154,12 +154,39 @@ def build_catalog(model: dict | None = None) -> dict:
             focus[nid] = {"error": str(exc), "nodes": [], "edges": [], "focus": nid}
 
     val = sum(1 for n in nodes.values() if n["provenance"] == "VALIDATED")
+
+    # Per-service validation standing (V3): the catalog as a validation
+    # progress board. For each service count VALIDATED vs total nodes so the
+    # drilldown can show "✅ 7/7" / "🟡 3/9" / "❌ 0/5 (docs)" at a glance.
+    services: dict[str, dict] = {}
+    for n in nodes.values():
+        svc = n["service"]
+        if not svc:
+            continue
+        s = services.setdefault(svc, {
+            "service": svc, "category": n["category"],
+            "total": 0, "validated": 0, "ids": []})
+        s["total"] += 1
+        s["ids"].append(n["id"])
+        if n["provenance"] == "VALIDATED":
+            s["validated"] += 1
+    for s in services.values():
+        s["ids"].sort()
+        v, t = s["validated"], s["total"]
+        s["status"] = "full" if v == t else ("partial" if v > 0 else "zero")
+
+    fully = sum(1 for s in services.values() if s["status"] == "full")
+    partial = sum(1 for s in services.values() if s["status"] == "partial")
+    zero = sum(1 for s in services.values() if s["status"] == "zero")
     return {
         "generated_from": "knowledge/formal/resources/*.yaml (via composer)",
         "node_count": len(nodes), "validated": val,
+        "service_count": len(services),
+        "services_full": fully, "services_partial": partial, "services_zero": zero,
         "groups": {g: {"label": (groups.get(g) or {}).get("label", g),
                        "category": (groups.get(g) or {}).get("category", "")}
                    for g in sorted({n["group"] for n in nodes.values()})},
+        "services": services,
         "nodes": nodes, "focus": focus,
     }
 
@@ -281,6 +308,17 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
 .tbl td,.tbl th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
+.vbadge{display:inline-block;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;
+  border:1px solid var(--line)}.vbadge.full{background:#14322a;border-color:#3fb27f;color:#8ee0b9}
+.vbadge.partial{background:#33291a;border-color:#e0922f;color:#ffd9a0}
+.vbadge.zero{background:#3a1717;border-color:#ff6b6b;color:#ffb3b3}
+.vbar{height:6px;border-radius:4px;background:#2a3850;overflow:hidden;margin:8px 0 4px}
+.vbar>i{display:block;height:100%;background:var(--val)}
+.tag{display:inline-block;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:6px;
+  vertical-align:middle}.tag.v{background:#14322a;color:#8ee0b9;border:1px solid #3fb27f}
+.tag.d{background:#33291a;color:#ffd9a0;border:1px solid #e0922f}
+.compose{background:#2a1f3d;border:1px solid #7b5cc4;color:#d9c9ff;border-radius:8px;padding:8px 12px;
+  font-weight:600;font-size:13px;display:inline-block;margin-top:6px}.compose:hover{background:#372a52}
 </style></head><body><div class="wrap">
 <h1><a href="../index.html" style="color:#90a4ba">← 대시보드</a> · 자원 카탈로그
   <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
@@ -288,10 +326,11 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
 <p class="muted" id="sub"></p>
 <div class="cols">
   <div class="panel">
-    <h2>서비스 선택</h2>
+    <h2>서비스 선택 <span class="muted" style="font-weight:400;font-size:11px">— 검증 진행 보드</span></h2>
     <label>카테고리<select id="cat"></select></label>
     <label>서비스<select id="svc"></select></label>
-    <h3>자원 노드</h3><div class="scroll" id="list"></div>
+    <div id="svcstat"></div>
+    <h3>자원 노드 <span class="muted" style="font-weight:400;text-transform:none">(노드별 검증 표시)</span></h3><div class="scroll" id="list"></div>
   </div>
   <div class="panel">
     <h2 id="gtitle"></h2>
@@ -310,19 +349,35 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
 </div>
 <script src="catalog.js"></script><script src="graph.js"></script>
 <script>
-var C=window.CATALOG,N=C.nodes,sel=null;
-document.getElementById("sub").textContent=C.node_count+" 노드 · "+C.validated+" VALIDATED · "+Object.keys(C.groups).length+" 그룹";
+var C=window.CATALOG,N=C.nodes,SVC=C.services||{},sel=null;
+document.getElementById("sub").innerHTML=C.node_count+" 노드 · <b style='color:#3fb27f'>"+C.validated+" VALIDATED</b> ("+Math.round(100*C.validated/C.node_count)+"%) · "+C.service_count+" 서비스 — "+
+  "<span class='tag v'>✅ "+C.services_full+" 완료</span> <span class='tag d' style='background:#33291a;border-color:#e0922f'>🟡 "+C.services_partial+" 부분</span> <span class='tag' style='background:#3a1717;color:#ffb3b3;border:1px solid #ff6b6b'>❌ "+C.services_zero+" 미검증</span>";
 document.getElementById("gen").textContent=C.generated_from;
 var cats=[...new Set(Object.values(N).map(n=>n.category))].sort();
 var svcOf={};Object.values(N).forEach(n=>{(svcOf[n.category]=svcOf[n.category]||new Set()).add(n.service);});
 function fill(s,arr,v){s.innerHTML=arr.map(x=>'<option '+(x===v?'selected':'')+'>'+x+'</option>').join("");}
 function pickFirst(){sel="vpc" in N?"vpc":Object.keys(N)[0];}
-pickFirst();
+// dashboard deep-link: #<category>/<service> selects that service (else default)
+function fromHash(){var h=decodeURIComponent((location.hash||"").replace(/^#/,""));if(!h)return false;var id=Object.keys(N).find(k=>N[k].service===h);if(id){sel=id;return true;}return false;}
+if(!fromHash())pickFirst();
+window.addEventListener("hashchange",function(){if(fromHash())refresh();});
+function svcBadge(s){
+  var cls=s.status,lab=cls==="full"?"✅":(cls==="partial"?"🟡":"❌");
+  var tail=cls==="zero"?" (docs)":"";
+  return '<span class="vbadge '+cls+'">'+lab+' '+s.validated+'/'+s.total+' validated'+tail+'</span>';
+}
 function refresh(){
   var n=N[sel];fill(document.getElementById("cat"),cats,n.category);
   fill(document.getElementById("svc"),[...svcOf[n.category]].sort(),n.service);
+  // per-service validation standing (V3) + compose affordance (V4)
+  var s=SVC[n.service]||{validated:0,total:0,status:"zero",ids:[]};
+  var pct=s.total?Math.round(100*s.validated/s.total):0;
+  document.getElementById("svcstat").innerHTML=
+    '<div style="margin:8px 0">'+svcBadge(s)+'</div>'+
+    '<div class="vbar"><i style="width:'+pct+'%"></i></div>'+
+    '<a class="compose" href="plan.html?service='+encodeURIComponent(n.service)+'" title="이 서비스 자원으로 합성 Plan 미리보기">🧩 이 서비스 합성하기 (compose →)</a>';
   var ids=Object.keys(N).filter(id=>N[id].service===n.service).sort();
-  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="radio" name="nd" '+(id===sel?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><span><b>'+id+'</b> <span class="muted" style="font-size:11px">'+(N[id].requires.and.length+N[id].requires.one_of.length)+"↑ "+N[id].dependents.length+"↓</span></span></label>").join("");
+  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="radio" name="nd" '+(id===sel?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><span><b>'+id+'</b> <span class="tag '+(N[id].provenance==="VALIDATED"?"v\">✅ VALIDATED":"d\">📄 docs")+'</span> <span class="muted" style="font-size:11px">'+(N[id].requires.and.length+N[id].requires.one_of.length)+"↑ "+N[id].dependents.length+"↓</span></span></label>").join("");
   document.querySelectorAll('#list input').forEach(r=>r.onchange=function(){sel=r.dataset.id;refresh();});
   // graph
   var g=C.focus[sel];
@@ -342,7 +397,9 @@ function refresh(){
     '<h3>requires</h3><div>'+reqHtml+'</div>'+
     '<h3>피의존</h3><div>'+depHtml+'</div>'+
     '<h3>options</h3>'+optHtml+
-    '<div class="note">이 화면은 읽기 전용입니다. 정의/수정은 control plane <code>/planning/resources/'+sel+'</code> 에서.</div>';
+    '<h3>합성 (compose)</h3>'+
+    '<a class="compose" href="plan.html?targets='+encodeURIComponent(sel)+'">🧩 이 노드로 합성 Plan 미리보기 →</a>'+
+    '<div class="note">시나리오는 <b>카탈로그 서비스를 합성</b>해 생성됩니다(손으로 쓴 게 아님). 이 화면은 읽기 전용 — 정의/수정·실제 실행은 control plane <code>/planning/resources/'+sel+'</code> 에서.</div>';
 }
 document.getElementById("reduce").onchange=refresh;
 document.getElementById("cat").onchange=function(e){var c=e.target.value;var fs=[...svcOf[c]].sort()[0];sel=Object.keys(N).find(id=>N[id].service===fs);refresh();};
@@ -381,10 +438,11 @@ input,select{width:100%;background:var(--panel2);border:1px solid var(--line);co
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
 </style></head><body><div class="wrap">
-<h1>합성 Plan 미리보기 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
+<h1>🧩 서비스 합성 → Plan <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
   <a href="catalog.html">← 카탈로그</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 실제 합성/실행은 control plane.</span></h1>
-<p class="muted">여러 자원을 고르면 의존 폐포의 합집합과 <b>공통 선행자원(dedup)</b>을 미리 봅니다.
-  실제 compose+draft+실행은 <code>/planning/resources/compose</code>(FastAPI)에서.</p>
+<p class="muted"><b>시나리오 = 카탈로그 서비스들을 합성(compose)한 결과</b>입니다 — 손으로 작성하지 않습니다.
+  여러 서비스의 자원을 고르면 composer가 의존 폐포의 합집합과 <b>공통 선행자원(dedup)</b>을 계산해
+  레벨 병렬 lifecycle을 미리 봅니다. 실제 compose+draft+실행은 <code>/planning/resources/compose</code>(FastAPI)에서.</p>
 <div class="cols">
   <div class="panel">
     <h2>타깃 선택</h2><input type="search" id="q" placeholder="검색…">
@@ -400,8 +458,10 @@ input,select{width:100%;background:var(--panel2);border:1px solid var(--line);co
     <div class="svgbox"><svg id="svg"></svg></div>
   </div>
   <div class="panel">
-    <h2>plan 요약</h2><div id="sum"></div>
-    <a class="btn" id="live" href="#" style="margin-top:10px">control plane에서 실행 →</a>
+    <h2>합성 plan 요약 <span class="muted" style="font-weight:400;font-size:11px">(composed preview)</span></h2><div id="sum"></div>
+    <a class="btn" id="live" href="#" style="margin-top:10px">🧩 control plane에서 합성·실행 →</a>
+    <p class="muted" style="font-size:11px;margin-top:8px">이 preview는 composer가 서버 없이 순수 계산.
+      저장/실행만 control plane이 필요합니다.</p>
   </div>
 </div>
 <div class="foot">폐포·dedup·level은 클라이언트가 모델 의존(requires)으로 계산(미리보기). 실제 합성은
@@ -409,8 +469,13 @@ input,select{width:100%;background:var(--panel2);border:1px solid var(--line);co
 </div>
 <script src="catalog.js"></script><script src="graph.js"></script>
 <script>
-var C=window.CATALOG,N=C.nodes,T=new Set();
-["ske-cluster","mysql-cluster","private-nat"].forEach(id=>{if(N[id])T.add(id);});
+var C=window.CATALOG,N=C.nodes,SVC=C.services||{},T=new Set();
+// V4: foreground compose — preselect from the catalog's "🧩 합성하기" deep-link.
+// ?targets=a,b (node ids) or repeated, and ?service=svc (all of a service's nodes).
+(function(){var p=new URLSearchParams(location.search);
+  p.getAll("targets").forEach(v=>v.split(",").forEach(id=>{if(N[id.trim()])T.add(id.trim());}));
+  p.getAll("service").forEach(sv=>{var s=SVC[sv];if(s)s.ids.forEach(id=>{if(N[id])T.add(id);});});})();
+if(!T.size)["ske-cluster","mysql-cluster","private-nat"].forEach(id=>{if(N[id])T.add(id);});
 if(!T.size)Object.keys(N).slice(0,2).forEach(id=>T.add(id));
 function deps(id){var n=N[id];if(!n)return[];var out=[];
   n.requires.and.forEach(d=>{if(N[d.ref])out.push(d.ref);});
