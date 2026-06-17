@@ -1,6 +1,6 @@
 <!doctype html><html lang="ko"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SCP 통합 콘솔 — Knowledge·Overview·Plan·Run·Report</title>
+<title>SCP 콘솔 — Catalog·Plan·Run·Report</title>
 <link rel="stylesheet" href="assets/style.css">
 <script src="data/model.js"></script>
 <script src="data/results.js"></script>
@@ -48,10 +48,10 @@
 </style>
 </head><body><div class="wrap">
 <header class="top">
-  <h1>SCP 통합 콘솔</h1>
-  <span class="crumbs"><a href="index.html">홈</a> › Knowledge → Overview → Plan → Run → Report (같은 그래프, 오버레이만 교체)</span>
+  <h1>SCP 콘솔</h1>
+  <span class="crumbs">/platform — Catalog → Plan → Run → Report (같은 그래프, 오버레이만 교체)</span>
   <nav class="nav">
-    <a href="index.html">홈</a><a href="06-ia-walkthrough.html">워크스루</a>
+    <a href="../index.html">📊 대시보드</a><a href="knowledge.html">📚 Knowledge</a>
     <a href="references.html">참고</a>
   </nav>
 </header>
@@ -60,18 +60,16 @@
 <div class="ctxbar" id="ctxbar"></div>
 
 <div class="flow">
-  <b>Knowledge</b> 정의 <span class="ar">→</span>
-  <b>Overview</b> 건강도 <span class="ar">→</span>
+  <b>Catalog</b> 자원·의존 정의 <span class="ar">→</span>
   <b>Plan</b> 합성 <span class="ar">→</span> <b>Run</b> 실행 <span class="ar">→</span>
   <b>Report</b> 결과·커버리지 <span class="ar">↺</span>
 </div>
 
 <div class="tabs">
-  <button data-t="knowledge" class="on"><span class="n">1</span>Knowledge</button>
-  <button data-t="overview"><span class="n">2</span>Overview</button>
-  <button data-t="plan"><span class="n">3</span>Plan</button>
-  <button data-t="run"><span class="n">4</span>Run</button>
-  <button data-t="report"><span class="n">5</span>Report</button>
+  <button data-t="catalog" class="on"><span class="n">1</span>Catalog</button>
+  <button data-t="plan"><span class="n">2</span>Plan</button>
+  <button data-t="run"><span class="n">3</span>Run</button>
+  <button data-t="report"><span class="n">4</span>Report</button>
 </div>
 
 <div class="cols wide">
@@ -94,7 +92,7 @@ const RES=window.RESULTS||{summary:{},perService:{}};
 const PS=RES.perService||{};
 const TH=(RES.thresholds||{high:80,mid:50});
 const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",time:"",mode:"SNAPSHOT"};
-let tab="knowledge";
+let tab="catalog";
 let targets=new Set(["ske-cluster","mysql-cluster","private-nat"].filter(V.exists));
 let choices={};
 let selNode=V.exists("vpc")?"vpc":V.allIds()[0];
@@ -423,11 +421,11 @@ function reportTab(){
   document.getElementById("right").innerHTML=`<h2>단계별 수행시간</h2>
     <div class="scroll"><table class="tbl">
       <tr><th>node</th><th>L</th><th>create</th><th>ready</th><th>verify</th><th>합</th><th>구간</th></tr>${rows}</table></div>
-    <button class="btn ghost" style="margin-top:10px" onclick="go('overview')">↺ Overview로</button>`;
+    <button class="btn ghost" style="margin-top:10px" onclick="go('catalog')">↺ Catalog로</button>`;
 }
 
 // ---- tab switch ----
-function draw(){({knowledge,overview,plan:planTab,run:runTab,report:reportTab})[tab]();}
+function draw(){({catalog:knowledge,plan:planTab,run:runTab,report:reportTab})[tab]();}
 function go(t){stopRun();if(t==="run")clock=0;tab=t;
   document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));draw();}
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>go(b.dataset.t));
