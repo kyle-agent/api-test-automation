@@ -6,19 +6,21 @@
 <div class="card pad">
   <div class="compose">
     <form class="picker" method="post" action="/runs/trigger">
+      {% set pf = prefill|default({}) %}
       <label>환경 (프로파일)</label>
       <select name="profile" id="runEnv">
         <option value="">(repo vars 기본 — stage)</option>
-        {% for p in profiles %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        {% for p in profiles %}<option value="{{ p }}" {% if pf.profile == p %}selected{% endif %}>{{ p }}</option>{% endfor %}
       </select>
       <label style="margin-top:12px">스위트</label>
       <select name="suite" id="runSuite">
-        {% for s in suites %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        {% for s in suites %}<option value="{{ s }}" {% if pf.suite == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
       </select>
       <label style="margin-top:12px">범위 좁히기 (선택)</label>
       <input type="text" name="service" placeholder="service (smoke 범위)"
-             style="margin-bottom:6px">
-      <input type="text" name="crud_filter" placeholder="crud_filter (lifecycle -k)">
+             value="{{ pf.service|default('') }}" style="margin-bottom:6px">
+      <input type="text" name="crud_filter" placeholder="crud_filter (lifecycle -k)"
+             value="{{ pf.crud_filter|default('') }}">
       <div style="margin-top:16px;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
         <button class="btn primary" type="submit">RUN 실행</button>
         {% if not dispatch_ok %}

@@ -100,3 +100,37 @@ list → graph highlight + Triage link · glossary/tooltips consistent.
 
 **Scope guard:** all work on `claude/zealous-heisenberg-irf3xt`; public Pages root
 untouched until merged (only `preview-v2/` subdir is published).
+
+## Read-plane ↔ write-plane hand-off (Run/Edit/Dispatch)
+
+The static console is **read-only by design**: it visualises the model + results,
+and its Catalog/Plan/Run/Report buttons hand off to the FastAPI **control plane**
+(the write/dispatch plane) where the real action — and the safety gates — live.
+Two stages:
+
+### A — deep-link hand-off (DONE, 2026-06-17)
+
+The console resolves a control-plane base URL `CP` (`?cp=<url>` → `localStorage`
+→ default `http://localhost:8000`; header **🧩 컨트롤플레인 ↗** + **⚙** to open/change),
+then deep-links each action there as a plain GET:
+
+| Console button | → control plane |
+|---|---|
+| Catalog **편집(쓰기)** | `GET /planning/resources/<id>` |
+| Catalog **+ 새 노드 생성** | `GET /planning/resources/_new?service=<cat/svc>` |
+| Plan **dispatch ↗** / Run **실제 실행 ↗** / Report **재실행 ↗** | `GET /testing?suite=full&service=<cat/svc>` (run console, trigger form **prefilled**) |
+
+The actual run is a **server-side POST `/runs/trigger` → `dispatch.dispatch_run`**,
+so `SCP_ALLOW_*` / dispatch config are never bypassed by a static page. `/testing`
+GET accepts `suite`/`service`/`profile`/`crud_filter` query hints to prefill the
+form (carries the picked scope across the hand-off). Forward-compatible with B:
+same buttons, the base URL just points at a local install instead of a remote.
+
+### B — packaged local install / live console (ROADMAP, not started)
+
+Bundle the control plane so it installs locally (e.g. `pipx`/desktop) and the
+console runs **against it directly** — buttons call the dispatch API + poll the
+run id so the **Run tab streams real progress** (replacing the schedule
+simulation) and **Report shows live run history**. Requires a runtime (not just
+Pages), auth for the dispatch token, and explicit in-UI safety-gate surfacing.
+Until then, A is the contract: static read + control-plane write, joined by `CP`.

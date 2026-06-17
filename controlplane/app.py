@@ -427,7 +427,8 @@ def _run_preview_data() -> dict:
 
 
 @app.get("/testing", response_class=HTMLResponse)
-def testing(request: Request):
+def testing(request: Request, suite: str = "", service: str = "",
+            profile: str = "", crud_filter: str = ""):
     runs = db.list_runs(limit=15)
     running = [r for r in runs if r["status"] in ("running", "dispatched")]
     live = []
@@ -435,9 +436,15 @@ def testing(request: Request):
         if r["gh_run_id"]:
             evs = db.list_events(r["gh_run_id"], kind="milestone", limit=50)
             live.append({"run": r, "milestones": evs})
+    # prefill the trigger form from query hints — the static /platform console
+    # deep-links here carrying the picked service/suite (read-plane → write-plane
+    # hand-off, IA.md A). The actual dispatch stays a server-side POST so the
+    # safety gates are never bypassed.
+    prefill = {"suite": suite.strip(), "service": service.strip(),
+               "profile": profile.strip(), "crud_filter": crud_filter.strip()}
     return _render(request, "testing.html", "testing",
                    runs=runs, live=live, schedules=db.list_schedules(),
-                   preview=_run_preview_data())
+                   preview=_run_preview_data(), prefill=prefill)
 
 
 @app.get("/partials/runs", response_class=HTMLResponse)

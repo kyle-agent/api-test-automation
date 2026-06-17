@@ -1,8 +1,10 @@
-# Publish-only run after the catalog-consolidation merge (#2).
-# Purpose: republish so the console Catalog tab becomes the single canonical
-# catalog surface — dashboard per-service downlinks now deep-link into
-# platform/console.html?service=<cat>/<svc>, and the standalone catalog/ static
-# export is retired (graph_export kept, just not published).
+# Publish-only run for IA "A" — read-plane→write-plane deep-link hand-off.
+# Purpose: republish /platform so the console's Catalog/Plan/Run/Report buttons
+# deep-link into the control plane (편집→/planning/resources/<id>, dispatch/실제
+# 실행/재실행→/testing?suite=full&service=<svc> with the trigger form prefilled).
+# Static console stays read-only; the actual dispatch is a server-side POST so the
+# safety gates are never bypassed. (controlplane/app.py + testing.html changes ride
+# along but only affect the FastAPI plane, not Pages.)
 #
 # READ-ONLY SMOKE — explicitly NO mutations / destructive / heavy. Cheap (~15min),
 # no resource changes. Cumulative coverage (verified_endpoints/endpoint_status) is
