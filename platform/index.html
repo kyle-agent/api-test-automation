@@ -96,6 +96,22 @@ let targets=new Set(["ske-cluster","mysql-cluster","private-nat"].filter(V.exist
 let choices={};
 let selNode=V.exists("vpc")?"vpc":V.allIds()[0];
 
+// ---- deep-link: pre-select a service from the URL ----
+// accepts ?service=<category>/<service> (querystring) OR #<category>/<service> (hash).
+// if it matches a node's `service`, select that service's first node + Catalog tab.
+function svcFromURL(){
+  const q=new URLSearchParams(location.search).get("service");
+  const h=location.hash.replace(/^#/,"");
+  return (q||h||"").trim();
+}
+function applyURLService(){
+  const svc=svcFromURL();if(!svc)return false;
+  const id=V.allIds().filter(id=>N[id].service===svc).sort()[0];
+  if(!id)return false;
+  selNode=id;tab="catalog";return true;
+}
+applyURLService();
+
 // ---- C3 health color for a node, from its service's results ----
 function svcRes(id){return PS[N[id].service]||null;}
 function healthFill(id){const r=svcRes(id);
@@ -428,6 +444,8 @@ function draw(){({catalog:knowledge,plan:planTab,run:runTab,report:reportTab})[t
 function go(t){stopRun();if(t==="run")clock=0;tab=t;
   document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));draw();}
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>go(b.dataset.t));
+// re-select when the hash deep-link changes (e.g. #networking/loadbalancer)
+window.addEventListener("hashchange",()=>{if(applyURLService())go("catalog");});
 ctxBar();
 draw();
 </script>
