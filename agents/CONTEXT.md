@@ -253,10 +253,22 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   billingplan/devops lifecycles still carry old invented bodies). All R1
   0-errors; resource model now **275 task nodes / 59 service files**
   (2026-06-17, `python knowledge/formal/validate.py`).
-- **What to advance next:** confirm heavy rev 3 (static-NAT `publicip_id`,
-  scr/fs recompose, docker-probe borrow), then continue R3 verification
-  waves over the **144 remaining docs nodes** (131/275 VALIDATED as of
-  2026-06-17) (compose → scoped
+- **Wave A.1 light batch MATERIALIZED & dispatch-ready (2026-06-17):** the 16
+  cheapest VALIDATION-QUEUE Wave A.1 READY nodes are composed into
+  `regression/scenarios/lifecycles/generated__waveA1.json` (`enabled:true`;
+  validator 209 lifecycles / 0 errors). **Awaiting a single light dispatch**
+  (`mutations=true destructive=true heavy=false`, scoped `crud_filter` in
+  `docs/HANDOFF-waveA1-dispatch-prep.md`) once the owner-rule lane clears —
+  3 docs→VALIDATED promotion candidates (quick-query-validate unconditional;
+  alert + cm-account-resource conditional on a metric-emitting/Running-VM
+  account). 7 Wave A.1 nodes stay blocked/gated (sts-token, trail,
+  account-budget PF-04, diagnosis, secretvault-vault, certificate-import,
+  cm-event-policy — see handoff).
+- **What to advance next:** dispatch the materialized Wave A.1 batch when the
+  lane clears (then triage → promote), confirm heavy rev 3 (static-NAT
+  `publicip_id`, scr/fs recompose, docker-probe borrow), then continue R3
+  verification waves over the **144 remaining docs nodes** (131/275 VALIDATED
+  as of 2026-06-17) (compose → scoped
   `crud_filter=gen-*` run → triage → re-compose), promote VALIDATED nodes
   and progressively replace hand-written lifecycles, then M4 cutover
   verification. Earlier backlog (query-signing fix, DBaaS sub-op windows,

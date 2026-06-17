@@ -26,16 +26,14 @@ crud_filter=gen-pricing-reads or gen-cost-reads or gen-quota-request or gen-supp
 mutations=true  destructive=true  heavy=false
 ```
 
-> **Hard prerequisite (dispatch-blocking for the whole batch):** these `gen-*`
-> lifecycles are produced by `regression/scenarios/composer.py` on demand and the
-> composer emits `enabled: false`. They are **NOT yet materialized into
-> `regression/scenarios/lifecycles/generated__*.json`**, so `active_lifecycles()`
-> (the pytest param source) does not see them and `-k` would match nothing.
-> Before dispatch, the lifecycle-composer / Meta-Orch must (1) compose each
-> READY node, (2) write it into a `generated__*.json` fragment, (3) flip
-> `enabled: true`, (4) re-run `python -m regression.scenarios.validate` (0 errors).
-> Only then does the `crud_filter` above resolve. This is the one remaining
-> step between "prepped" and "dispatchable".
+> **Hard prerequisite — DONE (2026-06-17):** the 16 READY `gen-*` lifecycles are
+> now **materialized into `regression/scenarios/lifecycles/generated__waveA1.json`**
+> (composed via `composer.compose([node])`, `enabled` flipped to `true`).
+> `python -m regression.scenarios.validate` → **209 lifecycles, 0 errors** (16 new,
+> 0 new warnings); the loader resolves every id, so the `crud_filter` above now
+> matches. The batch is **dispatchable** the moment the owner-rule lane clears
+> (one run at a time — confirm the in-flight conformance run + its sweep have
+> concluded before pushing the run-request to `main`).
 
 ---
 
@@ -101,7 +99,7 @@ quick-query-validate) all have a destructive teardown so nothing is left behind.
 - Servicewatch lookup nodes (`sw-metric-catalog`, `sw-custom-metric-meta`) have no
   delete by design → the R1 "create without delete" warning is expected, not an error.
 
-## Edits made this session (working tree only — NOT committed)
+## Edits made (across the prep + materialization)
 
 1. `knowledge/formal/resources/data-analytics__quick-query.yaml` — added an explicit
    `verify` (idempotent dry-run re-POST of `/v1/quick-query/validate-resources`) to
@@ -109,9 +107,10 @@ quick-query-validate) all have a destructive teardown so nothing is left behind.
    derivation and raises. After the edit: `python knowledge/formal/validate.py` →
    **0 errors** (warnings 84→79); `compose(["quick-query-validate"])` → OK (2 steps).
 2. `docs/HANDOFF-waveA1-dispatch-prep.md` — this file.
-
-No resource yaml outside the allowed list was touched; no shared index
-(`CONTEXT.md`, `ledger.json`, `VALIDATION-QUEUE.md`) was edited.
+3. **`regression/scenarios/lifecycles/generated__waveA1.json` (materialization,
+   2026-06-17)** — the 16 READY nodes composed and `enabled: true`. Regenerate with:
+   `compose([node]) for node in <16 READY>` → flip `enabled` → write fragment →
+   `python -m regression.scenarios.validate` (209 lifecycles, 0 errors).
 
 ## Tally
 
