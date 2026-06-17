@@ -1,0 +1,218 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>management__iam-identity-center.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/management__iam-identity-center.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/management__iam-identity-center.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — management/iam-identity-center (mg-idc group, SSO).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from the idc-* lifecycles.
+#
+# REACHABILITY-ONLY COVERAGE WITH A SAFETY RAIL (owner override, 2026-06-16).
+# IdC was previously ALL-disabled (service excluded from the C3 target, waived in
+# coverage_waivers.json). The owner has now reframed it as a REACHABILITY-ONLY
+# target (same shape as storage/archivestorage): every IdC write + id-bound GET
+# is CALLED regardless of the result — the point is to test ACCESS/REACHABILITY,
+# not real SSO config. So each write/GET below is an `optional` step with a
+# tolerant `expect_status` ([...,400,403,404,409,422]); a 4xx is EXPECTED and
+# TOLERATED (reachability = the endpoint RESPONDED, even 4xx, NOT a successful
+# grant). provenance stays `docs` — these are reachability probes, NOT validated.
+#
+# CRITICAL SAFETY — IdC writes can mutate ACCOUNT-LEVEL SSO config IF they
+# succeed. The reachability calls MUST 4xx WITHOUT creating/granting real config:
+#   * create-instance: the body is the docs-sample LDAP bind to a NON-EXISTENT
+#     test directory (bind_dn/connection_url point at test.subdomain.company.com)
+#     so it ValidationErrors/403s rather than persisting a real SSO instance; it
+#     carries a tolerant teardown DELETE so any stray 2xx is torn down.
+#   * users/groups/permission-sets: instance_id is the SYNTHETIC placeholder
+#     ssoins-12345 (NO real instance) so creates 4xx; by-id GET/PATCH/PUT/DELETE
+#     key off captured-soft ids that never resolve to real objects (4xx). Group
+#     add/remove-users send EMPTY user_uuids[]; policy arrays are EMPTY.
+#   * account-assignment (MOST SENSITIVE — grants a principal a permission-set on
+#     a target account): the body uses ALL-ZERO synthetic ids
+#     (target_account_id/permission_set_id/principal_id = 32 zeros) + synthetic
+#     instance_id so it CANNOT create a real grant. We deliberately do NOT wire
+#     real node ids into the live account-assignment create.
+# NO real SSO instance and NO real account assignment is created. The entitlement
+# (owner-exclusion) waivers were dropped from data/baselines/coverage_waivers.json
+# and the idc-* lifecycles were enabled in the same unit.
+#
+# NOTE: the model below keeps the curated {iam-identity-center.instance_id} /
+# node-reference wiring as the DEPENDENCY-SHAPE documentation for a future
+# dedicated org-management test account (R3+); the ENABLED lifecycles use the
+# synthetic/all-zero ids described above for safe reachability.
+version: 1
+resources:
+  iam-identity-center:
+    code: &quot;mg-idc-instance&quot;
+    service: management/iam-identity-center
+    heavy: true
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/instances&quot;
+      body:
+        name: &quot;regridc{ualpha}&quot;
+        description: &quot;API regression suite SSO instance&quot;
+        identity_store_type: &quot;{opt.identity_store_type}&quot;
+        identity_store_config:
+          bind_credential: password
+          bind_dn: &quot;CN=Administrator,CN=Users,DC=test,DC=add&quot;
+          connection_url: &quot;ldaps://test.subdomain.company.com:123&quot;
+          rdn_ldap_attribute: cn
+          user_object_classes: &quot;person, organizationalPerson, user&quot;
+          username_ldap_attribute: sAMAccountName
+          users_dn: &quot;OU=Employees,OU=Accounts,DC=sub,DC=org&quot;
+      options:
+        identity_store_type: {type: enum,
+                              values: [ACTIVE_DIRECTORY, IDENTITY_CENTER_DIRECTORY],
+                              required: true, default: ACTIVE_DIRECTORY, vary: true,
+                              note: &quot;identity source. ACTIVE_DIRECTORY 분기는 identity_store_config(LDAP) 필요 — 소스 body는 api_bodies createinstance의 doc 샘플 그대로(실 AD 아님). IDENTITY_CENTER_DIRECTORY는 config 불필요 추정. identity source 변경은 기존 사용자/그룹/할당 전체 삭제 (identity-source-change-wipes-everything)&quot;}
+    capture: {instance_id: &quot;$.instance.id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/instances/{instance_id}&quot;, destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-instance, steps: [create-instance, delete-instance]}
+    notes: &quot;cross-service 노드 키 iam-identity-center. Organization MANAGEMENT 계정만 생성 가능 (Organization 선행 — 엔타이틀먼트 사전조건이라 requires 엣지가 아닌 note로 기록; cross-service requires []와 일치). 단일 region, kr-south3 미지원 — 스모크 400의 원인. BLAST RADIUS: instance는 모든 SSO 사용자/그룹/permission-set의 기반, 삭제는 cascade (delete-cascades). capture envelope $.instance.id는 소스에서 capture_soft 추정 — UNPROVEN.&quot;
+
+  idc-user:
+    code: &quot;mg-idc-user&quot;
+    service: management/iam-identity-center
+    heavy: true
+    requires: [iam-identity-center]
+    create:
+      endpoint: &quot;POST /v1/users&quot;
+      body:
+        instance_id: &quot;{iam-identity-center.instance_id}&quot;
+        user_id: &quot;regridc{ualpha}&quot;
+        name: &quot;API Regression User&quot;
+        email: &quot;regr-test@example.com&quot;
+        description: &quot;API regression suite SSO user&quot;
+        department: QA
+        business_unit: Automation
+        manager: &quot;Regression Bot&quot;
+        employee_id: &quot;regr-{unique}&quot;
+        nation_id: &quot;+82&quot;
+        phone_number: &quot;010-1234-5678&quot;
+        temporary_password: true
+        password: &quot;&quot;
+        group_ids: []
+    capture: {user_uuid: &quot;$.user.id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/users/{user_uuid}&quot;, destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-user, steps: [create-user, delete-user]}
+    notes: &quot;소스는 instance_id에 docs placeholder(ssoins-12345)를 보냈다 — 실소유 instance 주입은 이 모델이 처음 제공 (private-nat 패턴). body createuser 기반, capture $.user.id capture_soft 추정 — 모두 UNPROVEN. 경로 /v1/users는 iam 계열과 path-root 공유 — per-service host 필수. MFA 필수 정책 주의 (mfa-mandatory).&quot;
+
+  idc-group:
+    code: &quot;mg-idc-group&quot;
+    service: management/iam-identity-center
+    heavy: true
+    requires: [iam-identity-center]
+    create:
+      endpoint: &quot;POST /v1/groups&quot;
+      body:
+        instance_id: &quot;{iam-identity-center.instance_id}&quot;
+        name: &quot;regrgrp{ualpha}&quot;
+        description: &quot;API regression suite SSO group&quot;
+        user_uuids: []
+    capture: {group_id: &quot;$.group.id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/groups/{group_id}&quot;, destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-group, steps: [create-group, delete-group]}
+    notes: &quot;user_uuids 빈 배열 — 선행 SSO user 불필요 (멤버 추가는 POST /v1/groups/{id}/users 오퍼레이션). 경로 /v1/groups는 mg-iam-group과 path-root 충돌 — per-service host 필수. body/capture UNPROVEN.&quot;
+
+  idc-permission-set:
+    code: &quot;mg-idc-permission-set&quot;
+    service: management/iam-identity-center
+    heavy: true
+    requires: [iam-identity-center]
+    create:
+      endpoint: &quot;POST /v1/permission-sets&quot;
+      body:
+        instance_id: &quot;{iam-identity-center.instance_id}&quot;
+        name: &quot;regrps{ualpha}&quot;
+        description: &quot;API regression suite permission set&quot;
+        session_duration: 3600
+        custom_policies: []
+        inline_policies: []
+        managed_policies: []
+    capture: {permission_set_id: &quot;$.permission_set.id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/permission-sets/{permission_set_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-permission-set, steps: [create-permission-set, delete-permission-set]}
+    notes: &quot;정책 배열들 빈 값 — 실 정책 미부착 (정책 부착은 PUT .../policies 오퍼레이션). body createpermissionset 기반, capture UNPROVEN.&quot;
+
+  idc-account-assignment:
+    code: &quot;mg-idc-account-assignment&quot;
+    service: management/iam-identity-center
+    heavy: true
+    requires: [iam-identity-center, idc-permission-set, idc-user]
+    create:
+      endpoint: &quot;POST /v1/account-assignments&quot;
+      body:
+        instance_id: &quot;{iam-identity-center.instance_id}&quot;
+        accounts:
+          - {target_account_email: &quot;regr-test@example.com&quot;,
+             target_account_id: &quot;00000000000000000000000000000000&quot;,
+             target_account_name: &quot;regr-target-account&quot;}
+        permission_sets:
+          - {permission_set_id: &quot;{idc-permission-set.permission_set_id}&quot;,
+             permission_set_name: &quot;regr-permission-set&quot;,
+             session_duration: 3600, custom_policies: [],
+             inline_policies: [], managed_policies: []}
+        principals:
+          - {principal_id: &quot;{idc-user.user_uuid}&quot;, principal_type: USER}
+    capture: {account_assignment_id: &quot;$.account_assignment.id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/account-assignments/{account_assignment_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: idc-account-assignment, steps: [create-account-assignment, delete-account-assignment]}
+    notes: &quot;가장 민감한 SSO write — principal에게 target 계정의 permission-set을 부여 (소스는 절대 실생성하지 않는 coverage-only). permission_set/principal id는 소스의 all-zero placeholder를 노드 참조로 배선(모델의 value-add); target_account_id는 Organization member 계정이 필요해 placeholder 유지 — organization-account 노드와의 배선은 org-master 계정 확보 후 R3 과제. body/capture UNPROVEN.&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/management__iam-identity-center.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

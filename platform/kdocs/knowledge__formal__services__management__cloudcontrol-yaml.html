@@ -1,0 +1,96 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>management__cloudcontrol.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/management__cloudcontrol.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/management__cloudcontrol.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: management/cloudcontrol
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/management/cloud_control/{overview,how_to_guides}/
+# (fetched 2026-06-11)
+
+version: 1
+service: management/cloudcontrol
+
+constraints:
+  - id: landing-zone-prereq-chain
+    rule: &quot;Cloud Control requires a LANDING ZONE to exist before any management feature works, and the landing zone itself requires Organization + ID Center (자체 디렉토리) + Object Storage + Logging&amp;Audit as 선행 서비스. On an account with no landing zone / not the Organization management account, all writes (and most reads) are denied — this is the most plausible cause of the smoke 403s: entitlement, not permission-policy tuning. WAIVER CANDIDATES until a landing zone exists&quot;
+    provenance: docs
+  - id: org-unit-name-rule
+    rule: &quot;기본/추가 조직 단위 (OU) names: case-sensitive ASCII letters, &lt;= 128 chars; landing-zone shared-account names (Log/Audit Account): 3-30 chars Korean/letters/digits/space and + = - _ @ [ ] ( ) , . ; account emails &lt;= 60 chars and Log vs Audit Account emails MUST differ&quot;
+    provenance: docs
+  - id: home-region-fixed
+    rule: &quot;the landing zone&#x27;s 홈 리전 is pinned to the account&#x27;s default region and cannot be changed; all other regions become managed regions; available in all five KR regions&quot;
+    provenance: docs
+  - id: landing-zone-create-irreversible
+    rule: &quot;landing-zone creation cannot be cancelled mid-flight; on failure you must DELETE the landing zone and recreate. Deleting a landing zone does NOT auto-delete the OUs, Accounts, buckets or ID Center it created — they must be cleaned up in Organization / Object Storage / ID Center individually before the same names can be reused&quot;
+    provenance: docs
+
+captures: {}
+
+states:
+  cloudcontrol-account-registration: {field: $.status, ready: [등록]}   # 등록/미등록/등록중/등록 실패 (docs; field name guessed)
+
+quirks:
+  - id: creates-real-shared-accounts
+    note: &quot;landing-zone create provisions REAL resources: 2 OUs, 2 shared accounts (Log Archive + Audit), Trail config, 10 preventive guardrails, and activates Organization control policies — extremely high blast radius; never run real creates on the shared test account (same waiver class as management/organization)&quot;
+    provenance: docs
+  - id: security-ou-locked
+    note: &quot;the Security OU (shared accounts) cannot receive new account registrations and its guardrails cannot be applied/removed; shared accounts cannot be unregistered&quot;
+    provenance: docs
+  - id: detective-guardrails-via-configinspection
+    note: &quot;detective guardrails are implemented as Config Inspection checklist runs (PASS/FAIL/CHECK/ERROR/N-A per item); preventive guardrails are Organization ACPs — cross-service edges to security/configinspection and management/organization&quot;
+    provenance: docs
+  - id: monitoring-not-yet-released
+    note: &quot;monitoring/notification feature and AuditBaseline are scheduled for 2026-07 — endpoints touching them may 404/400 until release&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/management__cloudcontrol.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

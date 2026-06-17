@@ -1,0 +1,125 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>_groups.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/_groups.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/_groups.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model groups (contract C1, docs/RESOURCE-MODEL-PLAN.md §2.5/§3)
+# — service bundles for the Planning UI and bundle composition.
+#
+# Code convention: &lt;cat&gt;-&lt;group&gt;-&lt;resource&gt; (e.g. nw-vpc-subnet). Group keys are
+# the first TWO segments (&lt;cat&gt;-&lt;group&gt;), so a node belongs to the group named
+# by its `group:` field or its code prefix (nw-vpc-subnet -&gt; nw-vpc).
+# Category abbreviations (fixed — reuse on fan-out):
+#   nw=networking  cp=compute  st=storage  db=database  sec=security
+#   mg=management  ct=container  ai=ai-ml  da=data-analytics
+#   ap=application-service  dt=devops-tools  fm=financial-management  pf=platform
+version: 1
+groups:
+  &quot;nw-vpc&quot;: {label: &quot;네트워크 — VPC 묶음 (vpc/subnet/gateway/endpoint/peering)&quot;, category: networking}
+  &quot;nw-sg&quot;: {label: &quot;네트워크 — Security Group&quot;, category: networking}
+  &quot;nw-lb&quot;: {label: &quot;네트워크 — Load Balancer 체인&quot;, category: networking}
+  &quot;nw-dns&quot;: {label: &quot;네트워크 — Private DNS&quot;, category: networking}
+  &quot;nw-dc&quot;: {label: &quot;네트워크 — Direct Connect&quot;, category: networking}
+  &quot;nw-gslb&quot;: {label: &quot;네트워크 — GSLB (글로벌 DNS 부하분산)&quot;, category: networking}
+  &quot;nw-vpn&quot;: {label: &quot;네트워크 — VPN (gateway/tunnel 체인)&quot;, category: networking}
+  &quot;nw-cdn&quot;: {label: &quot;네트워크 — Global CDN&quot;, category: networking}
+  &quot;cp-vs&quot;: {label: &quot;컴퓨트 — Virtual Server 묶음 (keypair/server/volume/image/asg)&quot;, category: compute}
+  &quot;cp-scf&quot;: {label: &quot;컴퓨트 — Cloud Functions&quot;, category: compute}
+  &quot;cp-bm&quot;: {label: &quot;컴퓨트 — Bare Metal Server&quot;, category: compute}
+  &quot;cp-gpu&quot;: {label: &quot;컴퓨트 — Multi-node GPU Cluster&quot;, category: compute}
+  &quot;ct-ske&quot;: {label: &quot;컨테이너 — Kubernetes Engine (cluster/nodepool)&quot;, category: container}
+  &quot;ct-scr&quot;: {label: &quot;컨테이너 — Container Registry (registry/repository/image/tag)&quot;, category: container}
+  &quot;sec-kms&quot;: {label: &quot;보안 — KMS (transit key)&quot;, category: security}
+  &quot;sec-cert&quot;: {label: &quot;보안 — Certificate Manager&quot;, category: security}
+  &quot;sec-sm&quot;: {label: &quot;보안 — Secrets Manager&quot;, category: security}
+  &quot;sec-sv&quot;: {label: &quot;보안 — Secret Vault&quot;, category: security}
+  &quot;sec-ci&quot;: {label: &quot;보안 — Config Inspection&quot;, category: security}
+  &quot;mg-iam&quot;: {label: &quot;관리 — IAM (group/policy/role/credentials)&quot;, category: management}
+  &quot;mg-idc&quot;: {label: &quot;관리 — IAM Identity Center (SSO)&quot;, category: management}
+  &quot;mg-org&quot;: {label: &quot;관리 — Organization (계정 계층)&quot;, category: management}
+  &quot;mg-cc&quot;: {label: &quot;관리 — Cloud Control (landing zone)&quot;, category: management}
+  &quot;mg-cm&quot;: {label: &quot;관리 — Cloud Monitoring&quot;, category: management}
+  &quot;mg-la&quot;: {label: &quot;관리 — Logging &amp; Audit (trail)&quot;, category: management}
+  &quot;mg-nl&quot;: {label: &quot;관리 — Network Logging&quot;, category: management}
+  &quot;mg-rm&quot;: {label: &quot;관리 — Resource Manager&quot;, category: management}
+  &quot;mg-sw&quot;: {label: &quot;관리 — ServiceWatch (logs/alerts/dashboards)&quot;, category: management}
+  &quot;ai-ml&quot;: {label: &quot;AI/ML — Cloud ML + AIMLOps Platform&quot;, category: ai-ml}
+  &quot;da-es&quot;: {label: &quot;데이터분석 — EventStreams (Kafka DBaaS)&quot;, category: data-analytics}
+  &quot;da-se&quot;: {label: &quot;데이터분석 — Search Engine (OpenSearch DBaaS)&quot;, category: data-analytics}
+  &quot;da-vt&quot;: {label: &quot;데이터분석 — Vertica (분석 DB DBaaS)&quot;, category: data-analytics}
+  &quot;da-df&quot;: {label: &quot;데이터분석 — Data Flow (서비스 + 플로우)&quot;, category: data-analytics}
+  &quot;da-do&quot;: {label: &quot;데이터분석 — Data Ops (서비스 + 옵스)&quot;, category: data-analytics}
+  &quot;da-qq&quot;: {label: &quot;데이터분석 — Quick Query&quot;, category: data-analytics}
+  &quot;ap-apigw&quot;: {label: &quot;애플리케이션 — API Gateway (api/stage/auth/usage-plan 묶음)&quot;, category: application-service}
+  &quot;ap-queue&quot;: {label: &quot;애플리케이션 — Queue Service&quot;, category: application-service}
+  &quot;dt-devops&quot;: {label: &quot;DevOps — DevOps Service (CI/CD 워크스페이스)&quot;, category: devops-tools}
+  &quot;fm-billing&quot;: {label: &quot;재무 — Billing Plan (planned computes)&quot;, category: financial-management}
+  &quot;fm-budget&quot;: {label: &quot;재무 — Budget (계정 예산 알림)&quot;, category: financial-management}
+  &quot;st-fs&quot;: {label: &quot;스토리지 — File Storage (volume/snapshot/schedule/replication)&quot;, category: storage}
+  &quot;st-pfs&quot;: {label: &quot;스토리지 — Parallel File Storage (volume/snapshot)&quot;, category: storage}
+  &quot;st-bs&quot;: {label: &quot;스토리지 — Baremetal Block Storage (volume/group/snapshot)&quot;, category: storage}
+  &quot;st-backup&quot;: {label: &quot;스토리지 — Backup (agent/policy)&quot;, category: storage}
+  &quot;st-as&quot;: {label: &quot;스토리지 — Archive Storage (영구 제외: 전용 인증키 미발급)&quot;, category: storage}
+  &quot;db-mysql&quot;: {label: &quot;데이터베이스 — MySQL DBaaS 클러스터&quot;, category: database}
+  &quot;db-postgresql&quot;: {label: &quot;데이터베이스 — PostgreSQL DBaaS 클러스터&quot;, category: database}
+  &quot;db-mariadb&quot;: {label: &quot;데이터베이스 — MariaDB DBaaS 클러스터&quot;, category: database}
+  &quot;db-epas&quot;: {label: &quot;데이터베이스 — EPAS DBaaS 클러스터&quot;, category: database}
+  &quot;db-sqlserver&quot;: {label: &quot;데이터베이스 — SQL Server DBaaS 클러스터 (라이선스 필요)&quot;, category: database}
+  &quot;db-cache&quot;: {label: &quot;데이터베이스 — CacheStore (Redis) DBaaS 클러스터&quot;, category: database}
+  &quot;mg-quota&quot;: {label: &quot;관리 — Quota (조회 전용)&quot;, category: management}
+  &quot;mg-support&quot;: {label: &quot;관리 — Support (조회 전용)&quot;, category: management}
+  &quot;pf-product&quot;: {label: &quot;플랫폼 — Product 카탈로그 (조회 전용)&quot;, category: platform}
+  &quot;pf-sts&quot;: {label: &quot;플랫폼 — STS 토큰 발급&quot;, category: platform}
+  &quot;fm-cost&quot;: {label: &quot;재무 — Cost Explorer (조회 전용)&quot;, category: financial-management}
+  &quot;fm-pricing&quot;: {label: &quot;재무 — Pricing (조회 전용)&quot;, category: financial-management}
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/_groups.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

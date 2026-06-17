@@ -1,97 +1,24 @@
-<!doctype html><html lang="ko"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>자원 카탈로그 (읽기 전용)</title>
-<style>
-:root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#27384b;--ink:#e7eef6;
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>자원 카탈로그 — 서비스 색인 (읽기 전용)</title><style>:root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#27384b;--ink:#e7eef6;
   --muted:#90a4ba;--accent:#5aa9ff;--val:#3fb27f;--docs:#e0922f}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
   font:14px/1.5 ui-sans-serif,-apple-system,Segoe UI,"Noto Sans KR",sans-serif}
 a{color:var(--accent);text-decoration:none}.wrap{max-width:1280px;margin:0 auto;padding:20px}
 h1{font-size:18px}.muted{color:var(--muted)}code{font-family:ui-monospace,Consolas,monospace}
-.cols{display:grid;grid-template-columns:280px 1fr 300px;gap:16px;align-items:start}
+.cols{display:grid;grid-template-columns:300px 1fr 300px;gap:16px;align-items:start}
 @media(max-width:1050px){.cols{grid-template-columns:1fr}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
 .panel h2{font-size:14px;margin:0 0 10px}.panel h3{font-size:12px;color:var(--muted);
   text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px}
-select,input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
-  border-radius:8px;padding:6px 9px;font-size:13px;margin-bottom:8px}
-.chk{display:flex;align-items:center;gap:7px;padding:3px 4px;border-radius:6px;cursor:pointer}
-.chk:hover{background:var(--panel2)}.chk input{accent-color:#5aa9ff;flex:0 0 auto;width:auto;margin:0}
-.chk .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
-.scroll{max-height:520px;overflow:auto}.svgbox{background:#0f1720;border:1px solid var(--line);
+.scroll{max-height:560px;overflow:auto}.svgbox{background:#0f1720;border:1px solid var(--line);
   border-radius:10px;overflow:auto}.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;
   color:var(--muted);margin:6px 0}.legend i{display:inline-block;width:11px;height:11px;border-radius:3px}
+.chk{display:flex;align-items:center;gap:7px;padding:3px 4px;border-radius:6px;cursor:pointer}
+.chk:hover{background:var(--panel2)}.chk input{accent-color:#5aa9ff;flex:0 0 auto;width:auto;margin:0}
 .chip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:14px;
   padding:2px 8px;font-size:11.5px;margin:2px}.kv{display:flex;justify-content:space-between;
   padding:3px 0;border-bottom:1px dashed var(--line)}.tbl{width:100%;border-collapse:collapse;font-size:12px}
 .tbl td,.tbl th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
-</style></head><body><div class="wrap">
-<h1><a href="../index.html" style="color:#90a4ba">← 대시보드</a> · 자원 카탈로그
-  <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
-  <a href="plan.html">Plan</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 정의/수정은 control plane.</span></h1>
-<p class="muted" id="sub"></p>
-<div class="cols">
-  <div class="panel">
-    <h2>서비스 선택</h2>
-    <label>카테고리<select id="cat"></select></label>
-    <label>서비스<select id="svc"></select></label>
-    <h3>자원 노드</h3><div class="scroll" id="list"></div>
-  </div>
-  <div class="panel">
-    <h2 id="gtitle"></h2>
-    <div class="legend"><span><i style="background:var(--val)"></i>VALIDATED</span>
-      <span><i style="background:var(--docs)"></i>docs</span>
-      <span><i style="background:#5aa9ff"></i>초점 ★</span>
-      <span><i style="background:#b48cff"></i>피의존 ↓</span></div>
-    <label class="chk" style="display:inline-flex;margin:4px 0"><input type="checkbox" id="reduce" checked><span>transitive reduction <span class="muted" style="font-size:11px">(끄면 모든 직접 의존 표시)</span></span></label>
-    <div class="svgbox"><svg id="svg"></svg></div>
-    <p class="muted" id="ghint" style="font-size:12px"></p>
-  </div>
-  <div class="panel" id="detail"></div>
-</div>
-<div class="foot">생성: <span id="gen"></span> · composer.focus_view 미리계산. 편집은
-  <code>/planning/resources/&lt;id&gt;</code>(FastAPI).</div>
-</div>
-<script src="catalog.js"></script><script src="graph.js"></script>
-<script>
-var C=window.CATALOG,N=C.nodes,sel=null;
-document.getElementById("sub").textContent=C.node_count+" 노드 · "+C.validated+" VALIDATED · "+Object.keys(C.groups).length+" 그룹";
-document.getElementById("gen").textContent=C.generated_from;
-var cats=[...new Set(Object.values(N).map(n=>n.category))].sort();
-var svcOf={};Object.values(N).forEach(n=>{(svcOf[n.category]=svcOf[n.category]||new Set()).add(n.service);});
-function fill(s,arr,v){s.innerHTML=arr.map(x=>'<option '+(x===v?'selected':'')+'>'+x+'</option>').join("");}
-function pickFirst(){sel="vpc" in N?"vpc":Object.keys(N)[0];}
-pickFirst();
-function refresh(){
-  var n=N[sel];fill(document.getElementById("cat"),cats,n.category);
-  fill(document.getElementById("svc"),[...svcOf[n.category]].sort(),n.service);
-  var ids=Object.keys(N).filter(id=>N[id].service===n.service).sort();
-  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="radio" name="nd" '+(id===sel?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><span><b>'+id+'</b> <span class="muted" style="font-size:11px">'+(N[id].requires.and.length+N[id].requires.one_of.length)+"↑ "+N[id].dependents.length+"↓</span></span></label>").join("");
-  document.querySelectorAll('#list input').forEach(r=>r.onchange=function(){sel=r.dataset.id;refresh();});
-  // graph
-  var g=C.focus[sel];
-  document.getElementById("gtitle").innerHTML="<code>"+sel+"</code> 의존 관계";
-  document.getElementById("ghint").textContent="왼쪽=의존(선행), 오른쪽=피의존(후행). 노드 클릭=초점 이동.";
-  if(g&&!g.error)ResourceGraph.render(document.getElementById("svg"),g,{reduce:document.getElementById("reduce").checked,onClick:function(id){if(N[id]){sel=id;refresh();}}});
-  else document.getElementById("svg").innerHTML='<text x="12" y="24" fill="#ff8585">'+(g&&g.error||"no graph")+'</text>';
-  // detail
-  var req=n.requires,reqHtml=req.and.map(d=>'<span class="chip">'+d.ref+(d.count>1?" ×"+d.count:"")+'</span>').join("")+req.one_of.map(o=>'<span class="chip">🔀 '+o.branches.join(" | ")+'</span>').join("")||'<span class="muted">없음</span>';
-  var depHtml=n.dependents.length?n.dependents.map(d=>'<span class="chip">'+d+'</span>').join(""):'<span class="muted">없음</span>';
-  var optHtml=n.options.length?'<table class="tbl">'+n.options.map(o=>'<tr><td><code>'+o.name+'</code></td><td class="muted">'+o.type+(o.required?" *":"")+'</td></tr>').join("")+'</table>':'<p class="muted">옵션 없음</p>';
-  document.getElementById("detail").innerHTML='<h2>'+sel+'</h2>'+
-    '<div class="kv"><span>service</span><b>'+n.service+'</b></div>'+
-    '<div class="kv"><span>provenance</span><b style="color:'+(n.provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'">'+n.provenance+'</b></div>'+
-    '<div class="kv"><span>endpoint</span><b style="font-size:11px">'+(n.endpoint||"—")+'</b></div>'+
-    (n.quota?'<div class="kv"><span>quota</span><b>⛔ '+n.quota+'</b></div>':'')+
-    '<h3>requires</h3><div>'+reqHtml+'</div>'+
-    '<h3>피의존</h3><div>'+depHtml+'</div>'+
-    '<h3>options</h3>'+optHtml+
-    '<div class="note">이 화면은 읽기 전용입니다. 정의/수정은 control plane <code>/planning/resources/'+sel+'</code> 에서.</div>';
-}
-document.getElementById("reduce").onchange=refresh;
-document.getElementById("cat").onchange=function(e){var c=e.target.value;var fs=[...svcOf[c]].sort()[0];sel=Object.keys(N).find(id=>N[id].service===fs);refresh();};
-document.getElementById("svc").onchange=function(e){var s=e.target.value;sel=Object.keys(N).find(id=>N[id].service===s);refresh();};
-refresh();
-</script></body></html>
+.compose{background:#2a1f3d;border:1px solid #7b5cc4;color:#d9c9ff;border-radius:8px;padding:8px 12px;
+  font-weight:600;font-size:13px;display:inline-block;margin-top:6px}.compose:hover{background:#372a52}.svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}.svc-card{display:block;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px}.svc-card:hover{border-color:var(--accent);background:var(--panel2)}.svc-n{font-weight:600;color:var(--ink)}.svc-m{color:var(--muted);font-size:12px;margin-top:3px}.cat{margin:18px 0}.cat h2{font-size:15px;margin:0 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px}</style></head><body><div class="wrap"><h1><a href="../index.html" style="color:#90a4ba">← 대시보드</a> · 자원 카탈로그 <span class="muted" style="font-size:13px">— 서비스 색인 (읽기 전용 / 정적). <a href="plan.html">Plan</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 정의/수정은 control plane.</span></h1><p class="muted">59 서비스 · 275 자원 노드. 서비스를 골라 자원·의존 그래프를 보고 Plan으로 구성하세요.</p><section class="cat"><h2>ai-ml <span class="muted" style="font-weight:400;font-size:12px">· 2 서비스 · 3 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/ai-ml__aimlops-platform.html"><div class="svc-n">aimlops-platform</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/ai-ml__cloud-ml.html"><div class="svc-n">cloud-ml</div><div class="svc-m">2 자원</div></a></div></section><section class="cat"><h2>application-service <span class="muted" style="font-weight:400;font-size:12px">· 2 서비스 · 13 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/application-service__apigateway.html"><div class="svc-n">apigateway</div><div class="svc-m">11 자원</div></a><a class="svc-card" href="services/application-service__queueservice.html"><div class="svc-n">queueservice</div><div class="svc-m">2 자원</div></a></div></section><section class="cat"><h2>compute <span class="muted" style="font-weight:400;font-size:12px">· 4 서비스 · 28 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/compute__baremetal.html"><div class="svc-n">baremetal</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/compute__multinodegpucluster.html"><div class="svc-n">multinodegpucluster</div><div class="svc-m">4 자원</div></a><a class="svc-card" href="services/compute__scf.html"><div class="svc-n">scf</div><div class="svc-m">4 자원</div></a><a class="svc-card" href="services/compute__virtualserver.html"><div class="svc-n">virtualserver</div><div class="svc-m">19 자원</div></a></div></section><section class="cat"><h2>container <span class="muted" style="font-weight:400;font-size:12px">· 2 서비스 · 10 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/container__scr.html"><div class="svc-n">scr</div><div class="svc-m">4 자원</div></a><a class="svc-card" href="services/container__ske.html"><div class="svc-n">ske</div><div class="svc-m">6 자원</div></a></div></section><section class="cat"><h2>data-analytics <span class="muted" style="font-weight:400;font-size:12px">· 6 서비스 · 12 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/data-analytics__data-flow.html"><div class="svc-n">data-flow</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/data-analytics__data-ops.html"><div class="svc-n">data-ops</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/data-analytics__eventstreams.html"><div class="svc-n">eventstreams</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/data-analytics__quick-query.html"><div class="svc-n">quick-query</div><div class="svc-m">5 자원</div></a><a class="svc-card" href="services/data-analytics__searchengine.html"><div class="svc-n">searchengine</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/data-analytics__vertica.html"><div class="svc-n">vertica</div><div class="svc-m">1 자원</div></a></div></section><section class="cat"><h2>database <span class="muted" style="font-weight:400;font-size:12px">· 6 서비스 · 102 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/database__cachestore.html"><div class="svc-n">cachestore</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/database__epas.html"><div class="svc-n">epas</div><div class="svc-m">19 자원</div></a><a class="svc-card" href="services/database__mariadb.html"><div class="svc-n">mariadb</div><div class="svc-m">22 자원</div></a><a class="svc-card" href="services/database__mysql.html"><div class="svc-n">mysql</div><div class="svc-m">22 자원</div></a><a class="svc-card" href="services/database__postgresql.html"><div class="svc-n">postgresql</div><div class="svc-m">19 자원</div></a><a class="svc-card" href="services/database__sqlserver.html"><div class="svc-n">sqlserver</div><div class="svc-m">19 자원</div></a></div></section><section class="cat"><h2>devops-tools <span class="muted" style="font-weight:400;font-size:12px">· 1 서비스 · 1 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/devops-tools__devopsservice.html"><div class="svc-n">devopsservice</div><div class="svc-m">1 자원</div></a></div></section><section class="cat"><h2>financial-management <span class="muted" style="font-weight:400;font-size:12px">· 4 서비스 · 4 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/financial-management__billingplan.html"><div class="svc-n">billingplan</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/financial-management__budget.html"><div class="svc-n">budget</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/financial-management__costexplorer.html"><div class="svc-n">costexplorer</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/financial-management__pricing.html"><div class="svc-n">pricing</div><div class="svc-m">1 자원</div></a></div></section><section class="cat"><h2>management <span class="muted" style="font-weight:400;font-size:12px">· 11 서비스 · 44 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/management__cloudcontrol.html"><div class="svc-n">cloudcontrol</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/management__cloudmonitoring.html"><div class="svc-n">cloudmonitoring</div><div class="svc-m">4 자원</div></a><a class="svc-card" href="services/management__iam.html"><div class="svc-n">iam</div><div class="svc-m">12 자원</div></a><a class="svc-card" href="services/management__iam-identity-center.html"><div class="svc-n">iam-identity-center</div><div class="svc-m">5 자원</div></a><a class="svc-card" href="services/management__loggingaudit.html"><div class="svc-n">loggingaudit</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/management__network-logging.html"><div class="svc-n">network-logging</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/management__organization.html"><div class="svc-n">organization</div><div class="svc-m">6 자원</div></a><a class="svc-card" href="services/management__quota.html"><div class="svc-n">quota</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/management__resourcemanager.html"><div class="svc-n">resourcemanager</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/management__servicewatch.html"><div class="svc-n">servicewatch</div><div class="svc-m">8 자원</div></a><a class="svc-card" href="services/management__support.html"><div class="svc-n">support</div><div class="svc-m">2 자원</div></a></div></section><section class="cat"><h2>networking <span class="muted" style="font-weight:400;font-size:12px">· 9 서비스 · 31 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/networking__cdn.html"><div class="svc-n">cdn</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/networking__direct-connect.html"><div class="svc-n">direct-connect</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/networking__dns.html"><div class="svc-n">dns</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/networking__firewall.html"><div class="svc-n">firewall</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/networking__gslb.html"><div class="svc-n">gslb</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/networking__loadbalancer.html"><div class="svc-n">loadbalancer</div><div class="svc-m">7 자원</div></a><a class="svc-card" href="services/networking__security-group.html"><div class="svc-n">security-group</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/networking__vpc.html"><div class="svc-n">vpc</div><div class="svc-m">13 자원</div></a><a class="svc-card" href="services/networking__vpn.html"><div class="svc-n">vpn</div><div class="svc-m">2 자원</div></a></div></section><section class="cat"><h2>platform <span class="muted" style="font-weight:400;font-size:12px">· 2 서비스 · 3 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/platform__product.html"><div class="svc-n">product</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/platform__sts.html"><div class="svc-n">sts</div><div class="svc-m">1 자원</div></a></div></section><section class="cat"><h2>security <span class="muted" style="font-weight:400;font-size:12px">· 5 서비스 · 6 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/security__certificatemanager.html"><div class="svc-n">certificatemanager</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/security__configinspection.html"><div class="svc-n">configinspection</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/security__kms.html"><div class="svc-n">kms</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/security__secretsmanager.html"><div class="svc-n">secretsmanager</div><div class="svc-m">1 자원</div></a><a class="svc-card" href="services/security__secretvault.html"><div class="svc-n">secretvault</div><div class="svc-m">1 자원</div></a></div></section><section class="cat"><h2>storage <span class="muted" style="font-weight:400;font-size:12px">· 5 서비스 · 18 자원</span></h2><div class="svc-grid"><a class="svc-card" href="services/storage__archivestorage.html"><div class="svc-n">archivestorage</div><div class="svc-m">2 자원</div></a><a class="svc-card" href="services/storage__backup.html"><div class="svc-n">backup</div><div class="svc-m">6 자원</div></a><a class="svc-card" href="services/storage__baremetal-blockstorage.html"><div class="svc-n">baremetal-blockstorage</div><div class="svc-m">4 자원</div></a><a class="svc-card" href="services/storage__filestorage.html"><div class="svc-n">filestorage</div><div class="svc-m">4 자원</div></a><a class="svc-card" href="services/storage__parallel-filestorage.html"><div class="svc-n">parallel-filestorage</div><div class="svc-m">2 자원</div></a></div></section><div class="foot">생성: knowledge/formal/resources/*.yaml (via composer) · composer.focus_view 미리계산. 편집은 <code>/planning/resources/&lt;id&gt;</code>(FastAPI).</div></div></body></html>

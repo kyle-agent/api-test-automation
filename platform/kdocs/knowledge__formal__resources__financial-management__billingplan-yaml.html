@@ -1,0 +1,136 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>financial-management__billingplan.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/financial-management__billingplan.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/financial-management__billingplan.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — financial-management/billingplan (fm-billing group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# billingplan-planned-computes-guarded (enabled, heavy, COVERAGE-ONLY — a
+# planned compute is a RESERVED/COMMITTED purchase, never actually bought by
+# the source lifecycle; create body/capture corrected from the API Reference
+# models 2026-06-14 -&gt; still docs until a real 2xx).
+version: 1
+resources:
+  planned-compute:
+    code: &quot;fm-billing-planned-compute&quot;
+    service: financial-management/billingplan
+    heavy: true
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/planned-computes&quot;
+      # Authoritative body = PlannedComputeCreateRequest (api_docs.json model
+      # financial-management/billingplan/plannedcomputecreaterequest). The
+      # PREVIOUS body (product_offering/product_category/term_months/quantity/
+      # payment_type) was INVENTED and does not exist in the model — replaced.
+      # Required: contract_type, os_type, server_type, service_id. The
+      # validation_findings.json &quot;undiscoverable required fields: server_type,
+      # service_id&quot; finding is satisfied by sending both.
+      body:
+        contract_type: &quot;{opt.contract_type}&quot;
+        os_type: &quot;{opt.os_type}&quot;
+        server_type: &quot;{opt.server_type}&quot;
+        service_id: &quot;{opt.service_id}&quot;
+      options:
+        contract_type:
+          type: enum
+          required: true
+          default: &quot;01&quot;
+          values: [&quot;01&quot;, &quot;03&quot;, &quot;05&quot;]
+          # API model enum (01,03,05). userguide: 1년/3년 약정(planned_compute
+          # overview) → 01=1yr, 03=3yr; 05 present in enum (5yr 추정), UNPROVEN.
+          note: &quot;Contract Type — API enum 01/03/05; userguide exposes 1년/3년 약정 (01/03). Term meaning of 05 UNPROVEN.&quot;
+        os_type:
+          type: enum
+          required: true
+          default: opensource
+          values: [opensource, rhel, windows, sles]
+          # API model PlannedComputeCreateRequest.os_type enum (lowercase).
+          # NB: list/coverage endpoints use the upcased display token
+          # OPEN_SOURCE; the create body wants the enum value `opensource`.
+          note: &quot;OS Type — create enum opensource/rhel/windows/sles (lowercase). Display token elsewhere is OPEN_SOURCE.&quot;
+        server_type:
+          type: string
+          required: true
+          default: s1v1m2
+          # Real spec id; valid set comes from GET /v1/planned-computes/
+          # server-types (which itself 500s — PF, see notes). s1v1m2 is the
+          # docs example; UNPROVEN that it is purchasable for the term.
+          note: &quot;Server Type spec id (e.g. s1v1m2). Authoritative list is GET /v1/planned-computes/server-types — but that endpoint 500s (Product Bug, baselined). Value UNPROVEN.&quot;
+        service_id:
+          type: enum
+          required: true
+          default: VIRTUAL_SERVER
+          values: [VIRTUAL_SERVER]
+          # API model example service_id = VIRTUAL_SERVER. userguide: 약정 대상
+          # 서비스군 = Compute/Database/Data Analytics; other service_id tokens
+          # (e.g. Database/DA products) UNPROVEN — discover via
+          # GET /v1/planned-computes/service-types (200) at synth time.
+          note: &quot;Service Id — model example VIRTUAL_SERVER. userguide covers Compute/Database/Data Analytics; full token set from GET /v1/planned-computes/service-types. Only VIRTUAL_SERVER proven-shaped.&quot;
+    # List response envelope = PlannedComputeListResponse.planned_computes[].id
+    # (api_docs model). The source lifecycle&#x27;s soft-capture $.contents[0].id is
+    # WRONG; single-show envelope is $.planned_compute.id.
+    capture: {planned_compute_id: &quot;$.planned_computes[0].id&quot;}
+    verify:
+      # CancellationFeeRequest.planned_compute_id is an ARRAY[string] (model),
+      # not a scalar — corrected. region is optional. Returns a fee QUOTE
+      # (read-like), no state change. 50% of remaining-term cost per userguide.
+      - {name: show-cancellation-fee,
+         endpoint: &quot;POST /v1/planned-computes/cancellation-fee&quot;,
+         json: {planned_compute_id: [&quot;{planned_compute_id}&quot;]},
+         expect_status: [200, 201, 400, 403, 404, 409, 422]}
+    provenance: docs
+    source: {lifecycle: billingplan-planned-computes-guarded,
+             steps: [list-planned-computes, show-cancellation-fee,
+                     create-planned-computes, update-planned-compute]}
+    notes: &quot;GLOBAL(account-scoped, region별 할인 적용) 서비스. userguide(planned_compute overview, 2026-06-14): 선행 서비스 없음(별도 선행 작업 불필요); 약정 컴퓨트 = 실제 금융 커밋(1년/3년 약정으로 최대 40% 할인, 동일 Account·동일 리전 무약정 자원에 할인 적용). 할인 적용 대상 서비스군 = Compute/Database/Data Analytics(overview 확인). 서버타입은 상향(upgrade)만 변경 가능(equal-or-higher spec). 해지 시 잔여기간 이용 금액의 50%가 해지 2개월 후 청구 — 자유 취소 불가. 신청/변경/조회는 Asia/Seoul(GMT+9), 정산 윈도(23:30~23:59)에는 신규 요청 차단. 할인 적용 시점 = 신청 익일(discount begins day after application submission, overview UNPROVEN-timing). 약정 만료 시 underlying 자원은 종료되지 않음(자원 자체는 유지, overview). coverage 데이터는 최대 2일 전까지만 제공. DELETE API 없음 → 의도적 teardown 없음(해지는 cancellation-fee 견적 read-like POST 경로뿐, 수수료 발생). 합성기는 이 노드를 기본 생성 비대상(heavy + 구매 권한/실 server_type·service_id 필요)으로 다뤄야 한다. create body는 API Reference 모델(PlannedComputeCreateRequest: contract_type/os_type/server_type/service_id) 기준으로 정정 — 종전 product_offering/term_months/quantity 등은 모델에 없는 발명값이었음. update(PUT)는 PlannedComputeChangeRequest(action enum + contract_type/server_type) = lifecycle 영역. body/capture 모두 2xx 미확인(docs); 소스는 구매가 일어나지 않도록 4xx를 기대하는 coverage probe. PRODUCT BUG (이미 baselined): GET /v1/planned-computes/server-types → 500 (data/baselines/known_issues.json, financial-management/billingplan/listplannedcomputeservertypes, type Product Bug, since 2026-06-01). 이 GET의 쿼리 파라미터(service_id/current_server_type/os_type)는 전부 optional이고 형제 enum 엔드포인트(contract-types/os-types/service-types)는 200을 반환하므로, 빈 요청에 500은 우리 요청 결함이 아니라 서버 결함이다 = &#x27;smoke 500!&#x27; 의 정체. retry-loop 금지. IB-019 BODY-MODEL CLARIFICATION (flag for separate ticket, NOT changed here): planned_compute overview(2026-06-14)는 콘솔 신청 폼이 service(target)+OS+server_type+commitment-term+QUANTITY 5개 값을 받는다고 명시 — 즉 콘솔 모델에는 &#x27;수량(quantity)&#x27;이 존재한다. 현재 create body(PlannedComputeCreateRequest: contract_type/os_type/server_type/service_id)에는 quantity가 없다. API 모델 vs 콘솔 폼 불일치 가능 — 옛 발명 body의 quantity가 콘솔에 근거했을 수 있으나 API Reference 모델에는 부재. 실 2xx 또는 apiref 재확인으로 quantity 필드 존재 여부를 별도 티켓에서 검증할 것. (body shape 변경 금지 — 여기서는 flag만.) WebFetch overview(financial_management/planned_compute/overview/)=200; how_to_guides/create/ = 503 skip.&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/financial-management__billingplan.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

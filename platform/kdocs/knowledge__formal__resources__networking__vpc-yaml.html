@@ -1,0 +1,456 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>networking__vpc.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/networking__vpc.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/networking__vpc.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — networking/vpc (nw-vpc group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validated by knowledge/formal/validate.py
+# · consumed by regression/scenarios/composer.py (R2a).
+#
+# Back-extracted from live lifecycles by knowledge/formal/resources/extract.py
+# and curated by hand: literal cidrs became {opt.cidr} pick schemes, captured-var
+# wiring became {&lt;node&gt;.&lt;cap&gt;} tokens, provenance follows C5 (VALIDATED only when
+# the source body/capture is runtime-proven; UNPROVEN bodies stay docs).
+version: 1
+resources:
+  vpc:
+    code: &quot;nw-vpc-vpc&quot;
+    service: networking/vpc
+    adopt: vpc
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/vpcs&quot;
+      body: {name: &quot;regrvpc{unique}&quot;, description: &quot;API regression suite&quot;,
+             cidr: &quot;{opt.cidr}&quot;, tags: []}
+      options:
+        cidr: {type: cidr, required: true, pick: unique-block,
+               note: &quot;live VPC들과 비겹침 (docs/domain-constraints 블록 할당; composer가 10.&lt;160+k&gt;.0.0/20을 할당)&quot;}
+        secondary_cidr: {type: string, default: &quot;10.200.0.0/20&quot;,
+                         note: &quot;add-cidr verify용 보조 블록 — unique-block(10.16x)과 비겹침 고정값&quot;}
+    capture: {vpc_id: &quot;$.vpc.id&quot;}
+    verify:
+      - {name: add-cidr, endpoint: &quot;POST /v1/vpcs/{vpc_id}/cidrs&quot;,
+         json: {cidr: &quot;{opt.secondary_cidr}&quot;},
+         expect_status: [200, 201, 202],
+         note: &quot;수작업 vpc-cidr-secondary 은퇴 갭: addvpccidr. 수작업은 [200..422] 관용이라 UNPROVEN이었음 — 하드 기대. 보조 CIDR은 표준 DELETE가 없어 VPC 삭제로 함께 제거&quot;}
+    ready: {field: &quot;$.vpc.state&quot;, until: ACTIVE, timeout: 180, interval: 10}
+    delete: {endpoint: &quot;DELETE /v1/vpcs/{vpc_id}&quot;, destructive: true}
+    quota: vpc
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-subnet, steps: [create-vpc, get-vpc-active, delete-vpc]}
+
+  subnet:
+    code: &quot;nw-vpc-subnet&quot;
+    service: networking/vpc
+    adopt: subnet
+    requires: [vpc]
+    create:
+      endpoint: &quot;POST /v1/subnets&quot;
+      body: {name: &quot;regrsub{unique}&quot;, description: &quot;API regression suite&quot;,
+             cidr: &quot;{opt.cidr}&quot;, type: GENERAL, vpc_id: &quot;{vpc.vpc_id}&quot;, tags: []}
+      options:
+        cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr,
+               note: &quot;VPC cidr의 하위 /24 (composer가 부모 블록에서 8+j번째 /24를 절단)&quot;}
+    capture: {subnet_id: &quot;$.subnet.id&quot;}
+    ready: {field: &quot;$.subnet.state&quot;, until: ACTIVE, timeout: 180, interval: 10}
+    verify:
+      - {name: read-vips, endpoint: &quot;GET /v1/subnets/{subnet_id}/vips&quot;,
+         expect_status: [200]}
+      - {name: read-sap-secondary-subnets,
+         endpoint: &quot;GET /v1/subnets/{subnet_id}/sap-secondary-subnets&quot;,
+         expect_status: [200]}
+    delete: {endpoint: &quot;DELETE /v1/subnets/{subnet_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-subnet, steps: [create-subnet, get-subnet-active, delete-subnet]}
+
+  endpoint-subnet:
+    code: &quot;nw-vpc-endpoint-subnet&quot;
+    service: networking/vpc
+    requires: [vpc]
+    create:
+      endpoint: &quot;POST /v1/subnets&quot;
+      body: {name: &quot;regrvpces{unique}&quot;, description: &quot;API regression endpoint subnet&quot;,
+             cidr: &quot;{opt.cidr}&quot;, type: VPC_ENDPOINT, vpc_id: &quot;{vpc.vpc_id}&quot;, tags: []}
+      options:
+        cidr: {type: cidr, required: true, pick: sub-block-of, of: vpc.cidr,
+               note: &quot;VPC cidr 하위 /24 (composer가 부모 블록 8+j번째 /24를 절단; endpoint-subnet은 GENERAL subnet과 공존 시 다른 /24를 받는다)&quot;}
+    capture: {subnet_id: &quot;$.subnet.id&quot;}
+    ready: {field: &quot;$.subnet.state&quot;, until: ACTIVE, timeout: 180, interval: 10}
+    delete: {endpoint: &quot;DELETE /v1/subnets/{subnet_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: gen-wave5-vpce,
+             steps: [create-endpoint-subnet, wait-endpoint-subnet, delete-endpoint-subnet]}
+    notes: &gt;
+      VPC Endpoint 전용 subnet (subnet type=VPC_ENDPOINT). vpc-endpoint create가
+      400 &#x27;scp-network.vpc-endpoint.subnet-not-found ... VPC Endpoint Type Subnet
+      not found&#x27; (run 27466988779)로 실패한 근본 원인 — generic GENERAL subnet으로는
+      불충분하고, subnet을 VPC_ENDPOINT 유형으로 생성해야 VPC Endpoint가 그 subnet에
+      붙는다. subnet type enum (GENERAL, LOCAL, VPC_ENDPOINT)은
+      api_docs subnetcreaterequestv1dot2 / userguide VPC overview(&#x27;VPC Endpoint
+      Subnet: VPC Endpoint로 활용 가능한 Subnet&#x27;)에서 확인. type=VPC_ENDPOINT
+      생성 body는 docs-derived(UNPROVEN) — endpoint-subnet 자체 2xx + vpc-endpoint
+      2xx는 라이브 재검증 대기(READY FOR LIVE RE-VALIDATION, IB-013). 다른 subnet
+      유형과 동일하게 standalone subnet 생성/삭제로 teardown.
+      live-validated run 27583285457 (2026-06-15)
+
+  port:
+    code: &quot;nw-vpc-port&quot;
+    service: networking/vpc
+    requires: [subnet]
+    create:
+      endpoint: &quot;POST /v1/ports&quot;
+      body: {name: &quot;regrport{unique}&quot;, description: &quot;API regression suite&quot;,
+             security_groups: [&quot;{opt.security_group}&quot;],
+             subnet_id: &quot;{subnet.subnet_id}&quot;, tags: []}
+      options:
+        security_group: {type: ref, target: security-group, required: false,
+                         note: &quot;선택 시 composer가 security-group 노드를 선행 생성해 id를 주입; 미선택 시 security_groups: [] (validated 형태)&quot;}
+    capture: {port_id: &quot;$.port.id&quot;}
+    ready: {field: &quot;$.port.state&quot;, until: [ACTIVE, CREATED, RUNNING, DOWN],
+            timeout: 180, interval: 10}
+    delete: {endpoint: &quot;DELETE /v1/ports/{port_id}&quot;, destructive: true,
+             expect_status: [200, 202, 204, 404],
+             note: &quot;idempotent delete: 404 = port already gone. 404 = port already deleted upstream (an earlier optional setport had 404&#x27;d); run 27593608514&quot;}
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-subnet, steps: [create-port, delete-port]}
+    notes: &quot;ready until 목록은 heavy-shared-networking port-wait의 validated 관측값&quot;
+
+  internet-gateway:
+    code: &quot;nw-vpc-igw&quot;
+    service: networking/vpc
+    requires: [vpc]
+    create:
+      endpoint: &quot;POST /v1/internet-gateways&quot;
+      body: {description: &quot;API regression suite&quot;,
+             firewall_enabled: &quot;{opt.firewall_enabled}&quot;,
+             firewall_loggable: false, type: IGW, vpc_id: &quot;{vpc.vpc_id}&quot;, tags: []}
+      options:
+        firewall_enabled: {type: enum, values: [false, true], default: false,
+                           vary: true,
+                           note: &quot;true면 firewall이 암묵 생성된다 (R3 carrier-capture: firewall 노드가 GET /v1/firewalls?vpc_name=...&amp;product_type=IGW lookup으로 회수). 기본 false가 VALIDATED 생성형; true 변형은 docs — firewall 과금(flavor) 동반하므로 firewall 체인 합성에서만 켠다&quot;}
+    capture: {internet_gateway_id: &quot;$.internet_gateway.id&quot;}
+    ready: {field: &quot;$.internet_gateway.state&quot;,
+            until: [ACTIVE, ATTACHED, CREATED, RUNNING], timeout: 300, interval: 15}
+    verify:
+      - {name: list, endpoint: &quot;GET /v1/internet-gateways?vpc_id={vpc.vpc_id}&quot;,
+         expect_status: [200]}
+      - {name: set, endpoint: &quot;PUT /v1/internet-gateways/{internet_gateway_id}&quot;,
+         json: {description: &quot;API regression suite (updated)&quot;},
+         expect_status: [200, 202],
+         note: &quot;수작업 체인 은퇴 갭: listinternetgateways + setinternetgateway (set body는 description-only 추정 — 라이브 본문이 정정)&quot;}
+    delete: {endpoint: &quot;DELETE /v1/internet-gateways/{internet_gateway_id}&quot;,
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-internet-gateway,
+             steps: [create-igw, wait-igw-active, delete-igw]}
+    notes: &quot;firewall_enabled: true로 만들면 firewall이 암묵 생성된다 (firewall 노드 참조) — 옵션 기본 false는 VALIDATED body와 동일형. IGW 삭제가 암묵 firewall도 함께 제거한다 (firewall 노드는 delete 없음).&quot;
+
+  nat-gateway:
+    code: &quot;nw-vpc-natgw&quot;
+    service: networking/vpc
+    requires: [subnet, public-ip]
+    create:
+      endpoint: &quot;POST /v1/nat-gateways&quot;
+      body: {description: &quot;API regression suite&quot;,
+             publicip_id: &quot;{public-ip.publicip_id}&quot;,
+             subnet_id: &quot;{subnet.subnet_id}&quot;, tags: []}
+    capture: {nat_gateway_id: &quot;$.nat_gateway.id&quot;}
+    ready: {field: &quot;$.nat_gateway.state&quot;,
+            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
+    delete: {endpoint: &quot;DELETE /v1/nat-gateways/{nat_gateway_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking,
+             steps: [natgw-create, natgw-wait, natgw-delete]}
+
+  public-ip:
+    code: &quot;nw-vpc-public-ip&quot;
+    service: networking/vpc
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/publicips&quot;
+      body: {description: &quot;API regression suite&quot;, type: IGW, tags: []}
+    capture: {publicip_id: &quot;$.publicip.id&quot;}
+    ready: {field: &quot;$.publicip.state&quot;,
+            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
+    delete: {endpoint: &quot;DELETE /v1/publicips/{publicip_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: networking-vpc-publicip, steps: [create, delete]}
+    notes: &quot;경로는 /v1/publicips (붙여쓰기) — 모델 노드 id는 cross-service의 public-ip 표기를 따른다&quot;
+
+  private-nat:
+    code: &quot;nw-vpc-private-nat&quot;
+    service: networking/vpc
+    requires:
+      # IB-012 (run 27466988779): the TRANSIT_GATEWAY branch must reach the TGW
+      # via the tgw-vpc-connection node (not the bare transit-gateway), because
+      # private-nat needs the TGW in &quot;Connectable&quot; state — which only happens
+      # once a VPC connection on it is ACTIVE. use: transit_gateway_id resolves
+      # service_resource_id to the TGW id (the connection node re-captures it),
+      # while the connection node + its ACTIVE wait are pulled into the closure
+      # ahead of the private-nat create.
+      - one_of:
+          - {ref: direct-connect}
+          - {ref: tgw-vpc-connection, use: transit_gateway_id}
+        bind: uplink
+    create:
+      endpoint: &quot;POST /v1/private-nats&quot;
+      body: {name: &quot;regrpnat{unique}&quot;, description: &quot;API regression private-nat&quot;,
+             cidr: &quot;192.167.0.0/24&quot;, service_resource_id: &quot;{dep.uplink}&quot;,
+             service_type: &quot;{opt.service_type}&quot;, tags: []}
+      options:
+        service_type: {type: enum, values: [TRANSIT_GATEWAY, DIRECT_CONNECT],
+                       required: true,
+                       note: &quot;선택한 one_of 분기와 일치해야 한다 — tgw-vpc-connection 분기면 TRANSIT_GATEWAY(첫 enum, 기본값), direct-connect 분기면 DIRECT_CONNECT로 override. 합성 시 choices={&#x27;private-nat&#x27;: &#x27;tgw-vpc-connection&#x27;}로 TGW 경로를 명시 고정.&quot;}
+    capture: {private_nat_id: &quot;$.private_nat.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/private-nats/{private_nat_id}&quot;,
+         expect_status: [200, 400, 403, 404],
+         note: &quot;id-bound GET getid 갭. private_nat_id가 create에서 잡히나 service_resource_id가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status&quot;}
+      - {name: read-ips, endpoint: &quot;GET /v1/private-nats/{private_nat_id}/private-nat-ips&quot;,
+         expect_status: [200, 400, 403, 404],
+         note: &quot;id-bound GET getid 갭 (private-nat IP 목록). 동일 관용 근거&quot;}
+    delete: {endpoint: &quot;DELETE /v1/private-nats/{private_nat_id}&quot;, destructive: true}
+    provenance: docs
+    source: {lifecycle: gen-wave5-privnat, steps: [create-private-nat, delete-private-nat]}
+    notes: &gt;
+      READY FOR LIVE RE-VALIDATION (IB-012). §1의 OR-의존 사례
+      (direct-connect OR tgw-vpc-connection). 핵심 수정: TGW 분기를 bare
+      transit-gateway → tgw-vpc-connection으로 바꿔, private-nat가 요구하는
+      Connectable TGW(=VPC connection ACTIVE 동반)를 선행으로 보장한다
+      (run 27466988779: 400
+      &#x27;scp-network.private-nat.connectable-transit-gateway-not-found ... Cannot
+      find the Transit Gateway in Connectable state&#x27;). use: transit_gateway_id로
+      service_resource_id에 connection id가 아니라 TGW id를 주입.
+      body/capture($.private_nat.id) UNPROVEN(docs) — 라이브 2xx 미관측, gated 유지.
+      분기 결정(2026-06-13, gap report 그룹 1 #2): direct-connect는 물리 회선
+      의심(owner 확인 대기)이라 TGW 경로로 검증 — 합성 시
+      choices={&#x27;private-nat&#x27;: &#x27;tgw-vpc-connection&#x27;}를 명시(branch cost상 dc(2) &lt;
+      tgw-conn(3)이라 기본 분기는 dc로 기울지만, 명시 choice가 우선).
+      service_type 기본값 TRANSIT_GATEWAY(첫 enum)와 정합. heavy(실 TGW+VPC+NAT).&quot;
+
+  vpc-endpoint:
+    code: &quot;nw-vpc-endpoint&quot;
+    service: networking/vpc
+    # IB-013 (run 27466988779): the create needs a DEDICATED endpoint-type
+    # subnet (subnet type=VPC_ENDPOINT), not the GENERAL subnet. The earlier
+    # belief that the FS-volume resource_key alone resolves the subnet was
+    # wrong — the 400 &#x27;scp-network.vpc-endpoint.subnet-not-found &quot;VPC Endpoint
+    # Type Subnet not found&quot;&#x27; fires because subnet_id pointed at a GENERAL
+    # subnet. So require the endpoint-subnet node (type=VPC_ENDPOINT) and wire
+    # subnet_id to it. filestorage-volume stays the FS target resource_key.
+    requires: [vpc, endpoint-subnet, filestorage-volume]
+    create:
+      endpoint: &quot;POST /v1/vpc-endpoints&quot;
+      # resource_key is the TARGET service resource (an FS volume id here);
+      # resource_info is free text describing it (api_docs: string, max 200).
+      # subnet_id MUST be a VPC_ENDPOINT-type subnet (endpoint-subnet node).
+      body: {name: &quot;regrvpce{unique}&quot;, description: &quot;API regression vpc endpoint&quot;,
+             endpoint_ip_address: &quot;{opt.endpoint_ip_address}&quot;,
+             resource_info: &quot;regrfs{unique}&quot;,
+             resource_key: &quot;{filestorage-volume.volume_id}&quot;,
+             resource_type: &quot;{opt.target}&quot;,
+             subnet_id: &quot;{endpoint-subnet.subnet_id}&quot;, vpc_id: &quot;{vpc.vpc_id}&quot;, tags: []}
+      options:
+        target: {type: enum, values: [FS, OBS, SCR], default: FS,
+                 required: true, vary: true,
+                 note: &quot;유효 enum은 라이브 ValidationError가 직접 알려줌(run 27394211896): &#x27;VPC Endpoint Resource Type should be a valid types(FS, OBS, SCR)&#x27; — dns는 유효 타입이 아님 (VALIDATED enum). resource_key가 FS 볼륨 id로 배선되어 있으므로 OBS/SCR 변형은 각자의 실 자원 키로 재배선 전에는 합성 금지&quot;}
+        endpoint_ip_address: {type: string, required: true, default: &quot;10.160.8.20&quot;,
+                              note: &quot;선택한 endpoint-subnet cidr 내부의 빈 IP여야 한다 — 기본값은 endpoint-subnet이 vpc(10.160.0.0/20)의 8번째 /24(10.160.8.0/24)를 받는 합성 기본 배치를 따른다; 공유 subnet 재호밍/다른 cidr로 합성 시 override 필요&quot;}
+    capture: {vpc_endpoint_id: &quot;$.vpc_endpoint.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/vpc-endpoints/{vpc_endpoint_id}&quot;,
+         expect_status: [200, 400, 403, 404],
+         note: &quot;id-bound GET getid 갭. vpc_endpoint_id가 create에서 잡히나 resource_key가 UNPROVEN(docs)이라 create가 4xx일 수 있어 관용 status&quot;}
+    delete: {endpoint: &quot;DELETE /v1/vpc-endpoints/{vpc_endpoint_id}&quot;, destructive: true}
+    provenance: docs
+    source: {lifecycle: gen-wave5-vpce, steps: [create-vpc-endpoint, delete-vpc-endpoint]}
+    notes: &gt;
+      READY FOR LIVE RE-VALIDATION (IB-013). endpoint_type(=resource_type) enum
+      FS/OBS/SCR 라이브 증명. 핵심 수정: subnet_id가 이제 VPC_ENDPOINT 유형
+      subnet(endpoint-subnet 노드)을 가리킨다 — run 27466988779의 400
+      subnet-not-found(&#x27;VPC Endpoint Type Subnet not found&#x27;)는 GENERAL subnet을
+      넘겨 발생했고, 전용 endpoint-type subnet이 선행돼야 한다. 실 FS volume_id +
+      endpoint-subnet 배선까지 합쳐진 body/capture는 아직 라이브 2xx 미관측이라
+      UNPROVEN(docs) — heavy/gated 유지, 라이브 재검증 대기. FS 볼륨은 VPC 무관
+      (standalone NFS)이라 &#x27;TARGET 서비스 subnet&#x27; 해석이 볼륨 쪽에서 어떻게
+      풀리는지는 라이브 정제 대상.&quot;
+
+  privatelink-service:
+    code: &quot;nw-vpc-privatelink-service&quot;
+    service: networking/vpc
+    # IB-031: dropped redundant `vpc` — reachable transitively via subnet→vpc; body uses {subnet.subnet_id} only, never {vpc...}. Closure unchanged.
+    requires: [subnet]
+    create:
+      endpoint: &quot;POST /v1/privatelink-services&quot;
+      body: {name: &quot;regrpls{ualpha}&quot;, description: &quot;API regression suite&quot;,
+             approval_type: AUTO, connected_resource_type: IP,
+             connected_resource_ip_address: &quot;{opt.connected_resource_ip}&quot;,
+             service_ip_address: &quot;{opt.service_ip}&quot;,
+             subnet_id: &quot;{subnet.subnet_id}&quot;, tags: []}
+      options:
+        service_ip: {type: string, required: true, default: &quot;10.163.8.5&quot;,
+                     note: &quot;선택한 subnet cidr 내부의 빈 IP여야 한다 (PrivateLinkServiceCreateRequest.service_ip_address required) — 기본값은 gen-wave5 privatelink 체인의 subnet 10.163.8.0/24에 묶인 값&quot;}
+        connected_resource_ip: {type: string, required: false, default: &quot;10.163.8.10&quot;,
+                                note: &quot;connected_resource_type=IP일 때의 대상 자원 IP — docs상 optional이나 IP 타입이면 사실상 필수로 추정 (UNPROVEN). LB 타입은 connected_resource_id(LB)가 필요해 의도적으로 IP 고정&quot;}
+    capture: {privatelink_service_id: &quot;$.privatelink_service.id&quot;}
+    ready: {field: &quot;$.privatelink_service.state&quot;, until: [ACTIVE],
+            timeout: 300, interval: 10}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/privatelink-services/{privatelink_service_id}&quot;,
+         expect_status: [200]}
+      - {name: read-list, endpoint: &quot;GET /v1/privatelink-services&quot;,
+         expect_status: [200]}
+      - {name: read-connected-endpoints,
+         endpoint: &quot;GET /v1/privatelink-services/{privatelink_service_id}/connected-endpoints&quot;,
+         expect_status: [200, 400, 403, 404],
+         note: &quot;id-bound GET getid 갭 (PLS 연결 엔드포인트 목록). create가 UNPROVEN(docs)이라 4xx일 수 있어 관용 status&quot;}
+    delete: {endpoint: &quot;DELETE /v1/privatelink-services/{privatelink_service_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: generated__wave5-appsvc,
+             steps: [create-privatelink-service, wait-privatelink-service,
+                     delete-privatelink-service]}
+    notes: &quot;UNPROVEN (docs DTO PrivateLinkServiceCreateRequest 그대로 — 라이브 2xx 미관측, R3 과제였던 privatelink-service 노드 신설). approval_type AUTO + connected_resource_type IP 조합이 LB/실서버 없이 자기완결로 만들 수 있는 최소 형태 — 엔드포인트 요청이 자동 승인되어 apigw/scf privatelink-endpoint 패밀리의 2xx 확률을 높인다. state enum CREATING/ACTIVE/DELETING/DELETED/ERROR (PrivateLinkServiceDetail). 과금 여부 미확인 — 라이프사이클 내 생성·즉시 삭제 전제.&quot;
+
+  vpc-peering:
+    code: &quot;nw-vpc-peering&quot;
+    service: networking/vpc
+    requires:
+      - {ref: vpc, count: 2}
+    create:
+      endpoint: &quot;POST /v1/vpc-peerings&quot;
+      body: {name: &quot;regrpeer{unique}&quot;, description: &quot;API regression vpc peering&quot;,
+             requester_vpc_id: &quot;{vpc.vpc_id}&quot;, approver_vpc_id: &quot;{vpc.2.vpc_id}&quot;,
+             tags: []}
+    capture: {vpc_peering_id: &quot;$.vpc_peering.id&quot;}
+    verify:
+      - {name: approve,
+         endpoint: &quot;PUT /v1/vpc-peerings/{vpc_peering_id}/approval&quot;,
+         json: {type: CREATE_APPROVE},
+         expect_status: [200, 201, 202, 400]}
+      - {name: read-routing-rules,
+         endpoint: &quot;GET /v1/vpc-peerings/{vpc_peering_id}/routing-rules&quot;,
+         expect_status: [200]}
+    delete: {endpoint: &quot;DELETE /v1/vpc-peerings/{vpc_peering_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: vpc-peering,
+             steps: [create-vpc-peering, approve-vpc-peering, delete-vpc-peering]}
+    notes: &quot;§1의 다중성 사례 (VPC 2개; composer가 vpc#2 인스턴스 + {vpc_id_2}를 배선). create 202 라이브 관측. 승인 body는 {type: CREATE_APPROVE}로 VALIDATED (구 {action: APPROVE}는 ValidationError로 CREATING 고착 → cap-poisoning 근원). 상태기계: 생성 직후 CREATING에서는 승인/수정/삭제가 400 — 소스 lifecycle은 승인 400 재시도 8회로 통과하므로 verify의 expect_status에 400 허용, 합성본에 재시도 정책을 옮기는 것은 R3 과제. approver_vpc_account_id는 소스에서 capture_soft($.vpc.account_id, envelope UNPROVEN)였고 동일 계정 페어링이라 생략 — 미검증 capture를 vpc 노드에 보태지 않기 위함.&quot;
+
+  transit-gateway:
+    code: &quot;nw-vpc-tgw&quot;
+    service: networking/vpc
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/transit-gateways&quot;
+      body: {name: &quot;regrtgw{ualpha}&quot;, description: &quot;API regression transit gateway&quot;,
+             tags: []}
+    capture: {transit_gateway_id: &quot;$.transit_gateway.id&quot;}
+    ready: {field: &quot;$.transit_gateway.state&quot;,
+            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 300, interval: 15}
+    verify:
+      - {name: read-routing-rules,
+         endpoint: &quot;GET /v1/transit-gateways/{transit_gateway_id}/routing-rules&quot;,
+         expect_status: [200]}
+      - {name: read-vpc-connections,
+         endpoint: &quot;GET /v1/transit-gateways/{transit_gateway_id}/vpc-connections&quot;,
+         expect_status: [200]}
+    delete: {endpoint: &quot;DELETE /v1/transit-gateways/{transit_gateway_id}&quot;,
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking, steps: [tgw-create, tgw-wait, tgw-delete]}
+
+  tgw-vpc-connection:
+    code: &quot;nw-vpc-tgw-vpc-connection&quot;
+    service: networking/vpc
+    requires: [transit-gateway, vpc]
+    create:
+      endpoint: &quot;POST /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections&quot;
+      # TransitGatewayVpcConnectionCreateRequest: vpc_id is the only field
+      # (api_docs networking/vpc/transitgatewayvpcconnectioncreaterequest).
+      body: {vpc_id: &quot;{vpc.vpc_id}&quot;}
+    # capture both the connection id (own delete) and the parent TGW id (so the
+    # private-nat one_of branch can resolve service_resource_id to the TGW via
+    # use: transit_gateway_id). vpc_connection_id is primary (drives delete).
+    capture: {vpc_connection_id: &quot;$.transit_gateway_vpc_connection.id&quot;,
+              transit_gateway_id: &quot;$.transit_gateway_vpc_connection.transit_gateway_id&quot;}
+    # No single-connection GET show endpoint exists — only LIST + DELETE. Poll
+    # the LIST and read the (only) connection&#x27;s state until ACTIVE; that ACTIVE
+    # connection is what makes the TGW &quot;Connectable&quot; for private-nat.
+    ready: {field: &quot;$.transit_gateway_vpc_connections[0].state&quot;, until: ACTIVE,
+            timeout: 300, interval: 15,
+            endpoint: &quot;GET /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections&quot;}
+    delete: {endpoint: &quot;DELETE /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections/{vpc_connection_id}&quot;,
+             destructive: true,
+             retry_on_status: [409], retries: 4, retry_interval: 15}
+    provenance: docs
+    source: {lifecycle: gen-wave5-privnat,
+             steps: [create-tgw-vpc-connection, wait-tgw-vpc-connection,
+                     delete-tgw-vpc-connection]}
+    notes: &gt;
+      READY FOR LIVE RE-VALIDATION (IB-012). Transit Gateway를 private-nat가
+      요구하는 &quot;Connectable&quot; 상태로 만드는 선행 노드 — TGW에 VPC connection이 붙어
+      ACTIVE가 되면 TGW가 Connectable이 된다(run 27466988779: create-private-nat
+      400 &#x27;scp-network.private-nat.connectable-transit-gateway-not-found ...
+      Cannot find the Transit Gateway in Connectable state&#x27;). 모델: child 자원이라
+      path가 {transit-gateway.transit_gateway_id}를 포함. 단건 show GET가 없어
+      ready는 LIST(GET .../vpc-connections)를 폴링해 첫 connection의 state ==
+      ACTIVE를 기다린다(상태 enum CREATING/ACTIVE/DELETING/DELETED/ERROR,
+      api_docs transitgatewayvpcconnection). create 응답 envelope는 show 응답
+      (transit_gateway_vpc_connection)을 따른다고 가정 — capture
+      $.transit_gateway_vpc_connection.id/.transit_gateway_id UNPROVEN(docs),
+      라이브에서 정정될 수 있음. transit_gateway_id를 함께 capture해 private-nat의
+      one_of 분기가 use: transit_gateway_id로 TGW id를 service_resource_id에
+      주입한다(connection id가 아니라 TGW id가 필요). TGW당 VPC 연결 ≤5(userguide).
+      heavy(실 TGW+VPC 동반).
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/networking__vpc.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

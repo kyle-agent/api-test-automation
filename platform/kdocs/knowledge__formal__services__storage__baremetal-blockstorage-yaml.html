@@ -1,0 +1,102 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>storage__baremetal-blockstorage.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/storage__baremetal-blockstorage.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/storage__baremetal-blockstorage.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: storage/baremetal-blockstorage
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/storage/block_storage_bm/ (overview + how_to_guides
+# + volume_group/snapshot/replication guides), fetched 2026-06-10 (retry of the
+# fetch that failed in the previous session). API-reference request examples are
+# already in data/api_bodies.json.
+
+version: 1
+service: storage/baremetal-blockstorage
+
+constraints:
+  - id: prereq-baremetal-server
+    rule: &quot;선행 서비스: Bare Metal Server. 연결 서버 is a REQUIRED create field (1..8 BM servers; Multi Node GPU Cluster also attachable) — this is why create with attachments:[] 400s; the whole ~40-endpoint chain is blocked until a real BM server exists to attach&quot;
+    provenance: docs
+  - id: create-fields
+    rule: &quot;create requires: name (starts with a letter; alnum + &#x27;-&#x27;; 3~28 chars; immutable), disk_type SSD|HDD (immutable; HDD has NO IOPS/Throughput settings), size_gb 1~16384 (immutable), qos.iops 5000~20000 (SSD only), qos.throughput 250~1000 MB/s (SSD only), attachments[1..8]&quot;
+    provenance: docs
+  - id: volume-group-targets
+    rule: &quot;volume-group create: name 3~28 (same charset rule), target volumes &lt;=16, and EVERY target volume must have snapshot capacity SET, snapshot schedule UNUSED and replication UNUSED — a freshly created bare volume does not qualify until its snapshot capacity is configured&quot;
+    provenance: docs
+  - id: snapshot-requires-capacity
+    rule: &quot;snapshots (and replications) can only be created after the volume&#x27;s snapshot CAPACITY is set; snapshot cap 1023/volume (128 via schedule); &gt;90% snapshot-space usage auto-deletes oldest snapshots and can PAUSE replication&quot;
+    provenance: docs
+  - id: replication-rules
+    rule: &quot;replication: 1 per volume, source volumes only, requires snapshot capacity set, copy gets the same disk_type, cycle ∈ {5MIN, hourly, daily, weekly, monthly}; kr-south region has NO replication; a replicated volume cannot join a volume group; policy edits only while replication is not in progress (사용↔일시 중지, 삭제 only from 일시 중지)&quot;
+    provenance: docs
+  - id: capacity-resize-only-without-snapshot
+    rule: &quot;volume capacity can be extended ONLY on volumes that do not use snapshots — for snapshot-enabled volumes, add a new volume instead&quot;
+    provenance: docs
+
+captures:
+  volume: &quot;$.result.id&quot;   # VALIDATED in knowledge/validated-facts.md (volume create returns $.result.id)
+
+states:
+  volume_group: {field: &quot;$.state&quot;, ready: [Available]}   # Creating/Available/Deleting/Editing/Error Deleting/Error (docs)
+
+quirks:
+  - id: snapshot-restore-needs-detach
+    note: &quot;snapshot restore requires ALL attached servers to be unmounted/offline first, and deletes every snapshot newer than the restore point; group snapshots actually live on the member volumes&quot;
+    provenance: docs
+  - id: recovery-creates-new-volume
+    note: &quot;복구본 생성 (recovery from snapshot) creates a SEPARATE volume with the same size (extra billing) — recovery tests must tear down the second volume; recovery copies hide the snapshot/replication tabs&quot;
+    provenance: docs
+  - id: no-volume-group-delete
+    note: &quot;no DELETE endpoint for volume-group in the catalog — teardown goes through member-volume removal (ledger note, wave 1)&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/storage__baremetal-blockstorage.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

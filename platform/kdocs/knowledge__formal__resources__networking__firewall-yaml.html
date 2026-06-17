@@ -1,0 +1,174 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>networking__firewall.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/networking__firewall.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/networking__firewall.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — networking/firewall (nw-vpc-firewall group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validated by knowledge/formal/validate.py
+# · consumed by regression/scenarios/composer.py (R2a).
+#
+# The firewall has NO Open API create (POST /v1/firewalls does not exist in
+# data/api_catalog.json) — it is implicitly created when a carrier resource
+# (internet gateway / transit gateway / direct connect / load balancer) is
+# created with firewall_enabled: true (cross-service.yaml
+# firewall-implicit-on-gateway-resources). R3 carrier-capture flow (2026-06-13):
+# the `firewall` node below is a lookup-on-list — create = GET /v1/firewalls
+# filtered to THIS run&#x27;s VPC, because the firewall_id is NOT in the carrier&#x27;s
+# create response. listfirewalls has NO vpc_id query param (api_docs verbatim:
+# name/vpc_name/product_type/state only), and engine capture expressions are
+# NOT placeholder-filled (no dynamic where-filter on a captured vpc_id) — but
+# the request PATH is placeholder-filled and {unique} is stable per lifecycle
+# run, so filtering by vpc_name=regrvpc{unique} (the vpc node&#x27;s name template)
+# + product_type=IGW pins exactly our firewall.
+#
+# ADOPTION CAVEAT: the vpc_name filter only resolves when the lifecycle
+# SELF-CREATES its VPC. A composed lifecycle that adopts the session-shared
+# VPC (adopt: vpc) has a different vpc name — compositions of this chain must
+# strip the adopt stamps from the vpc steps (see generated__wave5-net.json).
+#
+# USERGUIDE CITATIONS (docs-mapper enrichment, fetched 2026-06-15, HTTP 200):
+#   firewall: https://docs.e.samsungsdscloud.com/userguide/networking/firewall/overview/
+# All constraints below from this page are UNPROVEN (docs-only) — notes/comments
+# only, no shape changes.
+version: 1
+resources:
+  firewall:
+    lookup: true
+    code: &quot;nw-vpc-firewall&quot;
+    service: networking/firewall
+    requires: [internet-gateway]
+    create:
+      # lookup-on-list (pg-instance-group lookup-on-detail variant): no create
+      # API — the IGW (composed with firewall_enabled: true, see the
+      # internet-gateway option) implicitly created the firewall; find it via
+      # the list filtered to this run&#x27;s unique VPC name + IGW product type.
+      endpoint: &quot;GET /v1/firewalls?vpc_name=regrvpc{unique}&amp;product_type=IGW&quot;
+    capture: {firewall_id: &quot;$.firewalls[0].id&quot;}
+    ready: {endpoint: &quot;GET /v1/firewalls/{firewall_id}&quot;,
+            field: &quot;$.firewall.state&quot;, until: [ACTIVE],
+            timeout: 600, interval: 15}
+    verify:
+      - {name: show, endpoint: &quot;GET /v1/firewalls/{firewall_id}&quot;,
+         expect_status: [200]}
+      - {name: list-rules,
+         endpoint: &quot;GET /v1/firewalls/rules?firewall_id={firewall_id}&quot;,
+         expect_status: [200]}
+      # FirewallSetRequest {flavor_name opt enum(EXSMALL..EXLARGE), loggable
+      # opt bool} (api_docs verbatim) — same-value loggable set = no-op
+      # (carrier was created with firewall_loggable: false). Kept LAST among
+      # the verifies: a set can flip state to EDITING and would race the
+      # firewall-rule create that follows in composed order.
+      - {name: set-loggable, endpoint: &quot;PUT /v1/firewalls/{firewall_id}&quot;,
+         json: {loggable: false},
+         expect_status: [200, 202]}
+    # NO delete by design: the firewall is destroyed implicitly when its
+    # carrier (the IGW) is deleted — the composed teardown deletes the IGW.
+    provenance: VALIDATED
+    source: {lifecycle: networking-firewall-rule, steps: [createfirewallrule]}
+    notes: &quot;암묵 생성 자원의 lookup-on-list 노드 (R3 carrier-capture). 카탈로그의 firewall ops 8개 중 list/show/set을 이 노드가, rules 4종을 firewall-rule 노드가 커버한다. 상태기계 CREATING→ACTIVE (list enum: CREATING, ACTIVE, DELETING, DELETED, EDITING, ERROR, DEPLOYING — api_docs listfirewalls state 파라미터 verbatim); IGW가 ACTIVE여도 firewall은 CREATING일 수 있어 ready가 ACTIVE까지 재폴링한다. 리스트가 IGW-ACTIVE 직후 일시적으로 비어 캡처가 실패할 가능성은 라이브 정제 대상 (IGW ready 300s 윈도우가 보통 흡수). capture envelope $.firewalls[0].id는 api_docs response_example 기반 UNPROVEN — docs. [USERGUIDE 2026-06-15, UNPROVEN] firewall/overview 확인: (1) 방화벽은 명시 create API 없음 — 캐리어 자원(Internet Gateway / Direct Connect / Load Balancer) 생성 시 &#x27;firewall usage&#x27; 옵션 체크하면 함께 암묵 생성됨(cross-service.yaml firewall-implicit-on-gateway-resources와 일치). (2) 적용 가능 캐리어 = IGW/Direct Connect/Load Balancer 정확히 3종 — 우리 IGW(firewall_enabled:true) 경로 검증됨. (3) 생성 시 기본 크기는 Extra Small(EXSMALL) — verify의 set-loggable이 쓰는 flavor_name enum(EXSMALL..EXLARGE)과 정합. 크기 변경은 콘솔 전용(Open API 부재 가능성, set은 flavor_name도 받지만 콘솔 안내). (4) 초기 기본 규칙은 &#x27;Any Deny&#x27;(인바운드/아웃바운드 전체 차단) — permit 규칙 추가 전엔 통신 불가; firewall-rule 노드의 ALLOW 규칙이 그래서 의미가 있음. (5) 규칙 한도는 크기별: EXSMALL=5, SMALL=100, MEDIUM=200, LARGE=500, EXLARGE=1000 — 기본 EXSMALL이면 최대 5개 규칙(우리 단일 규칙은 안전). (6) 선행조건 = VPC + 캐리어(IGW/DC/LB) 존재. live-validated run 27583285457 (2026-06-15)&quot;
+
+  firewall-rule:
+    code: &quot;nw-vpc-firewall-rule&quot;
+    service: networking/firewall
+    requires: [firewall]
+    create:
+      endpoint: &quot;POST /v1/firewalls/rules&quot;
+      # FirewallRuleCreateSingleRequest {firewall_id REQ, firewall_rule REQ
+      # FirewallRuleCreateRequest {action REQ enum(ALLOW,DENY),
+      # destination_address REQ [str], direction REQ enum(INBOUND,OUTBOUND),
+      # service REQ [FirewallPort {service_type REQ enum(TCP,UDP,ICMP,...),
+      # service_value opt}], source_address REQ [str], status REQ
+      # enum(ENABLE,DISABLE), description/order_direction/order_rule_id opt}
+      # (api_docs verbatim; addresses = doc example values).
+      body:
+        firewall_id: &quot;{firewall.firewall_id}&quot;
+        firewall_rule:
+          action: ALLOW
+          description: &quot;API regression firewall rule&quot;
+          destination_address: [&quot;10.0.0.1&quot;]
+          direction: INBOUND
+          service: [{service_type: TCP, service_value: &quot;443&quot;}]
+          source_address: [&quot;192.168.1.1&quot;]
+          status: ENABLE
+      # the firewall set-loggable verify directly precedes this create in
+      # composed order and can leave the firewall EDITING -&gt; invalid-state
+      # 400/409 race; spaced retries absorb it.
+      retry_on_status: [400, 409]
+      retries: 8
+      retry_interval: 15
+    capture: {firewall_rule_id: &quot;$.firewall_rule.id&quot;}
+    ready: {endpoint: &quot;GET /v1/firewalls/rules/{firewall_rule_id}&quot;,
+            field: &quot;$.firewall_rule.state&quot;, until: [ACTIVE],
+            timeout: 600, interval: 15}
+    verify:
+      - {name: show, endpoint: &quot;GET /v1/firewalls/rules/{firewall_rule_id}&quot;,
+         expect_status: [200]}
+      # FirewallRuleSetRequest (api_docs): action/destination_address/
+      # direction/service/source_address REQ, description opt — same-value
+      # set = no-op edit.
+      - {name: set,
+         endpoint: &quot;PUT /v1/firewalls/rules/{firewall_rule_id}&quot;,
+         json: {action: ALLOW,
+                description: &quot;API regression firewall rule (set)&quot;,
+                destination_address: [&quot;10.0.0.1&quot;],
+                direction: INBOUND,
+                service: [{service_type: TCP, service_value: &quot;443&quot;}],
+                source_address: [&quot;192.168.1.1&quot;]},
+         expect_status: [200, 202]}
+    delete: {endpoint: &quot;DELETE /v1/firewalls/rules/{firewall_rule_id}&quot;,
+             destructive: true,
+             retry_on_status: [400, 409], retries: 8, retry_interval: 15}
+    provenance: VALIDATED
+    source: {lifecycle: networking-firewall-rule, steps: [createfirewallrule]}
+    notes: &quot;live-validated run 27593608514 (2026-06-16) — createfirewallrule POST /v1/firewalls/rules 2xx, evidence key networking/firewall/createfirewallrule (service-prefixed, own service). rule 상태기계 CREATING→ACTIVE (listfirewallrules state enum verbatim); set 직후 EDITING에서 delete가 400/409 가능성 → delete retry. 소스 lifecycle은 firewall_id placeholder로 4xx — 실 firewall_id 주입(carrier-capture)은 이 모델이 처음 제공하므로 body/capture 전부 UNPROVEN(docs). 카탈로그 createfirewallrule 201 응답 FirewallRuleShowResponse $.firewall_rule.id. [USERGUIDE 2026-06-15, UNPROVEN] firewall/overview 확인: 규칙은 destination/source address + protocol + port로 인바운드/아웃바운드 permit/deny를 지정 — body의 destination_address/source_address/service(protocol+port)/direction/action 구조와 정합. 기본 정책이 &#x27;Any Deny&#x27;이므로 ALLOW 규칙만이 실제 통신을 연다. 한 방화벽의 규칙 총수는 크기별 한도(EXSMALL=5 기본)에 묶임 — 회귀 단일 규칙은 여유. 우선순위/order(order_direction/order_rule_id opt)는 userguide가 명시 수치 없음(라이브 확인 대상).&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/networking__firewall.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

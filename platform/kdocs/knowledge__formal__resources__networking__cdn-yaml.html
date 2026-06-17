@@ -1,0 +1,129 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>networking__cdn.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/networking__cdn.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/networking__cdn.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — networking/cdn (nw-cdn group, Global CDN).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from networking-cdn-service
+# (light + enabled, but per its _note &quot;NOT runtime-proven … pending live
+# validation&quot; and the capture is capture_soft — so C5 keeps everything docs
+# until a live pass upgrades it; body copied verbatim from the lifecycle).
+# Userguide cited (re-fetched 2026-06-15, docs-mapper):
+#   https://docs.e.samsungsdscloud.com/userguide/networking/global_cdn/overview/
+#   Confirmed (docs, UNPROVEN — no live 2xx): 20 domains/account cap;
+#   region kr-west1/kr-east1 only (NOT kr-south1/kr-south2/kr-south3);
+#   origin protocols HTTP/HTTPS/HTTP2; Akamai-backed async provisioning.
+version: 1
+resources:
+  cdn:
+    code: &quot;nw-cdn-cdn&quot;
+    service: networking/cdn
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/cdns&quot;
+      body:
+        cache_expiry_time: &quot;86400&quot;
+        cache_key_hostname: REQUEST_HOST_HEADER
+        caching_option: &quot;&quot;
+        cdn_origin_hostname: &quot;{opt.origin_hostname}&quot;
+        cdn_origin_port: &quot;&quot;
+        cdn_origin_protocol: &quot;&quot;
+        cdn_service_domain_prefix: &quot;regr{ualpha}&quot;
+        cdn_service_origin_path: &quot;/test/global/&quot;
+        content_policy: &quot;&quot;
+        custom_forward_host_header: &quot;&quot;
+        description: &quot;API regression suite&quot;
+        forward_host_header: REQUEST_HOST_HEADER
+        name: &quot;regr{ualpha}&quot;
+        origin_hostname_type: DOMAIN
+        query_string_ignored: &quot;&quot;
+        range_request_allowed: &quot;&quot;
+        request_custom_headers: &quot;&quot;
+        response_custom_headers: &quot;&quot;
+        tags: []
+      options:
+        origin_hostname: {type: string, required: true,
+                          default: &quot;test.example.com&quot;,
+                          note: &quot;원본(origin) 도메인 — 기본값은 소스 lifecycle의
+                            placeholder (도메인명 방식 권장; 공인 IP 방식이면
+                            protocol/port도 필요, cdn-create-required-fields).
+                            실서빙 검증에는 실존 origin이 필요하다. userguide
+                            2026-06-15: origin protocol는 HTTP/HTTPS/HTTP2 지원
+                            (UNPROVEN — docs only). origin_hostname_type=DOMAIN이면
+                            cdn_origin_protocol/cdn_origin_port는 비워둘 수 있고,
+                            IP 방식이면 둘 다 필수 (cdn-create-required-fields).&quot;}
+    capture: {cdn_id: &quot;$.cdn.resource_id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/cdns/{cdn_id}&quot;, expect_status: [200]}
+    delete: {endpoint: &quot;DELETE /v1/cdns/{cdn_id}&quot;, destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-cdn-service, steps: [create-cdn, delete-cdn]}
+    notes: &quot;선행 서비스 없음 — 계정 스코프, VPC-free (cdn-no-prereq-services).
+      REGION GATE: kr-west1/kr-east1 전용 (cdn-region-availability — 엔진
+      region-guard 부재, 소스 lifecycle _note의 운영 게이트). 사용 가능 id는
+      $.cdn.resource_id — $.cdn.id 아님 (cdn-id-is-resource-id; create envelope은
+      {cdn:{account_id,resource_id,workflow_id}}). Akamai 외부 워크플로라
+      프로비저닝이 비동기 — workflow_id 참고, 전파 지연 허용
+      (cdn-backed-by-akamai). cache_expiry_time &#x27;86400&#x27;은 userguide 범위
+      3600-2592000s 적용형 (cdn-cache-ttl-applied; 문자열 타입은 API reference
+      예제 일치). enum 추정치 (UNVALIDATED): cache_key_hostname/
+      forward_host_header=REQUEST_HOST_HEADER, origin_hostname_type=DOMAIN.
+      name/domain prefix는 전역 유일해야 한다 (cdn-domain-prefix-globally-unique;
+      계정당 도메인 20개 cap). capture는 소스에서 capture_soft — envelope은 docs
+      response_example 근거라 docs 유지. verify GET가 cdn의 gap_getid 1건
+      (detailcdnservice)을 닫는다. userguide 재확인 (2026-06-15, UNPROVEN —
+      no live 2xx): REGION GATE는 kr-west1/kr-east1 전용이며 kr-south1/kr-south2/
+      kr-south3에서는 미제공 (명시적 제외 리전 확인); origin protocol는 HTTP/HTTPS/
+      HTTP2 지원; 계정당 도메인 20개 cap 재확인 (cdn-domain-quota-20-per-account);
+      Akamai 인프라 기반이라 콘솔/백엔드 워크플로가 비동기.&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/networking__cdn.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

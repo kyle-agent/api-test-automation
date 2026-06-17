@@ -1,0 +1,91 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>container__ske.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/container__ske.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/container__ske.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: container/ske
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+
+version: 1
+service: container/ske
+
+constraints:
+  - id: cluster-needs-servicewatch-flag
+    rule: &quot;v1.4 schema: service_watch_logging_enabled is REQUIRED on cluster create (sent as the string \&quot;true\&quot;)&quot;
+    provenance: VALIDATED
+  - id: nodepool-provisioned-iops
+    rule: &quot;nodepool with volume_type_name: SSD_Provisioned requires volume_max_iops and volume_max_throughput&quot;
+    provenance: VALIDATED
+  - id: cluster-name-rule
+    rule: &quot;cluster name: starts with a letter; letters/digits/hyphen; 3-30 chars; no duplicate names (userguide)&quot;
+    provenance: docs
+  - id: nodepool-node-limits
+    rule: &quot;max 100 nodes per node pool AND max 100 total nodes across all node pools; all nodes in a pool share the same server type/size/OS image (userguide)&quot;
+    provenance: docs
+
+captures:
+  ske-cluster: $.resource_id     # NOT $.cluster.id
+  ske-nodepool: $.nodepool.id
+
+states:
+  ske-cluster: {field: $.cluster.status, ready: [RUNNING, ACTIVE, Running]}
+  ske-nodepool: {field: $.nodepool.status, ready: [Running, RUNNING, ACTIVE, active]}
+
+quirks:
+  - id: cluster-volume-is-filestorage
+    note: &quot;cluster volume_id is a STRING id of a storage/filestorage volume (cross-service dependency — see cross-service.yaml)&quot;
+    provenance: VALIDATED
+  - id: k8s-version-lookup
+    note: &quot;kubernetes version from /v1/kubernetes-versions -&gt; $.kubernetes_versions[0].kubernetes_version&quot;
+    provenance: VALIDATED
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/container__ske.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

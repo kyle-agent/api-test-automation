@@ -1,0 +1,121 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>financial-management__budget.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/financial-management__budget.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/financial-management__budget.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — financial-management/budget (fm-budget group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from budget-account-budget
+# (enabled, light, guarded — body/capture UNPROVEN per the lifecycle&#x27;s own
+# note -&gt; docs) by extract.py, curated by hand.
+version: 1
+resources:
+  account-budget:
+    code: &quot;fm-budget-account&quot;
+    service: financial-management/budget
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/budgets/account&quot;
+      body:
+        # 예산명(name) — userguide: 최대 20자, 한글/영문/숫자/공백 및 특수문자
+        # + = . , @ - _ 허용. generator {unique} suffix stays within 20.
+        name: &quot;regr-budget-{unique}&quot;
+        # live 400 &quot;Amount is required.&quot; while sending budget_amount
+        # (run 27394211896) -&gt; the field name is `amount`
+        amount: 1000000
+        currency: KRW
+        period_type: &quot;{opt.period_type}&quot;
+        # 시작월(start_month) — userguide requires picking the month tracking
+        # begins. YYYY-MM shape is inferred (console date-picker); UNPROVEN.
+        start_month: &quot;{opt.start_month}&quot;
+        notifications:
+          - threshold_percent: 80
+            notification_emails: [&quot;kchoic.ai+budget{unique}@gmail.com&quot;]
+      options:
+        period_type:
+          type: enum
+          required: true
+          default: MONTHLY
+          values: [MONTHLY, TOTAL]
+          # userguide 관리 유형: &quot;월별 예산 설정&quot;(monthly reset) / &quot;전체 예산
+          # 설정&quot;(cumulative). API enum tokens MONTHLY/TOTAL are inferred —
+          # docs are console-only (JS-rendered apiref). Unproven until a 2xx.
+          note: &quot;docs-only field — console exposes 관리 유형 월별/전체; API token names MONTHLY/TOTAL UNPROVEN (no 2xx, create is 500-blocked PF-04)&quot;
+        start_month:
+          type: string
+          required: true
+          default: &quot;2026-06&quot;
+          # userguide 시작월: 예산 추적 시작 월 선택. 형식 YYYY-MM 추정 —
+          # console date-picker, API field name/format UNPROVEN.
+          note: &quot;docs-only field — userguide &#x27;시작월&#x27; (start month of tracking); field name/format YYYY-MM UNPROVEN (create is 500-blocked PF-04)&quot;
+        threshold_percent:
+          type: enum
+          required: false
+          default: 80
+          values: [50, 70, 80, 90, 100]
+          # userguide 임계치 도달 알림(threshold alert) — optional. 알림 발송
+          # 빈도 최초 1회/매일(one-time vs daily). Single threshold per budget
+          # per docs structure. Enum percentages are common console presets —
+          # exact allowed set UNPROVEN.
+          note: &quot;docs-only — userguide &#x27;임계치 도달 알림&#x27; optional; one threshold per budget (최초 1회/매일 알림 빈도). Allowed percent set UNPROVEN; mapped onto notifications[].threshold_percent&quot;
+    capture: {budget_id: &quot;$.budget.id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/budgets/account/{budget_id}&quot;,
+             destructive: true}
+    provenance: docs
+    # BLOCKED: live 500 ContactAdminForAssistance (run 27395331657) — Product
+    # Bug baselined in data/baselines/known_issues.json. Excluded from composed
+    # waves until the backend fix; retest then.
+    source: {lifecycle: budget-account-budget,
+             steps: [create-account-budget, show-account-budget,
+                     set-account-budget, delete-account-budget]}
+    notes: &quot;GLOBAL(account-scoped, region 세그먼트 없음) 서비스 — 비과금 지출 알림 설정(인프라 없음 → light). userguide(how_to_guides/budget, 2026-06-14): 예산명 ≤20자(한글/영문/숫자/공백+ = . , @ - _), 관리 유형 월별/전체, 예산 금액 필수, 시작월 선택; 임계치 도달 알림은 선택(임계치 % + 최초1회/매일 + 알림 수신자 이메일); &#x27;신규 생성 방지&#x27;는 임계 도달 시 Compute/Database 서비스군 신규 생성 차단(2025.12 기준 적용 대상: Virtual Server·Databases·Event Streams·Search Engine·Vertica·Oracle Service). currency 필드는 userguide에 노출 안 됨(계정 기본통화 추정 — body의 currency:KRW UNPROVEN). 공유 계정에 budget이 이미 있으면 create가 409 — 단일성(계정당 1개 추정) 충돌은 합성 시 env-skip/adopt 후보. body(amount/threshold/notification/start_month 필드)와 capture envelope $.budget.id 모두 소스 lifecycle이 best-effort/추측으로 명시 — UNPROVEN(docs), 실 2xx 후 승격. PUT /v1/budgets/account/{id}(setaccountbudget)는 lifecycle 영역. 삭제는 영구(복구 불가). cost_management overview(2026-06-14, WebFetch 200) 재확인: 비용/예산 전반 타임존 Asia/Seoul(GMT+09:00) 자정 기준; 비용 분석은 월 기준 제공. CONFIRMED: POST /v1/budgets/account → 500 ContactAdminForAssistance on complete-shaped body (run 27395331657) = product bug PF-04, already baselined in data/baselines/known_issues.json; node stays out of composed waves until backend fix. WebFetch: cost_management/overview/ = 200 (Budget 세부 규칙은 overview에 미노출); cost_management/how_to_guides/budget/ = 503 (skip — 세부 name-len/threshold-percent 규칙은 기존 how_to_guides/budget 인입분에서 유지, 재확인 불가).&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/financial-management__budget.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

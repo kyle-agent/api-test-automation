@@ -1,0 +1,156 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>management__loggingaudit.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/management__loggingaudit.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/management__loggingaudit.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — management/loggingaudit (mg-la group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from loggingaudit-trail
+# (enabled, guarded) by extract.py, curated by hand. start/stop trail and
+# downloadlogs are operations on the trail, not resources — they stay in the
+# hand-written lifecycle.
+#
+# 2026-06-14 ingest: the create body was the WRONG MODEL. The catalog endpoint
+# POST /v1/trails takes TrailCreateRequestV1dot1 (data/api_docs.json), whose
+# REQUIRED fields are account_id, bucket_name, bucket_region — NOT
+# name/object_storage_bucket_name/is_multi_region/tags. The trail&#x27;s display
+# name is trail_name (5-26 chars, [A-Za-z0-9-] per the userguide trail page;
+# UNCONFIRMED whether it is required at API level). Capture $.trail.id is
+# CONFIRMED against the response model TrailShowResponseV1dot1{trail:
+# Trail1dot1} and Trail1dot1.id. Body rewritten to the real model below.
+#
+# 2026-06-15 docs-mapper enrichment (notes/comments ONLY — no shape change).
+# Userguide cited (constraints UNPROVEN at API level until a live 2xx):
+#   [U1] /userguide/management/logging_audit/overview/
+#   [U2] /userguide/management/logging_audit/how_to_guides/trail/
+#   [U3] /userguide/management/logging_audit/how_to_guides/  (activity history)
+# [U2] Trail console constraints confirmed verbatim:
+#   - trail_name: &quot;영문, 숫자와 특수문자(-)를 사용하여 5~26자로 입력&quot; — 5-26
+#     chars, English letters + digits + hyphen only. (Confirms the prior guess;
+#     API-level required/optional still per spec = optional.)
+#   - bucket: &quot;활동 내역을 저장할 Object Storage 버킷명&quot; required; bucket region
+#     required and IMMUTABLE after creation (&quot;생성 후 변경 불가&quot;).
+#   - 대상 리전 (target region): default 전체(All); specific regions selectable;
+#     MODIFIABLE after creation (≠ the immutable bucket region).
+#   - 로그/자원 유형 (log types): default 전체(All); selectable; modifiable.
+#   - 저장할 파일 유형: JSON or CSV.
+#   - 로그파일 검증 (log file validation): optional; when on, stores a Digest
+#     file in the same bucket to detect log file 변경/삭제.
+# [U1] Activity history viewable 90 days; long-term retention requires a Trail
+#      writing to Object Storage.
+# [U3] Activity-history EXPORT (console, not the trail API) offers time-range
+#      presets 전체/최근30분/최근1시간/최근12시간/직접입력 and JSON|CSV download —
+#      this is the console activity-log download, distinct from the trail&#x27;s
+#      downloadlogs op; do not confuse with listlogs query params.
+version: 1
+resources:
+  trail:
+    code: &quot;mg-la-trail&quot;
+    service: management/loggingaudit
+    requires:
+      # bucket_region must match where the bucket lives; bucket_name is a
+      # pre-existing Object Storage bucket (userguide: &quot;Object Storage required
+      # for Trail creation&quot;). Object Storage has no node in this model yet, so
+      # the bucket is a docs-only precondition carried in options (_note).
+      - {credential: account_id,
+         note: &quot;account_id (ACCOUNT_ID-xxxx) is a required body field — the caller&#x27;s account id, supplied by the harness/credential context, not a graph node&quot;}
+    create:
+      endpoint: &quot;POST /v1/trails&quot;
+      # TrailCreateRequestV1dot1 required: account_id, bucket_name,
+      # bucket_region. Optional sent: trail_name (display name), region_total_yn
+      # (Y = all regions), log_type_total_yn (Y = all log types),
+      # log_verification_yn (N), organization_trail_yn (N), trail_description,
+      # trail_save_type (JSON|CSV). iam_role_id/log_group_name are ServiceWatch-
+      # trail-only; log_archive_account_id is org-trail-only — all omitted.
+      body:
+        account_id: &quot;{opt.account_id}&quot;
+        bucket_name: &quot;{opt.bucket_name}&quot;
+        bucket_region: &quot;{region}&quot;
+        trail_name: &quot;regrtrail{unique}&quot;
+        trail_description: &quot;API regression coverage probe&quot;
+        region_total_yn: &quot;Y&quot;
+        log_type_total_yn: &quot;Y&quot;
+        log_verification_yn: &quot;N&quot;
+        organization_trail_yn: &quot;N&quot;
+        trail_save_type: &quot;JSON&quot;
+      options:
+        account_id: {type: string, required: true, default: &quot;{account_id}&quot;,
+                     note: &quot;_note: 본문 필수 account_id — 호출 계정 id(ACCOUNT_ID-xxxx). 엔진 builtin {account_id}가 없으면 크리덴셜 컨텍스트에서 채워야 함(라이브 검증 대상)&quot;}
+        bucket_name: {type: string, required: true,
+                      default: &quot;apitest-logsink&quot;,
+                      note: &quot;사전 존재하는 Object Storage 버킷명. userguide [U2] 확인: 버킷·버킷 리전 모두 필수이며 버킷 리전은 &#x27;생성 후 변경 불가&#x27;(IMMUTABLE) — bucket_region이 버킷 실제 리전과 불일치하면 생성 실패 예상(UNPROVEN). 워크플로 ensure-logsink가 만드는 공용 apitest-logsink 사용 — network-logging과 공유 (owner 2026-06-13)&quot;}
+        trail_name: {type: string, required: false, default: &quot;regrtrail{unique}&quot;,
+                     note: &quot;_note: 트레일 표시명. userguide trail 페이지 [U2] 정확 문구 &#x27;영문, 숫자와 특수문자(-)를 사용하여 5~26자로 입력&#x27; — 5-26자, 영문/숫자/하이픈(-)만 (2026-06-15 [U2] 재확인). default regrtrail{unique}는 이 규칙 내. API 레벨 필수 여부는 스펙상 optional 표기 — 라이브 검증 대상(UNPROVEN)&quot;}
+        trail_save_type: {type: enum, values: [JSON, CSV], required: false,
+                          default: JSON, vary: true,
+                          note: &quot;저장 포맷 — 생성 후 변경 가능. userguide [U2] &#x27;저장할 파일 유형 (JSON, CSV)&#x27; 정확 2값 확인 (2026-06-15)&quot;}
+        region_total_yn: {type: enum, values: [&quot;Y&quot;, &quot;N&quot;], required: false,
+                          default: &quot;Y&quot;, vary: false,
+                          note: &quot;대상 리전 전체 여부(default Y). userguide [U2]: 대상 리전 default 전체(All), 특정 리전 선택 가능, 생성 후 변경 가능(버킷 리전과 달리 가변). N이면 region_names 목록 필요 — 미모델&quot;}
+        log_verification_yn: {type: enum, values: [&quot;N&quot;, &quot;Y&quot;], required: false,
+                              default: &quot;N&quot;, vary: true,
+                              note: &quot;로그파일 검증(digest) 활성 — Y면 무결성 검증용 digest 파일을 같은 버킷에 저장해 로그파일 변경/삭제 여부 검출(userguide [U2] 로그파일 검증, 2026-06-15 확인)&quot;}
+    capture: {trail_id: &quot;$.trail.id&quot;}
+    # showlog (GET /v1/logs/{logging_id}) is NOT a verify on this trail node: the
+    # trail captures trail_id, not logging_id, and a log entry is not a property
+    # of a trail (it&#x27;s an account-wide activity record). Documented for
+    # traceability: GET /v1/logs/{logging_id} (showlog) is exercised READ-ONLY by
+    # the loggingaudit-logs-readonly lifecycle via listlogs (GET /v1/logs, which
+    # REQUIRES start_at+end_at ISO-8601 UTC per constraint listlogs-needs-time-
+    # window; LogListResponse.logs[].id) -&gt; soft-capture logs[0].id -&gt; show,
+    # tolerant [200,400,403,404] (a fresh account may have no logs in the window).
+    # Closes the static id-bound GET gap GET /v1/logs/{logging_id}.
+    delete: {endpoint: &quot;DELETE /v1/trails/{trail_id}&quot;, destructive: true}
+    provenance: docs
+    source: {lifecycle: loggingaudit-trail, steps: [create-trail, delete-trail]}
+    notes: &quot;CloudTrail-equivalent 감사 trail (90일 콘솔 보관 + Object Storage 장기 보관). 2026-06-14 정정: create body는 종전 {name, object_storage_bucket_name, is_multi_region, tags} 추정값이 아니라 docs TrailCreateRequestV1dot1 모델(필수 account_id/bucket_name/bucket_region; 표시명은 trail_name; multi-region은 region_total_yn/region_names). capture $.trail.id는 응답 모델 TrailShowResponseV1dot1{trail: Trail1dot1}, Trail1dot1.id로 CONFIRMED(라이브 2xx 후 VALIDATED 승격). start/stop은 body 없는 POST /v1/trails/{trail_id}/start|stop 오퍼레이션(자원 아님 — 핸드라이트 lifecycle에 유지). downloadlogs는 POST /v1/logs/download. Object Storage 버킷이 선행 필수(userguide Prerequisites) — cross-service 엣지 후보(아래 리포트). Landing Zone 선행 체인 구성요소이기도 함(cloudcontrol-landing-zone notes). _note(smoke-400 관련 아님): loggingaudit의 listlogs(GET /v1/logs)는 start_at/end_at(필수 시간범위)를, listtrails(GET /v1/trails)는 필수 없음 — service yaml constraints 참조.&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/management__loggingaudit.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>
