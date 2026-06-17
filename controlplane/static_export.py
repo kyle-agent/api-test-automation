@@ -26,16 +26,22 @@ ROOT = Path(__file__).resolve().parent.parent
 # routes to the same file keeps every internal link rewritable.
 PAGES = {
     "/": "index.html",
+    # Plan = one linear flow (IA.md): the ?step= stepper + the two stages that
+    # have their own routes (Model→dependencies, Compose→scenarios).
     "/planning": "planning.html",
+    "/planning?step=model": "planning-model.html",
+    "/planning?step=compose": "planning-compose.html",
     "/planning/scenarios": "scenarios.html",
     "/planning/dependencies": "dependencies.html",
+    # knowledge has ONE home (/knowledge); the legacy alias renders the same file
     "/planning/knowledge": "knowledge.html",
     "/knowledge": "knowledge.html",
     "/testing": "testing.html",
+    # Report = run-centric tabs (summary/dashboard/runs) + embedded dashboard.
+    # The old coverage/conformance/trends re-render tabs are gone (WS1/IA.md).
     "/reporting": "reporting.html",
-    "/reporting?tab=coverage": "reporting-coverage.html",
-    "/reporting?tab=conformance": "reporting-conformance.html",
-    "/reporting?tab=trends": "reporting-trends.html",
+    "/reporting?tab=dashboard": "reporting-dashboard.html",
+    "/reporting?tab=runs": "reporting-runs.html",
     "/reporting?tab=triage": "reporting-triage.html",
     "/planning/resources": "resources.html",
     "/planning/resources/compose": "resource-compose.html",
@@ -52,30 +58,17 @@ BANNER = (
 _DEAD_PREFIXES = ("/runs", "/ai", "/planning/edit", "/schedules", "/partials")
 
 
-def _file_views() -> dict[str, str]:
-    """planning/view targets (knowledge, suites, environments) -> static names."""
-    out = {}
-    for pattern in ("knowledge/*.md", "knowledge/formal/*.yaml",
-                    "knowledge/formal/*.md", "knowledge/formal/services/*.yaml",
-                    "suites/*.yaml", "environments/*.yaml"):
-        for p in sorted(ROOT.glob(pattern)):
-            rel = p.relative_to(ROOT).as_posix()
-            out[rel] = "view/" + rel.replace("/", "__") + ".html"
-    return out
-
-
-def _rewrite(html: str, views: dict[str, str], depth: int = 0) -> str:
+def _rewrite(html: str, depth: int = 0) -> str:
     """Rewrite live-server links to the static file layout."""
     up = "../" * depth
-    # file viewer links (do these BEFORE the plain-route pass)
-    def view_sub(m):
-        rel = m.group(1)
-        target = views.get(rel)
-        return f'href="{up}{target}"' if target else 'href="#"'
-    html = re.sub(r'href="/planning/view\?path=([^"&]+)"', view_sub, html)
+    # file viewer is live-only on Pages (the per-file view/* fan-out was dropped
+    # to keep the export small) — neutralize its links.
+    html = re.sub(r'href="/planning/view\?path=[^"]*"', 'href="#"', html)
     # scenario service filter (query forms/links) — drop to the full list
     html = re.sub(r'href="/planning/scenarios\?[^"]*"',
                   f'href="{up}scenarios.html"', html)
+    # Plan stepper (?step=catalog is the default /planning page)
+    html = html.replace('href="/planning?step=catalog"', f'href="{up}planning.html"')
     # reporting sub-tabs -> per-tab static files (summary = reporting.html)
     def tab_sub(m):
         tab = m.group(1)
@@ -86,7 +79,8 @@ def _rewrite(html: str, views: dict[str, str], depth: int = 0) -> str:
     # compose-with-targets / compare / testing-resources -> nearest static page
     html = re.sub(r'href="/planning/resources/compose\?[^"]*"',
                   f'href="{up}resource-compose.html"', html)
-    html = html.replace('href="/reporting/compare"', f'href="{up}reporting-trends.html"')
+    # compare is a live-only diff; on Pages point at the embedded dashboard tab
+    html = html.replace('href="/reporting/compare"', f'href="{up}reporting-dashboard.html"')
     html = html.replace('href="/testing/resources"', f'href="{up}resources.html"')
     html = re.sub(r'href="/planning/resources/([a-z0-9_-]+)"',
                   lambda m: (f'href="{up}resource-compose.html"'
@@ -115,8 +109,7 @@ def export(out_dir: str) -> int:
     from controlplane.app import app
 
     out = Path(out_dir)
-    (out / "view").mkdir(parents=True, exist_ok=True)
-    views = _file_views()
+    out.mkdir(parents=True, exist_ok=True)
     written = 0
     with TestClient(app) as client:
         for route, fname in PAGES.items():
@@ -124,7 +117,7 @@ def export(out_dir: str) -> int:
             if resp.status_code != 200:
                 print(f"[static-export] skip {route}: HTTP {resp.status_code}")
                 continue
-            (out / fname).write_text(_rewrite(resp.text, views), encoding="utf-8")
+            (out / fname).write_text(_rewrite(resp.text), encoding="utf-8")
             written += 1
         # per-node resource form pages (read-only on Pages)
         try:
@@ -134,17 +127,10 @@ def export(out_dir: str) -> int:
                 if resp.status_code != 200:
                     continue
                 (out / f"resource__{nid}.html").write_text(
-                    _rewrite(resp.text, views), encoding="utf-8")
+                    _rewrite(resp.text), encoding="utf-8")
                 written += 1
         except Exception as exc:  # resource pages are best-effort
             print(f"[static-export] resource pages skipped: {exc}")
-        for rel, fname in views.items():
-            resp = client.get("/planning/view", params={"path": rel})
-            if resp.status_code != 200:
-                continue
-            (out / fname).write_text(_rewrite(resp.text, views, depth=1),
-                                     encoding="utf-8")
-            written += 1
     print(f"[static-export] wrote {written} page(s) -> {out}")
     return written
 

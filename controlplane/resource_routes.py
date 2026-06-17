@@ -10,19 +10,19 @@ app.py를 건드리지 않고 착륙한다 — 오케스트레이터가 머지 �
   GET  /planning/resources/{node_id}    노드 폼 (raw YAML이 아닌 폼; 신규 노드 포함)
   POST /planning/resources/{node_id}/save  폼 -> yaml -> authoring.propose_edit
 
-합성기(regression/scenarios/composer.py, 계약 C2)는 R2a가 병렬 작업 중 —
-import 실패 시 "합성기 미탑재"로 degrade한다. run 연계는 기존 /runs/trigger
-재사용 (crud_filter = 생성된 draft lifecycle id).
+합성기(regression/scenarios/composer.py, 계약 C2)는 이제 항상 탑재되어 있어
+직접 import 한다. run 연계는 기존 /runs/trigger 재사용
+(crud_filter = 생성된 draft lifecycle id).
 """
 from __future__ import annotations
 
-import importlib
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from regression.scenarios import composer
 from controlplane import dispatch, resource_model, triage
 from core import profiles as core_profiles
 from core import suites as core_suites
@@ -43,16 +43,6 @@ def _render(request: Request, name: str, **ctx) -> HTMLResponse:
         "active": "planning",
     }
     return templates.TemplateResponse(request, name, {**base, **ctx})
-
-
-# --- 합성기 (R2a 병렬 — import 가드) ------------------------------------------------
-
-def _composer():
-    """regression.scenarios.composer 모듈 또는 None (미탑재 degrade)."""
-    try:
-        return importlib.import_module("regression.scenarios.composer")
-    except Exception:
-        return None
 
 
 # --- 표시용 변환 ---------------------------------------------------------------------
@@ -152,7 +142,7 @@ def resource_list(request: Request):
                    validated=sum(1 for n in model.values()
                                  if n.get("provenance") == "VALIDATED"),
                    files=sorted(set(sources.values())),
-                   has_composer=_composer() is not None)
+                   has_composer=True)
 
 
 # --- 합성 (compose) — /{node_id}보다 먼저 선언해야 라우팅이 맞는다 ----------------------
@@ -167,7 +157,7 @@ def _compose_ctx(request: Request, *, selected=None, choices=None, options=None,
                 selected=set(selected or []),
                 choices=choices or {}, options=options or {},
                 lifecycle_id=lifecycle_id,
-                has_composer=_composer() is not None,
+                has_composer=True,
                 plan=plan,
                 plan_rows=_plan_rows(plan) if plan else [],
                 plan_error=plan_error, saved=saved,
@@ -206,20 +196,17 @@ def graph_json(request: Request, targets: str = "", focus: str = "",
     `?focus=<node>` -> that node's upstream closure + direct dependents.
     `?targets=a,b,c[&choices=node=branch,...]` -> the composed closure.
     """
-    mod = _composer()
-    if mod is None:
-        return JSONResponse({"error": "합성기 미탑재 (composer.py)"}, status_code=503)
     model = resource_model.load_model()
     try:
         if focus:
             if focus not in model:
                 return JSONResponse({"error": f"unknown node '{focus}'"}, status_code=404)
-            return JSONResponse(mod.focus_view(focus, model=model))
+            return JSONResponse(composer.focus_view(focus, model=model))
         tlist = [t for t in (targets or "").split(",") if t.strip()]
         if not tlist:
             return JSONResponse({"error": "targets 또는 focus 가 필요합니다"}, status_code=400)
-        return JSONResponse(mod.graph_view(tlist, _parse_choices(choices) or None,
-                                           None, model))
+        return JSONResponse(composer.graph_view(tlist, _parse_choices(choices) or None,
+                                                None, model))
     except Exception as exc:  # ComposeError or bad input -> 400, never 500
         return JSONResponse({"error": str(exc)}, status_code=400)
 
@@ -275,22 +262,19 @@ async def compose_run(request: Request):
 
     if not targets:
         return page(targets_error="대상 노드를 1개 이상 선택하세요")
-    mod = _composer()
-    if mod is None:
-        return page()  # 템플릿이 '합성기 미탑재' 안내를 보여준다
 
     model = resource_model.load_model()
     try:
-        plan = mod.plan(targets, choices or None, options or None, model=model)
+        plan = composer.plan(targets, choices or None, options or None, model=model)
     except Exception as exc:
         return page(plan_error=f"plan 계산 실패: {exc}")
 
     saved = None
     if action == "save":
         try:
-            lifecycle = mod.compose(targets, choices or None, options or None,
-                                    model=model,
-                                    lifecycle_id=lifecycle_id or None)
+            lifecycle = composer.compose(targets, choices or None, options or None,
+                                         model=model,
+                                         lifecycle_id=lifecycle_id or None)
         except Exception as exc:
             return page(plan=plan, plan_error=f"compose 실패: {exc}")
         name, errs = resource_model.save_lifecycle_draft(lifecycle)
@@ -323,7 +307,7 @@ def resource_form(request: Request, node_id: str, service: str = ""):
                    ready=node.get("ready") or {},
                    delete=node.get("delete") or {},
                    option_types=resource_model.OPTION_TYPES,
-                   has_composer=_composer() is not None)
+                   has_composer=True)
 
 
 @router.post("/{node_id}/save", response_class=HTMLResponse)

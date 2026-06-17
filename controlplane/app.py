@@ -577,11 +577,6 @@ def reporting_compare(request: Request, a: str = "", b: str = ""):
                    a_missing=a_missing, b_missing=b_missing)
 
 
-@app.get("/runs", include_in_schema=False)
-def runs_legacy():
-    return RedirectResponse("/reporting", status_code=307)
-
-
 @app.get("/runs/{gh_run_id}", response_class=HTMLResponse)
 def run_detail(request: Request, gh_run_id: str):
     run = db.get_run(gh_run_id)
