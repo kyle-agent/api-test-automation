@@ -1228,7 +1228,10 @@ jobs:
           # (controlplane.static_export -> reports/platform-static -> "$dd"/platform)
           # was RETIRED (IA.md V5). The separate static catalog/ export was also
           # RETIRED — the console Catalog tab (/platform, below) is now the
-          # canonical platform static read face.
+          # canonical platform static read face. Purge any stale catalog/ left on
+          # the branch from a pre-retirement run (publishing is non-destructive, so
+          # nothing else removes it — there is no catalog/ publisher anymore).
+          rm -rf "$dd/catalog"
           # conformance*.json: only overwrite when THIS build actually produced
           # them (the Build step writes data/conformance.json etc. only when the
           # source files exist this run). If conformance didn't run, these copies
