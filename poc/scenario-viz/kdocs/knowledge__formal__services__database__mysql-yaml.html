@@ -1,0 +1,75 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>database__mysql.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/database__mysql.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/database__mysql.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: database/mysql
+version: 1
+service: database/mysql
+constraints:
+  - id: async-writes-return-request-id
+    rule: &quot;write calls answer with AsyncResponse {request_id, resource:{id}} (api_docs response examples) — request_id is the ONLY key to GET /v1/requests/{request_id} (mysqlshowrequest); capture it from the create response, no list exposes it&quot;
+    provenance: docs
+  - id: list-parameters-needs-group-id
+    rule: &quot;GET /v1/parameters REQUIRES query param dbaas_parameter_group_id (api_docs required:true) — harvest it from GET /v1/parameter-groups contents[].id first&quot;
+    provenance: docs
+  - id: subop-window-conservative-set
+    rule: &quot;cluster-window sub-ops added 2026-06-11 (group mysql-subop-window in database-mysql-cluster): read-only GETs (requests/{id}, engine-versions/{id}/properties, parameter-groups, parameters, backup-histories, log-export-configs, replicas) + no-body POST sync-state + restart(+wait). Excluded as not obviously reversible: kernel-upgrade, patch, promote/switchover/reset-replica, restore, replica create, stop/start, log-export-config writes, remove-backup-histories&quot;
+    provenance: docs
+captures: {}
+states: {}
+quirks:
+  - id: backup-delete-intermittent-401
+    note: &quot;DELETE /v1/clusters/{id}/backups intermittently returns 401 Dbaas.Unauthorized.AuthNFailed while every other signed call in the same run succeeds (seen 2026-06-10, twice with different statuses 400/401) — platform-side signing/auth quirk on this route; conformance finding candidate. Step is optional+grouped so it no longer hard-fails&quot;
+    provenance: VALIDATED
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/database__mysql.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

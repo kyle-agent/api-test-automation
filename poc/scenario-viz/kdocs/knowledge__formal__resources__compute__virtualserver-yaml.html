@@ -1,0 +1,596 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>compute__virtualserver.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/compute__virtualserver.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/compute__virtualserver.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — compute/virtualserver (cp-vs group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · validated by knowledge/formal/validate.py
+# · consumed by regression/scenarios/composer.py (R2a).
+#
+# Back-extracted from the hand-written lifecycles (extract.py draft, curated):
+#   compute-virtualserver-full (enabled, HEAVY, core spine live-validated ~17min VM)
+#   virtualserver-keypair / compute-virtualserver-volume-snapshot (enabled, light)
+#   vs-autoscaling-coverage / vs-image-write-coverage / vs-volume-transfer-coverage
+#   (enabled but COVERAGE-ONLY — bodies UNPROVEN -&gt; provenance docs, C5)
+# image / server-type are read-only LOOKUP nodes (cross-service `lookups:`):
+# create is a GET + capture, no teardown by design (the validator&#x27;s
+# &quot;create without delete&quot; warning is expected there).
+version: 1
+resources:
+  keypair:
+    code: &quot;cp-vs-keypair&quot;
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/keypairs&quot;
+      body: {name: &quot;regrkey{unique}&quot;, tags: []}
+    # KeypairCreateResponse 최상위에 private_key — server password 복호 op의
+    # 입력 (owner 2026-06-13: showvirtualserverpassword는 private key를 param으로)
+    capture: {private_key: &quot;$.private_key&quot;}
+    delete: {endpoint: &quot;DELETE /v1/keypairs/regrkey{unique}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: virtualserver-keypair, steps: [create, get, delete]}
+    notes: &quot;keypair는 id가 아니라 NAME으로 주소된다 — id capture 없음(private_key만 password op용으로 capture), 소비자(server/ske-nodepool 등)는 같은 {unique} 값으로 keypair_name: regrkey{unique}를 보낸다 (소스 lifecycle들과 동일한 run-스코프 {unique} 공유 시맨틱). public_key 생략 시 SCP가 생성(zero-cost, 동기). 409 KeypairNameUsed = 동명 orphan 존재 — 이름 주소라 재사용 안전 (compute-virtualserver-full create-keypair는 409 허용).&quot;
+
+  server-group:
+    code: &quot;cp-vs-server-group&quot;
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/server-groups&quot;
+      body: {name: &quot;regrsgrp{unique}&quot;, policy: anti-affinity, tags: []}
+    capture: {server_group_id: &quot;$.id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/server-groups/{server_group_id}&quot;,
+             destructive: true}
+    provenance: VALIDATED  # full pass incl. teardown — run 27394211896 (gen-wave-vslight)
+    source: {lifecycle: compute-virtualserver-full,
+             steps: [create-server-group, delete-server-group]}
+    notes: &quot;compute-virtualserver-full의 COVERAGE EXPANSION 항목 (a) — optional group이며 아직 dispatch-검증 전이라 docs. 자원 자체는 standalone/zero-cost (소스 lifecycle의 heavy는 VM 때문이지 server-group 때문이 아님).&quot;
+
+  image:
+    lookup: true
+    code: &quot;cp-vs-image-lookup&quot;
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: &quot;GET /v1/images?status=active&amp;scp_original_image_type=standard&amp;visibility=public&amp;limit=50&quot;
+    capture: {image_id: &quot;$.images[0].id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/images/{image_id}&quot;, expect_status: [200]}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-full, steps: [find-image]}
+    notes: &quot;읽기 전용 LOOKUP 노드 (cross-service server.lookups의 image) — create가 GET이고 teardown이 없는 것이 의도. 소스 step의 params(status=active, scp_original_image_type=standard, visibility=public, limit=50 — services/compute__virtualserver.yaml image-lookup-params VALIDATED)를 endpoint 쿼리스트링으로 보존했다. capture envelope $.images[0].id verbatim.&quot;
+
+  server-type:
+    lookup: true
+    code: &quot;cp-vs-server-type&quot;
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: &quot;GET /v1/server-types&quot;
+    capture:
+      server_type_id:
+        list: &quot;$.server_types&quot;
+        where_prefix: {id: &quot;s&quot;}
+        where_not_prefix: {id: &quot;g&quot;}
+        get: &quot;id&quot;
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/server-types/{server_type_id}&quot;,
+         expect_status: [200, 404]}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-full, steps: [find-server-type]}
+    notes: &quot;읽기 전용 LOOKUP 노드. capture는 소스 find-server-type의 필터 셀렉터 verbatim(s-타입만, g-타입 거부 — services constraint server-type-prefix-s VALIDATED). 필터 capture는 engine._capture 네이티브 지원, composer/validator도 dict capture 통과 (R2a 반영).&quot;
+
+  volume-type:
+    lookup: true
+    code: &quot;cp-vs-volume-type&quot;
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: &quot;GET /v1/volume-types&quot;
+    capture: {volume_type_id: &quot;$.volume_types[0].id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/volume-types/{volume_type_id}&quot;,
+         expect_status: [200, 404]}
+    provenance: docs
+    source: {lifecycle: vs-volume-transfer-coverage, steps: [list-volume-types, read-volume-type]}
+    notes: &quot;읽기 전용 LOOKUP 노드 (image/server-type와 동형) — create가 GET이고 teardown 없음이 의도. 응답 봉투 VolumeTypeListResponse = {volume_types:[{id,name,extra_specs,...}]} (api_docs listvolumetypes), capture $.volume_types[0].id verbatim. showvolumetype(GET /v1/volume-types/{volume_type_id})은 gap_getid였던 마지막 볼륨 카탈로그 read — 이 lookup이 list+show로 닫는다. /v1/volume-types/default(showdefaultvolumetype)은 path-param 없는 GET이라 smoke floor가 이미 커버. UNPROVEN(docs) — 라이브 GET 후 VALIDATED 승급.&quot;
+
+  server:
+    code: &quot;cp-vs-server&quot;
+    service: compute/virtualserver
+    heavy: true
+    # IB-031: dropped redundant `vpc` — reachable transitively via subnet→vpc; body uses {subnet.subnet_id} only, never {vpc...}. Closure unchanged.
+    requires: [subnet, security-group, keypair, image, server-type]
+    create:
+      endpoint: &quot;POST /v1/servers&quot;
+      body:
+        name: &quot;regrsrv{unique}&quot;
+        image_id: &quot;{image.image_id}&quot;
+        server_type_id: &quot;{server-type.server_type_id}&quot;
+        keypair_name: &quot;regrkey{unique}&quot;
+        product_category: compute
+        product_offering: virtual_server
+        networks:
+          - {subnet_id: &quot;{subnet.subnet_id}&quot;}
+        security_groups: [&quot;{security-group.sg_id}&quot;]
+        volumes:
+          - {boot_index: 0, size: 104, type: SSD, delete_on_termination: true}
+    capture: {server_id: &quot;$.servers[0].id&quot;}  # post-create ops 가능(owner): dump/lock/unlock/password — services vs-postcreate-ops, C4 verify 후보
+    ready: {field: &quot;$.server.state&quot;, until: ACTIVE, timeout: 600, interval: 15}
+    verify:
+      - {name: read-ips, endpoint: &quot;GET /v1/servers/{server_id}/ips&quot;,
+         expect_status: [200]}
+      - {name: read-ips-by-subnet,
+         endpoint: &quot;GET /v1/servers/{server_id}/ips/{subnet.subnet_id}&quot;,
+         expect_status: [200]}
+      - {name: read-security-groups,
+         endpoint: &quot;GET /v1/servers/{server_id}/security-groups&quot;,
+         expect_status: [200]}
+      - {name: read-console-log,
+         endpoint: &quot;GET /v1/servers/{server_id}/console-log&quot;,
+         expect_status: [200]}
+      - {name: list-volumes,
+         endpoint: &quot;GET /v1/servers/{server_id}/volumes&quot;,
+         expect_status: [200],
+         note: &quot;listservervolumes — id-bound list-children off server_id (the captured id). The per-id show/update GET /v1/servers/{server_id}/volumes/{volume_id} (showservervolume, gap_getid) is NOT wired: the boot volume is created INLINE in the server body (volumes:[{boot_index:0,...}]) and the create response model servercreateresponseparam carries ONLY {id} (the server id) — no boot-volume id is captured, and `server` requires no separate volume node to source one. Capturing {volume_id} would need a new capture off this list read (e.g. $.volumes[0].id) — left as a gap rather than invented; the list read still exercises the volumes sub-tree.&quot;}
+      # post-create ops (owner 2026-06-12/13): lock 걸고 즉시 unlock(잠긴 채로
+      # teardown 가면 삭제 불가 위험), dump 생성, password는 keypair private_key
+      # 를 body로 (api_docs ServerPasswordRequest; lock/unlock/dump는 body 없음)
+      - {name: lock, endpoint: &quot;POST /v1/servers/{server_id}/lock&quot;,
+         expect_status: [200, 202, 204]}
+      - {name: unlock, endpoint: &quot;POST /v1/servers/{server_id}/unlock&quot;,
+         expect_status: [200, 202, 204]}
+      - {name: dump, endpoint: &quot;POST /v1/servers/{server_id}/dump&quot;,
+         expect_status: [200, 201, 202]}
+      - {name: password, endpoint: &quot;POST /v1/servers/{server_id}/password&quot;,
+         json: {private_key: &quot;{keypair.private_key}&quot;},
+         expect_status: [200, 400],
+         note: &quot;live 400 VirtualServer.InvalidPrivateKeyValue &#x27;Failed to decrypt&#x27; (run 27452095757) — Linux/ubuntu 서버는 복호화할 암호화된 관리자 패스워드가 없음(Windows 전용 기능 추정). private_key capture 자체는 정상. [200,400] 관용 + PF-17&quot;}
+    delete: {endpoint: &quot;DELETE /v1/servers/{server_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-full,
+             steps: [create-server, wait-server-active, delete-server, wait-server-gone]}
+    notes: &quot;HEAVY (~17분, 과금). capture envelope은 ARRAY $.servers[0].id ($.server.id 아님). 필수 필드: product_category/product_offering/networks/security_groups (services quirk create-server-required). inline boot volume은 type: SSD (standalone 볼륨의 volume_type과 다름) + delete_on_termination: true — 실패 run은 태그 없는 orphan 볼륨을 남긴다 (boot-volume-untagged-orphan). 소스는 삭제 후 wait-gone 404 폴링 600/15. lock/unlock은 billable VM 고착 위험으로 소스가 의도적으로 제외.&quot;
+
+  block-volume:
+    code: &quot;cp-vs-block-volume&quot;
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/volumes&quot;
+      body: {name: &quot;regrvol{unique}&quot;, description: &quot;API regression suite&quot;,
+             size: 104, volume_type: SSD_Provisioned, max_iops: 10000,
+             max_throughput: 500, tags: []}
+      # block_storage_vm userguide (overview + how_to_guides, 2026-06-14):
+      # volume_type ∈ {SSD, HDD, SSD_Provisioned, SSD_KMS/HDD_KMS,
+      # SSD_MultiAttach/HDD_MultiAttach}. SSD_Provisioned는 IOPS/Throughput
+      # 설정 가능한 유일 타입 — max_iops/max_throughput 필수 (다른 타입은 무시).
+      # _KMS는 AES-256 암호화(약 60% 성능 저하), _MultiAttach는 2대 이상
+      # 동시 연결 가능. size는 8~12228 GB, 8의 배수 (live: &#x27;should be
+      # divisible by 8&#x27; run 27452095757과 일치). max_iops 5000~20000,
+      # max_throughput 250~1000 (SSD_Provisioned 전용 범위).
+      # size/max_iops/max_throughput는 정수 범위 옵션이라 validator의 옵션
+      # 타입(cidr|enum|ref|string)에 매핑되지 않는다 — 범위/배수 제약은 위
+      # 주석 + node notes에 docs로 보존하고, varyable enum인 volume_type만
+      # options로 노출한다 (_note→note: validator OPTION_KEYS 준수).
+      options:
+        volume_type: {type: enum, default: SSD_Provisioned,
+                      values: [SSD, HDD, SSD_Provisioned, SSD_KMS, HDD_KMS, SSD_MultiAttach, HDD_MultiAttach],
+                      note: &quot;docs-only: 카탈로그/엔진은 SSD_Provisioned만 라이브 검증. _MultiAttach/_KMS variants는 docs. SSD_Provisioned만 max_iops(5000~20000)/max_throughput(250~1000) 필수, 그 외 타입은 무시. 모든 볼륨 AES-256 기본 암호화, _KMS는 추가로 인스턴스↔스토리지 전송구간 암호화(~60% 성능 저하). _MultiAttach만 다중 서버 동시 attach(Windows VM 불가).&quot;}
+    capture: {vol_id: &quot;$.id&quot;}
+    ready: {field: &quot;$.state&quot;, until: [available, AVAILABLE, ACTIVE],
+            timeout: 300, interval: 15}
+    # docs state-machine (block_storage_vm): Creating -&gt; (Downloading) -&gt;
+    # Available -&gt; Reserved/Attaching -&gt; In-use -&gt; Detaching -&gt; Available;
+    # Deleting/Error/Maintenance/Reverting도 존재. attach는 Available에서만,
+    # delete/snapshot/restore도 상태 게이트가 있다 (아래 notes).
+    delete: {endpoint: &quot;DELETE /v1/volumes/{vol_id}&quot;,
+             retry_on_status: [500, 409], retries: 8, retry_interval: 15,
+             destructive: true}
+    # 자식(snapshot) 삭제 직후 부모 volume 삭제 500 race (run 27401527554)
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-volume-snapshot,
+             steps: [create-volume, wait-volume-available, delete-volume]}
+    notes: &quot;standalone (VPC 불필요). 필드는 volume_type이지 type이 아니다 (services quirk volume-field-name); capture는 FLAT $.id (filestorage의 $.volume_id와 다름). SSD_Provisioned는 max_iops/max_throughput 필수. 삭제는 409/500 재시도 6×20s + wait-gone 404 (소스 시맨틱). [block_storage_vm userguide 2026-06-14] 데이터 볼륨 용량 8~12228GB·8배수(이미지별 OS/boot 볼륨은 최소가 &#x27;이미지별 최소 용량&#x27;이고 12TB까지 증설), SSD_Provisioned만 IOPS(5000~20000)/Throughput(250~1000) 설정. 리사이즈는 EXPAND-ONLY(축소 불가)·온라인·8배수 증설, 확장 후 스냅샷은 확장 전 상태로 복원 불가. 삭제 차단(termination): 볼륨이 서버에 attach됨 / OS(boot) 볼륨 / 비-삭제가능 상태 — 삭제 가능한 상태는 정확히 {Available, Error, Error Extending, Error Restoring, Error Managing} 뿐 → 그래서 역순 teardown(detach→delete)이 필수. 상태머신 21개 상태: Creating/Downloading/Available/Reserved/Attaching/Detaching/In Use/Deleting/Awaiting Transfer/Extending/Error Extending/Backing Up/Restoring Backup/Error Backing Up/Error Restoring/Error Deleting/Error Managing/Error/Maintenance/Reverting. attach는 Available 상태 + VM과 동일 location에서만.&quot;
+
+  volume-snapshot:
+    code: &quot;cp-vs-volume-snapshot&quot;
+    service: compute/virtualserver
+    requires: [block-volume]
+    create:
+      endpoint: &quot;POST /v1/snapshots&quot;
+      body: {name: &quot;regrsnap{unique}&quot;, description: &quot;API regression suite&quot;,
+             force: true, volume_id: &quot;{block-volume.vol_id}&quot;}
+      # block_storage_vm userguide (2026-06-14): 스냅샷 요금은 원본 볼륨
+      # 크기 기준 (Asia/Seoul timestamp). create/delete/restore 지원이되
+      # restore(=revert, Reverting 상태)는 원본 볼륨이 서버에 연결되지 않은
+      # (detached/Available) 상태에서만 가능. force: true는 in-use(연결된)
+      # 볼륨에서도 스냅샷을 강제 생성 (소스가 standalone Available 볼륨에
+      # 쓰므로 무해하지만 attach 시나리오 대비 보존).
+      # force는 bool 옵션이라 validator 옵션 타입에 매핑 안 됨 — body에 고정
+      # 값(true)으로 두고 의미는 notes에 docs로 보존. (force: true =
+      # in-use/연결된 볼륨에서도 강제 스냅샷, detach 없이 스냅샷할 때 필요)
+    capture: {snap_id: &quot;$.id&quot;}
+    verify:
+      - {name: list, endpoint: &quot;GET /v1/snapshots?volume_id={block-volume.vol_id}&quot;,
+         expect_status: [200],
+         note: &quot;수작업 체인 은퇴 갭 (retirement NEAR): listsnapshot&quot;}
+    delete: {endpoint: &quot;DELETE /v1/snapshots/{snap_id}&quot;,
+             retry_on_status: [500, 409], retries: 8, retry_interval: 15,
+             destructive: true}
+    # 생성 직후 delete 500 InternalServerError race (run 27399448835) — 재시도
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-volume-snapshot,
+             steps: [create-snapshot, delete-snapshot, wait-snapshot-gone]}
+    notes: &quot;스냅샷을 지운 뒤(409/500 재시도 + 404 폴링) 볼륨을 지워야 한다 — 역순 teardown이 자연 보장. PUT /v1/snapshots/{id} rename은 vs-volume-transfer-coverage에서 UNPROVEN. [block_storage_vm userguide 2026-06-14] restore/revert(Reverting 상태; POST 추정, 미모델)는 원본 볼륨이 detached(Available) 상태여야 함 — 서버에 연결된(in-use) 볼륨엔 restore 불가. 복원 방식 2가지: ① 스냅샷에서 신규 &#x27;복구 볼륨&#x27; 생성, ② 가장 최근 Available 스냅샷으로 in-place 복원. 스냅샷 요금은 원본 볼륨 크기 기준(Asia/Seoul timestamp). 스냅샷 보유는 부모 볼륨 삭제를 막는 termination 차단 조건은 아니지만(삭제 가능 상태는 block-volume notes 참조), 역순 teardown 안정성을 위해 자식 스냅샷 먼저 삭제 후 부모 삭제.&quot;
+
+  # owner 2026-06-13: 별도 block volume을 만들어 두고 VM에 붙였다 뗐다 —
+  # attach=create / detach=delete (server-interface와 같은 액션-자원 매핑)
+  volume-attachment:
+    code: &quot;cp-vs-volume-attach&quot;
+    service: compute/virtualserver
+    heavy: true
+    requires: [server, block-volume]
+    create:
+      endpoint: &quot;POST /v1/volumes/{block-volume.vol_id}/servers&quot;
+      body: {server_id: &quot;{server.server_id}&quot;, delete_on_termination: false}
+      # block_storage_vm userguide (2026-06-14): attach 전제 = 볼륨이
+      # Available 상태 + VM과 동일 location. VM당 최대 26개 볼륨 연결.
+      # _MultiAttach 타입만 2대 이상 서버에 동시 연결 (현재 block-volume은
+      # SSD_Provisioned라 단일 attach). running/stopped VM 모두 attach 가능
+      # (docs는 상태 제약 명시 안 함 — 온라인 attach 지원).
+      # delete_on_termination은 bool이라 validator enum(string 값)으로 노출:
+      # false=볼륨 수명을 우리가 관리(역순 teardown이 detach 후 삭제),
+      # true=VM 삭제 시 볼륨도 reap.
+      options:
+        delete_on_termination: {type: enum, default: &quot;false&quot;,
+                                values: [&quot;true&quot;, &quot;false&quot;],
+                                note: &quot;false(기본): 볼륨 수명을 우리가 관리 — 역순 teardown이 detach 후 volume 삭제. true: VM 삭제 시 볼륨도 함께 reap.&quot;}
+      # attach 시점 충돌 race 대비 (interface attach 409와 동류 가능성)
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 15
+    delete:
+      endpoint: &quot;DELETE /v1/volumes/{block-volume.vol_id}/servers/{server.server_id}&quot;
+      retry_on_status: [409, 500]
+      retries: 8
+      retry_interval: 15
+      destructive: true
+    verify:
+      # attach 상태는 볼륨 상세에서 확인 (delete 경로의 GET 형제는 카탈로그에 없음)
+      - {name: volume-shows-attachment,
+         endpoint: &quot;GET /v1/volumes/{block-volume.vol_id}&quot;,
+         expect_status: [200]}
+      # showservervolume — server_id × attached vol_id 두 토큰이 모두 잡혀 있는
+      # 유일한 노드라 여기서 닫는다 (server 노드는 inline boot-volume의 id를
+      # capture하지 않아 gap으로 남겨둔 GET; attach가 알려진 vol_id를 붙이므로
+      # 여기서 id-bound show가 가능). server 토큰은 server-attach 폐포에서 공급.
+      - {name: server-volume-show,
+         endpoint: &quot;GET /v1/servers/{server.server_id}/volumes/{block-volume.vol_id}&quot;,
+         expect_status: [200]}
+    provenance: docs
+    source: {lifecycle: compute-virtualserver-full, steps: []}
+    notes: &quot;VolumeServerAttachRequest {server_id, delete_on_termination} (api_docs). capture 없음 — detach가 prereq 토큰만 사용 (dotted-prereq-token-in-delete). delete_on_termination false: 볼륨 수명은 우리가 관리(역순 teardown이 detach 후 volume 삭제). [block_storage_vm userguide 2026-06-14] attach 게이트: 볼륨 Available 상태 + VM과 동일 location(블록 스토리지와 서버가 같은 location이어야 연결 대상). VM당 OS(basic) 볼륨 외에 추가 데이터 볼륨 최대 26개. running/stopped VM 모두 온라인 attach 지원(docs는 VM 상태 게이트 명시 안 함). detach는 게스트 OS에서 umount(Linux)/disk-offline(Windows)을 먼저 해야 연결 서버 hang(상태 에러)을 피함 — 우리 합성은 OS 미진입이라 데이터 볼륨(boot 아님)을 빈 채로 detach(안전). OS/boot 볼륨은 detach 불가(termination 차단 조건). _MultiAttach 타입만 다중 서버 동시 attach(Windows VM 불가).&quot;
+
+  custom-image:
+    code: &quot;cp-vs-custom-image&quot;
+    service: compute/virtualserver
+    heavy: true
+    requires: [server]
+    create:
+      endpoint: &quot;POST /v1/servers/{server.server_id}/images&quot;
+      body: {image_name: &quot;regrimg{ualpha}&quot;}
+    capture: {custom_image_id: &quot;$.image_id&quot;}
+    verify:
+      - {name: read-members,
+         endpoint: &quot;GET /v1/images/{custom_image_id}/members&quot;,
+         expect_status: [200],
+         note: &quot;공유 멤버 목록 — 소유 이미지에서만 조회 의미가 있어 public image 노드가 아닌 여기에 둔다 (빈 목록 200 기대)&quot;}
+    delete: {endpoint: &quot;DELETE /v1/images/{custom_image_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-full,
+             steps: [image-create, image-wait, image-delete]}
+    notes: &quot;서버 스냅샷 이미지 — owner 확인(2026-06-13): 서버 실행 중에도 생성 가능 (소스의 stop→image→start 순서는 보수적 선택이었음 → RUNNING 서버에서 합성 가능, heavy 체인 편입). capture envelope $.image_id (services captures custom-image). 삭제는 409 재시도. POST /v1/images (외부 소스 등록)는 별도 image-registration 노드.&quot;
+
+  image-registration:
+    code: &quot;cp-vs-image-reg&quot;
+    service: compute/virtualserver
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/images&quot;
+      body: {name: &quot;regrimg{ualpha}&quot;, os_type: linux, disk_format: qcow2,
+             min_disk: 100, min_ram: 0, visibility: private, tags: []}
+    capture: {image_id: &quot;$.image_id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/images/{image_id}&quot;, destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-image-write-coverage, steps: [create-image]}
+    notes: &quot;외부 소스로부터의 이미지 등록 (서버 스냅샷 custom-image와 다른 경로). 소스는 COVERAGE-ONLY — 실소스 없이 4xx 예상 body라 UNPROVEN(docs); capture envelope $.image_id도 미관측. import/share/members 하위 write들은 합성 대상이 아니라 소스 lifecycle에 남는다.&quot;
+
+  volume-transfer:
+    code: &quot;cp-vs-volume-transfer&quot;
+    service: compute/virtualserver
+    requires: [block-volume]
+    create:
+      endpoint: &quot;POST /v1/volume-transfer&quot;
+      body: {name: &quot;regrvt{unique}&quot;, volume_id: &quot;{block-volume.vol_id}&quot;}
+      optional: true
+      expect_status: [200, 202, 500]
+      note: &quot;PF-21 CONFIRMED product bug (500 InternalServerError, runs 27540589368/27583285457, req-bc27a3b6/req-78aec306) — baselined in known_issues.json (compute/virtualserver/createvolumetransfer); 500 tolerated so the chain survives, still records the 500 in observations&quot;
+    capture: {transfer_id: &quot;$.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/volume-transfer/{transfer_id}&quot;,
+         expect_status: [200, 404],
+         note: &quot;downstream of PF-21 create 500 → no transfer_id captured; the optional create is group-skipped so this required read runs with the literal {transfer_id} → 404. Tolerate 404 so the cascade is not a TEST FAILURE; run 27593608514&quot;}
+    delete: {endpoint: &quot;DELETE /v1/volume-transfer/{transfer_id}&quot;,
+             destructive: true}
+    provenance: VALIDATED  # full pass incl. teardown — run 27394211896 (gen-wave-vslight)
+    source: {lifecycle: vs-volume-transfer-coverage,
+             steps: [create-volume-transfer, delete-volume-transfer]}
+    notes: &quot;body는 data/api_bodies.json createvolumetransfer(name+volume_id)에 근거하지만 소스는 soft-seed 볼륨으로 4xx — 실볼륨 주입은 이 모델이 처음 제공, 2xx/capture envelope UNPROVEN(docs). accept는 create가 발급하는 auth_key가 필요(미모델). transfer는 소유권 이전이라 수락 전 삭제가 안전한 teardown.&quot;
+
+  launch-configuration:
+    code: &quot;cp-vs-launch-config&quot;
+    service: compute/virtualserver
+    requires: [image, server-type, keypair]
+    create:
+      endpoint: &quot;POST /v1/launch-configurations&quot;
+      body:
+        name: &quot;regrlc{unique}&quot;
+        image_id: &quot;{image.image_id}&quot;
+        server_type_id: &quot;{server-type.server_type_id}&quot;
+        keypair_name: &quot;regrkey{unique}&quot;
+        volumes:
+          # live 400 &#x27;Volume size of disk should be divisible by 8&#x27; (run
+          # 27452095757) — 100 -&gt; 104 (server/nodepool과 동일)
+          - {boot_index: 0, size: 104, type: SSD, delete_on_termination: true}
+        tags: []
+    capture: {launch_configuration_id: &quot;$.id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/launch-configurations/{launch_configuration_id}&quot;,
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-launch-configuration, delete-launch-configuration]}
+    notes: &quot;소스는 synthetic image/keypair id로 4xx 예상 (api_bodies 엔트리 없음, UNPROVEN) — 실자원 배선(image/server-type lookup + keypair)은 이 모델이 처음 제공. capture envelope $.id 미관측. live-validated run 27583285457 (2026-06-15)&quot;
+
+  auto-scaling-group:
+    code: &quot;cp-vs-asg&quot;
+    service: compute/virtualserver
+    requires: [launch-configuration, subnet, security-group]
+    create:
+      endpoint: &quot;POST /v1/auto-scaling-groups&quot;
+      # AutoScalingGroupCreateRequestV1Dot2 (api_docs): 필수 = name/launch_
+      # configuration_id/desired·min·max_server_count/desired_server_count_
+      # editable/server_name_prefix/state_check_delay_time/use_lb_state_check/
+      # subnet_ids(배열). 이전 body(subnet_id/security_groups)는 DTO 불일치.
+      # owner 2026-06-13: desired/min 0 시도 — 0이면 billable VM 없이 ASG
+      # 21 ops 전부 검증 가능
+      body:
+        name: &quot;regrasg{unique}&quot;
+        launch_configuration_id: &quot;{launch-configuration.launch_configuration_id}&quot;
+        desired_server_count: 0
+        desired_server_count_editable: true
+        min_server_count: 0
+        max_server_count: 1
+        server_name_prefix: &quot;regrasg{ualpha}&quot;
+        state_check_delay_time: 300
+        use_lb_state_check: false
+        subnet_ids: [&quot;{subnet.subnet_id}&quot;]
+        security_group_ids: [&quot;{security-group.sg_id}&quot;]
+        tags: []
+    capture: {auto_scaling_group_id: &quot;$.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/auto-scaling-groups/{auto_scaling_group_id}&quot;,
+         expect_status: [200]}
+      - {name: update,
+         endpoint: &quot;PUT /v1/auto-scaling-groups/{auto_scaling_group_id}&quot;,
+         json: {desired_server_count_editable: true},
+         expect_status: [200, 202]}
+      - {name: server-count,
+         endpoint: &quot;PUT /v1/auto-scaling-groups/{auto_scaling_group_id}/server-count&quot;,
+         json: {desired_server_count: 0},
+         expect_status: [200, 202]}
+      - {name: list-virtual-servers,
+         endpoint: &quot;GET /v1/auto-scaling-groups/{auto_scaling_group_id}/virtual-servers&quot;,
+         expect_status: [200]}
+      - {name: list-lb-server-groups,
+         endpoint: &quot;GET /v1/auto-scaling-groups/{auto_scaling_group_id}/lb-server-groups&quot;,
+         expect_status: [200]}
+    delete: {endpoint: &quot;DELETE /v1/auto-scaling-groups/{auto_scaling_group_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-auto-scaling-group, delete-auto-scaling-group]}
+    notes: &quot;비용 경고: ASG는 REAL billable VM을 관리한다 — desired 1이 성공하면 VM 1대가 켜진다 (소스는 그래서 synthetic id로 4xx 보장). body/capture UNPROVEN(docs); 라이브 검증 전 합성 run은 비용·잔존 VM 리스크를 명시 승인해야 한다.&quot;
+
+  asg-policy:
+    code: &quot;cp-vs-asg-policy&quot;
+    service: compute/virtualserver
+    requires: [auto-scaling-group]
+    create:
+      endpoint: &quot;POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies&quot;
+      # AutoScalingGroupPolicyCreateRequest (api_docs) 필수 10필드.
+      # comparison_operator는 short-code 검증 (run 27466988779 live 400:
+      # &quot;should be in ^(ge|gt|le|lt)$ format. Example: ge&quot;) — ge로 확정.
+      body: {name: &quot;regrpol{unique}&quot;, metric_type: CPU, metric_method: AVG,
+             comparison_operator: ge, threshold: 90,
+             evaluation_minutes: 5, scale_type: SCALE_OUT, scale_method: AMOUNT,
+             scale_value: 1, cooldown_seconds: 300}
+    capture: {policy_id: &quot;$.id&quot;}
+    verify:
+      # id-bound reads off the captured policy_id (FORMAT.md complete-lifecycle):
+      # parent-rooted list (listautoscalinggrouppolicy) + per-id show.
+      - {name: list, expect_status: [200],
+         endpoint: &quot;GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies&quot;}
+      - {name: read, expect_status: [200],
+         endpoint: &quot;GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}&quot;}
+    delete: {endpoint: &quot;DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-asg-policy, list-asg-policies, read-asg-policy, delete-asg-policy]}
+    notes: &quot;comparison_operator=ge VERIFIED (run 27466988779). UNVERIFIED enums — metric_type CPU, metric_method AVG, scale_type SCALE_OUT, scale_method AMOUNT — NOT flagged by the API (comparison_operator validated first); may also need short-code values, error-driven on the next run. 정책 자체는 무자원이지만 부모 ASG가 billable — auto-scaling-group 노트 참조.&quot;
+
+  asg-schedule:
+    code: &quot;cp-vs-asg-schedule&quot;
+    service: compute/virtualserver
+    requires: [auto-scaling-group]
+    create:
+      endpoint: &quot;POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules&quot;
+      # AutoScalingGroupScheduleCreateRequest (api_docs): frequency/start_date/
+      # hour/minute/timezone 필수 — ONCE + 5년 뒤 날짜로 실발화 차단
+      body: {name: &quot;regrsch{unique}&quot;, frequency: ONCE,
+             start_date: &quot;{today_plus_5y}&quot;, hour: 3, minute: 0,
+             timezone: &quot;Asia/Seoul&quot;, desired_server_count: 0}
+    capture: {schedule_id: &quot;$.id&quot;}
+    verify:
+      # id-bound reads off the captured schedule_id (FORMAT.md complete-lifecycle):
+      # parent-rooted list (listautoscalinggroupschedule) + per-id show.
+      - {name: list, expect_status: [200],
+         endpoint: &quot;GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules&quot;}
+      - {name: read, expect_status: [200],
+         endpoint: &quot;GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}&quot;}
+    delete: {endpoint: &quot;DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-asg-schedule, list-asg-schedules, read-asg-schedule, delete-asg-schedule]}
+    notes: &quot;UNPROVEN. start_time은 {today_plus_5y} builtin으로 원샷 스케줄을 먼 미래에 묶는다 (소스 verbatim — 실제로 스케일이 발화하지 않게 하는 안전장치).&quot;
+
+  asg-notification:
+    code: &quot;cp-vs-asg-notification&quot;
+    service: compute/virtualserver
+    requires: [auto-scaling-group]
+    create:
+      endpoint: &quot;POST /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications&quot;
+      # AutoScalingGroupNotificationCreateRequest (api_docs): notification_
+      # events(enum 배열) + user_ids 필수 — user_id는 계정 사용자 ID라
+      # 기본값 없는 required 옵션 (sts role_indicator와 같은 폼-입력 게이트)
+      body: {notification_events: [SCALE_OUT, SCALE_IN],
+             user_ids: [&quot;{opt.user_id}&quot;]}
+      options:
+        user_id: {type: string, required: true,
+                  note: &quot;알림 받을 계정 사용자 ID — owner가 콘솔에서 확인해 제공 (기본값 없음 = 의도된 게이트)&quot;}
+    capture: {notification_id: &quot;$.notifications[0].id&quot;}
+    verify:
+      # id-bound reads off the captured notification_id (FORMAT.md complete-lifecycle):
+      # parent-rooted list (listautoscalinggroupnotification) + per-id show. These two
+      # GETs are the last unreachable id-bound reads on the ASG sub-tree (coverage_gap).
+      - {name: list, expect_status: [200],
+         endpoint: &quot;GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications&quot;}
+      - {name: read, expect_status: [200],
+         endpoint: &quot;GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}&quot;}
+    delete: {endpoint: &quot;DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: vs-autoscaling-coverage,
+             steps: [create-asg-notification, list-asg-notifications, read-asg-notification, delete-asg-notification]}
+    notes: &quot;UNPROVEN body/capture (소스는 literal-seed ASG에 4xx). IB-026: capture를 $.id→$.notifications[0].id로 정정 — 응답 모델 autoscalinggroupnotificationlistresponse는 list 봉투(api_docs); 라이브 재검증 대기.&quot;
+
+  # owner 2026-06-12: 미리 만든 port를 서버에 붙였다 뗐다 할 수 있다 —
+  # attach=create / detach=delete 로 §1에 자연 매핑되는 노드.
+  server-interface:
+    code: &quot;cp-vs-interface&quot;
+    service: compute/virtualserver
+    requires: [server, port]
+    create:
+      endpoint: &quot;POST /v1/servers/{server.server_id}/interfaces&quot;
+      # 라이브 400 VirtualServer.CreateInterface.Duplicated (run 27417986669):
+      # port_id(기존)와 subnet_id(신규)를 같이 보내면 &#x27;both new and existing
+      # networks&#x27; — 기존 port attach는 port_id만 보낸다
+      body: {port_id: &quot;{port.port_id}&quot;}
+      # attach 시점 409 VirtualServer.CreateInterface.Conflict (run 27447899572,
+      # rev3~5에선 같은 합성으로 통과) — 서버 ready 직후의 일시 충돌 race
+      retry_on_status: [409]
+      retries: 8
+      retry_interval: 15
+    delete:
+      endpoint: &quot;DELETE /v1/servers/{server.server_id}/interfaces/{port.port_id}&quot;
+      destructive: true
+    provenance: VALIDATED
+    source: {lifecycle: compute-virtualserver-full,
+             steps: [attach-port-to-server, detach-port-from-server]}
+    notes: &quot;capture 없음 — detach path가 port capture를 그대로 쓴다 (dotted-prereq-token-in-delete 케이스). subnet은 server의 의존 폐포에 이미 포함. attach/detach 반복 가능(소유자).&quot;
+
+  # owner 2026-06-12: 서버에 붙어있는 port에 static NAT를 붙이고 뗄 수 있다.
+  server-static-nat:
+    code: &quot;cp-vs-static-nat&quot;
+    service: compute/virtualserver
+    # internet-gateway: 라이브 400(run 27424991237) VirtualServer.InvalidVpcPublicIp
+    # &quot;The VPC should have at least one Internet Gateway when attaching Internet
+    # NAT&quot; — NAT attach 전에 같은 VPC에 IGW 필수 (유저가이드에 없는 선행조건)
+    requires: [server-interface, server, port, public-ip, internet-gateway]
+    create:
+      endpoint: &quot;POST /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats&quot;
+      # 라이브 ValidationError(run 27421363609)가 필드명을 직접 줌: publicip_id
+      # (소스 probe의 public_ip_id는 항상 400이었던 또 하나의 가려진 오류)
+      body: {publicip_id: &quot;{public-ip.publicip_id}&quot;}
+    # 라이브 응답(run 27444823109)은 FLAT: {id, publicip_id, external/internal_ip
+    # _address, state: CREATING, subnet_id} — $.static_nat.id 추측은 오류였음
+    capture: {nat_id: &quot;$.id&quot;}
+    verify:
+      - {name: read,
+         endpoint: &quot;GET /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats/{nat_id}&quot;,
+         expect_status: [200, 403],
+         note: &quot;403 &#x27;Action definition is not found&#x27; (run 27450089575) — 미정의 IAM action 제품 결함 클래스 4번째 사례 (PF-15; log-streams·api-key·fs-snapshot read와 동일)&quot;}
+    delete:
+      endpoint: &quot;DELETE /v1/servers/{server.server_id}/interfaces/{port.port_id}/static-nats/{nat_id}&quot;
+      retry_on_status: [409, 500]
+      retries: 8
+      retry_interval: 15
+      destructive: true
+    provenance: VALIDATED  # create 2xx + capture $.id 라이브 증명 — run 27450089575 (verify 403은 제품 결함)
+    source: {lifecycle: vs-server-action-coverage,
+             steps: [create-interface-static-nat, delete-interface-static-nat]}
+    notes: &quot;소스는 placeholder publicip로 4xx probe였음 — 실소유 public-ip 주입은 이 모델이 처음 (owner: attach된 port에만 가능). capture envelope $.static_nat.id UNPROVEN — 라이브 후 확정. server/port 토큰은 server-interface의 선행 폐포에서 공급.&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/compute__virtualserver.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

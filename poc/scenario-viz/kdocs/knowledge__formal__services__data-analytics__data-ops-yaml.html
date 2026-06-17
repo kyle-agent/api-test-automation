@@ -1,0 +1,109 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>data-analytics__data-ops.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/data-analytics__data-ops.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/data-analytics__data-ops.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: data-analytics/data-ops (Apache Airflow on SKE)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide WebFetch 2026-06-14 — /userguide/analytics/data_ops/
+#   overview/ + how_to_guides/data_ops_services/
+# Recorded while ingesting the data-ops resource-task model (Lane B).
+
+version: 1
+service: data-analytics/data-ops
+
+constraints:
+  - id: runs-on-ske-not-dbaas
+    rule: &quot;Data Ops is an Apache Airflow-based managed workflow-orchestration service running ON A KUBERNETES ENGINE (SKE) cluster, not a DBaaS subnet cluster. Prerequisite chain (in order): ① SKE cluster, ② Ingress Controller installed on it, ③ File Storage. The dbaas instance_groups/subnet_id create body in the coverage-probe lifecycle is UNPROVEN and does not reflect the Airflow-on-K8s console form (Storage Class, Node Selector, executor type, workload selection, GitSync, account id/password, host alias)&quot;
+    provenance: docs
+  - id: ingress-controller-one-per-cluster
+    rule: &quot;Exactly ONE Ingress Controller may be installed per Kubernetes cluster, and it must be installed BEFORE provisioning a Data Ops service. It is a console/YAML-apply precondition, not a graph resource node (same dss-ingress / dss-nginx mechanism as data-flow)&quot;
+    provenance: docs
+  - id: region-restricted
+    rule: &quot;Data Ops is available only in kr-west1 and kr-east1; kr-south1/2/3 are unsupported&quot;
+    provenance: docs
+  - id: ops-name-rules
+    rule: &quot;Data Ops / service name: start with lowercase letter, lowercase + digits + hyphen, must not end with hyphen, length 3-30. Domain: same rules, length 3-50. Final access URL = {ServiceName}.{Domain}. Pre-check collisions via GET /v1/data-ops/{name}/check-duplication and GET /v1/data-ops-services/{name}/check-duplication (free-form NAME path-param)&quot;
+    provenance: docs
+  - id: airflow-account-credential-rules
+    rule: &quot;Airflow account: ID 6-30 chars, lowercase letters + digits only; password 8-50 chars containing uppercase + lowercase + digits + special chars (!@#$%^&amp;*). User-supplied console-form credentials — no model default should be issued&quot;
+    provenance: docs
+  - id: worker-executor-choice
+    rule: &quot;Worker Executor is Kubernetes (dynamic pods) OR Celery (static pods, requires a replica count). Recommended specs differ: KubernetesExecutor 43 CPU cores vs CeleryExecutor 25 CPU cores; both 50 GB memory / 100+ GB storage. Workload modules Web Server / Scheduler / Worker are mandatory. Requested resource scale must not exceed available K8s cluster capacity&quot;
+    provenance: docs
+  - id: optional-field-limits
+    rule: &quot;Description optional, max 150 chars. Host Alias optional, up to 20 hostname/IP entries. Tags max 50 per service. DAGs GitSync repository optional for DAG source-control integration&quot;
+    provenance: docs
+
+captures:
+  data_ops: $.id                          # from POST /v1/data-ops (UNPROVEN; list fallback $.contents[0].id)
+  data_ops_service: $.id                  # from POST /v1/data-ops-services (UNPROVEN; list fallback $.contents[0].id)
+  cluster: $.cluster_id                   # from GET /v1/data-ops-services/{id} detail (best-effort, feeds ingress GETs)
+
+states:
+  data_ops_service: {field: $.status, ready: [Running]}    # Creating -&gt; Running -&gt; Updating -&gt; Terminating -&gt; Error
+
+quirks:
+  - id: create-body-unproven-dbaas-shape
+    note: &quot;No data/api_bodies.json entry exists for data-ops. The coverage-probe create body mirrors data-flow which mirrors the dbaas instance_groups/block_storage shape and was only sent with empty-string ids (guaranteed 4xx). The real Airflow-on-K8s body (executor type, workload, GitSync) is undocumented at the API level — promote to VALIDATED only after a real 2xx&quot;
+    provenance: docs
+  - id: validate-resources-preflight
+    note: &quot;The console calls POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources (create scope) and POST /v1/data-ops-services/{data_ops_service_id}/validate-resources (update scope) as a dry-run capacity preflight before create/update&quot;
+    provenance: docs
+  - id: service-selects-existing-ops
+    note: &quot;Creation order is ops-first: a Data Ops Service must SELECT an existing Data Ops (&#x27;Data Ops Name — required selection&#x27;). The legacy model putting data_ops_service_id inside the create-ops body had the dependency direction reversed&quot;
+    provenance: docs
+  - id: deletion-is-irreversible
+    note: &quot;Deletion (해지) is irreversible; running workloads stop immediately upon termination&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/data-analytics__data-ops.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

@@ -1,0 +1,115 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>networking__vpn.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/networking__vpn.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/networking__vpn.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: networking/vpn
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/vpn/overview/ + /how_to_guides/ +
+#         /how_to_guides/vpn_tunnel/ (fetched 2026-06-11)
+
+version: 1
+service: networking/vpn
+
+constraints:
+  - id: vpn-gateway-quota-3-per-account
+    rule: &quot;account cap: max 3 VPN Gateways per account (userguide)&quot;
+    provenance: docs
+  - id: vpn-tunnel-quota-5-per-gateway
+    rule: &quot;max 5 VPN Tunnels per VPN Gateway (VPN Gateway당 5개 생성 가능, userguide)&quot;
+    provenance: docs
+  - id: vpn-prereq-vpc
+    rule: &quot;선행 서비스: a VPC must exist before a VPN Gateway can be created (userguide; the gateway create additionally needs a public IP for ip_id)&quot;
+    provenance: docs
+  - id: vpn-gateway-name-rules
+    rule: &quot;VPN Gateway name: 3-20 chars, LETTERS AND DIGITS ONLY (영문, 숫자) — NO hyphens/underscores per the userguide create form; a regr-style name containing &#x27;-&#x27; is a likely 400 on create&quot;
+    provenance: docs
+  - id: vpn-gateway-create-required-fields
+    rule: &quot;gateway create requires: name + connected VPC + Public IP (원격지 통신용 IP, 필수) — a create without a public-ip id should 400&quot;
+    provenance: docs
+  - id: vpn-tunnel-name-rules
+    rule: &quot;VPN Tunnel name: 3-20 chars, letters and digits only (영문, 숫자) — same no-special-chars rule as the gateway&quot;
+    provenance: docs
+  - id: vpn-tunnel-create-required-fields
+    rule: &quot;tunnel create requires: name, vpn_gateway, peer VPN GW IP (plain IP e.g. 192.168.10.0), &gt;=1 remote subnet CIDR (e.g. 20.0.0.0/24, max 10), pre-shared key, IKE settings (version, encryption+digest algorithms, Diffie-Hellman group, SA lifetime), IPSec settings (algorithms, PFS on/off, DH group, SA lifetime), DPD probe interval&quot;
+    provenance: docs
+  - id: vpn-tunnel-psk-length
+    rule: &quot;Pre-shared Key: 8-64 chars (32-char alnum string recommended by the guide)&quot;
+    provenance: docs
+  - id: vpn-tunnel-remote-subnet-max-10
+    rule: &quot;max 10 remote subnet CIDRs per tunnel&quot;
+    provenance: docs
+  - id: vpn-tunnel-dpd-interval-range
+    rule: &quot;DPD probe interval must be 1-3600 seconds&quot;
+    provenance: docs
+
+captures:
+  vpn-gateway: $.vpn_gateway.id
+  vpn-tunnel: $.vpn_tunnel.id
+
+states: {}
+
+quirks:
+  - id: vpn-region-availability
+    note: &quot;VPN is only offered in kr-west1, kr-east1 and kr-south3 — NOT available in Korea South 1/2 (userguide); region-gate any VPN lifecycle&quot;
+    provenance: docs
+  - id: vpn-console-states
+    note: &quot;console state machine (gateway AND tunnel): Creating -&gt; Active; also Editing, Deleting, Error (userguide) — poll for Active before dependent calls&quot;
+    provenance: docs
+  - id: vpn-gateway-delete-blocked
+    note: &quot;a VPN Gateway cannot be terminated while any VPN Tunnel (or other connected resource) exists, nor while its state is Creating/Editing (userguide 해지하기 주의) — teardown order: tunnels first, then gateway, and wait for Active before delete&quot;
+    provenance: docs
+  - id: vpn-tunnel-mutable-fields
+    note: &quot;peer GW IP, remote subnets, PSK, IKE/IPSec blocks and DPD interval are all editable on an existing tunnel (per-field PUT targets exist) — usable for cheap update-coverage without recreate&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/networking__vpn.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

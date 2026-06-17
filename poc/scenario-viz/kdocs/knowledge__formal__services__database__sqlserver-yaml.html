@@ -1,0 +1,117 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>database__sqlserver.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/database__sqlserver.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/database__sqlserver.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: database/sqlserver (MS SQL Server DBaaS)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /database/mssql/* (WebFetch 2026-06-14) + data/api_docs.json
+# sqlserver entries + the guarded source lifecycle database__sqlserver.json.
+# SQL Server is the ONE DBaaS engine the shared heavy-shared-dbaas lifecycle
+# EXCLUDES — it needs a real Microsoft license. No live 2xx has been observed
+# for any sqlserver WRITE → every write is provenance: docs.
+# reachability-only (owner 2026-06-16): sqlserver is a license-gated engine we do
+# NOT hold a license for → it is an access-check-only (reachability-TERMINAL)
+# coverage target. Endpoints are CALLED + 4xx/5xx tolerated as access evidence;
+# functional validation (Always On HA/secondary) stays owner-license-gated and is
+# NOT a coverage blocker. No real license consumed, no billable-persistent cluster.
+version: 1
+service: database/sqlserver
+
+constraints:
+  - id: async-writes-return-request-id
+    rule: &quot;write calls answer with AsyncResponse {request_id, resource:{id}} (api_docs response examples, shared DBaaS envelope) — request_id is the ONLY key to GET /v1/requests/{request_id} (sqlservershowrequest); capture it from the create response, no list exposes it&quot;
+    provenance: docs
+  - id: list-parameters-needs-group-id
+    rule: &quot;GET /v1/parameters REQUIRES query param dbaas_parameter_group_id (shared DBaaS DTO) — harvest it from GET /v1/parameter-groups contents[].id first&quot;
+    provenance: docs
+  - id: engine-editions-2019-2022
+    rule: &quot;engine catalog = SQL Server 2019 (Enterprise/Standard, EOS 2029-06, EoTS 2030-01) and SQL Server 2022 (Enterprise/Standard, EOS 2032-06, EoTS 2033-01) (userguide overview). Edition is baked into the engine-version id; minor-only upgrade WITHIN a major (no 2019→2022) — &#x27;동일한 Major 버전 내에서 Minor 버전 업그레이드 기능만 지원합니다&#x27; (managing)&quot;
+    provenance: docs
+  - id: secondary-needs-license-and-enterprise
+    rule: &quot;Secondary (Always On HA standby / read-only replica) REQUIRES a valid SQL Server License Key input + Enterprise Edition + backup enabled, and ONLY ONE per cluster — &#x27;하나의 클러스터당 1개만 구성 가능&#x27;, &#x27;입력한 라이선스 key가 유효하지 않을 경우 서비스가 생성되지 않을 수 있음&#x27; (secondary how_to). The license key is an account/vendor credential with NO documented self-service issuance. reachability-only (owner 2026-06-16): the add-secondary endpoint is access-TESTED (CALLED with an empty license, tolerant expect including 400/401/403/422/500) so reachability is covered; functional HA/secondary validation remains owner-license-gated (deferred, NOT blocking coverage — see IB-017)&quot;
+    provenance: docs
+  - id: additional-databases-enterprise-100
+    rule: &quot;Enterprise edition supports up to 100 additional databases per cluster, added/removed via POST /v1/clusters/{id}/databases {add_databases, del_databases} (managing). Standard edition limit not documented&quot;
+    provenance: docs
+  - id: secondary-name-rule
+    rule: &quot;Secondary name = 3–15 chars, lowercase-start, lowercase/digits/hyphen — &#x27;영문 소문자로 시작하여, 소문자, 숫자와 특수문자(-)를 사용하여 3 ~ 15자로 입력&#x27; (secondary how_to). NOTE: differs from relational replica name pattern (3–20)&quot;
+    provenance: docs
+  - id: server-type-naming
+    rule: &quot;server-type name = [Type][Spec][vCore][Memory], e.g. &#x27;Standard db1v2m4&#x27; = 2 vCore / 4GB; Type=Standard|High Capacity, Spec=db1 (standard) or dbh2 (large, 24+ vCore) (userguide overview) — consume the NAME from GET /v1/server-types contents[].name, not an id&quot;
+    provenance: docs
+  - id: block-storage-bounds
+    rule: &quot;DATA storage capacity 16–5,120 GB in 8 GB increments; restore requires the same storage type as origin (backupandrestore how_to)&quot;
+    provenance: docs
+  - id: default-db-port-2866
+    rule: &quot;Database Port defaults to 2866 but is user-overridable — &#x27;Database Port는 기본으로 2866이나, 사용자가 지정하셔도 됩니다&#x27; (connection how_to)&quot;
+    provenance: docs
+
+captures: {}
+
+states: {}
+
+quirks:
+  - id: reachability-only-license-gated
+    note: &quot;reachability-only (owner 2026-06-16): sqlserver is a license-gated engine we do NOT hold a license for, so it CANNOT be functionally validated — it is an access-check-only (reachability-TERMINAL) coverage target. Reachability is its FINAL state, NOT a held/blocked-owner state: every endpoint (cluster create + sub-ops incl. add-secondary + id-bound GETs) is CALLED with optional:true and a tolerant expect_status [200,201,202,400,401,403,404,409,422,500], so license/auth/validation/server errors are tolerated as access evidence. No functional validation, no real license consumed, no billable-persistent cluster created (sub-ops soft-adopt an existing cluster_id or normalize to the catalog &#x27;*&#x27; key; the guarded delete targets a SYNTHETIC non-existent id; any 2xx is torn down). Functional HA/secondary validation stays owner-license-gated (IB-017, deferred not blocking). Provenance stays docs.&quot;
+    provenance: docs
+  - id: license-excludes-from-shared-heavy
+    note: &quot;SQL Server is the only DBaaS engine excluded from heavy-shared-dbaas: cluster create itself does NOT take a license field (instance create can be tested without one), but Secondary/Always On HA does. The guarded source sends empty ids so create can only 4xx; this model curates real tokens but the cluster create template has NEVER returned 2xx → docs/UNPROVEN&quot;
+    provenance: docs
+  - id: secondary-is-not-relational-replica
+    note: &quot;sqlserver has NO /v1/clusters/{id}/replicas, promote, reset-replica, sync-replica-state, other-region or archive endpoints (unlike postgresql/mysql). Its HA/read-scale path is add-secondary (POST /v1/clusters/{id}/add-secondary {license, name, service_ip_address}) + databases (POST /v1/clusters/{id}/databases). switchover applies to the Always On Active↔Standby pair once a Secondary exists&quot;
+    provenance: docs
+  - id: backup-scheduled-not-immediate
+    note: &quot;backup runs on schedule not immediately — &#x27;백업을 설정한 경우에는 설정한 시간 이후 지정된 시간에 백업이 수행되며&#x27;; restore (PITR &#x27;사용자 지정 시점&#x27; or backup point) needs a COMPLETED backup first, PITR window = first backup start .. now-minus-archive-granularity (5/10/30min or 1hr). Restore creates a NEW cluster (&#x27;신규 서버가 생성되고&#x27;) inheriting origin network. So create-then-immediately-restore fails for lack of a backup (backupandrestore how_to)&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/database__sqlserver.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

@@ -1,0 +1,469 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>scenario-catalog.md — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/scenario-catalog.md</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/scenario-catalog.md</div>
+  <div class="kbody"><h1>Scenario catalog</h1>
+<p>The declarative CRUD lifecycles that exist today
+(<code>regression/scenarios/scenarios.json</code>) and the coverage gap. Each lifecycle
+drives create → read → (update) → delete with <code>capture</code>/<code>poll</code>/<code>cleanup</code> and the
+safety gates. Re-derive flags with the snippet at the bottom.</p>
+<h2>Light scenarios (run in routine opted-in CRUD)</h2>
+<table>
+<thead>
+<tr>
+<th>Lifecycle id</th>
+<th>Service</th>
+<th>Headline resource(s)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>resourcemanager-resource-group</code></td>
+<td>management/resourcemanager</td>
+<td>resource group</td>
+</tr>
+<tr>
+<td><code>networking-vpc-subnet</code></td>
+<td>networking/vpc</td>
+<td>vpc + subnet + port</td>
+</tr>
+<tr>
+<td><code>quota-reads</code></td>
+<td>management/quota</td>
+<td>read-only quota endpoints</td>
+</tr>
+<tr>
+<td><code>support-reads</code></td>
+<td>management/support</td>
+<td>read-only support endpoints</td>
+</tr>
+<tr>
+<td><code>container-scr-registry</code></td>
+<td>container/scr</td>
+<td>registry + repository</td>
+</tr>
+<tr>
+<td><code>filestorage-volume</code></td>
+<td>storage/filestorage</td>
+<td>NFS volume</td>
+</tr>
+<tr>
+<td><code>security-certificatemanager-selfsign</code></td>
+<td>security/certificatemanager</td>
+<td>self-signed cert</td>
+</tr>
+<tr>
+<td><code>application-queueservice-queue</code></td>
+<td>application-service/queueservice</td>
+<td>queue</td>
+</tr>
+<tr>
+<td><code>networking-security-group</code></td>
+<td>networking/security-group</td>
+<td>SG + rule</td>
+</tr>
+<tr>
+<td><code>virtualserver-keypair</code></td>
+<td>compute/virtualserver</td>
+<td>SSH keypair (zero-cost)</td>
+</tr>
+<tr>
+<td><code>compute-virtualserver-volume-snapshot</code></td>
+<td>compute/virtualserver</td>
+<td>block volume + snapshot</td>
+</tr>
+<tr>
+<td><code>networking-vpc-publicip</code></td>
+<td>networking/vpc</td>
+<td>public IP</td>
+</tr>
+<tr>
+<td><code>networking-vpc-internet-gateway</code></td>
+<td>networking/vpc</td>
+<td>vpc + internet gateway</td>
+</tr>
+<tr>
+<td><code>security-kms-key</code></td>
+<td>security/kms</td>
+<td>KMS key</td>
+</tr>
+<tr>
+<td><code>security-secretsmanager-secret</code></td>
+<td>security/secretsmanager</td>
+<td>secret</td>
+</tr>
+<tr>
+<td><code>application-apigateway-api-resource</code></td>
+<td>application-service/apigateway</td>
+<td>API + resource</td>
+</tr>
+<tr>
+<td><code>compute-scf-cloud-function-cronjob-trigger</code></td>
+<td>compute/scf</td>
+<td>cloud function + trigger</td>
+</tr>
+<tr>
+<td><code>iam-group</code></td>
+<td>management/iam</td>
+<td>IAM group</td>
+</tr>
+<tr>
+<td><code>iam-policy</code></td>
+<td>management/iam</td>
+<td>IAM policy</td>
+</tr>
+<tr>
+<td><code>servicewatch-loggroup-logstream</code></td>
+<td>management/servicewatch</td>
+<td>log group + stream</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Shared VPC (heavy):</strong> the heavy lifecycles below no longer each create a VPC
+— they <strong>adopt one session-shared VPC</strong> (<code>conftest.py shared_vpc</code> →
+<code>engine.provision_shared_vpc</code>; <code>create-vpc</code>/<code>delete-vpc</code> steps carry
+<code>{"adopt":"vpc"}</code>). Each still makes its own subnet under it (re-homed to
+<code>10.124.1-6.0/24</code>). 6 VPC creates → 1; no-op fallback to self-create. See
+<code>knowledge/vpc-scheduling-strategy.md</code>. Pending live validation.</p>
+</blockquote>
+<h2>Heavy scenarios (billable; only with <code>SCP_RUN_HEAVY=true</code>)</h2>
+<table>
+<thead>
+<tr>
+<th>Lifecycle id</th>
+<th>Service</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>container-ske-cluster-nodepool</code></td>
+<td>container/ske</td>
+<td>real K8s, ~27 min, consumes 1 vpc</td>
+</tr>
+<tr>
+<td><code>compute-virtualserver-full</code></td>
+<td>virtualserver</td>
+<td>real VM, ~17 min, consumes 1 vpc</td>
+</tr>
+<tr>
+<td><code>database-mysql-cluster</code></td>
+<td>database/mysql</td>
+<td>DB cluster, consumes 1 vpc</td>
+</tr>
+<tr>
+<td><code>database-postgresql-cluster</code></td>
+<td>database/postgresql</td>
+<td>DB cluster, consumes 1 vpc</td>
+</tr>
+<tr>
+<td><code>heavy-shared-dbaas</code></td>
+<td>networking/vpc</td>
+<td>shared DBaaS flow, consumes 1 vpc</td>
+</tr>
+<tr>
+<td><code>heavy-shared-networking</code></td>
+<td>networking/vpc</td>
+<td>consumes vpc + private-dns</td>
+</tr>
+</tbody>
+</table>
+<h2>Disabled (need work before enabling)</h2>
+<table>
+<thead>
+<tr>
+<th>Lifecycle id</th>
+<th>Why disabled</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>networking-dns-hosted-zone</code></td>
+<td>needs a private-dns activate sub-flow; must declare <code>private-dns</code> quota when re-enabled</td>
+</tr>
+<tr>
+<td><code>iam-role</code></td>
+<td>not yet validated</td>
+</tr>
+<tr>
+<td><code>security-certificatemanager-import</code></td>
+<td>cert import flow currently unsatisfiable (see HANDOFF doc)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>29 lifecycles total</strong> (24 enabled, 3 disabled here + the heavy ones gated by
+<code>SCP_RUN_HEAVY</code>). The setter-coverage expansion (26 write steps, in-place
+updates) added in the trusting-curie merge lives inside several existing
+lifecycles as extra steps — see <code>docs/HANDOFF-crud-setter-validation.md</code>.</p>
+</blockquote>
+<h2>Coverage gap (drive AXIS 1 to 100%)</h2>
+<p>Use <code>python -m spec.summary</code> for live numbers. As of last check: 225
+directly-testable GETs (smoke floor), 302 id-bound GETs (need read-chain/CRUD),
+845 mutating endpoints (need CRUD scenarios). The biggest uncovered surfaces by
+endpoint count are <strong>database (255)</strong>, <strong>management (244)</strong>, <strong>networking (205)</strong>,
+<strong>compute (181)</strong>, <strong>storage (129)</strong>, <strong>data-analytics (119)</strong> — prioritize CRUD
+scenarios there. Record specific missing endpoints here as you triage them.</p>
+<blockquote>
+<p><strong>TODO (next sessions):</strong> triage uncovered endpoints per category into concrete
+scenario ideas and list them here so the Regression agent can pick them up.</p>
+</blockquote>
+<h2>How to inspect / extend</h2>
+<pre><code class="language-bash"># list all lifecycles with flags
+python3 -c &quot;import json;[print(f\&quot;{l['id']:45} enabled={l.get('enabled')} heavy={l.get('heavy',False)}\&quot;) for l in json.load(open('regression/scenarios/scenarios.json'))['lifecycles']]&quot;
+</code></pre>
+<p>Add a scenario = add an entry to <code>scenarios.json</code> (no new Python; the engine
+drives it) + declare any quota kinds in <code>dependencies.json</code> + record validated
+facts in <code>validated-facts.md</code>. See <code>agents/domain-knowledge-agent.md</code>.</p>
+<hr />
+<h2>Coverage campaign — fragment lifecycles (Wave 1, 2026-06-08)</h2>
+<p>Per-service CRUD lifecycles now also live in
+<code>regression/scenarios/lifecycles/&lt;category&gt;__&lt;service&gt;.json</code> fragments (merged by
+<code>regression/scenarios/loader.py</code>; one file per service-agent → no collisions).
+See <code>agents/CAMPAIGN.md</code>. Wave 1 closed <strong>151 write ops across 6 services</strong>,
+raising the static coverage ceiling <strong>43.0% → 55.4%</strong> (write gap 547 → ~390).</p>
+<table>
+<thead>
+<tr>
+<th>Fragment</th>
+<th>Lifecycles</th>
+<th>Writes</th>
+<th>Flags</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>management__iam.json</code></td>
+<td>iam-role-full, -policy-extra-writes, -group-bindings, -user-policy-bindings, -resource-policy, -credentials-heavy</td>
+<td>35</td>
+<td>5 light + 1 heavy</td>
+</tr>
+<tr>
+<td><code>management__organization.json</code></td>
+<td>org-{organizations,units,accounts,service-control-policies,policy-bindings-and-delegation,invitations}-guarded</td>
+<td>23</td>
+<td>all heavy+optional (blast radius)</td>
+</tr>
+<tr>
+<td><code>management__iam-identity-center.json</code></td>
+<td>idc-{instance,user,group,permission-set,account-assignment}</td>
+<td>19</td>
+<td>all heavy+optional (SSO)</td>
+</tr>
+<tr>
+<td><code>management__servicewatch.json</code></td>
+<td>servicewatch-{alert,dashboard,event-rule,custom-ingest}</td>
+<td>16</td>
+<td>light</td>
+</tr>
+<tr>
+<td><code>storage__baremetal-blockstorage.json</code></td>
+<td>blockstorage-{volume,volume-group}</td>
+<td>30</td>
+<td>heavy (billable)</td>
+</tr>
+<tr>
+<td><code>application-service__apigateway.json</code></td>
+<td>apigateway-{api-write-coverage,privatelink-endpoint}</td>
+<td>28</td>
+<td>light</td>
+</tr>
+</tbody>
+</table>
+<p>Remaining write-op gap after Wave 1: <strong>~390 across 47 services</strong> (top: compute/
+virtualserver 41, networking/vpc 38, then database epas/mariadb/mysql/postgresql
+~17 each, storage/archivestorage, security/kms, …). Track in
+<code>agents/coordination/ledger.json</code>. All Wave-1 bodies are docs-derived and pending
+live validation — see <code>knowledge/validated-facts.md</code> "Wave 1 facts".</p>
+<h2>Coverage campaign — Wave 2 (2026-06-08)</h2>
+<p>7 cluster-agents added <strong>30 fragment files / 49 lifecycles</strong> closing <strong>302 write
+ops</strong>; static ceiling <strong>55.4% → 78.6%</strong> (write gap 390 → 88). Services at write-gap 0:
+networking/{vpc,loadbalancer,dns,cdn,gslb,vpn,firewall,direct-connect},
+compute/virtualserver, database/{mysql,mariadb,epas,postgresql,sqlserver,cachestore},
+storage/{archivestorage,backup,filestorage,parallel-filestorage},
+security/{kms,secretsmanager,secretvault,configinspection,certificatemanager},
+data-analytics/{data-flow,data-ops,quick-query,searchengine,vertica,eventstreams}.</p>
+<p><strong>Remaining write gap = 88 / ~14 services</strong> (Wave 3 targets): compute/baremetal 12,
+container/scr 10, compute/multinodegpucluster 9, management/cloudcontrol 9,
+management/resourcemanager 9, compute/scf 7, management/loggingaudit 6,
+management/cloudmonitoring 4, ai-ml/{aimlops-platform,cloud-ml} 3 each,
+financial-management/{billingplan,budget} 3 each, platform/sts 3, container/ske 2,
+devops-tools/devopsservice 2, management/network-logging 2, networking 1.</p>
+<h2>Coverage campaign — Wave 3 (2026-06-08) — WRITE COVERAGE COMPLETE</h2>
+<p>4 cluster-agents closed the final 88 writes / 17 services: compute/{baremetal,
+multinodegpucluster,scf}, container/{scr,ske}, management/{cloudcontrol,
+resourcemanager,loggingaudit,cloudmonitoring,network-logging}, ai-ml/{aimlops-
+platform,cloud-ml}, financial-management/{billingplan,budget}, platform/sts,
+devops-tools/devopsservice, networking/security-group.</p>
+<p><strong>Campaign result: every one of the 547 catalog write operations is now reachable
+by an enabled lifecycle (write-op gap = 0 across all 53 services).</strong> 113 lifecycles
+total (29 base + 84 in 53 fragments). Static ceiling <strong>43.0% → 85.6%</strong>; the residual
+198-endpoint gap is exclusively id-bound GETs, which read-chains (list→show) and
+CRUD probe_reads discover at runtime — so measured live <code>cov_op</code> runs above the
+static figure. All bodies are docs-derived and <strong>pending live validation</strong> (see
+<code>validated-facts.md</code>). Next step: a lane-scheduled live CI run to convert the static
+ceiling into measured coverage.</p>
+<h2>Coverage expansion — 2026-06-11 (levers ①③④, docs-derived)</h2>
+<p>No new lifecycles; existing ones extended (see <code>docs/COVERAGE-WAVE-PLAN.md</code>):</p>
+<ul>
+<li><strong>DBaaS sub-op window prep (①)</strong>: <code>database-mysql-cluster</code> + <code>database-postgresql-cluster</code>
+  gained conservative-only window groups (<code>mysql-subop-window</code>/<code>mysql-restart</code>/
+  <code>pg-subop-window</code>) — read-only sub-op GETs incl. <code>show-request</code> (AsyncResponse
+  <code>request_id</code> capture), no-body <code>sync-state</code>, mysql <code>restart</code>+wait. Still gated by
+  <code>heavy:true</code>.</li>
+<li><strong>servicewatch (③)</strong>: metric POST bodies fixed to real catalog namespace/metric;
+  explicit <code>get-group</code> step closes the showloggroup static gap.</li>
+<li><strong>eventstreams (④)</strong>: guarded sub-op bodies re-derived from the correct api_docs
+  models; sync-state/parameters-sync/unset-maintenance added; read-coverage
+  literal-uuid bug fixed (closes the shared <code>/v1/requests/*</code> static gap for 9
+  DBaaS-family services).</li>
+</ul>
+<p>Static ceiling <strong>85.6% → 86.3%</strong> (gap_getid 166 → 156; gap_write 32 = all waived).</p>
+<h2>Composed lifecycles — M5 resource-task model (2026-06-12)</h2>
+<p>New lifecycles are no longer hand-written: the resource-task model
+(<code>knowledge/formal/resources/*.yaml</code>, <strong>128 nodes</strong>) is compiled by
+<code>regression/scenarios/composer.py</code> into <code>gen-&lt;node&gt;</code> / <code>bundle-&lt;group&gt;</code>
+lifecycles, kept in <code>regression/scenarios/lifecycles/generated__*.json</code>
+(<strong>146 lifecycles total</strong> now pass the scenarios validator; 18 are
+composed, 13 enabled). Status of the composed set (after waves 1·2 + the
+heavy window, runs 27394211896 … 27421363609):</p>
+<table>
+<thead>
+<tr>
+<th>Lifecycle</th>
+<th>Steps</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gen-pilot-net-basics</code> (vpc/subnet/port/igw/public-ip)</td>
+<td>20</td>
+<td><strong>enabled, green</strong> — 20/20 live, kept as the composer-path canary; re-composed with id-bound GET verifies (wave 2)</td>
+</tr>
+<tr>
+<td><code>gen-wave-vslight</code> (server-group, volume-transfer)</td>
+<td>9</td>
+<td><strong>enabled, green</strong> — 9/9 in three consecutive runs (27394211896 · 27395331657 · 27396649009)</td>
+</tr>
+<tr>
+<td><code>gen-wave-apigw</code> (api→…→api-key/usage-plan/access-control)</td>
+<td>20</td>
+<td><strong>enabled, green</strong> — 20/20 twice incl. all deletes</td>
+</tr>
+<tr>
+<td><code>gen-wave-dashboard</code></td>
+<td>3</td>
+<td><strong>enabled, green</strong> — create 201 proven; capture <code>$.id</code> + delete body <code>dashboard_ids</code> (run 27398084089)</td>
+</tr>
+<tr>
+<td><code>gen-wave2-queue</code> (queue + attributes)</td>
+<td>—</td>
+<td><strong>enabled, green</strong> — required attributes/name query proven (27401527554)</td>
+</tr>
+<tr>
+<td><code>gen-wave2-sec</code> (kms-key + secret)</td>
+<td>—</td>
+<td><strong>enabled, green</strong> (27401527554)</td>
+</tr>
+<tr>
+<td><code>gen-wave2-rg</code> (resource-group)</td>
+<td>—</td>
+<td><strong>enabled, green</strong> (27401527554)</td>
+</tr>
+<tr>
+<td><code>gen-wave2-iam</code> (iam-group + iam-policy)</td>
+<td>—</td>
+<td><strong>enabled, green</strong> (27401527554)</td>
+</tr>
+<tr>
+<td><code>gen-wave2-volume</code> (block volume + snapshot)</td>
+<td>—</td>
+<td><strong>enabled, green</strong> — delete 500-race retries proven (27417986669)</td>
+</tr>
+<tr>
+<td><code>gen-wave2-scf</code> (function + trigger + logs/metrics)</td>
+<td>—</td>
+<td><strong>enabled, green</strong> — trigger_type <code>cron</code> unmasked (27421363609, PF-11)</td>
+</tr>
+<tr>
+<td><code>gen-wave2-scr</code> / <code>gen-wave2-fs</code></td>
+<td>—</td>
+<td>enabled — recomposed after 27421363609 (private-acl verify removed · fs delete <code>volume_id</code> query); next run should green</td>
+</tr>
+<tr>
+<td><code>gen-heavy-vs-netops</code> (server closure + port attach/detach + static NAT)</td>
+<td>—</td>
+<td><strong>enabled (heavy)</strong> — server chain + attach/detach proven; static NAT <code>publicip_id</code> fix in, rev 3 dispatched</td>
+</tr>
+<tr>
+<td><code>gen-wave-mgmisc</code> / <code>gen-wave-devops</code> / <code>gen-wave-net-endpoint</code> / <code>gen-wave2-cmep</code></td>
+<td>—</td>
+<td>disabled — triaged blockers in node notes (product 400s/500, console-only ids, no monitored VM yet)</td>
+</tr>
+<tr>
+<td><code>gen-cloudml-chain</code></td>
+<td>24</td>
+<td>disabled (gated-ready) — full chain composed, blocked on SCR auth key (console credential — docker-probe experiment running) + heavy</td>
+</tr>
+</tbody>
+</table>
+<p>Live wave findings + blocked classes: <code>docs/RESOURCE-MODEL-PLAN.md</code> §6;
+the consolidated product/API findings ledger is <code>docs/PRODUCT-FINDINGS.md</code>
+(12 rows). Current static ceiling per <code>python -m spec.coverage_gap</code>:
+<strong>88.1% (1,209/1,372)</strong> (gap_getid 130 · gap_write 33); latest published run
+C3 <strong>44.79%</strong> (cov_op 36.73), fail_new 0, 249 waivers. R3 direction:
+hand-written lifecycles above get replaced by composed equivalents node-by-node
+after live verification — treat this catalog's earlier sections as history.</p></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/scenario-catalog.md</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

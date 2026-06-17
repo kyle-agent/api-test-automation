@@ -1,0 +1,103 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>data-analytics__data-flow.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/data-analytics__data-flow.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/data-analytics__data-flow.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: data-analytics/data-flow (Apache NiFi on SKE)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide WebFetch 2026-06-14 — /userguide/analytics/data_flow/
+#   overview/ + how_to_guides/data_flow_services/ + how_to_guides/ingress_install/
+# Recorded while ingesting the data-flow resource-task model (Lane B).
+
+version: 1
+service: data-analytics/data-flow
+
+constraints:
+  - id: runs-on-ske-not-dbaas
+    rule: &quot;Data Flow is Apache NiFi running ON A KUBERNETES ENGINE (SKE) cluster, not a DBaaS subnet cluster. Prerequisite chain (in order): ① SKE standard cluster, ② Ingress Controller installed on it, ③ File Storage for network file sharing. The dbaas instance_groups/subnet_id create body in the coverage-probe lifecycle is UNPROVEN and does not reflect the NiFi-on-K8s console form (Storage Class, Node Selector, account id/password, workload module selection, host alias)&quot;
+    provenance: docs
+  - id: ingress-controller-one-per-cluster
+    rule: &quot;Exactly ONE Ingress Controller may be installed per Kubernetes cluster (namespace dss-ingress, ServiceAccount dss-ingress, IngressClass dss-nginx set as default, Service type NodePort ports 30708 HTTP / 31416 HTTPS, controller image from region-specific private Container Registry). It must be installed BEFORE creating a Data Flow service; it is a console/YAML-apply precondition, not a graph resource node&quot;
+    provenance: docs
+  - id: region-restricted
+    rule: &quot;Data Flow is available only in kr-west1 and kr-east1; kr-south1/2/3 are unsupported&quot;
+    provenance: docs
+  - id: flow-name-rules
+    rule: &quot;Data Flow / Data Flow Service name: must start with a lowercase letter, may use lowercase letters + digits + hyphen, must NOT end with a hyphen, length 3-30. Domain: same character rules, length 3-50, must not end with hyphen. Pre-check name collisions via GET /v1/data-flows/{name}/check-duplication and GET /v1/data-flow-services/{name}/check-duplication (free-form NAME path-param, not an id)&quot;
+    provenance: docs
+  - id: account-credential-rules
+    rule: &quot;Service account: ID 6-30 chars; password 8-50 chars containing uppercase + lowercase + digits + special chars. These are user-supplied console-form credentials — no model default should be issued&quot;
+    provenance: docs
+  - id: optional-field-limits
+    rule: &quot;Description optional, max 150 chars. Host Alias optional, up to 20 hostname/IP entries total. Tags max 50 per service. Recommended minimum spec: CPU 21 cores / Memory 57 GB / Storage 100+ GB. Requested resource scale must not exceed available K8s cluster capacity&quot;
+    provenance: docs
+
+captures:
+  data_flow: $.id                         # from POST /v1/data-flows (UNPROVEN; list fallback $.contents[0].id)
+  data_flow_service: $.id                 # from POST /v1/data-flow-services (UNPROVEN; list fallback $.contents[0].id)
+  cluster: $.cluster_id                   # from GET /v1/data-flow-services/{id} detail (best-effort, feeds ingress GETs)
+
+states:
+  data_flow_service: {field: $.status, ready: [Running]}   # Creating -&gt; Running -&gt; Updating -&gt; Terminating -&gt; Error
+
+quirks:
+  - id: create-body-unproven-dbaas-shape
+    note: &quot;No data/api_bodies.json entry exists for data-flow (only createcluster for searchengine/vertica/eventstreams). The coverage-probe lifecycle&#x27;s create body mirrors the dbaas instance_groups/block_storage shape and was only ever sent with empty-string ids (guaranteed 4xx). The real NiFi-on-K8s body is undocumented at the API level — promote to VALIDATED only after a real 2xx with a console-derived body&quot;
+    provenance: docs
+  - id: validate-resources-preflight
+    note: &quot;The console calls POST /v1/data-flow-services/clusters/{cluster_id}/validate-resources (create scope) and POST /v1/data-flow-services/{data_flow_service_id}/validate-resources (update scope) as a dry-run preflight before create/update — a resource-capacity check against the cluster&quot;
+    provenance: docs
+  - id: service-selects-existing-flow
+    note: &quot;Creation order is flow-first: a Data Flow Service must SELECT an existing Data Flow (&#x27;Data Flow Selection — must choose existing Data Flow&#x27;). The legacy resource model that put data_flow_service_id inside the create-flow body had the dependency direction reversed&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/data-analytics__data-flow.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

@@ -1,0 +1,183 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>networking__vpn.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/networking__vpn.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/networking__vpn.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — networking/vpn (nw-vpn group, the gateway-&gt;tunnel
+# chain). Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# networking-vpn-gateway-tunnel (HEAVY/billable; its _note says &quot;NOT
+# runtime-proven … Wave 2&quot; and both captures are capture_soft — so per C5
+# every body/capture stays docs until a heavy-window live pass upgrades it).
+#
+# Chain wiring mirrors the lb chain: vpn-gateway consumes the shared vpc
+# (adopt) + a self-created public-ip (ip_id), vpn-tunnel consumes
+# {vpn-gateway.vpn_gateway_id}. Delete retry semantics copied from the source
+# steps (tunnel 409x6, gateway 409x8 — gateway is not deletable while tunnels
+# exist or while Creating/Editing, services quirk vpn-gateway-delete-blocked).
+#
+# docs-mapper enrichment (2026-06-15, networking subtree UP). Sources cited:
+#   - https://docs.e.samsungsdscloud.com/userguide/networking/vpn/overview/
+#   - https://docs.e.samsungsdscloud.com/userguide/networking/vpn/how_to_guides/
+# Userguide-derived constraints below are UNPROVEN (notes only). The userguide
+# confirms quotas/naming/region/delete-precondition but does NOT document the
+# Phase1/Phase2 IKE specifics (encryption/DH/lifetime/PSK-length/DPD/remote-
+# subnet-max), so those stay UNPROVEN docs-example estimates as before.
+version: 1
+resources:
+  vpn-gateway:
+    code: &quot;nw-vpn-gw&quot;
+    service: networking/vpn
+    heavy: true
+    requires: [vpc, public-ip]
+    create:
+      endpoint: &quot;POST /v1/vpn-gateways&quot;
+      body: {description: &quot;API regression suite&quot;,
+             ip_id: &quot;{public-ip.publicip_id}&quot;, ip_type: PUBLIC,
+             name: &quot;regrvpngw{ualpha}&quot;, tags: [], vpc_id: &quot;{vpc.vpc_id}&quot;}
+    capture: {vpn_gateway_id: &quot;$.vpn_gateway.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/vpn-gateways/{vpn_gateway_id}&quot;,
+         expect_status: [200]}
+    delete: {endpoint: &quot;DELETE /v1/vpn-gateways/{vpn_gateway_id}&quot;,
+             retry_on_status: [409], retries: 8, retry_interval: 15,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-vpn-gateway-tunnel,
+             steps: [create-vpn-gateway, delete-vpn-gateway]}
+    notes: &quot;이름은 3-20자 영숫자만 — 하이픈/언더스코어 금지 (vpn-gateway-name-rules;
+      regrvpngw{ualpha}=17 영숫자). Public IP(ip_id) + VPC 필수
+      (vpn-gateway-create-required-fields). 계정당 3개 cap. REGION GATE:
+      kr-west1/kr-east1/kr-south3 전용 (vpn-region-availability — 엔진
+      region-guard 부재, 소스 lifecycle _note의 운영 게이트). 상태기계
+      Creating-&gt;Active (vpn-console-states, docs) — 소스 lifecycle은 poll 없이
+      delete 409-재시도로 흡수하므로 모델도 ready 없이 동일 재시도 시맨틱 유지
+      ($.vpn_gateway.state 필드 경로는 UNPROVEN이라 ready 선언 보류). capture는
+      소스에서 capture_soft($.vpn_gateway.id) — envelope UNPROVEN이라 docs.
+      verify GET가 vpn gap_getid 중 showvpngateway를 닫는다.
+      userguide 확증 (overview + how_to_guides, 2026-06-15, UNPROVEN):
+      이름 &#x27;영문,숫자 3~20자&#x27; 재확인(vpn-gateway-name-rules — 하이픈/언더스코어
+      금지가 charset &#x27;English+digits only&#x27;와 일치). 계정당 3개 cap 재확인.
+      region kr-west1/kr-east1/kr-south3 전용(kr-south1/2 불가) 재확인.
+      delete precondition 문서 확증: &#x27;연결된 VPN Tunnel이 있으면 종료 불가&#x27; —
+      vpn-gateway-delete-blocked의 docs 근거(이전엔 소스 lifecycle 409-재시도
+      관찰뿐). IPsec Gateway 이중화(active/standby auto-failover) 지원.&quot;
+
+  vpn-tunnel:
+    code: &quot;nw-vpn-tunnel&quot;
+    service: networking/vpn
+    heavy: true
+    requires: [vpn-gateway]
+    create:
+      endpoint: &quot;POST /v1/vpn-tunnels&quot;
+      body:
+        description: &quot;API regression suite&quot;
+        name: &quot;regrvpntun{ualpha}&quot;
+        phase1:
+          dpd_retry_interval: 60
+          ike_version: 2
+          peer_gateway_ip: &quot;{opt.peer_gateway_ip}&quot;
+          phase1_diffie_hellman_groups: [14]
+          phase1_encryptions: [&quot;aes256-sha256&quot;]
+          phase1_life_time: 86400
+          pre_shared_key: &quot;{opt.pre_shared_key}&quot;
+        phase2:
+          perfect_forward_secrecy: ENABLE
+          phase2_diffie_hellman_groups: [14]
+          phase2_encryptions: [&quot;aes256-sha256&quot;]
+          phase2_life_time: 43200
+          remote_subnets: [&quot;{opt.remote_subnet}&quot;]
+        tags: []
+        vpn_gateway_id: &quot;{vpn-gateway.vpn_gateway_id}&quot;
+      options:
+        peer_gateway_ip: {type: string, required: true, default: &quot;203.0.113.2&quot;,
+                          note: &quot;온프레미스 peer VPN GW의 공인 IP — 실제 터널
+                            연결에는 실존 peer가 필요하다. 기본값은 소스
+                            lifecycle의 TEST-NET-3 문서용 IP (CRUD 형태 검증용
+                            placeholder; 터널은 생성되되 협상은 실패 예상)&quot;}
+        pre_shared_key: {type: string, required: true,
+                         default: &quot;regrPreSharedKey1&quot;,
+                         note: &quot;PSK 8-64자 (vpn-tunnel-psk-length; 기본값 17자
+                           — 가이드 권장은 32자 영숫자). 실연결 시 peer와 동일
+                           값이어야 한다&quot;}
+        remote_subnet: {type: cidr, required: true, default: &quot;10.1.1.0/24&quot;,
+                        note: &quot;온프레미스 원격 subnet CIDR — 터널당 최대 10개
+                          (vpn-tunnel-remote-subnet-max-10; 모델은 소스와 동일하게
+                          1개만 전송). 실연결 시 peer 측 실제 대역이어야 한다&quot;}
+    capture: {vpn_tunnel_id: &quot;$.vpn_tunnel.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/vpn-tunnels/{vpn_tunnel_id}&quot;,
+         expect_status: [200]}
+    delete: {endpoint: &quot;DELETE /v1/vpn-tunnels/{vpn_tunnel_id}&quot;,
+             retry_on_status: [409], retries: 6, retry_interval: 15,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-vpn-gateway-tunnel,
+             steps: [create-vpn-tunnel, delete-vpn-tunnel]}
+    notes: &quot;이름은 3-20자 영숫자만 (vpn-tunnel-name-rules; regrvpntun{ualpha}=18).
+      gateway당 5개 cap. phase1/phase2의 encryption/diffie-hellman enum 값은
+      docs-example 추정 (UNVALIDATED — 거부될 수 있음); DPD interval 60은 1-3600s
+      범위 내 (vpn-tunnel-dpd-interval-range). peer_gateway_ip/PSK/remote_subnet은
+      온프레미스 peer 값이라 옵션으로 노출 (기본값 = 소스 lifecycle placeholder).
+      teardown은 tunnel 먼저, gateway 나중 (vpn-gateway-delete-blocked) — composer의
+      interval-scheduled teardown이 보장. capture는 소스에서
+      capture_soft($.vpn_tunnel.id) — envelope UNPROVEN이라 docs. verify GET가
+      vpn gap_getid 중 showvpntunnel을 닫는다.
+      userguide 확증 (vpn/overview + how_to_guides, 2026-06-15, UNPROVEN):
+      gateway당 tunnel 5개 cap 재확인. 그러나 userguide는 Phase1/Phase2 IKE 세부
+      (ike_version, phase1/2_encryptions, diffie_hellman_groups, life_time,
+      pre_shared_key 길이, dpd_retry_interval, remote_subnets 최대수)를 수치로
+      문서화하지 않음 — 따라서 이 노드 body/options의 IKE enum·범위 값은 여전히
+      docs-example 추정(UNPROVEN), 라이브 패스 전까지 미확정. vpn-tunnel-psk-length
+      (8-64자), vpn-tunnel-dpd-interval-range(1-3600s), vpn-tunnel-remote-subnet-
+      max-10은 services-layer constraint 출처(userguide 미확증)임을 명시.&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/networking__vpn.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

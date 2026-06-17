@@ -1,0 +1,166 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>management__resourcemanager.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/management__resourcemanager.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/management__resourcemanager.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — management/resourcemanager (mg-rm group).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# resourcemanager-resource-group (enabled, live-validated), curated by hand.
+#
+# owner 계획 (2026-06-13): &quot;과금 없는 자원 하나 만들고 tag 붙이고 떼고&quot; —
+# resource-group 자체가 그 자원이다 (zero-cost + 생성 응답에 srn).
+# SRN 태그 패밀리 전부를 resource-group verify로 닫는다:
+#   bulk set → list → show key → update value → global bulk set →
+#   delete key → global bulk delete → delete all. (DTO: Tag{key,value*},
+#   TagSetRequest{tags[Tag]}, TagsSetRequest/TagDeleteRequest{tags: {srn: [...]}}.)
+# components-주소 per-key 3종(show/update/delete by region/service/type/id/key)은
+# components 주소 스킴 확정 후 2차 (updatecomponentstags(bulk)는 검증됨).
+#
+# 2026-06-15 docs-mapper enrichment (notes/comments ONLY — no shape change).
+# Userguide cited:
+#   [U1] /userguide/management/resource_groups/overview/
+#   [U2] /userguide/management/resource_groups/how_to_guides/
+# [U2] Resource Group console create requires: 그룹명(name), 자원 유형(resource
+#   type — 전체 or multi-select), 그룹핑 기준 태그(grouping tags, key+value).
+#   Optional: 설명(description), Lock(잠금 여부), Init Script(≤45,000 bytes),
+#   그룹 자체 태그. This confirms the existing node note: the verified API create
+#   needs only name+description, and resource_types/grouping-tags land via the
+#   PUT-set verify step (console front-loads them; API splits them). UNPROVEN
+#   whether the API enforces the grouping-tags-required rule that the console does.
+# [U2] 태그는 &quot;자원 당 최대 50개까지 추가 가능&quot; — max 50 tags per resource
+#   (confirms the prior _note; LOCK candidate).
+# [U2/U1] STILL UNSPECIFIED in userguide+overview: resource-group name
+#   length/allowed chars, and max resource groups per account — confirmed absent
+#   on both pages 2026-06-15; must be settled live or from API Reference.
+version: 1
+resources:
+  resource-group:
+    code: &quot;mg-rm-resource-group&quot;
+    service: management/resourcemanager
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/resource-groups&quot;
+      body: {name: &quot;regr-rg-{unique}&quot;, description: &quot;created by API regression suite&quot;}
+    # rg_srn: 소스 lifecycle이 capture_soft하던 envelope — 하드 승격 (owner
+    # 2026-06-13: 자원 생성 시 srn 발급). 비면 capture-failure 본문이 정답을 줌.
+    capture: {rg_id: &quot;$.resource_group.id&quot;, rg_srn: &quot;$.resource_group.srn&quot;}
+    verify:
+      - {name: read-resources,
+         endpoint: &quot;GET /v1/resource-groups/{rg_id}/resources&quot;,
+         expect_status: [200]}
+      - {name: set,
+         endpoint: &quot;PUT /v1/resource-groups/{rg_id}&quot;,
+         json: {name: &quot;regr-rg-{unique}&quot;, description: &quot;updated by API regression suite&quot;,
+                resource_types: [&quot;resourcemanager:resource-group&quot;],
+                tags: [{key: &quot;regrset{unique}&quot;, value: regrv}]},
+         expect_status: [200, 202],
+         note: &quot;set은 tags 비어있으면 400 &#x27;tags must not be empty&#x27; (run 27452095757) — 비어있지 않은 태그 필수&quot;}
+      - {name: show-resource,
+         endpoint: &quot;GET /v1/resources/{rg_srn}&quot;,
+         expect_status: [200, 403],
+         note: &quot;PF-18 — GET /v1/resources/{srn} 403 &#x27;Forbidden / You do not have permission to Action&#x27; (run 27466988779). 5th missing-action-definition case (cf. PF-01/PF-15) — product gap, not our body. [200,403] 허용으로 통과시키고 액션 정의가 추가되면 strict 200으로 조임.&quot;}
+      - {name: tags-bulk-set,
+         endpoint: &quot;PUT /v1/tags/{rg_srn}/bulk&quot;,
+         json: {tags: [{key: &quot;regr{unique}&quot;, value: regrv}]},
+         expect_status: [200, 201, 202]}
+      - {name: tags-list,
+         endpoint: &quot;GET /v1/tags/{rg_srn}&quot;,
+         expect_status: [200]}
+      - {name: tag-show,
+         endpoint: &quot;GET /v1/tags/{rg_srn}/regr{unique}&quot;,
+         expect_status: [200]}
+      - {name: tag-update-value,
+         endpoint: &quot;PUT /v1/tags/{rg_srn}/regr{unique}&quot;,
+         json: {value: regrv2},
+         expect_status: [200, 201, 202],
+         note: &quot;TagValue DTO는 {value} 단일 필드&quot;}
+      - {name: tags-global-bulk-set,
+         endpoint: &quot;PUT /v1/tags/bulk&quot;,
+         json: {tags: {&quot;{rg_srn}&quot;: [{key: &quot;regrx{unique}&quot;, value: regrv}]}},
+         expect_status: [200, 201, 202],
+         note: &quot;TagsSetRequest: {srn: [Tag]} 맵 — dict KEY 자리의 placeholder는 엔진 _fill_obj가 키도 치환하는지 라이브로 확인 (실패 시 본문이 알려줌)&quot;}
+      - {name: tag-delete-one,
+         endpoint: &quot;DELETE /v1/tags/{rg_srn}/regr{unique}&quot;,
+         expect_status: [200, 202, 204]}
+      - {name: tags-global-bulk-delete,
+         endpoint: &quot;DELETE /v1/tags&quot;,
+         json: {tags: {&quot;{rg_srn}&quot;: [&quot;regrx{unique}&quot;]}},
+         expect_status: [200, 202, 204],
+         note: &quot;TagDeleteRequest: {srn: [key,...]} 맵&quot;}
+      - {name: tags-delete-all,
+         endpoint: &quot;DELETE /v1/tags/{rg_srn}&quot;,
+         expect_status: [200, 202, 204]}
+    delete: {endpoint: &quot;DELETE /v1/resource-groups/{rg_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: resourcemanager-resource-group, steps: [create, delete]}
+    notes: &quot;글로벌(account-scoped) 서비스 — host에 region 세그먼트 없음. 싸고 가역적인 실생성 자원 — tag-write 계열의 실 SRN 공급원 (owner 2026-06-13 계획). rg_srn envelope은 소스 capture_soft에서 하드 승격 — 1차 라이브에서 확정. 콘솔 생성은 name(필수)·description(선택)·resource_types(필수)·그룹핑 기준 태그(필수) 요구 — 검증된 API create 는 name+description 만으로 201, resource_types/tags 는 PUT set 에서 적용(verify set 노드). 삭제는 영구(복구 불가) — destructive 표시와 일치.&quot;
+    _note: &quot;docs(how_to_guides 2026-06-14, 재확인 2026-06-15 [U2]): 태그는 자원당 최대 50개(&#x27;자원 당 최대 50개까지 추가 가능&#x27;). 콘솔 create 필수=그룹명+자원유형(전체/멀티선택)+그룹핑 기준 태그(key/value); 선택=설명·Lock·Init Script(≤45,000 bytes). resource-group 이름 길이/허용문자 및 계정당 그룹 최대 개수는 overview+how_to_guides 양쪽 모두 미명시(2026-06-15 재확인, API Reference 미확인) — quota/naming 미상, 라이브에서 확정 필요. PROBE-READS gap_getid (B-rows, NOT wired — noted not invented): the 4-segment component-addressed reads GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier} + GET /v1/tags/{region}/{service}/{resource_type}/{resource_identifier} + .../{key} CANNOT be wired off this VALIDATED node. This create captures only rg_id ($.resource_group.id) and rg_srn ($.resource_group.srn); validate.py L819-864 requires every verify-read token to resolve to this node&#x27;s OWN capture/builtin. The (region/service/resource_type/resource_identifier) tuple + tag {key} are NOT in the create response — resourcemanager-tag-lifecycle obtains them only via a SEPARATE GET /v1/resources?limit=1 discover-resource-addressing step (capture_soft $.contents[0].region/service/resource_type/resource_identifier/tags[0].key, explicitly BEST-GUESS + UNPROVEN). Injecting those soft captures here would be inventing an unproven capture path on a VALIDATED parent — forbidden by the probe-read guardrail. The SRN-COMPOSITE siblings ARE already wired off the cleanly-captured rg_srn: show-resource (GET /v1/resources/{rg_srn}), tags-list (GET /v1/tags/{rg_srn}), tag-show (GET /v1/tags/{rg_srn}/regr{unique}) — distinct catalog keys from the 4-segment forms. Closing the 3 component-addressed endpoints needs the discovery tuple live-proven first (promote $.contents[0].* in resourcemanager-tag-lifecycle from capture_soft to a hard capture), then a tuple-capturing lookup/sibling node can carry the verify.&quot;
+
+  # deleteresourcegroups(벌크) 전용 — 두 번째 rg를 만들고 벌크 DELETE로 지운다
+  # (delete.json passthrough). 단일 rg의 teardown과 중복 없이 벌크 경로를 검증.
+  resource-group-bulk:
+    code: &quot;mg-rm-rg-bulk&quot;
+    service: management/resourcemanager
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/resource-groups&quot;
+      body: {name: &quot;regr-rgb-{unique}&quot;, description: &quot;bulk-delete probe&quot;}
+    capture: {rgb_id: &quot;$.resource_group.id&quot;}
+    delete:
+      endpoint: &quot;DELETE /v1/resource-groups&quot;
+      json: {ids: [&quot;{rgb_id}&quot;]}
+      destructive: true
+    provenance: VALIDATED
+    source: {lifecycle: resourcemanager-resource-group, steps: [create]}
+    notes: &quot;ResourceGroupsDeleteRequest {ids:[...]} (api_docs). create는 검증된 rg body와 동일 — 벌크 DELETE 경로만 신규. live-validated run 27583285457 (2026-06-15)&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/management__resourcemanager.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

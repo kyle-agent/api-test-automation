@@ -6,7 +6,7 @@
   const M = global.MODEL || { nodes: {}, groups: {} };
   const N = M.nodes;
 
-  const provColor = p => p === "VALIDATED" ? "#3fb27f" : "#e0922f";
+  const provColor = p => p === "VALIDATED" ? "#15924f" : "#b5740b";
   const node = id => N[id];
   const exists = id => Object.prototype.hasOwnProperty.call(N, id);
 
@@ -116,7 +116,7 @@
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     const defs = document.createElementNS(NS, "defs");
     defs.innerHTML = `<marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3"
-      orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="#5b7088"/></marker>`;
+      orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="#9aa3ad"/></marker>`;
     svg.appendChild(defs);
     // edges
     L.edges.forEach(e => {
@@ -126,7 +126,7 @@
       p.setAttribute("d", `M${x1},${y1} C${x1 + 50},${y1} ${x2 - 50},${y2} ${x2},${y2}`);
       p.setAttribute("fill", "none");
       const dim = opts.highlight && !(opts.highlight.has(e.from) && opts.highlight.has(e.to));
-      p.setAttribute("stroke", dim ? "#2b3b4d" : "#5b7088");
+      p.setAttribute("stroke", dim ? "#d0d7de" : "#9aa3ad");
       p.setAttribute("stroke-width", "1.4");
       p.setAttribute("marker-end", "url(#ar)");
       svg.appendChild(p);
@@ -143,8 +143,8 @@
       r.setAttribute("x", p.x); r.setAttribute("y", p.y);
       r.setAttribute("width", p.w); r.setAttribute("height", p.h);
       r.setAttribute("rx", 8);
-      r.setAttribute("fill", isTarget ? "#11314f" : "#16212e");
-      r.setAttribute("stroke", isShared ? "#ffd166" : isTarget ? "#5aa9ff" : provColor(n.provenance));
+      r.setAttribute("fill", isTarget ? "#e8f0fd" : "#fff");
+      r.setAttribute("stroke", isShared ? "#b5740b" : isTarget ? "#2563c9" : provColor(n.provenance));
       r.setAttribute("stroke-width", isTarget || isShared ? 2.4 : 1.4);
       r.setAttribute("opacity", dim ? .32 : 1);
       g.appendChild(r);
@@ -157,7 +157,7 @@
       g.appendChild(t1);
       const t2 = document.createElementNS(NS, "text");
       t2.setAttribute("x", p.x + 10); t2.setAttribute("y", p.y + 34);
-      t2.setAttribute("font-size", "10.5"); t2.setAttribute("fill", "#90a4ba");
+      t2.setAttribute("font-size", "10.5"); t2.setAttribute("fill", "#6b7480");
       t2.setAttribute("opacity", dim ? .4 : 1);
       t2.textContent = n.service + (n.quota ? "  ⛔" + n.quota : "");
       g.appendChild(t2);
