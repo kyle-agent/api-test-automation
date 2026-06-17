@@ -472,43 +472,18 @@ def add_run_command(gh_run_id: str, action: str = Form(...), target: str = Form(
 
 # --- Reporting -----------------------------------------------------------------
 
-REPORT_TABS = (("summary", "Summary"), ("coverage", "Coverage"),
-               ("conformance", "Conformance"), ("trends", "Runs & Trends"),
-               ("triage", "Triage"))
-
-
-def _spark_paths(hist: list[dict], w: int = 600, h: int = 90) -> dict:
-    """history rows (oldest first) -> SVG path strings for the trend
-    sparkline: pass rate (ok/tested), C3 verified, C1 reachable."""
-    def series(fn):
-        vals = [fn(r) for r in hist]
-        vals = [v for v in vals if v is not None]
-        if len(vals) < 2:
-            return ""
-        n = len(vals)
-        return " ".join(f"{'M' if i == 0 else 'L'}{i / (n - 1) * w:.1f},"
-                        f"{h - (min(max(v, 0), 100) / 100 * h):.1f}"
-                        for i, v in enumerate(vals))
-    def pass_rate(r):
-        tested = r.get("tested") or 0
-        return (r.get("ok") or 0) * 100.0 / tested if tested else None
-    return {"pass": series(pass_rate),
-            "c3": series(lambda r: r.get("cov_c3")),
-            "c1": series(lambda r: r.get("reachable_pct"))}
+REPORT_TABS = (("summary", "Summary"),
+               ("dashboard", "Coverage & Conformance"),
+               ("runs", "Runs & Archive"), ("triage", "Triage"))
 
 
 @app.get("/reporting", response_class=HTMLResponse)
 def reporting(request: Request, tab: str = "summary"):
     if tab not in {t for t, _ in REPORT_TABS}:
         tab = "summary"
-    hist = dashdata.history(limit=30)
     return _render(request, "reporting.html", "reporting",
                    tab=tab, tabs=REPORT_TABS,
                    coverage=dashdata.latest_coverage(),
-                   trend=list(reversed(hist[-10:])),
-                   spark=_spark_paths(hist), spark_n=len(hist),
-                   conformance=dashdata.conformance_summary(),
-                   catbars=dashdata.category_coverage(),
                    runs=db.list_runs(limit=100),
                    archive=snapshots.archive_index(limit=100))
 

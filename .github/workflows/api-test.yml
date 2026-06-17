@@ -1199,7 +1199,7 @@ jobs:
         # are left untouched), commit, then push with a fetch+rebase retry loop.
         # The two publishers write DISJOINT file sets (dashboard owns
         # index.html/history.jsonl/services/*/ops.html/platform/*/
-        # verified_endpoints.json/endpoint_status.json/smoke_status.tsv;
+        # verified_endpoints.json/endpoint_status.json;
         # conformance owns conformance.json/baseline/new), so a concurrent
         # conformance push is rebased ON TOP, never clobbered.
         run: |
@@ -1232,7 +1232,6 @@ jobs:
           # view-only platform pages (controlplane/static_export.py)
           rm -rf "$dd"/platform 2>/dev/null || true
           cp -r reports/platform-static "$dd"/platform 2>/dev/null || true
-          cp reports/smoke_status.tsv "$dd"/ 2>/dev/null || true
           # conformance*.json: only overwrite when THIS build actually produced
           # them (the Build step writes data/conformance.json etc. only when the
           # source files exist this run). If conformance didn't run, these copies

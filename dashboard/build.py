@@ -1,9 +1,10 @@
 """dashboard.build — render the API-regression dashboard.
 
-Reads the unified results store FIRST via ``core.results``; falls back to the
-legacy flat-file inputs (reports/smoke_status.tsv, reports/param_status.tsv,
-data/conformance.json, reports/junit-crud.xml) so nothing regresses while
-the migration is in flight.
+Reads the unified results store (``core.results`` JSONL — reports/results/*.jsonl)
+as the SINGLE source of truth. With no store present the build still renders
+(all-zero coverage) and does not crash. Platform-wide systemic conformance
+findings (not per-endpoint) are still merged from data/conformance.json when the
+static-analysis axis writes one.
 
 Both axes are first-class in the output:
   * Axis 1 — regression: coverage %, pass/fail, response-time column, failure
@@ -23,7 +24,6 @@ import json
 import math
 import os
 import time
-import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -138,43 +138,6 @@ def smoke_tested_keys(cat):
     """Reproduce what the smoke suite calls: GET, no path params, non-mutating."""
     return {e["key"] for e in cat
             if e["method"] == "GET" and "{" not in e["http_path"]}
-
-
-def parse_smoke_tsv(path):
-    """rows: (status:int, category:str, key:str, method, path, elapsed_ms:float|None).
-    The 6th column (response time) is optional and may be absent on older rows."""
-    rows = []
-    if path and os.path.exists(path):
-        for ln in open(path):
-            p = ln.rstrip("\n").split("\t")
-            if len(p) >= 5:
-                try:
-                    ems = float(p[5]) if len(p) >= 6 and p[5] != "" else None
-                    rows.append((int(p[0]), p[1], p[2], p[3], p[4], ems))
-                except ValueError:
-                    pass
-    return rows
-
-
-def parse_crud_junit(path):
-    """-> {lifecycle_id: 'pass'|'fail'|'skip'}"""
-    out = {}
-    if not (path and os.path.exists(path)):
-        return out
-    try:
-        root = ET.parse(path).getroot()
-    except ET.ParseError:
-        return out
-    for tc in root.iter("testcase"):
-        name = tc.get("name", "")
-        lid = name[name.find("[") + 1:name.rfind("]")] if "[" in name else name
-        st = "pass"
-        if tc.find("failure") is not None or tc.find("error") is not None:
-            st = "fail"
-        elif tc.find("skipped") is not None:
-            st = "skip"
-        out[lid] = st
-    return out
 
 
 def crud_write_ops(lifecycles, cat):
@@ -1467,7 +1430,7 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
 <thead><tr><th>endpoint</th><th>status</th><th>유형</th></tr></thead>
 <tbody>@@KNROWS@@</tbody></table></div>
 
-<div class="foot">생성 <code>dashboard/build.py</code> ← unified results store (reports/results/*.jsonl) + legacy fallback · 추세 <code>dashboard-data</code> 브랜치 · 배포 GitHub Pages</div>
+<div class="foot">생성 <code>dashboard/build.py</code> ← unified results store (reports/results/*.jsonl) · 추세 <code>dashboard-data</code> 브랜치 · 배포 GitHub Pages</div>
 </div>
 
 <script>
@@ -1585,15 +1548,13 @@ def build(
     # Unified store paths (None = use core.results defaults)
     obs_path=None,
     findings_path=None,
-    # Legacy fallback paths
     catalog: str = "data/api_catalog.json",
-    tsv: str = "reports/smoke_status.tsv",
-    param_tsv: str = "reports/param_status.tsv",
-    crud: str = "reports/junit-crud.xml",
     lifecycles: str = "regression/scenarios/scenarios.json",
     known: str = "data/baselines/known_issues.json",
     waivers: str = "data/baselines/coverage_waivers.json",
     prior: str = "data/verified_endpoints.json",
+    # Platform-wide systemic conformance findings (not per-endpoint; the static
+    # axis writes them here — merged into the unified findings for the banner).
     conformance: str = "data/conformance.json",
     # Output
     out: str = "reports/dashboard/index.html",
@@ -1604,9 +1565,8 @@ def build(
 ):
     """Build the dashboard HTML.
 
-    Reads the unified results store FIRST (core.results JSONL).  If the store
-    is empty or unavailable, falls back to the legacy TSV/XML/JSON inputs so
-    nothing regresses during migration.
+    Reads the unified results store (core.results JSONL) as the SINGLE source.
+    With no store present coverage is all-zero and the build still renders.
     """
     if not branch:
         branch = os.environ.get("GITHUB_REF_NAME", "—")
@@ -1617,44 +1577,30 @@ def build(
     cat = load_catalog(catalog) if os.path.exists(catalog) else []
 
     # ------------------------------------------------------------------
-    # 2. Load regression observations — unified store FIRST, then legacy
+    # 2. Load regression observations from the unified store (sole source).
+    #    Empty store -> empty rows -> all-zero coverage (still renders).
     # ------------------------------------------------------------------
     unified_obs, unified_findings = _try_load_unified(obs_path, findings_path)
-
-    if unified_obs:
-        # Convert unified Observation records to the legacy 6-tuple format
-        tsv_rows = [obs_to_tsv_row(o) for o in unified_obs]
-        source_label = "unified results store"
-    else:
-        # Legacy fallback: read smoke TSV
-        tsv_rows = parse_smoke_tsv(tsv)
-        source_label = "legacy smoke_status.tsv"
-
-    param_rows = parse_smoke_tsv(param_tsv)
+    tsv_rows = [obs_to_tsv_row(o) for o in unified_obs]
+    source_label = "unified results store"
+    param_rows = ()
 
     # ------------------------------------------------------------------
-    # 3. Load conformance findings — unified store FIRST, then legacy JSON
+    # 3. Conformance findings — per-endpoint from the unified store; merge the
+    #    platform-wide "systemic" findings (not per-endpoint, so absent from the
+    #    unified store) from conformance.json when the static axis writes one.
     # ------------------------------------------------------------------
-    if unified_findings:
-        conf = findings_to_conf(unified_findings)
-        # The platform-wide "systemic" findings are NOT per-endpoint, so they are
-        # not in the unified findings store — they live in the conformance.json
-        # the static analysis writes. Merge them back so the dashboard's
-        # "플랫폼 전역 항목" banner is populated.
-        if os.path.exists(conformance):
-            try:
-                conf["systemic"] = json.load(open(conformance)).get("systemic", [])
-            except (ValueError, OSError):
-                pass
-    elif os.path.exists(conformance):
-        conf = json.load(open(conformance))
-    else:
-        conf = {"summary": {}, "systemic": [], "by_endpoint": {}}
+    conf = findings_to_conf(unified_findings)
+    if os.path.exists(conformance):
+        try:
+            conf["systemic"] = json.load(open(conformance)).get("systemic", [])
+        except (ValueError, OSError):
+            pass
 
     # ------------------------------------------------------------------
-    # 4. Load CRUD / lifecycle data (legacy only, no unified equivalent yet)
+    # 4. Load CRUD / lifecycle data (lifecycle definitions only).
     # ------------------------------------------------------------------
-    crud_results = parse_crud_junit(crud)
+    crud_results = {}
     # Merge base scenarios.json + per-service fragments (lifecycles/*.json) via
     # the shared loader so coverage counts every agent's fragment. Fall back to
     # the raw file if the loader isn't importable (keeps the dashboard standalone).
@@ -1765,10 +1711,6 @@ def main():
     ap.add_argument("--findings", default=None,
                     help="Path to findings.jsonl (unified store); default: core.results.FINDINGS")
     ap.add_argument("--catalog", default="data/api_catalog.json")
-    ap.add_argument("--tsv", default="reports/smoke_status.tsv",
-                    help="Legacy fallback: smoke_status.tsv")
-    ap.add_argument("--param-tsv", default="reports/param_status.tsv")
-    ap.add_argument("--crud", default="reports/junit-crud.xml")
     ap.add_argument("--lifecycles", default="regression/scenarios/scenarios.json")
     ap.add_argument("--known", default="data/baselines/known_issues.json")
     ap.add_argument("--waivers", default="data/baselines/coverage_waivers.json",
@@ -1776,7 +1718,7 @@ def main():
     ap.add_argument("--prior", default="data/verified_endpoints.json",
                     help="cumulative verified set from the dashboard-data branch")
     ap.add_argument("--conformance", default="data/conformance.json",
-                    help="Legacy fallback: conformance.json")
+                    help="Platform-wide systemic conformance findings (banner)")
     ap.add_argument("--history", default="dashboard/history.jsonl")
     ap.add_argument("--out", default="reports/dashboard/index.html")
     ap.add_argument("--run-type", default="local")
@@ -1788,9 +1730,6 @@ def main():
         obs_path=args.obs,
         findings_path=args.findings,
         catalog=args.catalog,
-        tsv=args.tsv,
-        param_tsv=args.param_tsv,
-        crud=args.crud,
         lifecycles=args.lifecycles,
         known=args.known,
         waivers=args.waivers,
