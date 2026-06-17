@@ -1,135 +1,102 @@
-# IA.md — two-tier platform information architecture (v2, 2026-06-17)
+# IA.md — one-graph / step-overlay console (v3, 2026-06-17)
 
-> **v2 supersedes v1's framing.** v1 treated the FastAPI control plane as "the
-> platform" and the static export as a read-only mirror. v2 inverts to the
-> owner's model: the **Dashboard is the public main** (coverage + API health, for
-> everyone); the **per-service catalog → compose → plan → run → report** platform
-> is the **backend** that exists to build that coverage. *Viewing* needs no
-> server; only *defining/dispatching* needs the FastAPI control plane.
-> (v1's WS1–WS5 cleanup still holds — see "Relationship to v1" below.)
+> **v3 adopts the Claude-design directive** (preview-v2 IA 수정 지시서). Supersedes
+> v2's "separate dashboard + per-service static pages" framing. The canonical IA is
+> the POC **`poc/scenario-viz/06-ia-walkthrough.html`** model: **one resource-task
+> DAG, rendered by one shared component (`viz.js`), with a per-step color OVERLAY** —
+> the same graph carries Knowledge → Overview → Plan → Run → Report (feedback loop ↺ =
+> model-based testing). One-line: *declarative composition over a resource DAG.*
 
-## The two tiers
+## Why this supersedes v2
+
+v2 polished the stacked dashboard + built separate per-service catalog pages +
+separate plan/run/report pages. The design review's verdict: that is **not the
+graph spine** — Overview is a card pile, and the step pages each draw their own
+thing. v3 unifies everything onto **one graph + overlays**.
+
+## The model (target)
 
 ```
-┌─ TIER 1 · PUBLIC MAIN (everyone) ───────────────────────────────┐
-│  📊 Dashboard — overall coverage (C1/C2/C3) + API health         │
-│     the front door: "how healthy & how covered is the SCP API?"  │
-│        └ drilldown: category → per-service health/coverage       │
-└────────┬─────────────────────────────────────────────────────────┘
-         │  "build/improve this service's coverage" → enter backend
-         ▼
-┌─ TIER 2 · BACKEND PLATFORM (builders) — Plan · Run · Report ────┐
-│  🗂  per-service CATALOG  (the organizing unit)                   │
-│        each service's endpoints/resources + that service's status │
-│  🧩  COMPOSE — combine services into a lifecycle (M5 composer)    │
-│  📋  PLAN → ▶ RUN → ✅ REPORT (verify)                            │
-│        results feed back into the Dashboard coverage ↑           │
-│   static (catalog/) = READ face · FastAPI control plane = WRITE   │
-└──────────────────────────────────────────────────────────────────┘
-                🔧 Ops — live resource tree / cleanup verdict (static, reads oplog)
+Knowledge ─▶ Overview ─▶ Plan ─▶ Run ─▶ Report ─┐   (one DAG, overlay swaps per tab)
+   정의        건강도      합성     실행     결과·커버리지
+   ▲                                              │
+   └──────────────── ↺ feedback loop ─────────────┘   (model-based testing)
 ```
 
-**The coverage loop (why the platform exists):** Dashboard shows the gap → a
-builder enters the platform → picks services and **composes** them → plan → run →
-verify (Report) → coverage rises → reflected back on the Dashboard.
+| Tab | Overlay on the shared DAG | Data source |
+|-----|---------------------------|-------------|
+| **Knowledge** | resource/dep definitions (requires·options), validated-facts, formal YAML | `knowledge/` + per-node facts |
+| **Overview** | node color = C3 coverage / regression health; regression nodes highlighted → click → Report·Triage | results store (observations) overlaid on nodes |
+| **Plan** | target select → closure → composed plan (create→ready→verify→reverse delete), dedup, peak quota; one_of branch toggle | `viz.js plan()` (mirrors composer) |
+| **Run** | level-parallel live status coloring + gantt | ops live (oplog) + `viz.js` schedule |
+| **Report** | pass/fail · coverage · timing overlay + regression/Triage/trends | results store + critical-path timing |
 
-## Runtimes — who needs a server
+## Shared engine + data bridge (already exist)
 
-| Surface | Runtime | Audience |
-|---|---|---|
-| Dashboard (coverage + health) | **static** (Pages) | everyone |
-| per-service Catalog · Plan · Run · Report (**read/browse**) | **static** (Pages) | builders |
-| Ops (resource tree / cleanup verdict) | **static** (browser reads oplog) | everyone |
-| Author **save** · run **dispatch**/schedule · intervene · single-delete · AI | **FastAPI control plane** (`uvicorn`) | builders, deep-linked from catalog |
+- **`poc/scenario-viz/assets/viz.js`** — pure client-side graph engine: `closure`,
+  `topoOrder`, `layout`, `renderGraph`, `plan` (closure→order→steps→dedup→quota),
+  `levels`, `dur`. Mirrors `regression/scenarios/composer.py`. Tabs pass only
+  `colorOf/strokeOf/badgeOf` overlay fns — node coordinates never move.
+- **`poc/scenario-viz/build_data.py`** — emits `window.MODEL` (model.js) from
+  `knowledge/formal/resources/*.yaml` (same source as composer). Refresh = re-run it
+  (currently 270 nodes → rebuild to 275).
+- **NEW data the overlays need** (build-time, alongside model.js):
+  - `results.js` (`window.RESULTS`) — per-node/endpoint coverage + regression status
+    from `reports/results/observations.jsonl` (sample via `tools/sample_data.py`, real
+    from runs). Drives Overview/Report node color.
+  - `context.js` (`window.CTX`) — env × suite × snapshot sha · time · LIVE/SNAPSHOT.
+  - Knowledge facts per node (validated-facts / formal YAML) for the Knowledge tab.
 
-The static catalog hands every **write** off to the live control plane via a
-clearly-marked deep-link (e.g. edit → `/planning/resources/<id>`). No server →
-those actions show as "⚙ control plane required", everything else still browses.
+## Global shell (every page)
 
-## Canonical homes (single-source — render once, link/embed elsewhere)
+- **One tab bar**: `Knowledge · Overview · Plan · Run · Report` + feedback ↺.
+- **Context bar**: env × suite × snapshot sha · time · **LIVE/SNAPSHOT badge** → every
+  tab points at the same scope (kills the cross-screen number mismatch).
+- **Glossary + tooltips**: C1/C2/C3 · cov_op · soft · known-red · waiver standardized;
+  one label per concept ("신규 회귀" = "신규 fail" → pick one). Static/live badge;
+  non-functional buttons disabled + tooltip ("control plane 전용"), never hidden.
 
-| Concern | Canonical owner | Everyone else |
-|---|---|---|
-| Coverage ladder + API health | **`dashboard/build.py`** → `index.html`, `services/*` (Tier-1 main) | catalog `report.html` **embeds/links** it — NO re-render |
-| per-service catalog · dependency graph · compose-focus | **`controlplane/graph_export.py`** → `catalog/` (catalog·plan·run·report) | — |
-| Live ops (resource tree · run history · verdict) | **`ops.html`** (static, oplog) | catalog links it |
-| Writes / live run control / authoring save | **FastAPI control plane** | catalog deep-links in |
+## Retire
 
-## Top-level navigation
+- **`platform/*`** (control-plane static mirror) — absorb its unique bits (context bar,
+  Report depth: Coverage·Conformance·Triage·Trends·A/B; Knowledge data; schedule/cleanup)
+  into the unified tabs, then **301-redirect** `platform/*` → the matching tab. Zero
+  duplicate Plan/Run/Report.
+- The v2 **per-service static pages** (`catalog/services/*.html`) + the stacked
+  **`index.html`** dashboard are **superseded** by the unified app (Catalog/Overview
+  tabs). Keep as redirect targets during migration.
 
-- **Public (static dashboard):** `Dashboard(/) · Services · Ops` — with a
-  prominent **"build/improve coverage →"** that enters the per-service Catalog.
-- **Platform (catalog/):** `Catalog · Plan · Run · Report` — Plan/Run/Report kept
-  as the platform basics; every write affordance carries a **"⚙ control plane"**
-  deep-link/badge.
+## Migration workstreams (Claude-design S1–S6, priority order)
 
-## Per-service catalog (the organizing unit)
+| WS | Scope | Acceptance |
+|----|-------|-----------|
+| **S1** | Global shell + context bar; 5-tab scaffold over `viz.js` (Catalog/Plan/Run/Report from the POC + Overview/Knowledge) | 5 tabs 1-click; active tab; same sha/env badge on every page |
+| **S3** | Plan/Run/Report = the one shared `viz.js` component, overlay arg only | 4+ tabs share graph coordinates; only overlay changes |
+| **S2** | `index.html` → **Overview overlay** (node color = C3/regression; "새 회귀 N건" → graph highlight → Report·Triage); old tables → collapsed side panel | Overview uses the same component as 06 |
+| **S4** | Absorb + 301-redirect `platform/*`; zero duplicate Plan/Run/Report | platform path → unified tab |
+| **S5** | **Knowledge** 1급 tab (constraints·validated-facts·formal YAML; node click → defs/facts) | Knowledge is Plan's upstream, graph-linked |
+| **S6** | Glossary + tooltips; unified terms; static/live badges; disabled-not-hidden | glossary consistent on every page |
 
-Each service owns a catalog: its endpoints/resources + that service's
-coverage/health + a **"compose into a plan"** entry. The Dashboard's per-service
-drilldown (`services/<svc>`) **links into that service's catalog**. **Composing
-across services** (M5 `regression/scenarios/composer.py`) is the platform's
-primary interaction — plan = a chosen combination of services' resources.
+## Build / publish
 
-## Read / Write / Live — the bucket rule (migration spec)
+The unified app is **static** (Pages, no server) — `viz.js` + `style.css` + generated
+`model.js`/`results.js`/`context.js`. Edits/dispatch deep-link to the FastAPI control
+plane (read/write split unchanged). Generator: evolve `build_data.py` (+ a results/context
+emitter) and the `06-ia-walkthrough` shell into the product app; publish under the
+canonical Pages path; wire `dashboard-data` publish job.
 
-Don't reimplement complex platform screens statically — **classify and route**:
+**Verification checklist (Claude-design §6):** one `viz.js` renders all tabs (coords
+fixed, overlay swaps) · `platform/*` redirected, 0 duplicate Plan/Run/Report · context
+bar same sha/env everywhere · Overview is a graph overlay not a card pile · regression
+list → graph highlight + Triage link · glossary/tooltips consistent.
 
-| Bucket | Lives in | In catalog |
-|---|---|---|
-| **READ** (catalog/model/deps/coverage/run-history/report/validate) | catalog/ static (baked at build) | shown directly |
-| **WRITE** (edit-save, dispatch, schedule, delete) | FastAPI control plane | a deep-link button only |
-| **LIVE** (live run timeline, intervene, inventory) | FastAPI / ops.html (oplog) | last-known snapshot + "open live" |
+## Status (2026-06-17)
 
-Progressive disclosure: the catalog top nav stays the 4 basics; rare/power
-features (schedules, compare, snapshot restore, AI triage) live one step in,
-under the control plane — not in catalog's primary nav.
+- **Done & still valid:** `platform/*` static export retired (v2-V5); coverage
+  single-source = results store; `tools/sample_data.py` (populated preview data).
+- **Superseded:** v2-V2/V3/V4 per-service pages + stacked dashboard → replaced by the
+  unified one-graph app (this v3).
+- **Next:** S1 (shell + 5-tab scaffold over viz.js, real model + sample overlays) → preview.
 
-## Generators (must stay in repo + the publish job)
-
-| Output | Generator | Notes |
-|---|---|---|
-| `index.html` + `services/*` (Dashboard) + `ops.html` | `dashboard/build.py` | coverage+health; ops DEP map injected at build (WS3) |
-| `catalog/` (catalog·plan·run·report + data) | **`controlplane/graph_export.py`** | the platform static **read face**; edits deep-link to `/planning/resources/<id>` |
-| **RETIRE** `platform/*` static export | `controlplane/static_export.py` | duplicate of `catalog/` — drop it |
-
-`poc/scenario-viz/` stays a design reference (not published). All generators must
-run in the dashboard publish job (`api-test.yml`) → `dashboard-data` → Pages, so
-the static surfaces never go stale vs the model.
-
-## Relationship to v1 (WS1–WS5)
-
-- **Still valid:** WS1 (coverage single-source = dashboard — *more* correct under
-  v2), WS3 (ops DEP build-time), WS4 (legacy cleanup), WS5 (docs).
-- **Rescope / retire:** WS2 (Plan templates *inside* the FastAPI app) and
-  `static_export.py`'s `platform/*` are **superseded by `catalog/`** as the static
-  face. The FastAPI control plane shrinks to the **write/live API** behind catalog.
-
-## Migration workstreams (v2) — to be detailed & approved before building
-
-> **Already in place (verified 2026-06-17):** `catalog/` is **already generated and
-> published** — `api-test.yml` (~line 1248) runs `python -m controlplane.graph_export
-> "$dd/catalog"` into the `dashboard-data` branch each build. `graph_export.py` emits
-> `catalog/plan/run/report.html` (+ `catalog.js`/`report.js`/`graph.js`); the catalog
-> already links **↑ to the dashboard** (`../index.html` "← 대시보드") and carries the
-> **"정의/수정은 control plane"** write deep-link. `report.html` is a **per-run** report
-> (step timings from `observations.jsonl`), NOT a coverage re-render — so no
-> single-source conflict with the dashboard. The 2-tier structure largely EXISTS;
-> the remaining work is **dedup + wiring + emphasis**, not building from scratch.
-
-| WS | Scope |
-|----|-------|
-| **V1 ✅** | `graph_export.py` → `catalog/` published by CI as the platform read face (already wired). |
-| **V2 ✅** | Dashboard front door → per-service `services/<svc>` links **down into** that service's catalog (`#<cat>/<svc>`); catalog.js `fromHash` honors it. |
-| **V3 ✅** | Read/Write boundary surfaced — catalog write/edit/execute deep-link to the control plane; static side is read-only (composer preview runs server-free). |
-| **V4 ✅** | Per-service catalog = validation progress board (✅/🟡/❌ badges) + **compose-across-services** foregrounded ("🧩 합성하기" → `plan.html?service=/?targets=`). |
-| **V5 ✅** | Retired `controlplane/static_export.py` (`platform/*`, duplicate of `catalog/`) — workflow no longer builds/publishes it; module is a deprecation stub. |
-| **V6 ✅** | Docs reconcile (this file + `docs/CATALOG-VALIDATION-STATUS.md` registered in `docs/INDEX.md`). |
-
-> **Status (2026-06-17):** V1–V6 implemented on `claude/zealous-heisenberg-irf3xt`,
-> offline-test gated (controlplane 18/18, ai 18/18, dashboard build OK, catalog
-> render OK). Catalog validation state (the composition-only goal) tracked in
-> `docs/CATALOG-VALIDATION-STATUS.md`: secured 100% / runtime-validated ~48%.
-
-**Scope guard:** all work on `claude/zealous-heisenberg-irf3xt`; the live public
-Pages root is untouched until merged (only the `preview-reorg/` subdir is published).
+**Scope guard:** all work on `claude/zealous-heisenberg-irf3xt`; public Pages root
+untouched until merged (only `preview-v2/` subdir is published).
