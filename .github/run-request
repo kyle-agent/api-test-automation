@@ -1,6 +1,8 @@
-# Publish-only run after the platform-IA merge (main @ 6e44383).
-# Purpose: republish the dashboard (now linking the 🧩 콘솔 /platform) + publish
-# the new static /platform console (build_console.py) with THIS run's results.
+# Publish-only run after the catalog-consolidation merge (#2).
+# Purpose: republish so the console Catalog tab becomes the single canonical
+# catalog surface — dashboard per-service downlinks now deep-link into
+# platform/console.html?service=<cat>/<svc>, and the standalone catalog/ static
+# export is retired (graph_export kept, just not published).
 #
 # READ-ONLY SMOKE — explicitly NO mutations / destructive / heavy. Cheap (~15min),
 # no resource changes. Cumulative coverage (verified_endpoints/endpoint_status) is
