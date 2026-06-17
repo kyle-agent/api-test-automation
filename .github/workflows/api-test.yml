@@ -1241,6 +1241,13 @@ jobs:
           python -m controlplane.graph_export "$dd/catalog" \
             reports/results/observations.jsonl 2>/dev/null \
             || echo "::warning::catalog export skipped"
+          # /platform — the static console (one graph: Catalog·Plan·Run·Report + a
+          # Knowledge viewer), built with THIS run's results + git sha. Static, no
+          # server; edits/dispatch deep-link to the control plane. Never fails publish.
+          pip install -q markdown 2>/dev/null || true
+          python poc/scenario-viz/build_console.py reports/platform 2>/dev/null \
+            && { rm -rf "$dd/platform"; cp -r reports/platform "$dd/platform"; } \
+            || echo "::warning::platform console build skipped"
           # nojekyll so GitHub Pages serves the raw HTML as-is
           touch "$dd/.nojekyll"
           cd "$dd"

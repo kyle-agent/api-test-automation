@@ -1377,12 +1377,10 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
   @@PILL@@
   <span class="meta">branch <code>@@BRANCH@@</code> · 최근 실행 @@WHEN@@ · @@RUNTYPE@@</span>
   <div class="links" style="margin-top:7px;font-size:13px">
-    자원 모델:
-    <a href="catalog/catalog.html" title="플랫폼 카탈로그로 진입 → 자원 선택·합성·plan으로 커버리지 채우기">🗂 카탈로그(커버리지 채우기 →)</a> ·
-    <a href="catalog/plan.html">Plan</a> ·
-    <a href="catalog/run.html">Run</a> ·
-    <a href="catalog/report.html">Report</a>
-    &nbsp;|&nbsp; <a href="ops.html">Ops</a> · <a href="platform/">Platform</a>
+    플랫폼:
+    <a href="platform/console.html" title="자원 모델 콘솔 — Catalog·Plan·Run·Report (자원 선택·합성·plan으로 커버리지 채우기)">🧩 콘솔(Catalog·Plan·Run·Report)</a> ·
+    <a href="platform/knowledge.html">📚 Knowledge</a>
+    &nbsp;|&nbsp; <a href="ops.html">Ops</a>
   </div>
 </div>
 
