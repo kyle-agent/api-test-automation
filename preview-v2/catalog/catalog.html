@@ -27,12 +27,6 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
 .tbl td,.tbl th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
-.vbadge{display:inline-block;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:600;
-  border:1px solid var(--line)}.vbadge.full{background:#14322a;border-color:#3fb27f;color:#8ee0b9}
-.vbadge.partial{background:#33291a;border-color:#e0922f;color:#ffd9a0}
-.vbadge.zero{background:#3a1717;border-color:#ff6b6b;color:#ffb3b3}
-.vbar{height:6px;border-radius:4px;background:#2a3850;overflow:hidden;margin:8px 0 4px}
-.vbar>i{display:block;height:100%;background:var(--val)}
 .tag{display:inline-block;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:6px;
   vertical-align:middle}.tag.v{background:#14322a;color:#8ee0b9;border:1px solid #3fb27f}
 .tag.d{background:#33291a;color:#ffd9a0;border:1px solid #e0922f}
@@ -69,8 +63,7 @@ select,input{width:100%;background:var(--panel2);border:1px solid var(--line);co
 <script src="catalog.js"></script><script src="graph.js"></script>
 <script>
 var C=window.CATALOG,N=C.nodes,SVC=C.services||{},sel=null;
-document.getElementById("sub").innerHTML=C.node_count+" 노드 · <b style='color:#3fb27f'>"+C.validated+" VALIDATED</b> ("+Math.round(100*C.validated/C.node_count)+"%) · "+C.service_count+" 서비스 — "+
-  "<span class='tag v'>✅ "+C.services_full+" 완료</span> <span class='tag d' style='background:#33291a;border-color:#e0922f'>🟡 "+C.services_partial+" 부분</span> <span class='tag' style='background:#3a1717;color:#ffb3b3;border:1px solid #ff6b6b'>❌ "+C.services_zero+" 미검증</span>";
+document.getElementById("sub").innerHTML=C.node_count+" 노드 · "+C.service_count+" 서비스";
 document.getElementById("gen").textContent=C.generated_from;
 var cats=[...new Set(Object.values(N).map(n=>n.category))].sort();
 var svcOf={};Object.values(N).forEach(n=>{(svcOf[n.category]=svcOf[n.category]||new Set()).add(n.service);});
@@ -80,23 +73,13 @@ function pickFirst(){sel="vpc" in N?"vpc":Object.keys(N)[0];}
 function fromHash(){var h=decodeURIComponent((location.hash||"").replace(/^#/,""));if(!h)return false;var id=Object.keys(N).find(k=>N[k].service===h);if(id){sel=id;return true;}return false;}
 if(!fromHash())pickFirst();
 window.addEventListener("hashchange",function(){if(fromHash())refresh();});
-function svcBadge(s){
-  var cls=s.status,lab=cls==="full"?"✅":(cls==="partial"?"🟡":"❌");
-  var tail=cls==="zero"?" (docs)":"";
-  return '<span class="vbadge '+cls+'">'+lab+' '+s.validated+'/'+s.total+' validated'+tail+'</span>';
-}
 function refresh(){
   var n=N[sel];fill(document.getElementById("cat"),cats,n.category);
   fill(document.getElementById("svc"),[...svcOf[n.category]].sort(),n.service);
-  // per-service validation standing (V3) + compose affordance (V4)
-  var s=SVC[n.service]||{validated:0,total:0,status:"zero",ids:[]};
-  var pct=s.total?Math.round(100*s.validated/s.total):0;
   document.getElementById("svcstat").innerHTML=
-    '<div style="margin:8px 0">'+svcBadge(s)+'</div>'+
-    '<div class="vbar"><i style="width:'+pct+'%"></i></div>'+
-    '<a class="compose" href="plan.html?service='+encodeURIComponent(n.service)+'" title="이 서비스 자원으로 합성 Plan 미리보기">🧩 이 서비스 합성하기 (compose →)</a>';
+    '<a class="compose" href="plan.html?service='+encodeURIComponent(n.service)+'" title="이 서비스 자원으로 Plan 구성">📋 이 서비스로 Plan 구성 →</a>';
   var ids=Object.keys(N).filter(id=>N[id].service===n.service).sort();
-  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="radio" name="nd" '+(id===sel?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><span><b>'+id+'</b> <span class="tag '+(N[id].provenance==="VALIDATED"?"v\">✅ VALIDATED":"d\">📄 docs")+'</span> <span class="muted" style="font-size:11px">'+(N[id].requires.and.length+N[id].requires.one_of.length)+"↑ "+N[id].dependents.length+"↓</span></span></label>").join("");
+  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="radio" name="nd" '+(id===sel?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><span><b>'+id+'</b> <span class="muted" style="font-size:11px">'+(N[id].requires.and.length+N[id].requires.one_of.length)+"↑ "+N[id].dependents.length+"↓</span></span></label>").join("");
   document.querySelectorAll('#list input').forEach(r=>r.onchange=function(){sel=r.dataset.id;refresh();});
   // graph
   var g=C.focus[sel];
@@ -116,9 +99,9 @@ function refresh(){
     '<h3>requires</h3><div>'+reqHtml+'</div>'+
     '<h3>피의존</h3><div>'+depHtml+'</div>'+
     '<h3>options</h3>'+optHtml+
-    '<h3>합성 (compose)</h3>'+
-    '<a class="compose" href="plan.html?targets='+encodeURIComponent(sel)+'">🧩 이 노드로 합성 Plan 미리보기 →</a>'+
-    '<div class="note">시나리오는 <b>카탈로그 서비스를 합성</b>해 생성됩니다(손으로 쓴 게 아님). 이 화면은 읽기 전용 — 정의/수정·실제 실행은 control plane <code>/planning/resources/'+sel+'</code> 에서.</div>';
+    '<h3>Plan 구성</h3>'+
+    '<a class="compose" href="plan.html?targets='+encodeURIComponent(sel)+'">📋 이 자원으로 Plan 구성 →</a>'+
+    '<div class="note">시나리오는 <b>카탈로그 서비스를 조합</b>해 만듭니다(직접 작성 아님). 이 화면은 읽기 전용 — 정의/수정·실제 실행은 control plane <code>/planning/resources/'+sel+'</code> 에서.</div>';
 }
 document.getElementById("reduce").onchange=refresh;
 document.getElementById("cat").onchange=function(e){var c=e.target.value;var fs=[...svcOf[c]].sort()[0];sel=Object.keys(N).find(id=>N[id].service===fs);refresh();};

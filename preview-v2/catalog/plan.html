@@ -1,6 +1,6 @@
 <!doctype html><html lang="ko"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>합성 Plan 미리보기 (읽기 전용)</title>
+<title>구성 Plan 미리보기 (읽기 전용)</title>
 <style>
 :root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#27384b;--ink:#e7eef6;
   --muted:#90a4ba;--accent:#5aa9ff;--val:#3fb27f;--docs:#e0922f;--shared:#ffd166}
@@ -28,9 +28,9 @@ input,select{width:100%;background:var(--panel2);border:1px solid var(--line);co
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
 </style></head><body><div class="wrap">
-<h1>🧩 서비스 합성 → Plan <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
-  <a href="catalog.html">← 카탈로그</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 실제 합성/실행은 control plane.</span></h1>
-<p class="muted"><b>시나리오 = 카탈로그 서비스들을 합성(compose)한 결과</b>입니다 — 손으로 작성하지 않습니다.
+<h1>🧩 서비스 구성 → Plan <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
+  <a href="catalog.html">← 카탈로그</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 실제 구성/실행은 control plane.</span></h1>
+<p class="muted"><b>시나리오 = 카탈로그 서비스들을 구성(compose)한 결과</b>입니다 — 손으로 작성하지 않습니다.
   여러 서비스의 자원을 고르면 composer가 의존 폐포의 합집합과 <b>공통 선행자원(dedup)</b>을 계산해
   레벨 병렬 lifecycle을 미리 봅니다. 실제 compose+draft+실행은 <code>/planning/resources/compose</code>(FastAPI)에서.</p>
 <div class="cols">
@@ -39,7 +39,7 @@ input,select{width:100%;background:var(--panel2);border:1px solid var(--line);co
     <div class="scroll" id="list"></div>
   </div>
   <div class="panel">
-    <h2 id="gtitle">합성 폐포</h2>
+    <h2 id="gtitle">구성 폐포</h2>
     <div class="legend"><span><i style="background:#11314f"></i>대상 ★</span>
       <span><i style="background:#1c2a3a"></i>선행</span>
       <span><i style="background:#ffd166"></i>공유(dedup)</span>
@@ -48,19 +48,19 @@ input,select{width:100%;background:var(--panel2);border:1px solid var(--line);co
     <div class="svgbox"><svg id="svg"></svg></div>
   </div>
   <div class="panel">
-    <h2>합성 plan 요약 <span class="muted" style="font-weight:400;font-size:11px">(composed preview)</span></h2><div id="sum"></div>
-    <a class="btn" id="live" href="#" style="margin-top:10px">🧩 control plane에서 합성·실행 →</a>
+    <h2>구성 plan 요약 <span class="muted" style="font-weight:400;font-size:11px">(composed preview)</span></h2><div id="sum"></div>
+    <a class="btn" id="live" href="#" style="margin-top:10px">🧩 control plane에서 구성·실행 →</a>
     <p class="muted" style="font-size:11px;margin-top:8px">이 preview는 composer가 서버 없이 순수 계산.
       저장/실행만 control plane이 필요합니다.</p>
   </div>
 </div>
-<div class="foot">폐포·dedup·level은 클라이언트가 모델 의존(requires)으로 계산(미리보기). 실제 합성은
+<div class="foot">폐포·dedup·level은 클라이언트가 모델 의존(requires)으로 계산(미리보기). 실제 구성은
   서버 composer가 동일 규칙으로 수행.</div>
 </div>
 <script src="catalog.js"></script><script src="graph.js"></script>
 <script>
 var C=window.CATALOG,N=C.nodes,SVC=C.services||{},T=new Set();
-// V4: foreground compose — preselect from the catalog's "🧩 합성하기" deep-link.
+// V4: foreground compose — preselect from the catalog's "🧩 구성하기" deep-link.
 // ?targets=a,b (node ids) or repeated, and ?service=svc (all of a service's nodes).
 (function(){var p=new URLSearchParams(location.search);
   p.getAll("targets").forEach(v=>v.split(",").forEach(id=>{if(N[id.trim()])T.add(id.trim());}));
@@ -100,7 +100,7 @@ function draw(){
   if(!T.size){document.getElementById("svg").innerHTML="";document.getElementById("sum").innerHTML='<p class="muted">타깃을 선택하세요.</p>';return;}
   var b=build();
   ResourceGraph.render(document.getElementById("svg"),b.graph,{onClick:function(id){T.has(id)?T.delete(id):T.add(id);if(T.size){list();draw();}}});
-  document.getElementById("gtitle").innerHTML='합성 폐포 <span class="muted" style="font-weight:400;font-size:12px">· '+b.union.size+' 노드</span>';
+  document.getElementById("gtitle").innerHTML='구성 폐포 <span class="muted" style="font-weight:400;font-size:12px">· '+b.union.size+' 노드</span>';
   var saved=b.naive-b.union.size;
   document.getElementById("sum").innerHTML=
     '<div class="kv"><span>대상</span><b>'+T.size+'</b></div>'+

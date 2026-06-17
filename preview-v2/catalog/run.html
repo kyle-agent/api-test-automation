@@ -30,7 +30,7 @@ input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var
 </style></head><body><div class="wrap">
 <h1>실행 구조 — 레벨 병렬 <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
   <a href="catalog.html">← 카탈로그</a> · <a href="plan.html">Plan</a> · <a href="report.html">Report</a></span></h1>
-<p class="muted">합성 plan을 <b>실행 단계(level)</b>로 나눠 보여줍니다 — 같은 단계의 독립 노드는
+<p class="muted">구성 plan을 <b>실행 단계(level)</b>로 나눠 보여줍니다 — 같은 단계의 독립 노드는
   <b>병렬 실행 가능</b>, 다음 단계는 이전 단계가 모두 끝나야 시작(배리어). 실시간 상태(생성중/완료/실패)는
   control plane <code>/runs/{id}/graph</code>(oplog)에서 이 그래프에 색칠됩니다.</p>
 <div class="cols">
