@@ -119,12 +119,17 @@ the static surfaces never go stale vs the model.
 
 | WS | Scope |
 |----|-------|
-| **V1 ✅ (mostly done)** | `graph_export.py` → `catalog/` already published by CI as the platform read face. Remaining: spot-check it renders cleanly on Pages. |
-| **V2** | Dashboard = front door: per-service drilldown (`services/<svc>`) links **down into** that service's catalog (catalog already links up; add the downlink). |
-| **V3** | Read/Write boundary: confirm every catalog write affordance deep-links to the control plane with a clear badge; graceful read-only when no server. |
-| **V4** | Per-service catalog + **compose-across-services** as the primary platform action — make "pick services → compose → plan" the foreground flow in `catalog/plan`. |
-| **V5** | **Retire `controlplane/static_export.py` (`platform/*`)** — it duplicates `catalog/`. Stop publishing `platform/`; repoint any links to `catalog/`. (Biggest cleanup.) |
-| **V6** | Docs reconcile (this file canonical; `controlplane/README.md`, `PLATFORM-PLAN.md`, `OPS-DASHBOARD.md`). |
+| **V1 ✅** | `graph_export.py` → `catalog/` published by CI as the platform read face (already wired). |
+| **V2 ✅** | Dashboard front door → per-service `services/<svc>` links **down into** that service's catalog (`#<cat>/<svc>`); catalog.js `fromHash` honors it. |
+| **V3 ✅** | Read/Write boundary surfaced — catalog write/edit/execute deep-link to the control plane; static side is read-only (composer preview runs server-free). |
+| **V4 ✅** | Per-service catalog = validation progress board (✅/🟡/❌ badges) + **compose-across-services** foregrounded ("🧩 합성하기" → `plan.html?service=/?targets=`). |
+| **V5 ✅** | Retired `controlplane/static_export.py` (`platform/*`, duplicate of `catalog/`) — workflow no longer builds/publishes it; module is a deprecation stub. |
+| **V6 ✅** | Docs reconcile (this file + `docs/CATALOG-VALIDATION-STATUS.md` registered in `docs/INDEX.md`). |
+
+> **Status (2026-06-17):** V1–V6 implemented on `claude/zealous-heisenberg-irf3xt`,
+> offline-test gated (controlplane 18/18, ai 18/18, dashboard build OK, catalog
+> render OK). Catalog validation state (the composition-only goal) tracked in
+> `docs/CATALOG-VALIDATION-STATUS.md`: secured 100% / runtime-validated ~48%.
 
 **Scope guard:** all work on `claude/zealous-heisenberg-irf3xt`; the live public
 Pages root is untouched until merged (only the `preview-reorg/` subdir is published).

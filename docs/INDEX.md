@@ -25,7 +25,8 @@ work-in-progress notes.
 | [`OPS-DASHBOARD.md`](OPS-DASHBOARD.md) | 영구 oplog 버킷 + 정적 ops 뷰어 (의존순서 라이브 자원 트리 · run 필터 · verdict) | active |
 | [`PARALLEL-EXECUTION-PLAN.md`](PARALLEL-EXECUTION-PLAN.md) | Staged foundations + per-VPC lanes — cut wall-clock to max(lane) instead of sum | **draft** (현 구현 A∥B split + shared adopt가 부분 반영; 전면 일반화는 미승인) |
 | [`harness-tests.md`](harness-tests.md) | 적대적 Tier-0 안전레일 거부 테스트 체크리스트 (env 게이트 flip · name-guess 삭제 · `.env` 커밋) | **active** — append-only |
-| [`IA.md`](IA.md) | 플랫폼 UI/IA 정본 — 표면별 소유 + single-source 규칙 + 재구조 워크스트림 | **adopted** (2026-06-17) — 구현 진행 중 |
+| [`IA.md`](IA.md) | 플랫폼 UI/IA 정본 (v2) — 2계층(Dashboard 공개메인 / per-service catalog 백엔드) + single-source + 마이그레이션 V1–V6 | **adopted** (2026-06-17) — V1–V6 구현 완료 |
+| [`CATALOG-VALIDATION-STATUS.md`](CATALOG-VALIDATION-STATUS.md) | "합성 only" 목표 대비 catalog 검증 상태 — secured 100% / validated ~48%, 서비스 15/17/27, 합성61/손작성103. `tools/catalog_status.py`로 재생성 | **active** — 검증 웨이브로 갱신 |
 
 ## Handoffs
 
