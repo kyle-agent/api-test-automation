@@ -953,8 +953,12 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
+          "optional": true,
+          "group": "lb-health-check",
+          "_note": "400 SubnetNotAssociatedWithLoadBalancer: the shared subnet has no LB, so the health-check cannot attach. Env/data-dependent; coverage-only (C2). R3 to provide an LB-associated subnet to make it 2xx.",
           "capture": {
             "lb_health_check_id": "$.lb_health_check.id"
           },

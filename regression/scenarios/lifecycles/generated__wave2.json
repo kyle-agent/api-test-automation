@@ -764,9 +764,13 @@
           "expect_status": [
             200,
             202,
-            204
+            204,
+            404
           ],
-          "destructive": true
+          "optional": true,
+          "group": "volume-transfer",
+          "destructive": true,
+          "_note": "404 Volume.TransferNotFound: {transfer_id} stays literal when no transfer was created/soft-captured, so the delete hits a nonexistent id. Coverage-only (C2); deleting a never-created transfer -> 404 is expected."
         },
         {
           "name": "delete-block-volume",

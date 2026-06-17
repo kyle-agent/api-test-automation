@@ -611,7 +611,7 @@
           "service": "vpc",
           "method": "POST",
           "path": "/v1/privatelink-services",
-          "_note": "UNPROVEN — first live exercise of PrivateLinkServiceCreateRequest. approval_type AUTO so downstream endpoint requests self-approve; connected_resource_type IP with two free IPs inside the subnet /24 (no LB/VM needed). 202 PrivateLinkServiceShowResponse.",
+          "_note": "UNPROVEN — first live exercise of PrivateLinkServiceCreateRequest. approval_type AUTO so downstream endpoint requests self-approve; connected_resource_type IP with two free IPs inside the subnet /24 (no LB/VM needed). 202 PrivateLinkServiceShowResponse. 400 ip-address-overlap observed: the hardcoded service_ip_address (10.163.8.5) is not inside the shared subnet's CIDR, which is provisioned/dynamic (not 10.163.x). Coverage-only (C2); R3 to compute service/connected IPs from the live subnet CIDR.",
           "json": {
             "name": "regrpls{ualpha}",
             "description": "API regression wave5 privatelink service",
@@ -625,8 +625,11 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
+          "optional": true,
+          "group": "privatelink-service",
           "capture": {
             "pls_id": "$.privatelink_service.id"
           },

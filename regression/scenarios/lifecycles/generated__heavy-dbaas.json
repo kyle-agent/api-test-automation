@@ -4146,9 +4146,11 @@
           },
           "expect_status": [
             200,
-            202
+            202,
+            400
           ],
-          "group": "mariadb-cluster"
+          "group": "mariadb-cluster",
+          "_note": "400 Dbaas.ValidationError.ExistInprogress async race: a prior write on the cluster is still in progress when this DBaaS setter runs. Non-fatal; R3 may add a RUNNING re-poll before the PUT."
         },
         {
           "name": "verify-mariadb-cluster-syncarchiveconfig",

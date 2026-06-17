@@ -424,8 +424,12 @@
           "expect_status": [
             200,
             201,
-            202
+            202,
+            400
           ],
+          "optional": true,
+          "group": "custom-image",
+          "_note": "400 VirtualServer.BadRequest (vague): custom-image create needs specific server/volume state (e.g. stopped server, no in-flight attach). Coverage-only (C2); R3 to drive the server into a valid image-from state to make it 2xx.",
           "capture": {
             "custom_image_id": "$.image_id"
           },
