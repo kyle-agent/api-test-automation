@@ -42,3 +42,20 @@
   버킷 엔드포인트 저장(localStorage).
 - 수동: `python -m core.oplog ensure|emit|finalize` (env: SCP_OPLOG_BUCKET,
   SCP_OPLOG_S3_ENDPOINT, 키는 SCP_* 폴백).
+
+## DEP 맵 (kind→parent 의존성) — 빌드 시 자동 생성
+
+`ops.html`의 리소스 트리는 `const DEP={...}`(kind별 parent + topological depth)를
+써서 자식 리소스를 가장 가까운 의존성 아래에 중첩한다. 이 맵은 이제 **대시보드
+빌드 시점에 자동 생성**된다 (수동 복붙 폐기, IA.md WS3):
+
+- `dashboard/ops.html`은 **소스 템플릿**(`DEP-MAP` 마커 + last-known 플레이스홀더 맵).
+- `python -m dashboard.build`가 리소스 모델(`knowledge/formal/resources`,
+  `regression.scenarios.composer.load_model`)에서 맵을 계산해
+  (`dashboard.gen_dep_map.dep_map_js`) **마커 사이에 주입**하고 결과를
+  `reports/dashboard/ops.html`로 내보낸다. CI publish는 이 **빌드된 사본**을
+  게시한다(`reports/dashboard/ops.html` → dashboard-data).
+- 따라서 리소스 모델이 바뀌면 다음 빌드에서 맵이 자동 갱신된다 — 더 이상
+  `gen_dep_map.py`를 돌려 손으로 붙여넣을 필요가 없다. 모델 파싱은 관용적이라
+  (필드 누락 → skip) 빌드를 절대 깨뜨리지 않는다.
+- 수동 확인용: `python dashboard/gen_dep_map.py`가 계산된 `const DEP=...`를 출력한다.

@@ -1540,6 +1540,51 @@ if(@@CRUDFAIL@@>0){crudFilter='fail';showList();renderSum();renderCrud();}
 
 
 # ---------------------------------------------------------------------------
+# Ops viewer (ops.html) — build-time DEP-map injection
+# ---------------------------------------------------------------------------
+
+# dashboard/ops.html is the SOURCE template (markers + a last-known map). The
+# build injects a FRESH kind→parent dependency map (computed from the resource
+# model) between these markers and writes the result to <outdir>/ops.html, so
+# the published viewer can never go stale (retires the old manual gen_dep_map
+# paste — see docs/IA.md WS3 / docs/OPS-DASHBOARD.md).
+
+OPS_TEMPLATE = os.path.join(os.path.dirname(__file__), "ops.html")
+_DEP_BEGIN = "// ---- DEP-MAP"
+_DEP_END = "// ---- /DEP-MAP ----"
+
+
+def emit_ops_html(outdir, src=OPS_TEMPLATE):
+    """Render <outdir>/ops.html from the source template with a freshly computed
+    DEP map injected between the DEP-MAP markers. Tolerant: any failure
+    (missing template / unparseable model) falls back to copying the template
+    verbatim and never crashes the build."""
+    try:
+        with open(src, encoding="utf-8") as fh:
+            page = fh.read()
+    except OSError:
+        return None  # no template -> nothing to publish (workflow tolerates this)
+
+    try:
+        from dashboard.gen_dep_map import dep_map_js
+        dep_line = dep_map_js()
+        b = page.find(_DEP_BEGIN)
+        e = page.find(_DEP_END, b + 1) if b != -1 else -1
+        if b != -1 and e != -1:
+            # keep the begin-marker line, replace everything up to the end marker
+            nl = page.find("\n", b)
+            if nl != -1 and nl < e:
+                page = page[:nl + 1] + dep_line + "\n" + page[e:]
+    except Exception:
+        pass  # leave the template's last-known map in place; never break the build
+
+    dst = os.path.join(outdir, "ops.html")
+    with open(dst, "w", encoding="utf-8") as fh:
+        fh.write(page)
+    return dst
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -1682,6 +1727,11 @@ def build(
     for s in services:
         with open(os.path.join(sdir, s["slug"] + ".html"), "w") as fh:
             fh.write(render_service_page(s, meta))
+
+    # Emit the static ops viewer with a build-time DEP map injected (the
+    # published copy lives at <outdir>/ops.html — the workflow copies THIS one,
+    # not the source template, so the kind→parent map is always current).
+    emit_ops_html(outdir)
 
     print(
         f"dashboard -> {out}  "
