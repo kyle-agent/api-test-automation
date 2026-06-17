@@ -180,7 +180,8 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   full rounds (KMS/Secrets deletion is SCHEDULED: pending-deletion items
   stay listed, PF-09).
 - **M5 resource-task model (2026-06-12): R1·R2 DONE, R3 waves LIVE.**
-  `knowledge/formal/resources/*.yaml` = **132 nodes / 53 files / 51 groups**
+  `knowledge/formal/resources/*.yaml` = **275 nodes / 59 files / 51 groups**
+  (2026-06-17, `python knowledge/formal/validate.py` → 275 resource tasks, 0 errors)
   (codes `<cat>-<group>-<resource>`; lookup-node pattern now ~7: image,
   server-type, kubernetes-version, apigw-root-resource, cm-account-resource,
   cloudml-image + fs replication-regions candidate);
@@ -191,7 +192,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   (runs 27394211896 … 27421363609): composed roster **~10 stable greens**
   (pilot, vslight 9/9 ×3, apigw 20/20 incl. all deletes, dashboard, queue,
   sec=kms+secret, rg, iam, scf, volume-snapshot; scr/fs recomposed, next run
-  should green) → **56 nodes VALIDATED / 72 docs**. Heavy VS chain proven
+  should green) → **131 nodes VALIDATED / 144 docs** (2026-06-17). Heavy VS chain proven
   through server creation + port attach/detach; static NAT one field from
   done (`publicip_id`, live-derived — rev 3 dispatched). Product findings
   now live in the **consolidated ledger `docs/PRODUCT-FINDINGS.md`** (12
@@ -204,8 +205,8 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   `regression/scr_docker_probe.py` experiment tests whether SCP keys
   satisfy it; first verdict INCONCLUSIVE on quota-403, registry-borrow
   fallback added). Wave narrative: `docs/RESOURCE-MODEL-PLAN.md` §6.
-- **Coverage now:** static ceiling **88.1%** (1,209/1,372,
-  `python -m spec.coverage_gap`; gap_getid 151→**130**, gap_write 33 —
+- **Coverage now (2026-06-17):** static ceiling **100.0%** (1,372/1,372,
+  `python -m spec.coverage_gap`; GAP=0 — gap_getid **0**, gap_write **0** —
   `docs/COVERAGE-GETID-PLAN.md`); latest published run **C3 44.79%**
   (cov_op 36.73), **fail_new 0 policy holding**, 249 approved waivers
   (incl. 7 PFS `owner-exclusion`). Owner scope: **archivestorage = reachability-only
@@ -219,8 +220,10 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   only — endpoints CALLED with license/4xx/5xx tolerated, synthetic bodies, no real
   license consumed; reachability-TERMINAL, NOT held; 74 entitlement waivers dropped
   → 111 total; gap=0 each; IB-017 → deferred functional-HA, not blocking coverage).**
-  **Repo write-op gap now 0; static ceiling 95.0%
-  (1303/1372), remaining gap 69 = all id-bound GETs.** per-profile baselines file-suffixed
+  **Repo write-op gap now 0; static ceiling 100.0%
+  (1372/1372), remaining gap 0 — getid 0, write 0 (2026-06-17,
+  `python -m spec.coverage_gap`; id-bound GETs now all reachable via composed
+  read-chains/scenarios).** per-profile baselines file-suffixed
   (`core/baselines.py`); multi-tenancy confirmed required.
 - **SKE upgrade LIVE-PROVEN (run 27492496266, 2026-06-14):** the
   `gen-heavy-ske-upgrade` chain passed end-to-end (35m real cluster
@@ -248,10 +251,12 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   license — owner credential), **IB-018** (analytics NiFi/Airflow/Trino are
   SKE-on-k8s, create bodies UNPROVEN), **IB-019** (model↔lifecycle JSON drift:
   billingplan/devops lifecycles still carry old invented bodies). All R1
-  0-errors; resource model now **270 task nodes / 55 service files**.
+  0-errors; resource model now **275 task nodes / 59 service files**
+  (2026-06-17, `python knowledge/formal/validate.py`).
 - **What to advance next:** confirm heavy rev 3 (static-NAT `publicip_id`,
   scr/fs recompose, docker-probe borrow), then continue R3 verification
-  waves over the 72 remaining docs nodes (compose → scoped
+  waves over the **144 remaining docs nodes** (131/275 VALIDATED as of
+  2026-06-17) (compose → scoped
   `crud_filter=gen-*` run → triage → re-compose), promote VALIDATED nodes
   and progressively replace hand-written lifecycles, then M4 cutover
   verification. Earlier backlog (query-signing fix, DBaaS sub-op windows,

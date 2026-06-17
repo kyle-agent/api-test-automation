@@ -9,6 +9,13 @@
 > **51 services**, **91 already `VALIDATED`**. Split below: **Wave A (light)
 > 95 · Wave B (heavy) 86 · Gated (owner) 23** (the gated count is a subset
 > surfaced out of A/B — see the Gated table).
+>
+> **State (2026-06-17, live):** `python knowledge/formal/validate.py` →
+> **275 resource task nodes** in 59 files, 0 errors; **144 `docs` (unvalidated)**,
+> **131 `VALIDATED`**. Progress since authoring: +3 nodes total, **+40 promoted to
+> VALIDATED** (91 → 131), docs backlog 181 → 144. (Queue rows below were authored
+> against the 2026-06-15 snapshot and are not re-struck here — re-derive the open
+> set from current `provenance: docs` nodes before dispatching.)
 
 ## How the validator uses this
 
