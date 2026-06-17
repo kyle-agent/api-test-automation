@@ -2,6 +2,8 @@
 {% block title %}자원 노드 — {{ node_id }}{% endblock %}
 {% block content %}
 
+{% include "_plan_steps.html" %}
+
 <section>
   <h2><a href="/planning/resources">자원 모델</a> › <code>{{ node_id }}</code>
     {% if is_new %}<span class="cat">신규</span>

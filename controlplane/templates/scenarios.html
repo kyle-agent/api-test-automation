@@ -2,6 +2,8 @@
 {% block title %}시나리오 카탈로그{% endblock %}
 {% block content %}
 
+{% include "_plan_steps.html" %}
+
 <section>
   <h2>시나리오 카탈로그 ({{ rows|length }}건{% if service %} · 필터: {{ service }}{% endif %})</h2>
   <form class="inline" method="get" action="/planning/scenarios">

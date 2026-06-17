@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Validate — SCP API Regression{% endblock %}
+{% block content %}
+
+{% include "_plan_steps.html" %}
+
+<h2>④ Validate <span class="hint">합성된 lifecycle 정합성 정적 검증 — <code>python -m regression.scenarios.validate</code> (live 호출 없음)</span></h2>
+
+{% if result.error %}
+<div class="verdict bad">
+  <span class="pip"></span>
+  <div><b>검증을 실행하지 못했습니다.</b>
+    <div class="small">{{ result.error }}</div></div>
+</div>
+{% else %}
+<div class="verdict {{ 'bad' if result.errors else ('none' if result.rc != 0 else '') }}">
+  <span class="pip"></span>
+  <div>
+    {% if result.errors %}
+    <b>{{ result.errors }} error(s)</b> — 합성 lifecycle에 정합성 문제가 있습니다.
+    {% else %}
+    <b>정합성 OK</b> — error 없음.
+    {% endif %}
+    <div class="small">{{ result.checked }} lifecycle 검사 ·
+      {{ result.errors }} error · {{ result.warnings }} warning</div>
+  </div>
+</div>
+
+<div class="tiles">
+  <div class="card tile"><div class="v">{{ result.checked }}</div>
+    <div class="k">lifecycle 검사</div></div>
+  <div class="card tile"><div class="v" style="color:var(--red)">{{ result.errors }}</div>
+    <div class="k">error</div></div>
+  <div class="card tile"><div class="v" style="color:var(--amber)">{{ result.warnings }}</div>
+    <div class="k">warning</div></div>
+</div>
+
+{% if result.error_lines %}
+<h2 style="margin-top:22px">ERROR ({{ result.error_lines|length }})</h2>
+<div class="card pad"><pre style="white-space:pre-wrap">{{ result.error_lines|join('\n') }}</pre></div>
+{% endif %}
+
+{% if result.warning_lines %}
+<h2 style="margin-top:22px">WARN ({{ result.warning_lines|length }}{% if result.warnings > result.warning_lines|length %} · 처음 {{ result.warning_lines|length }}건 표시{% endif %})</h2>
+<div class="card pad"><pre style="white-space:pre-wrap">{{ result.warning_lines|join('\n') }}</pre></div>
+{% endif %}
+
+{% if result.stderr %}
+<h2 style="margin-top:22px">stderr</h2>
+<div class="card pad"><pre style="white-space:pre-wrap">{{ result.stderr }}</pre></div>
+{% endif %}
+{% endif %}
+
+<p class="small muted" style="margin-top:14px">
+  <a href="/planning?step=compose">← Compose</a> 단계에서 합성한 lifecycle이 검증 대상입니다.
+  결과가 깨끗해야 RUN 단계로 보냅니다.</p>
+
+{% endblock %}

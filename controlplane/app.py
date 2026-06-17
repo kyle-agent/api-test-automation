@@ -139,10 +139,20 @@ def _model_stats() -> dict:
         return {"nodes": 0, "validated": 0, "docs": 0, "groups": 0}
 
 
+PLAN_STEPS = ("catalog", "model", "compose", "validate")
+
+
 @app.get("/planning", response_class=HTMLResponse)
-def planning(request: Request):
+def planning(request: Request, step: str = "catalog"):
+    """Plan = one linear flow (IA.md). The stepper ① Catalog → ② Model →
+    ③ Compose → ④ Validate is the single entry; ?step= selects the stage.
+    Validate is its own route (/planning/validate) since it runs a subprocess."""
+    if step == "validate":
+        return RedirectResponse("/planning/validate", status_code=307)
+    if step not in PLAN_STEPS:
+        step = "catalog"
     rows = _scenario_rows()
-    return _render(request, "planning.html", "planning",
+    return _render(request, "planning.html", "planning", plan_step=step,
                    profile_list=core_profiles.list_profiles(),
                    suite_list=core_suites.list_suites(),
                    scenario_stats=_scenario_stats(),
@@ -150,6 +160,49 @@ def planning(request: Request):
                    model_stats=_model_stats(),
                    gen_count=sum(1 for r in rows if r["id"].startswith("gen-")),
                    disabled_count=sum(1 for r in rows if not r["enabled"]))
+
+
+def _run_validate() -> dict:
+    """Run `python -m regression.scenarios.validate` as a guarded subprocess and
+    parse its stdout into a structured result for the ④ Validate panel.
+
+    The validator prints WARN/ERROR lines plus a summary tail
+    'N lifecycle(s) checked · N error(s) · N warning(s)'. Failures (non-zero rc,
+    timeout, crash) degrade to {error: ...} rather than 500ing the page."""
+    import re
+    import subprocess
+    import sys as _sys
+    try:
+        proc = subprocess.run(
+            [_sys.executable, "-m", "regression.scenarios.validate"],
+            cwd=str(ROOT), capture_output=True, text=True, timeout=120,
+            env={**os.environ, "PYTHONPATH": str(ROOT)})
+    except subprocess.TimeoutExpired:
+        return {"error": "검증이 120초 안에 끝나지 않았습니다 (timeout)."}
+    except Exception as exc:
+        return {"error": f"검증 실행 실패: {exc}"}
+    out = proc.stdout or ""
+    err_lines = [ln[6:].rstrip() for ln in out.splitlines()
+                 if ln.startswith("ERROR ")]
+    warn_lines = [ln[6:].rstrip() for ln in out.splitlines()
+                  if ln.startswith("WARN  ")]
+    checked = errors = warnings = 0
+    m = re.search(r"(\d+) lifecycle\(s\) checked · (\d+) error\(s\) · "
+                  r"(\d+) warning\(s\)", out)
+    if m:
+        checked, errors, warnings = (int(m.group(1)), int(m.group(2)),
+                                     int(m.group(3)))
+    return {"rc": proc.returncode, "checked": checked,
+            "errors": errors, "warnings": warnings,
+            "error_lines": err_lines[:200],
+            "warning_lines": warn_lines[:200],
+            "stderr": (proc.stderr or "").strip()[:4000]}
+
+
+@app.get("/planning/validate", response_class=HTMLResponse)
+def planning_validate(request: Request):
+    return _render(request, "validate.html", "planning",
+                   plan_step="validate", result=_run_validate())
 
 
 def _fragment_rel(source_name: str) -> str:
@@ -179,12 +232,17 @@ def _scenario_rows(service: str = "", note_chars: int = 300) -> list[dict]:
 
 @app.get("/planning/scenarios", response_class=HTMLResponse)
 def planning_scenarios(request: Request, service: str = ""):
-    return _render(request, "scenarios.html", "planning",
+    return _render(request, "scenarios.html", "planning", plan_step="compose",
                    rows=_scenario_rows(service, note_chars=160), service=service)
 
 
+@app.get("/planning/knowledge", include_in_schema=False)
+def planning_knowledge_legacy():
+    """Deduped (IA.md): knowledge has ONE home at /knowledge."""
+    return RedirectResponse("/knowledge", status_code=301)
+
+
 @app.get("/knowledge", response_class=HTMLResponse)
-@app.get("/planning/knowledge", response_class=HTMLResponse)
 def planning_knowledge(request: Request):
     def listing(pattern: str) -> list[dict]:
         out = []
@@ -324,6 +382,7 @@ def planning_dependencies(request: Request):
         and not s.get("adopt"))}
         for lid in sched.get("vpc_crud_lifecycles") or []]
     return _render(request, "dependencies.html", "planning",
+                   plan_step="model",
                    load_errs=load_errs, sched=sched, sim=sim,
                    sim_warnings=authoring.vpc_quota_warnings(deps, lifecycles),
                    crud_rows=crud_rows,

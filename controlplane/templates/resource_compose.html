@@ -2,8 +2,11 @@
 {% block title %}자원 합성{% endblock %}
 {% block content %}
 
+{% include "_plan_steps.html" %}
+
 <section>
-  <h2><a href="/planning/resources">자원 모델</a> › 합성 (단독 · 묶음 · 상품)</h2>
+  <h2><a href="/planning/resources">자원 모델</a> › 합성 (단독 · 묶음 · 상품)
+    <a href="/ai" style="font-size:12px;font-weight:600;margin-left:8px">· AI 보조 초안 →</a></h2>
   <p class="muted">대상 노드를 멀티선택하면 의존 폐포 합집합 + dedup으로 하나의
     lifecycle을 합성합니다 (§2.5 — 단독 1개 = <code>gen-&lt;node&gt;</code>,
     여러 개 = bundle/상품). 산출물은 <code>drafts/lifecycle-*.json</code>

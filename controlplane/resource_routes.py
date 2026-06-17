@@ -146,7 +146,7 @@ def _plan_rows(plan: dict) -> list[dict]:
 def resource_list(request: Request):
     model, sources = resource_model.load_model(with_sources=True)
     groups = resource_model.load_groups()
-    return _render(request, "resource_list.html",
+    return _render(request, "resource_list.html", plan_step="model",
                    groups=_grouped(model, groups),
                    total=len(model),
                    validated=sum(1 for n in model.values()
@@ -163,6 +163,7 @@ def _compose_ctx(request: Request, *, selected=None, choices=None, options=None,
     model = resource_model.load_model()
     plan = _plan_dict(plan) if plan is not None else None
     return dict(nodes=_compose_nodes(model),
+                plan_step="compose",
                 selected=set(selected or []),
                 choices=choices or {}, options=options or {},
                 lifecycle_id=lifecycle_id,
@@ -231,16 +232,13 @@ def graph_js():
                     media_type="application/javascript")
 
 
-@router.get("/graph", response_class=HTMLResponse)
-def graph_demo(request: Request, focus: str = "", targets: str = ""):
-    """P0 demo page — the shared graph component against live model data."""
-    model = resource_model.load_model()
-    if not focus and not targets:
-        focus = "vpc" if "vpc" in model else next(iter(model), "")
-    return _render(request, "resource_graph.html",
-                   focus=focus, targets=targets,
-                   nodes=sorted(model.keys()),
-                   has_composer=_composer() is not None)
+@router.get("/graph", include_in_schema=False)
+def graph_demo():
+    """Retired (IA.md WS2): the standalone resource_graph 'P0 demo' overlapped
+    the real dependency graph. Redirect to its canonical home. The JSON/JS
+    contract (graph.json / graph.js) stays — the composer + node forms use it."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/planning/dependencies", status_code=301)
 
 
 @router.get("/compose", response_class=HTMLResponse)
@@ -314,7 +312,7 @@ def resource_form(request: Request, node_id: str, service: str = ""):
     node = model.get(node_id)
     is_new = node is None
     node = node or {"service": service.strip(), "provenance": "docs"}
-    return _render(request, "resource_form.html",
+    return _render(request, "resource_form.html", plan_step="model",
                    node_id=node_id, node=node, is_new=is_new,
                    file=sources.get(node_id, ""),
                    node_ids=sorted(model),
