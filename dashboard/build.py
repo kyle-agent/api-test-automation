@@ -894,7 +894,7 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 </style></head><body><div class="wrap">
 
 <div class="crumb"><a href="../index.html">← 대시보드</a> / @@CAT@@ / <b>@@SVC@@</b>
-  <a class="catlink" href="../catalog/catalog.html#@@CAT@@/@@SVC@@" title="이 서비스를 플랫폼 카탈로그에서 열어 자원 선택 → 합성 → plan으로 커버리지 채우기">🗂 카탈로그에서 보기 / 커버리지 채우기 →</a></div>
+  <a class="catlink" href="../catalog/services/@@CAT@@__@@SVC@@.html" title="이 서비스를 플랫폼 카탈로그에서 열어 자원 선택 → 합성 → plan으로 커버리지 채우기">🗂 카탈로그에서 보기 / 커버리지 채우기 →</a></div>
 
 <div class="hero">
   <div class="gauge">
@@ -1456,9 +1456,9 @@ SVCS.forEach(function(s){
 });
 Object.keys(catMeta).forEach(function(c){var m=catMeta[c];m.pct=m.tot?Math.round(m.cov/m.tot*100):0;});
 function catLink(s){
-  // DOWN into this service's platform catalog (자원 선택 → 합성 → plan). The
-  // catalog lands on its drilldown; the #cat/svc anchor names the service.
-  return '<a class="svc-cat-link" href="catalog/catalog.html#'+s.c+'/'+s.n+'"'
+  // DOWN into this service's dedicated platform catalog page (자원 선택 →
+  // 합성 → plan). Slug = <category>__<service>, matching graph_export.
+  return '<a class="svc-cat-link" href="catalog/services/'+s.c+'__'+s.n+'.html"'
     +' title="플랫폼 카탈로그에서 '+s.n+' 자원 선택 → 합성 → plan으로 커버리지 채우기">'
     +'🗂 카탈로그 →</a>';
 }

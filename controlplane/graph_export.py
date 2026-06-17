@@ -191,6 +191,16 @@ def build_catalog(model: dict | None = None) -> dict:
     }
 
 
+def _svc_slug(service: str) -> str:
+    """`networking/loadbalancer` -> `networking__loadbalancer`.
+
+    Same slug the dashboard's ``slug(category, service)`` produces, so the
+    Dashboard per-service drilldown can deep-link straight to the dedicated
+    catalog page.
+    """
+    return service.replace("/", "__")
+
+
 def _split_endpoint(ep: str):
     m, _, p = (ep or "").partition(" ")
     return m.strip().upper(), p.split("?")[0].strip()
@@ -259,7 +269,20 @@ def export(outdir: str | Path, observations_path: str | Path | None = None) -> P
         "window.CATALOG = " + json.dumps(data, ensure_ascii=False) + ";\n",
         encoding="utf-8")
     shutil.copyfile(HERE / "static" / "graph.js", out / "graph.js")
-    (out / "catalog.html").write_text(_CATALOG_HTML, encoding="utf-8")
+
+    # catalog.html is now a clean INDEX of services grouped by category (each a
+    # link to its dedicated page); the per-service browse experience lives in
+    # services/<slug>.html.
+    (out / "catalog.html").write_text(_render_catalog_index(data), encoding="utf-8")
+
+    # one dedicated page per service — only that service's nodes/focus embedded.
+    svc_dir = out / "services"
+    svc_dir.mkdir(parents=True, exist_ok=True)
+    for svc, s in data["services"].items():
+        slug = _svc_slug(svc)
+        (svc_dir / f"{slug}.html").write_text(
+            _render_service_page(svc, s, data), encoding="utf-8")
+
     (out / "plan.html").write_text(_PLAN_HTML, encoding="utf-8")
     (out / "report.html").write_text(_REPORT_HTML, encoding="utf-8")
     (out / "run.html").write_text(_RUN_HTML, encoding="utf-8")
@@ -273,122 +296,179 @@ def export(outdir: str | Path, observations_path: str | Path | None = None) -> P
         encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
     extra = f" · report observed={report['observed']}" if report else ""
-    print(f"wrote {out}/catalog.html + plan.html + report.html — "
+    print(f"wrote {out}/catalog.html (service index) + services/*.html "
+          f"({data['service_count']} pages) + plan.html + report.html — "
           f"{data['node_count']} nodes, {data['validated']} VALIDATED, "
           f"{len(data['groups'])} groups{extra}")
     return out / "catalog.html"
 
 
-_CATALOG_HTML = r"""<!doctype html><html lang="ko"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>자원 카탈로그 (읽기 전용)</title>
-<style>
-:root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#27384b;--ink:#e7eef6;
+# Shared dark tokens / base CSS reused by the index + per-service pages.
+_CAT_CSS = r""":root{--bg:#0f1720;--panel:#16212e;--panel2:#1c2a3a;--line:#27384b;--ink:#e7eef6;
   --muted:#90a4ba;--accent:#5aa9ff;--val:#3fb27f;--docs:#e0922f}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);
   font:14px/1.5 ui-sans-serif,-apple-system,Segoe UI,"Noto Sans KR",sans-serif}
 a{color:var(--accent);text-decoration:none}.wrap{max-width:1280px;margin:0 auto;padding:20px}
 h1{font-size:18px}.muted{color:var(--muted)}code{font-family:ui-monospace,Consolas,monospace}
-.cols{display:grid;grid-template-columns:280px 1fr 300px;gap:16px;align-items:start}
+.cols{display:grid;grid-template-columns:300px 1fr 300px;gap:16px;align-items:start}
 @media(max-width:1050px){.cols{grid-template-columns:1fr}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
 .panel h2{font-size:14px;margin:0 0 10px}.panel h3{font-size:12px;color:var(--muted);
   text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px}
-select,input{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
-  border-radius:8px;padding:6px 9px;font-size:13px;margin-bottom:8px}
-.chk{display:flex;align-items:center;gap:7px;padding:3px 4px;border-radius:6px;cursor:pointer}
-.chk:hover{background:var(--panel2)}.chk input{accent-color:#5aa9ff;flex:0 0 auto;width:auto;margin:0}
-.chk .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
-.scroll{max-height:520px;overflow:auto}.svgbox{background:#0f1720;border:1px solid var(--line);
+.scroll{max-height:560px;overflow:auto}.svgbox{background:#0f1720;border:1px solid var(--line);
   border-radius:10px;overflow:auto}.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;
   color:var(--muted);margin:6px 0}.legend i{display:inline-block;width:11px;height:11px;border-radius:3px}
+.chk{display:flex;align-items:center;gap:7px;padding:3px 4px;border-radius:6px;cursor:pointer}
+.chk:hover{background:var(--panel2)}.chk input{accent-color:#5aa9ff;flex:0 0 auto;width:auto;margin:0}
 .chip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:14px;
   padding:2px 8px;font-size:11.5px;margin:2px}.kv{display:flex;justify-content:space-between;
   padding:3px 0;border-bottom:1px dashed var(--line)}.tbl{width:100%;border-collapse:collapse;font-size:12px}
 .tbl td,.tbl th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line)}
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;
   color:var(--muted);font-size:12.5px;margin-top:10px}.foot{margin-top:30px;color:#6b7e93;font-size:12px}
-.tag{display:inline-block;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:6px;
-  vertical-align:middle}.tag.v{background:#14322a;color:#8ee0b9;border:1px solid #3fb27f}
-.tag.d{background:#33291a;color:#ffd9a0;border:1px solid #e0922f}
 .compose{background:#2a1f3d;border:1px solid #7b5cc4;color:#d9c9ff;border-radius:8px;padding:8px 12px;
-  font-weight:600;font-size:13px;display:inline-block;margin-top:6px}.compose:hover{background:#372a52}
-</style></head><body><div class="wrap">
-<h1><a href="../index.html" style="color:#90a4ba">← 대시보드</a> · 자원 카탈로그
-  <span class="muted" style="font-size:13px">— 읽기 전용 (정적).
-  <a href="plan.html">Plan</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a> · 정의/수정은 control plane.</span></h1>
-<p class="muted" id="sub"></p>
-<div class="cols">
-  <div class="panel">
-    <h2>서비스 선택 <span class="muted" style="font-weight:400;font-size:11px">— 검증 진행 보드</span></h2>
-    <label>카테고리<select id="cat"></select></label>
-    <label>서비스<select id="svc"></select></label>
-    <div id="svcstat"></div>
-    <h3>자원 노드 <span class="muted" style="font-weight:400;text-transform:none">(노드별 검증 표시)</span></h3><div class="scroll" id="list"></div>
-  </div>
-  <div class="panel">
-    <h2 id="gtitle"></h2>
-    <div class="legend"><span><i style="background:var(--val)"></i>VALIDATED</span>
-      <span><i style="background:var(--docs)"></i>docs</span>
-      <span><i style="background:#5aa9ff"></i>초점 ★</span>
-      <span><i style="background:#b48cff"></i>피의존 ↓</span></div>
-    <label class="chk" style="display:inline-flex;margin:4px 0"><input type="checkbox" id="reduce" checked><span>transitive reduction <span class="muted" style="font-size:11px">(끄면 모든 직접 의존 표시)</span></span></label>
-    <div class="svgbox"><svg id="svg"></svg></div>
-    <p class="muted" id="ghint" style="font-size:12px"></p>
-  </div>
-  <div class="panel" id="detail"></div>
-</div>
-<div class="foot">생성: <span id="gen"></span> · composer.focus_view 미리계산. 편집은
-  <code>/planning/resources/&lt;id&gt;</code>(FastAPI).</div>
-</div>
-<script src="catalog.js"></script><script src="graph.js"></script>
-<script>
-var C=window.CATALOG,N=C.nodes,SVC=C.services||{},sel=null;
-document.getElementById("sub").innerHTML=C.node_count+" 노드 · "+C.service_count+" 서비스";
-document.getElementById("gen").textContent=C.generated_from;
-var cats=[...new Set(Object.values(N).map(n=>n.category))].sort();
-var svcOf={};Object.values(N).forEach(n=>{(svcOf[n.category]=svcOf[n.category]||new Set()).add(n.service);});
-function fill(s,arr,v){s.innerHTML=arr.map(x=>'<option '+(x===v?'selected':'')+'>'+x+'</option>').join("");}
-function pickFirst(){sel="vpc" in N?"vpc":Object.keys(N)[0];}
-// dashboard deep-link: #<category>/<service> selects that service (else default)
-function fromHash(){var h=decodeURIComponent((location.hash||"").replace(/^#/,""));if(!h)return false;var id=Object.keys(N).find(k=>N[k].service===h);if(id){sel=id;return true;}return false;}
-if(!fromHash())pickFirst();
-window.addEventListener("hashchange",function(){if(fromHash())refresh();});
+  font-weight:600;font-size:13px;display:inline-block;margin-top:6px}.compose:hover{background:#372a52}"""
+
+
+def _render_catalog_index(data: dict) -> str:
+    """catalog.html — a clean INDEX of services grouped by category.
+
+    Each service is a card linking to its dedicated ``services/<slug>.html``
+    page (with node count). No dropdown, no validation status — just navigation.
+    """
+    services = data.get("services", {})
+    by_cat: dict[str, list] = {}
+    for svc, s in services.items():
+        by_cat.setdefault(s["category"], []).append((svc, s))
+    parts = []
+    for cat in sorted(by_cat):
+        rows = sorted(by_cat[cat], key=lambda x: x[0])
+        tot = sum(s["total"] for _, s in rows)
+        cards = []
+        for svc, s in rows:
+            slug = _svc_slug(svc)
+            name = svc.split("/", 1)[1] if "/" in svc else svc
+            cards.append(
+                f'<a class="svc-card" href="services/{slug}.html">'
+                f'<div class="svc-n">{name}</div>'
+                f'<div class="svc-m">{s["total"]} 자원</div></a>')
+        parts.append(
+            f'<section class="cat"><h2>{cat} '
+            f'<span class="muted" style="font-weight:400;font-size:12px">'
+            f'· {len(rows)} 서비스 · {tot} 자원</span></h2>'
+            f'<div class="svc-grid">{"".join(cards)}</div></section>')
+    body = "".join(parts)
+    return (
+        '<!doctype html><html lang="ko"><head>'
+        '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<title>자원 카탈로그 — 서비스 색인 (읽기 전용)</title><style>'
+        + _CAT_CSS +
+        '.svc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}'
+        '.svc-card{display:block;background:var(--panel);border:1px solid var(--line);'
+        'border-radius:10px;padding:11px 13px}.svc-card:hover{border-color:var(--accent);'
+        'background:var(--panel2)}.svc-n{font-weight:600;color:var(--ink)}'
+        '.svc-m{color:var(--muted);font-size:12px;margin-top:3px}'
+        '.cat{margin:18px 0}.cat h2{font-size:15px;margin:0 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px}'
+        '</style></head><body><div class="wrap">'
+        '<h1><a href="../index.html" style="color:#90a4ba">← 대시보드</a> · 자원 카탈로그'
+        ' <span class="muted" style="font-size:13px">— 서비스 색인 (읽기 전용 / 정적).'
+        ' <a href="plan.html">Plan</a> · <a href="run.html">Run</a> · <a href="report.html">Report</a>'
+        ' · 정의/수정은 control plane.</span></h1>'
+        f'<p class="muted">{data.get("service_count", len(services))} 서비스 · '
+        f'{data.get("node_count", 0)} 자원 노드. 서비스를 골라 자원·의존 그래프를 보고 Plan으로 구성하세요.</p>'
+        f'{body}'
+        '<div class="foot">생성: ' + str(data.get("generated_from", "")) +
+        ' · composer.focus_view 미리계산. 편집은 <code>/planning/resources/&lt;id&gt;</code>(FastAPI).</div>'
+        '</div></body></html>')
+
+
+def _render_service_page(svc: str, s: dict, data: dict) -> str:
+    """One dedicated page per service (no dropdown).
+
+    Embeds ONLY this service's nodes + focus graphs (``window.SVC``) to keep the
+    page light, then reuses the catalog render logic — scoped to one service —
+    plus graph.js for the focused dependency graph.
+    """
+    ids = s["ids"]
+    nodes = {nid: data["nodes"][nid] for nid in ids if nid in data["nodes"]}
+    focus = {nid: data["focus"].get(nid) for nid in ids if nid in data["focus"]}
+    name = svc.split("/", 1)[1] if "/" in svc else svc
+    blob = {"service": svc, "category": s["category"], "name": name,
+            "ids": ids, "nodes": nodes, "focus": focus}
+    payload = json.dumps(blob, ensure_ascii=False)
+    return (
+        '<!doctype html><html lang="ko"><head>'
+        '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        f'<title>{name} · {s["category"]} — 자원 카탈로그</title><style>'
+        + _CAT_CSS +
+        '</style></head><body><div class="wrap">'
+        '<h1><span id="svcname"></span>'
+        ' <span class="muted" style="font-size:13px">— 읽기 전용 (정적).'
+        ' <a href="../catalog.html">← 카탈로그</a> · <a href="../../index.html">← 대시보드</a>'
+        ' · <a href="../plan.html">Plan</a> · <a href="../run.html">Run</a> · <a href="../report.html">Report</a>'
+        ' · 정의/수정은 control plane.</span></h1>'
+        '<div id="svcaction"></div>'
+        '<div class="cols">'
+        '  <div class="panel">'
+        '    <h2>자원 노드 <span class="muted" style="font-weight:400;font-size:11px">(클릭=초점)</span></h2>'
+        '    <div class="scroll" id="list"></div>'
+        '  </div>'
+        '  <div class="panel">'
+        '    <h2 id="gtitle"></h2>'
+        '    <div class="legend"><span><i style="background:#5aa9ff"></i>초점 ★</span>'
+        '      <span><i style="background:#b48cff"></i>피의존 ↓</span>'
+        '      <span><i style="background:var(--panel2)"></i>의존(선행)</span></div>'
+        '    <label class="chk" style="display:inline-flex;margin:4px 0"><input type="checkbox" id="reduce" checked>'
+        '<span>transitive reduction <span class="muted" style="font-size:11px">(끄면 모든 직접 의존 표시)</span></span></label>'
+        '    <div class="svgbox"><svg id="svg"></svg></div>'
+        '    <p class="muted" id="ghint" style="font-size:12px"></p>'
+        '  </div>'
+        '  <div class="panel" id="detail"></div>'
+        '</div>'
+        '<div class="foot">composer.focus_view 미리계산 · 이 서비스의 노드 데이터만 임베드(경량). '
+        '편집은 <code>/planning/resources/&lt;id&gt;</code>(FastAPI).</div>'
+        '</div>'
+        '<script>window.SVC=' + payload + ';</script>'
+        '<script src="../graph.js"></script>'
+        '<script>' + _SERVICE_JS + '</script>'
+        '</body></html>')
+
+
+_SERVICE_JS = r"""
+var S=window.SVC,N=S.nodes,FOCUS=S.focus,IDS=S.ids.slice(),sel=IDS[0];
+document.getElementById("svcname").innerHTML='<code>'+S.service+'</code>';
+document.getElementById("svcaction").innerHTML=
+  '<a class="compose" href="../plan.html?service='+encodeURIComponent(S.service)+'" title="이 서비스 자원으로 Plan 구성">📋 이 서비스로 Plan 구성 →</a>';
 function refresh(){
-  var n=N[sel];fill(document.getElementById("cat"),cats,n.category);
-  fill(document.getElementById("svc"),[...svcOf[n.category]].sort(),n.service);
-  document.getElementById("svcstat").innerHTML=
-    '<a class="compose" href="plan.html?service='+encodeURIComponent(n.service)+'" title="이 서비스 자원으로 Plan 구성">📋 이 서비스로 Plan 구성 →</a>';
-  var ids=Object.keys(N).filter(id=>N[id].service===n.service).sort();
-  document.getElementById("list").innerHTML=ids.map(id=>'<label class="chk"><input type="radio" name="nd" '+(id===sel?"checked":"")+' data-id="'+id+'"><span class="dot" style="background:'+(N[id].provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'"></span><span><b>'+id+'</b> <span class="muted" style="font-size:11px">'+(N[id].requires.and.length+N[id].requires.one_of.length)+"↑ "+N[id].dependents.length+"↓</span></span></label>").join("");
-  document.querySelectorAll('#list input').forEach(r=>r.onchange=function(){sel=r.dataset.id;refresh();});
-  // graph
-  var g=C.focus[sel];
+  var n=N[sel];
+  document.getElementById("list").innerHTML=IDS.map(function(id){var x=N[id];
+    return '<label class="chk"><input type="radio" name="nd" '+(id===sel?"checked":"")+' data-id="'+id+'">'+
+      '<span><b>'+id+'</b> <span class="muted" style="font-size:11px">'+
+      (x.endpoint||"—")+' · '+(x.requires.and.length+x.requires.one_of.length)+"↑ "+x.dependents.length+"↓</span></span></label>";}).join("");
+  document.querySelectorAll('#list input').forEach(function(r){r.onchange=function(){sel=r.dataset.id;refresh();};});
+  var g=FOCUS[sel];
   document.getElementById("gtitle").innerHTML="<code>"+sel+"</code> 의존 관계";
-  document.getElementById("ghint").textContent="왼쪽=의존(선행), 오른쪽=피의존(후행). 노드 클릭=초점 이동.";
+  document.getElementById("ghint").textContent="왼쪽=의존(선행), 오른쪽=피의존(후행). 노드 클릭=초점 이동(이 서비스 내).";
   if(g&&!g.error)ResourceGraph.render(document.getElementById("svg"),g,{reduce:document.getElementById("reduce").checked,onClick:function(id){if(N[id]){sel=id;refresh();}}});
   else document.getElementById("svg").innerHTML='<text x="12" y="24" fill="#ff8585">'+(g&&g.error||"no graph")+'</text>';
-  // detail
-  var req=n.requires,reqHtml=req.and.map(d=>'<span class="chip">'+d.ref+(d.count>1?" ×"+d.count:"")+'</span>').join("")+req.one_of.map(o=>'<span class="chip">🔀 '+o.branches.join(" | ")+'</span>').join("")||'<span class="muted">없음</span>';
-  var depHtml=n.dependents.length?n.dependents.map(d=>'<span class="chip">'+d+'</span>').join(""):'<span class="muted">없음</span>';
-  var optHtml=n.options.length?'<table class="tbl">'+n.options.map(o=>'<tr><td><code>'+o.name+'</code></td><td class="muted">'+o.type+(o.required?" *":"")+'</td></tr>').join("")+'</table>':'<p class="muted">옵션 없음</p>';
+  var req=n.requires,reqHtml=(req.and.map(function(d){return '<span class="chip">'+d.ref+(d.count>1?" ×"+d.count:"")+'</span>';}).join("")+req.one_of.map(function(o){return '<span class="chip">🔀 '+o.branches.join(" | ")+'</span>';}).join(""))||'<span class="muted">없음</span>';
+  var depHtml=n.dependents.length?n.dependents.map(function(d){return '<span class="chip">'+d+'</span>';}).join(""):'<span class="muted">없음</span>';
+  var optHtml=n.options.length?'<table class="tbl">'+n.options.map(function(o){return '<tr><td><code>'+o.name+'</code></td><td class="muted">'+o.type+(o.required?" *":"")+'</td></tr>';}).join("")+'</table>':'<p class="muted">옵션 없음</p>';
   document.getElementById("detail").innerHTML='<h2>'+sel+'</h2>'+
     '<div class="kv"><span>service</span><b>'+n.service+'</b></div>'+
-    '<div class="kv"><span>provenance</span><b style="color:'+(n.provenance==="VALIDATED"?"#3fb27f":"#e0922f")+'">'+n.provenance+'</b></div>'+
+    '<div class="kv"><span>provenance</span><b>'+n.provenance+'</b></div>'+
     '<div class="kv"><span>endpoint</span><b style="font-size:11px">'+(n.endpoint||"—")+'</b></div>'+
     (n.quota?'<div class="kv"><span>quota</span><b>⛔ '+n.quota+'</b></div>':'')+
     '<h3>requires</h3><div>'+reqHtml+'</div>'+
     '<h3>피의존</h3><div>'+depHtml+'</div>'+
     '<h3>options</h3>'+optHtml+
     '<h3>Plan 구성</h3>'+
-    '<a class="compose" href="plan.html?targets='+encodeURIComponent(sel)+'">📋 이 자원으로 Plan 구성 →</a>'+
+    '<a class="compose" href="../plan.html?targets='+encodeURIComponent(sel)+'">📋 이 자원으로 Plan 구성 →</a>'+
     '<div class="note">시나리오는 <b>카탈로그 서비스를 조합</b>해 만듭니다(직접 작성 아님). 이 화면은 읽기 전용 — 정의/수정·실제 실행은 control plane <code>/planning/resources/'+sel+'</code> 에서.</div>';
 }
 document.getElementById("reduce").onchange=refresh;
-document.getElementById("cat").onchange=function(e){var c=e.target.value;var fs=[...svcOf[c]].sort()[0];sel=Object.keys(N).find(id=>N[id].service===fs);refresh();};
-document.getElementById("svc").onchange=function(e){var s=e.target.value;sel=Object.keys(N).find(id=>N[id].service===s);refresh();};
 refresh();
-</script></body></html>"""
+"""
 
 
 _PLAN_HTML = r"""<!doctype html><html lang="ko"><head>
