@@ -259,5 +259,15 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   remains tracked in `docs/COVERAGE-WAVE-PLAN.md` /
   `agents/coordination/ledger.json`.
 
+- **프로세스/하니스 도구 추가 (2026-06-17):** repo 루트에 자동 로드 `CLAUDE.md`
+  (얇은 진입 인덱스 — Hard Rules + Quick Ref + Compact 지침). `.claude/skills/`에
+  user-invocable 스킬 6종(`/adr /brief /freeze /pre-push /retro /token-audit`,
+  AlexZio00 MIT vendored). 기존 하니스에 백포트된 9개: HARNESS.md "Memory discipline",
+  PROMPTS.md subagent STATUS enum(`DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED`)
+  +changed-files, orchestrator.md severity→머지 액션 표 + output-drift 체크,
+  START_HERE.md stale-reference 점검 + 핸드오프 resume-command 규칙,
+  `knowledge/validated-facts.md` conf·seen·obs 메타, `docs/harness-tests.md`
+  안전레일 적대 테스트. 출처/미채택 목록: `.claude/skills/README.md`.
+
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.

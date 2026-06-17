@@ -24,6 +24,7 @@ work-in-progress notes.
 | [`DEPLOY.md`](DEPLOY.md) | Operations runbook: Docker Compose bundle, executor switch, host migration (M4) | **adopted** — awaiting live/docker verification |
 | [`OPS-DASHBOARD.md`](OPS-DASHBOARD.md) | 영구 oplog 버킷 + 정적 ops 뷰어 (의존순서 라이브 자원 트리 · run 필터 · verdict) | active |
 | [`PARALLEL-EXECUTION-PLAN.md`](PARALLEL-EXECUTION-PLAN.md) | Staged foundations + per-VPC lanes — cut wall-clock to max(lane) instead of sum | **draft** (현 구현 A∥B split + shared adopt가 부분 반영; 전면 일반화는 미승인) |
+| [`harness-tests.md`](harness-tests.md) | 적대적 Tier-0 안전레일 거부 테스트 체크리스트 (env 게이트 flip · name-guess 삭제 · `.env` 커밋) | **active** — append-only |
 
 ## Handoffs
 
