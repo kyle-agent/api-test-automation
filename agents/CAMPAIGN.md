@@ -5,6 +5,11 @@
 > The live to-do state is the machine-readable blackboard
 > [`coordination/ledger.json`](coordination/ledger.json).
 
+> **Canonical operating loop & role naming → [`AUTONOMOUS-LOOP.md`](AUTONOMOUS-LOOP.md)**
+> (2026-06-15). Its 4-track concurrency model supersedes any one-unit-at-a-time
+> dispatch implied below; this file remains the campaign's **coverage-goal +
+> service-agent contract** definition.
+
 ## The gap we are closing
 
 `python -m spec.coverage_gap` computes the **static coverage ceiling** — the % of

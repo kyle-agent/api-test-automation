@@ -13,7 +13,10 @@ here — so the work continues identically across sessions.
    safety rails).
 3. [`PROMPTS.md`](PROMPTS.md) — prompt conventions + reusable blocks to paste
    when spawning a subagent.
-4. One file per agent (below). Each follows the **same template**: Role ·
+4. [`AUTONOMOUS-LOOP.md`](AUTONOMOUS-LOOP.md) — **canonical** operating loop (the
+   4-track concurrency model + L0–L3 ladder + STOP 6기준); [`CAMPAIGN.md`](CAMPAIGN.md)
+   — the coverage-campaign goal + service-agent contract.
+5. One file per agent (below). Each follows the **same template**: Role ·
    Objective · Inputs · Process · Outputs · Tools · Guardrails · Done-when.
 
 ## The roster
@@ -29,6 +32,12 @@ here — so the work continues identically across sessions.
 | **AI-Evaluator** | [`ai-evaluator-agent.md`](ai-evaluator-agent.md) | Third-party "can an AI use this API?" judge; feeds conformance's AI-usability lens. |
 | **Dashboard** | [`dashboard-agent.md`](dashboard-agent.md) | Builds/publishes the unified dashboard from the results store. |
 | **Coverage-Validator** | [`validation-agent.md`](validation-agent.md) | Track ② standing loop: validates one service/node-batch at a time, promotes `docs`→`VALIDATED` on a real 2xx (IB-041 evidence, masked-defect-safe); works `docs/VALIDATION-QUEUE.md` low-verification-first. |
+
+> The 8 roster roles above are the **durable** team. `AUTONOMOUS-LOOP.md`
+> additionally spawns **ephemeral sub-agent types** per track (e.g. docs-mapper,
+> lifecycle-composer, live-verifier, drift-detector, product-defect-finder) —
+> these are short-lived `Task` workers, not separate role files; see that doc for
+> the per-track roster.
 
 ## Collaboration flow
 

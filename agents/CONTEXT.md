@@ -104,7 +104,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 ## Current state (keep this updated as work progresses)
 
 - Catalog: extracted, 1,372 endpoints, 0 unresolved.
-- **29 CRUD lifecycles** today (full list + flags in
+- **29 base (hand-written) CRUD lifecycles** (full list + flags in
   `knowledge/scenario-catalog.md`). Light: resourcemanager resource-group, quota/
   support reads, vpc+subnet+port, scr registry+repo, filestorage volume,
   certificatemanager self-sign, queueservice queue, security-group(+rule),

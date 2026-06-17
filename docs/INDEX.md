@@ -35,3 +35,17 @@ work-in-progress notes.
 | [`HANDOFF-fail-new-triage.md`](HANDOFF-fail-new-triage.md) | The 52 fail_new of the 2026-06-10 full heavy run, classified (body-fix vs domain-hunt vs known-red candidates) | **done** — fail_new 0 policy holding since; residual levers carried into `COVERAGE-WAVE-PLAN.md` |
 | [`SESSION-HANDOFF-run6-and-ops.md`](SESSION-HANDOFF-run6-and-ops.md) | 측정 런 #6 재개 절차 + peering 근원수정 + ops 대시보드 인수인계 | **done** — run #6 landed (27329026254), ops viewer live on Pages |
 | [`COVERAGE-WAVE-PLAN.md`](COVERAGE-WAVE-PLAN.md) | 잔여 정적 갭 전수 분석 (write 32 = 전부 waived/disabled) + 다음 웨이브 (DBaaS 윈도우 prep ①, servicewatch ③ done, eventstreams ④ partial) | active — 신규 커버리지 웨이브는 M5 합성 경로(`crud_filter=gen-wave`, RESOURCE-MODEL-PLAN §6)로 진행 |
+
+## Standing / reference docs (auto-registered 2026-06-17 — reconcile status on next touch)
+
+| Doc | Topic | Status |
+|-----|-------|--------|
+| [`SESSION-HANDOFF.md`](SESSION-HANDOFF.md) | 현재 세션 인수인계 스냅샷 (이어받기 절차 + TODO + 시퀀싱) | **active** — 매 세션 갱신 |
+| [`VALIDATION-QUEUE.md`](VALIDATION-QUEUE.md) | coverage-validator의 우선순위 큐 (low-verification-first) | **active** — standing loop |
+| [`IMPROVEMENT-BACKLOG.md`](IMPROVEMENT-BACKLOG.md) | Planner가 유지하는 개선 계획 (IB-### 티켓) | **active** |
+| [`M6-DESIGN.md`](M6-DESIGN.md) | 자율 운영 가능한 플랫폼 M6 설계 | active |
+| [`LIVE-READINESS-GATES.md`](LIVE-READINESS-GATES.md) | disabled-lifecycle 인벤토리 (IB-023) | active |
+| [`PROBE-READS-PLAN.md`](PROBE-READS-PLAN.md) | probe-read 원칙 적용 잔여 지점 | active |
+| [`SERVICE-GAP-REPORTS.md`](SERVICE-GAP-REPORTS.md) | 서비스별 커버리지 갭 리포트 (병렬 분석, 2026-06-13) | reference |
+| [`SECOND-ACCOUNT-BACKLOG.md`](SECOND-ACCOUNT-BACKLOG.md) | 2번째 계정 대기 백로그 (owner 차단) | **blocked** — owner 계정 대기 |
+| [`quotas-and-budgets.md`](quotas-and-budgets.md) | 계정 쿼터 + `core.budgets` 예약/skip 모델 | reference |

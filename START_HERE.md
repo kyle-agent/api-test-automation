@@ -7,12 +7,12 @@
 
 This repository is the **SCP API Regression Test Platform**: it tests the
 **Samsung Cloud Platform (SCP) Open APIs**
-(15 categories / ~60 services / **1,372 endpoints**) along two axes —
+(13 categories / ~60 services / **1,372 endpoints**) along two axes —
 **regression** ("does it work?") and **conformance** ("is it well designed &
 AI-usable?") — and wraps them in a **control plane**
 ([`controlplane/`](controlplane/README.md): dispatch, schedule, live tracking,
 intervention, history/compare, AI seams) plus the **M5 resource-task model**
-([`knowledge/formal/resources/`](knowledge/formal/), 127 nodes) from which
+([`knowledge/formal/resources/`](knowledge/formal/), 275 nodes / 60 service files) from which
 scenarios are *composed* (`regression/scenarios/composer.py`). The engineering
 is done by **a team of AI agents** (this is a *multi-agent* project) whose
 roles, prompts, context and execution harness are documented under

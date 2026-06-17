@@ -2,7 +2,7 @@
 
 Automated testing **platform** for the Samsung Cloud Platform (SCP) Open APIs
 documented at <https://docs.e.samsungsdscloud.com/apireference/>
-(**15 categories / ~60 services / ~1,372 endpoints**).
+(**13 categories / ~60 services / ~1,372 endpoints**).
 
 What started as a catalog-driven test suite is now a full platform with
 **three areas**:
@@ -21,7 +21,7 @@ What started as a catalog-driven test suite is now a full platform with
    entrypoints either way.
 3. **Knowledge & model — [`knowledge/formal/`](knowledge/formal/FORMAT.md)**,
    including the **M5 resource-task model**
-   (`knowledge/formal/resources/*.yaml`, 128 nodes) from which
+   (`knowledge/formal/resources/*.yaml`, 275 nodes / 60 service files) from which
    `regression/scenarios/composer.py` *composes* lifecycles — scenarios are
    increasingly generated from the model rather than hand-written.
 
@@ -70,7 +70,7 @@ environments/ environment profiles (stage/prod × region; credential *references
 tests/        thin pytest entrypoints that drive the regression engines
 agents/       the multi-agent system: roster · shared context · harness · per-agent prompts
 knowledge/    SCP domain knowledge (human-readable, AI-maintained) + formal/ (editable YAML)
-              formal/resources/  ← M5 resource-task model (128 nodes; composer input)
+              formal/resources/  ← M5 resource-task model (275 nodes / 60 files; composer input)
 drafts/       AI/composer outputs awaiting human review (never auto-enabled)
 data/         api_catalog.json · api_bodies.json · api_docs.json · conformance.json
               baselines/known_issues.json · baselines/coverage_waivers.json (per-profile
@@ -200,7 +200,7 @@ opt a run into CRUD; the result + any teardown is posted as a PR comment.
 Hand-written lifecycles are progressively being replaced by **composed** ones:
 `knowledge/formal/resources/*.yaml` defines per-resource tasks (requires graph
 incl. `one_of`/`count`/credential prerequisites, validated body templates,
-options, capture/ready/delete) — **128 nodes** across 12 categories with
+options, capture/ready/delete) — **275 nodes** across 13 categories with
 human-readable codes (`nw-vpc-vpc`, groups in `_groups.yaml`).
 `regression/scenarios/composer.py` compiles a target set into an ordinary
 lifecycle JSON (`gen-<node>` / `bundle-<group>`): dependency closure →

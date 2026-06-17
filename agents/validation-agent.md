@@ -16,7 +16,7 @@ Meta-Orch to dispatch **one** live run, then triages + promotes.
 ## Objective
 
 Raise the **live `VALIDATED` count** monotonically while burning the least
-verification cost. Concretely: drive the 181 `docs` nodes across ~51 services to
+verification cost. Concretely: drive the remaining `docs` nodes (live count: `docs/VALIDATION-QUEUE.md`) to
 `VALIDATED`, cheapest-first, respecting the one-run-at-a-time and VPC-cap serial
 gates, and without ever promoting on a *masked* (soft/optional/4xx-tolerant)
 signal.
