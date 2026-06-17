@@ -26,7 +26,7 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-bg);color:var(--blue)}
 .gauge{display:flex;align-items:center;gap:14px}
 .ring{width:62px;height:62px;border-radius:50%;flex:none;
-  background:conic-gradient(var(--red) calc(0*1%),var(--grey-bg) 0);
+  background:conic-gradient(var(--amber) calc(44*1%),var(--grey-bg) 0);
   display:grid;place-items:center;position:relative}
 .ring::after{content:"";position:absolute;inset:7px;background:var(--surface);border-radius:50%}
 .ring span{position:relative;font-weight:700;font-size:15px}
@@ -140,22 +140,22 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 </style></head><body><div class="wrap">
 
 <div class="crumb"><a href="../index.html">← 대시보드</a> / networking / <b>security-group</b>
-  <a class="catlink" href="../catalog/catalog.html#networking/security-group" title="이 서비스를 플랫폼 카탈로그에서 열어 자원 선택 → 합성 → plan으로 커버리지 채우기">🗂 카탈로그에서 보기 / 커버리지 채우기 →</a></div>
+  <a class="catlink" href="../catalog/services/networking__security-group.html" title="이 서비스를 플랫폼 카탈로그에서 열어 자원 선택 → 합성 → plan으로 커버리지 채우기">🗂 카탈로그에서 보기 / 커버리지 채우기 →</a></div>
 
 <div class="hero">
   <div class="gauge">
-    <div class="ring"><span>0%</span></div>
-    <div class="lbl">검증(2xx) 커버<br><b>0 / 9</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 0</span></div>
+    <div class="ring"><span>44%</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>4 / 9</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 2</span></div>
   </div>
   <h1>security-group <span class="tag">networking</span></h1>
   <div class="split">
-    <div><div class="k">읽기 GET</div><div class="v" style="color:var(--red)">0% <span class="sub">0/4</span></div></div>
-    <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--red)">0% <span class="sub">0/5</span></div></div>
-    <div><div class="k">설계/동작 결함</div><div class="v">0 <span class="sub">개선 · 결함 0</span></div></div>
+    <div><div class="k">읽기 GET</div><div class="v" style="color:var(--green)">75% <span class="sub">3/4</span></div></div>
+    <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--red)">20% <span class="sub">1/5</span></div></div>
+    <div><div class="k">설계/동작 결함</div><div class="v">1 <span class="sub">개선 · 결함 1</span></div></div>
   </div>
 </div>
 
-<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0).</div></div>
+<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 20%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0). 문서/설계 결함 중 가장 흔한 건 <b>error.unstructured(1)</b>.</div></div>
 
 <div class="controls">
   <div class="row1">
@@ -200,11 +200,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-17 13:43 KST · branch <code>—</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-17 13:55 KST · branch <code>—</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/security-group-rules/{security_group_rule_id}", "api": "deletesecuritygrouprule", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "DELETE", "p": "/v1/security-groups/{security_group_id}", "api": "deletesecuritygroup", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-group-rules", "api": "listsecuritygrouprules", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-group-rules/{security_group_rule_id}", "api": "showsecuritygrouprule", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-groups", "api": "listsecuritygroups", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-groups/{security_group_id}", "api": "showsecuritygroup", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/security-group-rules", "api": "createsecuritygrouprule", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/security-groups", "api": "createsecuritygroup", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "PUT", "p": "/v1/security-groups/{security_group_id}", "api": "setsecuritygroup", "c": "n", "s": null, "t": null, "src": "", "d": []}];
+var R=[{"m": "DELETE", "p": "/v1/security-group-rules/{security_group_rule_id}", "api": "deletesecuritygrouprule", "c": "p", "s": 403, "t": 0.2, "src": "", "d": []}, {"m": "DELETE", "p": "/v1/security-groups/{security_group_id}", "api": "deletesecuritygroup", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-group-rules", "api": "listsecuritygrouprules", "c": "y", "s": 200, "t": 0.2, "src": "", "d": [{"label": "error.unstructured", "issue": "", "kind": "static", "detail": "[sample] error.unstructured on networking/security-group/listsecuritygrouprules", "crit": true}]}, {"m": "GET", "p": "/v1/security-group-rules/{security_group_rule_id}", "api": "showsecuritygrouprule", "c": "y", "s": 200, "t": 0.1, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-groups", "api": "listsecuritygroups", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-groups/{security_group_id}", "api": "showsecuritygroup", "c": "y", "s": 200, "t": 0.2, "src": "", "d": []}, {"m": "POST", "p": "/v1/security-group-rules", "api": "createsecuritygrouprule", "c": "y", "s": 200, "t": 0.2, "src": "", "d": []}, {"m": "POST", "p": "/v1/security-groups", "api": "createsecuritygroup", "c": "p", "s": 403, "t": 0.5, "src": "", "d": []}, {"m": "PUT", "p": "/v1/security-groups/{security_group_id}", "api": "setsecuritygroup", "c": "n", "s": null, "t": null, "src": "", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
