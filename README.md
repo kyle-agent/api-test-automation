@@ -102,11 +102,16 @@ pip install -r requirements.txt -r controlplane/requirements.txt
 uvicorn controlplane.app:app --host 0.0.0.0 --port 8800   # run from the repo root
 ```
 
-The UI follows the **Overview → Plan → Run → Report (+ Knowledge)** IA: trigger
-suite × profile runs, watch them live, queue abort/skip commands the engine
-polls at step boundaries, browse/edit suites · profiles · scenarios · knowledge
-(validator-gated saves, local git commits), view the resource inventory, compare
-two runs, and restore any past run's dashboard from its snapshot. See
+The UI follows the **Overview · Plan · Run · Report · Knowledge** IA
+(canonical IA: [`docs/IA.md`](docs/IA.md)): **Plan** is one linear
+`Catalog → Model → Compose → Validate` stepper (Validate runs
+`regression.scenarios.validate`; AI drafts are inline assist in Model/Compose),
+**Report** embeds the canonical static dashboard for coverage/conformance
+alongside run list/compare/triage. Trigger suite × profile runs, watch them live,
+queue abort/skip commands the engine polls at step boundaries, browse/edit
+suites · profiles · scenarios · knowledge (validator-gated saves, local git
+commits), view the resource inventory, compare two runs, and restore any past
+run's dashboard from its snapshot. See
 [`controlplane/README.md`](controlplane/README.md) for env vars and the command
 channel API, and [`docs/DEPLOY.md`](docs/DEPLOY.md) for the Docker Compose
 deployment bundle (M4 server + worker).
@@ -267,9 +272,11 @@ Everything is published to the **`dashboard-data`** branch each run (enable via
   **cleanup-integrity verdict** (testing/leaked/cleanup-failed/deleted),
   paginated S3 listing and KST timestamps (watch a run without GitHub).
 - `/platform/` — a **static export of the whole platform UI**
-  (`python -m controlplane.static_export`): Overview/Plan/Run/Report tabs,
-  knowledge and resource-model pages incl. a read-only page per resource node —
-  ~199 pages, every nav/menu clickable; server-only actions show a banner.
+  (`python -m controlplane.static_export`): the `Overview · Plan · Run · Report ·
+  Knowledge` nav (Plan as the `Catalog → Model → Compose → Validate` stepper),
+  resource-model pages incl. a read-only page per resource node — PAGES aligned to
+  the new IA with the per-file `view/*` fan-out dropped (~289 pages), every
+  nav/menu clickable; server-only actions show a banner.
 - Per-run **snapshots** (results JSONL + built dashboard + meta) are archived to
   the oplog bucket under `runs/<run_id>/snapshot/` and restorable from the
   control plane's Report screen.

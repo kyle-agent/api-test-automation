@@ -501,15 +501,32 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 controlplane UI는 owner 목업에 따라 **Overview → Plan → Run → Report
 (+ Knowledge)** IA로 재설계됐고(설계 시스템·ctxbar·report 탭), 같은 화면들이
 `controlplane/static_export.py`로 Pages `/platform/`에 정적 export된다
-(노드별 read-only 폼 포함 **~199페이지**, 모든 메뉴 클릭 가능 — 액션 버튼은
-"서버 전용" 배너). Plan 화면은 **모델→시나리오→스위트 흐름 스트립** +
-시나리오 카탈로그의 합성(gen) 필터 칩으로 재구성됐다. 라이브 관제는
-`dashboard/ops.html`이 제공: 모델에서 파생한 의존순서 자원 트리
-(`dashboard/gen_dep_map.py`), run 종료 시 **정리 무결성 verdict**
-(테스트중/잔존/정리실패/삭제), in-flight 전용 run pill + 히스토리 행 선택,
-S3 listing pagination(1000-key 캡 해소), `oplog-test-*` 개발 prefix 필터,
-전 시각 KST 표기(대시보드 헤더 `dashboard/build.py` 포함) —
-`docs/OPS-DASHBOARD.md`.
+(노드별 read-only 폼 포함, 모든 메뉴 클릭 가능 — 액션 버튼은 "서버 전용" 배너).
+라이브 관제는 `dashboard/ops.html`이 제공: 모델에서 파생한 의존순서 자원 트리,
+run 종료 시 **정리 무결성 verdict** (테스트중/잔존/정리실패/삭제), in-flight 전용
+run pill + 히스토리 행 선택, S3 listing pagination(1000-key 캡 해소),
+`oplog-test-*` 개발 prefix 필터, 전 시각 KST 표기(대시보드 헤더
+`dashboard/build.py` 포함) — `docs/OPS-DASHBOARD.md`.
+
+### IA reorg (2026-06-17) — 정식 IA는 `docs/IA.md`
+플랫폼 IA를 정리해 surface 중복을 제거했다. 정보 구조의 단일 소스는
+**[`docs/IA.md`](IA.md)** 이며, 위 비고의 화면 설명 중 아래는 이 reorg로 갱신됐다:
+
+- **두 런타임**: 정적 대시보드(Pages) = 정식 **Results + Ops**, 라이브
+  control plane = 인터랙티브 **Plan + Run + 저작**.
+- **상단 네비**는 `Overview · Plan · Run · Report · Knowledge`. 장식용 환경/스위트
+  헤더 셀렉트는 제거(ctxbar는 발행 스냅샷 상태만). `/ai/*`는 top-nav가 아니라
+  Plan 인라인 어시스트. bare `/runs` 리디렉트 제거(Report가 정식, `/runs/{id}`
+  상세 유지).
+- **Plan**은 단일 선형 스테퍼 **① Catalog → ② Model → ③ Compose → ④ Validate**
+  (`/planning?step=…` + `/planning/validate`). Catalog 커버리지는 대시보드로
+  링크(재렌더 없음), standalone resource-graph "demo"는 `/planning/dependencies`로
+  은퇴, 중복 `/planning/knowledge` 301→`/knowledge`. **Validate는 신규 패널**
+  (`python -m regression.scenarios.validate`).
+- **Report**는 정식 대시보드를 임베드(탭 summary/dashboard/runs/triage); 옛
+  coverage/conformance/trends 재렌더 탭 제거.
+- **Ops** `ops.html` DEP map은 빌드 생성(수동 paste 폐지),
+  static_export PAGES는 새 IA에 정렬하고 per-file `view/*` fan-out을 제거.
 
 ---
 

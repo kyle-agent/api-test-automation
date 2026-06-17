@@ -59,13 +59,13 @@ Five overlapping stores today (`history.jsonl`, `verified_endpoints.json`, `endp
 
 ## Execution workstreams (commit per WS, offline-test gated)
 
-| WS | Scope |
-|----|-------|
-| **WS1** | Results canonicalization — platform Report embeds dashboard; remove `build.py` legacy readers + stop publishing `smoke_status.tsv` |
-| **WS2** | Plan linear flow — Catalog→Model→Compose→**Validate**; retire `resource_graph` demo + dup knowledge route; demote `/ai/*` to inline assist |
-| **WS3** | Ops — generate `DEP` map at build time (retire `gen_dep_map.py` manual paste) |
-| **WS4** | Shell/legacy — `base.html` CSS unify + nav update; remove `/runs` redirect + composer stubs; `static_export` PAGES align + view-fan-out drop |
-| **WS5** | Docs — this file + `controlplane/README.md`, `docs/OPS-DASHBOARD.md`, `docs/PLATFORM-PLAN.md` nav/IA sections; register in `docs/INDEX.md` |
+| WS | Status | Scope |
+|----|--------|-------|
+| **WS1** | ✅ done | Results canonicalization — platform Report embeds dashboard; remove `build.py` legacy readers + stop publishing `smoke_status.tsv` |
+| **WS2** | ✅ done | Plan linear flow — Catalog→Model→Compose→**Validate**; retire `resource_graph` demo + dup knowledge route; demote `/ai/*` to inline assist |
+| **WS3** | ✅ done | Ops — generate `DEP` map at build time (retire `gen_dep_map.py` manual paste) |
+| **WS4** | ✅ done | Shell/legacy — `base.html` CSS unify + nav update; remove `/runs` redirect + composer stubs; `static_export` PAGES align + view-fan-out drop |
+| **WS5** | 🔄 in progress | Docs — this file + `controlplane/README.md`, `docs/OPS-DASHBOARD.md`, `docs/PLATFORM-PLAN.md` nav/IA sections; register in `docs/INDEX.md` |
 
 **Verify each WS** (offline, no network/creds):
 `PYTHONPATH=. python3 controlplane/tests_offline.py` · `…/tests_ai_offline.py` ·

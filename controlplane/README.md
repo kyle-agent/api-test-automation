@@ -11,6 +11,21 @@ plane입니다 (docs/PLATFORM-PLAN.md M1~M4). 실행기는
 run 레코드/스케줄/UI는 두 모드에서 동일합니다. Docker Compose 배포 번들
 (server + worker + 공유 repo 볼륨)과 운영 runbook은 `docs/DEPLOY.md` 참고.
 
+## IA — 두 런타임 (2026-06-17 reorg)
+
+정보 구조(IA)의 단일 소스는 **`docs/IA.md`** 입니다. 두 런타임으로 깔끔히
+분리됩니다:
+
+- **정적 대시보드** (GitHub Pages) — 정식 **Results + Ops**. `dashboard/build.py`가
+  커버리지 래더·conformance를 한 번만 렌더하고, `ops.html`이 라이브 ops를 보여줌.
+- **라이브 control plane** (이 서버) — 인터랙티브 **Plan + Run + 저작/개입**.
+
+상단 네비게이션은 **`Overview · Plan · Run · Report · Knowledge`** 입니다. 헤더의
+장식용 환경/스위트 선택 셀렉트는 제거됐고(ctxbar는 발행 스냅샷 상태만 표시),
+`/ai/*`는 top-nav 섹션이 아니라 Plan(Model/Compose) 안의 **인라인 어시스트**입니다.
+정식 Report가 표준이라 bare `/runs` 리디렉트는 **제거**됐습니다(`/runs/{id}` 상세는
+유지).
+
 ## 기능
 
 | 영역 | 내용 |
@@ -20,15 +35,18 @@ run 레코드/스케줄/UI는 두 모드에서 동일합니다. Docker Compose �
 | 라이브 추적 | `core/oplog.py`의 `APITEST_PLATFORM_URL` 미러를 `/api/ingest/events`로 수신 → run 상태/마일스톤 타임라인 |
 | Run 히스토리 | DB 기록 + oplog 버킷 `index.json` 아카이브 병합 |
 | 스냅샷 복원 | `runs/<id>/snapshot/`(core/snapshot.py)을 프록시해 **과거 run의 대시보드를 그대로 다시 열기** |
+| Plan 스테퍼 | `/planning?step=…` 단일 선형 흐름 **① Catalog → ② Model → ③ Compose → ④ Validate**. Catalog의 커버리지 수치는 정식 대시보드로 **링크**(재렌더 없음), Model에 의존 그래프(`/planning/dependencies`)가 접혀 들어감, AI 초안은 Model/Compose 인라인 어시스트 |
+| Validate 패널 | `/planning/validate` — **신규 패널**: `python -m regression.scenarios.validate`를 가드된 서브프로세스로 실행해 clean/오류 표시 (이전엔 UI 없던 단계) |
+| Report (대시보드 임베드) | `/reporting?tab=…` — `summary` / `dashboard`(정식 커버리지·conformance 대시보드 **임베드**) / `runs`(목록·아카이브) / `triage`. 옛 coverage/conformance/trends 재렌더 탭은 제거 |
 | AI triage (B1) | run 종료 후 baseline 외 신규 fail을 Claude가 environment / spec_change / test_bug / real_regression으로 분류 + 조치 제안 |
 | 알림 (B2) | triage 요약을 webhook으로 push |
-| 개입 명령 (M2) | run 상세 페이지에서 run abort / 시나리오 skip / 폴링 강제 종료 명령을 쌓으면 **엔진이 step 경계마다 폴링**해 수행 (아래 명령 채널 API) |
+| 개입 명령 (M2) | run 상세 페이지(`/runs/{id}`)에서 run abort / 시나리오 skip / 폴링 강제 종료 명령을 쌓으면 **엔진이 step 경계마다 폴링**해 수행 (아래 명령 채널 API) |
 | 리소스 인벤토리 (M2) | `/testing/resources` — ingest된 resource 이벤트를 res_id별로 접어 live/gone 상태 표시, run 필터 |
 | 단일 리소스 삭제 (M2) | live 행의 삭제 버튼 — `cleanup/reconciler.py`의 `_delete` + kind별 DELETE 매핑 재사용, `SCP_ALLOW_DESTRUCTIVE=true` 필수, 시도는 `platform-delete` resource 이벤트로 기록 |
 | Run 비교 (M2) | `/reporting/compare?a=&b=` — 두 run의 스냅샷 observations를 endpoint_key+method로 조인해 새로 깨짐/고쳐짐/계속 실패/분류 변화 diff |
 | multi-tenancy 기반 (M2) | runs/schedules에 `tenant` 컬럼 (§6 확정 4 — UI 선택자는 M3) |
-| 저작 편집기 (M3) | Planning의 스위트·환경 프로파일·시나리오(lifecycle)·knowledge 파일을 `/planning/edit`에서 raw 편집 — 검증만(htmx 인라인 오류) / 검증+저장. 아래 "편집 모델" 참고 |
-| 의존 그래프 뷰 (M3) | `/planning/dependencies` — `dependencies.json`의 vpc_schedule(공유 adopt VPC vs 직렬 vpc-crud, lanes, quota)과 `knowledge/formal/cross-service.yaml`의 requires 그래프를 서버 렌더 SVG/박스로 시각화 (read-only, 편집은 원본 파일 편집기 링크) |
+| 저작 편집기 (M3) | Plan의 스위트·환경 프로파일·시나리오(lifecycle)·knowledge 파일을 `/planning/edit`에서 raw 편집 — 검증만(htmx 인라인 오류) / 검증+저장. 아래 "편집 모델" 참고 |
+| 의존 그래프 뷰 (M3) | `/planning/dependencies` (Plan→Model에 접혀 듦) — `dependencies.json`의 vpc_schedule(공유 adopt VPC vs 직렬 vpc-crud, lanes, quota)과 `knowledge/formal/cross-service.yaml`의 requires 그래프를 서버 렌더 SVG/박스로 시각화. 옛 standalone resource-graph "demo"는 이 뷰로 대체 (read-only, 편집은 원본 파일 편집기 링크) |
 | 할당량 시뮬레이션 (M3) | scenario/dependencies 파일 저장 시 vpc_schedule이 함의하는 peak 동시 VPC(공유 adopt 1 + 직렬 vpc-crud 최악)를 계산, `core/budgets.py` 한도 초과면 **경고** (차단하지 않음) |
 
 ## 편집 모델 (M3 — §3.1 개발 기간 반영 방식)
