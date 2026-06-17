@@ -1,0 +1,107 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>data-analytics__quick-query.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/data-analytics__quick-query.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/data-analytics__quick-query.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: data-analytics/quick-query (interactive SQL / Trino on SKE)
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /analytics/quick_query/overview/ + data/api_docs.json
+#   (apireference .../quick-query/...). Ingested 2026-06-14 (Lane B), provenance: docs.
+
+version: 1
+service: data-analytics/quick-query
+
+constraints:
+  - id: list-requires-size-and-page
+    rule: &quot;GET /v1/quick-query (getquickquerylist) marks BOTH `size` AND `page` query params required:true (api_docs). A bare `GET /v1/quick-query` therefore returns 400 Bad Request — this is the documented cause of the smoke 400s. Always send ?size=20&amp;page=0. Other filters (sort default created_dt:desc, cluster_name, created_by, quick_query_state enum, version, quick_query_name) are optional.&quot;
+    provenance: docs
+  - id: list-envelope-id-field
+    rule: &quot;The list response is {contents:[{quick_query_id, quick_query_name, quick_query_state, cluster_id, ...}], page, size, sort, total_count}. The id field on each item is `quick_query_id`, NOT `id` — capture from $.contents[0].quick_query_id, not $.contents[0].id.&quot;
+    provenance: docs
+  - id: name-pattern
+    rule: &quot;quick_query_name pattern ^[a-z][a-z0-9\\-]*[a-z0-9]$ (lowercase start, len &gt;=3); kubernetes_engine_name follows the SKE cluster-name pattern ^[a-z][a-z0-9...]$. Use a &#x27;regrqq{ualpha}&#x27; style token.&quot;
+    provenance: docs
+  - id: create-is-ske-engine-triple
+    rule: &quot;POST /v1/quick-query (QuickQueryTotalCreateRequest) is an SKE-engine install, NOT a DBaaS instance_groups create. Required top-level fields: kubernetes_engine_create_request (REQUIRED), node_pool_create_requests[] (REQUIRED), quick_query_create_request (REQUIRED); tags optional. Returns 202 AsyncResponse. kubernetes_engine_create_request REQUIRES vpc_id, subnet_id, security_group_id_list, volume_id, k8s_version, kubernetes_engine_name. node_pool_create_requests[] REQUIRES image_os, image_os_version, keypair_name, server_type_id, volume_size, volume_type_name. quick_query_create_request REQUIRES domain, dsc_domain, image_id, is_engine_type_private, max_query (^(32|64|96|128)$), quick_query_name, version, query_engine_spec.&quot;
+    provenance: docs
+  - id: max-query-enum
+    rule: &quot;quick_query_create_request.max_query is a string constrained to ^(32|64|96|128)$ (concurrent query slots).&quot;
+    provenance: docs
+  - id: prerequisites
+    rule: &quot;Userguide prerequisites: VPC (network), Security Group (firewall), File Storage (shared volume across query clients). The k8s engine create consumes vpc_id + subnet_id + security_group_id_list + volume_id (the File Storage volume_id).&quot;
+    provenance: docs
+  - id: dsc-domain-needs-real-value
+    rule: &quot;quick_query_create_request.domain and dsc_domain (each len 3-50, REQUIRED) are real Data Security Center (DSC) domain values — they cannot be synthesized, so a true create is owner/IB-blocked. The 5 in-place PUT setters .../domain and .../dsc-domain have the same dependency.&quot;
+    provenance: docs
+  - id: regional-availability
+    rule: &quot;Service available in kr-west1 and kr-east1; NOT available in kr-south1/2/3 (userguide). Trino-based parallel distributed engine on standard Kubernetes.&quot;
+    provenance: docs
+
+captures:
+  quick-query: $.contents[0].quick_query_id   # from GET /v1/quick-query?size=&amp;page= (list adopt; id field is quick_query_id)
+  image-version: $.contents[0].image_id       # from GET /v1/quick-query/image-versions
+  query-engine-detail: $.cluster_id           # GET /v1/quick-query/{id} -&gt; QuickQueryDetailResponse.cluster_id
+
+states: {}   # detail carries quick_query_state enum (ACTIVE/CREATING/RUNNING/ERROR/.../DELETED); poll values undocumented (R3)
+
+quirks:
+  - id: smoke-400-is-bare-list
+    note: &quot;The recorded &#x27;smoke 400s&#x27; (INGESTION.md) are the bare GET /v1/quick-query missing the required size+page query params — same class as ske-image (run 27483895557). GET /v1/quick-query/image-versions has NO params (api_docs parameters:[]) so it is a safe bare smoke; check-duplication takes a PATH name (no query); GET /v1/quick-query/{id} needs a real id.&quot;
+    provenance: docs
+  - id: create-coverage-only
+    note: &quot;billable (installs an SKE cluster + node pool + Trino). The source guarded lifecycle (quick-query-lifecycle-guarded) is COVERAGE-ONLY: it adopts an existing id via the list and never provisions. Real create blocked on real DSC domain values + an undocumented query_engine_spec shape (DOMAIN-HUNT).&quot;
+    provenance: docs
+  - id: validate-resources-is-dry-run
+    note: &quot;POST /v1/quick-query/validate-resources (QuickQueryValidateResourceRequest: node_pool_validation_request[] + quick_query_engine_request, both REQUIRED; cluster_id optional) is a non-destructive preflight that checks whether resources can be created/modified — cheap probe that creates no resource.&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/data-analytics__quick-query.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

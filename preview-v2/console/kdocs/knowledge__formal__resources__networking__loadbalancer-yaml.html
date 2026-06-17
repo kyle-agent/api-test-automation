@@ -1,0 +1,349 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>networking__loadbalancer.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/networking__loadbalancer.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/networking__loadbalancer.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — networking/loadbalancer (nw-lb group, the LB chain).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from heavy-shared-networking
+# (enabled, live-validated bodies/captures) + networking-loadbalancer-members-nat.
+#
+# requires here follow what each VALIDATED body actually consumes (subnet_id +
+# vpc_id fields), which diverges from cross-service.yaml&#x27;s coarser edges for
+# lb-health-check ([], region-scoped) and lb-server-group ([load-balancer]) —
+# the validator reports those as reconcile-during-R3 warnings by design.
+#
+# docs-mapper enrichment (2026-06-15, networking subtree UP). Sources cited:
+#   - https://docs.e.samsungsdscloud.com/userguide/networking/load_balancer/overview/
+#   - https://docs.e.samsungsdscloud.com/userguide/networking/load_balancer/how_to_guides/
+# Userguide-derived constraints below are UNPROVEN (notes only — no body/requires
+# /capture shape changed). Quotas per REGION (overview): load-balancer 50,
+# listener 1000, lb-server-group 1000, members 1000 total, lb-health-check 500,
+# service subnets per VPC 3.
+version: 1
+resources:
+  lb-health-check:
+    code: &quot;nw-lb-health-check&quot;
+    service: networking/loadbalancer
+    # DESIGN NOTE (owner 2026-06-15): health-check is a STANDALONE top-level
+    # resource (POST /v1/lb-health-checks, body keyed on vpc/subnet only — no
+    # load_balancer_id), NOT a child of load-balancer. The LB link is INDIRECT:
+    # lb-server-group requires this health-check, and a listener binds the
+    # server-group to the LB. So `subnet` as the direct dependency is correct
+    # (cf. lb-member/lb-static-nat which ARE children — their paths carry
+    # {server_group_id}/{loadbalancer_id}; health-check&#x27;s does not). AI-usability
+    # quirk: conceptually feels LB-owned, but the API models it independently.
+    requires: [vpc, subnet]
+    create:
+      endpoint: &quot;POST /v1/lb-health-checks&quot;
+      body:
+        lb_health_check:
+          name: &quot;regrhc{ualpha}&quot;
+          description: &quot;API regression suite&quot;
+          protocol: TCP
+          health_check_count: 3
+          health_check_interval: 5
+          health_check_port: 80
+          health_check_timeout: 5
+          subnet_id: &quot;{subnet.subnet_id}&quot;
+          vpc_id: &quot;{vpc.vpc_id}&quot;
+          tags: []
+    capture: {lb_health_check_id: &quot;$.lb_health_check.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/lb-health-checks/{lb_health_check_id}&quot;,
+         expect_status: [200]}
+      # LbHealthCheckSetRequest {lb_health_check REQ LbHealthCheckSet — 전부
+      # optional 필드} (api_docs verbatim) — 동일 값 set = no-op (wave5 setter
+      # 커버: setlbhealthcheck).
+      - {name: set, endpoint: &quot;PUT /v1/lb-health-checks/{lb_health_check_id}&quot;,
+         json: {lb_health_check: {description: &quot;API regression suite (set)&quot;,
+                                  health_check_count: 3,
+                                  health_check_interval: 5,
+                                  health_check_timeout: 5}},
+         expect_status: [200, 202]}
+    delete: {endpoint: &quot;DELETE /v1/lb-health-checks/{lb_health_check_id}&quot;,
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking,
+             steps: [lb-healthcheck-create, lb-healthcheck-delete]}
+    notes: &quot;region 스코프 재사용 자원 — 참조할 server group보다 먼저 생성 (run 27306490231 LbHealthCheckNotFoundError 교훈)&quot;
+
+  load-balancer:
+    code: &quot;nw-lb-lb&quot;
+    service: networking/loadbalancer
+    heavy: true
+    requires: [vpc, subnet]
+    create:
+      endpoint: &quot;POST /v1/loadbalancers&quot;
+      body:
+        loadbalancer:
+          name: &quot;regrlb{ualpha}&quot;
+          description: &quot;API regression suite&quot;
+          layer_type: L4
+          firewall_enabled: false
+          firewall_logging_enabled: false
+          publicip_id: &quot;&quot;
+          service_ip: &quot;{opt.service_ip}&quot;
+          source_nat_ip: &quot;&quot;
+          subnet_id: &quot;{subnet.subnet_id}&quot;
+          vpc_id: &quot;{vpc.vpc_id}&quot;
+          tags: []
+      options:
+        service_ip: {type: string, required: true, default: &quot;10.124.0.100&quot;,
+                     note: &quot;서비스 subnet cidr 내부의 빈 IP — 기본값은 공유 subnet(10.124.0.0/24, engine._SHARED_SUBNET_CIDR) 재호밍 규칙을 따른다 (구 기본 10.140.6.100은 소스 lifecycle의 자체 subnet에 묶인 값이었음; 수작업 members-nat의 10.124.0.30과 충돌 회피로 .100 선택). adopt 없이 자가 생성 subnet(10.160.8.0/24)으로 합성 시 override 필요. subnet에서 4개 IP 소비(service+SNAT+HC 2), SNAT/HC IP는 생성 후 불변&quot;}
+    capture: {loadbalancer_id: &quot;$.loadbalancer.id&quot;}
+    ready: {field: &quot;$.loadbalancer.state&quot;,
+            until: [ACTIVE, CREATED, RUNNING, AVAILABLE], timeout: 600, interval: 20}
+    verify:
+      - {name: read-static-nats,
+         endpoint: &quot;GET /v1/loadbalancers/{loadbalancer_id}/static-nats&quot;,
+         expect_status: [200]}
+      - {name: read-private-static-nats,
+         endpoint: &quot;GET /v1/loadbalancers/{loadbalancer_id}/private-static-nats&quot;,
+         expect_status: [200]}
+      # LoadbalancerUpdateRequest {loadbalancer REQ {description REQ}}
+      # (api_docs verbatim — description이 유일한 수정 필드; wave5 setter 커버:
+      # setloadbalancer).
+      - {name: set, endpoint: &quot;PUT /v1/loadbalancers/{loadbalancer_id}&quot;,
+         json: {loadbalancer: {description: &quot;API regression suite (set)&quot;}},
+         expect_status: [200, 202]}
+    delete: {endpoint: &quot;DELETE /v1/loadbalancers/{loadbalancer_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking, steps: [lb-create, lb-wait, lb-delete]}
+
+  lb-server-group:
+    code: &quot;nw-lb-server-group&quot;
+    service: networking/loadbalancer
+    requires: [vpc, subnet, lb-health-check]
+    create:
+      endpoint: &quot;POST /v1/lb-server-groups&quot;
+      body:
+        lb_server_group:
+          name: &quot;regrsg{ualpha}&quot;
+          description: &quot;API regression suite&quot;
+          lb_health_check_id: &quot;{lb-health-check.lb_health_check_id}&quot;
+          lb_method: ROUND_ROBIN
+          protocol: TCP
+          subnet_id: &quot;{subnet.subnet_id}&quot;
+          vpc_id: &quot;{vpc.vpc_id}&quot;
+          tags: []
+    capture: {lb_server_group_id: &quot;$.lb_server_group.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/lb-server-groups/{lb_server_group_id}&quot;,
+         expect_status: [200]}
+      - {name: read-members,
+         endpoint: &quot;GET /v1/lb-server-groups/{lb_server_group_id}/members&quot;,
+         expect_status: [200]}
+      # LbServerGroupSetRequest {lb_server_group REQ {description/
+      # lb_health_check_id/lb_method 전부 optional}} (api_docs verbatim) —
+      # 동일 값 set = no-op (wave5 setter 커버: setlbservergroup).
+      - {name: set, endpoint: &quot;PUT /v1/lb-server-groups/{lb_server_group_id}&quot;,
+         json: {lb_server_group: {description: &quot;API regression suite (set)&quot;,
+                                  lb_method: ROUND_ROBIN}},
+         expect_status: [200, 202]}
+    delete: {endpoint: &quot;DELETE /v1/lb-server-groups/{lb_server_group_id}&quot;,
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking,
+             steps: [lb-servergroup-create, lb-servergroup-delete]}
+
+  lb-listener:
+    code: &quot;nw-lb-listener&quot;
+    service: networking/loadbalancer
+    requires: [load-balancer, lb-server-group]
+    create:
+      endpoint: &quot;POST /v1/lb-listeners&quot;
+      body:
+        listener:
+          name: &quot;regrls{ualpha}&quot;
+          description: &quot;API regression suite&quot;
+          loadbalancer_id: &quot;{load-balancer.loadbalancer_id}&quot;
+          protocol: TCP
+          routing_action: LB_SERVER_GROUP
+          server_group_id: &quot;{lb-server-group.lb_server_group_id}&quot;
+          service_port: &quot;80&quot;
+          session_duration_time: 120
+          support_http2: false
+          tags: []
+    capture: {listener_id: &quot;$.listener.id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/lb-listeners/{listener_id}&quot;,
+         expect_status: [200]}
+      # LbListenerSetRequestV1Dot3 {listener REQ ListenerForSetV1Dot3 — 전부
+      # optional 필드} (api_docs verbatim): 생성값과 동일한 최소 set = no-op.
+      # heavy-shared-networking의 setlblistener는 빈 문자열 다발로 UNPROVEN —
+      # 여기는 타입에 맞는 필드만 보낸다 (wave5 setter 커버: setlblistener).
+      - {name: set, endpoint: &quot;PUT /v1/lb-listeners/{listener_id}&quot;,
+         json: {listener: {description: &quot;API regression suite (set)&quot;,
+                           session_duration_time: 120}},
+         expect_status: [200, 202]}
+    delete: {endpoint: &quot;DELETE /v1/lb-listeners/{listener_id}&quot;, destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: heavy-shared-networking,
+             steps: [lb-listener-create, lb-listener-delete]}
+
+  lb-member:
+    code: &quot;nw-lb-member&quot;
+    service: networking/loadbalancer
+    requires: [lb-server-group]
+    create:
+      endpoint: &quot;POST /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members&quot;
+      # MemberListCreateRequestV1Dot1 {members REQ [MemberCreateRequestV1Dot1
+      # {member_ip REQ, member_port REQ, name REQ, object_type REQ,
+      # member_state/member_weight/object_id opt}]} (api_docs verbatim).
+      # member_ip는 subnet 내 임의 IP 직접 입력 가능 — 실 VM 불필요 (수작업
+      # members-nat _note 검증 사항: &quot;no backend VM required&quot;).
+      body:
+        members:
+          - name: regrmember1
+            member_ip: &quot;{opt.member_ip}&quot;
+            member_port: 80
+            member_state: ENABLE
+            member_weight: 100
+            object_id: &quot;&quot;
+            object_type: VM
+      options:
+        member_ip: {type: string, required: true, default: &quot;10.124.0.101&quot;,
+                    note: &quot;LB와 같은 VPC의 VS/BM 서버 IP 또는 직접 입력 IP (직접 입력이 테스트 최저비용 — VM 불필요). 기본값은 공유 subnet(10.124.0.0/24) 재호밍 규칙 (수작업 members-nat의 10.124.0.31과 충돌 회피로 .101). 자가 생성 subnet 합성 시 override 필요&quot;}
+    capture: {member_id: &quot;$.members[0].id&quot;}
+    verify:
+      - {name: show,
+         endpoint: &quot;GET /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members/{member_id}&quot;,
+         expect_status: [200]}
+      # MemberSetRequest {member REQ {member_port/member_state/member_weight
+      # 전부 optional}} (api_docs verbatim) — 동일 값 set = no-op (wave5 setter
+      # 커버: setlbservergroupmember).
+      - {name: set,
+         endpoint: &quot;PUT /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members/{member_id}&quot;,
+         json: {member: {member_port: 80, member_state: ENABLE,
+                         member_weight: 100}},
+         expect_status: [200, 202]}
+    delete: {endpoint: &quot;DELETE /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members/{member_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-loadbalancer-members-nat,
+             steps: [members-add, members-set, members-remove-single]}
+    notes: &quot;capture는 소스에서 capture_soft($.members[0].id, envelope UNPROVEN) — docs 유지. delete = removelbservergroupmember(단건); bulk 삭제는 lb-member-bulk 노드가 커버.
+      userguide(load_balancer/overview, UNPROVEN): member의 object_type은
+      VM(Virtual Server)/BM(Bare Metal, 동일 VPC) 또는 직접 입력 IP 중 선택 —
+      직접 입력 IP는 백엔드 서버 불필요 (수작업 _note &#x27;no backend VM required&#x27;와
+      일치). member_state는 활성/비활성 수정 가능(Healthy/Unhealthy는 HC가
+      판정하는 관측 상태이지 입력 필드 아님). member_port/member_weight 범위는
+      userguide에 수치 미명시 (UNPROVEN). 리전당 member 총합 1000 cap.&quot;
+
+  # 두 번째 member — 같은 add API로 생성하되 teardown이 BULK 삭제
+  # (DELETE .../members + member_id_list body = removelbservergroupmembers)를
+  # 커버한다. lb-member와 ip/이름만 다르다.
+  lb-member-bulk:
+    code: &quot;nw-lb-member-bulk&quot;
+    service: networking/loadbalancer
+    requires: [lb-server-group]
+    create:
+      endpoint: &quot;POST /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members&quot;
+      body:
+        members:
+          - name: regrmember2
+            member_ip: &quot;{opt.member_ip}&quot;
+            member_port: 80
+            member_state: ENABLE
+            member_weight: 100
+            object_id: &quot;&quot;
+            object_type: VM
+      options:
+        member_ip: {type: string, required: true, default: &quot;10.124.0.102&quot;,
+                    note: &quot;lb-member와 동일 규칙 — 공유 subnet 재호밍, .102로 분리 (동일 ip:port 중복 등록 회피)&quot;}
+    capture: {member_bulk_id: &quot;$.members[0].id&quot;}
+    # MemberDeleteBulkRequestV1Dot2 {member_id_list REQ [string]} (api_docs
+    # verbatim) — bulk 삭제가 이 노드의 teardown.
+    delete: {endpoint: &quot;DELETE /v1/lb-server-groups/{lb-server-group.lb_server_group_id}/members&quot;,
+             json: {member_id_list: [&quot;{member_bulk_id}&quot;]},
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-loadbalancer-members-nat,
+             steps: [members-add, members-remove-bulk]}
+    notes: &quot;removelbservergroupmembers(벌크) 커버 전용 노드 — capture envelope $.members[0].id UNPROVEN(docs)&quot;
+
+  # public static-NAT — PF-13 교훈: LB에 Public NAT IP를 붙이려면 그 VPC에
+  # IGW가 있어야 한다 (수작업 members-nat _note: &quot;attaching a Public NAT IP
+  # requires an IGW on the VPC&quot; — IGW 없는 VPC에서 4xx). internet-gateway를
+  # requires로 배선해 closure에 강제 포함시킨다.
+  lb-static-nat:
+    code: &quot;nw-lb-static-nat&quot;
+    service: networking/loadbalancer
+    requires: [load-balancer, public-ip, internet-gateway]
+    create:
+      endpoint: &quot;POST /v1/loadbalancers/{load-balancer.loadbalancer_id}/static-nats&quot;
+      # StaticNatCreateRequest {static_nat REQ {publicip_id REQ}} (api_docs
+      # verbatim) — 수작업 members-nat은 빈 publicip_id로 4xx-tolerant였고,
+      # 실 public-ip 주입은 이 모델이 처음 제공.
+      body: {static_nat: {publicip_id: &quot;{public-ip.publicip_id}&quot;}}
+    capture: {static_nat_id: &quot;$.static_nat.id&quot;}
+    verify:
+      - {name: read,
+         endpoint: &quot;GET /v1/loadbalancers/{load-balancer.loadbalancer_id}/static-nats&quot;,
+         expect_status: [200]}
+    # deleteloadbalancerpublicnatip: DELETE .../static-nats (path param만 문서화;
+    # 수작업 members-nat은 static_nat_id_list body를 보냈다 — 그 형식 승계).
+    delete: {endpoint: &quot;DELETE /v1/loadbalancers/{load-balancer.loadbalancer_id}/static-nats&quot;,
+             json: {static_nat_id_list: [&quot;{static_nat_id}&quot;]},
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: networking-loadbalancer-members-nat,
+             steps: [static-nat-create, static-nat-delete]}
+    notes: &quot;createloadbalancerpublicnatip/deleteloadbalancerpublicnatip 커버. capture envelope $.static_nat.id는 api_docs response_example 기반 UNPROVEN. private-static-nats(createloadbalancerprivatenatip)는 private_nat_id + private_nat_ip_id가 필요 — private-nat IP 하위자원 모델이 없어 미배선 (owner 질문: private NAT IP 발급 경로).
+      userguide(load_balancer/how_to_guides, UNPROVEN)가 IGW precondition을
+      문서로 확증: Public NAT IP는 &#x27;선택한 VPC에 Internet Gateway가 연결된 경우&#x27;
+      에만 구성 가능 — PF-13 lifecycle 교훈(IGW 없는 VPC에서 4xx)과 일치하므로
+      requires에 internet-gateway 유지가 옳다. publicip_id는 기존 Public IP
+      목록에서 선택(또는 신규 생성). Private NAT IP는 생성 후 수정 가능(modifiable
+      post-create).&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/networking__loadbalancer.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

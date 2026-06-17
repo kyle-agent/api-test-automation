@@ -1,0 +1,120 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>networking__dns.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/networking__dns.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/networking__dns.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: networking/dns
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/dns/overview/ + /how_to_guides/ +
+#         /how_to_guides/private_dns/ (fetched 2026-06-11)
+
+version: 1
+service: networking/dns
+
+constraints:
+  - id: private-dns-quota-3
+    rule: &quot;account cap: max 3 private-dns (error scp-network.private-dns.max-count-exceed)&quot;
+    provenance: VALIDATED
+  - id: private-dns-docs-quota-1
+    rule: &quot;userguide (overview 제약 사항 + private_dns guide, 2026-06-11) says max 1 Private DNS per account — conflicts with our VALIDATED cap of 3 (error fired at 3). Docs-vs-live discrepancy; do NOT lower the validated number, but expect the console to advertise 1&quot;
+    provenance: docs
+  - id: private-dns-name-rules
+    rule: &quot;Private DNS name: 3-20 chars, lowercase letters + digits + hyphen(-); must be unique across ALL of Samsung Cloud Platform (중복 체크 제공) — a 409/400 on create may simply mean the name is taken platform-wide, not just in our account&quot;
+    provenance: docs
+  - id: private-dns-vpc-connect-max-5
+    rule: &quot;max 5 VPCs can be connected to one Private DNS (per region selection; VPC 연결 is optional at create — newly created/activated Private DNS starts with NO VPC connected)&quot;
+    provenance: docs
+  - id: hosted-zone-quota-20-per-account
+    rule: &quot;account cap: max 20 Hosted Zones per account (userguide 제약 사항)&quot;
+    provenance: docs
+  - id: record-quota-100-per-hosted-zone
+    rule: &quot;max 100 records per Hosted Zone (userguide 제약 사항)&quot;
+    provenance: docs
+  - id: public-dns-restricted-kr-south
+    rule: &quot;Public Domain Name and Public Hosted Zone requests are NOT available in kr-south regions (한국 남부 리전 사용 신청 제한, userguide) — region-gate public-zone scenarios&quot;
+    provenance: docs
+  - id: private-dns-slow-provisioning
+    rule: &quot;private-dns CREATE and DELETE are VERY slow (observed: a heavy run stalled for hours waiting on creation, 2026-06-10). Scenarios must isolate it — own VPC/lane, kick the create off as EARLY as possible and the delete as LATE as possible, generous poll timeouts, and never let other lifecycles serialize behind it&quot;
+    provenance: VALIDATED
+
+captures:
+  private-dns: $.private_dns.id
+  hosted-zone: $.id
+  hosted-zone-record: $.id
+
+states:
+  private-dns: {field: $.private_dns.state, ready: [ACTIVE]}
+
+quirks:
+  - id: hosted-zone-needs-activate
+    note: &quot;SUPERSEDED understanding (kept for history): the hosted-zone chain does NOT need an activate sub-flow when the private-dns is freshly CREATED in the run region — activate is only for re-using the account-global name in ANOTHER region (see private-dns-account-global). The chain create-private-dns -&gt; poll Active -&gt; connect VPC -&gt; hosted zone -&gt; A record -&gt; reverse teardown is now encoded in networking-dns-hosted-zone-private (lifecycles/networking__dns.json, 2026-06-11, pending live validation); the old networking-dns-hosted-zone stays disabled&quot;
+    provenance: docs
+  - id: private-dns-account-global
+    note: &quot;the Private DNS NAME is account-global across ALL regions: first create in any one region, then in every other region you ACTIVATE the same name from the Private DNS list (not create) — this is the documented root of the activate sub-flow; Hosted Zone data is shared across regions, but some detail fields (SRN/creator/modifier) are only visible in the region of first creation&quot;
+    provenance: docs
+  - id: private-dns-console-states
+    note: &quot;console state machine: Creating -&gt; Activing -&gt; Active; also Inactive, Editing, Deleting, Error (userguide private_dns guide) — poll for Active before any hosted-zone/VPC-connect call; the validated 400 invalid-state on setters fired while still CREATING&quot;
+    provenance: docs
+  - id: private-dns-delete-blocked-by-hosted-zone
+    note: &quot;Private DNS cannot be terminated while any Hosted Zone is attached (해지 불가) — delete hosted zones (and their records) first; expect 4xx/409 otherwise&quot;
+    provenance: docs
+  - id: record-types
+    note: &quot;supported record types: A, AAAA, TXT, CNAME, MX, SPF (user-settable); NS and SOA are auto-generated per zone — do not attempt to create NS/SOA records&quot;
+    provenance: docs
+  - id: hosted-zone-bare-envelope-ids
+    note: &quot;createhostedzone AND createhostedzonerecord responses are BARE envelopes — the id is $.id (NOT $.hosted_zone.id / $.record.id; API reference response examples, data/api_docs.json). The legacy heavy-shared-networking dns group still captures $.hosted_zone.id and is expected to capture-miss; the new networking-dns-hosted-zone-private captures $.id. createprivatedns DOES wrap: $.private_dns.id, state at $.private_dns.state (CREATING in the create response)&quot;
+    provenance: docs
+  - id: public-domain-via-whois
+    note: &quot;Public Domain Name purchase goes through the external registrar (Whois), bought in 1-year units with auto-renew configurable until 7 days before expiry — billable + external dependency, keep out of automated CRUD (coverage-only)&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/networking__dns.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

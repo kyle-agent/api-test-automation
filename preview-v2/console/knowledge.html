@@ -1,29 +1,37 @@
 <!doctype html><html lang="ko"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SCP 콘솔 — Knowledge</title>
+<title>SCP API Regression Platform · Knowledge</title>
 <link rel="stylesheet" href="assets/style.css">
-<script src="data/model.js"></script><script src="data/context.js"></script>
+<script src="data/context.js"></script><script src="data/kindex.js"></script>
 <style>
 .ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
   border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
 .ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
-.ctxbar .snap{background:#33291a;border:1px solid #e0922f;color:#ffd9a0}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
 .kcards{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 18px}
 .kcards .s{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 14px}
 .kcards .s b{font-size:20px;display:block}.kcards .s span{font-size:11px;color:var(--muted)}
-.src{display:grid;grid-template-columns:200px 1fr;gap:8px 14px;margin:8px 0}
-.src code{color:var(--accent2)} .src .d{color:var(--muted);font-size:13px}
-.glist{display:flex;flex-wrap:wrap;gap:6px}
-.glist .g{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-size:12px}
-.glist .g b{color:var(--ink)} .glist .g span{color:var(--muted);font-size:11px;margin-left:5px}
+.kgroup{margin:10px 0 20px}
+.kgroup h3{margin:0 0 8px;font-size:15px}
+.kgroup h3 code{color:var(--accent2)}
+.kgroup h3 .n{color:var(--muted);font-size:12px;font-weight:400;margin-left:6px}
+.flist{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:7px}
+.flist a{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 11px;
+  text-decoration:none;color:var(--ink);font-size:13px}
+.flist a:hover{border-color:var(--accent)}
+.flist a .fn{font-family:ui-monospace,Menlo,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:10px;font-weight:600;border-radius:11px;padding:1px 7px;flex:none}
+.tag.md{background:#e7f6ed;border:1px solid #a9dcbf;color:#15924f}
+.tag.yaml{background:#f1e9fb;border:1px solid #d9c4f2;color:#7a45c2}
+.tag.json{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
 </style>
 </head><body><div class="wrap">
 <header class="top">
-  <h1>SCP 콘솔 · Knowledge</h1>
-  <span class="crumbs">정의·참조 레이어 — catalog 자원 모델의 근거 데이터</span>
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">플랫폼 지식 뷰어 — .md 렌더 + 정본 YAML</span>
   <nav class="nav">
     <a href="../index.html">📊 대시보드</a><a href="console.html">🧩 콘솔(Catalog·Plan·Run·Report)</a>
-    <a href="references.html">참고</a>
   </nav>
 </header>
 
@@ -31,26 +39,16 @@
 
 <div class="panel">
   <h2>Knowledge — 정의·제약·검증사실</h2>
-  <p class="muted small">Plan의 상류(정의 레이어). 자원 모델·의존·옵션이 무엇에 근거하는지를 모읍니다.
-    읽기 전용 — 정의/수정은 control plane <code>/planning/...</code>.</p>
+  <p class="muted small">플랫폼의 실제 지식 파일을 그대로 봅니다. <code>.md</code>는 HTML로 렌더, <code>.yaml/.json</code>은 원문(raw)으로.
+    각 항목은 자체 완결 페이지(<code>kdocs/</code>)로 링크됩니다. 읽기 전용.</p>
   <div class="kcards" id="cards"></div>
-
-  <h3>지식 소스</h3>
-  <div class="src">
-    <code>knowledge/validated-facts.md</code><div class="d">런타임 검증된 SCP API 사실 (conf·seen·obs 메타) — 모델 requires/options의 근거</div>
-    <code>knowledge/formal/resources/*.yaml</code><div class="d">M5 자원-task 모델 (catalog의 정본) — 노드·의존·생성옵션·verify</div>
-    <code>knowledge/domain-model.md · resource-dependencies.md</code><div class="d">도메인 제약 (네이밍·쿼터·상태머신·의존 규칙)</div>
-    <code>suites/ · environments/</code><div class="d">실행 단위(스위트) × 환경 프로파일 정의</div>
-  </div>
-
-  <h3>그룹 인덱스 <span class="muted small" id="gcount"></span></h3>
-  <div class="glist" id="groups"></div>
+  <div id="groups"></div>
 </div>
 
-<div class="foot">데이터=실제 모델(<code>knowledge/formal/resources</code>). 상세 사실은 repo의 knowledge/ 및 control plane에서.</div>
+<div class="foot">인덱스=<code>data/kindex.js</code>, 페이지=<code>kdocs/</code> (생성: <code>poc/scenario-viz/build_knowledge.py</code>).</div>
 </div>
 <script>
-const M=window.MODEL||{nodes:{},groups:{}},N=M.nodes,CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+const KINDEX=window.KINDEX||[],CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
 function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
 // context bar (same shape as console)
 const live=(CTX.mode||"").toUpperCase()==="LIVE";
@@ -58,17 +56,24 @@ document.getElementById("ctxbar").innerHTML=
   `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
   `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
   `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
-// summary cards
-const vals=Object.values(N), val=vals.filter(n=>n.provenance==="VALIDATED").length;
-const svcs=new Set(vals.map(n=>n.service)).size;
+// summary cards (counts)
+const byKind={};KINDEX.forEach(it=>{byKind[it.kind]=(byKind[it.kind]||0)+1;});
+const order=[];KINDEX.forEach(it=>{if(!order.includes(it.group))order.push(it.group);});
 document.getElementById("cards").innerHTML=
-  [[vals.length,"자원 노드"],[val,"VALIDATED"],[Object.keys(M.groups||{}).length,"그룹"],[svcs,"서비스"]]
+  [[KINDEX.length,"파일"],[byKind.md||0,"markdown"],[byKind.yaml||0,"yaml"],
+   [byKind.json||0,"json"],[order.length,"그룹"]]
   .map(c=>`<div class="s"><b>${c[0]}</b><span>${c[1]}</span></div>`).join("");
-// group index
-const groups=M.groups||{};
-const byG={};vals.forEach(n=>{(byG[n.group]=byG[n.group]||0);byG[n.group]++;});
-document.getElementById("gcount").textContent=`(${Object.keys(groups).length})`;
-document.getElementById("groups").innerHTML=Object.keys(groups).sort().map(g=>
-  `<span class="g"><b>${esc((groups[g]||{}).label||g)}</b><span>${byG[g]||0}</span></span>`).join("");
+// grouped file list (preserve build order)
+const groups=document.getElementById("groups");
+order.forEach(grp=>{
+  const items=KINDEX.filter(it=>it.group===grp);
+  const sec=document.createElement("div");sec.className="kgroup";
+  sec.innerHTML=`<h3><code>${esc(grp)}</code><span class="n">${items.length}</span></h3>`+
+    `<div class="flist">`+items.map(it=>
+      `<a href="kdocs/${esc(it.slug)}.html"><span class="fn" title="${esc(it.path)}">${esc(it.title)}</span>`+
+      `<span class="tag ${esc(it.kind)}">${esc(it.kind)}</span></a>`).join("")+`</div>`;
+  groups.appendChild(sec);
+});
+if(!KINDEX.length){groups.innerHTML='<p class="muted">kindex.js가 비어 있습니다. <code>python3 poc/scenario-viz/build_knowledge.py</code> 를 실행하세요.</p>';}
 </script>
 </body></html>

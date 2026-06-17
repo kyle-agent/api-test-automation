@@ -1,8 +1,9 @@
 :root{
-  --bg:#0f1720; --panel:#16212e; --panel2:#1c2a3a; --line:#27384b;
-  --ink:#e7eef6; --muted:#90a4ba; --muted2:#6b7e93;
-  --val:#3fb27f; --docs:#e0922f; --accent:#5aa9ff; --accent2:#b48cff;
-  --heavy:#ff6b6b; --shared:#ffd166;
+  --bg:#fbfcfd; --panel:#fff; --panel2:#f5f7f9; --line:#e4e7eb;
+  --ink:#1d2530; --muted:#6b7480; --muted2:#9aa3ad;
+  --val:#15924f; --docs:#b5740b; --accent:#2563c9; --accent2:#7a45c2;
+  --heavy:#c63434; --shared:#b5740b;
+  --surface2:#eef1f4;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);
@@ -63,13 +64,13 @@ svg text{fill:var(--ink)}
 .tbl th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase}
 .pill{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:20px;
   border:1px solid var(--line);color:var(--muted)}
-.pill.create{color:#7fd9aa;border-color:#2f5e49}
-.pill.verify{color:#9ec5ff;border-color:#2c4a73}
-.pill.delete{color:#ff9b9b;border-color:#6e3030}
-.pill.ready{color:#ffd98a;border-color:#6e5a2a}
-.pill.q{color:#ffb3b3;border-color:#6e3030}
-.pill.heavy{color:#ff9b9b}
-.btn{background:var(--accent);color:#06121f;border:none;border-radius:8px;
+.pill.create{color:#15924f;border-color:#a9dcbf;background:#e7f6ed}
+.pill.verify{color:#2563c9;border-color:#b9d2f5;background:#e8f0fd}
+.pill.delete{color:#c63434;border-color:#f0bcbc;background:#fbe9e9}
+.pill.ready{color:#b5740b;border-color:#ecd09a;background:#fdf3e2}
+.pill.q{color:#c63434;border-color:#f0bcbc;background:#fbe9e9}
+.pill.heavy{color:#c63434}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;
   padding:7px 12px;font-weight:600;cursor:pointer;font-size:13px}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .btn:hover{filter:brightness(1.08)}
@@ -81,7 +82,7 @@ svg text{fill:var(--ink)}
 .note{background:var(--panel2);border-left:3px solid var(--accent);border-radius:6px;
   padding:9px 12px;color:var(--muted);font-size:12.5px;margin:10px 0}
 .bar{height:22px;border-radius:5px;display:flex;align-items:center;padding:0 8px;
-  font-size:11px;color:#06121f;font-weight:600;white-space:nowrap;overflow:hidden}
+  font-size:11px;color:#fff;font-weight:600;white-space:nowrap;overflow:hidden}
 .barrow{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;margin:4px 0}
 .barrow .lab{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}

@@ -1,6 +1,6 @@
 <!doctype html><html lang="ko"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SCP 콘솔 — Catalog·Plan·Run·Report</title>
+<title>SCP API Regression Platform — Catalog·Plan·Run·Report</title>
 <link rel="stylesheet" href="assets/style.css">
 <script src="data/model.js"></script>
 <script src="data/results.js"></script>
@@ -26,8 +26,8 @@
 .chiprow{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0}
 .chip{background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:2px 8px;font-size:11.5px;
   display:inline-flex;align-items:center;gap:5px}
-.chip b{font-weight:600}.chip .x{cursor:pointer;color:#ff8585}
-.lvlband{fill:#10314d22}
+.chip b{font-weight:600}.chip .x{cursor:pointer;color:#c63434}
+.lvlband{fill:#2563c911}
 /* ---- global context bar (same on every tab) ---- */
 .ctxbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--panel);
   border:1px solid var(--line);border-radius:10px;padding:7px 12px;margin:0 0 14px;font-size:12.5px;color:var(--muted)}
@@ -35,8 +35,8 @@
 .ctxbar .seg b{color:var(--ink);font-weight:600}
 .ctxbar .badge{margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.4px;
   border-radius:12px;padding:2px 10px;border:1px solid}
-.ctxbar .badge.snap{color:#ffd166;border-color:#7a6321;background:#3a2c1240}
-.ctxbar .badge.live{color:#3fb27f;border-color:#235945;background:#14322a60}
+.ctxbar .badge.snap{color:#b5740b;border-color:#ecd09a;background:#fdf3e2}
+.ctxbar .badge.live{color:#15924f;border-color:#a9dcbf;background:#e7f6ed}
 .ctxbar .gloss{cursor:help;border:1px solid var(--line);border-radius:50%;width:18px;height:18px;
   line-height:16px;text-align:center;color:var(--muted);font-weight:700}
 /* disabled (read-only / control-plane only) buttons */
@@ -44,15 +44,14 @@
 .reglist .ri{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 6px;
   border-radius:7px;cursor:pointer;border-bottom:1px dashed var(--line)}
 .reglist .ri:hover{background:var(--panel2)}
-.reglist .ri .pct{font-weight:700;color:#ff8585}
+.reglist .ri .pct{font-weight:700;color:#c63434}
 </style>
 </head><body><div class="wrap">
 <header class="top">
-  <h1>SCP 콘솔</h1>
+  <h1>SCP API Regression Platform</h1>
   <span class="crumbs">/platform — Catalog → Plan → Run → Report (같은 그래프, 오버레이만 교체)</span>
   <nav class="nav">
     <a href="../index.html">📊 대시보드</a><a href="knowledge.html">📚 Knowledge</a>
-    <a href="references.html">참고</a>
   </nav>
 </header>
 
@@ -84,7 +83,7 @@
 </div>
 
 <div class="foot">데이터=실제 모델 + 샘플 결과(SNAPSHOT). 편집/실행 상태는 데모(저장 안 됨, 쓰기는 control plane 전용).
-  같은 <code>viz.js</code> 그래프를 5개 탭이 공유 — 노드 좌표 고정, <code>colorOf/strokeOf/badgeOf</code> 오버레이만 교체.</div>
+  같은 <code>viz.js</code> 그래프를 4개 탭이 공유 — 노드 좌표 고정, <code>colorOf/strokeOf/badgeOf</code> 오버레이만 교체.</div>
 </div>
 <script>
 const V=VIZ,N=V.N,NS="http://www.w3.org/2000/svg";
@@ -100,17 +99,17 @@ let selNode=V.exists("vpc")?"vpc":V.allIds()[0];
 // ---- C3 health color for a node, from its service's results ----
 function svcRes(id){return PS[N[id].service]||null;}
 function healthFill(id){const r=svcRes(id);
-  if(!r)return"#1b2533";                       // no data — neutral
-  if(r.fail>0)return"#3a1717";                 // regression present — red base
-  if(r.c3_pct>=TH.high)return"#14322a";        // green
-  if(r.c3_pct>=TH.mid)return"#3a3112";         // amber
-  return"#3a1717";}                            // low — red
+  if(!r)return"#f5f7f9";                        // no data — neutral
+  if(r.fail>0)return"#fbe9e9";                  // regression present — red base
+  if(r.c3_pct>=TH.high)return"#e7f6ed";         // green
+  if(r.c3_pct>=TH.mid)return"#fdf3e2";          // amber
+  return"#fbe9e9";}                             // low — red
 function healthStroke(id){const r=svcRes(id);
-  if(!r)return"#3a4654";
-  if(r.fail>0)return"#ff6b6b";
-  if(r.c3_pct>=TH.high)return"#3fb27f";
-  if(r.c3_pct>=TH.mid)return"#e0b24a";
-  return"#ff6b6b";}
+  if(!r)return"#9aa3ad";
+  if(r.fail>0)return"#c63434";
+  if(r.c3_pct>=TH.high)return"#15924f";
+  if(r.c3_pct>=TH.mid)return"#b5740b";
+  return"#c63434";}
 function healthBadge(id){const r=svcRes(id);if(!r)return"";
   return r.fail>0?"●":r.c3_pct>=TH.high?"✓":r.c3_pct>=TH.mid?"◐":"✕";}
 
@@ -120,22 +119,22 @@ function renderG(set,opt){
   const L=V.layout(set,opt.choices,{colGap:opt.colGap||190,rowGap:54,bw:160,bh:42});
   const svg=document.getElementById("svg");
   svg.setAttribute("viewBox",`0 0 ${L.w} ${L.h}`);svg.setAttribute("width",L.w);svg.setAttribute("height",L.h);
-  let s=`<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="#5b7088"/></marker></defs>`;
+  let s=`<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="#9aa3ad"/></marker></defs>`;
   (opt.bands||[]).forEach(b=>{s+=`<rect class="lvlband" x="${b.x}" y="0" width="${b.w}" height="${L.h}"/>
-    <text x="${b.x+6}" y="14" font-size="10" fill="#5b7088">${b.label}</text>`;});
+    <text x="${b.x+6}" y="14" font-size="10" fill="#9aa3ad">${b.label}</text>`;});
   L.edges.forEach(e=>{const a=L.byId[e.from],b=L.byId[e.to];
     const x1=a.x+a.w,y1=a.y+a.h/2,x2=b.x,y2=b.y+b.h/2;
-    s+=`<path d="M${x1},${y1} C${x1+46},${y1} ${x2-46},${y2} ${x2},${y2}" fill="none" stroke="#4b5e72" stroke-width="1.3" marker-end="url(#ar)"/>`;});
+    s+=`<path d="M${x1},${y1} C${x1+46},${y1} ${x2-46},${y2} ${x2},${y2}" fill="none" stroke="#9aa3ad" stroke-width="1.3" marker-end="url(#ar)"/>`;});
   L.nodes.forEach(p=>{const n=N[p.id];
-    const fill=(opt.colorOf&&opt.colorOf(p.id))||"#1c2a3a";
+    const fill=(opt.colorOf&&opt.colorOf(p.id))||"#fff";
     const stroke=(opt.strokeOf&&opt.strokeOf(p.id))||V.provColor(n.provenance);
     const sw=(opt.targets&&opt.targets.has(p.id))?2.6:1.5;
     const badge=opt.badgeOf?opt.badgeOf(p.id):"";
     s+=`<g style="cursor:${opt.onClick?'pointer':'default'}" data-id="${p.id}">
       <title>${p.id} — ${n.service}\nprovenance ${n.provenance}${n.options.length?"\noptions: "+n.options.map(o=>o.name).join(", "):""}</title>
       <rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
-      <text x="${p.x+9}" y="${p.y+17}" font-size="12" font-weight="600" fill="#e7eef6">${n.heavy?"🜂 ":""}${p.id}</text>
-      <text x="${p.x+9}" y="${p.y+32}" font-size="10" fill="#90a4ba">${n.service.split("/").pop()}${n.quota?" ⛔"+n.quota:""}</text>
+      <text x="${p.x+9}" y="${p.y+17}" font-size="12" font-weight="600" fill="#1d2530">${n.heavy?"🜂 ":""}${p.id}</text>
+      <text x="${p.x+9}" y="${p.y+32}" font-size="10" fill="#6b7480">${n.service.split("/").pop()}${n.quota?" ⛔"+n.quota:""}</text>
       ${badge?`<text x="${p.x+p.w-8}" y="${p.y+16}" font-size="12" text-anchor="end">${badge}</text>`:""}
     </g>`;});
   svg.innerHTML=s;
@@ -185,11 +184,11 @@ function knowledge(){
   const deps=V.dependents(selNode);
   const set=new Set([...up,...deps]);
   document.getElementById("gtitle").innerHTML=`<code>${selNode}</code> 정의·의존 <span class="muted small">· ↑${up.size-1} 의존 · ↓${deps.length} 피의존</span>`;
-  document.getElementById("legend").innerHTML=leg([["#11314f","이 노드"],["#1c2a3a","의존(선행)"],["#241a33","피의존(후행)"]])+'<span>★ 선택 · ↓ 이걸 필요로 함</span>';
+  document.getElementById("legend").innerHTML=leg([["#e8f0fd","이 노드"],["#f5f7f9","의존(선행)"],["#f1e9fb","피의존(후행)"]])+'<span>★ 선택 · ↓ 이걸 필요로 함</span>';
   document.getElementById("ghint").textContent="정의 그래프: 왼쪽=선행 의존, 오른쪽=이 자원을 필요로 하는 것. 노드 클릭=초점 이동. (같은 viz.js 그래프)";
   renderG(set,{targets:new Set([selNode]),
-    colorOf:id=>id===selNode?"#11314f":deps.includes(id)&&!up.has(id)?"#241a33":"#1c2a3a",
-    strokeOf:id=>id===selNode?"#5aa9ff":deps.includes(id)&&!up.has(id)?"#b48cff":V.provColor(N[id].provenance),
+    colorOf:id=>id===selNode?"#e8f0fd":deps.includes(id)&&!up.has(id)?"#f1e9fb":"#f5f7f9",
+    strokeOf:id=>id===selNode?"#2563c9":deps.includes(id)&&!up.has(id)?"#7a45c2":V.provColor(N[id].provenance),
     badgeOf:id=>id===selNode?"★":(deps.includes(id)&&!up.has(id)?"↓":""),
     onClick:id=>{selNode=id;knowledge();}});
   document.getElementById("left").innerHTML=catTree();
@@ -204,7 +203,7 @@ function knowledge(){
   const reqAnd=(n.and||[]).map(d=>`<span class="chip"><b>${d.ref}</b>${d.count>1?" ×"+d.count:""}</span>`).join("")||'<span class="muted small">없음</span>';
   const oneof=(n.one_of||[]).map(g=>`<span class="chip">🔀 ${g.branches.join(" | ")}</span>`).join("");
   const creds=(n.creds||[]).map(c=>`<span class="chip">🔑 ${c}</span>`).join("")||'<span class="muted small">없음</span>';
-  const depList=deps.length?deps.map(d=>`<span class="chip" style="border-color:#3a2c55"><b>${d}</b></span>`).join(""):'<span class="muted small">없음</span>';
+  const depList=deps.length?deps.map(d=>`<span class="chip" style="border-color:#d9c4f2"><b>${d}</b></span>`).join(""):'<span class="muted small">없음</span>';
   const optRows=(n.options||[]).map(o=>`<tr><td><code>${o.name}</code></td><td class="muted">${o.type}${o.required?" *":""}</td><td class="muted small">${o.values?esc(JSON.stringify(o.values)):(o.ref_target||"")}</td></tr>`).join("")
     ||'<tr><td colspan="3" class="muted small">옵션 없음</td></tr>';
   const r=svcRes(selNode);
@@ -244,7 +243,7 @@ function overview(){
   const set=overviewSet();
   const sm=RES.summary||{};
   document.getElementById("gtitle").innerHTML=`전체 건강도 오버레이 <span class="muted small">· ${set.size} 노드 / 색 = 서비스 C3</span>`;
-  document.getElementById("legend").innerHTML=leg([["#14322a","C3 높음"],["#3a3112","C3 중간"],["#3a1717","낮음/회귀"],["#1b2533","데이터 없음"]])+'<span>● 회귀 · ✓ green · ◐ amber</span>';
+  document.getElementById("legend").innerHTML=leg([["#e7f6ed","C3 높음"],["#fdf3e2","C3 중간"],["#fbe9e9","낮음/회귀"],["#f5f7f9","데이터 없음"]])+'<span>● 회귀 · ✓ green · ◐ amber</span>';
   document.getElementById("ghint").textContent="같은 그래프 — 노드 색은 그 서비스의 C3 건강도(RESULTS.perService). 회귀 노드 클릭 → Report로. 우측 회귀 목록 클릭 = 해당 서비스로 포커스.";
   renderG(set,{
     colorOf:id=>id===null?"":healthFill(id),
@@ -255,12 +254,12 @@ function overview(){
   document.getElementById("left").innerHTML=`<h2>전체 KPI <span class="muted small">(RESULTS.summary)</span></h2>
     <div class="kpi">
       <div class="s"><b>${sm.total||0}</b><span>관측(엔드포인트)</span></div>
-      <div class="s"><b style="color:#3fb27f">${sm.c3_pct||0}%</b><span>C3 (cov_op)</span></div>
+      <div class="s"><b style="color:#15924f">${sm.c3_pct||0}%</b><span>C3 (cov_op)</span></div>
       <div class="s"><b>${sm.service_count||0}</b><span>서비스</span></div></div>
     <div class="kpi" style="margin-top:8px">
-      <div class="s"><b style="color:#3fb27f">${sm.ok||0}</b><span>ok</span></div>
-      <div class="s"><b style="color:#e0b24a">${sm.soft||0}</b><span>soft</span></div>
-      <div class="s"><b style="color:#ff8585">${sm.fail||0}</b><span>fail</span></div></div>
+      <div class="s"><b style="color:#15924f">${sm.ok||0}</b><span>ok</span></div>
+      <div class="s"><b style="color:#b5740b">${sm.soft||0}</b><span>soft</span></div>
+      <div class="s"><b style="color:#c63434">${sm.fail||0}</b><span>fail</span></div></div>
     <div class="note small" style="margin-top:10px">색 = 서비스의 <b>C3 cov_op</b> 성공률. red = 회귀(fail&gt;0) 또는 낮은 커버리지. 카드 더미 대신 그래프 오버레이.</div>
     ${ovFocus?`<p class="small" style="margin-top:8px">포커스: <code>${esc(ovFocus)}</code> <button class="btn ghost" id="clrFocus">전체로</button></p>`:""}`;
   if(document.getElementById("clrFocus"))document.getElementById("clrFocus").onclick=()=>{ovFocus=null;overview();};
@@ -286,13 +285,13 @@ function overview(){
 function planTab(){
   const p=V.plan([...targets],choices);
   document.getElementById("gtitle").innerHTML=`합성 폐포 <span class="muted small">· ${p.closure.size} 노드 / 대상 ${targets.size}</span>`;
-  document.getElementById("legend").innerHTML=leg([["#11314f","대상"],["#1c2a3a","선행"]])+
-    '<span><i style="background:#ffd166;border-radius:50%"></i>공유(dedup)</span><span>🔀 분기</span>';
+  document.getElementById("legend").innerHTML=leg([["#e8f0fd","대상"],["#f5f7f9","선행"]])+
+    '<span><i style="background:#b5740b;border-radius:50%"></i>공유(dedup)</span><span>🔀 분기</span>';
   document.getElementById("ghint").textContent="노드 클릭=대상 토글. 🔀=one_of 분기(우측 선택). 공통 의존은 1회만 생성(dedup).";
   const branchNodes=[...p.closure].filter(id=>N[id].one_of&&N[id].one_of.length);
   renderG(p.closure,{choices,targets,
-    colorOf:id=>targets.has(id)?"#11314f":"#1c2a3a",
-    strokeOf:id=>p.shared.has(id)?"#ffd166":targets.has(id)?"#5aa9ff":V.provColor(N[id].provenance),
+    colorOf:id=>targets.has(id)?"#e8f0fd":"#f5f7f9",
+    strokeOf:id=>p.shared.has(id)?"#b5740b":targets.has(id)?"#2563c9":V.provColor(N[id].provenance),
     badgeOf:id=>branchNodes.includes(id)?"🔀":(targets.has(id)?"★":""),
     onClick:id=>{targets.has(id)?targets.delete(id):targets.add(id);if(targets.size)draw();}});
   const ids=V.allIds().sort((a,b)=>N[a].category<N[b].category?-1:1);
@@ -345,7 +344,7 @@ function runTab(){
   SC=schedule(p.closure);
   failId=p.order.find(id=>N[id].provenance==="docs")||null;
   document.getElementById("gtitle").innerHTML=`레벨 병렬 실행 <span class="muted small">· ${p.closure.size} 노드 / ${SC.linfo.length} 단계</span>`;
-  document.getElementById("legend").innerHTML=leg([["#3a4654","대기"],["#2c4a73","실행중(병렬)"],["#14322a","완료"],["#4a1f1f","실패"]])+'<span>세로 띠 = 단계(L)</span>';
+  document.getElementById("legend").innerHTML=leg([["#eef1f4","대기"],["#e8f0fd","실행중(병렬)"],["#e7f6ed","완료"],["#fbe9e9","실패"]])+'<span>세로 띠 = 단계(L)</span>';
   document.getElementById("ghint").textContent="같은 단계(세로 띠)의 독립 노드는 동시에 실행, 다음 단계는 이전 단계가 모두 끝나야 시작(배리어).";
   drawRun();
   document.getElementById("left").innerHTML=`<h2>실행 (데모)</h2>
@@ -366,16 +365,16 @@ function nodeStatus(id){const s=SC.sched[id];if(!s)return"queued";
   if(clock<s.start)return"queued";if(clock<s.end)return"run";return id===failId?"fail":"done";}
 function drawRun(){const set=new Set(Object.keys(SC.sched));
   renderG(set,{bands:bandsFor(set),
-    colorOf:id=>({queued:"#222e3c",run:"#16314d",done:"#14322a",fail:"#3a1717"})[nodeStatus(id)],
-    strokeOf:id=>({queued:"#3a4654",run:"#5aa9ff",done:"#3fb27f",fail:"#ff6b6b"})[nodeStatus(id)],
+    colorOf:id=>({queued:"#eef1f4",run:"#e8f0fd",done:"#e7f6ed",fail:"#fbe9e9"})[nodeStatus(id)],
+    strokeOf:id=>({queued:"#7a838d",run:"#2563c9",done:"#15924f",fail:"#c63434"})[nodeStatus(id)],
     badgeOf:id=>({queued:"",run:"⏳",done:"✓",fail:"✕"})[nodeStatus(id)]});}
 function drawGantt(){const W=520,sc=W/SC.wall;let h="";
   Object.keys(SC.sched).sort((a,b)=>SC.sched[a].start-SC.sched[b].start).forEach(id=>{const s=SC.sched[id];
     h+=`<div class="grow"><div class="gl small"><code>${id}</code></div>
       <div class="gtrack" style="min-width:${W}px">
-        <div class="seg" style="left:${s.start*sc}px;width:${Math.max(8,s.d.total*sc)}px;background:${SC.crit.has(id)?"#ffb86b":"#3fb27f"}" title="L${s.depth} ~${s.d.total}s"></div>
+        <div class="seg" style="left:${s.start*sc}px;width:${Math.max(8,s.d.total*sc)}px;background:${SC.crit.has(id)?"#b5740b":"#15924f"}" title="L${s.depth} ~${s.d.total}s"></div>
       </div></div>`;});
-  let bl="";SC.linfo.forEach(l=>{if(l.start>0)bl+=`<div style="position:absolute;left:${118+l.start*sc}px;top:0;bottom:0;border-left:1px dashed #5b7088"></div>`;});
+  let bl="";SC.linfo.forEach(l=>{if(l.start>0)bl+=`<div style="position:absolute;left:${118+l.start*sc}px;top:0;bottom:0;border-left:1px dashed #9aa3ad"></div>`;});
   document.getElementById("gantt").innerHTML=`<div style="position:relative">${h}${bl}</div>`;}
 function updateRun(){const done=Object.keys(SC.sched).filter(id=>nodeStatus(id)==="done").length;
   const running=Object.keys(SC.sched).filter(id=>nodeStatus(id)==="run");
@@ -383,39 +382,39 @@ function updateRun(){const done=Object.keys(SC.sched).filter(id=>nodeStatus(id)=
   const curLevel=SC.linfo.findIndex(l=>clock<l.end);const lvl=curLevel<0?SC.linfo.length:curLevel;
   document.getElementById("prog").innerHTML=`<div class="kpi">
     <div class="s"><b>${done}/${Object.keys(SC.sched).length}</b><span>완료</span></div>
-    <div class="s"><b style="color:#5aa9ff">${running.length}</b><span>동시 실행중</span></div>
-    <div class="s"><b style="color:#ff8585">${fail}</b><span>fail</span></div>
+    <div class="s"><b style="color:#2563c9">${running.length}</b><span>동시 실행중</span></div>
+    <div class="s"><b style="color:#c63434">${fail}</b><span>fail</span></div>
     <div class="s"><b>${Math.round(clock)}s</b><span>경과 / ${SC.wall}s</span></div></div>
     ${clock>=SC.wall?`<p class="small" style="margin-top:8px">완료 — <button class="btn" onclick="go('report')">Report 보기 →</button></p>`:""}`;
   document.getElementById("levels").innerHTML=SC.linfo.map((l,i)=>{
     const st=clock>=l.end?"done":clock>=l.start?"run":"wait";
-    return `<div class="kv"><span><span class="statusdot" style="background:${st==="done"?"#3fb27f":st==="run"?"#5aa9ff":"#3a4654"}"></span>L${l.depth} <span class="muted">(${l.ids.length} 동시)</span></span><b class="muted">${l.dur}s</b></div>`;}).join("");}
+    return `<div class="kv"><span><span class="statusdot" style="background:${st==="done"?"#15924f":st==="run"?"#2563c9":"#7a838d"}"></span>L${l.depth} <span class="muted">(${l.ids.length} 동시)</span></span><b class="muted">${l.dur}s</b></div>`;}).join("");}
 
 // ============ 5 REPORT: 단계별 수행시간 + 결과 ============
 function reportTab(){
   const p=V.plan([...targets],choices);const sc=schedule(p.closure);
   const fail=p.order.find(id=>N[id].provenance==="docs")||null;
   document.getElementById("gtitle").innerHTML=`실행 결과 + 수행시간 <span class="muted small">· 임계경로 강조</span>`;
-  document.getElementById("legend").innerHTML=leg([["#14322a","pass"],["#1d3a2a","★ 승격"],["#4a1f1f","fail"],["#3a2c12","임계경로"]]);
+  document.getElementById("legend").innerHTML=leg([["#e7f6ed","pass"],["#e8f0fd","★ 승격"],["#fbe9e9","fail"],["#fdf3e2","임계경로"]]);
   document.getElementById("ghint").textContent="노드 테두리=결과, 주황=임계경로(병렬 wall-clock을 결정하는 체인). 우측에 단계별 시간표.";
   renderG(new Set(p.order),{bands:bandsFor(new Set(p.order)),
-    colorOf:id=>id===fail?"#3a1717":sc.crit.has(id)?"#3a2c12":(N[id].provenance==="docs"?"#1d3a2a":"#14322a"),
-    strokeOf:id=>id===fail?"#ff6b6b":sc.crit.has(id)?"#ffb86b":(N[id].provenance==="docs"?"#5aa9ff":"#3fb27f"),
+    colorOf:id=>id===fail?"#fbe9e9":sc.crit.has(id)?"#fdf3e2":(N[id].provenance==="docs"?"#e8f0fd":"#e7f6ed"),
+    strokeOf:id=>id===fail?"#c63434":sc.crit.has(id)?"#b5740b":(N[id].provenance==="docs"?"#2563c9":"#15924f"),
     badgeOf:id=>id===fail?"✕":(N[id].provenance==="docs"?"★":"✓")});
   const speed=(sc.seq/sc.wall);
   const r=svcRes(selNode);
   document.getElementById("left").innerHTML=`<h2>결과 요약</h2>
     <div class="kpi"><div class="s"><b>${p.order.length-(fail?1:0)}/${p.order.length}</b><span>pass</span></div>
-    <div class="s"><b style="color:#ff8585">${fail?1:0}</b><span>fail</span></div></div>
+    <div class="s"><b style="color:#c63434">${fail?1:0}</b><span>fail</span></div></div>
     ${r?`<div class="note small"><b>선택 서비스</b> <code>${esc(N[selNode].service)}</code> — C3 ${r.c3_pct}% · ok/soft/fail ${r.ok}/${r.soft}/${r.fail} (RESULTS.perService)</div>`:""}
     <h3>수행시간(시뮬)</h3>
     <div class="kv"><span>순차 합계</span><b>${sc.seq}s</b></div>
-    <div class="kv"><span>레벨 병렬 wall-clock</span><b style="color:#3fb27f">${sc.wall}s</b></div>
+    <div class="kv"><span>레벨 병렬 wall-clock</span><b style="color:#15924f">${sc.wall}s</b></div>
     <div class="kv"><span>병렬 가속</span><b>${speed.toFixed(2)}×</b></div>
     <div class="note small"><b>임계 노드(각 단계 최장)</b>: ${[...sc.crit].join(" · ")} — 배리어 스케줄에서 wall-clock = Σ(단계별 최장).</div>
     ${fail?`<div class="note"><b>fail:</b> <code>${fail}</code> (docs 미실증 추정).</div>`:""}`;
   const rows=p.order.map(id=>{const s=sc.sched[id],d=s.d;
-    return `<tr ${sc.crit.has(id)?'style="background:#241d10"':''}><td><code>${id}</code></td><td class="muted">L${s.depth}</td>
+    return `<tr ${sc.crit.has(id)?'style="background:#fdf3e2"':''}><td><code>${id}</code></td><td class="muted">L${s.depth}</td>
       <td>${d.create}s</td><td>${d.ready}s</td><td>${d.verify}s</td><td><b>${d.total}s</b></td>
       <td class="muted small">${s.start}–${s.end}s</td></tr>`;}).join("");
   document.getElementById("right").innerHTML=`<h2>단계별 수행시간</h2>

@@ -1,0 +1,245 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>domain-constraints.md — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/domain-constraints.md</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/domain-constraints.md</div>
+  <div class="kbody"><h1>SCP account domain constraints (confirmed) — networking &amp; DBaaS</h1>
+<blockquote>
+<p>Confirmed, load-bearing account facts the test harness must obey. Recorded in
+git so every run/agent honours them. Machine-readable mirror lives in
+<code>regression/scenarios/dependencies.json</code> (<code>vpc_schedule</code>, <code>quota_kinds</code>); the
+hard limits also live in <code>core/budgets.py</code> (<code>DEFAULT_LIMITS</code>).</p>
+</blockquote>
+<h2>Quotas (hard account caps)</h2>
+<table>
+<thead>
+<tr>
+<th>Resource</th>
+<th>Max</th>
+<th>Error on exceed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>VPC</strong></td>
+<td><strong>3</strong></td>
+<td><code>scp-network.vpc.exceed-max-count</code></td>
+</tr>
+<tr>
+<td>private-dns</td>
+<td>3</td>
+<td><code>scp-network.private-dns.max-count-exceed</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>VPC max = 3</strong> (NOT 5 — corrected). <code>core/budgets.py:DEFAULT_LIMITS["vpc"]=3</code>
+  and <code>dependencies.json:vpc_schedule.vpc_limit=3</code>.</li>
+<li>A run must never hold more than 3 live VPCs at once, <em>including</em> lingering
+  async-deletes. The shared VPC counts as 1 while alive.</li>
+<li><strong>Docs discrepancy:</strong> the
+  <a href="https://docs.e.samsungsdscloud.com/userguide/networking/vpc/overview/#constraints">userguide</a>
+  says the <em>default</em> is <strong>5 VPCs/account</strong> — our account enforces 3 at runtime.
+  Trust the VALIDATED 3; the discrepancy itself is a docs/conformance finding.</li>
+</ul>
+<h3>Further userguide limits (from docs, not yet runtime-confirmed)</h3>
+<p>Per the VPC/SG userguide constraint tables (mirrored in
+<code>knowledge/formal/services/</code>): <strong>6 IP ranges per VPC</strong> (1 default + 5 extra),
+<strong>3 subnets per VPC</strong> (default — this is why parallel adopters must ADOPT the
+shared subnet, not create their own), <strong>5 VPC peerings/account</strong>, <strong>3 Private
+NAT/VPC</strong>, <strong>3 Transit Gateways/account</strong> (5 VPC connections each, same account
+only), <strong>100 security groups/account</strong>, <strong>100 rules/SG, 1,000 rules/account</strong>.</p>
+<h2>CIDR rules (confirmed)</h2>
+<ol>
+<li><strong>VPCs must not overlap.</strong> Any two VPCs that exist at the same time (the
+   shared VPC + any self-created VPC, and self-created VPCs among themselves)
+   MUST have non-overlapping CIDR blocks. Each VPC-creating lifecycle is
+   assigned a unique <code>/20</code> (see allocation table below); the shared VPC owns
+   <code>10.124.0.0/20</code>.</li>
+<li><strong>A subnet's CIDR must be a sub-range of its VPC's CIDR.</strong> Every subnet is
+   carved from inside its parent VPC's <code>/20</code> (e.g. the shared subnet
+   <code>10.124.0.0/24</code> is the first <code>/24</code> of the shared VPC <code>10.124.0.0/20</code>).</li>
+</ol>
+<h3>VPC <code>/20</code> allocation (one unique block per VPC-creating lifecycle)</h3>
+<table>
+<thead>
+<tr>
+<th>Lifecycle</th>
+<th>VPC CIDR</th>
+<th>Class</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>(shared VPC, engine.provision_shared_vpc)</em></td>
+<td><code>10.124.0.0/20</code></td>
+<td>shared</td>
+</tr>
+<tr>
+<td>networking-vpc-subnet</td>
+<td><code>10.123.0.0/20</code></td>
+<td>vpc-crud</td>
+</tr>
+<tr>
+<td>container-ske-cluster-nodepool</td>
+<td><code>10.125.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>networking-vpc-internet-gateway</td>
+<td><code>10.126.0.0/20</code></td>
+<td>vpc-crud</td>
+</tr>
+<tr>
+<td>vpc-cidr-secondary</td>
+<td><code>10.127.0.0/20</code> (primary) + <code>10.200.0.0/20</code> (secondary, same VPC)</td>
+<td>vpc-crud</td>
+</tr>
+<tr>
+<td>vpc-privatelink-service</td>
+<td><code>10.128.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>vpc-endpoint</td>
+<td><code>10.129.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>vpc-peering</td>
+<td><code>10.130.0.0/20</code> (VPC-A) + <code>10.141.0.0/20</code> (VPC-B)</td>
+<td>vpc-crud</td>
+</tr>
+<tr>
+<td>vpc-transit-gateway-children</td>
+<td><code>10.131.0.0/20</code> (+ unique <code>/20</code> per child VPC)</td>
+<td>vpc-crud</td>
+</tr>
+<tr>
+<td>vpc-subnet-vip-nat</td>
+<td><code>10.132.0.0/20</code></td>
+<td>vpc-crud</td>
+</tr>
+<tr>
+<td>database-postgresql-cluster</td>
+<td><code>10.133.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>heavy-shared-dbaas</td>
+<td><code>10.134.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>compute-virtualserver-full</td>
+<td><code>10.135.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>database-mysql-cluster</td>
+<td><code>10.136.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>networking-direct-connect-routing</td>
+<td><code>10.137.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>networking-loadbalancer-members-nat</td>
+<td><code>10.138.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>networking-vpn-gateway-tunnel</td>
+<td><code>10.139.0.0/20</code></td>
+<td>adopt (fallback)</td>
+</tr>
+<tr>
+<td>heavy-shared-networking</td>
+<td><code>10.140.0.0/20</code></td>
+<td>vpc-crud (+ private-dns)</td>
+</tr>
+<tr>
+<td>networking-dns-hosted-zone-private</td>
+<td><code>10.142.0.0/20</code></td>
+<td>adopt (fallback) (+ private-dns)</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>"adopt (fallback)" lifecycles ADOPT the shared VPC+subnet at runtime (they
+create no VPC); their own CIDR is used only in the degraded self-create
+fallback when no shared VPC is present. They are still given a unique block so
+even the fallback path never overlaps.</p>
+</blockquote>
+<p>Each lifecycle's subnet(s) are the first <code>/24</code>(s) of its VPC <code>/20</code>
+(e.g. <code>10.13X.0.0/24</code>). The shared subnet is <code>10.124.0.0/24</code>. ADOPT lifecycles
+that pin a fixed host IP re-home it into the shared subnet (<code>10.124.0.x</code>,
+distinct hosts — see <code>dependencies.json:vpc_schedule.fixed_ip_map</code>).</p>
+<h2>Parallelism (shared-infra + adopt)</h2>
+<ul>
+<li>Provision ONE shared VPC + ONE shared subnet once; ADOPT-class lifecycles
+  adopt them and create only their own child resource, so they run in PARALLEL
+  (pytest-xdist <code>-n</code>). They add no VPCs → no VPC-quota pressure.</li>
+<li><strong>DBaaS per-engine parallelism:</strong> all DB engine lifecycles (mysql, postgresql,
+  heavy-shared-dbaas, and the cachestore/epas/mariadb/sqlserver cluster-subops
+  lifecycles) are in the parallel pass, so the DB clusters provision concurrently
+  in the ONE shared subnet — this is where the wall-clock win comes from.</li>
+<li>VPC-CRUD lifecycles (self-create a VPC/subnet, peer, or need &gt;1 VPC) run
+  SERIALLY. The shared VPC is torn down BEFORE the VPC-CRUD pass so those
+  lifecycles get the full 3-VPC budget (e.g. vpc-peering needs 2 at once).</li>
+</ul>
+<h2>Cross-run rule</h2>
+<p>Never let two VPC-mutating runs overlap (they compete for the same 3 VPCs).
+Trigger one CRUD run at a time; wait for the prior run's regression job to finish.</p></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/domain-constraints.md</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

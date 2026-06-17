@@ -1,0 +1,316 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FORMAT.md — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/FORMAT.md</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/FORMAT.md</div>
+  <div class="kbody"><h1>knowledge/formal/ — formalized domain knowledge (DRAFT)</h1>
+<blockquote>
+<p><strong>이 디렉토리가 "사람이 읽고 조정하는" 도메인 지식의 공식 형식입니다.</strong>
+도메인 지식은 세 층위로 구조화됩니다 — <strong>① 서비스별 지식/제약</strong>,
+<strong>② 연관 서비스 간 제약</strong>, <strong>③ 시나리오 흐름 지식</strong> — 그리고 조합
+시나리오는 <strong>시나리오 단위 검토(review 블록)</strong> 를 거칩니다.
+워크플로: <strong>AI가 초안 작성 → 사람이 YAML 수정/승인 → <code>validate.py</code> → 엔진 데이터에 반영.</strong></p>
+</blockquote>
+<p>Domain knowledge is structured in <strong>three layers</strong>, plus a reviewed scenario
+catalog. AI agents draft it; <strong>humans edit and approve it</strong>; the validator
+keeps it consistent with the engine data (<code>regression/scenarios/*.json</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>File(s)</th>
+<th>Question it answers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>1 · Per-service</strong></td>
+<td><a href="services/"><code>services/&lt;category&gt;__&lt;service&gt;.yaml</code></a></td>
+<td>이 서비스 자체의 지식/제약 — constraints, id capture shapes, state machines, quirks of ONE service</td>
+</tr>
+<tr>
+<td><strong>2 · Cross-service</strong></td>
+<td><a href="cross-service.yaml"><code>cross-service.yaml</code></a></td>
+<td>연관 서비스 간 제약 — the resource dependency graph (what must exist before what), constraints spanning services, account quotas</td>
+</tr>
+<tr>
+<td><strong>3 · Scenario-flow</strong></td>
+<td><a href="flows.yaml"><code>flows.yaml</code></a></td>
+<td>시나리오 흐름 지식 — rules that only exist in a flow (teardown order, delete races, shared-VPC adoption, scheduling) + canonical per-resource call orders</td>
+</tr>
+<tr>
+<td><strong>Review</strong></td>
+<td><a href="combo-scenarios.yaml"><code>combo-scenarios.yaml</code></a></td>
+<td>조합 시나리오 + 시나리오 기반 검토 — multi-service combos with a per-scenario <code>review:</code> block a human approves</td>
+</tr>
+</tbody>
+</table>
+<p>Validate after every edit (offline, no credentials needed):</p>
+<pre><code class="language-bash">python knowledge/formal/validate.py
+</code></pre>
+<p>The validator checks YAML structure per layer, that every <code>requires:</code>/resource
+reference exists, that the dependency graph is acyclic, that quota limits match
+<code>regression/scenarios/dependencies.json</code>, that <code>encoded_in</code> lifecycle ids exist
+in the merged scenario data, that service names exist in the catalog, and that
+every non-encoded combo carries a <code>review:</code> block with a valid <code>decision</code>.</p>
+<h2>Provenance (applies to every entry, all layers)</h2>
+<ul>
+<li><code>provenance: VALIDATED</code> — confirmed by a real 2xx at runtime. Trust it.</li>
+<li><code>provenance: docs</code> — taken from the API Reference, not yet runtime-confirmed.</li>
+</ul>
+<p>Never promote <code>docs</code> → <code>VALIDATED</code> without a real successful run.</p>
+<h2>Probe-read completion (owner principle, 2026-06-15)</h2>
+<blockquote>
+<p><strong>Every created resource runs its COMPLETE lifecycle:
+create → ALL id-bound reads → ALL id-bound writes → delete.</strong> (owner, 2026-06-15)</p>
+</blockquote>
+<p>This is a durable, repo-wide rule for <strong>every</strong> resource — not a per-service
+afterthought, not apigw-only. The resource-task model
+(<code>resources/&lt;category&gt;__&lt;service&gt;.yaml</code>) is the place it lives. A node is "done"
+only when, off the id its <code>create</code> captures, it exercises:
+1. <strong>all id-bound GET reads</strong> (per-id <code>show</code> + <code>list-children</code>) — closes <code>gap_getid</code>;
+2. <strong>all id-bound writes</strong> (setters / updates / PUT-PATCH / action sub-ops on that
+   id) — closes <code>gap_write</code> (the write-coverage campaign drove this to 0; keep it
+   there as new write ops appear);
+3. <strong>delete</strong> (reverse-order teardown) — every created resource is owned and torn down.</p>
+<p>The read side (this section's focus + <code>docs/PROBE-READS-PLAN.md</code>, gap_getid=80) is
+the remaining open axis; the write side is structurally in place via the
+<code>*-write-coverage</code> lifecycles. <code>agents/validation-agent.md</code> uses this complete
+4-stage shape as each node's <strong>done-when</strong>.</p>
+<p><strong>Rule.</strong> Every node whose <code>create</code> captures an id MUST attach, as <code>verify</code>
+read steps, the <strong>id-bound GET endpoints that key off that id</strong> — the per-id
+<code>show</code>, and the <code>list-children</code> endpoints rooted at it. A <code>verify</code> read keys off
+the node's own <code>capture</code> (and its direct <code>requires</code>' captures, which the
+validator already enforces). This turns every such GET from a <code>gap_getid</code>
+endpoint (unreachable from any enabled scenario) into one that is <strong>auto-covered
+the moment the node is composed into an enabled lifecycle and run</strong> — no
+separate read-chain, no extra scenario authoring.</p>
+<pre><code class="language-yaml">  &lt;node&gt;:
+    create: { endpoint: &quot;POST /v1/things&quot;, ... }
+    capture: { thing_id: &quot;$.id&quot; }            # ← the id this create yields
+    verify:                                   # ← ALL id-bound GETs off thing_id
+      - {name: read,        endpoint: &quot;GET /v1/things/{thing_id}&quot;,          expect_status: [200]}
+      - {name: list-kids,   endpoint: &quot;GET /v1/things/{thing_id}/children&quot;, expect_status: [200]}
+</code></pre>
+<p><strong>Conventions (keep these tight):</strong></p>
+<ul>
+<li><strong><code>expect_status: [200]</code> by default.</strong> Only widen to <strong><code>[200, 404]</code></strong> when the
+  child collection is <em>legitimately absent on a freshly-created parent</em> (e.g. a
+  policy that was never set, a history that is empty right after create). Carry a
+  one-line <code>note:</code> saying <em>why</em> the 404 is tolerated — never use <code>[200,404]</code> to
+  paper over a real 4xx/5xx. (See the apigw <code>resource-policies</code> read below for a
+  worked example of a justified-404 with a PF cross-reference.)</li>
+<li><strong>Mark required query params.</strong> If a read needs a query param to avoid a 400
+  (period/range for <code>reports</code>/<code>logs</code>/<code>metrics</code>, paging, etc.) and the docs give
+  no model, carry a <code>note:</code> flagging it; on a live 400 <strong>add the param</strong> rather
+  than widening <code>expect_status</code>.</li>
+<li><strong>Address-by-name reads</strong> (no id in the response, e.g. apigw <code>stage</code>) reuse the
+  create body's <code>{unique}</code>/<code>{ualpha}</code> literal (a run-constant) in the read path.</li>
+<li><strong>Prerequisite/<code>docs</code> parents:</strong> do <strong>not</strong> add the verify until the node's
+  <code>create</code> is <code>VALIDATED</code> — a verify on an UNPROVEN create is dead weight (the
+  composer must not run unproven creates). Validate the create first, then add
+  the one-line read (C5 promotion order).</li>
+</ul>
+<p><strong>Worked example — the apigw tree</strong> (<code>resources/application-service__apigateway.yaml</code>):
+each create carries its id-bound reads, so the whole API sub-tree is covered on
+one composed run.</p>
+<table>
+<thead>
+<tr>
+<th>node</th>
+<th>id captured</th>
+<th>verify reads attached (id-bound GETs)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>apigw-api</code></td>
+<td><code>api_id</code></td>
+<td><code>apis/{api_id}/connected-endpoints</code> · <code>/reports</code> (note: may need period param) · <code>/resource-policies</code> (<code>[200,404]</code>, PF-19 — PUT 500 means no policy to read)</td>
+</tr>
+<tr>
+<td><code>apigw-root-resource</code> (lookup)</td>
+<td><code>root_resource_id</code></td>
+<td><code>apis/{api_id}/resources</code></td>
+</tr>
+<tr>
+<td><code>apigw-resource</code></td>
+<td><code>resource_id</code></td>
+<td><code>apis/{api_id}/resources/{resource_id}</code></td>
+</tr>
+<tr>
+<td><code>apigw-method</code></td>
+<td><code>method_type</code></td>
+<td><code>.../methods</code> (list) · <code>.../methods/{method_type}</code></td>
+</tr>
+<tr>
+<td><code>apigw-deployment</code></td>
+<td><code>deployment_id</code></td>
+<td><code>apis/{api_id}/deployments</code></td>
+</tr>
+<tr>
+<td><code>apigw-stage</code></td>
+<td>(name-addressed)</td>
+<td><code>apis/{api_id}/stages</code> · <code>apis/{api_id}/stages/stg{unique}</code></td>
+</tr>
+<tr>
+<td><code>apigw-usage-plan</code></td>
+<td><code>usage_plan_id</code></td>
+<td><code>.../usage-plans</code> · <code>usage-plans/{up}/api-keys</code></td>
+</tr>
+<tr>
+<td><code>apigw-api-key</code></td>
+<td><code>api_key_id</code></td>
+<td>per-id (<code>[200,403]</code> — IAM action undefined, PF) · list</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Where it still needs applying:</strong> the repo-wide map of <code>gap_getid</code> endpoints not
+yet probe-read-covered — parent node, service, already-wired status, and the
+cheapest (already-VALIDATED-parent) wins — lives in
+<a href="../../docs/PROBE-READS-PLAN.md"><code>docs/PROBE-READS-PLAN.md</code></a>. Regenerate the gap
+total any time with <code>python -m spec.coverage_gap</code> (the <code>gap_getid</code> line). The
+validation agent (<code>agents/validation-agent.md</code>) closes each row by validating the
+parent create, then adding the one-line verify read.</p>
+<h2>Layer 1 — <code>services/&lt;category&gt;__&lt;service&gt;.yaml</code></h2>
+<p>One file per service (same naming as <code>regression/scenarios/lifecycles/</code>
+fragments — one owner per file, no collisions). Knowledge that is true of the
+service regardless of any scenario:</p>
+<pre><code class="language-yaml">version: 1
+service: &lt;category&gt;/&lt;service&gt;     # must match the filename
+constraints:                      # hard rules this service imposes
+  - id: &lt;kebab-id&gt;
+    rule: &lt;text a human can act on&gt;
+    provenance: VALIDATED|docs
+captures:                         # where each resource's id lives in the response
+  &lt;resource-key&gt;: &lt;jsonpath&gt;      # e.g. server: $.servers[0].id   (ARRAY!)
+states:                           # state machines (poll field -&gt; ready values)
+  &lt;resource-key&gt;: {field: &lt;jsonpath&gt;, ready: [&lt;values&gt;]}
+quirks:                           # everything else the docs don't tell you
+  - id: &lt;kebab-id&gt;
+    note: &lt;text&gt;
+    provenance: VALIDATED|docs
+</code></pre>
+<h2>Layer 2 — <code>cross-service.yaml</code></h2>
+<p>The dependency <strong>graph</strong> (which resource must exist before which) plus
+constraints that span services:</p>
+<pre><code class="language-yaml">version: 1
+cross_constraints:                # rules involving &gt;1 service
+  - id: &lt;kebab-id&gt;
+    services: [&lt;category/service&gt;, ...]
+    rule: &lt;text&gt;
+    provenance: VALIDATED|docs
+resources:                        # the graph nodes
+  &lt;resource-key&gt;:
+    service: &lt;category/service&gt;   # owning service
+    requires: [&lt;resource-key&gt;]    # MUST exist first
+    lookups:  [&lt;name&gt;]            # read-only finds needed (no resource created)
+    quota: &lt;quota-key&gt;            # optional: capped kind this create consumes
+    provenance: VALIDATED|docs
+quotas:
+  &lt;quota-key&gt;: {limit: &lt;int&gt;, scope: account|region, provenance: ...}
+</code></pre>
+<h2>Layer 3 — <code>flows.yaml</code></h2>
+<p>Knowledge that only exists <strong>in the context of a flow</strong> — no single endpoint
+exhibits it:</p>
+<pre><code class="language-yaml">version: 1
+defaults:                         # global flow rules unless overridden
+  teardown: reverse-order
+  delete_poll: {until_status: [404]}
+  delete_retry_on: [409, 500]
+flow_rules:                       # named, citable flow-level rules
+  - id: &lt;kebab-id&gt;
+    rule: &lt;text&gt;
+    provenance: VALIDATED|docs
+call_orders:                      # canonical pattern per resource family
+  &lt;resource-key&gt;:                 # must exist in cross-service.yaml resources
+    provenance: VALIDATED|docs
+    encoded_in: [&lt;lifecycle-id&gt;]  # scenario ids realizing this pattern
+    create: {api: &lt;METHOD /path&gt;, capture: &lt;jsonpath&gt;, poll: {...}}
+    delete: {api: &lt;METHOD /path&gt;}
+    notes: &lt;gotchas — field-level detail stays in services/ or validated-facts.md&gt;
+</code></pre>
+<h2>Combos + scenario-based review — <code>combo-scenarios.yaml</code></h2>
+<pre><code class="language-yaml">version: 1
+combos:
+  - id: &lt;kebab-id&gt;                # == lifecycle id once encoded
+    status: encoded|draft|idea
+    heavy: true|false
+    services: [&lt;category/service&gt;]
+    flow: [&lt;resource-key or action&gt;]
+    value: &lt;why this combination is worth testing&gt;
+    encoded_in: &lt;path&gt;            # required when status: encoded
+    review:                       # REQUIRED for draft/idea (scenario-based review)
+      decision: pending|approved|rejected   # ← 사람이 바꿔서 승인/반려
+      checks: [&lt;what to verify before approving&gt;]
+      risks:  [&lt;cost / quota / blast-radius accepted by approving&gt;]
+      notes:  &lt;reviewer free text&gt;
+</code></pre>
+<p><strong>Review flow:</strong> <code>idea</code> → <code>draft</code> (agent fills <code>checks</code>/<code>risks</code>) → human sets
+<code>decision: approved</code> (optionally editing <code>flow</code>) → Domain-Knowledge agent
+encodes it as a lifecycle in <code>regression/scenarios/</code> and flips
+<code>status: encoded</code> (the <code>review:</code> block stays as the audit record). <code>rejected</code>
+entries stay in the file as institutional memory of what NOT to build.</p>
+<h2>Relationship to the rest of the repo</h2>
+<pre><code>knowledge/*.md            narrative (why / history / field-level detail)
+knowledge/formal/         ← THE editable formal model (this directory)
+  services/*.yaml           layer 1: per-service
+  cross-service.yaml        layer 2: between services
+  flows.yaml                layer 3: scenario flows
+  combo-scenarios.yaml      combos + per-scenario review
+regression/scenarios/*.json   what the engine actually executes
+core/budgets.py               quota limits enforced at runtime
+</code></pre>
+<p>Long-term direction (see <code>ROADMAP.md</code>): the formal files become the source of
+truth from which <code>dependencies.json</code> entries are <strong>generated</strong>; until then the
+validator keeps the two consistent.</p></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/FORMAT.md</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

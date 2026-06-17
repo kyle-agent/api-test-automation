@@ -1,0 +1,197 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>compute__scf.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/resources/compute__scf.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/resources/compute__scf.yaml</div>
+  <div class="kbody"><pre class="raw"># Resource-task model — compute/scf (cp-scf group, Cloud Functions).
+# Schema: docs/RESOURCE-MODEL-PLAN.md §1 · extracted from
+# compute-scf-cloud-function-cronjob-trigger (enabled, live-validated spine)
+# and scf-privatelink-apigateway-coverage (coverage-only -&gt; docs).
+#
+# docs-mapper enrichment (UNPROVEN, 2026-06-15) — userguide cites:
+#   overview:       https://docs.e.samsungsdscloud.com/userguide/compute/cloud_functions/overview/
+#   how_to_guides:  https://docs.e.samsungsdscloud.com/userguide/compute/cloud_functions/how_to_guides/
+# docs facts: runtimes GO 1.21/1.23/1.25, Java 17, Node.js 18/20/22/24,
+#   PHP 8.1/8.4/8.5, Python 3.9/3.10/3.11/3.14 (body runtime &#x27;Node.js:20&#x27; valid);
+#   regions kr-west1/kr-east1 only (kr-south* unavailable); EoTS runtime은 2026.7
+#   이후 신규/수정 불가(기존 함수는 호출만 유지). Notes/comments only — no
+#   requires/create/body/capture/delete shapes changed.
+version: 1
+resources:
+  scf-function:
+    code: &quot;cp-scf-function&quot;
+    service: compute/scf
+    requires: []
+    create:
+      endpoint: &quot;POST /v1/cloud-functions&quot;
+      body: {name: &quot;regrscf{unique}&quot;, runtime: &quot;Node.js:20&quot;,
+             content: &quot;exports.handler = async () =&gt; ({ statusCode: 200, body: &#x27;regr&#x27; });&quot;,
+             tags: []}
+    capture: {cloud_function_id: &quot;$.id&quot;}
+    ready: {field: &quot;$.cloud_function.state&quot;,
+            until: [READY, RUNNING, ACTIVE, Running], timeout: 300, interval: 10}
+    verify:
+      # 함수 하위 read family — 모두 READ-ONLY (Deploying 뒤집기 없음), 함수
+      # id만으로 주소화된다. gap_getid 일괄 폐쇄 (id-bound GET coverage).
+      - {name: read-codes,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/codes&quot;,
+         expect_status: [200]}
+      - {name: read-configurations,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/configurations&quot;,
+         expect_status: [200]}
+      - {name: read-config,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/configurations/config&quot;,
+         expect_status: [200]}
+      - {name: read-environment-variables,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/configurations/environment-variables&quot;,
+         expect_status: [200]}
+      - {name: read-privatelink-endpoints,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints&quot;,
+         expect_status: [200]}
+      - {name: read-privatelink-services,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-services&quot;,
+         expect_status: [200],
+         note: &quot;READ는 안전 — Creating 고착을 일으키는 것은 PUT enable뿐 (노드 노트)&quot;}
+      - {name: read-resource-policies,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/configurations/resource-policies&quot;,
+         expect_status: [200]}
+      - {name: read-url,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/configurations/url&quot;,
+         expect_status: [200]}
+      - {name: read-logs,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/logs?time=1h&quot;,
+         expect_status: [200, 400],
+         note: &quot;run 27399448835: &#x27;must select either time or period&#x27; — docs엔 전부 optional로 기재된 미문서 필수 (undiscoverable-params 클래스). time 포맷 1h 추정&quot;}
+      - {name: read-metrics,
+         endpoint: &quot;GET /v1/cloud-functions/{cloud_function_id}/metrics?time=1h&quot;,
+         expect_status: [200, 400],
+         note: &quot;logs와 동일 — time 포맷 미문서&quot;}
+    delete: {endpoint: &quot;DELETE /v1/cloud-functions/{cloud_function_id}&quot;,
+             retry_on_status: [500, 409], retries: 6, retry_interval: 20,
+             destructive: true}
+    provenance: VALIDATED
+    source: {lifecycle: compute-scf-cloud-function-cronjob-trigger,
+             steps: [create, wait-ready, delete, wait-gone]}
+    notes: &quot;VPC-FREE standalone (선행 서비스 없음 — services constraint prereq-optional-only). kr-west1/kr-east1 전용 — 남부 리전 4xx는 entitlement (region-availability). 모든 config/code/trigger write가 상태를 Deploying으로 뒤집는다 — write 사이마다 READY 재폴링 필수 (소스는 그룹마다 wait-ready 전치; deploying-after-every-change quirk). privatelink-service를 켜면 Creating 고착으로 삭제가 CloudFunctionNotDeletableError 400 — teardown 전 PL enable 금지 (소스 run #5 교훈). 삭제는 409/500 재시도 6×20s + 404 폴링.&quot;
+
+  scf-cronjob-trigger:
+    code: &quot;cp-scf-cronjob-trigger&quot;
+    service: compute/scf
+    requires: [scf-function]
+    create:
+      endpoint: &quot;POST /v1/triggers/cronjob&quot;
+      body: {cloud_function_id: &quot;{scf-function.cloud_function_id}&quot;,
+             schedule: &quot;0 0 * * 0&quot;, timezone: &quot;Asia/Seoul&quot;}
+    capture: {trigger_id: &quot;$.triggers[0].trigger_id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/triggers/{trigger_id}&quot;,
+         expect_status: [200]}
+    delete:
+      endpoint: &quot;DELETE /v1/triggers/{trigger_id}&quot;
+      # 라이브 400 (run 27417986669): &quot;Trigger type must be &#x27;apigateway&#x27; or
+      # &#x27;cron&#x27;&quot; — 수작업본의 &#x27;cronjob&#x27;은 관대한 expect([..,400])에 가려 조용히
+      # 400나고 있었음 (관대한 expect가 결함을 숨긴 사례)
+      json: {cloud_function_id: &quot;{scf-function.cloud_function_id}&quot;, trigger_type: &quot;cron&quot;}
+      destructive: true
+      # 소스 delete-trigger와 동일 body — body 없이는 400 (run 27401527554)
+    provenance: VALIDATED
+    source: {lifecycle: compute-scf-cloud-function-cronjob-trigger,
+             steps: [create-trigger, delete-trigger]}
+    notes: &quot;CRONJOB 트리거 — apigateway/VPC 의존 없음 (apigateway 트리거는 scf-apigateway-trigger 노드가 cross-file requires로 모델). capture envelope $.triggers[0].trigger_id (ARRAY). schedule은 5-field cron, timezone은 tz name. 소스의 delete는 body {cloud_function_id, trigger_type: cronjob}를 best-guess로 보내며 400 허용 + 409/500 재시도 — 모델 delete 스키마는 body를 못 싣는다 (R3에서 합성기 동치 비교 시 확인). 함수가 Deploying이면 트리거 write 4xx — scf-function 노트의 READY 재폴링 시맨틱 적용.&quot;
+
+  scf-privatelink-endpoint:
+    code: &quot;cp-scf-privatelink-endpoint&quot;
+    service: compute/scf
+    requires: [scf-function, privatelink-service]
+    create:
+      endpoint: &quot;POST /v1/cloud-functions/{scf-function.cloud_function_id}/configurations/privatelink-endpoints&quot;
+      body: {endpoint: {alias: &quot;regrple{unique}&quot;,
+                        service_id: &quot;{privatelink-service.privatelink_service_id}&quot;}}
+    capture: {endpoint_id: &quot;$.endpoint.endpoint_id&quot;}
+    delete: {endpoint: &quot;DELETE /v1/cloud-functions/{scf-function.cloud_function_id}/configurations/privatelink-endpoints/{endpoint_id}&quot;,
+             destructive: true}
+    provenance: docs
+    source: {lifecycle: generated__wave5-appsvc,
+             steps: [create-scf-privatelink-endpoint, delete-scf-privatelink-endpoint]}
+    notes: &quot;UNPROVEN. R3 해소 (2026-06-13): 구 flat body {subnet_id, endpoint_service_id, name}는 docs DTO와 불일치 — 실제 PrivateLinkEndpointCreateRequest는 중첩 {endpoint: EndpointCreateRequest{alias, service_id}} (subnet 없음)라 verbatim으로 교체, service_id는 신설 networking privatelink-service 노드 ref로 배선. 응답 envelope $.endpoint.endpoint_id (PrivateLinkEndpoint{endpoint: Endpoint}) — docs 파생. request/approval/connection PUT({type} 단일 enum: CANCEL|RE_REQUEST / APPROVE|REJECT / DISCONNECT|RECONNECT)은 상태기계 의존 lifecycle 영역(gen-wave5 gated probes). 경고 유지: 함수의 privatelink-SERVICE enable(PUT .../privatelink-services {privatelink_service_enabled: true})은 함수를 Creating에 고착시켜 teardown을 막는다 — endpoint family만 모델링, service enable 금지(disable=false probe만 lifecycle에서). config write 후 READY 재폴링 시맨틱 적용. [docs-mapper UNPROVEN 2026-06-15, userguide how_to_guides &#x27;트리거 설정하기&#x27;/&#x27;Private 연결 구성&#x27;]: PrivateLink는 &#x27;선택적 준비 서비스&#x27;로 PrivateLink Service와 연계하여 사용 — overview는 PL Service/API Gateway를 optional prereq로만 기술하고 endpoint create의 구체 제약/네이밍은 overview에 없음(detail은 &#x27;PrivateLink 서비스 연계하기&#x27; 하위로 defer). Deploying 상태에서는 함수의 트리거/구성 변경이 차단된다는 docs 진술이 &#x27;config write 후 READY 재폴링&#x27; 시맨틱을 뒷받침.&quot;
+
+  scf-apigateway-trigger:
+    code: &quot;cp-scf-apigateway-trigger&quot;
+    service: compute/scf
+    requires: [scf-function, apigw-api, apigw-deployment]
+    create:
+      endpoint: &quot;POST /v1/triggers/apigateway&quot;
+      body: {apigateway_api_id: &quot;{apigw-api.api_id}&quot;,
+             apigateway_stage_name: dev,
+             cloud_function_id: &quot;{scf-function.cloud_function_id}&quot;}
+    capture: {trigger_id: &quot;$.triggers[0].trigger_id&quot;}
+    verify:
+      - {name: read, endpoint: &quot;GET /v1/triggers/{trigger_id}&quot;,
+         expect_status: [200]}
+      - {name: read-list,
+         endpoint: &quot;GET /v1/triggers?cloud_function_id={scf-function.cloud_function_id}&quot;,
+         expect_status: [200],
+         note: &quot;listcloudfunctiontriggers는 cloud_function_id query가 docs상 required — bare GET은 4xx 예상&quot;}
+    delete:
+      endpoint: &quot;DELETE /v1/triggers/{trigger_id}&quot;
+      # cronjob 트리거의 검증된 quirk 그대로 (run 27417986669): DELETE는
+      # body {cloud_function_id, trigger_type}를 요구하고 trigger_type 리터럴은
+      # &quot;apigateway&quot; 또는 &quot;cron&quot;만 유효
+      json: {cloud_function_id: &quot;{scf-function.cloud_function_id}&quot;,
+             trigger_type: &quot;apigateway&quot;}
+      destructive: true
+    provenance: VALIDATED
+    source: {lifecycle: generated__wave5-appsvc,
+             steps: [create-apigateway-trigger, delete-apigateway-trigger]}
+    notes: &quot;UNPROVEN body (docs DTO ApigatewayTriggerCreateRequest verbatim — 구 coverage probe의 {api_gateway_id, resource_id, method_type, auth_type} 추측 body는 폐기). apigateway_api_id 패턴 ^[0-9a-f]{24}$ = apigw-api capture와 일치, apigateway_stage_name dev는 apigw-deployment(stage_type=new)가 만든 stage — cross-file requires (ske-cluster→filestorage-volume 패턴). 트리거 write 전 함수 READY 필수 (deploying-after-every-change quirk). capture envelope $.triggers[0].trigger_id는 cronjob 트리거와 동일 ARRAY envelope (TriggerCreateResponse). [docs-mapper UNPROVEN 2026-06-15, userguide how_to_guides &#x27;트리거 설정하기&#x27;]: 함수는 Cronjob과 API Gateway 두 가지 트리거 메커니즘만 지원. Deploying 상태(함수 생성/코드(inline·JAR) 수정/트리거 추가·수정/구성 변경 중)에서는 트리거 수정 불가 — 트리거 write 전 READY 재폴링 필수의 docs 근거. Cronjob 경고: 함수 timeout 완료 전 cron이 재호출하면 nested execution으로 실행 횟수·시간 증가 → 고비용 발생 (cost/blast-radius 주의, cronjob 노드 schedule 0 0 * * 0 주1회는 이 위험 낮음). live-validated run 27583285457 (2026-06-15)&quot;
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/resources/compute__scf.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>

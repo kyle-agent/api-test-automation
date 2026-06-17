@@ -1,0 +1,96 @@
+<!doctype html><html lang="ko"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>networking__firewall.yaml — Knowledge</title>
+<link rel="stylesheet" href="../assets/style.css">
+<script src="../data/context.js"></script>
+<style>
+.ctxbar{display:flex;gap:14px;flex-wrap:wrap;align-items:center;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin:0 0 16px;font-size:12px;color:var(--muted)}
+.ctxbar .seg b{color:var(--ink)} .ctxbar .badge{margin-left:auto;border-radius:12px;padding:2px 9px;font-weight:600}
+.ctxbar .snap{background:#fdf3e2;border:1px solid #ecd09a;color:#b5740b}
+.kpath{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--accent2);font-size:13px;margin:2px 0 14px}
+.kbody{color:var(--ink);line-height:1.6;font-size:14px}
+.kbody h1,.kbody h2,.kbody h3,.kbody h4{color:var(--ink);border-bottom:1px solid var(--line);padding-bottom:4px;margin:22px 0 10px}
+.kbody h1{font-size:22px} .kbody h2{font-size:19px} .kbody h3{font-size:16px} .kbody h4{font-size:14px}
+.kbody p,.kbody li{color:var(--ink)}
+.kbody a{color:var(--accent)}
+.kbody code{font-family:ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);
+  border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12.5px;color:var(--accent2)}
+.kbody pre{background:#f5f7f9;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+.kbody pre code{background:none;border:0;padding:0;color:var(--ink)}
+.kbody pre.raw{white-space:pre;color:var(--ink);font-size:12.5px}
+.kbody table{border-collapse:collapse;margin:12px 0;font-size:13px}
+.kbody th,.kbody td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+.kbody th{background:var(--panel2);color:var(--ink)}
+.kbody blockquote{border-left:3px solid var(--line);margin:10px 0;padding:2px 14px;color:var(--muted)}
+.kbody ul,.kbody ol{padding-left:22px}
+</style>
+</head><body><div class="wrap">
+<header class="top">
+  <h1>SCP API Regression Platform · Knowledge</h1>
+  <span class="crumbs">knowledge/formal/services/networking__firewall.yaml</span>
+  <nav class="nav">
+    <a href="../../index.html">📊 대시보드</a><a href="../console.html">🧩 콘솔</a>
+    <a href="../knowledge.html">📚 Knowledge</a>
+  </nav>
+</header>
+
+<div class="ctxbar" id="ctxbar"></div>
+
+<div class="panel">
+  <div class="kpath">knowledge/formal/services/networking__firewall.yaml</div>
+  <div class="kbody"><pre class="raw"># Layer 1 — per-service knowledge: networking/firewall
+# Schema: knowledge/formal/FORMAT.md · validate: python knowledge/formal/validate.py
+# Source: userguide /userguide/networking/firewall/overview/ + /how_to_guides/
+#         (fetched 2026-06-11)
+
+version: 1
+service: networking/firewall
+
+constraints:
+  - id: firewall-rule-quota-by-size
+    rule: &quot;rule quota depends on the firewall size tier: Extra Small=5, Small=100, Medium=200, Large=500, Extra Large=1000 rules (userguide)&quot;
+    provenance: docs
+  - id: firewall-default-size-exsmall
+    rule: &quot;a firewall is created at size Extra Small by default (5-rule quota!); the size can be changed afterwards on the Console firewall details page (userguide) — matches flavor_name EXSMALL in the API. Any scenario adding &gt;5 rules must resize first or expect a quota 4xx&quot;
+    provenance: docs
+  - id: firewall-prereq-gateway-services
+    rule: &quot;선행 서비스: VPC, Direct Connect and Load Balancer must exist first (userguide) — a firewall is an attribute of a gateway-type resource (created implicitly via firewall_enabled:true), not a standalone create&quot;
+    provenance: docs
+
+captures:
+  firewall-rule: $.firewall_rule.id
+
+states: {}
+
+quirks:
+  - id: firewall-no-standalone-create
+    note: &quot;there is no POST /v1/firewalls — only POST /v1/firewalls/rules (needs an existing firewall_id) and PUT /v1/firewalls/{firewall_id}; a firewall_id must be minted by creating a firewall-bearing resource: IGW (firewall_enabled), Transit Gateway (Uplink Firewall 연계서비스), Direct Connect or Load Balancer (userguide how_to: 단독으로 신규 생성할 수 없습니다)&quot;
+    provenance: docs
+  - id: firewall-name-auto-generated
+    note: &quot;the firewall NAME is auto-generated as {선행 서비스 타입}_Firewall / {자원명_Firewall_연결명} — it is never user-supplied; don&#x27;t send a name on create-by-proxy and don&#x27;t expect regr-prefix names in lists (sweep/reconciler must match by VPC/owner tag instead)&quot;
+    provenance: docs
+  - id: firewall-default-any-deny
+    note: &quot;a freshly ENABLED firewall applies a base Any-Deny: ALL inbound+outbound traffic is blocked until explicit Allow rules are added; a firewall toggled to 미사용 (disabled) instead applies Any-Allow and is NOT billed (userguide) — dataplane tests behind a new firewall need allow rules first&quot;
+    provenance: docs
+  - id: firewall-rules-top-down
+    note: &quot;rules apply in list order (top-down first-match); each rule has direction Inbound/Outbound, action Allow/Deny, an enable flag (비활성 rules don&#x27;t act), a unique rule ID and an Index used in log analysis; bulk creation via form/xlsx exists in console&quot;
+    provenance: docs
+  - id: firewall-console-states
+    note: &quot;console state machine: Creating -&gt; Active; also Editing, Deploying (배포 완료), Deleting, Error (userguide) — rule writes during Editing/Deploying are the suspected invalid-state 4xx window&quot;
+    provenance: docs
+</pre></div>
+</div>
+
+<div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/services/networking__firewall.yaml</code></div>
+</div>
+<script>
+const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",mode:"SNAPSHOT"};
+function esc(s){return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;");}
+const live=(CTX.mode||"").toUpperCase()==="LIVE";
+document.getElementById("ctxbar").innerHTML=
+  `<span class="seg">env <b>${esc(CTX.env)}</b></span><span class="seg">× suite <b>${esc(CTX.suite)}</b></span>`+
+  `<span class="seg">· sha <b>${esc(CTX.sha)}</b></span>`+(CTX.time?`<span class="seg">· ${esc(CTX.time)}</span>`:"")+
+  `<span class="badge ${live?'':'snap'}">${live?'LIVE':'SNAPSHOT'}</span>`;
+</script>
+</body></html>
