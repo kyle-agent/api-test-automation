@@ -1,0 +1,99 @@
+{
+  "_note": "Wave A read-only lookup promotions — 3 pure-GET docs nodes (no resource creation, no billing, closure=self). Materialized 2026-06-17 so the same light dispatch that runs generated__waveA1.json also promotes these model nodes docs->VALIDATED on a 2xx. Safe to enable: read-only.",
+  "lifecycles": [
+    {
+      "id": "gen-gpu-node-image",
+      "service": "compute/multinodegpucluster",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: gpu-node-image",
+      "steps": [
+        {
+          "name": "create-gpu-node-image",
+          "service": "multinodegpucluster",
+          "method": "GET",
+          "path": "/v1/gpu-nodes/images",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "verify-gpu-node-image-list",
+          "service": "multinodegpucluster",
+          "method": "GET",
+          "path": "/v1/gpu-nodes/images",
+          "expect_status": [
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen-cloudml-image",
+      "service": "ai-ml/cloud-ml",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: cloudml-image",
+      "steps": [
+        {
+          "name": "create-cloudml-image",
+          "service": "cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml/images",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "verify-cloudml-image-read",
+          "service": "cloud-ml",
+          "method": "GET",
+          "path": "/v1/cloud-ml/images",
+          "expect_status": [
+            200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gen-volume-type",
+      "service": "compute/virtualserver",
+      "enabled": true,
+      "_note": "composed by regression/scenarios/composer.py — targets: volume-type",
+      "steps": [
+        {
+          "name": "create-volume-type",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volume-types",
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "capture": {
+            "volume_type_id": "$.volume_types[0].id"
+          }
+        },
+        {
+          "name": "verify-volume-type-read",
+          "service": "virtualserver",
+          "method": "GET",
+          "path": "/v1/volume-types/{volume_type_id}",
+          "expect_status": [
+            200,
+            404
+          ]
+        }
+      ]
+    }
+  ]
+}

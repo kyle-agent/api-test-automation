@@ -264,8 +264,20 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   account). 7 Wave A.1 nodes stay blocked/gated (sts-token, trail,
   account-budget PF-04, diagnosis, secretvault-vault, certificate-import,
   cm-event-policy — see handoff).
-- **What to advance next:** dispatch the materialized Wave A.1 batch when the
-  lane clears (then triage → promote), confirm heavy rev 3 (static-NAT
+- **Coverage-max roadmap (2026-06-17): `docs/COVERAGE-MAX-PLAN.md`.** Grounded
+  finding: **offline coverage is MAXED** (C1 100% heavy-on / 52.9% light-only);
+  every further C3 gain (last published ~44.79%) is **dispatch-gated**. The 646
+  heavy-only endpoints are the frontier (DB engines ~190, networking/vpc 49,
+  baremetal-blockstorage 36, loadbalancer 29, organization 28, virtualserver 26,
+  …). Tiered dispatch plan with copy-paste run-request blocks: Tier 0 LIGHT
+  (Wave A batch, cheapest, lane CLEAR) → Tier 1 PG sub-ops (already-VALIDATED
+  cluster) → Tier 2 DB cluster families → Tier 3 heavy networking/storage/compute
+  → Tier 4 gated/billable/waiver singletons. Also materialized 3 safe read-only
+  lookup promotions (`generated__waveA-lookups.json`: gpu-node-image, cloudml-image,
+  volume-type). Validator 212 lifecycles / 0 errors.
+- **What to advance next:** **dispatch Tier 0 (LIGHT) per `docs/COVERAGE-MAX-PLAN.md`**
+  (lane is CLEAR; low blast, no heavy spend) → triage → promote, then walk Tiers
+  1→4. Confirm heavy rev 3 (static-NAT
   `publicip_id`, scr/fs recompose, docker-probe borrow), then continue R3
   verification waves over the **144 remaining docs nodes** (131/275 VALIDATED
   as of 2026-06-17) (compose → scoped
