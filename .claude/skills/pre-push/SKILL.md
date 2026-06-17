@@ -121,7 +121,9 @@ CHANGED_GO=$(echo "$STAGED_FILES" | grep -E "\.go$")
 ```bash
 if [ -n "$CHANGED_PY" ] && ([ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "requirements.txt" ]); then
   TEST_START=$(date +%s)
-  timeout 120 pytest -q 2>&1 | tail -20
+  # SCP repo: scope to the read-only smoke suite — never collect CRUD/heavy tests
+  # (they require SCP_ALLOW_MUTATIONS/DESTRUCTIVE/RUN_HEAVY, never set in pre-push).
+  timeout 120 pytest tests/smoke -m smoke -q 2>&1 | tail -20
   PYTEST_EXIT=$?
   TEST_TIME=$(($(date +%s) - TEST_START))
 fi

@@ -35,9 +35,21 @@ a parallel, conflicting system:
 | `project-init` | `ROADMAP.md` / `ARCHITECTURE.md` already exist (overwrite risk) |
 | `collab-audit` | generic; low priority |
 
+**Note — ideas were still mined from these.** We skipped the *skills*, but
+backported 9 concrete techniques from `session-start` / `session-checkpoint` /
+`harness-init` / `team-init` into the repo's own docs (Memory discipline, subagent
+STATUS enum, handoff resume-command rule, stale-reference check, severity→merge
+table, output-drift check, `conf·seen·obs` fact metadata, adversarial safety
+tests). See `agents/CONTEXT.md` "프로세스/하니스 도구 추가 (2026-06-17)".
+
 ## Notes
 
 - The rest of `.claude/` is git-ignored (local config); only `.claude/skills/`
   is tracked — see the exception in `.gitignore`.
 - `/token-audit` writes generated artifacts under `reports/`, which is
   git-ignored by design.
+- **Two distinct lesson/fact stores — don't conflate them.** `/retro` writes
+  *process/meta* lessons to `docs/lessons.md` (created on first use); SCP *domain*
+  facts (undocumented fields, state machines, call orders) stay in
+  `knowledge/validated-facts.md`. Both use a `conf·seen·obs` confidence line but
+  keep their own scale per store (validated-facts: 0.3 docs → 0.7+ live-2xx).

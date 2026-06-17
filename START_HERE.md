@@ -67,7 +67,9 @@ not duplicate them.
 
 - **Safety gates are sacred.** A run never changes cloud state unless explicitly
   opted in: `GET` always runs; `POST/PUT/PATCH` need `SCP_ALLOW_MUTATIONS=true`;
-  `DELETE` needs `SCP_ALLOW_DESTRUCTIVE=true`. Never weaken these defaults.
+  `DELETE` needs `SCP_ALLOW_DESTRUCTIVE=true`; heavy/billable lifecycles (VM, K8s,
+  DB) need `SCP_RUN_HEAVY=true`. Never weaken these defaults. (Canonical table:
+  `agents/CONTEXT.md` "Safety gates".)
 - **Domain knowledge is data, not code.** Call order, dependencies, quotas and
   scenarios live in `knowledge/` + `regression/scenarios/*.json` so a human can
   read and adjust them. Agents generate them; humans review them. The

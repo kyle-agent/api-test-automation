@@ -96,6 +96,9 @@ the next obvious objective is named for the following session.
 머지 전, Executor가 **실제로 바꾼 파일**을 그 Executor에게 **배정된 슬라이스**
 (`resources/<cat>__<svc>.yaml` + 관련 scenario/coverage 파일)와 대조한다.
 메커니즘: `git diff --stat`(worktree) ↔ 보고된 `changed-files:` 목록.
+(Executor 보고의 STATUS enum + `changed-files:` 계약은 `agents/PROMPTS.md`
+"Report format"이 정본 — STATUS 없거나 `changed-files:` 빠지면 최대 2회 재요청 후
+`BLOCKED` 처리.)
 배정 슬라이스 **밖**의 파일이 바뀌었으면(예: `resources/storage__backup.yaml`
 배정 agent가 무관한 파일까지 편집) **EXTRA-drift로 FLAG** — 조용히 머지하지
 말고 검토·정당화 후 커밋(정당화 안 되면 해당 변경 되돌리고 재배정).
