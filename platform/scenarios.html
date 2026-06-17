@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T19:53:14Z · <b>sha 8530c40</b>
+    2026-06-17T00:02:59Z · <b>sha 290230f</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -244,7 +244,7 @@
 
 
 <section>
-  <h2>시나리오 카탈로그 (190건)</h2>
+  <h2>시나리오 카탈로그 (193건)</h2>
   <form class="inline" method="get" action="/planning/scenarios">
     <input type="text" name="service" value=""
            placeholder="서비스 필터 (예: networking)">
@@ -2283,6 +2283,21 @@
     </tr>
     
     <tr>
+      <td><code>cloudmonitoring-readonly-shows</code></td>
+      <td>management/cloudmonitoring</td>
+      <td>8</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, READ-ONLY (no writes, no cleanup). EOL SERVICE (IB-034: Cloud Monitoring sunsets 2026-09 -&gt; ServiceWatch) — these 5 id-bound GETs are already entitlement</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__cloudmonitoring.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
       <td><code>idc-instance</code></td>
       <td>management/iam-identity-center</td>
       <td>6</td>
@@ -2472,6 +2487,21 @@
         
       </td>
       <td class="muted">Light governance lifecycle for loggingaudit (audit trails / CloudTrail-equivalent). Covers all 6 uncovered writes: createtrail(POST /v1/trails), settrail(PUT /v</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__loggingaudit.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>loggingaudit-logs-readonly</code></td>
+      <td>management/loggingaudit</td>
+      <td>2</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, READ-ONLY (no writes, no cleanup). Closes the static id-bound GET gap GET /v1/logs/{logging_id} (showlog) by the list-&gt;soft-capture-&gt;show idiom (the same</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/management__loggingaudit.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>
@@ -2795,7 +2825,7 @@
     <tr>
       <td><code>vpc-private-nat</code></td>
       <td>networking/vpc</td>
-      <td>6</td>
+      <td>8</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2810,7 +2840,7 @@
     <tr>
       <td><code>vpc-privatelink-service</code></td>
       <td>networking/vpc</td>
-      <td>11</td>
+      <td>12</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2825,7 +2855,7 @@
     <tr>
       <td><code>vpc-endpoint</code></td>
       <td>networking/vpc</td>
-      <td>11</td>
+      <td>12</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2840,7 +2870,7 @@
     <tr>
       <td><code>vpc-peering</code></td>
       <td>networking/vpc</td>
-      <td>15</td>
+      <td>16</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2855,7 +2885,7 @@
     <tr>
       <td><code>vpc-transit-gateway-children</code></td>
       <td>networking/vpc</td>
-      <td>15</td>
+      <td>17</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2870,7 +2900,7 @@
     <tr>
       <td><code>vpc-subnet-vip-nat</code></td>
       <td>networking/vpc</td>
-      <td>13</td>
+      <td>14</td>
       <td>
         
         <span class="cat test_bug">heavy</span>
@@ -2952,6 +2982,21 @@
         
       </td>
       <td class="muted">KMS transit-key CRYPTO lifecycle (Wave 2 coverage). The existing &#39;security-kms-key&#39; lifecycle covers create/get/list/update-description/delete; this sibling cov</td>
+      <td style="white-space:nowrap" title="regression/scenarios/lifecycles/security__kms.json">
+        <a href="#">보기</a> ·
+        <a href="#">편집</a></td>
+    </tr>
+    
+    <tr>
+      <td><code>security-kms-managed-readonly</code></td>
+      <td>security/kms</td>
+      <td>2</td>
+      <td>
+        
+        
+        
+      </td>
+      <td class="muted">Light, READ-ONLY (no writes, no cleanup). Closes the static id-bound GET gap GET /v1/managed-kms/transit/{key_id} (showmanagedkey) by the list-&gt;soft-capture-&gt;sh</td>
       <td style="white-space:nowrap" title="regression/scenarios/lifecycles/security__kms.json">
         <a href="#">보기</a> ·
         <a href="#">편집</a></td>

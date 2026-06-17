@@ -235,7 +235,7 @@
     
     
     <span class="pip"></span> 보는 중: <b>최신 발행 스냅샷</b> ·
-    2026-06-16T19:53:14Z · <b>sha 8530c40</b>
+    2026-06-17T00:02:59Z · <b>sha 290230f</b>
     (push) · 모든 수치는 이 스냅샷 기준
     
   </div>
@@ -247,18 +247,18 @@
 <div class="pipe">
   <a class="pstage" href="#sec-model">
     <div class="pl">① 자원 모델 <span style="font-weight:400;color:var(--faint)">재료</span></div>
-    <div class="pv">273</div>
+    <div class="pv">275</div>
     <div class="ps">자원별 사실: 의존·생성법·검증·삭제 ·
       <span style="color:var(--green);font-weight:700">검증 131</span> ·
-      문서 142</div>
+      문서 144</div>
     <div class="ps" style="color:var(--blue)">합성기가 의존을 따라 시나리오 생성 →</div>
     <span class="chev">→</span>
   </a>
   <a class="pstage" href="#sec-scen">
     <div class="pl">② 시나리오 <span style="font-weight:400;color:var(--faint)">실행 단위</span></div>
-    <div class="pv">190</div>
+    <div class="pv">193</div>
     <div class="ps">생성→검증→역순 정리 스텝 ·
-      합성 <b>61</b> · 수작업 129</div>
+      합성 <b>61</b> · 수작업 132</div>
     <div class="ps" style="color:var(--blue)">속성(mutation·destructive·heavy)이 게이트 통과해야 실행 →</div>
     <span class="chev">→</span>
   </a>
@@ -286,8 +286,8 @@
 
 <h2 id="sec-scen">② 시나리오 카탈로그 <span class="hint">실행되는 테스트 전체 목록 — ①에서 합성된 gen-* 와 수작업이 함께 (비고 클릭 = 전체 보기)</span></h2>
 <div class="fchips" id="scenChips">
-  <span class="fchip on" data-f="all"><b>190</b> 전체</span>
-  <span class="fchip" data-f="enabled"><b>167</b> enabled</span>
+  <span class="fchip on" data-f="all"><b>193</b> 전체</span>
+  <span class="fchip" data-f="enabled"><b>170</b> enabled</span>
   <span class="fchip" data-f="heavy"><b>77</b> heavy(과금성)</span>
   <span class="fchip" data-f="gen"><b>61</b> 합성(gen)</span>
   <span class="fchip" data-f="disabled"><b>23</b> disabled</span>
@@ -3530,6 +3530,30 @@
           <a href="#">편집</a></td>
       </tr>
       
+      <tr data-id="cloudmonitoring-readonly-shows" data-service="management/cloudmonitoring"
+          data-enabled="1"
+          data-heavy=""
+          data-gen="">
+        <td><code>cloudmonitoring-readonly-shows</code></td>
+        <td><span class="srv">management/cloudmonitoring</span></td>
+        <td>8</td>
+        <td>
+          
+          
+          
+          
+        </td>
+        <td>
+          
+          <div class="biz" onclick="this.classList.toggle('open')">Light, READ-ONLY (no writes, no cleanup). EOL SERVICE (IB-03… <span class="toggle">더보기</span>
+            <div class="more">Light, READ-ONLY (no writes, no cleanup). EOL SERVICE (IB-034: Cloud Monitoring sunsets 2026-09 -&gt; ServiceWatch) — these 5 id-bound GETs are already entitlement-class WAIVED in data/baselines/coverage_waivers.json (excluded from the C3 validation denominator); this lifecycle adds ONLY C1 reachabilit</div></div>
+          
+        </td>
+        <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__cloudmonitoring.json">
+          <a href="#">보기</a> ·
+          <a href="#">편집</a></td>
+      </tr>
+      
       <tr data-id="idc-instance" data-service="management/iam-identity-center"
           data-enabled="1"
           data-heavy="1"
@@ -3835,6 +3859,30 @@
           
           <div class="biz" onclick="this.classList.toggle('open')">Light governance lifecycle for loggingaudit (audit trails / … <span class="toggle">더보기</span>
             <div class="more">Light governance lifecycle for loggingaudit (audit trails / CloudTrail-equivalent). Covers all 6 uncovered writes: createtrail(POST /v1/trails), settrail(PUT /v1/trails/{trail_id}), starttrail(POST /v1/trails/{trail_id}/start), stoptrail(POST /v1/trails/{trail_id}/stop), deletetrail(DELETE /v1/trail</div></div>
+          
+        </td>
+        <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__loggingaudit.json">
+          <a href="#">보기</a> ·
+          <a href="#">편집</a></td>
+      </tr>
+      
+      <tr data-id="loggingaudit-logs-readonly" data-service="management/loggingaudit"
+          data-enabled="1"
+          data-heavy=""
+          data-gen="">
+        <td><code>loggingaudit-logs-readonly</code></td>
+        <td><span class="srv">management/loggingaudit</span></td>
+        <td>2</td>
+        <td>
+          
+          
+          
+          
+        </td>
+        <td>
+          
+          <div class="biz" onclick="this.classList.toggle('open')">Light, READ-ONLY (no writes, no cleanup). Closes the static … <span class="toggle">더보기</span>
+            <div class="more">Light, READ-ONLY (no writes, no cleanup). Closes the static id-bound GET gap GET /v1/logs/{logging_id} (showlog) by the list-&gt;soft-capture-&gt;show idiom (the same pattern iam-readonly-shows uses). The trail node captures trail_id, NOT logging_id, so the trail lifecycle never satisfies this GET. listlo</div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/management__loggingaudit.json">
@@ -4352,7 +4400,7 @@
           data-gen="">
         <td><code>vpc-private-nat</code></td>
         <td><span class="srv">networking/vpc</span></td>
-        <td>6</td>
+        <td>8</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4376,7 +4424,7 @@
           data-gen="">
         <td><code>vpc-privatelink-service</code></td>
         <td><span class="srv">networking/vpc</span></td>
-        <td>11</td>
+        <td>12</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4400,7 +4448,7 @@
           data-gen="">
         <td><code>vpc-endpoint</code></td>
         <td><span class="srv">networking/vpc</span></td>
-        <td>11</td>
+        <td>12</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4424,7 +4472,7 @@
           data-gen="">
         <td><code>vpc-peering</code></td>
         <td><span class="srv">networking/vpc</span></td>
-        <td>15</td>
+        <td>16</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4448,7 +4496,7 @@
           data-gen="">
         <td><code>vpc-transit-gateway-children</code></td>
         <td><span class="srv">networking/vpc</span></td>
-        <td>15</td>
+        <td>17</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4472,7 +4520,7 @@
           data-gen="">
         <td><code>vpc-subnet-vip-nat</code></td>
         <td><span class="srv">networking/vpc</span></td>
-        <td>13</td>
+        <td>14</td>
         <td>
           
           <span class="tag heavy">heavy</span>
@@ -4603,6 +4651,30 @@
           
           <div class="biz" onclick="this.classList.toggle('open')">KMS transit-key CRYPTO lifecycle (Wave 2 coverage). The exis… <span class="toggle">더보기</span>
             <div class="more">KMS transit-key CRYPTO lifecycle (Wave 2 coverage). The existing &#39;security-kms-key&#39; lifecycle covers create/get/list/update-description/delete; this sibling covers the 9 remaining transit WRITE ops + the 1 managed-kms WRITE. Spine: create transit key (key_type &#39;advanced&#39;, purpose &#39;rsa-2048&#39; from dat</div></div>
+          
+        </td>
+        <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/security__kms.json">
+          <a href="#">보기</a> ·
+          <a href="#">편집</a></td>
+      </tr>
+      
+      <tr data-id="security-kms-managed-readonly" data-service="security/kms"
+          data-enabled="1"
+          data-heavy=""
+          data-gen="">
+        <td><code>security-kms-managed-readonly</code></td>
+        <td><span class="srv">security/kms</span></td>
+        <td>2</td>
+        <td>
+          
+          
+          
+          
+        </td>
+        <td>
+          
+          <div class="biz" onclick="this.classList.toggle('open')">Light, READ-ONLY (no writes, no cleanup). Closes the static … <span class="toggle">더보기</span>
+            <div class="more">Light, READ-ONLY (no writes, no cleanup). Closes the static id-bound GET gap GET /v1/managed-kms/transit/{key_id} (showmanagedkey) by the list-&gt;soft-capture-&gt;show idiom (the same pattern iam-readonly-shows uses). managed-kms keys are SYSTEM-managed: there is NO create in the OpenAPI, so a synthetic </div></div>
           
         </td>
         <td style="white-space:nowrap" class="small" title="regression/scenarios/lifecycles/security__kms.json">
