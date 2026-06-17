@@ -23,6 +23,13 @@ from .config import Settings, settings
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 DESTRUCTIVE = {"DELETE"}
 RETRY_STATUS = {502, 503, 504}
+# Non-idempotent verbs must NOT be retried after a timeout / connection error:
+# the server may have applied the change while the response was lost (e.g. a
+# slow SKE cluster create that exceeds the client timeout), so a blind retry
+# creates a DUPLICATE — a 409 duplicate-name plus an orphaned, untracked
+# resource the lifecycle can never tear down. PUT/DELETE are idempotent and
+# stay retriable; POST/PATCH do not.
+NO_RETRY_ON_EXCEPTION = {"POST", "PATCH"}
 
 
 class MutationBlocked(Exception):
@@ -101,7 +108,8 @@ class ApiClient:
                     headers=hdrs, timeout=self.cfg.timeout)
             except requests.RequestException as exc:
                 last_exc = exc
-                if attempt < self.cfg.max_retries:
+                if (attempt < self.cfg.max_retries
+                        and method.upper() not in NO_RETRY_ON_EXCEPTION):
                     time.sleep(backoff)
                     backoff = min(backoff * 2, 16)
                     continue

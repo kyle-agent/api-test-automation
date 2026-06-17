@@ -834,6 +834,17 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # (e.g. the shared subnet being torn down, or a racing sweep).
                 or "state : deleting" in _tl or "state: deleting" in _tl
                 or ("state.invalid-format" in _tl and "deleting" in _tl)))
+            # Idempotent re-assertion on a SHARED resource: a verify/setup step
+            # that re-adds something already present has ACHIEVED its desired
+            # state, so it is SUCCESS, not a failure. Today's case: several
+            # parallel lifecycles each add the same secondary CIDR to the ONE
+            # shared VPC -> the first wins, the rest get
+            # scp-network.vpc.cidr-already-in-use. Only honoured when the step
+            # captures nothing (a pure verify/setup) so we never mask a create
+            # whose id we still need.
+            _is_already_present = (resp.status not in expected
+                                   and not step.get("capture")
+                                   and "cidr-already-in-use" in _tl)
             if resp.status not in expected and (_is_quota or _is_gateway_block or _is_dep_gone):
                 if bkind:  # the create did not take effect — give the slot back
                     budget.release(bkind)
@@ -852,7 +863,11 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                     f"[{lifecycle['id']}] environmental limit at step "
                     f"'{step['name']}': {resp.raw_text[:200]}")
 
-            status_ok = resp.status in expected
+            status_ok = resp.status in expected or _is_already_present
+            if _is_already_present:
+                print(f"  step '{step['name']}' -> {resp.status} "
+                      f"already-present (idempotent on shared resource) "
+                      f"-> treating as success")
             if status_ok:
                 for var, expr in step.get("capture", {}).items():
                     if _capture(resp.body, expr) is None:
@@ -870,7 +885,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                     group_fail_reason.setdefault(grp, reason)
                     _teardown_group(grp)
                 continue
-            assert resp.status in expected, (
+            assert resp.status in expected or _is_already_present, (
                 f"[{lifecycle['id']}] step '{step['name']}' "
                 f"{step['method']} {path} -> {resp.status}, expected {expected}\n"
                 f"{resp.raw_text[:500]}")
