@@ -1,76 +1,130 @@
-# IA.md — platform surfaces & canonical homes (2026-06-17 reorg)
+# IA.md — two-tier platform information architecture (v2, 2026-06-17)
 
-> The flow **catalog → model → compose → validate → run → results → ops** is now
-> stable. This file is the **canonical information architecture**: which surface
-> owns what, and the single-source rule that kills the 3×-duplicated coverage view.
-> Supersedes the ad-hoc screen sprawl accumulated stage-by-stage.
+> **v2 supersedes v1's framing.** v1 treated the FastAPI control plane as "the
+> platform" and the static export as a read-only mirror. v2 inverts to the
+> owner's model: the **Dashboard is the public main** (coverage + API health, for
+> everyone); the **per-service catalog → compose → plan → run → report** platform
+> is the **backend** that exists to build that coverage. *Viewing* needs no
+> server; only *defining/dispatching* needs the FastAPI control plane.
+> (v1's WS1–WS5 cleanup still holds — see "Relationship to v1" below.)
 
-## Two runtimes (clean split)
+## The two tiers
 
-| Runtime | What | Needs |
+```
+┌─ TIER 1 · PUBLIC MAIN (everyone) ───────────────────────────────┐
+│  📊 Dashboard — overall coverage (C1/C2/C3) + API health         │
+│     the front door: "how healthy & how covered is the SCP API?"  │
+│        └ drilldown: category → per-service health/coverage       │
+└────────┬─────────────────────────────────────────────────────────┘
+         │  "build/improve this service's coverage" → enter backend
+         ▼
+┌─ TIER 2 · BACKEND PLATFORM (builders) — Plan · Run · Report ────┐
+│  🗂  per-service CATALOG  (the organizing unit)                   │
+│        each service's endpoints/resources + that service's status │
+│  🧩  COMPOSE — combine services into a lifecycle (M5 composer)    │
+│  📋  PLAN → ▶ RUN → ✅ REPORT (verify)                            │
+│        results feed back into the Dashboard coverage ↑           │
+│   static (catalog/) = READ face · FastAPI control plane = WRITE   │
+└──────────────────────────────────────────────────────────────────┘
+                🔧 Ops — live resource tree / cleanup verdict (static, reads oplog)
+```
+
+**The coverage loop (why the platform exists):** Dashboard shows the gap → a
+builder enters the platform → picks services and **composes** them → plan → run →
+verify (Report) → coverage rises → reflected back on the Dashboard.
+
+## Runtimes — who needs a server
+
+| Surface | Runtime | Audience |
 |---|---|---|
-| **Published static** (GitHub Pages, `dashboard-data` branch) | read-only **Results + Ops** — what everyone sees | nothing (static) |
-| **Live control plane** (`controlplane/`, FastAPI+SQLite+htmx) | interactive **Plan + Run + intervene + author** | `uvicorn` server |
+| Dashboard (coverage + health) | **static** (Pages) | everyone |
+| per-service Catalog · Plan · Run · Report (**read/browse**) | **static** (Pages) | builders |
+| Ops (resource tree / cleanup verdict) | **static** (browser reads oplog) | everyone |
+| Author **save** · run **dispatch**/schedule · intervene · single-delete · AI | **FastAPI control plane** (`uvicorn`) | builders, deep-linked from catalog |
 
-## Canonical homes (single-source rule — render once, link/embed elsewhere)
+The static catalog hands every **write** off to the live control plane via a
+clearly-marked deep-link (e.g. edit → `/planning/resources/<id>`). No server →
+those actions show as "⚙ control plane required", everything else still browses.
+
+## Canonical homes (single-source — render once, link/embed elsewhere)
 
 | Concern | Canonical owner | Everyone else |
 |---|---|---|
-| Coverage ladder (C1/C2/C3) + conformance defects | **static dashboard** (`dashboard/build.py` → `index.html`, `services/*`) | platform **embeds** it via `/dashboard/*` proxy — NO re-render |
-| Live ops (resource tree · run history · cleanup verdict) | **`ops.html`** (static, reads oplog bucket) | platform links it |
-| Authoring (Catalog→Model→Compose→Validate) | **platform → Plan** (single linear flow) | — |
-| Run control (trigger/schedule/live/intervene/compare/triage) | **platform → Run + Report(run-centric)** | — |
-| Knowledge browse | **platform `/knowledge`** (one route) | — |
+| Coverage ladder + API health | **`dashboard/build.py`** → `index.html`, `services/*` (Tier-1 main) | catalog `report.html` **embeds/links** it — NO re-render |
+| per-service catalog · dependency graph · compose-focus | **`controlplane/graph_export.py`** → `catalog/` (catalog·plan·run·report) | — |
+| Live ops (resource tree · run history · verdict) | **`ops.html`** (static, oplog) | catalog links it |
+| Writes / live run control / authoring save | **FastAPI control plane** | catalog deep-links in |
 
-## Top-level nav (after reorg)
+## Top-level navigation
 
-**Static dashboard (Pages):** `Results · Services · Ops`  (+ "Platform" link if a live server is configured)
+- **Public (static dashboard):** `Dashboard(/) · Services · Ops` — with a
+  prominent **"build/improve coverage →"** that enters the per-service Catalog.
+- **Platform (catalog/):** `Catalog · Plan · Run · Report` — Plan/Run/Report kept
+  as the platform basics; every write affordance carries a **"⚙ control plane"**
+  deep-link/badge.
 
-**Live platform:** `Plan · Run · Report · Knowledge`
-- **Report** = run-centric only (run list / detail / compare / triage / archive) **+ embedded canonical dashboard** for coverage/conformance. The old `coverage`/`conformance`/`trends` re-render tabs are removed.
+## Per-service catalog (the organizing unit)
 
-## Plan = one linear flow (replaces the 4-headed authoring sprawl)
+Each service owns a catalog: its endpoints/resources + that service's
+coverage/health + a **"compose into a plan"** entry. The Dashboard's per-service
+drilldown (`services/<svc>`) **links into that service's catalog**. **Composing
+across services** (M5 `regression/scenarios/composer.py`) is the platform's
+primary interaction — plan = a chosen combination of services' resources.
 
-Stepper: **① Catalog → ② Model → ③ Compose → ④ Validate**
+## Read / Write / Live — the bucket rule (migration spec)
 
-1. **Catalog** — endpoint inventory + coverage status. Numbers **link to** the canonical dashboard (no re-render here).
-2. **Model** — resource-model nodes (`resources.html`/`resource_form.html`); the dependency graph is folded in here (retire the standalone `resource_graph` "demo" page).
-3. **Compose** — composer preview (`resource_compose.html`) → the composed-lifecycle list (folds in today's `/planning/scenarios`).
-4. **Validate** — **NEW panel**: surface `python -m regression.scenarios.validate` (clean / errors). This stage had **no UI** before.
+Don't reimplement complex platform screens statically — **classify and route**:
 
-AI drafts (`/ai/*`) become an **inline assist** inside Model/Compose, not a top-nav section.
+| Bucket | Lives in | In catalog |
+|---|---|---|
+| **READ** (catalog/model/deps/coverage/run-history/report/validate) | catalog/ static (baked at build) | shown directly |
+| **WRITE** (edit-save, dispatch, schedule, delete) | FastAPI control plane | a deep-link button only |
+| **LIVE** (live run timeline, intervene, inventory) | FastAPI / ops.html (oplog) | last-known snapshot + "open live" |
 
-## Retire (legacy / dead / duplicate)
+Progressive disclosure: the catalog top nav stays the 4 basics; rare/power
+features (schedules, compare, snapshot restore, AI triage) live one step in,
+under the control plane — not in catalog's primary nav.
 
-- platform `/reporting` `coverage`+`conformance`+`trends` re-render → **embed** the canonical dashboard instead.
-- `build.py` legacy readers (`smoke_status.tsv`, `param_status.tsv`, `data/conformance.json`, `junit-crud.xml`) — the unified `reports/results/*.jsonl` store is authoritative. Stop publishing `smoke_status.tsv`.
-- `gen_dep_map.py` manual copy-paste of the `DEP` const → **generate it at dashboard build time** so `ops.html` can't go stale.
-- duplicate knowledge route (`/knowledge` ≡ `/planning/knowledge`) → keep one.
-- vestigial `/runs` → `/reporting` redirect; composer "미탑재 degrade" stubs (composer is present now).
-- `base.html`: two CSS layers (legacy + token) → one token set; decorative header `환경`/`스위트` selects → bound on Run only (or removed).
-- `static_export.py` `PAGES`: align to the new IA; drop the per-file `view/*` fan-out (keep per-node `resource__*` pages) to shrink the ~199-page export.
+## Generators (must stay in repo + the publish job)
 
-## State stores (consolidate / document)
+| Output | Generator | Notes |
+|---|---|---|
+| `index.html` + `services/*` (Dashboard) + `ops.html` | `dashboard/build.py` | coverage+health; ops DEP map injected at build (WS3) |
+| `catalog/` (catalog·plan·run·report + data) | **`controlplane/graph_export.py`** | the platform static **read face**; edits deep-link to `/planning/resources/<id>` |
+| **RETIRE** `platform/*` static export | `controlplane/static_export.py` | duplicate of `catalog/` — drop it |
 
-Five overlapping stores today (`history.jsonl`, `verified_endpoints.json`, `endpoint_status.json`, `verified_endpoints_evidence.json`, oplog `index.json`). Target:
-- **Run history**: oplog `index.json` (published) + platform DB (live) — keep both, they serve different runtimes; document the merge in `controlplane/dashdata`.
-- **Trends**: `history.jsonl` (canonical).
-- **Cumulative endpoint state**: `verified_endpoints.json` + `endpoint_status.json` (merge state) — keep; fold `…_evidence.json` into one documented schema.
+`poc/scenario-viz/` stays a design reference (not published). All generators must
+run in the dashboard publish job (`api-test.yml`) → `dashboard-data` → Pages, so
+the static surfaces never go stale vs the model.
 
-## Execution workstreams (commit per WS, offline-test gated)
+## Relationship to v1 (WS1–WS5)
 
-| WS | Status | Scope |
-|----|--------|-------|
-| **WS1** | ✅ done | Results canonicalization — platform Report embeds dashboard; remove `build.py` legacy readers + stop publishing `smoke_status.tsv` |
-| **WS2** | ✅ done | Plan linear flow — Catalog→Model→Compose→**Validate**; retire `resource_graph` demo + dup knowledge route; demote `/ai/*` to inline assist |
-| **WS3** | ✅ done | Ops — generate `DEP` map at build time (retire `gen_dep_map.py` manual paste) |
-| **WS4** | ✅ done | Shell/legacy — `base.html` CSS unify + nav update; remove `/runs` redirect + composer stubs; `static_export` PAGES align + view-fan-out drop |
-| **WS5** | 🔄 in progress | Docs — this file + `controlplane/README.md`, `docs/OPS-DASHBOARD.md`, `docs/PLATFORM-PLAN.md` nav/IA sections; register in `docs/INDEX.md` |
+- **Still valid:** WS1 (coverage single-source = dashboard — *more* correct under
+  v2), WS3 (ops DEP build-time), WS4 (legacy cleanup), WS5 (docs).
+- **Rescope / retire:** WS2 (Plan templates *inside* the FastAPI app) and
+  `static_export.py`'s `platform/*` are **superseded by `catalog/`** as the static
+  face. The FastAPI control plane shrinks to the **write/live API** behind catalog.
 
-**Verify each WS** (offline, no network/creds):
-`PYTHONPATH=. python3 controlplane/tests_offline.py` · `…/tests_ai_offline.py` ·
-`runner/tests_offline.py` · `python -m dashboard.build` (offline render) ·
-`python -m controlplane.static_export --out /tmp/pe` · `python -m regression.scenarios.validate`.
+## Migration workstreams (v2) — to be detailed & approved before building
 
-**Scope guard:** all work on `claude/zealous-heisenberg-irf3xt`; nothing publishes from this
-branch (Pages publishes from `main` runs), so the live public dashboard is untouched until merged.
+> **Already in place (verified 2026-06-17):** `catalog/` is **already generated and
+> published** — `api-test.yml` (~line 1248) runs `python -m controlplane.graph_export
+> "$dd/catalog"` into the `dashboard-data` branch each build. `graph_export.py` emits
+> `catalog/plan/run/report.html` (+ `catalog.js`/`report.js`/`graph.js`); the catalog
+> already links **↑ to the dashboard** (`../index.html` "← 대시보드") and carries the
+> **"정의/수정은 control plane"** write deep-link. `report.html` is a **per-run** report
+> (step timings from `observations.jsonl`), NOT a coverage re-render — so no
+> single-source conflict with the dashboard. The 2-tier structure largely EXISTS;
+> the remaining work is **dedup + wiring + emphasis**, not building from scratch.
+
+| WS | Scope |
+|----|-------|
+| **V1 ✅ (mostly done)** | `graph_export.py` → `catalog/` already published by CI as the platform read face. Remaining: spot-check it renders cleanly on Pages. |
+| **V2** | Dashboard = front door: per-service drilldown (`services/<svc>`) links **down into** that service's catalog (catalog already links up; add the downlink). |
+| **V3** | Read/Write boundary: confirm every catalog write affordance deep-links to the control plane with a clear badge; graceful read-only when no server. |
+| **V4** | Per-service catalog + **compose-across-services** as the primary platform action — make "pick services → compose → plan" the foreground flow in `catalog/plan`. |
+| **V5** | **Retire `controlplane/static_export.py` (`platform/*`)** — it duplicates `catalog/`. Stop publishing `platform/`; repoint any links to `catalog/`. (Biggest cleanup.) |
+| **V6** | Docs reconcile (this file canonical; `controlplane/README.md`, `PLATFORM-PLAN.md`, `OPS-DASHBOARD.md`). |
+
+**Scope guard:** all work on `claude/zealous-heisenberg-irf3xt`; the live public
+Pages root is untouched until merged (only the `preview-reorg/` subdir is published).
