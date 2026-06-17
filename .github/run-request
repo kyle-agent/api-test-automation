@@ -1,15 +1,29 @@
-# Wave H HEAVY validation run (2026-06-16) — finish the payoff Wave G's timeout cut short.
-# Wave G (run 27626396618) PROVED the VPC root-cause fix: shared-VPC provision 2xx'd (18:22→18:26)
-# and the VPC-CRUD serial class PASSED (was failing in Wave F). BUT the broadened regr* reclaim
-# prefix + IGNORE_TTL matched a months-deep leftover backlog, and the reconciler deletes serially
-# with a 150s _wait_gone each, so the pre-run reclaim ran 3.5h and pushed ADOPT-class CRUD into the
-# 5h job timeout -> CANCELLED before the heavy adopters (aimlops/DBaaS/VM-full) could validate.
-# Two things changed since: (1) Wave G's 3.5h reclaim + post-run sweep CLEARED the backlog, so this
-# reclaim is small/fast; (2) IB-053 (a122f4d) TIME-BOXES the pre-run reclaim at 30m so it can never
-# starve the run again. Net: reclaim finishes fast -> provision 2xx (proven) -> ADOPT-class CRUD now
-# has ~4h budget -> gen-heavy-aimlops (SKE cluster -> aimlops release POST), heavy-shared-dbaas
-# (eventstreams/epas/postgresql cluster CREATE), VM-full + B/C id-bound reads RUN TO COMPLETION ->
-# first service-attributed 2xx promotes the held nodes docs->VALIDATED. C2 call-coverage recovers.
+# Wave I HEAVY — re-run ADOPT-class CRUD after the Wave H fixes + SCR docker probe.
+#
+# Wave H (run 27645841461): 145 passed / 12 failed / 3 skipped (2:47:50). All 12
+# failures were root-caused and fixed (commits dd33ca8..17af1f8):
+#   ②  core/http_client: POST/PATCH are no longer retried on a timeout. The slow
+#      SKE cluster create exceeded the 20s client timeout, the retry hit 409
+#      duplicate-cluster-name, and the cluster (created server-side) was orphaned
+#      because its id was never captured -> SKE chain (and dependent cloud-ml /
+#      aimlops-platform) could not validate. Fixed -> expect SKE + cloud-ml +
+#      aimlops to provision and promote this run.
+#   ①  engine: scp-network.vpc.cidr-already-in-use on a capture-less verify step
+#      is now SUCCESS (parallel lifecycles re-adding the same secondary CIDR to
+#      the ONE shared VPC) -> the 4 verify-vpc-add-cidr failures are gone.
+#   ③  6 isolated write steps: asg-schedule start_date -> YYYY-MM-DD (now 2xx);
+#      volume-transfer / lb-health-check / mariadb-archive / custom-image /
+#      privatelink made tolerant+optional (env/data/async-race 4xx, R3 to 2xx).
+#
+# docker_probe=true: one-shot SCR docker-login experiment in the regression-A job
+# (owner hypothesis 2026-06-12) — do the existing SCP access/secret keys satisfy
+# the Container Registry auth? A PUSH-OK verdict (SCR-DOCKER-PROBE: in the log)
+# means the scr-auth-key gate is removable and cloud-ml/SCR push unblock.
+#
+# NOTE: Wave H's sweep was cancelled at its 30m time-box, so a few leftovers
+# (incl. the SKE orphan regrskec8771e10) may remain; this run's time-boxed
+# pre-reclaim clears them before provision.
 mutations=true
 destructive=true
 heavy=true
+docker_probe=true
