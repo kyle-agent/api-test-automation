@@ -41,6 +41,12 @@
   line-height:16px;text-align:center;color:var(--muted);font-weight:700}
 /* disabled (read-only / control-plane only) buttons */
 .btn[disabled]{opacity:.5;cursor:not-allowed;filter:grayscale(.4)}
+/* A: control-plane deep-link buttons (anchors styled as .btn) */
+a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.cp-link{color:var(--muted);font-size:11px;text-decoration:none;border:1px solid var(--line);
+  border-radius:7px;padding:3px 7px;background:var(--panel)}
+.cp-link:hover{color:var(--ink);border-color:var(--accent)}
+.cp-note{font-size:11px;color:var(--muted);margin-top:6px}
 .reglist .ri{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:4px 6px;
   border-radius:7px;cursor:pointer;border-bottom:1px dashed var(--line)}
 .reglist .ri:hover{background:var(--panel2)}
@@ -52,6 +58,8 @@
   <span class="crumbs">/platform — Catalog → Plan → Run → Report (같은 그래프, 오버레이만 교체)</span>
   <nav class="nav">
     <a href="../index.html">📊 대시보드</a><a href="knowledge.html">📚 Knowledge</a>
+    <a id="cpOpen" target="_blank" rel="noopener">🧩 컨트롤플레인 ↗</a>
+    <a href="#" id="cpGear" onclick="setCP();return false" title="컨트롤플레인 주소 변경">⚙</a>
   </nav>
 </header>
 
@@ -91,6 +99,32 @@ const RES=window.RESULTS||{summary:{},perService:{}};
 const PS=RES.perService||{};
 const TH=(RES.thresholds||{high:80,mid:50});
 const CTX=window.CTX||{env:"?",suite:"?",sha:"sample",time:"",mode:"SNAPSHOT"};
+
+// ---- A: deep-link hand-off to the control plane (write/dispatch plane) ----
+// This static console is read-only; real edit/dispatch lives on the FastAPI
+// control plane. Resolve its base URL once: ?cp=<url> (persisted) → localStorage
+// → default localhost:8000 (dev today, the packaged-local server tomorrow). The
+// buttons below open that plane; the actual POST + safety gates stay server-side
+// (read-plane never bypasses a gate). Roadmap B = bundle the control plane so the
+// same buttons execute against a local install (docs/ROADMAP.md).
+const CP=(function(){
+  const q=new URLSearchParams(location.search).get("cp");
+  if(q){try{localStorage.setItem("scp_cp",q);}catch(e){}}
+  let saved=null;try{saved=localStorage.getItem("scp_cp");}catch(e){}
+  return (q||saved||"http://localhost:8000").replace(/\/+$/,"");
+})();
+const cpUrl=p=>CP+p;
+const enc=encodeURIComponent;
+const dispatchUrl=svc=>cpUrl("/testing?suite=full"+(svc?"&service="+enc(svc):""));
+const editUrl=id=>cpUrl("/planning/resources/"+enc(id));
+const newUrl=svc=>cpUrl("/planning/resources/_new"+(svc?"?service="+enc(svc):""));
+function setCP(){
+  const cur=CP;const v=prompt("컨트롤플레인 base URL (실제 실행/편집이 일어나는 FastAPI 서버):\n예) http://localhost:8000",cur);
+  if(v===null)return;
+  try{localStorage.setItem("scp_cp",v.trim().replace(/\/+$/,""));}catch(e){}
+  location.reload();
+}
+
 let tab="catalog";
 let targets=new Set(["ske-cluster","mysql-cluster","private-nat"].filter(V.exists));
 let choices={};
@@ -237,8 +271,11 @@ function knowledge(){
     <h3>이 정의로</h3>
     <div class="run-ctl">
       <button class="btn" id="toPlan">Plan에 추가 →</button>
-      <button class="btn ghost" disabled title="control plane 전용">편집(쓰기)</button>
-      <button class="btn ghost" disabled title="control plane 전용">+ 새 노드 생성</button></div>`;
+      <a class="btn ghost" href="${editUrl(selNode)}" target="_blank" rel="noopener"
+         title="컨트롤플레인에서 이 자원 정의 편집 (${esc(CP)})">편집(쓰기) ↗</a>
+      <a class="btn ghost" href="${newUrl(n.service)}" target="_blank" rel="noopener"
+         title="컨트롤플레인에서 새 노드 생성">+ 새 노드 생성 ↗</a></div>
+    <p class="cp-note">↗ = 컨트롤플레인(<code>${esc(CP)}</code>)에서 열림. 쓰기/실행은 거기서. <a href="#" class="cp-link" onclick="setCP();return false">서버 변경</a></p>`;
   document.getElementById("toPlan").onclick=()=>{targets.add(selNode);go("plan");};
 }
 
@@ -332,7 +369,9 @@ function planTab(){
     ${branchNodes.length?`<h3>분기 선택</h3>${bx}`:""}
     ${p.shared.size?`<h3>공유 인프라(1회)</h3><p class="small">${[...p.shared].map(s=>`<code>${s}</code>`).join(" ")}</p>`:""}
     <button class="btn" style="margin-top:10px" onclick="go('run')">이 plan을 Run으로 →</button>
-    <button class="btn ghost" disabled title="control plane 전용">dispatch(실행 트리거)</button>`;
+    <a class="btn ghost" href="${dispatchUrl(targets.size?N[[...targets][0]].service:'')}" target="_blank" rel="noopener"
+       title="컨트롤플레인 Run 콘솔에서 실제 dispatch (${esc(CP)})">dispatch(실행 트리거) ↗</a>
+    <p class="cp-note">↗ 컨트롤플레인 Run 콘솔이 대상 서비스로 미리 채워진 채 열립니다. 안전게이트·실행은 서버에서. <a href="#" class="cp-link" onclick="setCP();return false">서버 변경</a></p>`;
   document.querySelectorAll('#right input[type=radio]').forEach(r=>r.onchange=()=>{choices[r.dataset.key]=r.dataset.b;draw();});
 }
 
@@ -365,7 +404,9 @@ function runTab(){
   drawRun();
   document.getElementById("left").innerHTML=`<h2>실행 (데모)</h2>
     <div class="run-ctl"><button class="btn" id="play">▶ Play</button><button class="btn ghost" id="reset">↻ Reset</button>
-      <button class="btn ghost" disabled title="control plane 전용">실제 실행</button></div>
+      <a class="btn ghost" href="${dispatchUrl(targets.size?N[[...targets][0]].service:'')}" target="_blank" rel="noopener"
+         title="컨트롤플레인 Run 콘솔에서 실제 dispatch (${esc(CP)})">실제 실행 ↗</a></div>
+    <p class="cp-note">▶ Play는 병렬 스케줄 시뮬레이션. <b>실제 실행 ↗</b> 는 컨트롤플레인(<code>${esc(CP)}</code>)에서 진짜 run을 트리거합니다.</p>
     <div class="note"><b>병렬 모델:</b> depth가 같은(서로 의존 없는) 노드는 <b>동시 실행</b>,
       한 단계가 끝나야 다음 단계 시작(배리어). 예: vpc 뒤의 subnet·igw·public-ip는 병렬.</div>
     <h3>단계(level) 진행</h3><div id="levels"></div>`;
@@ -436,7 +477,11 @@ function reportTab(){
   document.getElementById("right").innerHTML=`<h2>단계별 수행시간</h2>
     <div class="scroll"><table class="tbl">
       <tr><th>node</th><th>L</th><th>create</th><th>ready</th><th>verify</th><th>합</th><th>구간</th></tr>${rows}</table></div>
-    <button class="btn ghost" style="margin-top:10px" onclick="go('catalog')">↺ Catalog로</button>`;
+    <div class="run-ctl" style="margin-top:10px">
+      <button class="btn ghost" onclick="go('catalog')">↺ Catalog로</button>
+      <a class="btn ghost" href="${dispatchUrl(r?N[selNode].service:(targets.size?N[[...targets][0]].service:''))}" target="_blank" rel="noopener"
+         title="컨트롤플레인에서 이 범위 재실행 (${esc(CP)})">재실행(dispatch) ↗</a></div>
+    <p class="cp-note">수행시간은 시뮬 추정. C3·pass/fail은 실측. <b>재실행 ↗</b> 는 컨트롤플레인에서. <a href="#" class="cp-link" onclick="setCP();return false">서버 변경</a></p>`;
 }
 
 // ---- tab switch ----
@@ -446,6 +491,9 @@ function go(t){stopRun();if(t==="run")clock=0;tab=t;
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>go(b.dataset.t));
 // re-select when the hash deep-link changes (e.g. #networking/loadbalancer)
 window.addEventListener("hashchange",()=>{if(applyURLService())go("catalog");});
+// header control-plane link (JS-resolved CP base)
+(function(){const o=document.getElementById("cpOpen");
+  if(o){o.href=cpUrl("/testing");o.title="실제 실행/편집 플레인 (Run·편집·dispatch) — "+CP;}})();
 ctxBar();
 draw();
 </script>
