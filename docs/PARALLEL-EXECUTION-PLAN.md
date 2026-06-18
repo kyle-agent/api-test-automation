@@ -96,3 +96,35 @@ lane 정의(`dependencies.json:vpc_schedule.lanes`) · -k 파티션 생성기
    우선순위에 포함할지.
 3. lane 실패 격리: lane 하나가 깨져도 다른 lane은 계속 (group/optional을
    lane 단위로 확장) — 동의하는지.
+
+---
+
+## Audit-confirmed finding + near-term lever (2026-06-18)
+
+**Symptom (owner, audit-log confirmed):** independent DBaaS engines run ~SERIALLY
+(mariadb→mysql→epas→…→postgresql, each ~8-12min) when they have NO inter-dependency
+and could run in parallel. The audit log (`/v1/logs`) showed postgresql starting
+only after the others finished — matching the recorded field report in
+`engine.active_lifecycles()` ("postgresql started only after mysql finished").
+
+**Principle (now explicit):** scenarios with NO inter-dependency must run with
+MAXIMUM parallelism; optimize for **total completion = max(independent lifecycles)**,
+not sum. Shared prerequisites (VPC/subnet/lookups) are built ONCE then adopted, so
+the dependent lifecycles fan out concurrently.
+
+**Root cause of the current serial-ness = the adopt-class runs `pytest -n 2`**
+(api-test.yml). It was lowered from `-n 6` in IB-050 (cap-poisoning bundle), but
+the actual provision RACE is separately guarded by IB-049 (engine xdist-gated
+skip: an adopter with no shared-VPC id under xdist SKIPS instead of self-creating).
+So with a successfully pre-provisioned shared VPC, **raising `-n` is safe** — every
+adopter adopts the SAME VPC/subnet (no `POST /v1/vpcs` race), and the ~7 heavy
+lifecycles (5 DBaaS + SKE + VM) run concurrently instead of 2-at-a-time.
+
+**Near-term lever (validate on a heavy run):** raise the adopt-class
+`-n 2 → ~6`. Expected: DBaaS phase ~sum(engines) → ~max(engine) ≈ 12min (vs
+~60min+). The audit-optimizer now MEASURES per-run wall-time, so the speedup is
+directly verifiable. Risks to watch on validation: shared-subnet IP contention
+(CONTEXT: DB-parallel-on-one-subnet confirmed) + API rate limits.
+
+**Bigger picture:** the full Stage-0/1/2 multi-VPC lane model above remains the
+end-state; the `-n` raise is the cheap first step toward it.
