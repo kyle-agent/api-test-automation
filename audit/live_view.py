@@ -217,6 +217,147 @@ def render(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
     return "".join(parts)
 
 
+# --- v2: layered-DAG live state (console-report style, not a gantt) ----------
+# map a loggingaudit resource_type -> the gen_dep_map KIND (plural collection).
+_KIND_ALIAS = {
+    "virtual-server": "servers", "cloud-function": "cloud-functions",
+    "postgresql": "clusters", "mysql": "clusters", "mariadb": "clusters",
+    "epas": "clusters", "cachestore": "clusters", "sqlserver": "clusters",
+    "vertica": "clusters", "searchengine": "clusters", "eventstreams": "clusters",
+    "instance-group": "instance-groups", "block-storage-group": "block-storage-groups",
+    "log-stream": "log-streams", "log-group": "log-groups", "security-group": "security-groups",
+    "nodepool": "nodepools", "public-ip": "public-ips", "publicip": "public-ips",
+    "internet-gateway": "internet-gateways",
+}
+
+
+def _kind_of(rtype: str, dep_kinds: set) -> str:
+    if not rtype:
+        return "?"
+    if rtype in _KIND_ALIAS:
+        return _KIND_ALIAS[rtype]
+    for cand in (rtype + "s", rtype + "es", rtype[:-1] + "ies" if rtype.endswith("y") else rtype, rtype):
+        if cand in dep_kinds:
+            return cand
+    return rtype + "s"
+
+
+def _state_of(d: dict) -> str:
+    """현재 상태: creating(생성중) / testing(테스트중) / created(생성됨) / deleted(삭제됨)."""
+    names = [n for _, n in d["ops"]]
+    if any("Delete" in n and "End" in n for n in names):
+        return "deleted"
+    created = any("Create" in n and "End" in n for n in names)
+    if not created:
+        return "creating"
+    # any non-create/non-delete op AFTER create end == being exercised (API 점검중)
+    seen_create_end = False
+    for _, n in d["ops"]:
+        if "Create" in n and "End" in n:
+            seen_create_end = True; continue
+        if seen_create_end and "Delete" not in n:
+            return "testing"
+    return "created"
+
+
+_STATE_COLOR = {"creating": "#58a6ff", "testing": "#d29922", "created": "#3fb950", "deleted": "#6e7681"}
+_STATE_KO = {"creating": "생성중", "testing": "테스트중", "created": "생성됨", "deleted": "삭제됨"}
+
+
+def render_dag(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
+    from collections import defaultdict
+    try:
+        from dashboard.gen_dep_map import dep_map_dict
+        dm = dep_map_dict()
+    except Exception:
+        dm = {"parent": {}, "depth": {}}
+    parent, depth = dm.get("parent", {}), dm.get("depth", {})
+    dep_kinds = set(depth)
+
+    # group resource instances by kind, aggregate state
+    kinds = defaultdict(lambda: {"insts": [], "states": defaultdict(int)})
+    for d in spans.values():
+        if not d["start"]:
+            continue
+        k = _kind_of(d["rtype"], dep_kinds)
+        st = _state_of(d)
+        kinds[k]["insts"].append((d, st))
+        kinds[k]["states"][st] += 1
+        kinds[k]["rtype"] = d["rtype"]
+
+    # x = depth (creation order); fallback depth 0
+    col = {k: depth.get(k, 0) for k in kinds}
+    maxc = max(col.values(), default=0)
+    bycol = defaultdict(list)
+    for k in kinds:
+        bycol[col[k]].append(k)
+    for c in bycol:
+        bycol[c].sort()
+
+    COLW, ROWH, BW, BH, PADX, PADY = 230, 70, 188, 52, 30, 70
+    rows = max((len(v) for v in bycol.values()), default=1)
+    W = PADX * 2 + (maxc + 1) * COLW
+    H = PADY + rows * ROWH + 40
+    pos = {}
+    for c, ks in bycol.items():
+        for i, k in enumerate(ks):
+            pos[k] = (PADX + c * COLW, PADY + i * ROWH)
+
+    P = [f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>live DAG</title>']
+    if refresh:
+        P.append(f'<meta http-equiv="refresh" content="{refresh}">')
+    P.append('''<style>
+ body{background:#0b1018;color:#c9d1d9;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:14px}
+ h1{font-size:17px;margin:0 0 2px} .sub{color:#8b949e;font-size:12px;margin-bottom:8px}
+ .lg{font-size:12px;color:#8b949e;margin:6px 0}
+ .lg i{display:inline-block;width:11px;height:11px;border-radius:50%;margin:0 3px 0 10px;vertical-align:-1px}
+ svg{background:#0d1117;border:1px solid #21262d;border-radius:8px}
+ g.node rect.box:hover{stroke:#fff}
+</style></head><body>''')
+    P.append('<h1>SCP 실행 위상 · 라이브 상태 <span style="color:#8b949e;font-size:12px">· loggingaudit</span></h1>')
+    P.append(f'<div class="sub">왼→오 = 생성 순서(의존 깊이) · 같은 열 = 동시 실행 가능 · '
+             f'{html.escape(meta.get("start",""))} → {html.escape(meta.get("end",""))}'
+             f'{" · 자동갱신 "+str(refresh)+"s" if refresh else ""}</div>')
+    P.append('<div class="lg">'
+             '<i style="background:#58a6ff"></i>생성중<i style="background:#d29922"></i>테스트중'
+             '<i style="background:#3fb950"></i>생성됨<i style="background:#6e7681"></i>삭제됨'
+             ' · 박스 안 숫자 = 인스턴스 수</div>')
+
+    P.append(f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
+    P.append('<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">'
+             '<path d="M0,0 L8,3 L0,6 z" fill="#3a4a5e"/></marker></defs>')
+    # column headers (depth = order)
+    for c in range(maxc + 1):
+        P.append(f'<text x="{PADX + c*COLW + BW/2}" y="{PADY-22}" fill="#566" font-size="11" text-anchor="middle">단계 {c}</text>')
+    # edges: parent -> child (both present)
+    for k in kinds:
+        par = parent.get(k)
+        if par in pos and k in pos:
+            ax, ay = pos[par]; bx, by = pos[k]
+            x1, y1 = ax + BW, ay + BH/2; x2, y2 = bx, by + BH/2
+            P.append(f'<path d="M{x1},{y1} C{x1+40},{y1} {x2-40},{y2} {x2},{y2}" fill="none" '
+                     f'stroke="#3a4a5e" stroke-width="1.3" marker-end="url(#ar)"/>')
+    # nodes
+    for k, (x, y) in pos.items():
+        info = kinds[k]; states = info["states"]
+        # dominant state for border color (priority: testing > creating > created > deleted)
+        dom = next((s for s in ("testing", "creating", "created", "deleted") if states.get(s)), "created")
+        n = sum(states.values())
+        badge = " ".join(f'<tspan fill="{_STATE_COLOR[s]}">{_STATE_KO[s]} {states[s]}</tspan>'
+                         for s in ("creating", "testing", "created", "deleted") if states.get(s))
+        tip = f'{k} ({info.get("rtype","")}) · {n} 인스턴스 · ' + ", ".join(f'{_STATE_KO[s]}:{states[s]}' for s in states)
+        P.append(f'<g class="node"><title>{html.escape(tip)}</title>'
+                 f'<rect class="box" x="{x}" y="{y}" width="{BW}" height="{BH}" rx="9" fill="#13202e" '
+                 f'stroke="{_STATE_COLOR[dom]}" stroke-width="2"/>'
+                 f'<text x="{x+10}" y="{y+19}" font-size="12.5" font-weight="600" fill="#e6edf3">{html.escape(k)} '
+                 f'<tspan fill="#7d8896" font-size="10">×{n}</tspan></text>'
+                 f'<text x="{x+10}" y="{y+37}" font-size="10">{badge}</text></g>')
+    P.append('</svg>')
+    P.append(f'<div class="sub" style="margin-top:8px">{len(kinds)} kinds · {sum(len(v["insts"]) for v in kinds.values())} 인스턴스 · 깊이 {maxc}</div>')
+    P.append('</body></html>')
+    return "".join(P)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Live resource-topology viewer from loggingaudit.")
     ap.add_argument("--events", help="pre-harvested loggingaudit JSONL (skip harvest)")
@@ -225,6 +366,8 @@ def main(argv=None):
     ap.add_argument("--hours", type=float, default=6.0, help="window = now-<hours> when --start absent")
     ap.add_argument("--out", default="reports/audit/live_view.html")
     ap.add_argument("--refresh", type=int, default=0, help="HTML auto-refresh seconds (live mode)")
+    ap.add_argument("--mode", choices=["dag", "gantt"], default="dag",
+                    help="dag = console-report layered topology w/ live state (default); gantt = timeline")
     a = ap.parse_args(argv)
 
     now = datetime.now(timezone.utc)
@@ -249,7 +392,8 @@ def main(argv=None):
         return 1
 
     spans = build_spans(events, now)
-    htmlout = render(spans, now, {"start": start, "end": end}, refresh=a.refresh)
+    _render = render_dag if a.mode == "dag" else render
+    htmlout = _render(spans, now, {"start": start, "end": end}, refresh=a.refresh)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(htmlout)
     live = sum(1 for d in spans.values() if d["start"] and not d["end"])
