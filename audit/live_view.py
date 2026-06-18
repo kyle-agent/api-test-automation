@@ -60,13 +60,27 @@ def harvest(start: str, end: str, out: str, max_pages: int = 80) -> str:
     return out
 
 
-def build_spans(events: list[dict], now: datetime):
+def _is_ours(name: str) -> bool:
+    """Only OUR test resources carry a regr*/zznet* owner tag. loggingaudit also
+    reports activity on PRE-EXISTING account resources (IAM policies/ACLs like
+    AdministratorAccess_ACL, platform log-streams), which have no Create event in
+    our window and would otherwise be mislabeled '생성중' and pulse forever — they
+    aren't ours and aren't running. Filter them out by default."""
+    return bool(_TAG.search(name or ""))
+
+
+def build_spans(events: list[dict], now: datetime, ours_only: bool = True):
     """Return per-resource-instance spans:
-    {(rtype, tag, name): {start, end|None, rtype, tag, name, ops:[(ts,event)]}}."""
+    {(rtype, tag, name): {start, end|None, rtype, tag, name, ops:[(ts,event)]}}.
+
+    ``ours_only`` (default) keeps only regr*/zznet*-tagged resources — the ones a
+    test run created — so pre-existing account resources don't pollute the view."""
     inst: dict = {}
     for e in sorted(events, key=lambda x: x.get("timestamp", "")):
         rt = e.get("resource_type") or "?"
         nm = e.get("resource_name") or ""
+        if ours_only and not _is_ours(nm):
+            continue
         key = (rt, _tag_of(e), nm)
         d = inst.setdefault(key, {"rtype": rt, "tag": _tag_of(e), "name": nm,
                                   "start": None, "end": None, "ops": []})
@@ -744,6 +758,9 @@ def main(argv=None):
                          "obs = test logs reports/results/observations (default for exec)")
     ap.add_argument("--obs", default="reports/results/observations.jsonl",
                     help="observations jsonl for --from obs / --mode exec")
+    ap.add_argument("--all-resources", action="store_true",
+                    help="include PRE-EXISTING account resources (untagged IAM "
+                         "policies/ACLs, platform log-streams); default = ours only")
     a = ap.parse_args(argv)
 
     now = datetime.now(timezone.utc)
@@ -801,7 +818,7 @@ def main(argv=None):
         print(f"no events file {ev_path}")
         return 1
 
-    spans = build_spans(events, now)
+    spans = build_spans(events, now, ours_only=not a.all_resources)
     _render = {"flow": render_flow, "dag": render_dag, "gantt": render}[a.mode]
     htmlout = _render(spans, now, {"start": start, "end": end}, refresh=a.refresh)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
