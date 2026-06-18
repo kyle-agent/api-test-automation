@@ -322,8 +322,10 @@ jobs:
     # one shared VPC + one shared subnet provisioned ONCE, every lifecycle
     # adopts them (SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env so every xdist
     # worker adopts the SAME live infra) and creates only its own child ->
-    # safe with pytest-xdist `-n 2` (IB-050: lowered from -n 6 so a provision
-    # miss can't fan out into a 6-worker create-VPC race against the 5-VPC cap).
+    # safe with pytest-xdist `-n 6` (re-raised from -n 2 on 2026-06-18 — see the
+    # adopt-pass step comment + CONTEXT.md "Parallel-scheduling principle"; a
+    # provision miss can no longer fan out into a create-VPC race because IB-049
+    # skips adopters that lack a shared-VPC id under xdist).
     # The complementary VPC-CRUD class (VPC_CRUD_K — lifecycles that MUST
     # self-create/mutate/peer VPCs) runs in the PARALLEL `regression-vpc-crud`
     # job (B) so the full run's wall-clock is max(A, B), not A+B.
@@ -554,13 +556,23 @@ jobs:
         # PARALLEL_K selects every CRUD lifecycle that is NOT a vpc-crud one (the
         # adopt-class + all non-VPC CRUD). They adopt the shared VPC+subnet via
         # env ids, so they only create their own child resource -> safe to run in
-        # parallel with pytest-xdist -n 2. A manual crud_filter (dispatch) or the
+        # parallel with pytest-xdist -n 6. A manual crud_filter (dispatch) or the
         # heavy.txt self-trigger filter is ANDed in to NARROW within the pass.
+        #
+        # PARALLELISM (2026-06-18): independent lifecycles (each engine requires=
+        # None, adopts the same shared VPC/subnet) must fan out to minimise TOTAL
+        # completion = max(independent), not sum. Raised -n 2 -> 6 (CONTEXT.md
+        # "Parallel-scheduling principle"). IB-050 lowered it to 2 inside a
+        # cap-poisoning BUNDLE whose real fix was the pre-run reclaim step +
+        # concurrency-group constant (both still in force); the provision RACE is
+        # separately guarded by IB-049's xdist-gated adopter skip, and adopters
+        # adopt the SAME VPC so more workers do NOT consume more VPC cap. Billable
+        # DBaaS quota stays protected by core.budgets (reserve-or-skip).
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}
         run: |
-          echo "Running ADOPT-class CRUD in parallel (-n 2)" | tee reports/crud.log
+          echo "Running ADOPT-class CRUD in parallel (-n 6)" | tee reports/crud.log
           MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
           if [ -n "$MANUAL" ]; then FILTER="($PARALLEL_K) and ($MANUAL)"; else FILTER="$PARALLEL_K"; fi
           echo "adopt-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
@@ -1279,6 +1291,51 @@ jobs:
         run: |
           python -m core.oplog emit --stage dashboard --status done --job dashboard || true
           python -m core.oplog finalize --history dashboard/history.jsonl || true
+
+      - name: Audit-log harvest + optimize (read-only, non-blocking)
+        # Pull this run's loggingaudit events for the run window [start .. now]
+        # and (if the sibling optimizer is present) derive a scenario time/cost
+        # report. READ-ONLY (GET /v1/logs only) and NON-BLOCKING: every command
+        # is `|| true` and the step is continue-on-error, so it can NEVER fail
+        # the run. Inherits the workflow-level SCP_* env block (creds + region),
+        # same as the sibling steps in this job.
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          mkdir -p reports/audit
+          # Run window: head_commit.timestamp (the run start) -> now (UTC).
+          START="${{ github.event.head_commit.timestamp }}"
+          # Normalize to the ISO8601 Z form the API expects (drop offset, force Z).
+          START="$(python - "$START" <<'PY'
+          import sys
+          from datetime import datetime, timezone
+          raw = (sys.argv[1] or "").strip()
+          try:
+              dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+              dt = dt.astimezone(timezone.utc)
+          except Exception:
+              dt = None
+          print(dt.strftime("%Y-%m-%dT%H:%M:%SZ") if dt else "")
+          PY
+          )"
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Fall back to a 6h lookback if head_commit.timestamp was unavailable
+          # (e.g. workflow_dispatch has no head_commit).
+          [ -n "$START" ] || START="$(date -u -d '6 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "audit window: $START .. $NOW"
+          python -m audit.harvest --start "$START" --end "$NOW" \
+            --out reports/audit/${{ github.run_id }}.jsonl || true
+          # The optimizer is built by another agent; tolerate its absence.
+          python -m audit.optimizer reports/audit/${{ github.run_id }}.jsonl \
+            --out reports/audit/${{ github.run_id }}-report.md || true
+      - name: Upload audit harvest + report
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit
+          path: reports/audit/
+          if-no-files-found: ignore
 
       - name: Test result summary
         if: ${{ always() }}

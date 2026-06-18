@@ -214,6 +214,15 @@ _PARAM_ALIASES = {
 }
 
 
+# Auto-probe runtime guards (2026-06-18): the full-ctx auto-seed fires many more
+# id-bound GETs per lifecycle than the old hand-seed, so bound the per-step count
+# and use a short, non-retrying deadline (read-only best-effort) so a slow read
+# can't blow up the run. Tunable via env for live tuning.
+import os as _os
+_PROBE_TIMEOUT_S = float(_os.environ.get("SCP_PROBE_TIMEOUT_S", "8"))
+_PROBE_MAX_PER_STEP = int(_os.environ.get("SCP_PROBE_MAX_PER_STEP", "60"))
+
+
 def _resolve_param(param, mapping):
     """Value for a catalog path-param: exact seed match, else a known alias in
     the seed. Returns None when neither is present."""
@@ -241,11 +250,19 @@ def _probe_reads(client, mapping, service):
         vals = {p: _resolve_param(p, mapping) for p in params}
         if any(v is None for v in vals.values()):
             continue
+        if called >= _PROBE_MAX_PER_STEP:   # runtime guard (auto-seed can match many)
+            print(f"  probe-reads[{service}]: cap {_PROBE_MAX_PER_STEP} reached, "
+                  f"skipping remaining")
+            break
         path = e.http_path
         for p, v in vals.items():
             path = path.replace("{%s}" % p, str(v))
         try:
-            resp = client.get(path, service=service)
+            # best-effort: short deadline, no retry — a slow/unreachable read must
+            # not cost cfg.timeout x retries (the auto-seed fires many more GETs
+            # than the old hand-seed, so an unbounded per-GET cost compounds).
+            resp = client.get(path, service=service,
+                              timeout=_PROBE_TIMEOUT_S, retry=False)
         except Exception as exc:  # network/host issue — record nothing, continue
             print(f"  probe ERROR {path}: {exc}")
             continue

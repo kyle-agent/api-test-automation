@@ -68,8 +68,14 @@ class ApiClient:
     # -- request -------------------------------------------------------------
     def request(self, method: str, path: str, *, params: dict | None = None,
                 json: Any | None = None, headers: dict | None = None,
-                service: str | None = None) -> Response:
+                service: str | None = None, timeout: float | None = None,
+                retry: bool = True) -> Response:
         self._guard(method)
+        # best-effort callers (e.g. read-only coverage probes) pass timeout=...,
+        # retry=False so a slow/unreachable endpoint costs one short deadline
+        # instead of cfg.timeout x cfg.max_retries + backoff (~42s).
+        _to = timeout or self.cfg.timeout
+        _max = self.cfg.max_retries if retry else 1
         if path.startswith("http"):
             url = path
         else:
@@ -93,7 +99,7 @@ class ApiClient:
         body = _json.dumps(json).encode("utf-8") if json is not None else b""
         backoff = 2.0
         last_exc: Exception | None = None
-        for attempt in range(1, self.cfg.max_retries + 1):
+        for attempt in range(1, _max + 1):
             hdrs = {"Accept": "application/json"}
             if json is not None:
                 hdrs["Content-Type"] = "application/json"
@@ -105,16 +111,16 @@ class ApiClient:
                 resp = self.session.request(
                     method.upper(), url,
                     data=body if json is not None else None,
-                    headers=hdrs, timeout=self.cfg.timeout)
+                    headers=hdrs, timeout=_to)
             except requests.RequestException as exc:
                 last_exc = exc
-                if (attempt < self.cfg.max_retries
+                if (attempt < _max
                         and method.upper() not in NO_RETRY_ON_EXCEPTION):
                     time.sleep(backoff)
                     backoff = min(backoff * 2, 16)
                     continue
                 raise
-            if resp.status_code in RETRY_STATUS and attempt < self.cfg.max_retries:
+            if resp.status_code in RETRY_STATUS and attempt < _max:
                 time.sleep(backoff)
                 backoff = min(backoff * 2, 16)
                 continue

@@ -4,8 +4,8 @@
     {
       "id": "gen-heavy-pg-replica",
       "service": "database/postgresql",
-      "enabled": true,
-      "_note": "owner-approved replica flow (2026-06-13, same-region: '한 리전에서 가능하면 하고 안되면 이야기 해줘' — userguide confirms standard replicas are same-region/same-subnet, max 5/DB): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. pg-switchover is deliberately ABSENT: userguide (how_to_guides/) defines Switch-Over as the HA Active<->Standby flip of one cluster ('HA 구성된 경우에는 Switch-over를 통해 Active-Standby 서버를 전환할 수 있습니다'), and the prove",
+      "enabled": false,
+      "_note": "owner-approved replica flow (2026-06-13, same-region: '한 리전에서 가능하면 하고 안되면 이야기 해줘' — userguide confirms standard replicas are same-region/same-subnet, max 5/DB): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. pg-switchover is deliberately ABSENT: userguide (how_to_guides/) defines Switch-Over as the HA Active<->Standby flip of one cluster ('HA 구성된 경우에는 Switch-over를 통해 Active-Standby 서버를 전환할 수 있습니다'), and the prove DE-DUP (2026-06-18, audit-confirmed): DISABLED — redundant with the comprehensive hand-written {engine}-cluster-subops-guarded (primary+replica+region-replica+restore+all sub-ops). This composed draft spun its OWN ~8-12min billable cluster for only a few unique endpoints (replica sync/reset/promote; -upgrade GET .../archive is now auto-probed by subops-guarded via the engine auto-probe). Per contract C4 drafts are not auto-enabled. TODO: fold the replica-state ops (sync-replica-state/reset-replica/promote) into {engine}-cluster-subops-guarded on its EXISTING replica, then this stays retired.",
       "steps": [
         {
           "name": "create-pg-engine-version",
