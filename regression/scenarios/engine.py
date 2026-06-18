@@ -701,9 +701,24 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             if step.get("wait"):
                 time.sleep(float(step["wait"]))
 
-            if step.get("probe_reads"):
-                mapping = {k: _fill(v, ctx) for k, v in step["probe_reads"].items()}
-                mapping = {k: v for k, v in mapping.items() if "{" not in v}
+            if step.get("probe_reads") is not None:
+                # AUTO-SEED from the full capture context (platform-level
+                # create->show, 2026-06-18): probe-reads fires every catalog GET
+                # whose path-params are all in the seed, so seeding it with EVERY
+                # captured attribute-id (the ctx) — not just a hand-listed subset —
+                # exercises the read of every child resource this lifecycle just
+                # created, for all services at once. (Historically each lifecycle
+                # hand-seeded one id, so nested child-id GETs were never probed; see
+                # docs/COVERAGE-GETID-PLAN.md §7.) Explicit probe_reads entries still
+                # apply ON TOP — for name-addressed segments that are not captured
+                # vars (e.g. stage_name: "stg{unique}"). Only scalar ctx values are
+                # usable as path-param substitutes; unfilled placeholders are dropped.
+                auto = {k: v for k, v in ctx.items()
+                        if isinstance(v, (str, int)) and v != ""}
+                explicit = {k: _fill(v, ctx)
+                            for k, v in (step.get("probe_reads") or {}).items()}
+                mapping = {**auto, **explicit}
+                mapping = {k: v for k, v in mapping.items() if "{" not in str(v)}
                 _probe_reads(client, mapping, step_service)
                 continue
 

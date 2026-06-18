@@ -211,5 +211,24 @@ PENDING LIVE VALIDATION (needs a Tier-0 apigw run to confirm the 2xx).
 - **api-keys per-id GET** `…/api-keys/{key_id}` stays **PF-02** (403 missing-IAM-action; LIST works) — not seeded.
 - **resource-policies** PUT setresourcepolicy = **PF-19** (500 ContactAdminForAssistance, baselined) → the GET read 404s downstream (no policy ever created). Separate investigation for the correct call / backend bug.
 
-### TODO — apply the same seed-broadening to the other 46 lifecycles
-Highest value: the 7 DBaaS `*-cluster-subops-guarded` (cluster_id → + instance-group/parameter ids) and iam/idc/backup. Do per-service alongside its next run, capturing child ids → seeding them. Track here as each is closed.
+### Piece 1 — DONE: engine auto-probe (supersedes per-lifecycle seeding)
+`regression/scenarios/engine.py` now AUTO-SEEDS `probe_reads` from the full
+capture context (`ctx`), merged with explicit entries, so EVERY lifecycle fires
+every id-bound GET reachable from what it just created — no per-lifecycle
+hand-seeding. The manual 46-lifecycle TODO is **obviated** (one engine change
+covers all). Offline-proven on apigw: seed{api_id}=10 GETs → auto-seed=18 (the 8
+child shows showresource/listmethods/showmethod/showstage/showauth/
+showaccesscontrol/showusageplan/listapikeys). Explicit seeds still apply for
+NAME-addressed segments not captured as vars (apigw `stage_name: "stg{unique}"`).
+Query-param GETs (apigw `reports`) still need an explicit step/model verify.
+PENDING LIVE VALIDATION. The apigw explicit child-id seed (46ef5d9) is now
+redundant-but-harmless.
+
+### Piece 2 — read-reachability report (`python -m spec.read_reachability`)
+Static catalog×model join classifying every id-bound GET: cat1-auto /
+cat2-needs-child / query-param / **model-gap**. The model-gap list is Piece 3's
+worklist. Output `docs/READ-REACHABILITY.md`. (in progress)
+
+### Piece 3 — burn down model-gaps
+Driven by Piece 2's model-gap list (params no node captures → add capture / child
+node / list-recover; fix catalog↔model param-name mismatches). Finite list.
