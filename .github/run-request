@@ -1,15 +1,8 @@
-# Tier 0 — LIGHT regression run (docs/COVERAGE-MAX-PLAN.md). Owner-authorized 2026-06-17.
-# Goal: lift C2/C3 across the light-reachable surface (726 endpoints) at low blast
-# radius and ZERO heavy/billable spend. Runs smoke + read-chains + the LIGHT CRUD
-# class (all non-heavy lifecycles, incl. the freshly-materialized Wave A batch
-# generated__waveA1.json + generated__waveA-lookups.json). Every created resource is
-# small config (resource-groups, network-logging storage, servicewatch alerts/
-# dashboards/log-groups, quick-query dry-run) with a destructive teardown + sweep.
-# Promotes docs->VALIDATED on a 2xx: quick-query-validate, alert, cm-account-resource,
-# gpu-node-image, cloudml-image, volume-type.
-#
-# Safety: mutations/destructive ON (light writes + their teardown), heavy OFF
-# (no VM/DB/K8s/billable infra). conformance OFF (regression-focused; AXIS2 unchanged).
+# Tier 0 — LIGHT regression run: VALIDATE the platform create→show(조회) change.
+# Confirms the engine auto-probe (probe_reads seeded from full capture context)
+# + the _PARAM_ALIASES name-mismatch resolver actually fire the child-id GETs as
+# real 2xx reads across services (apigw is the exemplar; VPC-free, light). Also
+# re-runs with the archivestorage 401 fix landed. ZERO heavy/billable spend.
 mutations=true
 destructive=true
 heavy=false
