@@ -271,6 +271,37 @@ def _purge_vpc_children(client, vid):
     first (they own ports), then any remaining ports, then subnets after clearing
     their VIPs. Safe because we only call this for our own regr*/zznet* VPCs."""
     n = 0
+    # 0. privatelink-services in this VPC must go FIRST — they own a customer
+    # `prvlink-*` port that blocks every subnet/VPC delete, and the service itself
+    # 409s while it has a connected endpoint. An AUTO-approved connection is ACTIVE
+    # (not REJECT-able), so DISCONNECT each connected endpoint (provider side) then
+    # delete the service; its customer port is reaped with it. (Learned reaping the
+    # leaked wave5 privatelink VPC, 2026-06-18.)
+    try:
+        pls_items = _items(client.get("/v1/privatelink-services", service="vpc").body)
+    except Exception:
+        pls_items = []
+    for pls in pls_items:
+        if not (isinstance(pls, dict) and pls.get("id") and str(pls.get("vpc_id")) == vid):
+            continue
+        psid = pls["id"]
+        try:
+            eps = _items(client.get(f"/v1/privatelink-services/{psid}/connected-endpoints",
+                                    service="vpc").body)
+        except Exception:
+            eps = []
+        for ep in eps:
+            eid = ep.get("id") if isinstance(ep, dict) else None
+            if not eid:
+                continue
+            try:  # provider-side disconnect (PUT needs SCP_ALLOW_MUTATIONS)
+                client.put(f"/v1/privatelink-endpoints/{eid}/connection",
+                           service="vpc", json={"type": "DISCONNECT"})
+            except Exception as exc:
+                print(f"  privatelink disconnect {eid} -> {exc}")
+        if _delete(client, "vpc", f"/v1/privatelink-services/{psid}"):
+            n += 1
+            _wait_gone(client, "vpc", f"/v1/privatelink-services/{psid}", 180, 10)
     for svc, coll in (("loadbalancer", "/v1/loadbalancers"),
                       ("vpc", "/v1/nat-gateways"),
                       ("vpc", "/v1/internet-gateways"),

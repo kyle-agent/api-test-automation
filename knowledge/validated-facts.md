@@ -661,6 +661,21 @@ First coverage-max dispatch (`docs/COVERAGE-MAX-PLAN.md` Tier 0). Result:
   a LAST-resort fallback pending LIVE proof of the identity path; delete the 8
   redundant entries once a live run shows the produced-index path firing 2xx.
   118 offline pass, validator 212/0. (engine: `regression/scenarios/engine.py`.)
+- **Leaked privatelink VPC teardown (2026-06-18).** A VPC can be permanently
+  stuck at 409 because a **privatelink-service** in it owns an auto-created
+  `prvlink-*` customer port (blocks subnet/VPC delete), and the service itself
+  409s (`privatelink-service.exist-connected-endpoint`) while it has a connected
+  endpoint. The connection is AUTO-approved → endpoint state **ACTIVE**, which is
+  **NOT REJECT-able** (`/approval type=REJECT` → `invalid-rejectable-state`; REJECT
+  only works on pending). Correct teardown (provider side): GET
+  `/v1/privatelink-services/{id}/connected-endpoints` → for each, PUT
+  `/v1/privatelink-endpoints/{eid}/connection {"type":"DISCONNECT"}` (enum is
+  DISCONNECT/RECONNECT, not on `/connection`'s sibling `/approval` which is
+  APPROVE/REJECT) → DELETE the service (202, async) → wait gone (its customer port
+  reaps with it) → delete subnet → delete VPC. Now encoded in
+  `cleanup.reconciler._purge_vpc_children` (runs first, before LB/NAT/ports).
+  NOTE: the disconnect PUT needs `SCP_ALLOW_MUTATIONS=true` (DELETE needs BOTH
+  MUTATIONS+DESTRUCTIVE — DELETE is in the MUTATING set too).
 - **FAST sweep mode (`SCP_SWEEP_NOWAIT=true`, 2026-06-18).** The reconciler's
   per-resource `_wait_gone` (blocking poll, up to 150–900s each) was the teardown
   bottleneck (audit: DBaaS clusters ~165s ea, SKE nodepools ~380s ea, all serial).
