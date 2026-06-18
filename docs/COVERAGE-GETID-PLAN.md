@@ -21,6 +21,13 @@
 
 ## 0 · Headline
 
+> **Update 2026-06-18:** the §7 read-reachability worklist (Piece 3b, the 89
+> `produced_by:null` self-params) is **RESOLVED** — producer-match on catalog
+> self path-params went **90.9% → 98.1%** (960/979), **100% non-null** (70 newly
+> produced + 19 honest waivers, 0 unexplained). Source of truth:
+> `data/api_catalog_params.json`. Full closure: §7 dated section
+> *"2026-06-18 — produced_by 98.1%, gap worklist resolved"*.
+
 | bucket | count | meaning |
 |---|---|---|
 | gap_getid total | **151** | id-bound GETs unreachable from enabled scenarios |
@@ -262,6 +269,17 @@ explicit lifecycle step / model `verify` with the params. Listed in
 
 ### Piece 3b — PRECISE worklist (89 self-params, no producer; from data/api_catalog_params.json 2026-06-18)
 
+> **RESOLVED 2026-06-18.** The 89 `produced_by:null` self-params below are now
+> closed — the regenerated sidecar `data/api_catalog_params.json` carries a real
+> `produced_by` + `producer_kind` + `capture` on every self path-param. **70 got
+> real producers, 19 are honest waivers, 0 remain unexplained.** Across all 979
+> self path-params in the catalog the producer-match is now **960/979 = 98.1%**
+> (was 90.9%), **100% non-null** (19 waivers + 960 produced). See the dated
+> closure section **"2026-06-18 — produced_by 98.1%, gap worklist resolved"**
+> below for the per-kind table, the explicit 19-waiver list, and how these
+> producers now feed the engine.py stage-2 identity auto-probe. The original
+> worklist table is kept verbatim for history.
+
 | service | unproduced self-param → endpoint | likely class |
 |---|---|---|
 | aimlops-platform (5) | cluster_id, cluster_id, cluster_id, cluster_id, cluster_id | needs capture / console-only id |
@@ -287,3 +305,72 @@ explicit lifecycle step / model `verify` with the params. Listed in
 | sqlserver (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
 | vertica (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
 | virtualserver (1) | subnet_id | needs capture / console-only id |
+
+---
+
+## 8 · 2026-06-18 — produced_by 98.1%, gap worklist resolved
+
+A multi-agent enrichment pass regenerated the sidecar
+`data/api_catalog_params.json`: every self path-param now carries
+`produced_by` + `producer_kind` (one of `create`, `create-xsvc`, `lookup`,
+`lookup-xsvc`, `detail-read`, `async-op`, `waiver`) + `capture`. Catalog-wide
+self path-param **producer-match went 90.9% → 98.1% (960/979)**, **100%
+non-null**. The Piece-3b worklist of **89** previously-`null` self-params closed
+as **70 real producers + 19 honest waivers, 0 unexplained null**. All figures
+below are mechanically derived from `data/api_catalog_params.json`.
+
+### (1) The 70 resolved — by producer_kind × service
+
+Evidence: `knowledge/formal/resources/*.yaml` + `data/api_docs.json`.
+
+| producer_kind | service | self-param(s) | producer (capture) |
+|---|---|---|---|
+| **detail-read** | mysql · mariadb · postgresql · epas · sqlserver · vertica · searchengine · eventstreams · cachestore (9 DBaaS svc) | `instance_group_id`, `block_storage_group_id` | `<svc>showcluster` cluster DETAIL read — nested capture `$.instance_groups[0].id` and `$.instance_groups[0].block_storage_groups[0].id` |
+| **async-op** | same 9 DBaaS svc | `request_id` | `<svc>createcluster` async envelope `$.request_id` |
+| **create-xsvc** | aimlops-platform · cloud-ml · data-flow · data-ops | `cluster_id` | external SKE cluster `container/ske/createcluster` `$.resource_id` (consumed as a body field) |
+| **create-xsvc** | virtualserver | `subnet_id` | vpc `createsubnet` `$.subnet.id` (cross-service) |
+| **create** | kms | `key_id` | `createkey` `$.key.id` (pseudo-resource ops keyed off the parent create) |
+| **create** | secretvault | `secret_vault_id` | parent create (`createsecret`/vault create) |
+| **create** | configinspection | `diagnosis_id` | parent create (run-diagnosis op) |
+| **create** | data-flow | `data_flow_id` | same-service create — 202/no-body convention; jsonpath **UNPROVEN** |
+| **create** | data-ops | `data_ops_id` | same-service create — 202/no-body convention; jsonpath **UNPROVEN** |
+| **create** | baremetal | `baremetal_id` | same-service create — 202/no-body convention; jsonpath **UNPROVEN** |
+| **create** | apigateway | `resource_id`, `parent_id` | parent `createapi`/`createresource` create |
+| **lookup** | kms | `key_id` (lookup-addressed reads) | key list/lookup |
+
+Counts by `producer_kind` for the resolved self-params (catalog-occurrence
+basis): `create`, `detail-read` (25 — the DBaaS instance/block-storage group
+reads), `create-xsvc`, `async-op` (9 — the DBaaS `request_id`), `lookup`. The
+**same-service 202/no-body creates** (`data_flow_id`, `data_ops_id`,
+`baremetal_id`) are matched by convention; their capture jsonpath is **UNPROVEN**
+and must be live-confirmed before a `verify` is added.
+
+### (2) The 19 honest waivers (producer_kind == "waiver")
+
+These have **no producer** — the id is not minted by any REST create we can
+drive, so a null `produced_by` is correct, not a gap.
+
+| service | param | # endpoints | why (waiver reason) |
+|---|---|---|---|
+| resourcemanager | `key` | 6 | composite **name-addressed** tag key (showresourcetag, showcomponentstag, updateresourcetagvalue, updatecomponentstagvalue, deleteresourcetag, deletecomponentstag) — no single create mints it |
+| resourcemanager | `resource_identifier` | 4 | composite **name-addressed** path (listcomponentstags, showresourcebycomponents, updatecomponentstags, deletecomponentstags) — region/service/type/identifier scheme, not a created id |
+| scr | `tags_id` | 8 | container image tag is **docker-pushed**, no REST create (checktagsvulnerability, downloadmanifest, showtags, showtagspackages, showtagssecrets, showtagsvulnerabilities, updatetagslockpolicy, deletetags) |
+| cloudmonitoring | `addrbookId` | 1 | **EOL / IB-034** (getadressbookmemberlist) — feature retired, no create path |
+
+(19 total: 6 + 4 + 8 + 1. Verified by filtering `producer_kind=="waiver"` over
+`data/api_catalog_params.json`.)
+
+### (3) Downstream: these producers feed the stage-2 identity auto-probe
+
+The `produced_by` + `capture` now populated on every self path-param is consumed
+by the stage-2 **identity auto-probe** in `regression/scenarios/engine.py`
+(§7 "Piece 1"): an id-bound GET resolves by identity from the producing step's
+capture context, so a lifecycle that creates / reads / async-completes a
+resource also **SHOWs** every nested child it minted — no per-lifecycle
+hand-seeding. The DBaaS `detail-read` chain is the headline beneficiary: the
+`<svc>showcluster` capture supplies `instance_group_id` /
+`block_storage_group_id`, and the `createcluster` `$.request_id` supplies
+`request_id`, so the cluster-subops GETs that §7 flagged as never-shown now
+resolve by identity. UNPROVEN same-service captures (`data_flow_id`,
+`data_ops_id`, `baremetal_id`) and the 19 waivers are deliberately excluded from
+auto-probe until a live run proves the envelope (or, for waivers, never).
