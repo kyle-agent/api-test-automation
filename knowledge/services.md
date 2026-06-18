@@ -104,6 +104,42 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Host:** regional. queue `$.id`; create body includes retention/size/key-reuse
   periods + units.
 
+## management / iam
+
+- **Host:** global-ish (management). 62 endpoints. Cross-link
+  `validated-facts.md`.
+- **Coverage levers (2026-06-18):**
+  - *Read-only LISTs (no gate, via smoke):* `accesskeylist`, `listendpoints`,
+    `listgroup`, `listpolicy`, `listrole`, `listsamlprovider`,
+    `listserviceaccount` all return 200 on a bare GET — pure smoke wins.
+  - *List→show chains (no gate, via read_chains):* `showrole`,
+    `showserviceaccount`, `accesskeyshow`, `listrolepolicybindings` derive an id
+    from their sibling list and return 200. `showgroup`/`showpolicy` likewise.
+  - *Account-scoped read:* there is **no `/v1/accounts` or `/v1/users`
+    collection list** (both 404). `account_id` is only derivable from a real
+    role's `$.role.account_id` (a `/v1/roles` item carries `account_id`). Use it
+    to call `listiamuser` = `GET /v1/accounts/{account_id}/users` (200, returns
+    `{users:[], count,page,size,sort}`). This is why read_chains can't auto-pair
+    listiamuser/getiamuser/listuserpolicybindings — the parent list doesn't exist.
+  - *Group/policy lifecycles (MUTATIONS gate):* `creategroup` → `$.group.id`,
+    `createpolicy` → flat `$.id`. Both delete cleanly. Already enabled.
+- **Empty-collection blockers (needs-peer-resource):** this account has **0 SAML
+  providers, 0 IAM users, 0 resource-policies** → `showsamlprovider`,
+  `getiamuser`, `listuserpolicybindings`, `updateiamuser`,
+  `updateiamuserpassword`, `deleteiamuser`, `showresourcepolicy` have no id to
+  target and can't be covered read-only until a peer creates one.
+- **Product-bug blocker (5xx, baselined):** `createrole` → 500
+  ContactAdminForAssistance. This blocks the whole role-mutation chain
+  downstream (`setrole`, `addrolepolicybindings`, `removerolepolicybinding`,
+  `removebulkrolepolicybindings`, `setroletrustpolicy`, `deleterole`,
+  `deletebulkrole`). `iam-role` lifecycle stays `enabled:false`.
+- **Entitlement / validation blockers:** `adduserpolicybinding` /
+  `removeuserpolicybinding` → 403; resource-policy mutations
+  (`addpermission`/`setpermission`/`removepermission`/`setresourcepolicy`/
+  `deleteresourcepolicy`) → 400 (need a real `srn` target).
+- **Coverage 2026-06-18:** 15 → **27 / 62** (read-only levers only; no resources
+  created, account left clean).
+
 ---
 
 ## Services not yet deeply explored (stubs — fill in as you go)
