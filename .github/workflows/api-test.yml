@@ -25,19 +25,27 @@ on:
   # itself (mutations/destructive/heavy/conformance/category/service/
   # crud_filter) — parsed by the spec job, honored by every gate. So a chat
   # session can start ANY kind of run by writing the file and pushing.
-  push:
-    # The file does not need to pre-exist: creating or editing it in a push is
-    # the trigger. Keep it OUT of unrelated commits so merges stay silent.
-    # SEQUENCING RULE (owner, 2026-06-10): do NOT push ANY run-request-touching
-    # commit (including the consume/delete) while a previous workflow run —
-    # INCLUDING its sweep job — is still in progress. Wait for the whole run
-    # to conclude first.
-    # branches: main ONLY — without this, pushing the run-request to BOTH main
-    # and the feature branch (routine here) fires the workflow on EACH ref =
-    # duplicate concurrent heavy runs (2x cost; found 2026-06-15, runs
-    # 27520649710 + 27520650231). Dispatch is a main-branch action.
-    branches: [main]
-    paths: [".github/run-request"]
+  # AUTOMATIC CI EXECUTION DISABLED (owner, 2026-06-18). Live runs now execute
+  # from the Claude remote environment (env vars + live API calls verified in a
+  # separate session), NOT from CI. The file-triggered `push` automation below
+  # is intentionally commented out so editing/pushing `.github/run-request` no
+  # longer starts a workflow run. `workflow_dispatch` is kept as a MANUAL-ONLY
+  # fallback (it never fires on its own). To re-enable file-triggered CI, restore
+  # the `push:` block:
+  #
+  #   push:
+  #     # The file does not need to pre-exist: creating or editing it in a push
+  #     # is the trigger. Keep it OUT of unrelated commits so merges stay silent.
+  #     # SEQUENCING RULE (owner, 2026-06-10): do NOT push ANY run-request-touching
+  #     # commit (including the consume/delete) while a previous workflow run —
+  #     # INCLUDING its sweep job — is still in progress. Wait for the whole run
+  #     # to conclude first.
+  #     # branches: main ONLY — without this, pushing the run-request to BOTH
+  #     # main and the feature branch (routine here) fires the workflow on EACH
+  #     # ref = duplicate concurrent heavy runs (2x cost; found 2026-06-15, runs
+  #     # 27520649710 + 27520650231). Dispatch is a main-branch action.
+  #     branches: [main]
+  #     paths: [".github/run-request"]
   workflow_dispatch:
     inputs:
       suite:
