@@ -2037,7 +2037,7 @@ window.MODEL = {
     }
    ],
    "ready_timeout": null,
-   "verify_n": 0,
+   "verify_n": 1,
    "has_delete": false
   },
   "quick-query-update-description": {

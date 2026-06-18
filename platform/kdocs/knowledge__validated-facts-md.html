@@ -776,6 +776,73 @@ validated after the scoped live run 2xxes. Do NOT remove the two
   <code>scp_original_image_type=k8s</code> query is REQUIRED (api_docs; omission → 400
   "Field required", runs 27483895557/27491816948). <code>size</code>/<code>page</code> optional.
 - Nodes promoted to VALIDATED: ske-image, ske-cluster-upgrade, ske-nodepool-upgrade.</p>
+</blockquote>
+<h2>Resource-model ↔ cross-service.yaml requires reconciliation (R1 validator WARNs, 2026-06-17)</h2>
+<blockquote>
+<p>conf: 0.6 · seen: 2026-06-17 · obs: 1 (offline reconciliation against VALIDATED create bodies)
+Five "requires diverges" WARNs resolved by aligning cross-service.yaml (the coarse
+L2 graph) to the resource-model node's VALIDATED create body — the body is the API
+truth for create-order:
+- <strong>lb-health-check</strong> requires <strong>[vpc, subnet]</strong> (was [] in L2). POST /v1/lb-health-checks
+  body keys on vpc_id + subnet_id — it is a STANDALONE top-level resource (no
+  loadbalancer_id), region-scoped/reusable but still needs vpc+subnet live first.
+- <strong>lb-server-group</strong> requires <strong>[vpc, subnet, lb-health-check]</strong> (was [load-balancer]
+  + lookups:[lb-health-check] in L2). POST /v1/lb-server-groups body keys on vpc_id +
+  subnet_id + lb_health_check_id — NOT loadbalancer_id. The LB link is INDIRECT: a
+  listener binds the server-group to the LB. health-check is a HARD prereq, not a lookup.
+- <strong>direct-connect</strong> requires <strong>[vpc]</strong> (was [vpc, security-group] in L2). POST
+  /v1/direct-connects body carries vpc_id ONLY. Security Group is a documented 선행
+  서비스 for the WORKLOAD behind the DC, not a DC create-body field → it stays as the
+  cross_constraint <code>dc-prereq-security-group</code>, NOT a create-order requires (IB-035).
+- <strong>secret</strong> (secretsmanager) requires <strong>[kms-key]</strong> (was [] on the top <code>secret</code> L2
+  node — the sibling docs node <code>secretsmanager-secret</code> already had [kms-key]). POST
+  /v1/secrets body sends kms_id = an encrypt-capable KMS key id.
+- <strong>backup-policy</strong> requires <strong>[backup-target]</strong> (was [server] in L2). POST /v1/backups
+  consumes server_uuid/server_guid DISCOVERED via the backup-target LOOKUP (GET
+  /v1/backups/backup-targets), which itself requires a live server. Added a
+  <code>backup-target</code> lookup node to cross-service.yaml so the L2 graph carries the same
+  edge (IB-031: closure unchanged, body uses {backup-target.*} only).</p>
+</blockquote>
+<p><strong>create-without-delete WARNs confirmed NO-TEARDOWN-BY-DESIGN</strong> (not modeling gaps;
+SCP API exposes no DELETE — parent/cluster delete reclaims, or op is fire-and-forget):
+- sqlserver ss-<em> family (add-block-storage, resize-block-storage, resize-server-type,
+  restart, sync-state, set-audit-log, patch, switchover, add-secondary, databases) —
+  cluster sub-ops; parent sqlserver-cluster DELETE reclaims everything.
+- storage/backup backup-manual (manual-backup trigger) &amp; backup-restore (creates a NEW
+  billable server reclaimed via compute DELETE — cross-service teardown unsupported,
+  node kept enabled:false).
+- billingplan planned-compute (no DELETE API; cancellation is a fee-incurring read-like
+  POST), storage/archivestorage archiving-policy (policy is immutable/deactivate-only),
+  storage/baremetal-blockstorage bm-volume-group (no DELETE /v1/volume-groups/{id} in
+  catalog; teardown via member-volume removal).
+- platform/sts sts-token &amp; management/servicewatch sw-</em> are owned by other agents —
+  their create-without-delete WARNs are likewise expected-by-design (expiring token /
+  catalog-read / fire-and-forget sub-ops).</p>
+<h2>Tier-0 LIGHT run (27725293499, 2026-06-18) — findings</h2>
+<blockquote>
+<p>conf: 0.8 · seen: 2026-06-18 · obs: 1 (run 27725293499, kr-west1)
+First coverage-max dispatch (<code>docs/COVERAGE-MAX-PLAN.md</code> Tier 0). Result:
+<strong>134 passed / 2 failed / 27 skipped</strong> (adopt-CRUD 44m; smoke+read-chains ✅).
+- <strong><code>heavy=false</code> in <code>.github/run-request</code> did NOT propagate to the env</strong> — the
+  adopt-CRUD job ran with <code>SCP_RUN_HEAVY: true</code> and the heavy ids in <code>ADOPT_K</code>.
+  No billable infra resulted because every heavy ADOPTER self-skips without a
+  shared VPC in the parallel xdist lane (<code>tests/crud/test_crud_lifecycle.py:43</code>
+  "no shared VPC … skipping adopter instead of self-creating": heavy-shared-dbaas,
+  compute-virtualserver-full, database-mysql/postgresql-cluster,
+  container-ske-cluster-nodepool, networking-vpn-gateway-tunnel,
+  vpc-privatelink-service, direct-connect). <strong>Implication:</strong> a Tier-0 "light"
+  dispatch still pulls in heavy <em>reachability-only</em> lifecycles (archivestorage)
+  because the heavy flag isn't gated; the no-shared-VPC fallback is what keeps it
+  non-billable. To force a truly light run, the run-request heavy gate needs to
+  reach <code>SCP_RUN_HEAVY</code> (workflow option-resolution bug — not yet fixed).
+- <strong>archivestorage reachability 401:</strong> archivestorage has NO dedicated auth key
+  (owner reachability-only override), so id-bound GETs return <strong>401</strong>, which the
+  4 non-optional reachability GETs (show-bucket-versioning/encryption/objects/
+  object-versions) did not tolerate → hard fail. Fixed: added 401 to their
+  expect_status (4xx-tolerated intent; <code>storage__archivestorage.json</code>).
+- <strong>iam-policy-extra-writes ReadTimeout</strong> (iam.e.samsungsdscloud.com, 20s) =
+  transient network flake, not a defect; passes on re-run (SCP_TIMEOUT=20 is tight
+  for iam under load). No code change.</p>
 </blockquote></div>
 </div>
 

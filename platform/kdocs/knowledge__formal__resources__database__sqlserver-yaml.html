@@ -64,6 +64,20 @@
 # it HAS add-secondary + databases(add/del) but has NO replicas/promote/
 # reset-replica/sync-replica-state/other-region/archive/kernel-upgrade endpoints.
 # switchover applies to the Always On Active↔Standby pair once a Secondary exists.
+#
+# NO-TEARDOWN-BY-DESIGN (validator create-without-delete WARN is EXPECTED for the
+# ss-* sub-op family — owner 2026-06-17): ss-add-block-storage, ss-resize-block-
+# storage, ss-resize-server-type, ss-restart, ss-sync-state, ss-set-audit-log,
+# ss-patch, ss-switchover, ss-add-secondary, ss-databases are cluster
+# SUB-OPERATIONS (POST/PUT /v1/clusters/{cluster_id}/&lt;op&gt; or .../instance-groups/
+# {id}/&lt;op&gt;), not independently deletable resources. The SCP API exposes NO DELETE
+# for any of them — their state lives inside the parent sqlserver-cluster, whose
+# DELETE /v1/clusters/{cluster_id} reclaims everything (block-storage adds are
+# IRREVERSIBLE in-place, secondary/databases are removed via their own add/del
+# bodies or by cluster delete, restart/sync/switchover/patch are fire-and-forget
+# actions with no resource to delete). So delete: is intentionally absent; the
+# warning is understood, not a modeling gap. (Mirrors the same family in the
+# mysql/postgresql/mariadb/epas models.)
 # Action nodes follow the SKE upgrade pattern (create=call + ready=RUNNING
 # re-poll, no capture/delete) — same as the postgresql action nodes.
 version: 1
@@ -305,7 +319,7 @@ resources:
     provenance: docs
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [resize-instance-group]}
-    notes: &quot;InstanceGroupResizeRequest {server_type_name REQ} — guarded 소스 body verbatim. composer create expect [200,201,202] 고정이라 same-type 400을 관용 못함 — masked-defect 방지용 의도된 hard (pg 선례).&quot;
+    notes: &quot;InstanceGroupResizeRequest {server_type_name REQ} — guarded 소스 body verbatim. composer create expect [200,201,202] 고정이라 same-type 400을 관용 못함 — masked-defect 방지용 의도된 hard (pg 선례). in-place resize sub-op — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; 부모 cluster DELETE가 회수).&quot;
 
   # ---- lifecycle/maintenance/backup/audit 액션 (body 있는 것은 guarded 소스
   # ---- verbatim; restart/stop/start/sync-state는 body 없음) ----------------
@@ -324,7 +338,7 @@ resources:
             timeout: 1800, interval: 30}
     provenance: docs
     source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [restart-cluster]}
-    notes: &quot;body 없음 (api_docs). 재기동 후 RUNNING 재폴링. 409 = 진행 중 작업 경합.&quot;
+    notes: &quot;body 없음 (api_docs). 재기동 후 RUNNING 재폴링. 409 = 진행 중 작업 경합. 액션 sub-op — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; 부모 cluster DELETE가 회수).&quot;
 
   ss-sync-state:
     code: &quot;db-sqlserver-sync-state&quot;
@@ -342,7 +356,7 @@ resources:
     provenance: docs
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [sync-cluster-state]}
-    notes: &quot;body 없음. userguide (managing): 패치/업그레이드 전 &#x27;서비스 상태 동기화를 통해 서비스 상태를 먼저 조회한 후&#x27; 수행 권고 — patch 선행 후보. 202 AsyncResponse.&quot;
+    notes: &quot;body 없음. userguide (managing): 패치/업그레이드 전 &#x27;서비스 상태 동기화를 통해 서비스 상태를 먼저 조회한 후&#x27; 수행 권고 — patch 선행 후보. 202 AsyncResponse. 액션 sub-op — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; 부모 cluster DELETE가 회수).&quot;
 
   ss-set-audit-log:
     code: &quot;db-sqlserver-set-audit-log&quot;
@@ -357,7 +371,7 @@ resources:
             timeout: 900, interval: 30}
     provenance: docs
     source: {lifecycle: sqlserver-cluster-subops-guarded, steps: [set-audit-log]}
-    notes: &quot;UpdateAuditLogRequest {use_audit_log bool} — guarded 소스 body verbatim. userguide (overview): Audit로 DB 접근/DDL·DML 모니터링; audit 로그를 Object Storage로 내보내는 log-export 전제. 가역 (false로 되돌릴 수 있음).&quot;
+    notes: &quot;UpdateAuditLogRequest {use_audit_log bool} — guarded 소스 body verbatim. userguide (overview): Audit로 DB 접근/DDL·DML 모니터링; audit 로그를 Object Storage로 내보내는 log-export 전제. 가역 (false로 되돌릴 수 있음). in-place PUT setter — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; use_audit_log:false 되돌림 또는 부모 cluster DELETE로 회수).&quot;
 
   ss-set-maintenance:
     code: &quot;db-sqlserver-set-maintenance&quot;
@@ -488,7 +502,7 @@ resources:
     provenance: docs
     source: {lifecycle: sqlserver-cluster-subops-guarded,
              steps: [switchover-cluster]}
-    notes: &quot;body 없음. userguide (overview): Always On 기반 Primary↔Secondary 수동 switchover. Secondary(ss-add-secondary)가 구성된 HA 클러스터에서만 유효 — ha_enabled:false 기본 body에서는 4xx 예상 → HA 변형 대기 게이트로 남긴다 (sqlserver-cluster body가 ha_enabled true + Secondary를 갖출 때까지 합성 제외). sqlserver는 reset-replica/sync-replica-state가 없어 postgresql식 분기 불가 — switchover가 유일한 HA 전환 동작. path param cluster_id = 해당 HA 클러스터.&quot;
+    notes: &quot;body 없음. userguide (overview): Always On 기반 Primary↔Secondary 수동 switchover. Secondary(ss-add-secondary)가 구성된 HA 클러스터에서만 유효 — ha_enabled:false 기본 body에서는 4xx 예상 → HA 변형 대기 게이트로 남긴다 (sqlserver-cluster body가 ha_enabled true + Secondary를 갖출 때까지 합성 제외). sqlserver는 reset-replica/sync-replica-state가 없어 postgresql식 분기 불가 — switchover가 유일한 HA 전환 동작. path param cluster_id = 해당 HA 클러스터. 액션 sub-op — DELETE 없음(파일 헤더 NO-TEARDOWN-BY-DESIGN; 부모 cluster DELETE가 회수).&quot;
 
   # ---- add-secondary — ESCALATE: SQL Server License Key (계정/벤더 자격,
   # ---- 자체 발급 절차 미문서) + Enterprise edition + 백업 활성화 필요.
