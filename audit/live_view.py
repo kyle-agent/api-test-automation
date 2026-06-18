@@ -510,6 +510,188 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
     return "".join(P)
 
 
+# --- v5: TEST-LOG-driven execution view -------------------------------------
+# loggingaudit only sees resource Create/Delete, so it misses the read/probe
+# calls and tells you nothing about pass/fail — and after teardown it shows
+# almost nothing (the "only log-stream left" problem). The TEST logs
+# (reports/results/observations*.jsonl) are the complete execution record: every
+# call, when, how long, ok/soft/fail. So we drive the execution-stage view from
+# them, and keep loggingaudit for *actual resource state* confirmation. Stages
+# still deepen ONLY by dependency depth (gen_dep_map) — the test logs just say
+# WHAT ran at each stage and how it went.
+
+# test-result palette (fill, border)
+_EXEC = {
+    "pass":    ("#c8efd4", "#1f9d57"),  # 통과 (ok)
+    "running": ("#cfe8ff", "#2b7de9"),  # 수행중 (fresh call) — pulses
+    "soft":    ("#ffe6ad", "#d99413"),  # 데이터/권한 필요 (soft)
+    "fail":    ("#ffd6d6", "#e5484d"),  # 오류 (fail)
+}
+_EXEC_KO = {"pass": "통과", "running": "수행중", "soft": "데이터필요", "fail": "오류"}
+_ACTIVE_S = 90  # a call whose last activity is within this of 'now' == still running
+
+
+def _path_kind(path: str, dep_kinds: set) -> str | None:
+    """Map an endpoint path to its dependency KIND = the deepest path collection
+    segment that gen_dep_map knows (e.g. /v1/vpcs/{id}/subnets -> subnets)."""
+    segs = [s for s in (path or "").split("/")
+            if s and not s.startswith("{") and not re.fullmatch(r"v\d+", s)]
+    cand = [s for s in segs if s in dep_kinds]
+    return cand[-1] if cand else None
+
+
+def build_exec_spans(observations: list[dict], now: datetime, dep_kinds: set) -> dict:
+    """One node per endpoint_key from the TEST logs: aggregate its calls into
+    {kind, name, start, end, ts_last, n, ms, cats, state}. State is the test
+    outcome (pass/soft/fail) + 'running' when its last call is within _ACTIVE_S."""
+    from collections import defaultdict
+    agg: dict = {}
+    for o in observations:
+        key = o.get("endpoint_key") or o.get("path") or "?"
+        ts = o.get("ts")
+        d = agg.setdefault(key, {"kind": _path_kind(o.get("path"), dep_kinds),
+                                 "name": key.split("/")[-1][:34], "full": key,
+                                 "path": o.get("path") or "", "tmin": None, "tmax": None,
+                                 "n": 0, "ms": [], "cats": defaultdict(int),
+                                 "source": o.get("source") or ""})
+        d["n"] += 1
+        d["cats"][o.get("category") or "?"] += 1
+        if isinstance(o.get("elapsed_ms"), (int, float)):
+            d["ms"].append(o["elapsed_ms"])
+        if ts:
+            d["tmin"] = ts if d["tmin"] is None else min(d["tmin"], ts)
+            d["tmax"] = ts if d["tmax"] is None else max(d["tmax"], ts)
+    now_ts = now.timestamp()
+    for d in agg.values():
+        c = d["cats"]
+        # worst-of outcome, but 'running' wins if the endpoint is still active
+        if d["tmax"] and (now_ts - d["tmax"]) <= _ACTIVE_S:
+            d["state"] = "running"
+        elif c.get("fail"):
+            d["state"] = "fail"
+        elif c.get("ok"):
+            d["state"] = "pass"
+        elif c.get("soft"):
+            d["state"] = "soft"
+        else:
+            d["state"] = "soft"
+        d["mean_ms"] = (sum(d["ms"]) / len(d["ms"])) if d["ms"] else 0
+    return agg
+
+
+def render_exec(agg: dict, now: datetime, meta: dict, refresh: int = 0) -> str:
+    """v5 — execution stages from the TEST logs: every tested endpoint, staged by
+    dependency depth, colored by pass/soft/fail (running pulses). Light theme."""
+    from collections import defaultdict
+    try:
+        from dashboard.gen_dep_map import dep_map_dict
+        depth = dep_map_dict().get("depth", {})
+    except Exception:
+        depth = {}
+
+    # column = dependency depth of the endpoint's kind; group col -> kind -> nodes
+    col_kind = defaultdict(lambda: defaultdict(list))
+    for d in agg.values():
+        k = d["kind"] or "(misc)"
+        col_kind[depth.get(k, 0)][k].append(d)
+    maxc = max(col_kind, default=0)
+
+    COLW, BW, BH, GAP, KGAP, PADX, PADY = 248, 222, 24, 4, 22, 24, 96
+    pos, col_h = {}, {}
+    for c in range(maxc + 1):
+        y = PADY
+        for k in sorted(col_kind.get(c, {})):
+            y += KGAP
+            for d in sorted(col_kind[c][k], key=lambda x: (x["tmin"] or 0)):
+                pos[id(d)] = (PADX + c * COLW, y, d, k)
+                y += BH + GAP
+            y += 6
+        col_h[c] = y
+    W = PADX * 2 + (maxc + 1) * COLW
+    H = max(col_h.values(), default=PADY) + 40
+
+    nstate = defaultdict(int)
+    for d in agg.values():
+        nstate[d["state"]] += 1
+
+    P = [f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>execution stages</title>']
+    if refresh:
+        P.append(f'<meta http-equiv="refresh" content="{refresh}">')
+    P.append('''<style>
+ body{background:#f5f7fb;color:#1f2733;font:12px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:14px}
+ h1{font-size:17px;margin:0 0 2px;color:#0f1722} .sub{color:#5b6675;font-size:12px;margin-bottom:8px}
+ .lg{font-size:12px;color:#5b6675;margin:6px 0} .lg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin:0 3px 0 12px;vertical-align:-1px;border:1px solid #0002}
+ svg{background:#fff;border:1px solid #e3e8ef;border-radius:10px}
+ @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+ .run{animation:pulse 1.1s ease-in-out infinite}
+ g.n rect:hover{stroke-width:2.5}
+</style></head><body>''')
+    P.append('<h1>SCP 테스트 수행 단계 · 실행 로그 기반</h1>')
+    P.append(f'<div class="sub">왼→오 = 의존 깊이(단계) · 각 박스 = 점검한 엔드포인트 1개 · 색 = 테스트 결과 '
+             f'· 출처 reports/results/observations · {html.escape(meta.get("start",""))}'
+             f'{" · 자동갱신 "+str(refresh)+"s" if refresh else ""}</div>')
+    P.append(f'<div class="lg">'
+             f'<i style="background:#c8efd4"></i>통과 {nstate["pass"]}'
+             f'<i style="background:#cfe8ff"></i>수행중 {nstate["running"]}(깜빡)'
+             f'<i style="background:#ffe6ad"></i>데이터필요 {nstate["soft"]}'
+             f'<i style="background:#ffd6d6"></i>오류 {nstate["fail"]}</div>')
+
+    P.append(f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
+    for c in range(maxc + 1):
+        P.append(f'<text x="{PADX + c*COLW + 4}" y="{PADY-26}" font-size="12" font-weight="700" fill="#8893a4">단계 {c}</text>')
+        if c < maxc:
+            xx = PADX + (c+1)*COLW - 12
+            P.append(f'<line x1="{xx}" y1="{PADY-34}" x2="{xx}" y2="{H-20}" stroke="#eef1f6"/>')
+    # kind sub-labels
+    for c in range(maxc + 1):
+        y = PADY
+        for k in sorted(col_kind.get(c, {})):
+            P.append(f'<text x="{PADX + c*COLW}" y="{y+13}" font-size="10.5" font-weight="700" fill="#aab3c0">{html.escape(k)}</text>')
+            y += KGAP + (BH + GAP) * len(col_kind[c][k]) + 6
+    # endpoint boxes
+    for (x, y, d, k) in pos.values():
+        st = d["state"]; fill, bd = _EXEC[st]
+        run = ' class="run"' if st == "running" else ""
+        dur = f'{d["mean_ms"]/1000:.1f}s' if d["mean_ms"] >= 1000 else f'{d["mean_ms"]:.0f}ms'
+        cats = " ".join(f'{c}:{n}' for c, n in d["cats"].items())
+        tip = (f'{d["full"]} · {d["path"]} · {_EXEC_KO[st]} · {d["n"]}회 호출 · '
+               f'평균 {dur} · {cats} · src={d["source"]}')
+        P.append(f'<g class="n"{run}><title>{html.escape(tip)}</title>'
+                 f'<rect x="{x}" y="{y}" width="{BW}" height="{BH}" rx="6" fill="{fill}" stroke="{bd}" stroke-width="1.4"/>'
+                 f'<circle cx="{x+10}" cy="{y+BH/2}" r="3.5" fill="{bd}"/>'
+                 f'<text x="{x+20}" y="{y+16}" font-size="10.5">{html.escape(d["name"])}</text>'
+                 f'<text x="{x+BW-6}" y="{y+16}" font-size="9" text-anchor="end" fill="#7a8493">{dur}{("·"+str(d["n"])) if d["n"]>1 else ""}</text></g>')
+    P.append('</svg>')
+    P.append(f'<div class="sub" style="margin-top:8px">{len(agg)} 엔드포인트 · {maxc+1} 단계 · '
+             f'통과 {nstate["pass"]} / 오류 {nstate["fail"]} / 데이터필요 {nstate["soft"]}</div>')
+    P.append('</body></html>')
+    return "".join(P)
+
+
+def _load_observations(path: str) -> list[dict]:
+    import glob as _glob
+    rows, seen = [], set()
+    files = sorted(_glob.glob("reports/results/observations-gw*.jsonl")) + [path] \
+        if path == "reports/results/observations.jsonl" else [path]
+    for f in files:
+        try:
+            for line in open(f):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    o = json.loads(line)
+                except Exception:
+                    continue
+                key = (o.get("endpoint_key"), o.get("status"), round(o.get("ts") or 0, 3))
+                if key in seen:
+                    continue
+                seen.add(key); rows.append(o)
+        except FileNotFoundError:
+            continue
+    return rows
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Live resource-topology viewer from loggingaudit.")
     ap.add_argument("--events", help="pre-harvested loggingaudit JSONL (skip harvest)")
@@ -518,13 +700,53 @@ def main(argv=None):
     ap.add_argument("--hours", type=float, default=6.0, help="window = now-<hours> when --start absent")
     ap.add_argument("--out", default="reports/audit/live_view.html")
     ap.add_argument("--refresh", type=int, default=0, help="HTML auto-refresh seconds (live mode)")
-    ap.add_argument("--mode", choices=["flow", "dag", "gantt"], default="flow",
-                    help="flow = per-instance topology, light, running pulses (default); "
+    ap.add_argument("--mode", choices=["flow", "dag", "gantt", "exec"], default="flow",
+                    help="flow = per-instance resource topology (loggingaudit); "
+                         "exec = test-log execution stages (pass/soft/fail); "
                          "dag = kind-level; gantt = timeline")
+    ap.add_argument("--from", dest="source", choices=["audit", "obs"], default=None,
+                    help="audit = loggingaudit resource state (default for flow/dag/gantt); "
+                         "obs = test logs reports/results/observations (default for exec)")
+    ap.add_argument("--obs", default="reports/results/observations.jsonl",
+                    help="observations jsonl for --from obs / --mode exec")
     a = ap.parse_args(argv)
 
     now = datetime.now(timezone.utc)
     end = a.end or now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # TEST-LOG source: execution stages straight from observations (complete
+    # record incl. probes + pass/fail), no harvest, no API. loggingaudit stays
+    # the source for *resource state* (flow/dag/gantt).
+    source = a.source or ("obs" if a.mode == "exec" else "audit")
+    if source == "obs" or a.mode == "exec":
+        try:
+            from dashboard.gen_dep_map import dep_map_dict
+            dep_kinds = set(dep_map_dict().get("depth", {}))
+        except Exception:
+            dep_kinds = set()
+        obs = _load_observations(a.obs)
+        if not obs:
+            print(f"no observations in {a.obs}")
+            return 1
+        # window filter: --start ISO, else now-<hours> (--hours 0 = full history).
+        win_lo = None
+        if a.start:
+            win_lo = _t(a.start).timestamp()
+        elif a.hours and a.hours > 0:
+            win_lo = now.timestamp() - a.hours * 3600
+        if win_lo is not None:
+            kept = [o for o in obs if (o.get("ts") or 0) >= win_lo]
+            obs = kept or obs  # don't blank the view if the window misses everything
+        agg = build_exec_spans(obs, now, dep_kinds)
+        htmlout = render_exec(agg, now, {"start": f"{a.obs} ({len(obs)} obs)", "end": end}, refresh=a.refresh)
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.out).write_text(htmlout)
+        from collections import Counter
+        sc = Counter(d["state"] for d in agg.values())
+        print(f"exec_view: {len(obs)} obs, {len(agg)} endpoints "
+              f"(pass {sc['pass']} / running {sc['running']} / soft {sc['soft']} / fail {sc['fail']}) -> {a.out}")
+        return 0
+
     if a.events:
         ev_path = a.events
         start = a.start or "(file)"
