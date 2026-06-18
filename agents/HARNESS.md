@@ -127,6 +127,12 @@ when repo var `SCP_RUN_CRUD=true`. Every job exports `APITEST_RUN_ID` so
 4. Persist hard-won facts to `knowledge/` + scenario `_note`s and commit them.
 5. Commit to the assigned branch with clear messages; push when done; no PR
    unless asked.
+6. **Record findings to git — hard rule.** Anything an agent confirms that's
+   worth remembering (a validated quirk, a required param/body shape, a confirmed
+   blocker, a proven backend bug) MUST be committed — `knowledge/` + scenario
+   `_note` + the relevant ledger/baseline — **every run, before ending**. The
+   container is ephemeral; an uncommitted finding is lost. A chat report is a
+   summary of what was committed, never the only copy.
 
 ### Memory discipline
 

@@ -54,6 +54,16 @@ resumable state: your row in `data/coverage_ledger.json` (`blockers`, `next_leve
 - A clean account: tear down everything you created (owner-tagged; verify gone).
 - A commit to the assigned branch (no PR; never put a model id in the message).
 
+## RECORD TO GIT — hard rule
+Anything you confirm that's worth remembering **goes into git, not just your chat
+report**: a validated quirk (required param, body shape, case-sensitivity, state
+machine) → `knowledge/services.md` + the scenario `_note`; a confirmed blocker
+(entitlement-403 / product-bug-5xx / heavy-prereq / needs-peer) → your
+`coverage_ledger.json` row (and `known_issues.json` if it's a proven backend bug);
+a fix → the scenario/body file. **The container is ephemeral — an uncommitted
+finding is lost.** Commit your durable findings every run before you end; report in
+chat is a summary of what you committed, never the only copy.
+
 ## Hard guardrails
 - Safety gates are opt-ins, never set "to make a test pass". A `soft`
   (needs data/permission/entitlement) is not a failure — don't fake it.
