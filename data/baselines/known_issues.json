@@ -56,6 +56,76 @@
       "classification": "Product Bug",
       "since": "2026-06-18",
       "note": "POST /v1/roles -> 500 ContactAdminForAssistance (iam-role-full create-role) with a complete body. ContactAdmin-class backend fault, same precedent as budget/resource-policy 500s. Observed in the 2026-06-18 iam coverage run. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/mariadb/mariadbsetarchiveconfig",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "PUT archive-config -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, mariadb-cluster-subops-guarded set-archive). ContactAdmin-class backend fault on a DB sub-op; the guarded lifecycle soft-skips and still records coverage. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/mariadb/mariadbregisterlogexportconfig",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "POST log-export-config -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, mariadb-cluster-subops-guarded register-log-export-config). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/mariadb/mariadbupgradekernel",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "PUT upgrade-kernel -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, mariadb-cluster-subops-guarded upgrade-kernel). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/epas/epassetarchiveconfig",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "PUT archive-config -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, epas-cluster-subops-guarded set-archive). ContactAdmin-class backend fault on a DB sub-op. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/epas/epasregisterlogexportconfig",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "POST log-export-config -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, epas-cluster-subops-guarded register-log-export-config). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/epas/epasupgradekernel",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "PUT upgrade-kernel -> 500 ContactAdminForAssistance against a real live cluster (heavy n6 DBaaS run, epas-cluster-subops-guarded upgrade-kernel). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/mysql/mysqlupgradekernel",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "PUT upgrade-kernel -> 500 ContactAdminForAssistance (heavy n6 DBaaS run, mysql-cluster-subops-guarded upgrade-kernel). ContactAdmin-class backend fault on a DB sub-op. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/postgresql/postgresqlsetarchiveconfig",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "PUT archive-config -> 500 ContactAdminForAssistance (heavy n6 DBaaS run, postgresql-cluster-subops-guarded set-archive). ContactAdmin-class backend fault on a DB sub-op. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/postgresql/postgresqlregisterlogexportconfig",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "POST log-export-config -> 500 ContactAdminForAssistance (heavy n6 DBaaS run, postgresql-cluster-subops-guarded register-log-export-config). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/postgresql/postgresqlupgradekernel",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "PUT upgrade-kernel -> 500 ContactAdminForAssistance (heavy n6 DBaaS run, postgresql-cluster-subops-guarded upgrade-kernel). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
     }
   ]
 }

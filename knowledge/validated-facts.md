@@ -719,5 +719,16 @@ First coverage-max dispatch (`docs/COVERAGE-MAX-PLAN.md` Tier 0). Result:
   target wall ≈ **max(single engine ~44 min)**, i.e. ~76 min saved on the DB
   phase alone. Re-raising is safe (IB-049 xdist-gated adopter-skip + IB-050
   pre-run reclaim/concurrency-group are the real cap-poisoning guards, NOT the
-  `-n` lowering — handoff key-fact #2). Still PENDING live validation on the
-  next heavy run (confirm DBaaS wall drops sum→max via `audit.optimizer`).
+  `-n` lowering — handoff key-fact #2).
+- **`-n 6` DBaaS fan-out VALIDATED LIVE (2026-06-18 heavy n6 run).** The
+  `heavy-shared-dbaas` worker fired 3 real billable cluster creates back-to-back
+  (within 28s) adopting the shared VPC, so they ran concurrently. From
+  loggingaudit create/delete Start/End: mariadb live-span 16.0m / epas 15.4m /
+  cache-store 14.6m. **Peak concurrent live DB clusters = 3** (> the -n2 baseline
+  peak of 2); **DBaaS-phase wall = 16.0m ≈ max(engine span), NOT sum (46.0m)** →
+  ~30m / **65% saved** vs serial on the DB phase. Confirms the `requires=None`
+  engines fan out under `-n 6` exactly as predicted (wall→max). 0 billable
+  survivors after teardown+sweep (3 independent rechecks). Coverage: +26 newly-
+  verified endpoints, 25 distinct DB sub-op 2xx. The 3 DB sub-ops set-archive /
+  register-log-export-config / upgrade-kernel return 500 ContactAdminForAssistance
+  on all 4 engines — product bugs, now baselined (`known_issues.json`).
