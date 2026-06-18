@@ -367,6 +367,18 @@ _FLOW = {
 }
 
 
+_LK = re.compile(r"[0-9a-f]{8}$")  # trailing 8-hex unique == per-lifecycle key
+
+
+def _lk(d: dict) -> str:
+    """Lifecycle key: resources from one lifecycle share the run's 8-hex unique
+    suffix (engine: ts_hex(4)+rand_hex(4)), so vpc/subnet/server of the same run
+    group together — lets us draw which-belongs-to-which edges."""
+    t = d["tag"] or ""
+    m = _LK.search(t)
+    return m.group(0) if m else t
+
+
 def _dur(d: dict, now: datetime) -> str:
     if not d["start"]:
         return ""
@@ -380,16 +392,21 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
     from collections import defaultdict
     try:
         from dashboard.gen_dep_map import dep_map_dict
-        depth = dep_map_dict().get("depth", {})
+        dm = dep_map_dict()
+        depth, parent = dm.get("depth", {}), dm.get("parent", {})
     except Exception:
-        depth = {}
+        depth, parent = {}, {}
     dep_kinds = set(depth)
 
     # column = creation-order depth of the instance's kind; group col -> kind -> instances
     col_kind = defaultdict(lambda: defaultdict(list))
     insts = [d for d in spans.values() if d["start"]]
+    kind_of = {}                       # id(d) -> kind
+    by_kind_lk = defaultdict(list)     # (kind, lifecycle-key) -> [d]
     for d in insts:
         k = _kind_of(d["rtype"], dep_kinds)
+        kind_of[id(d)] = k
+        by_kind_lk[(k, _lk(d))].append(d)
         col_kind[depth.get(k, 0)][d["rtype"]].append(d)
     maxc = max(col_kind, default=0)
 
@@ -436,18 +453,42 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
              f'<i style="background:#e6e9ee"></i>삭제됨 {nstate["deleted"]}</div>')
 
     P.append(f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
+    P.append('<defs><marker id="rel" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">'
+             '<path d="M0,0 L6,2.5 L0,5 z" fill="#aab6c6"/></marker></defs>')
     for c in range(maxc + 1):
         P.append(f'<text x="{PADX + c*COLW + 4}" y="{PADY-26}" font-size="12" font-weight="700" fill="#8893a4">단계 {c}</text>')
         if c < maxc:
             xx = PADX + (c+1)*COLW - 10
             P.append(f'<line x1="{xx}" y1="{PADY-34}" x2="{xx}" y2="{H-20}" stroke="#eef1f6"/>')
     # kind sub-labels
-    placed = set()
     for c in range(maxc + 1):
         y = PADY
         for rt in sorted(col_kind.get(c, {})):
             P.append(f'<text x="{PADX + c*COLW}" y="{y+13}" font-size="10.5" font-weight="700" fill="#aab3c0">{html.escape(rt)}</text>')
             y += KGAP + (BH + GAP) * len(col_kind[c][rt]) + 6
+
+    # relationship lines: parent-instance -> child-instance sharing one lifecycle
+    # key. The engine names every resource of a lifecycle with the same 8-hex
+    # unique, so a vpc and its subnet/server/etc. share _lk(); we connect a child
+    # to the parent-KIND instance(s) of its same lifecycle (which vpc owns which
+    # subnet). Drawn first so boxes sit on top.
+    xy = {id(d): (px, py) for (px, py, d, rt) in pos.values()}
+    edges = 0
+    for d in insts:
+        k = kind_of[id(d)]
+        par = parent.get(k)
+        if not par:
+            continue
+        for pd in by_kind_lk.get((par, _lk(d)), []):
+            if pd is d:
+                continue
+            ax, ay = xy[id(pd)]; bx, by = xy[id(d)]
+            x1, y1 = ax + BW, ay + BH / 2          # parent right edge
+            x2, y2 = bx, by + BH / 2               # child left edge
+            P.append(f'<path d="M{x1:.0f},{y1:.0f} C{x1+34:.0f},{y1:.0f} {x2-34:.0f},{y2:.0f} {x2:.0f},{y2:.0f}" '
+                     f'fill="none" stroke="#c3ccd9" stroke-width="1.1" marker-end="url(#rel)"/>')
+            edges += 1
+
     # instance boxes
     for (x, y, d, rt) in pos.values():
         st = _state_of(d)
@@ -464,7 +505,7 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
                  f'<text x="{x+20}" y="{y+16}" font-size="11" fill="{"#9aa4b2" if st=="deleted" else "#1f2733"}"{deco}>{html.escape(lab)}</text>'
                  f'<text x="{x+BW-6}" y="{y+16}" font-size="9.5" text-anchor="end" fill="#7a8493">{dur}</text></g>')
     P.append('</svg>')
-    P.append(f'<div class="sub" style="margin-top:8px">{len(insts)} 인스턴스 · {maxc+1} 단계</div>')
+    P.append(f'<div class="sub" style="margin-top:8px">{len(insts)} 인스턴스 · {maxc+1} 단계 · {edges} 연관선</div>')
     P.append('</body></html>')
     return "".join(P)
 
