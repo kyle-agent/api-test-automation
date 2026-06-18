@@ -322,8 +322,10 @@ jobs:
     # one shared VPC + one shared subnet provisioned ONCE, every lifecycle
     # adopts them (SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env so every xdist
     # worker adopts the SAME live infra) and creates only its own child ->
-    # safe with pytest-xdist `-n 2` (IB-050: lowered from -n 6 so a provision
-    # miss can't fan out into a 6-worker create-VPC race against the 5-VPC cap).
+    # safe with pytest-xdist `-n 6` (re-raised from -n 2 on 2026-06-18 — see the
+    # adopt-pass step comment + CONTEXT.md "Parallel-scheduling principle"; a
+    # provision miss can no longer fan out into a create-VPC race because IB-049
+    # skips adopters that lack a shared-VPC id under xdist).
     # The complementary VPC-CRUD class (VPC_CRUD_K — lifecycles that MUST
     # self-create/mutate/peer VPCs) runs in the PARALLEL `regression-vpc-crud`
     # job (B) so the full run's wall-clock is max(A, B), not A+B.
@@ -554,13 +556,23 @@ jobs:
         # PARALLEL_K selects every CRUD lifecycle that is NOT a vpc-crud one (the
         # adopt-class + all non-VPC CRUD). They adopt the shared VPC+subnet via
         # env ids, so they only create their own child resource -> safe to run in
-        # parallel with pytest-xdist -n 2. A manual crud_filter (dispatch) or the
+        # parallel with pytest-xdist -n 6. A manual crud_filter (dispatch) or the
         # heavy.txt self-trigger filter is ANDed in to NARROW within the pass.
+        #
+        # PARALLELISM (2026-06-18): independent lifecycles (each engine requires=
+        # None, adopts the same shared VPC/subnet) must fan out to minimise TOTAL
+        # completion = max(independent), not sum. Raised -n 2 -> 6 (CONTEXT.md
+        # "Parallel-scheduling principle"). IB-050 lowered it to 2 inside a
+        # cap-poisoning BUNDLE whose real fix was the pre-run reclaim step +
+        # concurrency-group constant (both still in force); the provision RACE is
+        # separately guarded by IB-049's xdist-gated adopter skip, and adopters
+        # adopt the SAME VPC so more workers do NOT consume more VPC cap. Billable
+        # DBaaS quota stays protected by core.budgets (reserve-or-skip).
         if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}
         run: |
-          echo "Running ADOPT-class CRUD in parallel (-n 2)" | tee reports/crud.log
+          echo "Running ADOPT-class CRUD in parallel (-n 6)" | tee reports/crud.log
           MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
           if [ -n "$MANUAL" ]; then FILTER="($PARALLEL_K) and ($MANUAL)"; else FILTER="$PARALLEL_K"; fi
           echo "adopt-pass -> -k \"$FILTER\"" | tee -a reports/crud.log

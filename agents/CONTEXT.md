@@ -318,10 +318,13 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   matching the field report in `engine.active_lifecycles()`). **Root cause = the
   adopt-class `pytest -n 2`** (lowered from `-n 6` in IB-050); the provision RACE
   itself is separately guarded by IB-049 (xdist-gated adopter skip), so with a
-  pre-provisioned shared VPC raising `-n` is safe. **Near-term lever:** raise the
-  adopt-class `-n 2 → ~6` and validate on a heavy run (audit-optimizer measures
-  per-run wall-time, so the speedup is directly verifiable). Full plan + the
-  end-state multi-VPC lane model: `docs/PARALLEL-EXECUTION-PLAN.md`.
+  pre-provisioned shared VPC raising `-n` is safe. **DONE (2026-06-18):** adopt-class
+  raised `-n 2 → 6` in `api-test.yml` (the IB-050 cap-poisoning fix was really the
+  pre-run reclaim step + concurrency-group constant, both still in force; reclaim
+  observed working in run 27735741382). **Validate on the next heavy run** — the
+  audit-optimizer measures per-run wall-time, so DBaaS phase sum→max(engine) is
+  directly verifiable. Full plan + end-state multi-VPC lane model:
+  `docs/PARALLEL-EXECUTION-PLAN.md`.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.
