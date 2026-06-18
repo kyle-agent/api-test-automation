@@ -649,3 +649,19 @@ First coverage-max dispatch (`docs/COVERAGE-MAX-PLAN.md` Tier 0). Result:
 - **iam-policy-extra-writes ReadTimeout** (iam.e.samsungsdscloud.com, 20s) =
   transient network flake, not a defect; passes on re-run (SCP_TIMEOUT=20 is tight
   for iam under load). No code change.
+- **`-n 2 → 6` parallelism change (dab8a41) was applied COSMETICALLY only**
+  (found 2026-06-18 via loggingaudit audit-optimizer on run 27735741382). The
+  comments (`api-test.yml:333,572`) and the echo (`:583` "in parallel (-n 6)")
+  were updated, but the actual adopt-class pass still hardcoded
+  `ARGS=(... -n 2 ...)` at `:587` — so the workflow kept serializing at 2 xdist
+  workers. Fixed: `:587` `-n 2 → -n 6`. (The handoff §1 hand-run recipe already
+  used `-n 6`; only the workflow file was stale.) **Evidence the lever is real:**
+  in the `-n 2` baseline (run 27735741382, df8fb87) the four DB engine families
+  (epas 24m / mariadb 31m / mysql 43m / postgresql 44m) ran **staggered, peak
+  concurrency 2** → DB-phase wall **120 min** (span-sum 142m). All four are
+  `requires=None` adopting the same shared VPC, so `-n 6` fans them out →
+  target wall ≈ **max(single engine ~44 min)**, i.e. ~76 min saved on the DB
+  phase alone. Re-raising is safe (IB-049 xdist-gated adopter-skip + IB-050
+  pre-run reclaim/concurrency-group are the real cap-poisoning guards, NOT the
+  `-n` lowering — handoff key-fact #2). Still PENDING live validation on the
+  next heavy run (confirm DBaaS wall drops sum→max via `audit.optimizer`).

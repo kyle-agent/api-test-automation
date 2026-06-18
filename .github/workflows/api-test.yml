@@ -584,7 +584,7 @@ jobs:
           MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
           if [ -n "$MANUAL" ]; then FILTER="($PARALLEL_K) and ($MANUAL)"; else FILTER="$PARALLEL_K"; fi
           echo "adopt-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
-          ARGS=(tests/crud -m crud -n 2 --junitxml=reports/junit-crud-parallel.xml)
+          ARGS=(tests/crud -m crud -n 6 --junitxml=reports/junit-crud-parallel.xml)
           [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
           set -o pipefail
           rc=0; python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log || rc=$?
