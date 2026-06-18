@@ -6356,6 +6356,20 @@
           ]
         },
         {
+          "name": "list-secret-versions",
+          "service": "secretsmanager",
+          "method": "GET",
+          "path": "/v1/secrets/{secret_id}/versions",
+          "group": "xcov-setsecretsmanagerlabel",
+          "optional": true,
+          "capture": {
+            "secret_version_id": "$.version_list[0].version_id"
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
           "name": "setsecretsmanagerlabel",
           "service": "secretsmanager",
           "method": "PUT",
@@ -6364,8 +6378,7 @@
           "optional": true,
           "json": {
             "label": "My Custom Label",
-            "move_to_version_id": "3265ab469f0d406d83073da3e11e7a6c",
-            "remove_from_version_id": "3265ab469f0d406d83073da3e11e7a6c"
+            "move_to_version_id": "{secret_version_id}"
           },
           "expect_status": [
             200,
