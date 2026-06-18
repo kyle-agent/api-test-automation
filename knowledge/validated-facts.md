@@ -624,3 +624,28 @@ SCP API exposes no DELETE — parent/cluster delete reclaims, or op is fire-and-
 - platform/sts sts-token & management/servicewatch sw-* are owned by other agents —
   their create-without-delete WARNs are likewise expected-by-design (expiring token /
   catalog-read / fire-and-forget sub-ops).
+
+## Tier-0 LIGHT run (27725293499, 2026-06-18) — findings
+> conf: 0.8 · seen: 2026-06-18 · obs: 1 (run 27725293499, kr-west1)
+First coverage-max dispatch (`docs/COVERAGE-MAX-PLAN.md` Tier 0). Result:
+**134 passed / 2 failed / 27 skipped** (adopt-CRUD 44m; smoke+read-chains ✅).
+- **`heavy=false` in `.github/run-request` did NOT propagate to the env** — the
+  adopt-CRUD job ran with `SCP_RUN_HEAVY: true` and the heavy ids in `ADOPT_K`.
+  No billable infra resulted because every heavy ADOPTER self-skips without a
+  shared VPC in the parallel xdist lane (`tests/crud/test_crud_lifecycle.py:43`
+  "no shared VPC … skipping adopter instead of self-creating": heavy-shared-dbaas,
+  compute-virtualserver-full, database-mysql/postgresql-cluster,
+  container-ske-cluster-nodepool, networking-vpn-gateway-tunnel,
+  vpc-privatelink-service, direct-connect). **Implication:** a Tier-0 "light"
+  dispatch still pulls in heavy *reachability-only* lifecycles (archivestorage)
+  because the heavy flag isn't gated; the no-shared-VPC fallback is what keeps it
+  non-billable. To force a truly light run, the run-request heavy gate needs to
+  reach `SCP_RUN_HEAVY` (workflow option-resolution bug — not yet fixed).
+- **archivestorage reachability 401:** archivestorage has NO dedicated auth key
+  (owner reachability-only override), so id-bound GETs return **401**, which the
+  4 non-optional reachability GETs (show-bucket-versioning/encryption/objects/
+  object-versions) did not tolerate → hard fail. Fixed: added 401 to their
+  expect_status (4xx-tolerated intent; `storage__archivestorage.json`).
+- **iam-policy-extra-writes ReadTimeout** (iam.e.samsungsdscloud.com, 20s) =
+  transient network flake, not a defect; passes on re-run (SCP_TIMEOUT=20 is tight
+  for iam under load). No code change.

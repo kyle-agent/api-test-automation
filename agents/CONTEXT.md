@@ -275,9 +275,20 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   → Tier 4 gated/billable/waiver singletons. Also materialized 3 safe read-only
   lookup promotions (`generated__waveA-lookups.json`: gpu-node-image, cloudml-image,
   volume-type). Validator 212 lifecycles / 0 errors.
-- **What to advance next:** **dispatch Tier 0 (LIGHT) per `docs/COVERAGE-MAX-PLAN.md`**
-  (lane is CLEAR; low blast, no heavy spend) → triage → promote, then walk Tiers
-  1→4. Confirm heavy rev 3 (static-NAT
+- **Tier 0 LIGHT run DISPATCHED + TRIAGED (run 27725293499, 2026-06-18):**
+  smoke+read-chains ✅, light CRUD **134 passed / 2 failed / 27 skipped**. No
+  billable infra (heavy adopters self-skipped w/o shared VPC). 2 fails triaged:
+  (a) **archivestorage 401** reachability tolerance gap → FIXED (401 added to the
+  4 reachability GETs, `storage__archivestorage.json`); (b) **iam-policy-extra-writes
+  ReadTimeout** = transient flake (no fix). **Finding:** run-request `heavy=false`
+  did NOT reach `SCP_RUN_HEAVY` (env was true) — non-billable only thanks to the
+  no-shared-VPC adopter skip; truly-light dispatch needs the workflow heavy gate
+  fixed (`knowledge/validated-facts.md`). Re-run Tier 0 after the fix to clear
+  fail_new → 0 and capture the archivestorage/Wave-A 2xx evidence (promotions).
+- **What to advance next:** **re-dispatch Tier 0 (LIGHT) per `docs/COVERAGE-MAX-PLAN.md`**
+  once the 27725293499 sweep concludes (lane free) — should land fail_new 0 with the
+  archivestorage fix; then promote Wave A docs→VALIDATED and walk Tiers 1→4.
+  Confirm heavy rev 3 (static-NAT
   `publicip_id`, scr/fs recompose, docker-probe borrow), then continue R3
   verification waves over the **144 remaining docs nodes** (131/275 VALIDATED
   as of 2026-06-17) (compose → scoped

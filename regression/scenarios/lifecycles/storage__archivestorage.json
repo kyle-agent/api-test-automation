@@ -56,10 +56,11 @@
           "expect_status": [
             200,
             400,
+            401,
             403,
             404
           ],
-          "_note": "reachability-only id-bound GET (owner): access-tested off bucket_id, 4xx tolerated"
+          "_note": "reachability-only id-bound GET (owner): access-tested off bucket_id, 4xx tolerated incl 401 (no archivestorage dedicated auth key → 401 is the expected reachability response, run 27725293499)"
         },
         {
           "name": "show-bucket-encryption",
@@ -68,10 +69,11 @@
           "expect_status": [
             200,
             400,
+            401,
             403,
             404
           ],
-          "_note": "reachability-only id-bound GET (owner): access-tested off bucket_id, 4xx tolerated"
+          "_note": "reachability-only id-bound GET (owner): access-tested off bucket_id, 4xx tolerated incl 401 (no archivestorage dedicated auth key → 401 is the expected reachability response, run 27725293499)"
         },
         {
           "name": "show-bucket-objects",
@@ -80,10 +82,11 @@
           "expect_status": [
             200,
             400,
+            401,
             403,
             404
           ],
-          "_note": "reachability-only id-bound GET (owner): access-tested off bucket_id, 4xx tolerated"
+          "_note": "reachability-only id-bound GET (owner): access-tested off bucket_id, 4xx tolerated incl 401 (no archivestorage dedicated auth key → 401 is the expected reachability response, run 27725293499)"
         },
         {
           "name": "show-bucket-object-versions",
@@ -92,10 +95,11 @@
           "expect_status": [
             200,
             400,
+            401,
             403,
             404
           ],
-          "_note": "reachability-only id-bound GET (owner): access-tested off bucket_id, 4xx tolerated"
+          "_note": "reachability-only id-bound GET (owner): access-tested off bucket_id, 4xx tolerated incl 401 (no archivestorage dedicated auth key → 401 is the expected reachability response, run 27725293499)"
         },
         {
           "name": "set-bucket-versioning",
