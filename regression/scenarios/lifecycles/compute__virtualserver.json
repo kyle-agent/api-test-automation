@@ -25,21 +25,60 @@
           }
         },
         {
+          "name": "seed-lc-image",
+          "_note": "Read-only: soft-captures a REAL launch-config-compatible image id (lc_image_id) so create-launch-configuration can actually return 201. PROVEN (2026-06-18 live): the LC create validates image_id strictly (LaunchConfiguration.InvalidImage) and only the standard os_distro=windows images in this region are accepted — GPU/SKE/kube images all 400. where_prefix os_distro=windows picks one (all windows images are non-GPU 'Standard ENG', min_disk 30). If the account has no windows image the soft-capture finds nothing, the placeholder stays literal, and create-launch-configuration falls back to a 4xx (still records).",
+          "method": "GET",
+          "path": "/v1/images",
+          "expect_status": [200, 403],
+          "optional": true,
+          "params": {
+            "limit": 50
+          },
+          "capture_soft": {
+            "lc_image_id": {
+              "list": "$.images",
+              "where_prefix": {
+                "os_distro": "windows"
+              },
+              "get": "id"
+            }
+          }
+        },
+        {
+          "name": "create-lc-keypair",
+          "_note": "Light + FREE (no VM, no cost): registers a throwaway keypair so create-launch-configuration passes the LaunchConfiguration.InvalidKeypair check (PROVEN 2026-06-18 live: the account has 0 keypairs and the LC create rejects a synthetic keypair_name). Captures lc_keypair_name and its DELETE cleans it up. 4xx tolerated so a keypair quota/permission issue degrades the LC create to a 4xx coverage record rather than failing the run.",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "json": {
+            "name": "regrlckp{unique}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "lc-keypair",
+          "capture": {
+            "lc_keypair_name": "$.name"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/{lc_keypair_name}",
+            "service": "virtualserver"
+          }
+        },
+        {
           "name": "create-launch-configuration",
-          "_note": "UNPROVEN body. Mirrors create-server fields (image_id/server_type_id/keypair) but for a launch template; ids are literal synthetic strings (no real lookup needed). 4xx expected — still records POST /v1/launch-configurations.",
+          "_note": "PROVEN 2xx (2026-06-18 live, 201): needs a REAL lc_image_id (seed-lc-image, windows/standard) + a REAL lc_keypair_name (create-lc-keypair) + a volume size divisible by 8 (was 100 -> 400 'Volume size of disk should be divisible by 8.'; now 32, also >= windows min_disk 30). Volume body matches the LaunchConfigurationVolume model (boot_index/size/type only — 'delete_on_termination' is NOT a field and was dropped). When the image/keypair soft-seed found nothing the placeholders stay literal and this degrades to a 4xx (still records POST /v1/launch-configurations).",
           "method": "POST",
           "path": "/v1/launch-configurations",
           "json": {
             "name": "regrlc{unique}",
-            "image_id": "00000000-0000-0000-0000-000000000000",
+            "image_id": "{lc_image_id}",
             "server_type_id": "s1v1m2",
-            "keypair_name": "regrkey{unique}",
+            "keypair_name": "{lc_keypair_name}",
             "volumes": [
               {
                 "boot_index": 0,
-                "size": 100,
-                "type": "SSD",
-                "delete_on_termination": true
+                "size": 32,
+                "type": "SSD"
               }
             ],
             "tags": []
@@ -66,18 +105,32 @@
           "destructive": true
         },
         {
+          "name": "delete-lc-keypair",
+          "_note": "Explicit in-lifecycle teardown of the throwaway keypair from create-lc-keypair (the engine does NOT run group cleanups on the happy path — only on failure — so a real-id keypair would otherwise linger; the registry sweep would eventually reclaim it but this keeps the lifecycle self-cleaning). Runs after delete-launch-configuration so the keypair outlives the LC that referenced it.",
+          "method": "DELETE",
+          "path": "/v1/keypairs/{lc_keypair_name}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "lc-keypair",
+          "destructive": true
+        },
+        {
           "name": "create-auto-scaling-group",
-          "_note": "UNPROVEN body. References launch_configuration_id (soft-seeded or synthetic) + literal synthetic subnet/sg ids. 4xx expected — still records POST /v1/auto-scaling-groups.",
+          "_note": "HEAVY/VPC-BLOCKED (cannot reach 2xx in this lifecycle — see 2026-06-18 live): an ASG needs a REAL subnet_ids (the account has 0 subnets; this lifecycle is deliberately VPC-FREE) and spins up REAL billable VMs, so it stays coverage-only. Body now matches AutoScalingGroupCreateRequestV1Dot2 required fields (desired_server_count_editable / server_name_prefix / subnet_ids[array] / use_lb_state_check / state_check_delay_time, and security_group_ids not security_groups) so the failure is a resource 4xx (bad launch_configuration / subnet), NOT a ValidationError on body shape. To make this 2xx you would have to provision a VPC+subnet and let it create VMs — out of scope (heavy/billable).",
           "method": "POST",
           "path": "/v1/auto-scaling-groups",
           "json": {
             "name": "regrasg{unique}",
             "launch_configuration_id": "{launch_configuration_id}",
             "desired_server_count": 1,
+            "desired_server_count_editable": true,
             "min_server_count": 1,
             "max_server_count": 2,
-            "subnet_id": "00000000-0000-0000-0000-000000000000",
-            "security_groups": ["00000000-0000-0000-0000-000000000000"],
+            "server_name_prefix": "regrasg{unique}",
+            "subnet_ids": ["00000000-0000-0000-0000-000000000000"],
+            "security_group_ids": ["00000000-0000-0000-0000-000000000000"],
+            "use_lb_state_check": false,
+            "state_check_delay_time": 300,
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
@@ -132,15 +185,20 @@
         },
         {
           "name": "create-asg-policy",
-          "_note": "UNPROVEN. Scaling policy (scale-out on capacity change).",
+          "_note": "Body now matches AutoScalingGroupPolicyCreateRequest (all required): scale_type ^(SCALE_IN|SCALE_OUT)$, scale_method ^(AMOUNT|PERCENTAGE|FIXED)$, scale_value int, metric_type ^(CPU|NETWORK_IN_BYTES|...)$, metric_method ^(AVG|MIN|MAX)$, comparison_operator ^(ge|gt|le|lt)$, threshold/evaluation_minutes/cooldown_seconds int (the old policy_type/adjustment_type/adjustment_value/cooldown were not real fields -> ValidationError). HEAVY-blocked for 2xx: bound to {auto_scaling_group_id}, which is never a real ASG here (no subnet -> no ASG), so this 404s/4xx on the parent id — but the body is no longer the failure.",
           "method": "POST",
           "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies",
           "json": {
             "name": "regrpol{unique}",
-            "policy_type": "SCALE_OUT",
-            "adjustment_type": "CHANGE_IN_CAPACITY",
-            "adjustment_value": 1,
-            "cooldown": 300
+            "scale_type": "SCALE_OUT",
+            "scale_method": "AMOUNT",
+            "scale_value": 1,
+            "metric_type": "CPU",
+            "metric_method": "AVG",
+            "comparison_operator": "ge",
+            "threshold": 60,
+            "evaluation_minutes": 5,
+            "cooldown_seconds": 300
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
@@ -196,15 +254,19 @@
         },
         {
           "name": "create-asg-schedule",
-          "_note": "UNPROVEN. Scheduled scaling action (one-shot start_time, far future).",
+          "_note": "Body now matches AutoScalingGroupScheduleCreateRequest required set: frequency enum (ONCE|DAILY|WEEKLY|MONTHLY) (was missing -> 400 \"'frequency' field is required.\"), plus name/start_date/hour/minute/timezone (the old free-form start_time is not a model field). start_date is a static far-future YYYY-MM-DD literal. HEAVY-blocked for 2xx: bound to a non-real {auto_scaling_group_id} (no subnet -> no ASG) so it 404s on the parent — body is no longer the failure.",
           "method": "POST",
           "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules",
           "json": {
             "name": "regrsch{unique}",
+            "frequency": "ONCE",
             "desired_server_count": 2,
             "min_server_count": 1,
             "max_server_count": 3,
-            "start_time": "{today_plus_5y}T00:00:00Z"
+            "start_date": "2099-01-01",
+            "hour": 0,
+            "minute": 0,
+            "timezone": "Asia/Seoul"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
@@ -259,13 +321,12 @@
         },
         {
           "name": "create-asg-notification",
-          "_note": "UNPROVEN. Notification config (EMAIL recipient).",
+          "_note": "Body now matches AutoScalingGroupNotificationCreateRequest (both required): user_ids array[string] + notification_events array of enum (SCALE_OUT|SCALE_OUT_FAIL|SCALE_IN|SCALE_IN_FAIL|SATISFIED_POLICY_CONDITIONS) (the old name/notification_type/recipients were not real fields -> ValidationError). user_ids is a synthetic 32-hex id: this is bound to a non-real {auto_scaling_group_id} (no subnet -> no ASG) so the parent 404 fires before the user id is dereferenced — body is no longer the failure. HEAVY-blocked for 2xx.",
           "method": "POST",
           "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications",
           "json": {
-            "name": "regrntf{unique}",
-            "notification_type": "EMAIL",
-            "recipients": ["regression-coverage@example.com"]
+            "user_ids": ["00000000000000000000000000000000"],
+            "notification_events": ["SCALE_OUT", "SCALE_OUT_FAIL"]
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
@@ -352,16 +413,18 @@
         },
         {
           "name": "create-image",
-          "_note": "UNPROVEN. POST /v1/images registers an image from external source (os_type/disk_format/min_disk). Distinct from POST /v1/servers/{id}/images (snapshot a running VM, already covered). 4xx likely without a real source — still records.",
+          "_note": "HEAVY-blocked for 2xx (cannot reach 2xx in this lifecycle — see 2026-06-18 live): POST /v1/images registers an image from a qcow2 already uploaded to Object Storage, so a real 2xx needs a real bucket + uploaded qcow2 (out of scope, heavy). Body now matches ImageCreateRequest required fields: os_distro enum (alma|centos|rhel|rocky|ubuntu|windows|oracle) (was os_type -> ValidationError) + url (was missing -> ValidationError). With these the failure is now Image.InvalidObjectStorageUrl (a resource error on the synthetic url), NOT a body ValidationError — still records POST /v1/images. create-image-member below cascades (404 ImageNotFound) until a real image exists.",
           "method": "POST",
           "path": "/v1/images",
           "json": {
             "name": "regrimg{ualpha}",
-            "os_type": "linux",
+            "os_distro": "ubuntu",
             "disk_format": "qcow2",
-            "min_disk": 100,
+            "container_format": "bare",
+            "min_disk": 24,
             "min_ram": 0,
             "visibility": "private",
+            "url": "https://object-store.{region}.e.samsungsdscloud.com/regression-coverage/nonexistent-{ualpha}.qcow2",
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],

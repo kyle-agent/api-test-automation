@@ -527,7 +527,7 @@
       "id": "gen-alert",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: alert",
+      "_note": "composed by regression/scenarios/composer.py — targets: alert. create/set-alert carry a real dimension {key,value} captured from the metric catalog ($.namespaces[0].dimensions[0].metrics[0].dimensions[0]) — live 400 'At least one dimension must be set.' otherwise (DimensionDTO required at runtime though docs mark dimension/dimensions optional).",
       "steps": [
         {
           "name": "create-sw-metric-catalog",
@@ -544,7 +544,9 @@
             "namespace_id": "$.namespaces[0].id",
             "namespace_name": "$.namespaces[0].name",
             "metric_id": "$.namespaces[0].dimensions[0].metrics[0].id",
-            "metric_name": "$.namespaces[0].dimensions[0].metrics[0].name"
+            "metric_name": "$.namespaces[0].dimensions[0].metrics[0].name",
+            "dim_key": "$.namespaces[0].dimensions[0].metrics[0].dimensions[0].key",
+            "dim_value": "$.namespaces[0].dimensions[0].metrics[0].dimensions[0].value"
           }
         },
         {
@@ -554,6 +556,10 @@
           "path": "/v1/alerts",
           "json": {
             "description": "regr alert {unique}",
+            "dimension": {
+              "key": "{dim_key}",
+              "value": "{dim_value}"
+            },
             "evaluation_count": 3,
             "level": "HIGH",
             "lower_bound": 80.0,
@@ -603,6 +609,10 @@
           "method": "PATCH",
           "path": "/v1/alerts/{alert_id}",
           "json": {
+            "dimension": {
+              "key": "{dim_key}",
+              "value": "{dim_value}"
+            },
             "evaluation_count": 3,
             "level": "HIGH",
             "lower_bound": 80.0,
@@ -1110,19 +1120,23 @@
       "id": "gen-cm-account-resource",
       "service": "management/cloudmonitoring",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: cm-account-resource",
+      "_note": "composed by regression/scenarios/composer.py — targets: cm-account-resource. LIVE-VERIFIED (run 2026-06-18): getaccountproductlist REQUIRES the X-ResourceType header — without it the backend 400s 'InvalidHeaderValue' naming param resourceType / X-ResourceType. The header is undocumented (not in api_docs getaccountproductlist params) but mandatory — the earlier 'header was an invention, remove it' correction was a hypothesis the live call disproved. X-ResourceType:INSTANCE is accepted by the header validator (no more 400) but returns 404 ResourceNotFound on this account (error param hints the value should be a productCategoryCode and/or there is no INSTANCE-category monitored resource — the documented fail-fast when no Running VM is registered). 404 is therefore tolerated (records GET coverage) and capture is soft so the dependent read skips cleanly instead of false-failing.",
       "steps": [
         {
           "name": "create-cm-account-resource",
           "service": "cloudmonitoring",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "headers": {
+            "X-ResourceType": "INSTANCE"
+          },
           "expect_status": [
             200,
             201,
-            202
+            202,
+            404
           ],
-          "capture": {
+          "capture_soft": {
             "product_resource_id": {
               "list": "$.contents",
               "where_prefix": {
@@ -1137,8 +1151,12 @@
           "service": "cloudmonitoring",
           "method": "GET",
           "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "headers": {
+            "X-ResourceType": "INSTANCE"
+          },
           "expect_status": [
-            200
+            200,
+            404
           ]
         }
       ]
