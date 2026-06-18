@@ -48,6 +48,7 @@ Changed vs legacy:
 """
 from __future__ import annotations
 
+import os
 import time
 
 import core
@@ -244,6 +245,14 @@ def _delete(client, service, path, json=None):
 
 
 def _wait_gone(client, service, path, timeout=150, interval=10):
+    # FAST sweep (SCP_SWEEP_NOWAIT=true): skip the per-resource blocking wait
+    # entirely — issue every delete and let the fixed-point round loop (main)
+    # retry whatever still 409s (dependency) on the next pass. Dependencies
+    # resolve through retries instead of serial waits, so a sweep finishes in
+    # rounds, not in sum(per-resource teardown). Async deletes complete in the
+    # background; we only need to have ISSUED the delete.
+    if os.environ.get("SCP_SWEEP_NOWAIT", "").lower() == "true":
+        return True
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
@@ -735,10 +744,18 @@ def main() -> int:
     # Run to a FIXED POINT (bounded): list endpoints may paginate, so one pass
     # can only reap the first page's worth — repeat until a full pass deletes
     # nothing (or 5 rounds).
-    for rnd in range(1, 6):
+    nowait = os.environ.get("SCP_SWEEP_NOWAIT", "").lower() == "true"
+    rounds = int(os.environ.get("SCP_SWEEP_ROUNDS", "8" if nowait else "5"))
+    round_sleep = int(os.environ.get("SCP_SWEEP_ROUND_SLEEP_S", "12"))
+    for rnd in range(1, rounds + 1):
         print(f"--- sweep round {rnd} ---", flush=True)
         if run_sweep(client) == 0:
             break
+        # In FAST (no-wait) mode rounds fire back-to-back; pause briefly so
+        # async deletes issued this round actually disappear before the next
+        # pass retries their now-unblocked dependents.
+        if nowait and rnd < rounds:
+            time.sleep(round_sleep)
     return 0
 
 

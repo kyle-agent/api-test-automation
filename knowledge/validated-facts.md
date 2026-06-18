@@ -661,6 +661,16 @@ First coverage-max dispatch (`docs/COVERAGE-MAX-PLAN.md` Tier 0). Result:
   a LAST-resort fallback pending LIVE proof of the identity path; delete the 8
   redundant entries once a live run shows the produced-index path firing 2xx.
   118 offline pass, validator 212/0. (engine: `regression/scenarios/engine.py`.)
+- **FAST sweep mode (`SCP_SWEEP_NOWAIT=true`, 2026-06-18).** The reconciler's
+  per-resource `_wait_gone` (blocking poll, up to 150–900s each) was the teardown
+  bottleneck (audit: DBaaS clusters ~165s ea, SKE nodepools ~380s ea, all serial).
+  NOWAIT skips the blocking wait — issue EVERY owned delete, let the fixed-point
+  round loop retry whatever still 409s (dependency) next pass. Dependencies resolve
+  through retries, not serial waits, so a sweep finishes in rounds not sum(teardown).
+  Round count + inter-round pause are env-tunable (`SCP_SWEEP_ROUNDS` default 8 in
+  nowait, `SCP_SWEEP_ROUND_SLEEP_S` default 12s so async deletes clear between
+  rounds). Owner-tag scoping UNCHANGED (still `_select`-gated). Hand-driven cleanup:
+  `SCP_ALLOW_DESTRUCTIVE=true SCP_SWEEP_IGNORE_TTL=true SCP_SWEEP_NOWAIT=true python -m cleanup.reconciler`.
 - **(A) enrichment producer-match 90.9%→98.1% (2026-06-18, multi-agent residual pass).**
   The 89 `produced_by:null` self-params were NOT mechanically closable by deeper
   collection matching — diagnosis showed ALL 89 have NO collection-prefix POST.
