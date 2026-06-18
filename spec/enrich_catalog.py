@@ -110,11 +110,42 @@ def build() -> dict:
     catalog = load_catalog()
     model_caps = _model_capture_index()
 
-    # index POST endpoints by (service, normalised path) for producer lookup
+    # index POST + list-GET endpoints by (service, normalised path) for producer
+    # lookup. A resource id is produced by the POST that creates into its
+    # collection; for read-only LOOKUP resources (engine-versions, images,
+    # server-types) there is no POST — the list GET to the collection is the
+    # producer instead. cross_by holds the same keyed only by path (service
+    # dropped) so a cross-service producer (e.g. an SKE cluster_id consumed by
+    # aimlops/cloud-ml) can still resolve.
     post_by: dict[tuple, str] = {}
+    list_by: dict[tuple, str] = {}
+    post_xby: dict[str, str] = {}
+    list_xby: dict[str, str] = {}
     for e in catalog:
-        if (e.method or "").upper() == "POST" and e.http_path:
-            post_by.setdefault((e.service, _norm(e.http_path)), e.key)
+        if not e.http_path:
+            continue
+        m = (e.method or "").upper()
+        np = _norm(e.http_path)
+        if m == "POST":
+            post_by.setdefault((e.service, np), e.key)
+            post_xby.setdefault(np, e.key)
+        elif m == "GET" and "{" not in e.http_path:   # collection list GET
+            list_by.setdefault((e.service, np), e.key)
+            list_xby.setdefault(np, e.key)
+
+    def _producer(service: str, prefix: str):
+        """(producer_key, kind) for the collection at *prefix* — create POST >
+        same-service list lookup > cross-service create/list, else (None, None)."""
+        np = _norm(prefix)
+        if (service, np) in post_by:
+            return post_by[(service, np)], "create"
+        if (service, np) in list_by:
+            return list_by[(service, np)], "lookup"
+        if np in post_xby:
+            return post_xby[np], "create-xsvc"
+        if np in list_xby:
+            return list_xby[np], "lookup-xsvc"
+        return None, None
 
     out: dict[str, dict] = {}
     for e in catalog:
@@ -131,20 +162,23 @@ def build() -> dict:
         for name in path_param_names:
             seg = _owning_segment(path, name)
             rtype = f"{e.service}/{_singularize(seg)}" if seg else None
-            prod = None
-            cap = None
+            prod = kind = cap = None
             prefix = _collection_prefix(path, name)
             if prefix is not None:
-                prod = post_by.get((e.service, _norm(prefix)))
+                prod, kind = _producer(e.service, prefix)
                 if prod:
-                    # capture: model refinement on the producer's path, else $.id
-                    cap = model_caps.get(_norm(prefix + "_collection")) \
-                        or model_caps.get(_norm(prefix)) or "$.id"
+                    # capture: model refinement on the producer's path, else a
+                    # convention default by kind (create envelopes vary -> $.id;
+                    # list lookups -> first element id).
+                    cap = model_caps.get(_norm(prefix)) or (
+                        "$.contents[0].id" if kind and kind.startswith("lookup")
+                        else "$.id")
             pps.append({
                 "name": name,
                 "resource_type": rtype,
                 "role": "self" if name == last else "ancestor",
                 "produced_by": prod,
+                "producer_kind": kind,
                 "capture": cap,
             })
         if pps or query:
