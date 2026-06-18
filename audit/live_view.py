@@ -358,6 +358,117 @@ def render_dag(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
     return "".join(P)
 
 
+# light-theme per-state palette (fill, border)
+_FLOW = {
+    "creating": ("#cfe8ff", "#2b7de9"),  # 생성중 — pulses
+    "testing":  ("#ffe6ad", "#d99413"),  # 테스트중 — pulses
+    "created":  ("#c8efd4", "#1f9d57"),  # 생성됨
+    "deleted":  ("#e6e9ee", "#9aa4b2"),  # 삭제됨 — gray
+}
+
+
+def _dur(d: dict, now: datetime) -> str:
+    if not d["start"]:
+        return ""
+    end = _t(d["end"]) if d["end"] else now
+    s = (end - _t(d["start"])).total_seconds()
+    return f"{s/60:.0f}m" if s >= 60 else f"{s:.0f}s"
+
+
+def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
+    """v3 — per-INSTANCE topology (id shown), light theme, running pulses, deleted greys."""
+    from collections import defaultdict
+    try:
+        from dashboard.gen_dep_map import dep_map_dict
+        depth = dep_map_dict().get("depth", {})
+    except Exception:
+        depth = {}
+    dep_kinds = set(depth)
+
+    # column = creation-order depth of the instance's kind; group col -> kind -> instances
+    col_kind = defaultdict(lambda: defaultdict(list))
+    insts = [d for d in spans.values() if d["start"]]
+    for d in insts:
+        k = _kind_of(d["rtype"], dep_kinds)
+        col_kind[depth.get(k, 0)][d["rtype"]].append(d)
+    maxc = max(col_kind, default=0)
+
+    COLW, BW, BH, GAP, KGAP, PADX, PADY, HEADY = 226, 200, 26, 5, 22, 24, 96, 60
+    # lay out, compute column heights
+    pos, col_h = {}, {}
+    for c in range(maxc + 1):
+        y = PADY
+        for rt in sorted(col_kind.get(c, {})):
+            y += KGAP  # kind sub-label
+            for d in sorted(col_kind[c][rt], key=lambda x: x["start"]):
+                pos[id(d)] = (PADX + c * COLW, y, d, rt)
+                y += BH + GAP
+            y += 6
+        col_h[c] = y
+    W = PADX * 2 + (maxc + 1) * COLW
+    H = max(col_h.values(), default=PADY) + 40
+
+    nstate = defaultdict(int)
+    for d in insts:
+        nstate[_state_of(d)] += 1
+
+    P = [f'<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>live flow</title>']
+    if refresh:
+        P.append(f'<meta http-equiv="refresh" content="{refresh}">')
+    P.append('''<style>
+ body{background:#f5f7fb;color:#1f2733;font:12px/1.35 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:14px}
+ h1{font-size:17px;margin:0 0 2px;color:#0f1722} .sub{color:#5b6675;font-size:12px;margin-bottom:8px}
+ .lg{font-size:12px;color:#5b6675;margin:6px 0} .lg i{display:inline-block;width:11px;height:11px;border-radius:3px;margin:0 3px 0 12px;vertical-align:-1px;border:1px solid #0002}
+ svg{background:#fff;border:1px solid #e3e8ef;border-radius:10px}
+ @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+ .run{animation:pulse 1.1s ease-in-out infinite}
+ g.n rect:hover{stroke-width:2.5}
+ text{fill:#22303f}
+</style></head><body>''')
+    P.append('<h1>SCP 실행 흐름 · 인스턴스 라이브 상태</h1>')
+    P.append(f'<div class="sub">왼→오 = 생성 순서(의존 깊이) · 같은 열 = 동시 실행 · 각 박스 = 리소스 1개(id)'
+             f' · {html.escape(meta.get("start",""))}→{html.escape(meta.get("end",""))}'
+             f'{" · 자동갱신 "+str(refresh)+"s" if refresh else ""}</div>')
+    P.append(f'<div class="lg">'
+             f'<i style="background:#cfe8ff"></i>생성중 {nstate["creating"]}(깜빡)'
+             f'<i style="background:#ffe6ad"></i>테스트중 {nstate["testing"]}'
+             f'<i style="background:#c8efd4"></i>생성됨 {nstate["created"]}'
+             f'<i style="background:#e6e9ee"></i>삭제됨 {nstate["deleted"]}</div>')
+
+    P.append(f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
+    for c in range(maxc + 1):
+        P.append(f'<text x="{PADX + c*COLW + 4}" y="{PADY-26}" font-size="12" font-weight="700" fill="#8893a4">단계 {c}</text>')
+        if c < maxc:
+            xx = PADX + (c+1)*COLW - 10
+            P.append(f'<line x1="{xx}" y1="{PADY-34}" x2="{xx}" y2="{H-20}" stroke="#eef1f6"/>')
+    # kind sub-labels
+    placed = set()
+    for c in range(maxc + 1):
+        y = PADY
+        for rt in sorted(col_kind.get(c, {})):
+            P.append(f'<text x="{PADX + c*COLW}" y="{y+13}" font-size="10.5" font-weight="700" fill="#aab3c0">{html.escape(rt)}</text>')
+            y += KGAP + (BH + GAP) * len(col_kind[c][rt]) + 6
+    # instance boxes
+    for (x, y, d, rt) in pos.values():
+        st = _state_of(d)
+        fill, bd = _FLOW[st]
+        run = ' class="run"' if st in ("creating", "testing") else ""
+        tag = d["tag"] if d["tag"] != d["name"] else (d["name"] or "?")
+        lab = (d["name"] or tag)[:30]
+        dur = _dur(d, now)
+        tip = f'{rt} · {html.escape(d["name"] or tag)} · {_STATE_KO[st]} · {d["start"]}→{d["end"] or "LIVE"} · {dur} · {len(d["ops"])} ops'
+        deco = ' text-decoration="line-through"' if st == "deleted" else ""
+        P.append(f'<g class="n"{run}><title>{html.escape(tip)}</title>'
+                 f'<rect x="{x}" y="{y}" width="{BW}" height="{BH}" rx="6" fill="{fill}" stroke="{bd}" stroke-width="1.4"/>'
+                 f'<circle cx="{x+10}" cy="{y+BH/2}" r="3.5" fill="{bd}"/>'
+                 f'<text x="{x+20}" y="{y+16}" font-size="11" fill="{"#9aa4b2" if st=="deleted" else "#1f2733"}"{deco}>{html.escape(lab)}</text>'
+                 f'<text x="{x+BW-6}" y="{y+16}" font-size="9.5" text-anchor="end" fill="#7a8493">{dur}</text></g>')
+    P.append('</svg>')
+    P.append(f'<div class="sub" style="margin-top:8px">{len(insts)} 인스턴스 · {maxc+1} 단계</div>')
+    P.append('</body></html>')
+    return "".join(P)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Live resource-topology viewer from loggingaudit.")
     ap.add_argument("--events", help="pre-harvested loggingaudit JSONL (skip harvest)")
@@ -366,8 +477,9 @@ def main(argv=None):
     ap.add_argument("--hours", type=float, default=6.0, help="window = now-<hours> when --start absent")
     ap.add_argument("--out", default="reports/audit/live_view.html")
     ap.add_argument("--refresh", type=int, default=0, help="HTML auto-refresh seconds (live mode)")
-    ap.add_argument("--mode", choices=["dag", "gantt"], default="dag",
-                    help="dag = console-report layered topology w/ live state (default); gantt = timeline")
+    ap.add_argument("--mode", choices=["flow", "dag", "gantt"], default="flow",
+                    help="flow = per-instance topology, light, running pulses (default); "
+                         "dag = kind-level; gantt = timeline")
     a = ap.parse_args(argv)
 
     now = datetime.now(timezone.utc)
@@ -392,7 +504,7 @@ def main(argv=None):
         return 1
 
     spans = build_spans(events, now)
-    _render = render_dag if a.mode == "dag" else render
+    _render = {"flow": render_flow, "dag": render_dag, "gantt": render}[a.mode]
     htmlout = _render(spans, now, {"start": start, "end": end}, refresh=a.refresh)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(htmlout)
