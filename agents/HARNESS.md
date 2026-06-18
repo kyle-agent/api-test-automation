@@ -86,6 +86,25 @@ Write through `core.results` so the dashboard and baselines stay consistent:
 Files: `reports/results/observations.jsonl`, `reports/results/findings.jsonl`.
 Baseline of known/muted backend bugs: `data/baselines/known_issues.json`.
 
+### After every run — optimize (async, never skipped)
+
+Every run ends by analyzing its own logs for improvements (test-time ↓, errors
+→ 0, parallelism ↑, coverage ↑, teardown ↓):
+
+- **Deterministic layer fires automatically.** `conftest.py
+  pytest_sessionfinish` launches `python -m tools.analyze_run` (detached,
+  controller-only, opt-out `SCP_NO_OPTIMIZE=true`). It writes
+  `reports/optimizer/report-<ts>.md` + a trend row in
+  `data/optimizer/history.jsonl`. API-free and read-only, safe after any run.
+  For a non-pytest run, call it by hand (`--audit <spans.jsonl>` adds the
+  teardown-timing lens).
+- **The orchestrator then spawns the `log-optimizer` agent in the background**
+  (`run_in_background`) to reason over that report, scan several days of
+  `history.jsonl` for trends/plateaus, and deliver a ranked improvement list (or
+  small safe fixes). Role spec: `agents/optimizer-agent.md` / subagent
+  `.claude/agents/log-optimizer.md`. It never relaxes a safety gate to move a
+  number.
+
 ## CI (GitHub Actions)
 
 `.github/workflows/api-test.yml` is one orchestrator job graph:

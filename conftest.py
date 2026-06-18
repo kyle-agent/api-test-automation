@@ -15,6 +15,32 @@ def pytest_addoption(parser):
                      help="Limit smoke tests to one service (e.g. baremetal).")
 
 
+def pytest_sessionfinish(session, exitstatus):
+    """Async, every-run, never-skipped: fire the deterministic optimizer layer
+    (`tools.analyze_run`) when the test session ends so improvement analysis
+    accumulates after EVERY run without anyone remembering to run it. It writes
+    reports/optimizer/report-*.md + a history.jsonl trend row.
+
+    Best-effort and non-blocking: controller-only (xdist workers skip), detached
+    subprocess so it never delays pytest exit, fully swallowed on error, and
+    opt-out via SCP_NO_OPTIMIZE=true. It only READS result logs — no API, no
+    resources, no safety-gate interaction — so it is safe after any run."""
+    import os
+    import subprocess
+    import sys
+    if os.environ.get("PYTEST_XDIST_WORKER"):
+        return  # only the controller fires it, once
+    if os.environ.get("SCP_NO_OPTIMIZE", "").strip().lower() == "true":
+        return
+    try:
+        label = os.environ.get("APITEST_RUN_ID", "") or "pytest"
+        log = open("reports/audit/optimize.log", "a")
+        subprocess.Popen([sys.executable, "-m", "tools.analyze_run", "--label", label],
+                         stdout=log, stderr=log, start_new_session=True)
+    except Exception:
+        pass  # analysis is a convenience; never let it affect the run's exit
+
+
 @pytest.fixture(scope="session")
 def cfg():
     return settings
