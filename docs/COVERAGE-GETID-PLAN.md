@@ -160,3 +160,56 @@ Real new create nodes / capture additions:
 4. **privatelink-service node** — single node unblocking 4 endpoints + the
    scf/apigw privatelink synthetic-id placeholders.
 5. D stays parked until owner/console decisions change.
+
+---
+
+## 7 · probe_reads UNDER-SEEDING — the create→조회(show) gap (SYSTEMIC, 2026-06-18)
+
+> Owner-flagged: "createusageplan 했으면 이후 usage-plan 조회가 다 돼야 하는 거
+> 아닌가? 생성→조회·업데이트→삭제가 잘 인지 안 된 것 같다." Confirmed — and it is
+> **repo-wide**, not apigw-only. Record so it is not missed.
+
+**Mechanism.** A lifecycle's `probe_reads: {seed}` step fires every catalog GET
+in the service whose path-params are **all** present in `seed`
+(`regression/scenarios/engine.py:_probe_reads`, line 207 `params <= keys`). It is
+purpose-built to "exercise path-parameter GETs reusing a resource a lifecycle
+just created" (engine.py:74) and never fails the lifecycle (read-only). **The
+gap:** most lifecycles seed it with only the TOP id, so **nested child-id GETs
+are never fired** — the resource is created, updated and deleted, but never
+SHOWN. This is a pure seeding omission, NOT an ordering problem (the child ids
+are already captured when probe-reads runs).
+
+**Scope: 47 of 92 probe_reads lifecycles seed only 1 id** (survey 2026-06-18).
+Worst offenders = anything with nested children:
+- DBaaS cluster-subops (mysql/mariadb/epas/postgresql/cachestore/searchengine/
+  eventstreams `*-cluster-subops-guarded`) seed only `cluster_id` → miss
+  instance-group/{id}, parameter-group/{id}, etc.
+- iam-group/policy/role, idc-*, backup-job/agent, filestorage, archivestorage,
+  apigateway-api-write-coverage, application-apigateway-api-resource, …
+
+**Fix pattern (zero-risk — probe-reads never fails a lifecycle):** seed
+`probe_reads` with EVERY captured child id in the lifecycle. Where a child GET
+needs **query params** (not just path ids), probe-reads cannot supply them — add
+an explicit GET step instead (see apigw `list-reports` below).
+
+### apigateway — STATUS: FIXED on branch (regression/scenarios/lifecycles/application-service__apigateway.json)
+`apigateway-api-write-coverage` seeded only `{api_id}`. The 8 child-id GETs the
+owner listed split as:
+| endpoint | was | now |
+|---|---|---|
+| `…/reports` listreports | probe-reads fired it param-less → **400** | explicit `list-reports` step w/ `stage_name=dev&start_date&end_date` (3 required query params, model read-reports) |
+| `…/resources/{resource_id}` showresource | uncovered | probe-reads (seed `resource_id`) |
+| `…/resources/{resource_id}/methods` listmethods | uncovered | probe-reads (`resource_id`) |
+| `…/methods/{method_type}` showmethod | uncovered | probe-reads (`resource_id`+`method_type`) |
+| `…/stages/{stage_name}` showstage | uncovered | probe-reads (`stage_name`=stg{unique}) |
+| `…/auths/{auth_id}` showauth | uncovered | probe-reads (`auth_id`, captured via listauths) |
+| `…/access-controls/{access_control_id}` showaccesscontrol | uncovered | probe-reads (`access_control_id`) |
+| `…/usage-plans/{usage_plan_id}` showusageplan | uncovered | probe-reads (`usage_plan_id`) |
+| `…/usage-plans/{usage_plan_id}/api-keys` listapikeys | uncovered | probe-reads (`usage_plan_id`) |
+
+PENDING LIVE VALIDATION (needs a Tier-0 apigw run to confirm the 2xx).
+- **api-keys per-id GET** `…/api-keys/{key_id}` stays **PF-02** (403 missing-IAM-action; LIST works) — not seeded.
+- **resource-policies** PUT setresourcepolicy = **PF-19** (500 ContactAdminForAssistance, baselined) → the GET read 404s downstream (no policy ever created). Separate investigation for the correct call / backend bug.
+
+### TODO — apply the same seed-broadening to the other 46 lifecycles
+Highest value: the 7 DBaaS `*-cluster-subops-guarded` (cluster_id → + instance-group/parameter ids) and iam/idc/backup. Do per-service alongside its next run, capturing child ids → seeding them. Track here as each is closed.

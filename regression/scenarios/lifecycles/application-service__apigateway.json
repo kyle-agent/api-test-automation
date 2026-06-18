@@ -271,8 +271,25 @@
         },
 
         {
+          "name": "list-reports",
+          "method": "GET",
+          "path": "/v1/apis/{api_id}/reports?stage_name=dev&start_date=2025-01-01&end_date=2025-12-31",
+          "optional": true,
+          "expect_status": [200, 400, 404],
+          "_note": "listreports — needs 3 REQUIRED query params (stage_name/start_date/end_date), which probe-reads cannot supply (it issues param-less GETs), so this explicit step is required to exercise it as a real read. stage_name=dev is the stage the deployment (stage_type=new) created. New api with no traffic returns an empty report 200, or 400/404 if the date window/stage is rejected — tolerant. Mirrors the model read-reports verify (application-service__apigateway.yaml apigw-deployment)."
+        },
+        {
           "name": "probe-reads",
-          "probe_reads": {"api_id": "{api_id}"}
+          "_note": "SEED ALL captured child ids (not just api_id) so probe-reads — which fires every catalog GET whose path-params are all in this seed (engine _probe_reads) — exercises the create->SHOW reads for the child resources this lifecycle just created: resources/{resource_id} (showresource), resources/{resource_id}/methods (listmethods), resources/{resource_id}/methods/{method_type} (showmethod), stages/{stage_name} (showstage), auths/{auth_id} (showauth), access-controls/{access_control_id} (showaccesscontrol), usage-plans/{usage_plan_id} (showusageplan), usage-plans/{usage_plan_id}/api-keys (listapikeys). Previously seeded only {api_id}, so only api-level GETs were probed and every child-id GET was left uncovered (the create->read gap). stage_name uses the run-constant stg{unique} expansion (same value as create-stage). Read-only: probe-reads never fails the lifecycle.",
+          "probe_reads": {
+            "api_id": "{api_id}",
+            "resource_id": "{resource_id}",
+            "method_type": "{method_type}",
+            "stage_name": "stg{unique}",
+            "auth_id": "{auth_id}",
+            "access_control_id": "{access_control_id}",
+            "usage_plan_id": "{usage_plan_id}"
+          }
         },
 
         {
