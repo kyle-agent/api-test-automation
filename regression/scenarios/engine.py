@@ -192,11 +192,43 @@ def _record_smoke(status, category, key, method, path, elapsed_ms=None, note="")
         pass
 
 
+# Catalog path-param name -> capture-var synonyms (Piece 3, 2026-06-18). The SCP
+# API uses inconsistent path-param NAMES vs the semantic names lifecycles/model
+# capture (catalog `registry_id` vs captured `reg_id`), so an id-bound GET would
+# never auto-probe despite the resource being created. These aliases let the
+# probe resolve a catalog param from a differently-named captured var. SAFE
+# because _probe_reads is SERVICE-scoped: a shared synonym like `group_id`
+# (security-group vs resourcemanager) only ever resolves within its own service's
+# GETs. Derived from spec.read_reachability's near-miss column; conservative
+# (only unambiguous xxx_id<->yyy_id pairs — NOT publicip_id/log_group ambiguities).
+_PARAM_ALIASES = {
+    "registry_id": ("reg_id",),
+    "repository_id": ("repo_id",),
+    "dbaas_engine_version_id": ("engine_version_id",),
+    "srn": ("rg_srn",),
+    "certificate_id": ("cert_id",),
+    "resource_group_id": ("group_id",),
+    "security_group_id": ("group_id",),
+    "security_group_rule_id": ("rule_id",),
+    "service_account_id": ("account_id",),
+}
+
+
+def _resolve_param(param, mapping):
+    """Value for a catalog path-param: exact seed match, else a known alias in
+    the seed. Returns None when neither is present."""
+    if param in mapping:
+        return mapping[param]
+    for alias in _PARAM_ALIASES.get(param, ()):
+        if alias in mapping:
+            return mapping[alias]
+    return None
+
+
 def _probe_reads(client, mapping, service):
     """Call every catalog GET in `service` whose path params are all supplied by
-    `mapping` (catalog-param-name -> already-filled value). Read-only and record
-    only — a probe never fails the lifecycle."""
-    keys = set(mapping)
+    `mapping` (catalog-param-name -> already-filled value, or a known alias of it).
+    Read-only and record only — a probe never fails the lifecycle."""
     called = 0
     for e in _CATALOG:
         if e.service != service or (e.method or "").upper() != "GET":
@@ -204,11 +236,14 @@ def _probe_reads(client, mapping, service):
         if not e.http_path:
             continue
         params = set(_PLACEHOLDER.findall(e.http_path))
-        if not params or not params <= keys:
+        if not params:
+            continue
+        vals = {p: _resolve_param(p, mapping) for p in params}
+        if any(v is None for v in vals.values()):
             continue
         path = e.http_path
-        for p in params:
-            path = path.replace("{%s}" % p, str(mapping[p]))
+        for p, v in vals.items():
+            path = path.replace("{%s}" % p, str(v))
         try:
             resp = client.get(path, service=service)
         except Exception as exc:  # network/host issue — record nothing, continue

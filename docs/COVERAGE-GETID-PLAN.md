@@ -229,6 +229,33 @@ Static catalog×model join classifying every id-bound GET: cat1-auto /
 cat2-needs-child / query-param / **model-gap**. The model-gap list is Piece 3's
 worklist. Output `docs/READ-REACHABILITY.md`. (in progress)
 
-### Piece 3 — burn down model-gaps
-Driven by Piece 2's model-gap list (params no node captures → add capture / child
-node / list-recover; fix catalog↔model param-name mismatches). Finite list.
+### Piece 3 — burn down model-gaps (IN PROGRESS)
+**3a DONE — central param-alias map** (`engine._PARAM_ALIASES`): the name-mismatch
+subset of the 48 model-gaps (catalog `registry_id` vs captured `reg_id`, etc.) is
+closed centrally in the auto-probe — service-scoped so a shared synonym like
+`group_id` only resolves within its own service. Offline-proven: scr {reg_id,repo_id}
+→ 4 registry/repository GETs; security-group {group_id,rule_id} → 2 GETs. Aliases:
+registry_id←reg_id, repository_id←repo_id, dbaas_engine_version_id←engine_version_id
+(×9 DBaaS), srn←rg_srn (×4), certificate_id←cert_id, resource_group_id←group_id,
+security_group_id←group_id, security_group_rule_id←rule_id, service_account_id←account_id.
+~22 GETs closed, zero file-churn. PENDING LIVE VALIDATION.
+
+**3b REMAINING — genuinely-unmodeled / special** (need a real capture or are
+name-addressed; NOT aliasable): `tags_id` (scr ×5), resourcemanager composite
+`{region}/{service}/{resource_type}/{resource_identifier}` paths, `keypair_name`,
+the `*_name` check-duplication GETs (data-flow/data-ops/quick-query), bare `{id}`
+(cdn, servicewatch alerts — name-addressed, need the lifecycle's own show step),
+`record_id` (dns), `baremetal_id`, `guardrail_id`, `vip_id`, `public_domain_id`,
+`logging_id` (ambiguous near-miss — left out of aliases deliberately). Track here;
+close per-service as each lifecycle/model gains the capture.
+
+**Note:** "model-gap" is MODEL completeness; some are already covered at RUNTIME
+because a hand-written lifecycle captures the catalog param directly (e.g.
+`lb_certificate_id`, `dbaas_engine_version_id` in the dbaas read-coverage lifecycles)
++ Piece-1 auto-probe. A live run reconciles model-gap vs true runtime-gap.
+
+### Query-param GETs (17) — separate bucket
+Auto-probe issues param-less GETs, so id-bound GETs that ALSO need required query
+params (apigw `reports`, dbaas `check-duplication` by name, date windows) need an
+explicit lifecycle step / model `verify` with the params. Listed in
+`docs/READ-REACHABILITY.md`.
