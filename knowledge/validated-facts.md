@@ -661,6 +661,25 @@ First coverage-max dispatch (`docs/COVERAGE-MAX-PLAN.md` Tier 0). Result:
   a LAST-resort fallback pending LIVE proof of the identity path; delete the 8
   redundant entries once a live run shows the produced-index path firing 2xx.
   118 offline pass, validator 212/0. (engine: `regression/scenarios/engine.py`.)
+- **(A) enrichment producer-match 90.9%→98.1% (2026-06-18, multi-agent residual pass).**
+  The 89 `produced_by:null` self-params were NOT mechanically closable by deeper
+  collection matching — diagnosis showed ALL 89 have NO collection-prefix POST.
+  Four parallel investigation agents found the real producers (evidence in
+  `data/api_docs.json` + `knowledge/formal/resources/*.yaml`); encoded as a
+  residual layer in `spec/enrich_catalog.py` (`_DBAAS_SERVICES`/`_RESIDUAL_EXPLICIT`/
+  `_RESIDUAL_WAIVERS`, applied ONLY to null self-params so it can't regress the
+  890 mechanical matches). Result: **960/979 produced_by (98.1%) + 19 honest
+  waivers = 0 unexplained null.** Patterns: (1) DBaaS instance_group_id/
+  block_storage_group_id born in the cluster DETAIL read `showcluster`
+  (`$.instance_groups[0].id`, nested `…block_storage_groups[0].id`), request_id =
+  async-op from createcluster (`$.request_id`); (2) cross-service cluster_id ←
+  `container/ske/createcluster` `$.resource_id` (aimlops/cloud-ml/data-flow/data-ops
+  consume an external SKE cluster as a body field); (3) pseudo-resource ops
+  kms key_id←createkey `$.key.id`, secretvault, configinspection, virtualserver
+  subnet_id←vpc createsubnet; (4) waivers: resourcemanager key/resource_identifier
+  (name-addressed), cloudmonitoring addrbookId (EOL), scr tags_id (docker-pushed).
+  These produced_by directly feed the stage-2 identity probe. 118 offline pass,
+  validator 212/0. NOTE: bare `Endpoint.service` (e.g. `mysql`), not `database/mysql`.
 - **`-n 2 → 6` parallelism change (dab8a41) was applied COSMETICALLY only**
   (found 2026-06-18 via loggingaudit audit-optimizer on run 27735741382). The
   comments (`api-test.yml:333,572`) and the echo (`:583` "in parallel (-n 6)")

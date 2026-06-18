@@ -105,9 +105,78 @@ def _model_capture_index() -> dict:
     return out
 
 
+# --------------------------------------------------------------------------- #
+# Residual producer rules — the hard tail the REST path-convention cannot reach
+# (evidence: multi-agent investigation 2026-06-18 + knowledge/formal/resources/
+# *.yaml). Applied ONLY to a self-param the mechanical derivation left null, so it
+# can never regress an existing match. Each rule yields (produced_by, capture, kind).
+# --------------------------------------------------------------------------- #
+# NOTE: keys below use the BARE service name (Endpoint.service, e.g. "mysql"),
+# NOT the category-prefixed "database/mysql". Producer VALUES are full catalog
+# keys (category/service/name), verified against the live catalog before use.
+#
+# DBaaS engines: instance-groups / block-storage-groups are born inside the
+# cluster DETAIL read (showcluster), NOT a collection POST; request_id is the
+# async-operation id from the cluster create's 202 asyncresponse. The producer is
+# in the SAME service as the consumer, so its key prefix == the consumer's.
+_DBAAS_SERVICES = (
+    "epas", "mariadb", "mysql", "postgresql", "sqlserver",
+    "searchengine", "vertica", "eventstreams", "cachestore",
+)
+
+# Explicit (bare-service, param) -> (produced_by, capture, kind) for cross-service /
+# pseudo-resource ops the path convention can't see.
+_RESIDUAL_EXPLICIT = {
+    # cross-service: the cluster is an external SKE cluster passed in as a body field
+    ("aimlops-platform", "cluster_id"): ("container/ske/createcluster", "$.resource_id", "create-xsvc"),
+    ("cloud-ml", "cluster_id"):         ("container/ske/createcluster", "$.resource_id", "create-xsvc"),
+    ("data-flow", "cluster_id"):        ("container/ske/createcluster", "$.resource_id", "create-xsvc"),
+    ("data-ops", "cluster_id"):         ("container/ske/createcluster", "$.resource_id", "create-xsvc"),
+    # same-service creates the convention missed (202/no-body -> jsonpath from model, UNPROVEN)
+    ("data-flow", "data_flow_id"):      ("data-analytics/data-flow/createdataflow", "$.id", "create"),
+    ("data-ops", "data_ops_id"):        ("data-analytics/data-ops/createdataops", "$.id", "create"),
+    ("baremetal", "baremetal_id"):      ("compute/baremetal/createbaremetals", "$.resource_id", "create"),
+    # pseudo-resource crypto/vault/diagnosis ops keyed off the parent create
+    ("kms", "key_id"):                  ("security/kms/createkey", "$.key.id", "create"),
+    ("secretvault", "secret_vault_id"): ("security/secretvault/createsecretvault", "$.secret_vault.id", "create"),
+    ("configinspection", "diagnosis_id"):("security/configinspection/creatediagnosisobject", "$.diagnosis_id", "create"),
+    # cross-service subnet (server ip read keys off the VPC subnet)
+    ("virtualserver", "subnet_id"):     ("networking/vpc/createsubnet", "$.subnet.id", "create-xsvc"),
+    # apigateway resource tree: create-under-parent POST; same producer for both roles
+    ("apigateway", "resource_id"):      ("application-service/apigateway/createresource", "$.id", "create"),
+    ("apigateway", "parent_id"):        ("application-service/apigateway/createresource", "$.id", "create"),
+    # generic SRN target: owner-supplied; a disposable resource-group SRN is the practical source
+    ("iam", "srn"):                     ("management/resourcemanager/createresourcegroup", "$.resource_group.srn", "create-xsvc"),
+}
+
+# Genuine waivers: no producer exists (name-addressed / console-only / EOL). Left
+# produced_by=null but tagged producer_kind="waiver" so the worklist is honest.
+_RESIDUAL_WAIVERS = {
+    ("resourcemanager", "key"),
+    ("resourcemanager", "resource_identifier"),
+    ("cloudmonitoring", "addrbookId"),
+    ("scr", "tags_id"),
+}
+
+
+def _residual_for(service: str, param: str, key_prefix: str):
+    """(produced_by, capture, kind) for a null self-param, or (None, None, None).
+    `service` is the bare Endpoint.service; `key_prefix` is the consumer endpoint's
+    category/service prefix (for same-service templated producers)."""
+    if service in _DBAAS_SERVICES:
+        if param == "instance_group_id":
+            return f"{key_prefix}/{service}showcluster", "$.instance_groups[0].id", "detail-read"
+        if param == "block_storage_group_id":
+            return f"{key_prefix}/{service}showcluster", "$.instance_groups[0].block_storage_groups[0].id", "detail-read"
+        if param == "request_id":
+            return f"{key_prefix}/{service}createcluster", "$.request_id", "async-op"
+    return _RESIDUAL_EXPLICIT.get((service, param), (None, None, None))
+
+
 def build() -> dict:
     docs = json.loads(_DOCS.read_text())["endpoints"]
     catalog = load_catalog()
+    catalog_keys = {e.key for e in catalog}
     model_caps = _model_capture_index()
 
     # index POST + list-GET endpoints by (service, normalised path) for producer
@@ -173,6 +242,14 @@ def build() -> dict:
                     cap = model_caps.get(_norm(prefix)) or (
                         "$.contents[0].id" if kind and kind.startswith("lookup")
                         else "$.id")
+            # Residual fallback: only for a self-param the convention left null —
+            # the hard tail (cross-service / nested-in-detail / async / pseudo-op).
+            if prod is None and name == last:
+                rprod, rcap, rkind = _residual_for(e.service, name, e.key.rsplit("/", 1)[0])
+                if rprod and rprod in catalog_keys:
+                    prod, cap, kind = rprod, rcap, rkind
+                elif (e.service, name) in _RESIDUAL_WAIVERS:
+                    kind = "waiver"
             pps.append({
                 "name": name,
                 "resource_type": rtype,
