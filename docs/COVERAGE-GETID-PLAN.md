@@ -259,3 +259,31 @@ Auto-probe issues param-less GETs, so id-bound GETs that ALSO need required quer
 params (apigw `reports`, dbaas `check-duplication` by name, date windows) need an
 explicit lifecycle step / model `verify` with the params. Listed in
 `docs/READ-REACHABILITY.md`.
+
+### Piece 3b — PRECISE worklist (89 self-params, no producer; from data/api_catalog_params.json 2026-06-18)
+
+| service | unproduced self-param → endpoint | likely class |
+|---|---|---|
+| aimlops-platform (5) | cluster_id, cluster_id, cluster_id, cluster_id, cluster_id | needs capture / console-only id |
+| apigateway (3) | parent_id, resource_id, resource_id | needs capture / console-only id |
+| baremetal (2) | baremetal_id, baremetal_id | needs capture / console-only id |
+| cachestore (3) | block_storage_group_id, instance_group_id, request_id | needs capture / console-only id |
+| cloud-ml (3) | cluster_id, cluster_id, cluster_id | needs capture / console-only id |
+| cloudmonitoring (1) | addrbookId | needs capture / console-only id |
+| configinspection (2) | diagnosis_id, diagnosis_id | needs capture / console-only id |
+| data-flow (3) | cluster_id, cluster_id, data_flow_id | needs capture / console-only id |
+| data-ops (3) | cluster_id, cluster_id, data_ops_id | needs capture / console-only id |
+| epas (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
+| eventstreams (3) | block_storage_group_id, instance_group_id, request_id | needs capture / console-only id |
+| iam (2) | srn, srn | composite/srn path (no single create) |
+| kms (7) | key_id, key_id, key_id, key_id, key_id, key_id | needs capture / console-only id |
+| mariadb (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
+| mysql (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
+| postgresql (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
+| resourcemanager (5) | key, key, resource_identifier, resource_identifier, resource_identifier | composite/srn path (no single create) |
+| scr (7) | tags_id, tags_id, tags_id, tags_id, tags_id, tags_id | unmodeled (scr tag id) |
+| searchengine (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
+| secretvault (1) | secret_vault_id | needs capture / console-only id |
+| sqlserver (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
+| vertica (4) | block_storage_group_id, instance_group_id, instance_group_id, request_id | needs capture / console-only id |
+| virtualserver (1) | subnet_id | needs capture / console-only id |
