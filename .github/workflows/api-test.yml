@@ -1280,6 +1280,51 @@ jobs:
           python -m core.oplog emit --stage dashboard --status done --job dashboard || true
           python -m core.oplog finalize --history dashboard/history.jsonl || true
 
+      - name: Audit-log harvest + optimize (read-only, non-blocking)
+        # Pull this run's loggingaudit events for the run window [start .. now]
+        # and (if the sibling optimizer is present) derive a scenario time/cost
+        # report. READ-ONLY (GET /v1/logs only) and NON-BLOCKING: every command
+        # is `|| true` and the step is continue-on-error, so it can NEVER fail
+        # the run. Inherits the workflow-level SCP_* env block (creds + region),
+        # same as the sibling steps in this job.
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          mkdir -p reports/audit
+          # Run window: head_commit.timestamp (the run start) -> now (UTC).
+          START="${{ github.event.head_commit.timestamp }}"
+          # Normalize to the ISO8601 Z form the API expects (drop offset, force Z).
+          START="$(python - "$START" <<'PY'
+          import sys
+          from datetime import datetime, timezone
+          raw = (sys.argv[1] or "").strip()
+          try:
+              dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+              dt = dt.astimezone(timezone.utc)
+          except Exception:
+              dt = None
+          print(dt.strftime("%Y-%m-%dT%H:%M:%SZ") if dt else "")
+          PY
+          )"
+          NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          # Fall back to a 6h lookback if head_commit.timestamp was unavailable
+          # (e.g. workflow_dispatch has no head_commit).
+          [ -n "$START" ] || START="$(date -u -d '6 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "audit window: $START .. $NOW"
+          python -m audit.harvest --start "$START" --end "$NOW" \
+            --out reports/audit/${{ github.run_id }}.jsonl || true
+          # The optimizer is built by another agent; tolerate its absence.
+          python -m audit.optimizer reports/audit/${{ github.run_id }}.jsonl \
+            --out reports/audit/${{ github.run_id }}-report.md || true
+      - name: Upload audit harvest + report
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit
+          path: reports/audit/
+          if-no-files-found: ignore
+
       - name: Test result summary
         if: ${{ always() }}
         run: |
