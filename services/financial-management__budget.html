@@ -145,7 +145,7 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 <div class="hero">
   <div class="gauge">
     <div class="ring"><span>20%</span></div>
-    <div class="lbl">검증(2xx) 커버<br><b>1 / 5</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 3</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>1 / 5</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 0</span></div>
   </div>
   <h1>budget <span class="tag">financial-management</span></h1>
   <div class="split">
@@ -155,7 +155,7 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
   </div>
 </div>
 
-<div class="action"><div><b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능. 회귀 위험은 없음(신규 5xx/auth 0).</div></div>
+<div class="action"><div><b>신규 5xx/auth 실패 3건 — 조치 필요.</b> <b>다음 작업 후보:</b> 쓰기 커버리지 0%가 약점. 미검증 쓰기 대부분은 부모 리소스 ID가 없어 404(probe 한계 = 정상) — CRUD 시나리오를 추가하면 도달 가능.</div></div>
 
 <div class="controls">
   <div class="row1">
@@ -200,11 +200,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-18 17:14 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-19 07:27 KST · branch <code>claude/adoring-heisenberg-7sem6u</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/budgets/account/{budget_id}", "api": "deleteaccountbudget", "c": "p", "s": 404, "t": 2.1, "src": "", "d": []}, {"m": "GET", "p": "/v1/budgets/account", "api": "listaccountbudgets", "c": "y", "s": 200, "t": 2.4, "src": "", "d": []}, {"m": "GET", "p": "/v1/budgets/account/{budget_id}", "api": "showaccountbudget", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/budgets/account", "api": "createaccountbudget", "c": "p", "s": 400, "t": 1.0, "src": "", "d": []}, {"m": "PUT", "p": "/v1/budgets/account/{budget_id}", "api": "setaccountbudget", "c": "p", "s": 400, "t": 1.4, "src": "", "d": []}];
+var R=[{"m": "DELETE", "p": "/v1/budgets/account/{budget_id}", "api": "deleteaccountbudget", "c": "f", "s": 404, "t": 2.3, "src": "", "d": []}, {"m": "GET", "p": "/v1/budgets/account", "api": "listaccountbudgets", "c": "y", "s": 200, "t": 2.4, "src": "df8fb87", "d": []}, {"m": "GET", "p": "/v1/budgets/account/{budget_id}", "api": "showaccountbudget", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "POST", "p": "/v1/budgets/account", "api": "createaccountbudget", "c": "f", "s": 400, "t": 2.4, "src": "", "d": []}, {"m": "PUT", "p": "/v1/budgets/account/{budget_id}", "api": "setaccountbudget", "c": "f", "s": 400, "t": 0.9, "src": "", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
