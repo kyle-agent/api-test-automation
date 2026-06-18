@@ -257,12 +257,17 @@ def _kind_of(rtype: str, dep_kinds: set) -> str:
 
 
 def _state_of(d: dict) -> str:
-    """현재 상태: creating(생성중) / testing(테스트중) / created(생성됨) / deleted(삭제됨)."""
+    """현재 상태: creating(생성중) / testing(테스트중) / created(생성됨) /
+    deleted(삭제됨) / failed(생성실패). A 'Create Error' with no later Create End
+    and no Delete is a FAILED create — the resource never existed (e.g. the
+    createpublicdomainname 500), so it's neither running nor leaked."""
     names = [n for _, n in d["ops"]]
     if any("Delete" in n and "End" in n for n in names):
         return "deleted"
     created = any("Create" in n and "End" in n for n in names)
     if not created:
+        if any(("Error" in n or "Fail" in n) for n in names):
+            return "failed"
         return "creating"
     # any non-create/non-delete op AFTER create end == being exercised (API 점검중)
     seen_create_end = False
@@ -274,8 +279,10 @@ def _state_of(d: dict) -> str:
     return "created"
 
 
-_STATE_COLOR = {"creating": "#58a6ff", "testing": "#d29922", "created": "#3fb950", "deleted": "#6e7681"}
-_STATE_KO = {"creating": "생성중", "testing": "테스트중", "created": "생성됨", "deleted": "삭제됨"}
+_STATE_COLOR = {"creating": "#58a6ff", "testing": "#d29922", "created": "#3fb950",
+                "deleted": "#6e7681", "failed": "#e5484d"}
+_STATE_KO = {"creating": "생성중", "testing": "테스트중", "created": "생성됨",
+             "deleted": "삭제됨", "failed": "생성실패"}
 
 
 def render_dag(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
@@ -378,6 +385,7 @@ _FLOW = {
     "testing":  ("#ffe6ad", "#d99413"),  # 테스트중 — pulses
     "created":  ("#c8efd4", "#1f9d57"),  # 생성됨
     "deleted":  ("#e6e9ee", "#9aa4b2"),  # 삭제됨 — gray
+    "failed":   ("#ffd6d6", "#e5484d"),  # 생성실패 — red, not pulsing/leaked
 }
 
 
@@ -469,7 +477,8 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
              f'<i style="background:#cfe8ff"></i>생성중 {nstate["creating"]}(깜빡)'
              f'<i style="background:#ffe6ad"></i>테스트중 {nstate["testing"]}'
              f'<i style="background:#c8efd4"></i>생성됨 {nstate["created"]}'
-             f'<i style="background:#e6e9ee"></i>삭제됨 {nstate["deleted"]}</div>')
+             f'<i style="background:#e6e9ee"></i>삭제됨 {nstate["deleted"]}'
+             f'<i style="background:#ffd6d6"></i>생성실패 {nstate["failed"]}</div>')
 
     P.append(f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
     P.append('<defs><marker id="rel" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">'
