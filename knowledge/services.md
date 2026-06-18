@@ -57,6 +57,37 @@ duplicating. Add a new `##` section when you take on a new service.
 
 - **Host:** regional. registry/repository id `$.id`, registry poll `$.state` →
   `Running`. **Registry DELETE 500-races** for minutes after create — retry on 500.
+- **Quota = 1 registry** (`CONTAINER_REGISTRY.NON_VISIBILITY.MAX.COUNT applied_value: 1EA`);
+  a create when the slot is full returns **403 quota.value.exceeded**, NOT a bug.
+  Coverage lever for id-bound GETs is therefore **borrow-and-read-by-id, no create
+  needed**: list registries → take a `Running` one → walk its children read-only.
+- **Live-confirmed borrowable resources (2026-06-18, kr-west1):** registry
+  `sample` id `nayvugfp4154447ab0ab61279cba3d72` (Running), repository `test`
+  id `6c910ed5195842739f9c98a569982064` (Active). ids drift — re-harvest via
+  `GET /v1/container-registries` then `.../{id}/repositories`; don't hardcode.
+- **Detail envelopes:** `showregistry` → `{"registry": {...}}`, `showrepository`
+  → `{"repository": {...}}` (single-key wrappers). List shapes:
+  `listregistries` → `{count, registries[]}`, `listrepositories` →
+  `{count, repositories[]}`, `listimages` → `{count, images[]}`,
+  `connectable-resources` → `{count, resources[]}`.
+- **`checkrepositorynameduplication`** needs BOTH `registry_id` + `name` query
+  params (else 400 `Field required`); `checkregistrynameduplication` needs `name`.
+- **READ-ONLY coverage ceiling (no docker, no mutations):** 8 GETs reachable —
+  listregistries, showregistry, listrepositories, showregistry's
+  connectable-resources, both check-duplications, showrepository, listimages.
+  All 200 on the borrowed resources.
+- **Docker-push blocker:** the existing repository has `images:[]` (count 0), and
+  images/tags are **born only by `docker push`**, not by any REST POST. So
+  `showimage`, `listtagses`, `showtags`, `tags-{packages,secrets,vulnerabilities}`,
+  `downloadmanifest`, `showimagelifecyclepolicypreview`, and every image/tags
+  PUT/DELETE are **needs-docker-push blockers** — not testable from a no-docker
+  runner. (See `regression/scr_docker_probe.py` for the docker-login hypothesis.)
+- **Mutating policy PUTs** on registry/repository (description / lock / pull /
+  scan / lifecycle / ACL / public-endpoint) are gated behind `SCP_ALLOW_MUTATIONS`
+  and would mutate the SHARED borrowed `sample`/`test` resources — do NOT fire
+  them just to move coverage; cover via an own-resource lifecycle when the quota
+  slot is free. Several historically returned transient **503 upstream connect
+  timeout** (product/gateway flap, retry-then-classify, not a deterministic bug).
 
 ## security / certificatemanager
 
