@@ -164,6 +164,27 @@ def _list_all(client, service, path):
     return [it for it in _items(r.body) if isinstance(it, dict)]
 
 
+# Per-campaign convergence cache (Task C, change 1). A (service, path) pass that
+# lists ZERO deletable-owned items — either nothing of ours is left, or only
+# un-deletable items remain (live-ttl, name-mismatch, or PF-09 pending-deletion
+# items that _is_pending_deletion will skip anyway) — cannot produce a deletion
+# in a later round either: nothing it would re-list is going to flip to deletable
+# mid-sweep. Re-listing all ~30 collections every one of 5-8 rounds is the bulk
+# of a 55-min sweep, so once a pass converges we skip RE-LISTING it next round.
+#
+# SAFETY: a collection is marked converged ONLY when _select picked 0 deletable
+# items, so skipping it can never skip a real deletion. The very first round
+# always lists every collection (the set starts empty), and the gating
+# (is_owned/is_expired in _is_deletable) is untouched — convergence is decided
+# AFTER ownership scoping, never instead of it. Opt out with
+# SCP_SWEEP_NO_CONVERGE=true to force a full re-list every round.
+_CONVERGED: set = set()
+
+
+def _converge_enabled() -> bool:
+    return os.environ.get("SCP_SWEEP_NO_CONVERGE", "").lower() != "true"
+
+
 def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
             match_token: bool = False, force_unnamed: bool = False):
     """List a collection and return only deletable items.
@@ -185,6 +206,10 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
     import os
     import re
     from core.registry import _tag_value, OWNER_KEY, OWNER
+    # Converged-collection skip (Task C, change 1): a pass that picked nothing
+    # deletable in an earlier round of THIS campaign is skipped — don't re-list.
+    if _converge_enabled() and (service, path) in _CONVERGED:
+        return []
     force = os.environ.get("SCP_SWEEP_IGNORE_TTL", "").lower() == "true"
     listed = _list_all(client, service, path)
     picked, skipped = [], []
@@ -215,6 +240,14 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
         if skipped:
             print(f"    skipped: {', '.join(skipped[:5])}"
                   + (" …" if len(skipped) > 5 else ""))
+    # Convergence (Task C, change 1): this pass yields no further progress when
+    # it picked nothing deletable, OR everything it picked is already in a
+    # terminal pending-deletion state (PF-09) that the delete site skips. Either
+    # way a later round would re-list the same un-actionable items, so cache the
+    # pass as converged and skip re-listing it next round.
+    if _converge_enabled() and (
+            not picked or all(_is_pending_deletion(it) for it in picked)):
+        _CONVERGED.add((service, path))
     return picked
 
 
@@ -223,6 +256,53 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
 # already 2xx-deleted this sweep is not progress, or the round loop never
 # reaches its fixed point and burns ~10 minutes re-deleting the same 40.
 _DELETED_THIS_SWEEP: set = set()
+
+
+# PF-09: KMS keys and secrets enter a SCHEDULED ("pending deletion") state and
+# linger in the list for the whole waiting-time window. They never disappear
+# mid-sweep, so re-issuing DELETE to them every round keeps the fixed-point loop
+# alive for nothing (~10 min wasted re-deleting the same 40). The list field
+# observed live (2026-06-18):
+#   * /v1/kms/transit item -> state="To_Be_Terminated" (delete_target_yn="Y")
+#   * /v1/secrets    item -> state="To be terminated"   (deleted_at set)
+# Normalise (lower-case, strip spaces/underscores/hyphens) and match a family of
+# terminal-deletion tokens so vocabulary drift between services/regions is
+# tolerated. This is a TERMINAL-STATE check only — it never affects ownership
+# scoping (is_owned/is_expired still gate selection); it only suppresses a
+# no-op re-DELETE of an item that is already on its way out.
+_PENDING_DELETE_STATES = frozenset({
+    "tobeterminated",      # kms transit:  "To_Be_Terminated"
+    "toberterminated",     # tolerate a typo'd variant seen in some payloads
+    "pendingdeletion",
+    "pendingdelete",
+    "scheduledfordeletion",
+    "scheduleddeletion",
+    "scheduled",
+    "deleting",
+    "deleted",
+    "terminating",
+    "terminated",
+    "deletescheduled",
+})
+
+
+def _is_pending_deletion(item: dict) -> bool:
+    """True when a KMS/secret item is already in a scheduled/pending-deletion
+    terminal state (PF-09). Such an item never vanishes mid-sweep, so issuing
+    DELETE again is a no-op that only keeps the round loop alive.
+
+    Ownership-neutral: callers still go through ``_select`` (is_owned/is_expired
+    gating) to decide the item is OURS; this only suppresses the redundant
+    re-DELETE on a terminal item we already scheduled.
+    """
+    for field in ("state", "status"):
+        v = item.get(field)
+        if not isinstance(v, str):
+            continue
+        norm = v.lower().replace(" ", "").replace("_", "").replace("-", "")
+        if norm in _PENDING_DELETE_STATES:
+            return True
+    return False
 
 
 def _delete(client, service, path, json=None):
@@ -608,6 +688,8 @@ def run_sweep(client) -> int:
     # these before their KMS keys, since a secret references a kms_id.
     for it in _select(c, "secretsmanager", "/v1/secrets",
                       name_prefixes=("regrsec",)):
+        if _is_pending_deletion(it):
+            continue  # PF-09: already scheduled — re-DELETE is a no-op
         if it.get("id") and _delete(
                 c, "secretsmanager", f"/v1/secrets/{it['id']}",
                 json={"waiting_time_ndays": 7}):
@@ -619,6 +701,8 @@ def run_sweep(client) -> int:
     # prefix in ONE pass like the other collections.
     for it in _select(c, "kms", "/v1/kms/transit",
                       name_prefixes=("regr",)):
+        if _is_pending_deletion(it):
+            continue  # PF-09: already scheduled — re-DELETE is a no-op
         if it.get("id") and _delete(
                 c, "kms", f"/v1/kms/transit/{it['id']}"):
             deleted += 1
