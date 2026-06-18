@@ -1,14 +1,21 @@
 """read_reachability (Piece 2 of the create→조회(show) coverage effort) — a pure
-static analysis joining the API catalog with the resource-task model, classifying
-EVERY id-bound GET endpoint by whether the model can produce the path ids it needs.
+static analysis joining the API catalog with the enrichment sidecar, classifying
+EVERY id-bound GET endpoint by whether a known producer can supply the path ids it
+needs.
 
 Run with::
 
     python -m spec.read_reachability
 
-This NEVER touches the network, the engine, or the live model — it only *reads*
-``core.catalog.load_catalog()``, ``regression.scenarios.composer.load_model()`` and
-``data/api_docs.json``. It writes two artifacts and prints a summary:
+This NEVER touches the network, the engine, or the live model. The verdict source
+of truth is the **enrichment sidecar** ``data/api_catalog_params.json`` (written by
+``spec.enrich_catalog``), which records, per path-param, the AUTHORITATIVE producer
+(``produced_by`` + ``producer_kind`` + ``capture``) by resource identity — the same
+data the engine's identity probe uses. We no longer guess producers by capture-var
+name (the retired ``near_misses``/``_TRIVIAL`` heuristic mis-judged any producer that
+existed under a different var name). It also reads ``core.catalog.load_catalog()``
+(endpoint set) and ``data/api_docs.json`` (required query params). It writes two
+artifacts and prints a summary:
 
   * ``docs/READ-REACHABILITY.md``  — dated per-service report (the durable gap map).
   * ``reports/read_reachability.json`` — machine-readable verdict rows (gitignored dir).
@@ -18,31 +25,31 @@ its "Piece 1 — engine auto-probe" / "Piece 2" / "Piece 3" subsections. The
 ``model-gap`` list here IS Piece 3's worklist.
 
 VERDICTS (per id-bound GET in a service the model knows):
-  model-gap         — at least one path-param has NO producing model node. The real
-                      backlog: needs a new capture / child node / list-recover step.
-  query-param       — all path-params produced, but the GET ALSO carries a required
-                      query param (api_docs `in: query`, `required: true`) which the
-                      read-only auto-probe cannot supply — needs an explicit model
-                      `verify` step wiring those params.
-  cat2-needs-child  — all path-params produced, no required query, but reading this
-                      endpoint depends on a CHILD created beyond the resource's own
-                      create spine. Heuristic (documented below): the set of DISTINCT
-                      model nodes producing the path-params spans >= 3 levels of
-                      nesting (root → child → grandchild), OR a producer is off the
-                      deepest node's requires-ancestor chain. Such a read only fires
-                      once the leaf child node is itself composed into a lifecycle.
-  cat1-auto         — all path-params produced by the deepest resource node plus its
-                      requires ancestors, with <= 2 distinct producing nodes. Piece-1
-                      auto-probe (seeding probe_reads from the full capture ctx) fires
-                      it for free from the resource's own lifecycle.
+  model-gap         — at least one path-param has produced_by=null with NO waiver,
+                      i.e. no known producer. The real backlog: needs a producer
+                      (new capture / child node / list-recover step) or a waiver.
+  waiver            — all path-params accounted for, but at least one is an HONEST
+                      waiver (produced_by=null, producer_kind="waiver"): no producer
+                      exists (name-addressed / console-only / EOL). Not auto-reachable,
+                      but not a backlog item either.
+  query-param       — all path-params have a known producer, but the GET ALSO carries
+                      a required query param (api_docs `in: query`, `required: true`)
+                      which the read-only auto-probe cannot supply — needs an explicit
+                      model `verify` step wiring those params.
+  cat2-needs-child  — all path-params have a known producer, no required query, but at
+                      least one producer is NOT a same-service collection `create`
+                      (producer_kind in create-xsvc/lookup/detail-read/async-op). Such
+                      a read only fires once that cross-service / non-create producer
+                      is composed beyond the resource's own create spine.
+  cat1-auto         — all path-params produced by a same-service collection POST
+                      (producer_kind=="create"). Piece-1 auto-probe (seeding
+                      probe_reads from the create lifecycle's capture ctx) fires it
+                      for free from the resource's own lifecycle.
 
-cat2 heuristic rationale: a single-resource lifecycle's auto-probe seeds the ids it
-captured along ONE create spine (root resource + its direct requires). A GET whose
-ids come from a deeper nested child (api → resource → method) needs that child
-composed; the >=3-distinct-producer threshold is the calibration boundary
-(apigw usage-plans/{usage_plan_id} = 2 nodes → cat1; resources/{rid}/methods/{type}
-= 3 nodes → cat2). The boundary is deliberately soft (per the plan); query-param and
-model-gap are the load-bearing, unambiguous buckets.
+verdict source: ``producer_kind`` is assigned by ``spec.enrich_catalog`` from the REST
+collection-POST convention plus residual evidence (cross-service body fields, DBaaS
+detail-reads, async-op ids, genuine waivers). Reading it here keeps these verdicts
+aligned with the engine's actual identity probe rather than a name heuristic.
 """
 from __future__ import annotations
 
@@ -57,6 +64,7 @@ from regression.scenarios import composer
 
 ROOT = Path(__file__).resolve().parent.parent
 API_DOCS_PATH = ROOT / "data" / "api_docs.json"
+SIDECAR_PATH = ROOT / "data" / "api_catalog_params.json"
 MD_OUT = ROOT / "docs" / "READ-REACHABILITY.md"
 JSON_OUT = ROOT / "reports" / "read_reachability.json"
 
@@ -73,62 +81,42 @@ def _norm(p: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# model projection: param producers + requires graph
+# model projection: which services the resource model knows (verdict gating only)
 # --------------------------------------------------------------------------- #
-def _node_requires(task: dict) -> list[str]:
-    """Flatten a node's `requires` into the plain list of referenced node ids
-    (AND deps + every one_of branch; credentials are preconditions, not nodes)."""
-    out: list[str] = []
-    for entry in (task or {}).get("requires") or []:
-        if isinstance(entry, str):
-            out.append(entry)
-        elif isinstance(entry, dict):
-            if "ref" in entry:
-                out.append(entry["ref"])
-            elif "one_of" in entry:
-                for b in entry["one_of"]:
-                    out.append(b if isinstance(b, str) else b.get("ref"))
-            # {"credential": ...} → precondition, no create node
-    return [r for r in out if r]
+def model_service_set(model: dict) -> set[str]:
+    """Bare service names (``mysql``, not ``database/mysql``) the model has a node
+    for. We only classify id-bound GETs whose service the model knows; producer
+    identity itself now comes from the enrichment sidecar, not the model graph."""
+    out: set[str] = set()
+    for task in model.values():
+        svc = (task or {}).get("service") or ""
+        if svc:
+            out.add(svc.split("/")[-1])
+    return out
 
 
-def build_model_index(model: dict):
-    """Return (param_producer, node_service, requires, ancestors_fn).
+# --------------------------------------------------------------------------- #
+# enrichment sidecar: authoritative per-path-param producer
+# --------------------------------------------------------------------------- #
+def load_param_sidecar(path: Path = SIDECAR_PATH) -> dict:
+    """{endpoint-key -> {param-name -> {produced_by, producer_kind, capture, role}}}.
 
-    param_producer: {capture-var-name -> [node_id, ...]} — the var name a node
-    captures IS the attribute-id it produces (model schema §1).
-    """
-    param_producer: dict[str, list[str]] = defaultdict(list)
-    node_service: dict[str, str] = {}
-    requires: dict[str, list[str]] = {}
-
-    for nid, task in model.items():
-        task = task or {}
-        svc = task.get("service") or ""
-        node_service[nid] = svc.split("/")[-1] if svc else ""
-        caps = task.get("capture")
-        if isinstance(caps, dict):
-            for var in caps:
-                param_producer[var].append(nid)
-        requires[nid] = _node_requires(task)
-
-    _anc_memo: dict[str, set] = {}
-
-    def ancestors(nid: str) -> set:
-        if nid in _anc_memo:
-            return _anc_memo[nid]
-        seen: set = set()
-        stack = list(requires.get(nid, []))
-        while stack:
-            r = stack.pop()
-            if r in seen:
-                continue
-            seen.add(r)
-            stack.extend(requires.get(r, []))
-        _anc_memo[nid] = seen
-        return seen
-
-    return param_producer, node_service, requires, ancestors
+    The sidecar (``spec.enrich_catalog``) is keyed by catalog key (== endpoint.key,
+    1:1) and lists ``path_params`` in path order with the AUTHORITATIVE producer per
+    param. We index by param NAME (names are unique within a path and align with the
+    catalog placeholders) so verdicts are independent of list ordering."""
+    try:
+        docs = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+    out: dict[str, dict] = {}
+    for key, ep in docs.items():
+        out[key] = {
+            pp.get("name"): pp
+            for pp in (ep.get("path_params") or [])
+            if pp.get("name")
+        }
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -160,70 +148,60 @@ def load_required_query(api_docs_path: Path = API_DOCS_PATH) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# near-miss name mismatch (catalog path-param vs model capture var)
+# core verdict — driven by the enrichment sidecar's authoritative producer
 # --------------------------------------------------------------------------- #
-# Bare/ambiguous params that match too many vars to be a useful "near miss".
-_TRIVIAL = {"id", "key", "name", "region", "service", "type", "tags_id"}
+# producer_kind values that mean "auto-probe fires from the resource's OWN create
+# lifecycle" (a same-service collection POST). Anything else is a producer beyond
+# the create spine (cross-service create, lookup, detail-read, async-op).
+_AUTO_KIND = "create"
 
 
-def _suffix_on_boundary(short: str, long: str) -> bool:
-    """True if `short` is a '_'-boundary suffix of `long` (e.g. engine_version_id
-    of dbaas_engine_version_id, srn of rg_srn) — a clean prefix-mismatch signal."""
-    if short == long or len(short) >= len(long):
-        return False
-    return long.endswith(short) and long[len(long) - len(short) - 1] == "_"
+def classify(endpoint, param_sidecar, required_query) -> dict:
+    """Classify one id-bound catalog GET from the enrichment sidecar. Returns a row.
 
-
-def near_misses(param: str, all_vars: set[str]) -> list[str]:
-    """Model capture vars that look like a renamed form of catalog `param`."""
-    if param in _TRIVIAL:
-        return []
-    out: set[str] = set()
-    for v in all_vars:
-        if v == param:
-            continue
-        if _suffix_on_boundary(param, v) or _suffix_on_boundary(v, param):
-            out.add(v)
-        # abbreviation: shared head token where one stem prefixes the other
-        # (repo/repository, reg/registry, cert/certificate) AND both end _id.
-        elif param.endswith("_id") and v.endswith("_id"):
-            ps, vs = param[:-3].split("_"), v[:-3].split("_")
-            if ps and vs and (ps[0].startswith(vs[0]) or vs[0].startswith(ps[0])) \
-                    and ps[0] != vs[0] and min(len(ps[0]), len(vs[0])) >= 3:
-                out.add(v)
-    return sorted(out)
-
-
-# --------------------------------------------------------------------------- #
-# core verdict
-# --------------------------------------------------------------------------- #
-def classify(endpoint, param_producer, ancestors, required_query) -> dict:
-    """Classify one id-bound catalog GET. Returns a row dict."""
+    Verdict precedence (worst-first): a single unproducible param dominates.
+      model-gap  : any path-param produced_by=null and NOT a waiver.
+      waiver     : (no model-gap) any path-param is an honest waiver.
+      query-param: (all producible, no waiver) a required query param blocks probe.
+      cat2-needs-child: a producer is not a same-service `create` (xsvc/lookup/…).
+      cat1-auto  : every producer is a same-service collection POST.
+    """
     path = endpoint.http_path
     pps = _PLACEHOLDER.findall(path)
-    prods = {p: list(param_producer.get(p, [])) for p in pps}
+    params = param_sidecar.get(endpoint.key, {})
     rq = required_query.get(endpoint.key)  # list, [] (none), or None (unknown)
 
-    missing = [p for p in pps if not prods[p]]
-    if missing:
+    # Resolve each path-param against the sidecar. ``producers`` keeps the report's
+    # producer column populated (param -> [producer_key] | []) for downstream parse.
+    producers: dict[str, list[str]] = {}
+    kinds: dict[str, str | None] = {}
+    has_gap = has_waiver = has_nonauto = False
+    for p in pps:
+        meta = params.get(p) or {}
+        produced_by = meta.get("produced_by")
+        kind = meta.get("producer_kind")
+        kinds[p] = kind
+        if produced_by:
+            producers[p] = [produced_by]
+            if kind != _AUTO_KIND:
+                has_nonauto = True
+        else:
+            producers[p] = []
+            if kind == "waiver":
+                has_waiver = True
+            else:
+                has_gap = True  # null producer, no waiver → genuine backlog
+
+    if has_gap:
         verdict = "model-gap"
+    elif has_waiver:
+        verdict = "waiver"
     elif rq:  # non-empty required-query list
         verdict = "query-param"
+    elif has_nonauto:
+        verdict = "cat2-needs-child"
     else:
-        # deepest path-param's producer is the resource being read.
-        deep = next(prods[p][0] for p in reversed(pps) if prods[p])
-        chain = {deep} | ancestors(deep)
-        distinct = {prods[p][0] for p in pps}
-        if not distinct <= chain:
-            # a path-param produced by a node off the deepest node's chain — a
-            # sibling/child created beyond the create spine.
-            verdict = "cat2-needs-child"
-        elif len(distinct) >= 3:
-            # >=3 nesting levels (root → child → grandchild): the leaf child must
-            # be composed for its ids to exist in a lifecycle's capture ctx.
-            verdict = "cat2-needs-child"
-        else:
-            verdict = "cat1-auto"
+        verdict = "cat1-auto"
 
     return {
         "path": path,
@@ -231,7 +209,8 @@ def classify(endpoint, param_producer, ancestors, required_query) -> dict:
         "norm_path": _norm(path),
         "key": endpoint.key,
         "path_params": pps,
-        "producers": {p: prods[p] for p in pps},
+        "producers": producers,
+        "producer_kinds": kinds,
         "required_query": rq,  # list | None(unknown)
         "verdict": verdict,
     }
@@ -240,10 +219,9 @@ def classify(endpoint, param_producer, ancestors, required_query) -> dict:
 def analyze():
     catalog = load_catalog()
     model = composer.load_model()
-    param_producer, node_service, _requires, ancestors = build_model_index(model)
+    model_services = model_service_set(model)
+    param_sidecar = load_param_sidecar()
     required_query = load_required_query()
-    model_services = {s for s in node_service.values() if s}
-    all_vars = set(param_producer)
 
     rows_by_service: dict[str, list[dict]] = defaultdict(list)
     skipped_no_model = 0
@@ -255,23 +233,28 @@ def analyze():
         if e.service not in model_services:
             skipped_no_model += 1
             continue
-        row = classify(e, param_producer, ancestors, required_query)
+        row = classify(e, param_sidecar, required_query)
         rows_by_service[e.service].append(row)
 
-    return rows_by_service, all_vars, skipped_no_model
+    return rows_by_service, skipped_no_model
 
 
 # --------------------------------------------------------------------------- #
 # rendering
 # --------------------------------------------------------------------------- #
-_VERDICTS = ["model-gap", "query-param", "cat2-needs-child", "cat1-auto"]
+_VERDICTS = ["model-gap", "waiver", "query-param", "cat2-needs-child", "cat1-auto"]
 
 
-def _producer_cell(producers: dict) -> str:
+def _producer_cell(producers: dict, kinds: dict | None = None) -> str:
+    kinds = kinds or {}
     parts = []
     for p, nodes in producers.items():
         if nodes:
-            parts.append(f"`{p}`→{','.join(nodes)}")
+            k = kinds.get(p)
+            suffix = f" ({k})" if k else ""
+            parts.append(f"`{p}`→{','.join(nodes)}{suffix}")
+        elif kinds.get(p) == "waiver":
+            parts.append(f"`{p}`→waiver")
         else:
             parts.append(f"`{p}`→∅")
     return "<br>".join(parts) if parts else "—"
@@ -285,7 +268,7 @@ def _query_cell(rq) -> str:
     return "**yes**: " + ", ".join(rq)
 
 
-def render_markdown(rows_by_service, all_vars, skipped_no_model) -> str:
+def render_markdown(rows_by_service, skipped_no_model) -> str:
     # global counts
     totals = {v: 0 for v in _VERDICTS}
     total = 0
@@ -294,14 +277,14 @@ def render_markdown(rows_by_service, all_vars, skipped_no_model) -> str:
             totals[r["verdict"]] += 1
             total += 1
 
-    # model-gap params + near-misses (Piece 3 worklist seed)
+    # model-gap params (Piece 3 worklist seed)
     gap_param_count: dict[str, int] = defaultdict(int)
     for rows in rows_by_service.values():
         for r in rows:
             if r["verdict"] != "model-gap":
                 continue
             for p, nodes in r["producers"].items():
-                if not nodes:
+                if not nodes and r["producer_kinds"].get(p) != "waiver":
                     gap_param_count[p] += 1
 
     # service order: model-gap count desc, then service name
@@ -315,8 +298,9 @@ def render_markdown(rows_by_service, all_vars, skipped_no_model) -> str:
     lines.append("")
     lines.append(f"> Generated: **{date.today().isoformat()}** by "
                  f"`python -m spec.read_reachability` (Piece 2 of the "
-                 f"create→조회(show) coverage effort). Pure static catalog×model "
-                 f"join — no network, no engine, no live model.")
+                 f"create→조회(show) coverage effort). Pure static catalog×sidecar "
+                 f"join (`data/api_catalog_params.json` authoritative producers) — "
+                 f"no network, no engine, no live model.")
     lines.append(">")
     lines.append("> Cross-ref: `docs/COVERAGE-GETID-PLAN.md` §7 (probe_reads "
                  "UNDER-SEEDING — the create→조회 gap) and its Piece 1 (engine "
@@ -330,8 +314,10 @@ def render_markdown(rows_by_service, all_vars, skipped_no_model) -> str:
     lines.append("")
     lines.append("| verdict | count | meaning |")
     lines.append("|---|---|---|")
-    lines.append(f"| `model-gap` | {totals['model-gap']} | a path-param has NO "
-                 "producing node — Piece 3 backlog |")
+    lines.append(f"| `model-gap` | {totals['model-gap']} | a path-param has NO known "
+                 "producer (`produced_by`=null, not a waiver) — Piece 3 backlog |")
+    lines.append(f"| `waiver` | {totals['waiver']} | a path-param is an honest waiver "
+                 "(no producer exists: name-addressed / console-only / EOL) |")
     lines.append(f"| `query-param` | {totals['query-param']} | path-params produced "
                  "but a required query param blocks auto-probe |")
     lines.append(f"| `cat2-needs-child` | {totals['cat2-needs-child']} | produced "
@@ -350,36 +336,34 @@ def render_markdown(rows_by_service, all_vars, skipped_no_model) -> str:
     # ---- top section: full model-gap worklist ----
     lines.append("## model-gap worklist (Piece 3)")
     lines.append("")
-    lines.append("Every id-bound GET with at least one path-param no model node "
-                 "captures. The `∅` param is the one to close (new capture / child "
-                 "node / list-recover sub-step). Near-miss column flags likely "
-                 "catalog↔model param NAME mismatches.")
+    lines.append("Every id-bound GET with at least one path-param the enrichment "
+                 "sidecar has NO known producer for (`produced_by`=null, not a "
+                 "waiver). The `∅` param is the one to close — find/declare a "
+                 "producer in `spec.enrich_catalog` (new capture / child node / "
+                 "list-recover sub-step), or tag it a waiver if none exists.")
     lines.append("")
-    lines.append("| service | GET path | unproduced param(s) | near-miss model capture(s) |")
-    lines.append("|---|---|---|---|")
+    lines.append("| service | GET path | unproduced param(s) |")
+    lines.append("|---|---|---|")
     gap_rows = []
     for svc in sorted(rows_by_service):
         for r in rows_by_service[svc]:
             if r["verdict"] != "model-gap":
                 continue
-            unprod = [p for p, n in r["producers"].items() if not n]
-            nm = sorted({m for p in unprod for m in near_misses(p, all_vars)})
-            gap_rows.append((svc, r["path"], unprod, nm))
-    for svc, path, unprod, nm in sorted(gap_rows, key=lambda x: (x[0], x[1])):
-        nm_cell = ", ".join(f"`{m}`" for m in nm) if nm else "—"
+            unprod = [p for p, n in r["producers"].items()
+                      if not n and r["producer_kinds"].get(p) != "waiver"]
+            gap_rows.append((svc, r["path"], unprod))
+    for svc, path, unprod in sorted(gap_rows, key=lambda x: (x[0], x[1])):
         up_cell = ", ".join(f"`{p}`" for p in unprod)
-        lines.append(f"| {svc} | `{path}` | {up_cell} | {nm_cell} |")
+        lines.append(f"| {svc} | `{path}` | {up_cell} |")
     lines.append("")
     # aggregate unproduced-param frequency (the most-leveraged fixes)
-    lines.append("**Unproduced path-params by frequency** (a single capture/lookup "
-                 "node may close several rows):")
+    lines.append("**Unproduced path-params by frequency** (a single producer "
+                 "declaration may close several rows):")
     lines.append("")
-    lines.append("| param | # GETs blocked | near-miss model capture(s) |")
-    lines.append("|---|---|---|")
+    lines.append("| param | # GETs blocked |")
+    lines.append("|---|---|")
     for p, n in sorted(gap_param_count.items(), key=lambda x: (-x[1], x[0])):
-        nm = near_misses(p, all_vars)
-        nm_cell = ", ".join(f"`{m}`" for m in nm) if nm else "—"
-        lines.append(f"| `{p}` | {n} | {nm_cell} |")
+        lines.append(f"| `{p}` | {n} |")
     lines.append("")
 
     # ---- per-service sections ----
@@ -398,7 +382,8 @@ def render_markdown(rows_by_service, all_vars, skipped_no_model) -> str:
         for r in rows:
             pp_cell = ", ".join(f"`{p}`" for p in r["path_params"])
             lines.append(
-                f"| `{r['path']}` | {pp_cell} | {_producer_cell(r['producers'])} "
+                f"| `{r['path']}` | {pp_cell} | "
+                f"{_producer_cell(r['producers'], r.get('producer_kinds'))} "
                 f"| {_query_cell(r['required_query'])} | `{r['verdict']}` |")
         lines.append("")
 
@@ -406,7 +391,8 @@ def render_markdown(rows_by_service, all_vars, skipped_no_model) -> str:
 
 
 def build_json(rows_by_service) -> dict:
-    """{service: [ {path, method, path_params, producers, required_query, verdict} ]}"""
+    """{service: [ {path, method, path_params, producers, producer_kinds,
+    required_query, verdict} ]}"""
     out: dict[str, list] = {}
     for svc in sorted(rows_by_service):
         out[svc] = [
@@ -417,6 +403,7 @@ def build_json(rows_by_service) -> dict:
                 "key": r["key"],
                 "path_params": r["path_params"],
                 "producers": r["producers"],
+                "producer_kinds": r["producer_kinds"],
                 "required_query": r["required_query"],
                 "verdict": r["verdict"],
             }
@@ -426,7 +413,7 @@ def build_json(rows_by_service) -> dict:
 
 
 def main() -> int:
-    rows_by_service, all_vars, skipped_no_model = analyze()
+    rows_by_service, skipped_no_model = analyze()
 
     totals = {v: 0 for v in _VERDICTS}
     total = 0
@@ -437,13 +424,13 @@ def main() -> int:
 
     # write artifacts
     MD_OUT.parent.mkdir(parents=True, exist_ok=True)
-    MD_OUT.write_text(render_markdown(rows_by_service, all_vars, skipped_no_model))
+    MD_OUT.write_text(render_markdown(rows_by_service, skipped_no_model))
     JSON_OUT.parent.mkdir(parents=True, exist_ok=True)
     JSON_OUT.write_text(json.dumps(build_json(rows_by_service), indent=2,
                                    ensure_ascii=False) + "\n")
 
     # stdout summary
-    print("read-reachability — id-bound GET classification (static catalog×model)")
+    print("read-reachability — id-bound GET classification (static catalog×sidecar)")
     print(f"  total analyzed: {total}")
     for v in _VERDICTS:
         print(f"  {v:18} {totals[v]}")
