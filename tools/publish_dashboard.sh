@@ -11,9 +11,21 @@
 #
 # Usage:  tools/publish_dashboard.sh
 set -uo pipefail
-cd "$(git rev-parse --show-toplevel)"
+ROOT="$(git rev-parse --show-toplevel)"; cd "$ROOT"
 SHA=$(git rev-parse --short HEAD); BRANCH=$(git rev-parse --abbrev-ref HEAD)
 mkdir -p dashboard reports data data/baselines
+
+# This script pulls the dashboard-data CUMULATIVE state + build outputs into
+# tracked paths (data/*, dashboard/*) so build.py can merge them. Those belong on
+# dashboard-data, NOT on the source branch — restore the working tree on exit so
+# a hand-driven publish never leaves the repo dirty.
+cleanup() {
+  cd "$ROOT" 2>/dev/null || return
+  git checkout -- data/baselines/verified_endpoints.json data/conformance.json dashboard/ops.html 2>/dev/null || true
+  rm -f dashboard/endpoint_status.json dashboard/verified_endpoints.json \
+        data/endpoint_status.json data/verified_endpoints.json 2>/dev/null || true
+}
+trap cleanup EXIT
 
 echo "[publish] pulling cumulative state from origin/dashboard-data ..."
 git fetch origin dashboard-data --depth=1 >/dev/null 2>&1 || true
