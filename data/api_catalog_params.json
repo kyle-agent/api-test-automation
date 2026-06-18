@@ -550,9 +550,9 @@
     "name": "resource_id",
     "resource_type": "apigateway/resource",
     "role": "ancestor",
-    "produced_by": null,
-    "producer_kind": null,
-    "capture": null
+    "produced_by": "application-service/apigateway/createresource",
+    "producer_kind": "create",
+    "capture": "$.id"
    },
    {
     "name": "method_type",
@@ -1060,9 +1060,9 @@
     "name": "resource_id",
     "resource_type": "apigateway/resource",
     "role": "ancestor",
-    "produced_by": null,
-    "producer_kind": null,
-    "capture": null
+    "produced_by": "application-service/apigateway/createresource",
+    "producer_kind": "create",
+    "capture": "$.id"
    },
    {
     "name": "method_type",
@@ -1254,9 +1254,9 @@
     "name": "resource_id",
     "resource_type": "apigateway/resource",
     "role": "ancestor",
-    "produced_by": null,
-    "producer_kind": null,
-    "capture": null
+    "produced_by": "application-service/apigateway/createresource",
+    "producer_kind": "create",
+    "capture": "$.id"
    },
    {
     "name": "method_type",
@@ -12663,9 +12663,9 @@
     "name": "srn",
     "resource_type": "iam/resource-policy",
     "role": "ancestor",
-    "produced_by": null,
-    "producer_kind": null,
-    "capture": null
+    "produced_by": "management/resourcemanager/createresourcegroup",
+    "producer_kind": "create-xsvc",
+    "capture": "$.resource_group.srn"
    },
    {
     "name": "sid",
@@ -12739,9 +12739,9 @@
     "name": "srn",
     "resource_type": "iam/resource-policy",
     "role": "ancestor",
-    "produced_by": null,
-    "producer_kind": null,
-    "capture": null
+    "produced_by": "management/resourcemanager/createresourcegroup",
+    "producer_kind": "create-xsvc",
+    "capture": "$.resource_group.srn"
    },
    {
     "name": "sid",

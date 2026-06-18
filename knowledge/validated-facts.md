@@ -732,3 +732,64 @@ First coverage-max dispatch (`docs/COVERAGE-MAX-PLAN.md` Tier 0). Result:
   verified endpoints, 25 distinct DB sub-op 2xx. The 3 DB sub-ops set-archive /
   register-log-export-config / upgrade-kernel return 500 ContactAdminForAssistance
   on all 4 engines — product bugs, now baselined (`known_issues.json`).
+
+## id-bound GET coverage: the "create→get-by-id should raise coverage" question (2026-06-18, branch adoring-heisenberg)
+
+> conf: 0.8 · seen: 2026-06-18 · obs: 1 (full static cross-ref of 302 id-GETs vs reports/results/observations.jsonl)
+
+**The premise is right and the engine already honours it** — `engine._probe_reads` +
+`_resolve_param` resolve an id-bound GET's path-param by IDENTITY (which create
+produced the id, recorded in `produced`/`produced_rtype`) or by capture-var name,
+then fire the GET. Proven live: ALL 12 `compute/scf/show*` id-GETs are 2xx in
+crud_probe (showcloudfunction/code/configuration/trigger/etc.) — the probe works.
+
+**Bucketed truth for the 302 `is_read_only & has_path_params` GETs** (against the
+current observations.jsonl, a smoke + NON-heavy crud_probe partial run):
+- (a) COVERED 2xx ........ **84**
+- (b) reached, non-2xx ... **14** (12×400, 2×403 — need real query data / perms)
+- (c) NEVER reached ...... **204**
+
+**The (c)=204 breakdown is the answer to "why aren't they covered":**
+- **6** — self-param has NO producer (genuine static gap; see waivers below).
+- **198** — self-param HAS a producer, but its create never produced a usable id
+  *in this run*. Of those 198:
+  - **149** the producer create was NEVER OBSERVED — because **57 enabled
+    lifecycles never ran in this file (all 61 heavy ones + a few)**; 139 of those
+    149 producers ARE steps in an existing (heavy/gated) lifecycle, so they cover
+    on a full `SCP_RUN_HEAVY=true` run. Only ~10 producers are in NO lifecycle.
+  - **38** the producer create RAN but never got 2xx (id never born — upstream
+    create 4xx/skip, a separate problem from id-resolution).
+  - **11** the producer RAN & got 2xx but the read still wasn't issued in this
+    file (mostly list-lookup producers / cross-service subnet — recover on rerun).
+
+**So the dominant cause is RUNTIME/SCHEDULING (heavy lifecycles gated off this
+run), NOT a linking or substitution bug.** Static ceiling: **292/302 id-GETs are
+fully producer-linked** in the sidecar (after the ancestor-residual fix below);
+only 10–11 are true gaps.
+
+**The 10–11 genuine static gaps are correct WAIVERS** (no producer exists — name-
+addressed / console-only / EOL): scr `tags_id` family (docker-pushed image tags,
+5 GETs), cloudmonitoring `addrbookId`, resourcemanager component/tag composite
+paths keyed by `{region}/{service}/{resource_type}/{resource_identifier}` + `key`/
+`srn`. These can only be covered by name-addressing a pre-existing resource.
+
+**The literal-`{cloud_function_id}` 404 (`POST .../privatelink-endpoints`) is BY
+DESIGN, not a substitution bug.** It comes from lifecycle `scf-privatelink-
+apigateway-coverage`, which deliberately NO-OP soft-captures `cloud_function_id`
+so it stays LITERAL → guaranteed 404 → the write endpoint is still RECORDED
+(catalog `_norm_path` collapses `{..}`→`*`). It never creates a real function (a
+real PL-enable strands the function in 'Creating' and blocks teardown — see that
+lifecycle's `_note`). The READ probe is safe: `_probe_reads` filters `mapping` for
+`"{"` and `_resolve_param` returns None → the GET is SKIPPED (never sent with a
+literal brace). Only LIFECYCLE WRITE steps pass unresolved `{x}` through `_fill`
+(intentional for these coverage-404 lifecycles).
+
+**Fix applied (durable, purely additive): `spec/enrich_catalog.py` now applies the
+`_RESIDUAL_EXPLICIT` map to ANCESTOR params too** (previously self-only via
+`name == last`). This linked 5 ancestor params that were `produced_by=null`:
+apigateway `resource_id` on showmethod/setmethod/deletemethod →
+`createresource`, and iam `srn` on set/removepermission → `createresourcegroup`.
+id-GET static-linkage 291→**292/302**; sidecar self-link 98% (960/979). Offline
+127/127 pass, validator 212/0. The remaining recovery is OPERATIONAL: run the
+heavy lifecycles (`SCP_RUN_HEAVY=true`) to birth the ~149 producer ids whose
+reads then auto-probe — that is where the bulk of the missing 204 lives.

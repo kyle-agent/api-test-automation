@@ -242,14 +242,30 @@ def build() -> dict:
                     cap = model_caps.get(_norm(prefix)) or (
                         "$.contents[0].id" if kind and kind.startswith("lookup")
                         else "$.id")
-            # Residual fallback: only for a self-param the convention left null —
-            # the hard tail (cross-service / nested-in-detail / async / pseudo-op).
+            # Residual fallback: the hard tail (cross-service / nested-in-detail /
+            # async / pseudo-op) the REST path-convention cannot reach. Applied to
+            # a SELF param the convention left null (incl. the DBaaS detail-read /
+            # async-op self rules + waivers). ALSO applied to an ANCESTOR param
+            # when an EXPLICIT residual producer exists for it — e.g. apigateway
+            # `resource_id` is the ancestor of .../methods/{method_type}, and iam
+            # `srn` is the ancestor of .../permission ops; without this the ancestor
+            # stays produced_by=null and the id-bound GET/write can only resolve it
+            # by capture-var NAME, never by identity (the whole point of the
+            # sidecar). Purely additive — only fills a null, never overrides a
+            # convention match. (2026-06-18, branch adoring-heisenberg.)
             if prod is None and name == last:
                 rprod, rcap, rkind = _residual_for(e.service, name, e.key.rsplit("/", 1)[0])
                 if rprod and rprod in catalog_keys:
                     prod, cap, kind = rprod, rcap, rkind
                 elif (e.service, name) in _RESIDUAL_WAIVERS:
                     kind = "waiver"
+            elif prod is None and name != last:
+                # ancestor: ONLY the explicit cross-service/pseudo-op map (not the
+                # DBaaS self-only detail-read rules, not waivers which are self ids).
+                rprod, rcap, rkind = _RESIDUAL_EXPLICIT.get((e.service, name),
+                                                            (None, None, None))
+                if rprod and rprod in catalog_keys:
+                    prod, cap, kind = rprod, rcap, rkind
             pps.append({
                 "name": name,
                 "resource_type": rtype,
