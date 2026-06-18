@@ -12,6 +12,9 @@
           "service": "multinodegpucluster",
           "method": "GET",
           "path": "/v1/gpu-nodes/images",
+          "params": {
+            "region_id": "{region}"
+          },
           "expect_status": [
             200,
             201,
@@ -26,6 +29,9 @@
           "service": "multinodegpucluster",
           "method": "GET",
           "path": "/v1/gpu-nodes/images",
+          "params": {
+            "region_id": "{region}"
+          },
           "expect_status": [
             200
           ]

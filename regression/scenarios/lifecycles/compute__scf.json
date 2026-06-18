@@ -52,13 +52,14 @@
         },
         {
           "name": "create-privatelink-endpoint",
-          "_note": "UNPROVEN body. POST /v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints requests a privatelink endpoint into a consumer subnet (synthetic subnet/endpoint-service ids -> 4xx). cloud_function_id literal -> 404. Captures {endpoint_id} on the off chance of success so the matching DELETE in this group tears it down.",
+          "_note": "Body shape PROVEN from docs (compute/scf PrivateLinkEndpointCreateRequest -> required wrapper {endpoint:{alias,service_id}}; EndpointCreateRequest requires alias+service_id). Earlier flat body {subnet_id,endpoint_service_id,name} 400'd ValidationError 'Field required' (missing 'endpoint'). cloud_function_id literal -> 404 once body validation passes; service_id is synthetic (no real PL service owned) so a true 2xx still needs a live privatelink-service. Captures {endpoint_id} on the off chance of success so the matching DELETE in this group tears it down.",
           "method": "POST",
           "path": "/v1/cloud-functions/{cloud_function_id}/configurations/privatelink-endpoints",
           "json": {
-            "subnet_id": "00000000000000000000000000000000",
-            "endpoint_service_id": "00000000000000000000000000000000",
-            "name": "regrple{unique}"
+            "endpoint": {
+              "alias": "regrple{unique}",
+              "service_id": "00000000000000000000000000000000"
+            }
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
