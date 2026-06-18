@@ -148,6 +148,19 @@ resources:
       options:
         cluster_id: {type: string, required: false,
                      note: "기존 엔진 수정 검증 시에만; 신규 생성 검증은 생략 (api_docs required:false)"}
+    # non-resource preflight (no id created, no delete/ready) — give the target an
+    # explicit verify so the composer doesn't fall back to read-path derivation
+    # (which raises "no ready.endpoint and no delete.endpoint"). The dry-run
+    # validate is idempotent, so re-issuing it is a safe verify.
+    verify:
+      - {name: revalidate, endpoint: "POST /v1/quick-query/validate-resources",
+         json: {node_pool_validation_request:
+                  [{auto_scale: false, desired_node_count: 3, max_node_count: 3,
+                    min_node_count: 3, scale_name: "regrqqscale"}],
+                quick_query_engine_request:
+                  {auto_scale: false, cluster_size: "Small", cpu: "4", memory: "8",
+                   replica: "1", is_engine_type_private: false}},
+         expect_status: [200]}
     provenance: docs
     source: {lifecycle: quick-query-lifecycle-guarded, steps: [validate-resources]}
     notes: "dry-run preflight (수정/생성 전 자원 검증). node_pool_validation_request + quick_query_engine_request 필수(api_docs). cluster_id는 optional. 비파괴, id 미생성 — capture 불요. 200 QuickQueryValidateResourceResponse."

@@ -86,15 +86,14 @@ resources:
     notes: "consumes 4 IPs from the service subnet (service + SNAT + 2 health-check); SNAT/HC IPs immutable after create; public NAT additionally needs an internet-gateway on the VPC"
   lb-health-check:
     service: networking/loadbalancer
-    requires: []
+    requires: [vpc, subnet]
     provenance: docs
-    notes: "region-scoped (quota 500/region); reusable across server groups — create BEFORE the server group that references it (run 27306490231 LbHealthCheckNotFoundError was an ordering/capture miss)"
+    notes: "region-scoped reusable resource (quota 500/region) but the VALIDATED create body (POST /v1/lb-health-checks) keys on vpc_id + subnet_id, so vpc+subnet must exist BEFORE it — reconciled with resources/networking__loadbalancer.yaml (was [] here; the model's body is the API truth, run 27306490231). Create BEFORE any server group that references it (LbHealthCheckNotFoundError was an ordering/capture miss)"
   lb-server-group:
     service: networking/loadbalancer
-    requires: [load-balancer]
-    lookups: [lb-health-check]
+    requires: [vpc, subnet, lb-health-check]
     provenance: docs
-    notes: "attaches to exactly ONE load balancer; selects a default or pre-created lb-health-check"
+    notes: "the VALIDATED create body (POST /v1/lb-server-groups) keys on vpc_id + subnet_id + lb_health_check_id — NOT loadbalancer_id (the LB link is INDIRECT, minted by a listener binding the server-group to the LB). Reconciled with resources/networking__loadbalancer.yaml (was [load-balancer] + lookups:[lb-health-check] here, which was wrong against the create call); health-check is a hard prerequisite, not a lookup"
   lb-member:
     service: networking/loadbalancer
     requires: [lb-server-group]
@@ -123,9 +122,9 @@ resources:
     notes: "max 5 per gateway; needs peer GW IP + remote subnet CIDR(s, max 10) + PSK(8-64) + IKE/IPSec/DPD blocks"
   direct-connect:
     service: networking/direct-connect
-    requires: [vpc, security-group]
+    requires: [vpc]
     provenance: docs
-    notes: "1:1 per VPC in a service zone (second create on the shared VPC must fail); max 5/account; name 3-20 alnum only; uplink 1G|10G required. Security Group is a documented 선행 서비스 (cross_constraints dc-prereq-security-group, validated-facts 2026-06-15); it is not a DC create-body field but DC workloads are SG-protected (IB-035)"
+    notes: "1:1 per VPC in a service zone (second create on the shared VPC must fail); max 5/service-zone; name 3-20 alnum only; uplink 1G|10G required. The VALIDATED create body (POST /v1/direct-connects) carries vpc_id ONLY — Security Group is a documented 선행 서비스 for the WORKLOAD behind the DC, NOT a DC create-body field, so it is modeled as the cross_constraint dc-prereq-security-group, NOT a create-order requires (reconciled with resources/networking__direct-connect.yaml; was [vpc, security-group] here — security-group dropped from requires because the DC create does not consume it; validated-facts 2026-06-15, IB-035)"
   gslb:
     service: networking/gslb
     requires: []
@@ -216,8 +215,9 @@ resources:
     provenance: VALIDATED
   secret:
     service: security/secretsmanager
-    requires: []
+    requires: [kms-key]
     provenance: VALIDATED
+    notes: "the VALIDATED create body (POST /v1/secrets) sends kms_id = an encrypt-capable KMS key id, so kms-key must exist BEFORE the secret — reconciled with resources/security__secretsmanager.yaml (was [] here; the docs `secretsmanager-secret` node below already had [kms-key], this top node had drifted). DELETE has a 7-30 day waiting_time_ndays body"
 
   # --- application / management -------------------------------------------
   queue:
@@ -237,11 +237,17 @@ resources:
     requires: []
     provenance: docs
     notes: "needs its OWN 인증키 (IAM My Info > 인증키 관리) — platform HMAC creds alone 401; key expiry/suspension revokes access"
-  backup-policy:
+  backup-target:
     service: storage/backup
     requires: [server]
+    lookups: [server]
     provenance: docs
-    notes: "agent-type backups need a Backup Agent installed on the target server first; retention enum 14/31/93/186/365 days"
+    notes: "read-only LOOKUP (GET /v1/backups/backup-targets) that discovers a live server's backup-service-visible server_uuid/server_guid; needs a live `server` first. Mirrors resources/storage__backup.yaml backup-target lookup node (added here 2026-06-17 so the L2 graph carries the same edge the model uses for backup-policy)"
+  backup-policy:
+    service: storage/backup
+    requires: [backup-target]
+    provenance: docs
+    notes: "AGENTLESS VM_IMAGE backup create (POST /v1/backups) consumes server_uuid/server_guid DISCOVERED via the backup-target lookup — so its direct prerequisite is backup-target (which transitively requires a live server), NOT server directly (IB-031: body uses {backup-target.*} only, closure unchanged). Reconciled with resources/storage__backup.yaml (was [server] here). agent-type backups additionally need a Backup Agent installed on the target server first; retention enum 14/31/93/186/365 days"
   kms-key:
     service: security/kms
     requires: []

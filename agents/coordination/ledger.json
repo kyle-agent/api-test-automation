@@ -1,7 +1,7 @@
 {
   "_comment": "Campaign blackboard for the multi-agent coverage drive. Coordinator (lead session) and service-agents read/write this. Status: todo|claimed|authored|integrated|live-validated. fragment = regression/scenarios/lifecycles/<file>. See agents/CAMPAIGN.md.",
   "generated": "2026-06-08T20:57:46Z",
-  "static_ceiling_pct": 85.6,
+  "static_ceiling_pct": 100.0,
   "total_endpoints": 1372,
   "write_gap_total": 0,
   "shared_contracts": {
@@ -733,5 +733,5 @@
       "notes": ""
     }
   ],
-  "campaign_status": "write-coverage COMPLETE \u2014 all 547 write ops reachable; remaining gap is id-bound GETs (read-chain auto-covered). Next: live CI validation."
+  "campaign_status": "write-coverage COMPLETE \u2014 all 547 write ops reachable AND static ceiling 100.0% (gap=0, getid 0/write 0, 2026-06-17). R3 model-validation mid-flight: 131/275 resource nodes VALIDATED (144 still provenance:docs). Next: continue R3 verification waves + live CI validation."
 }
