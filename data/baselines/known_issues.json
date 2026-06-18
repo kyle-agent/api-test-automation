@@ -42,6 +42,20 @@
       "type": "Product Bug",
       "since": "2026-06-15",
       "note": "500 on POST /v1/volume-transfer; 2 repros runs 27540589368/27583285457 (req-bc27a3b6, req-78aec306); compute/virtualserver volume-transfer create"
+    },
+    {
+      "key": "data-analytics/quick-query/validatequickqueryresources",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "POST /v1/quick-query/validate-resources -> 500 ContactAdminForAssistance with a complete request body. A validation endpoint should not 500; backend fault, same class as budget createaccountbudget / apigateway setresourcepolicy (PF-19). Observed 2x in the 2026-06-18 per-service coverage runs (gen-quick-query-validate). Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "management/iam/createrole",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "POST /v1/roles -> 500 ContactAdminForAssistance (iam-role-full create-role) with a complete body. ContactAdmin-class backend fault, same precedent as budget/resource-policy 500s. Observed in the 2026-06-18 iam coverage run. Tracked upstream, not a suite regression."
     }
   ]
 }

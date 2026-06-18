@@ -213,23 +213,19 @@ except Exception as _exc:   # missing/corrupt sidecar -> identity disabled, alia
     _PARAMS_SIDECAR, _PRODUCER_OF = {}, {}
 
 
-# LEGACY fallback, now superseded by the identity resolver above for every
-# `produced_by` case (8/9 of these entries — verified 2026-06-18). Kept only as a
-# safety net pending live proof of the identity path, and for the residual
-# name-addressed param with no producer in the catalog (`srn`). Tried LAST, after
-# exact-name and identity. Slated for deletion once identity is live-validated.
-# SAFE because _probe_reads is SERVICE-scoped: a shared synonym like `group_id`
-# only ever resolves within its own service's GETs.
+# Residual name-addressed fallback. The identity resolver above now covers every
+# `produced_by` case — LIVE-PROVEN 2026-06-18: the per-service parallel coverage
+# runs fired the auto-probe across apigateway/scf/iam/kms/scr/resourcemanager/
+# secrets/etc. (884 crud_probe 2xx), resolving id-bound GET path-params by the
+# create that produced them. The 8 former string-alias entries (registry_id,
+# repository_id, dbaas_engine_version_id, certificate_id, resource_group_id,
+# security_group_id, security_group_rule_id, service_account_id) are RETIRED —
+# identity supersedes them (offline-proven in tests/offline/test_probe_identity.py).
+# Only `srn` remains: it is name-addressed (an arbitrary target resource's SRN)
+# with NO producer in the catalog, so the resource-group `rg_srn` capture is the
+# practical seed. Tried LAST, after exact-name and identity.
 _PARAM_ALIASES = {
-    "registry_id": ("reg_id",),
-    "repository_id": ("repo_id",),
-    "dbaas_engine_version_id": ("engine_version_id",),
     "srn": ("rg_srn",),
-    "certificate_id": ("cert_id",),
-    "resource_group_id": ("group_id",),
-    "security_group_id": ("group_id",),
-    "security_group_rule_id": ("rule_id",),
-    "service_account_id": ("account_id",),
 }
 
 
