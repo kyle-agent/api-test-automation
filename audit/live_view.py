@@ -69,12 +69,16 @@ def _is_ours(name: str) -> bool:
     return bool(_TAG.search(name or ""))
 
 
-def build_spans(events: list[dict], now: datetime, ours_only: bool = True):
+def build_spans(events: list[dict], now: datetime, ours_only: bool = True,
+                terminating: set | None = None):
     """Return per-resource-instance spans:
     {(rtype, tag, name): {start, end|None, rtype, tag, name, ops:[(ts,event)]}}.
 
     ``ours_only`` (default) keeps only regr*/zznet*-tagged resources — the ones a
-    test run created — so pre-existing account resources don't pollute the view."""
+    test run created — so pre-existing account resources don't pollute the view.
+    ``terminating`` (names from :func:`fetch_terminating`) flags deferred-delete
+    resources whose delete was accepted (pending-deletion) so they read as
+    삭제예정 instead of lingering as testing/created."""
     inst: dict = {}
     for e in sorted(events, key=lambda x: x.get("timestamp", "")):
         rt = e.get("resource_type") or "?"
@@ -94,6 +98,8 @@ def build_spans(events: list[dict], now: datetime, ours_only: bool = True):
     for d in inst.values():
         if d["start"] is None and d["ops"]:
             d["start"] = d["ops"][0][0]
+        if terminating and d["rtype"] in _DEFERRED_DELETE and d["name"] in terminating:
+            d["terminating"] = True
     return inst
 
 
@@ -256,14 +262,28 @@ def _kind_of(rtype: str, dep_kinds: set) -> str:
     return rtype + "s"
 
 
+# resource types whose delete is DEFERRED — the API accepts the delete request and
+# the resource sits in a pending-deletion state for days before it's physically
+# gone (KMS keys -> To_Be_Terminated, secrets -> "To be terminated"). The delete
+# REQUEST already succeeded, and loggingaudit logs it as a plain Update (no Delete
+# event), so the view must consult live state and treat that state as deleted.
+_DEFERRED_DELETE = {"kms", "secret"}
+_TERMINATING_STATES = {"to_be_terminated", "to be terminated", "pendingdeletion",
+                       "pending deletion", "scheduled", "terminating", "to_be_terminate"}
+
+
 def _state_of(d: dict) -> str:
     """현재 상태: creating(생성중) / testing(테스트중) / created(생성됨) /
-    deleted(삭제됨) / failed(생성실패). A 'Create Error' with no later Create End
-    and no Delete is a FAILED create — the resource never existed (e.g. the
-    createpublicdomainname 500), so it's neither running nor leaked."""
+    deleted(삭제됨) / failed(생성실패) / terminating(삭제예정). A 'Create Error'
+    with no later Create End and no Delete is a FAILED create — the resource never
+    existed (e.g. createpublicdomainname 500). A deferred-delete resource (kms /
+    secret) flagged ``terminating`` had its delete accepted (pending-deletion);
+    we show it as scheduled-for-deletion, i.e. effectively deleted."""
     names = [n for _, n in d["ops"]]
     if any("Delete" in n and "End" in n for n in names):
         return "deleted"
+    if d.get("terminating"):
+        return "terminating"
     created = any("Create" in n and "End" in n for n in names)
     if not created:
         if any(("Error" in n or "Fail" in n) for n in names):
@@ -280,9 +300,42 @@ def _state_of(d: dict) -> str:
 
 
 _STATE_COLOR = {"creating": "#58a6ff", "testing": "#d29922", "created": "#3fb950",
-                "deleted": "#6e7681", "failed": "#e5484d"}
+                "deleted": "#6e7681", "failed": "#e5484d", "terminating": "#8b95a3"}
 _STATE_KO = {"creating": "생성중", "testing": "테스트중", "created": "생성됨",
-             "deleted": "삭제됨", "failed": "생성실패"}
+             "deleted": "삭제됨", "failed": "생성실패", "terminating": "삭제예정"}
+
+
+def fetch_terminating(client=None) -> set:
+    """Live-state probe for deferred-delete types: returns the set of OUR resource
+    names currently in a pending-deletion state (KMS keys To_Be_Terminated, secrets
+    'To be terminated'). Needs credentials; returns empty set on any failure so the
+    offline render path is unaffected."""
+    out: set = set()
+    try:
+        if client is None:
+            from core.config import settings
+            from core.http_client import ApiClient
+            client = ApiClient(settings)
+    except Exception:
+        return out
+    probes = [("/v1/secrets", "secretsmanager"), ("/v1/kms/transit", "kms")]
+    for path, svc in probes:
+        try:
+            r = client.get(path, service=svc, params={"size": 1000})
+            j = json.loads(r.raw_text or "{}")
+        except Exception:
+            continue
+        for v in (j.values() if isinstance(j, dict) else []):
+            if not isinstance(v, list):
+                continue
+            for it in v:
+                if not isinstance(it, dict):
+                    continue
+                nm = str(it.get("name") or "")
+                st = str(it.get("state") or it.get("status") or it.get("key_state") or "").strip().lower()
+                if nm and _TAG.search(nm) and st in _TERMINATING_STATES:
+                    out.add(nm)
+    return out
 
 
 def render_dag(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
@@ -386,6 +439,7 @@ _FLOW = {
     "created":  ("#c8efd4", "#1f9d57"),  # 생성됨
     "deleted":  ("#e6e9ee", "#9aa4b2"),  # 삭제됨 — gray
     "failed":   ("#ffd6d6", "#e5484d"),  # 생성실패 — red, not pulsing/leaked
+    "terminating": ("#d6dbe2", "#8b95a3"),  # 삭제예정 — delete accepted, pending (kms/secret)
 }
 
 
@@ -478,6 +532,7 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
              f'<i style="background:#ffe6ad"></i>테스트중 {nstate["testing"]}'
              f'<i style="background:#c8efd4"></i>생성됨 {nstate["created"]}'
              f'<i style="background:#e6e9ee"></i>삭제됨 {nstate["deleted"]}'
+             f'<i style="background:#d6dbe2"></i>삭제예정 {nstate["terminating"]}'
              f'<i style="background:#ffd6d6"></i>생성실패 {nstate["failed"]}</div>')
 
     P.append(f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
@@ -533,11 +588,12 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
         myid = nid[id(d)]
         linked = " · 🔗연결" if adj.get(myid) else ""
         tip = f'{rt} · {html.escape(d["name"] or tag)} · {_STATE_KO[st]} · {d["start"]}→{d["end"] or "LIVE"} · {dur} · {len(d["ops"])} ops{linked}'
-        deco = ' text-decoration="line-through"' if st == "deleted" else ""
+        deco = ' text-decoration="line-through"' if st in ("deleted", "terminating") else ""
+        txt_gray = st in ("deleted", "terminating")
         P.append(f'<g class="n{run}" id="{myid}" onclick="hi(\'{myid}\')"><title>{html.escape(tip)}</title>'
                  f'<rect x="{x}" y="{y}" width="{BW}" height="{BH}" rx="6" fill="{fill}" stroke="{bd}" stroke-width="1.4"/>'
                  f'<circle cx="{x+10}" cy="{y+BH/2}" r="3.5" fill="{bd}"/>'
-                 f'<text x="{x+20}" y="{y+16}" font-size="11" fill="{"#9aa4b2" if st=="deleted" else "#1f2733"}"{deco}>{html.escape(lab)}</text>'
+                 f'<text x="{x+20}" y="{y+16}" font-size="11" fill="{"#9aa4b2" if txt_gray else "#1f2733"}"{deco}>{html.escape(lab)}</text>'
                  f'<text x="{x+BW-6}" y="{y+16}" font-size="9.5" text-anchor="end" fill="#7a8493">{dur}</text></g>')
     P.append('</svg>')
     P.append(f'<div class="sub" style="margin-top:8px">{len(insts)} 인스턴스 · {maxc+1} 단계 · {edges} 연관선 '
@@ -770,6 +826,9 @@ def main(argv=None):
     ap.add_argument("--all-resources", action="store_true",
                     help="include PRE-EXISTING account resources (untagged IAM "
                          "policies/ACLs, platform log-streams); default = ours only")
+    ap.add_argument("--live-state", action="store_true",
+                    help="cross-check live API for deferred-delete types (kms/secret): "
+                         "pending-deletion (To_Be_Terminated) shows as 삭제예정 not lingering")
     a = ap.parse_args(argv)
 
     now = datetime.now(timezone.utc)
@@ -827,7 +886,8 @@ def main(argv=None):
         print(f"no events file {ev_path}")
         return 1
 
-    spans = build_spans(events, now, ours_only=not a.all_resources)
+    terminating = fetch_terminating() if a.live_state else None
+    spans = build_spans(events, now, ours_only=not a.all_resources, terminating=terminating)
     _render = {"flow": render_flow, "dag": render_dag, "gantt": render}[a.mode]
     htmlout = _render(spans, now, {"start": start, "end": end}, refresh=a.refresh)
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)

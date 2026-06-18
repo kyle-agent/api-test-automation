@@ -24,7 +24,7 @@ git clone --depth=1 --branch dashboard-data "$url" "$dd" >/dev/null 2>&1 || { ec
 publish_once() {
   echo "[live] harvest+render (start=$START) ..."
   timeout 280 python -m audit.live_view --start "$START" --mode flow --refresh "$REFRESH" \
-    --out reports/audit/live_flow.html 2>&1 | tail -2
+    --live-state --out reports/audit/live_flow.html 2>&1 | tail -2
   cp reports/audit/live_flow.html "$dd/live.html"
   ( cd "$dd"
     git pull --rebase -q origin dashboard-data 2>/dev/null || true
