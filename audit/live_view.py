@@ -439,8 +439,13 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
  svg{background:#fff;border:1px solid #e3e8ef;border-radius:10px}
  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
  .run{animation:pulse 1.1s ease-in-out infinite}
- g.n rect:hover{stroke-width:2.5}
+ g.n{cursor:pointer} g.n rect:hover{stroke-width:2.5}
  text{fill:#22303f}
+ /* click-to-highlight a relationship chain */
+ svg.sel g.n{opacity:.18} svg.sel g.n.hi{opacity:1}
+ svg.sel path.rel{opacity:.06} svg.sel path.rel.hi{opacity:1;stroke:#2b7de9;stroke-width:2.2}
+ g.n.hi rect{stroke:#2b7de9;stroke-width:2.6}
+ .hint{color:#5b6675;font-size:11px;margin:2px 0 8px}
 </style></head><body>''')
     P.append('<h1>SCP 실행 흐름 · 인스턴스 라이브 상태</h1>')
     P.append(f'<div class="sub">왼→오 = 생성 순서(의존 깊이) · 같은 열 = 동시 실행 · 각 박스 = 리소스 1개(id)'
@@ -473,6 +478,8 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
     # to the parent-KIND instance(s) of its same lifecycle (which vpc owns which
     # subnet). Drawn first so boxes sit on top.
     xy = {id(d): (px, py) for (px, py, d, rt) in pos.values()}
+    nid = {id(d): f"n{i}" for i, (_x, _y, d, _rt) in enumerate(pos.values())}
+    adj = defaultdict(set)   # node-id -> connected node-ids (undirected, for click highlight)
     edges = 0
     for d in insts:
         k = kind_of[id(d)]
@@ -480,32 +487,60 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
         if not par:
             continue
         for pd in by_kind_lk.get((par, _lk(d)), []):
-            if pd is d:
+            if pd is d or id(pd) not in nid:
                 continue
+            a, b = nid[id(pd)], nid[id(d)]
             ax, ay = xy[id(pd)]; bx, by = xy[id(d)]
             x1, y1 = ax + BW, ay + BH / 2          # parent right edge
             x2, y2 = bx, by + BH / 2               # child left edge
-            P.append(f'<path d="M{x1:.0f},{y1:.0f} C{x1+34:.0f},{y1:.0f} {x2-34:.0f},{y2:.0f} {x2:.0f},{y2:.0f}" '
+            P.append(f'<path class="rel" id="e{edges}" data-a="{a}" data-b="{b}" '
+                     f'd="M{x1:.0f},{y1:.0f} C{x1+34:.0f},{y1:.0f} {x2-34:.0f},{y2:.0f} {x2:.0f},{y2:.0f}" '
                      f'fill="none" stroke="#c3ccd9" stroke-width="1.1" marker-end="url(#rel)"/>')
+            adj[a].add(b); adj[b].add(a)
             edges += 1
 
-    # instance boxes
+    # instance boxes (each gets a node id + onclick to highlight its chain)
     for (x, y, d, rt) in pos.values():
         st = _state_of(d)
         fill, bd = _FLOW[st]
-        run = ' class="run"' if st in ("creating", "testing") else ""
+        run = ' run' if st in ("creating", "testing") else ""
         tag = d["tag"] if d["tag"] != d["name"] else (d["name"] or "?")
         lab = (d["name"] or tag)[:30]
         dur = _dur(d, now)
-        tip = f'{rt} · {html.escape(d["name"] or tag)} · {_STATE_KO[st]} · {d["start"]}→{d["end"] or "LIVE"} · {dur} · {len(d["ops"])} ops'
+        myid = nid[id(d)]
+        linked = " · 🔗연결" if adj.get(myid) else ""
+        tip = f'{rt} · {html.escape(d["name"] or tag)} · {_STATE_KO[st]} · {d["start"]}→{d["end"] or "LIVE"} · {dur} · {len(d["ops"])} ops{linked}'
         deco = ' text-decoration="line-through"' if st == "deleted" else ""
-        P.append(f'<g class="n"{run}><title>{html.escape(tip)}</title>'
+        P.append(f'<g class="n{run}" id="{myid}" onclick="hi(\'{myid}\')"><title>{html.escape(tip)}</title>'
                  f'<rect x="{x}" y="{y}" width="{BW}" height="{BH}" rx="6" fill="{fill}" stroke="{bd}" stroke-width="1.4"/>'
                  f'<circle cx="{x+10}" cy="{y+BH/2}" r="3.5" fill="{bd}"/>'
                  f'<text x="{x+20}" y="{y+16}" font-size="11" fill="{"#9aa4b2" if st=="deleted" else "#1f2733"}"{deco}>{html.escape(lab)}</text>'
                  f'<text x="{x+BW-6}" y="{y+16}" font-size="9.5" text-anchor="end" fill="#7a8493">{dur}</text></g>')
     P.append('</svg>')
-    P.append(f'<div class="sub" style="margin-top:8px">{len(insts)} 인스턴스 · {maxc+1} 단계 · {edges} 연관선</div>')
+    P.append(f'<div class="sub" style="margin-top:8px">{len(insts)} 인스턴스 · {maxc+1} 단계 · {edges} 연관선 '
+             f'· <span style="color:#2b7de9">인스턴스 클릭 = 연관관계 강조</span>(빈 곳 클릭 = 해제)</div>')
+
+    # click-highlight: BFS the connected component (vpc→subnet→server→volume…) so
+    # clicking a subnet lights its parent vpc + the servers/volumes built in it.
+    adj_js = json.dumps({k: sorted(v) for k, v in adj.items()})
+    P.append('<script>')
+    P.append(f'var ADJ={adj_js};')
+    P.append('''
+function comp(s){var seen={},stk=[s];while(stk.length){var x=stk.pop();if(seen[x])continue;seen[x]=1;(ADJ[x]||[]).forEach(function(y){if(!seen[y])stk.push(y);});}return seen;}
+function hi(id){
+ var svg=document.querySelector('svg');
+ var set=comp(id);
+ svg.classList.add('sel');
+ document.querySelectorAll('g.n').forEach(function(g){g.classList.toggle('hi',!!set[g.id]);});
+ document.querySelectorAll('path.rel').forEach(function(p){
+   p.classList.toggle('hi', !!set[p.getAttribute('data-a')] && !!set[p.getAttribute('data-b')]);});
+ if(window.event) window.event.stopPropagation();
+}
+function clr(){var svg=document.querySelector('svg');if(svg){svg.classList.remove('sel');
+ document.querySelectorAll('.hi').forEach(function(e){e.classList.remove('hi');});}}
+document.addEventListener('click',function(e){if(!e.target.closest('g.n'))clr();});
+''')
+    P.append('</script>')
     P.append('</body></html>')
     return "".join(P)
 
