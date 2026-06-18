@@ -649,6 +649,18 @@ First coverage-max dispatch (`docs/COVERAGE-MAX-PLAN.md` Tier 0). Result:
 - **iam-policy-extra-writes ReadTimeout** (iam.e.samsungsdscloud.com, 20s) =
   transient network flake, not a defect; passes on re-run (SCP_TIMEOUT=20 is tight
   for iam under load). No code change.
+- **Design (A) stage 2 — identity-based auto-probe (2026-06-18).** The auto-probe
+  now resolves an id-bound GET's path-param by IDENTITY — the create that
+  `produced_by` it (per `data/api_catalog_params.json`), recorded per-lifecycle in
+  `produced{create_key→id}` / `produced_rtype{resource_type→id}` — instead of by
+  capture-var STRING name. Priority in `_resolve_param`: exact name → identity →
+  legacy `_PARAM_ALIASES`. Proven offline (`tests/offline/test_probe_identity.py`,
+  5 tests): EVERY `produced_by` param in the sidecar (incl. 8/9 alias targets)
+  resolves via identity from an empty name-seed — so the hand alias map is now
+  vestigial (only `srn`, name-addressed/no producer, still needs it). Map kept as
+  a LAST-resort fallback pending LIVE proof of the identity path; delete the 8
+  redundant entries once a live run shows the produced-index path firing 2xx.
+  118 offline pass, validator 212/0. (engine: `regression/scenarios/engine.py`.)
 - **`-n 2 → 6` parallelism change (dab8a41) was applied COSMETICALLY only**
   (found 2026-06-18 via loggingaudit audit-optimizer on run 27735741382). The
   comments (`api-test.yml:333,572`) and the echo (`:583` "in parallel (-n 6)")

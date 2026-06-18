@@ -192,15 +192,34 @@ def _record_smoke(status, category, key, method, path, elapsed_ms=None, note="")
         pass
 
 
-# Catalog path-param name -> capture-var synonyms (Piece 3, 2026-06-18). The SCP
-# API uses inconsistent path-param NAMES vs the semantic names lifecycles/model
-# capture (catalog `registry_id` vs captured `reg_id`), so an id-bound GET would
-# never auto-probe despite the resource being created. These aliases let the
-# probe resolve a catalog param from a differently-named captured var. SAFE
-# because _probe_reads is SERVICE-scoped: a shared synonym like `group_id`
-# (security-group vs resourcemanager) only ever resolves within its own service's
-# GETs. Derived from spec.read_reachability's near-miss column; conservative
-# (only unambiguous xxx_id<->yyy_id pairs — NOT publicip_id/log_group ambiguities).
+# (A)/(B) catalog enrichment sidecar — identity-based read->producer matching
+# (design A, stage 2, 2026-06-18). data/api_catalog_params.json maps each catalog
+# endpoint to structured path/query params, including `produced_by` (the create
+# that BIRTHS the id) + its `capture` jsonpath. This lets _probe_reads resolve a
+# GET's path-param by IDENTITY (which create produced the id, recorded per
+# lifecycle in `produced`) instead of by capture-var STRING name — retiring the
+# hand-maintained _PARAM_ALIASES map and making create->조회(show) self-maintaining.
+_PARAMS_PATH = Path(__file__).resolve().parents[2] / "data" / "api_catalog_params.json"
+_PARAMS_SIDECAR: dict = {}
+_PRODUCER_OF: dict = {}   # create_endpoint_key -> (resource_type, capture_jsonpath)
+try:
+    _PARAMS_SIDECAR = json.loads(_PARAMS_PATH.read_text())
+    for _ek, _meta in _PARAMS_SIDECAR.items():
+        for _pp in _meta.get("path_params", []):
+            _pk = _pp.get("produced_by")
+            if _pk:
+                _PRODUCER_OF.setdefault(_pk, (_pp.get("resource_type"), _pp.get("capture")))
+except Exception as _exc:   # missing/corrupt sidecar -> identity disabled, alias fallback stands
+    _PARAMS_SIDECAR, _PRODUCER_OF = {}, {}
+
+
+# LEGACY fallback, now superseded by the identity resolver above for every
+# `produced_by` case (8/9 of these entries — verified 2026-06-18). Kept only as a
+# safety net pending live proof of the identity path, and for the residual
+# name-addressed param with no producer in the catalog (`srn`). Tried LAST, after
+# exact-name and identity. Slated for deletion once identity is live-validated.
+# SAFE because _probe_reads is SERVICE-scoped: a shared synonym like `group_id`
+# only ever resolves within its own service's GETs.
 _PARAM_ALIASES = {
     "registry_id": ("reg_id",),
     "repository_id": ("repo_id",),
@@ -223,20 +242,38 @@ _PROBE_TIMEOUT_S = float(_os.environ.get("SCP_PROBE_TIMEOUT_S", "8"))
 _PROBE_MAX_PER_STEP = int(_os.environ.get("SCP_PROBE_MAX_PER_STEP", "60"))
 
 
-def _resolve_param(param, mapping):
-    """Value for a catalog path-param: exact seed match, else a known alias in
-    the seed. Returns None when neither is present."""
+def _resolve_param(param, mapping, endpoint=None, produced=None, produced_rtype=None):
+    """Value for a catalog path-param, in priority order:
+      1. exact capture-var name match in the seed (`mapping`);
+      2. IDENTITY — the enrichment sidecar says this `endpoint`'s `param` is
+         `produced_by` a create whose freshly-created id we recorded in
+         `produced` (or, failing that, by `resource_type` in `produced_rtype`);
+      3. LEGACY `_PARAM_ALIASES` fallback (residual name-addressed params).
+    Returns None when none apply."""
     if param in mapping:
         return mapping[param]
+    if endpoint is not None and produced is not None:
+        meta = _PARAMS_SIDECAR.get(getattr(endpoint, "key", None), {})
+        for pp in meta.get("path_params", []):
+            if pp.get("name") != param:
+                continue
+            pk = pp.get("produced_by")
+            if pk and pk in produced:
+                return produced[pk]
+            rt = pp.get("resource_type")
+            if rt and produced_rtype and rt in produced_rtype:
+                return produced_rtype[rt]
+            break
     for alias in _PARAM_ALIASES.get(param, ()):
         if alias in mapping:
             return mapping[alias]
     return None
 
 
-def _probe_reads(client, mapping, service):
-    """Call every catalog GET in `service` whose path params are all supplied by
-    `mapping` (catalog-param-name -> already-filled value, or a known alias of it).
+def _probe_reads(client, mapping, service, produced=None, produced_rtype=None):
+    """Call every catalog GET in `service` whose path params are all resolvable —
+    by exact capture-var name in `mapping`, by IDENTITY (the create that produced
+    the id, recorded in `produced`/`produced_rtype`), or by a legacy alias.
     Read-only and record only — a probe never fails the lifecycle."""
     called = 0
     for e in _CATALOG:
@@ -247,7 +284,7 @@ def _probe_reads(client, mapping, service):
         params = set(_PLACEHOLDER.findall(e.http_path))
         if not params:
             continue
-        vals = {p: _resolve_param(p, mapping) for p in params}
+        vals = {p: _resolve_param(p, mapping, e, produced, produced_rtype) for p in params}
         if any(v is None for v in vals.values()):
             continue
         if called >= _PROBE_MAX_PER_STEP:   # runtime guard (auto-seed can match many)
@@ -620,6 +657,13 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
     if shared_ctx:
         ctx.update({k: str(v) for k, v in shared_ctx.items() if v})
 
+    # Identity index for create->show (design A, stage 2): a create step records
+    # the id it produced, keyed by its catalog endpoint key + resource_type, so an
+    # id-bound GET probe resolves by IDENTITY (which create made the id) instead of
+    # by capture-var string name — see _resolve_param / _probe_reads.
+    produced: dict[str, str] = {}        # create_endpoint_key -> resource id
+    produced_rtype: dict[str, str] = {}  # resource_type        -> resource id
+
     # Teardown stack of (label, method, path, service, json, group, budget_kind).
     cleanups: list[tuple] = []
     failed_groups: set = set()
@@ -771,7 +815,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                             for k, v in (step.get("probe_reads") or {}).items()}
                 mapping = {**auto, **explicit}
                 mapping = {k: v for k, v in mapping.items() if "{" not in str(v)}
-                _probe_reads(client, mapping, step_service)
+                _probe_reads(client, mapping, step_service, produced, produced_rtype)
                 continue
 
             path = _fill(step["path"], ctx)
@@ -971,6 +1015,24 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                           f"from '{step['name']}' — dependent probe(s) skipped")
                     continue
                 ctx[var] = str(val)
+
+            # Identity registration (design A, stage 2): if this step is the create
+            # that the sidecar names as a `produced_by` for some id-bound GET, record
+            # the id it produced — keyed by catalog key AND resource_type — so the
+            # auto-probe resolves that GET by identity, not by capture-var name.
+            _skey = _catalog_key_for(step.get("method"), step.get("path"), step_service)
+            if _skey and _skey in _PRODUCER_OF:
+                _rt, _cap = _PRODUCER_OF[_skey]
+                _idv = _capture(resp.body, _cap) if _cap else None
+                if _idv is None:   # fall back to a value the lifecycle just captured
+                    for _v in step.get("capture", {}):
+                        if _v in ctx:
+                            _idv = ctx[_v]
+                            break
+                if _idv is not None:
+                    produced[_skey] = str(_idv)
+                    if _rt:
+                        produced_rtype[_rt] = str(_idv)
 
             # Register teardown + track in the kernel registry for the freshly
             # created resource (deletes only on a later failure; the happy path
