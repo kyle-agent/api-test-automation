@@ -1,0 +1,261 @@
+"""Live resource-topology viewer from SCP loggingaudit (CI-independent).
+
+The old `ops.html` rendered run events from the Object Storage oplog that ONLY
+the CI workflow wrote. With runs now hand-driven from the Claude remote env, this
+builds the same kind of live picture straight from **loggingaudit** — every
+resource Create/Delete the account saw — into a self-contained HTML (no server,
+no external JS) showing:
+
+  * a **Gantt timeline** of each resource's lifetime (create -> delete), so a
+    parallel ``-n 6`` run shows its fan-out as overlapping bars;
+  * a **concurrency** strip (how many resources were live at each moment — the
+    visual proof of sum-vs-max parallelism);
+  * the **current topology** — resources still live right now (no delete seen),
+    grouped by run-tag, which is the account's present state.
+
+Usage::
+
+    # harvest a window + render in one shot
+    python -m audit.live_view --start 2026-06-18T03:55:00Z --hours 6 --out reports/audit/live_view.html
+    # or render an already-harvested jsonl
+    python -m audit.live_view --events reports/audit/heavy.jsonl --out reports/audit/live_view.html
+    # live mode: re-harvest + self-refresh every 30s
+    python -m audit.live_view --hours 2 --refresh 30 --out reports/audit/live_view.html
+"""
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+_TAG = re.compile(r"regr[a-z0-9]+|zznet[a-z0-9]+")
+# billable resource types (cost-bearing) — highlighted distinctly
+_BILLABLE = {"cluster", "nodepool", "virtual-server", "postgresql", "mysql",
+             "mariadb", "epas", "cachestore", "sqlserver", "vertica",
+             "searchengine", "eventstreams", "loadbalancer", "baremetal"}
+# stable-ish color per resource_type (HSL hashed)
+def _color(rtype: str) -> str:
+    h = sum(ord(c) for c in (rtype or "?")) * 37 % 360
+    return f"hsl({h},62%,55%)"
+
+
+def _t(s: str) -> datetime:
+    return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+
+def _tag_of(e: dict) -> str:
+    m = _TAG.search(e.get("resource_name") or "")
+    return m.group(0) if m else (e.get("resource_name") or "?")
+
+
+def harvest(start: str, end: str, out: str, max_pages: int = 80) -> str:
+    subprocess.run([sys.executable, "-m", "audit.harvest", "--start", start,
+                    "--end", end, "--out", out, "--service", "loggingaudit",
+                    "--max-pages", str(max_pages)], check=False, timeout=300)
+    return out
+
+
+def build_spans(events: list[dict], now: datetime):
+    """Return per-resource-instance spans:
+    {(rtype, tag, name): {start, end|None, rtype, tag, name, ops:[(ts,event)]}}."""
+    inst: dict = {}
+    for e in sorted(events, key=lambda x: x.get("timestamp", "")):
+        rt = e.get("resource_type") or "?"
+        nm = e.get("resource_name") or ""
+        key = (rt, _tag_of(e), nm)
+        d = inst.setdefault(key, {"rtype": rt, "tag": _tag_of(e), "name": nm,
+                                  "start": None, "end": None, "ops": []})
+        ts = e.get("timestamp"); nmn = e.get("event_name") or ""
+        d["ops"].append((ts, nmn))
+        if "Create" in nmn and d["start"] is None:
+            d["start"] = ts
+        if "Delete" in nmn and "End" in nmn:
+            d["end"] = ts
+    # drop instances we never saw a create/first-event time for
+    for d in inst.values():
+        if d["start"] is None and d["ops"]:
+            d["start"] = d["ops"][0][0]
+    return inst
+
+
+def concurrency(spans, now: datetime, billable_only=False):
+    """List of (timestamp, live_count) step points."""
+    pts = []
+    for d in spans.values():
+        if billable_only and d["rtype"] not in _BILLABLE:
+            continue
+        if not d["start"]:
+            continue
+        pts.append((_t(d["start"]), 1))
+        end = _t(d["end"]) if d["end"] else now
+        pts.append((end, -1))
+    pts.sort()
+    series, cur, peak = [], 0, 0
+    for ts, delta in pts:
+        cur += delta; peak = max(peak, cur)
+        series.append((ts, cur))
+    return series, peak
+
+
+def render(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
+    # order rows by start time; only rows with a real start
+    rows = [d for d in spans.values() if d["start"]]
+    rows.sort(key=lambda d: (d["start"], d["tag"]))
+    if not rows:
+        t0 = t1 = now
+    else:
+        t0 = min(_t(d["start"]) for d in rows)
+        t1 = max((_t(d["end"]) if d["end"] else now) for d in rows)
+    span_s = max((t1 - t0).total_seconds(), 1)
+
+    PLOT_W, ROW_H, LABEL_W, PAD = 1180, 16, 260, 12
+    W = LABEL_W + PLOT_W + PAD * 2
+    conc_h = 90
+    H = PAD * 3 + conc_h + 24 + len(rows) * ROW_H + 40
+
+    def x(ts: datetime) -> float:
+        return LABEL_W + PAD + (ts - t0).total_seconds() / span_s * PLOT_W
+
+    live_rows = [d for d in rows if not d["end"]]
+    series, peak = concurrency(spans, now)
+    bseries, bpeak = concurrency(spans, now, billable_only=True)
+
+    parts = [f'''<!doctype html><html><head><meta charset="utf-8">
+<title>SCP live resource view</title>''']
+    if refresh:
+        parts.append(f'<meta http-equiv="refresh" content="{refresh}">')
+    parts.append(f'''<style>
+ body{{background:#0e1117;color:#c9d1d9;font:13px/1.4 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:16px}}
+ h1{{font-size:18px;margin:0 0 4px}} .sub{{color:#8b949e;font-size:12px;margin-bottom:12px}}
+ .cards{{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}}
+ .card{{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:8px 14px}}
+ .card b{{font-size:20px;display:block}} .card span{{color:#8b949e;font-size:11px}}
+ .live{{color:#3fb950}} .bill{{color:#f0883e}}
+ svg{{background:#0d1117;border:1px solid #21262d;border-radius:8px}}
+ rect.bar:hover{{stroke:#fff;stroke-width:1.5}}
+ .lg{{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;font-size:11px;color:#8b949e}}
+ .lg i{{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:3px;vertical-align:-1px}}
+</style></head><body>''')
+
+    parts.append(f'<h1>SCP live resource view <span style="color:#8b949e;font-size:12px">· loggingaudit</span></h1>')
+    parts.append(f'<div class="sub">window {html.escape(meta.get("start",""))} → {html.escape(meta.get("end",""))} '
+                 f'· generated {now.strftime("%Y-%m-%dT%H:%M:%SZ")}'
+                 f'{" · auto-refresh "+str(refresh)+"s" if refresh else ""}</div>')
+
+    total = len(rows)
+    bill_live = [d for d in live_rows if d["rtype"] in _BILLABLE]
+    parts.append('<div class="cards">')
+    parts.append(f'<div class="card"><b>{total}</b><span>resources (window)</span></div>')
+    parts.append(f'<div class="card"><b class="live">{len(live_rows)}</b><span>live now</span></div>')
+    parts.append(f'<div class="card"><b class="bill">{len(bill_live)}</b><span>billable live</span></div>')
+    parts.append(f'<div class="card"><b>{peak}</b><span>peak concurrency</span></div>')
+    parts.append(f'<div class="card"><b class="bill">{bpeak}</b><span>peak billable concur. (n-parallel)</span></div>')
+    parts.append('</div>')
+
+    # concurrency strip (billable overlaid)
+    def poly(series, h0, color, fill):
+        if not series:
+            return ""
+        mx = max(c for _, c in series) or 1
+        pts = []
+        for ts, c in series:
+            pts.append(f"{x(ts):.1f},{h0 - c / mx * (conc_h - 8):.1f}")
+        # step
+        d = "M" + " L".join(pts)
+        return f'<polyline points="{" ".join(pts)}" fill="none" stroke="{color}" stroke-width="1.5"/>'
+
+    parts.append(f'<svg width="{W}" height="{H}">')
+    cy0 = PAD + conc_h
+    parts.append(f'<text x="{LABEL_W+PAD}" y="{PAD+10}" fill="#8b949e" font-size="11">concurrency (all={peak}, billable={bpeak})</text>')
+    parts.append(poly(series, cy0, "#58a6ff", None))
+    parts.append(poly(bseries, cy0, "#f0883e", None))
+
+    # time axis ticks (6)
+    ty = cy0 + 16
+    for i in range(7):
+        tt = t0 + (t1 - t0) * (i / 6)
+        xx = x(tt)
+        parts.append(f'<line x1="{xx:.1f}" y1="{ty}" x2="{xx:.1f}" y2="{H-20}" stroke="#21262d"/>')
+        parts.append(f'<text x="{xx:.1f}" y="{ty-2}" fill="#6e7681" font-size="10" text-anchor="middle">{tt.strftime("%H:%M")}</text>')
+
+    # bars
+    y = ty + 8
+    for d in rows:
+        xs = x(_t(d["start"]))
+        xe = x(_t(d["end"]) if d["end"] else now)
+        w = max(xe - xs, 2)
+        col = _color(d["rtype"])
+        live = not d["end"]
+        bill = d["rtype"] in _BILLABLE
+        label = f'{d["rtype"]}/{d["tag"]}'
+        tip = f'{d["rtype"]} · {html.escape(d["name"][:40])} · {d["start"]} → {d["end"] or "LIVE"} · {len(d["ops"])} ops'
+        parts.append(f'<rect class="bar" x="{xs:.1f}" y="{y}" width="{w:.1f}" height="{ROW_H-3}" rx="2" '
+                     f'fill="{col}"><title>{tip}</title></rect>')
+        if live:
+            parts.append(f'<rect x="{xs:.1f}" y="{y}" width="{w:.1f}" height="{ROW_H-3}" rx="2" fill="none" stroke="#3fb950" stroke-width="1.5"/>')
+        parts.append(f'<text x="{LABEL_W+PAD-6}" y="{y+ROW_H-6}" fill="{"#f0883e" if bill else "#8b949e"}" '
+                     f'font-size="10" text-anchor="end">{html.escape(label[:38])}</text>')
+        y += ROW_H
+    parts.append('</svg>')
+
+    # legend
+    seen = {}
+    for d in rows:
+        seen.setdefault(d["rtype"], _color(d["rtype"]))
+    parts.append('<div class="lg">')
+    for rt, c in sorted(seen.items()):
+        star = "★" if rt in _BILLABLE else ""
+        parts.append(f'<span><i style="background:{c}"></i>{html.escape(rt)}{star}</span>')
+    parts.append('<span>· green border = live now · ★ billable</span></div>')
+
+    parts.append('</body></html>')
+    return "".join(parts)
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Live resource-topology viewer from loggingaudit.")
+    ap.add_argument("--events", help="pre-harvested loggingaudit JSONL (skip harvest)")
+    ap.add_argument("--start", help="window start ISO8601 Z")
+    ap.add_argument("--end", help="window end ISO8601 Z (default now)")
+    ap.add_argument("--hours", type=float, default=6.0, help="window = now-<hours> when --start absent")
+    ap.add_argument("--out", default="reports/audit/live_view.html")
+    ap.add_argument("--refresh", type=int, default=0, help="HTML auto-refresh seconds (live mode)")
+    a = ap.parse_args(argv)
+
+    now = datetime.now(timezone.utc)
+    end = a.end or now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    if a.events:
+        ev_path = a.events
+        start = a.start or "(file)"
+    else:
+        from datetime import timedelta
+        start = a.start or (now - timedelta(hours=a.hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ev_path = "reports/audit/_live_view.jsonl"
+        harvest(start, end, ev_path)
+
+    events = []
+    try:
+        for line in open(ev_path):
+            line = line.strip()
+            if line:
+                events.append(json.loads(line))
+    except FileNotFoundError:
+        print(f"no events file {ev_path}")
+        return 1
+
+    spans = build_spans(events, now)
+    htmlout = render(spans, now, {"start": start, "end": end}, refresh=a.refresh)
+    Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+    Path(a.out).write_text(htmlout)
+    live = sum(1 for d in spans.values() if d["start"] and not d["end"])
+    print(f"live_view: {len(events)} events, {len(spans)} resources, {live} live -> {a.out}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
