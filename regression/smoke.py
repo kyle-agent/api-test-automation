@@ -21,6 +21,7 @@ import json
 from pathlib import Path
 
 from core import results
+from core.config import settings as _settings
 from core.results import Observation
 from core.catalog import Endpoint, endpoints
 
@@ -118,6 +119,32 @@ def _record_param(endpoint: Endpoint, status: int, category: str) -> None:
         pass
 
 
+# Required-query defaults (2026-06-18): some read-only LIST GETs 400 on a bare
+# call purely because a REQUIRED query param is missing — NOT because they need a
+# billable resource. The enrichment sidecar (data/api_catalog_params.json) marks
+# which query params are required; we feed a known-safe default so the read is
+# actually exercised (covers e.g. baremetal/gpu image lists, backup-agent targets
+# that were mistakenly waived as billing-prohibitive). Defaults are read-only and
+# create nothing.
+_REQUIRED_QUERY_DEFAULTS = {
+    "region_id": lambda ep: _settings.region,
+    "server_category": lambda ep: "VIRTUAL_SERVER",
+    "dbType": lambda ep: ep.service,
+    "engine": lambda ep: ep.service,
+}
+
+try:
+    _PARAMS_SIDECAR = json.loads(
+        (Path(__file__).resolve().parents[1] / "data" / "api_catalog_params.json").read_text())
+except Exception:
+    _PARAMS_SIDECAR = {}
+
+
+def _required_query_names(endpoint: Endpoint) -> list[str]:
+    meta = _PARAMS_SIDECAR.get(endpoint.key, {})
+    return [q["name"] for q in meta.get("query_params", []) if q.get("required")]
+
+
 def _required_param_candidates(endpoint: Endpoint) -> list[dict]:
     p = endpoint.http_path or ""
     if p.endswith("/check-duplication") or p.endswith("/check-duplication/name"):
@@ -126,6 +153,12 @@ def _required_param_candidates(endpoint: Endpoint) -> list[dict]:
         svc = endpoint.service  # e.g. mysql / postgresql / eventstreams
         return [{"dbType": svc}, {"engine": svc}, {"engineName": svc},
                 {"dbEngine": svc}, {"engineVersion": "1"}, {"version": "1"}]
+    # Sidecar-driven: supply defaults for every REQUIRED query param we know a
+    # safe value for (region/category/db-engine). Skip if any required param has
+    # no known default (a synthetic guess would just 400 differently).
+    req = _required_query_names(endpoint)
+    if req and all(name in _REQUIRED_QUERY_DEFAULTS for name in req):
+        return [{name: _REQUIRED_QUERY_DEFAULTS[name](endpoint) for name in req}]
     return []
 
 
