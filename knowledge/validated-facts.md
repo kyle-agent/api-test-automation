@@ -793,3 +793,27 @@ id-GET static-linkage 291→**292/302**; sidecar self-link 98% (960/979). Offlin
 127/127 pass, validator 212/0. The remaining recovery is OPERATIONAL: run the
 heavy lifecycles (`SCP_RUN_HEAVY=true`) to birth the ~149 producer ids whose
 reads then auto-probe — that is where the bulk of the missing 204 lives.
+
+## queueservice getqueueattributes — required query params (LIVE-PROVEN 2026-06-18)
+
+`GET /v1/queues/{queue_id}/attributes` (catalog key
+`application-service/queueservice/getqueueattributes`) REQUIRES **two** query
+params: `attributes` and `name`.
+- Bare call → 400 `ValidationError`, `detail: ["Field required", "Field required"]`.
+- Only one supplied → 400 with a single `"Field required"`.
+- `attributes=All` **AND** `name=<the queue's own name>` → **200** (full attributes
+  payload). `attributes` is **case-sensitive**: `ALL`/`all` → 400.
+The earlier "empty 400 body" was a bare-call ValidationError. This was the one
+failing id-bound GET in queueservice; the suite now exercises it correctly
+(scenario `application-queueservice-queue:get-attributes` step with
+`params:{attributes:"All", name:"regrq{unique}"}`, and `_probe_reads` now feeds
+sidecar-declared REQUIRED query params via `_QUERY_DEFAULTS` (attributes=All)).
+queueservice catalog coverage: 12/12 endpoints OK.
+
+queueservice `update-deduplication` / `update-deduplication-scope` 400 on a
+**Standard** queue by design: `content_based_deduplication` and
+`deduplication_scope` are **FIFO-only** (`scp-queueservice.invalid-*`, "queue name
+must end with '.fifo'"). The per-service catalog ops 200 elsewhere because they
+ran against a `.fifo` queue. Not a regression — correctly isolated as optional
+groups in the queue lifecycle (qdedup/qdedupscope), so the create→delete spine
+still passes.

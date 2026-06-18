@@ -1140,6 +1140,19 @@
           ]
         },
         {
+          "name": "get-attributes",
+          "_note": "getqueueattributes (GET /v1/queues/{id}/attributes) REQUIRES two query params: attributes + name. LIVE-PROVEN 2026-06-18 attributes=All (case-sensitive) and name=<queue name> -> 200; bare/one-of -> 400 ValidationError 'Field required'. {unique} reconstructs the exact create name.",
+          "method": "GET",
+          "path": "/v1/queues/{queue_id}/attributes",
+          "params": {
+            "attributes": "All",
+            "name": "regrq{unique}"
+          },
+          "expect_status": [
+            200
+          ]
+        },
+        {
           "name": "update-description",
           "group": "qdesc",
           "optional": true,

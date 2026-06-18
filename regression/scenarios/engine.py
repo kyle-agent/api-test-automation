@@ -266,11 +266,37 @@ def _resolve_param(param, mapping, endpoint=None, produced=None, produced_rtype=
     return None
 
 
+# Known-safe constant values for REQUIRED query params on id-bound GET probes.
+# Some id-bound reads 400 unless a required query param is supplied (the param is
+# NOT in the URL path, so it can't be resolved from path-param identity). A value
+# the API treats as "give me everything" is read-only and creates nothing.
+# LIVE-PROVEN 2026-06-18 (queueservice getqueueattributes): attributes=All is
+# required and case-sensitive ("ALL"/"all" 400). See knowledge/validated-facts.md.
+_QUERY_DEFAULTS = {
+    "attributes": "All",
+}
+
+
+def _resolve_query_param(name, mapping):
+    """Value for a REQUIRED query param on an id-bound GET probe:
+      1. a known-safe constant (`_QUERY_DEFAULTS`, e.g. attributes=All);
+      2. the same name present in the seed/ctx `mapping` (e.g. a captured
+         resource name a filter-by-name read requires).
+    Returns None when neither applies (the probe then skips that GET)."""
+    if name in _QUERY_DEFAULTS:
+        return _QUERY_DEFAULTS[name]
+    if name in mapping:
+        return mapping[name]
+    return None
+
+
 def _probe_reads(client, mapping, service, produced=None, produced_rtype=None):
     """Call every catalog GET in `service` whose path params are all resolvable —
     by exact capture-var name in `mapping`, by IDENTITY (the create that produced
-    the id, recorded in `produced`/`produced_rtype`), or by a legacy alias.
-    Read-only and record only — a probe never fails the lifecycle."""
+    the id, recorded in `produced`/`produced_rtype`), or by a legacy alias. Also
+    supplies any REQUIRED query params the enrichment sidecar declares (skipping
+    the GET when one can't be resolved). Read-only, record only — never fails the
+    lifecycle."""
     called = 0
     for e in _CATALOG:
         if e.service != service or (e.method or "").upper() != "GET":
@@ -283,6 +309,13 @@ def _probe_reads(client, mapping, service, produced=None, produced_rtype=None):
         vals = {p: _resolve_param(p, mapping, e, produced, produced_rtype) for p in params}
         if any(v is None for v in vals.values()):
             continue
+        # Required query params (sidecar-declared) that live OUTSIDE the path —
+        # resolve each or skip this GET (a bare call would just 400).
+        req_q = [q["name"] for q in _PARAMS_SIDECAR.get(e.key, {}).get("query_params", [])
+                 if q.get("required")]
+        qparams = {n: _resolve_query_param(n, mapping) for n in req_q}
+        if any(v is None for v in qparams.values()):
+            continue
         if called >= _PROBE_MAX_PER_STEP:   # runtime guard (auto-seed can match many)
             print(f"  probe-reads[{service}]: cap {_PROBE_MAX_PER_STEP} reached, "
                   f"skipping remaining")
@@ -294,7 +327,7 @@ def _probe_reads(client, mapping, service, produced=None, produced_rtype=None):
             # best-effort: short deadline, no retry — a slow/unreachable read must
             # not cost cfg.timeout x retries (the auto-seed fires many more GETs
             # than the old hand-seed, so an unbounded per-GET cost compounds).
-            resp = client.get(path, service=service,
+            resp = client.get(path, service=service, params=qparams or None,
                               timeout=_PROBE_TIMEOUT_S, retry=False)
         except Exception as exc:  # network/host issue — record nothing, continue
             print(f"  probe ERROR {path}: {exc}")
@@ -477,7 +510,11 @@ def _run_step(client, step, path, body, service, ctx, *, lifecycle_id: str = "")
     """Execute a step; honour retry_on_status and poll (field/until or
     until_status) for async provisioning/teardown. ``lifecycle_id`` lets the
     platform command channel target this step's poll loop (stop_polling)."""
-    params = step.get("params")
+    # Fill {placeholders} in query params from ctx (e.g. a captured id or the
+    # {unique} name suffix) — some id-bound GETs REQUIRE a query param whose value
+    # is the resource's own name (e.g. queueservice getqueueattributes needs
+    # name=<queue name>), so params must be resolved just like path/body.
+    params = _fill_obj(step.get("params"), ctx)
     try:
         resp = client.request(step["method"], path, json=body, service=service, params=params,
                           headers=step.get("headers"))
@@ -647,6 +684,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         "region": cfg.region,
         "today": time.strftime("%Y%m%d", _now),
         "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}",
+        # ISO YYYY-MM-DD dates for endpoints that take a bounded report/metric
+        # window. apigateway listreports rejects any range that exceeds 30 days
+        # OR starts earlier than 30 days ago (live-confirmed 2026-06-18:
+        # "Date range cannot exceed 30 days." / "Dates cannot be earlier than 30
+        # days ago."), so a hardcoded calendar-year range always 400s. Use a
+        # rolling 29-day window ending today — always in-bounds on both rules.
+        "iso_today": time.strftime("%Y-%m-%d", _now),
+        "iso_29d_ago": time.strftime("%Y-%m-%d", time.gmtime(time.time() - 29 * 86400)),
     }
     # Seed shared resources (e.g. a session-shared VPC) so {"adopt": ...} steps
     # reuse them instead of creating their own.
@@ -903,7 +948,11 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # same way GETs do (reads already arrive under the catalog key via smoke
             # / probe_reads). Records the ACTUAL response — incl. a 4xx from an
             # isolated optional write — which is exactly the signal we want shown.
-            if step["method"].upper() != "GET":
+            # Also credit an id-bound GET step that carries explicit query `params`
+            # under its catalog key: such reads (e.g. queueservice getqueueattributes,
+            # which REQUIRES attributes+name) are unreachable by the bare probe, so
+            # this explicit step is the ONLY place that exercises the endpoint.
+            if step["method"].upper() != "GET" or step.get("params"):
                 _ck = _catalog_key_for(step["method"], step.get("path", ""), step_service)
                 if _ck:
                     _record_smoke(resp.status, _cat, _ck, step["method"],
