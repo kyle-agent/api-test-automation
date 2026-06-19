@@ -26,7 +26,7 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-bg);color:var(--blue)}
 .gauge{display:flex;align-items:center;gap:14px}
 .ring{width:62px;height:62px;border-radius:50%;flex:none;
-  background:conic-gradient(var(--red) calc(8*1%),var(--grey-bg) 0);
+  background:conic-gradient(var(--red) calc(17*1%),var(--grey-bg) 0);
   display:grid;place-items:center;position:relative}
 .ring::after{content:"";position:absolute;inset:7px;background:var(--surface);border-radius:50%}
 .ring span{position:relative;font-weight:700;font-size:15px}
@@ -144,12 +144,12 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div class="hero">
   <div class="gauge">
-    <div class="ring"><span>8%</span></div>
-    <div class="lbl">검증(2xx) 커버<br><b>1 / 12</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 1</span></div>
+    <div class="ring"><span>17%</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>2 / 12</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 7</span></div>
   </div>
   <h1>quick-query <span class="tag">data-analytics</span></h1>
   <div class="split">
-    <div><div class="k">읽기 GET</div><div class="v" style="color:var(--amber)">25% <span class="sub">1/4</span></div></div>
+    <div><div class="k">읽기 GET</div><div class="v" style="color:var(--amber)">50% <span class="sub">2/4</span></div></div>
     <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--red)">0% <span class="sub">0/8</span></div></div>
     <div><div class="k">설계/동작 결함</div><div class="v">0 <span class="sub">개선 · 결함 0</span></div></div>
   </div>
@@ -200,11 +200,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-19 11:00 KST · branch <code>claude/adoring-heisenberg-7sem6u</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-19 14:33 KST · branch <code>claude/stoic-cray-peww44</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/quick-query/{quick_query_id}", "api": "deletequickquery", "c": "n", "s": 400, "t": 0.9, "src": "df8fb87", "d": []}, {"m": "GET", "p": "/v1/quick-query", "api": "getquickquerylist", "c": "p", "s": 400, "t": 1.5, "src": "", "d": []}, {"m": "GET", "p": "/v1/quick-query/{quick_query_id}", "api": "getquickquery", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/quick-query/{quick_query_name}/check-duplication", "api": "checkduplicationquickquery", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/quick-query/image-versions", "api": "getquickqueryimageversions", "c": "y", "s": 200, "t": 2.8, "src": "", "d": []}, {"m": "POST", "p": "/v1/quick-query", "api": "createquickquery", "c": "n", "s": 400, "t": 0.8, "src": "df8fb87", "d": []}, {"m": "POST", "p": "/v1/quick-query/validate-resources", "api": "validatequickqueryresources", "c": "f", "s": 500, "t": 0.8, "src": "", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/description", "api": "updatequickquerydescription", "c": "n", "s": 404, "t": 1.2, "src": "df8fb87", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/domain", "api": "updatequickquerydomain", "c": "n", "s": 404, "t": 1.0, "src": "df8fb87", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/dsc-domain", "api": "updatequickquerydscdomain", "c": "n", "s": 404, "t": 0.9, "src": "df8fb87", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/engine", "api": "updatequickqueryengine", "c": "n", "s": 400, "t": 0.9, "src": "df8fb87", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/host-alias", "api": "updatequickqueryhostalias", "c": "n", "s": 404, "t": 0.9, "src": "df8fb87", "d": []}];
+var R=[{"m": "DELETE", "p": "/v1/quick-query/{quick_query_id}", "api": "deletequickquery", "c": "p", "s": 400, "t": 0.8, "src": "", "d": []}, {"m": "GET", "p": "/v1/quick-query", "api": "getquickquerylist", "c": "y", "s": 200, "t": 1.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/quick-query/{quick_query_id}", "api": "getquickquery", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/quick-query/{quick_query_name}/check-duplication", "api": "checkduplicationquickquery", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/quick-query/image-versions", "api": "getquickqueryimageversions", "c": "y", "s": 200, "t": 1.8, "src": "", "d": []}, {"m": "POST", "p": "/v1/quick-query", "api": "createquickquery", "c": "p", "s": 400, "t": 0.9, "src": "", "d": []}, {"m": "POST", "p": "/v1/quick-query/validate-resources", "api": "validatequickqueryresources", "c": "f", "s": 400, "t": 1.0, "src": "", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/description", "api": "updatequickquerydescription", "c": "p", "s": 404, "t": 0.8, "src": "", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/domain", "api": "updatequickquerydomain", "c": "p", "s": 404, "t": 0.8, "src": "", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/dsc-domain", "api": "updatequickquerydscdomain", "c": "p", "s": 404, "t": 0.8, "src": "", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/engine", "api": "updatequickqueryengine", "c": "p", "s": 400, "t": 0.8, "src": "", "d": []}, {"m": "PUT", "p": "/v1/quick-query/{quick_query_id}/host-alias", "api": "updatequickqueryhostalias", "c": "p", "s": 404, "t": 0.8, "src": "", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');

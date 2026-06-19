@@ -473,8 +473,11 @@ igw needs <code>vpc_id</code>, <code>firewall_enabled</code>, <code>type: IGW</c
 <p>conf: 0.7 · seen: 2026-06-17 · obs: 1</p>
 </blockquote>
 <p><code>{unique}</code> (collision-free token), <code>{ualpha}</code> (alpha-only unique), <code>{region}</code>,
-<code>{today}</code>, <code>{today_plus_5y}</code>. Use these instead of hardcoding values, so runs
-don't collide and resources are attributable.</p>
+<code>{today}</code> (<code>YYYYMMDD</code>), <code>{today_plus_5y}</code>, <code>{iso_today}</code> (<code>YYYY-MM-DD</code>),
+<code>{iso_29d_ago}</code> (<code>YYYY-MM-DD</code>, today−29d — a rolling in-bounds window for
+bounded report/metric ranges, see apigateway listreports below). Use these
+instead of hardcoding values, so runs don't collide and resources are
+attributable.</p>
 <h2>Teardown races</h2>
 <blockquote>
 <p>conf: 0.7 · seen: 2026-06-17 · obs: 1</p>
@@ -842,8 +845,248 @@ First coverage-max dispatch (<code>docs/COVERAGE-MAX-PLAN.md</code> Tier 0). Res
   expect_status (4xx-tolerated intent; <code>storage__archivestorage.json</code>).
 - <strong>iam-policy-extra-writes ReadTimeout</strong> (iam.e.samsungsdscloud.com, 20s) =
   transient network flake, not a defect; passes on re-run (SCP_TIMEOUT=20 is tight
-  for iam under load). No code change.</p>
-</blockquote></div>
+  for iam under load). No code change.
+- <strong>Design (A) stage 2 — identity-based auto-probe (2026-06-18).</strong> The auto-probe
+  now resolves an id-bound GET's path-param by IDENTITY — the create that
+  <code>produced_by</code> it (per <code>data/api_catalog_params.json</code>), recorded per-lifecycle in
+  <code>produced{create_key→id}</code> / <code>produced_rtype{resource_type→id}</code> — instead of by
+  capture-var STRING name. Priority in <code>_resolve_param</code>: exact name → identity →
+  legacy <code>_PARAM_ALIASES</code>. Proven offline (<code>tests/offline/test_probe_identity.py</code>,
+  5 tests): EVERY <code>produced_by</code> param in the sidecar (incl. 8/9 alias targets)
+  resolves via identity from an empty name-seed — so the hand alias map is now
+  vestigial (only <code>srn</code>, name-addressed/no producer, still needs it). Map kept as
+  a LAST-resort fallback pending LIVE proof of the identity path; delete the 8
+  redundant entries once a live run shows the produced-index path firing 2xx.
+  118 offline pass, validator 212/0. (engine: <code>regression/scenarios/engine.py</code>.)
+- <strong>Leaked privatelink VPC teardown (2026-06-18).</strong> A VPC can be permanently
+  stuck at 409 because a <strong>privatelink-service</strong> in it owns an auto-created
+  <code>prvlink-*</code> customer port (blocks subnet/VPC delete), and the service itself
+  409s (<code>privatelink-service.exist-connected-endpoint</code>) while it has a connected
+  endpoint. The connection is AUTO-approved → endpoint state <strong>ACTIVE</strong>, which is
+  <strong>NOT REJECT-able</strong> (<code>/approval type=REJECT</code> → <code>invalid-rejectable-state</code>; REJECT
+  only works on pending). Correct teardown (provider side): GET
+  <code>/v1/privatelink-services/{id}/connected-endpoints</code> → for each, PUT
+  <code>/v1/privatelink-endpoints/{eid}/connection {"type":"DISCONNECT"}</code> (enum is
+  DISCONNECT/RECONNECT, not on <code>/connection</code>'s sibling <code>/approval</code> which is
+  APPROVE/REJECT) → DELETE the service (202, async) → wait gone (its customer port
+  reaps with it) → delete subnet → delete VPC. Now encoded in
+  <code>cleanup.reconciler._purge_vpc_children</code> (runs first, before LB/NAT/ports).
+  NOTE: the disconnect PUT needs <code>SCP_ALLOW_MUTATIONS=true</code> (DELETE needs BOTH
+  MUTATIONS+DESTRUCTIVE — DELETE is in the MUTATING set too).
+- <strong>FAST sweep mode (<code>SCP_SWEEP_NOWAIT=true</code>, 2026-06-18).</strong> The reconciler's
+  per-resource <code>_wait_gone</code> (blocking poll, up to 150–900s each) was the teardown
+  bottleneck (audit: DBaaS clusters ~165s ea, SKE nodepools ~380s ea, all serial).
+  NOWAIT skips the blocking wait — issue EVERY owned delete, let the fixed-point
+  round loop retry whatever still 409s (dependency) next pass. Dependencies resolve
+  through retries, not serial waits, so a sweep finishes in rounds not sum(teardown).
+  Round count + inter-round pause are env-tunable (<code>SCP_SWEEP_ROUNDS</code> default 8 in
+  nowait, <code>SCP_SWEEP_ROUND_SLEEP_S</code> default 12s so async deletes clear between
+  rounds). Owner-tag scoping UNCHANGED (still <code>_select</code>-gated). Hand-driven cleanup:
+  <code>SCP_ALLOW_DESTRUCTIVE=true SCP_SWEEP_IGNORE_TTL=true SCP_SWEEP_NOWAIT=true python -m cleanup.reconciler</code>.
+- <strong>(A) enrichment producer-match 90.9%→98.1% (2026-06-18, multi-agent residual pass).</strong>
+  The 89 <code>produced_by:null</code> self-params were NOT mechanically closable by deeper
+  collection matching — diagnosis showed ALL 89 have NO collection-prefix POST.
+  Four parallel investigation agents found the real producers (evidence in
+  <code>data/api_docs.json</code> + <code>knowledge/formal/resources/*.yaml</code>); encoded as a
+  residual layer in <code>spec/enrich_catalog.py</code> (<code>_DBAAS_SERVICES</code>/<code>_RESIDUAL_EXPLICIT</code>/
+  <code>_RESIDUAL_WAIVERS</code>, applied ONLY to null self-params so it can't regress the
+  890 mechanical matches). Result: <strong>960/979 produced_by (98.1%) + 19 honest
+  waivers = 0 unexplained null.</strong> Patterns: (1) DBaaS instance_group_id/
+  block_storage_group_id born in the cluster DETAIL read <code>showcluster</code>
+  (<code>$.instance_groups[0].id</code>, nested <code>…block_storage_groups[0].id</code>), request_id =
+  async-op from createcluster (<code>$.request_id</code>); (2) cross-service cluster_id ←
+  <code>container/ske/createcluster</code> <code>$.resource_id</code> (aimlops/cloud-ml/data-flow/data-ops
+  consume an external SKE cluster as a body field); (3) pseudo-resource ops
+  kms key_id←createkey <code>$.key.id</code>, secretvault, configinspection, virtualserver
+  subnet_id←vpc createsubnet; (4) waivers: resourcemanager key/resource_identifier
+  (name-addressed), cloudmonitoring addrbookId (EOL), scr tags_id (docker-pushed).
+  These produced_by directly feed the stage-2 identity probe. 118 offline pass,
+  validator 212/0. NOTE: bare <code>Endpoint.service</code> (e.g. <code>mysql</code>), not <code>database/mysql</code>.
+- <strong><code>-n 2 → 6</code> parallelism change (dab8a41) was applied COSMETICALLY only</strong>
+  (found 2026-06-18 via loggingaudit audit-optimizer on run 27735741382). The
+  comments (<code>api-test.yml:333,572</code>) and the echo (<code>:583</code> "in parallel (-n 6)")
+  were updated, but the actual adopt-class pass still hardcoded
+  <code>ARGS=(... -n 2 ...)</code> at <code>:587</code> — so the workflow kept serializing at 2 xdist
+  workers. Fixed: <code>:587</code> <code>-n 2 → -n 6</code>. (The handoff §1 hand-run recipe already
+  used <code>-n 6</code>; only the workflow file was stale.) <strong>Evidence the lever is real:</strong>
+  in the <code>-n 2</code> baseline (run 27735741382, df8fb87) the four DB engine families
+  (epas 24m / mariadb 31m / mysql 43m / postgresql 44m) ran <strong>staggered, peak
+  concurrency 2</strong> → DB-phase wall <strong>120 min</strong> (span-sum 142m). All four are
+  <code>requires=None</code> adopting the same shared VPC, so <code>-n 6</code> fans them out →
+  target wall ≈ <strong>max(single engine ~44 min)</strong>, i.e. ~76 min saved on the DB
+  phase alone. Re-raising is safe (IB-049 xdist-gated adopter-skip + IB-050
+  pre-run reclaim/concurrency-group are the real cap-poisoning guards, NOT the
+  <code>-n</code> lowering — handoff key-fact #2).
+- <strong><code>-n 6</code> DBaaS fan-out VALIDATED LIVE (2026-06-18 heavy n6 run).</strong> The
+  <code>heavy-shared-dbaas</code> worker fired 3 real billable cluster creates back-to-back
+  (within 28s) adopting the shared VPC, so they ran concurrently. From
+  loggingaudit create/delete Start/End: mariadb live-span 16.0m / epas 15.4m /
+  cache-store 14.6m. <strong>Peak concurrent live DB clusters = 3</strong> (&gt; the -n2 baseline
+  peak of 2); <strong>DBaaS-phase wall = 16.0m ≈ max(engine span), NOT sum (46.0m)</strong> →
+  ~30m / <strong>65% saved</strong> vs serial on the DB phase. Confirms the <code>requires=None</code>
+  engines fan out under <code>-n 6</code> exactly as predicted (wall→max). 0 billable
+  survivors after teardown+sweep (3 independent rechecks). Coverage: +26 newly-
+  verified endpoints, 25 distinct DB sub-op 2xx. The 3 DB sub-ops set-archive /
+  register-log-export-config / upgrade-kernel return 500 ContactAdminForAssistance
+  on all 4 engines — product bugs, now baselined (<code>known_issues.json</code>).</p>
+</blockquote>
+<h2>id-bound GET coverage: the "create→get-by-id should raise coverage" question (2026-06-18, branch adoring-heisenberg)</h2>
+<blockquote>
+<p>conf: 0.8 · seen: 2026-06-18 · obs: 1 (full static cross-ref of 302 id-GETs vs reports/results/observations.jsonl)</p>
+</blockquote>
+<p><strong>The premise is right and the engine already honours it</strong> — <code>engine._probe_reads</code> +
+<code>_resolve_param</code> resolve an id-bound GET's path-param by IDENTITY (which create
+produced the id, recorded in <code>produced</code>/<code>produced_rtype</code>) or by capture-var name,
+then fire the GET. Proven live: ALL 12 <code>compute/scf/show*</code> id-GETs are 2xx in
+crud_probe (showcloudfunction/code/configuration/trigger/etc.) — the probe works.</p>
+<p><strong>Bucketed truth for the 302 <code>is_read_only &amp; has_path_params</code> GETs</strong> (against the
+current observations.jsonl, a smoke + NON-heavy crud_probe partial run):
+- (a) COVERED 2xx ........ <strong>84</strong>
+- (b) reached, non-2xx ... <strong>14</strong> (12×400, 2×403 — need real query data / perms)
+- (c) NEVER reached ...... <strong>204</strong></p>
+<p><strong>The (c)=204 breakdown is the answer to "why aren't they covered":</strong>
+- <strong>6</strong> — self-param has NO producer (genuine static gap; see waivers below).
+- <strong>198</strong> — self-param HAS a producer, but its create never produced a usable id
+  <em>in this run</em>. Of those 198:
+  - <strong>149</strong> the producer create was NEVER OBSERVED — because <strong>57 enabled
+    lifecycles never ran in this file (all 61 heavy ones + a few)</strong>; 139 of those
+    149 producers ARE steps in an existing (heavy/gated) lifecycle, so they cover
+    on a full <code>SCP_RUN_HEAVY=true</code> run. Only ~10 producers are in NO lifecycle.
+  - <strong>38</strong> the producer create RAN but never got 2xx (id never born — upstream
+    create 4xx/skip, a separate problem from id-resolution).
+  - <strong>11</strong> the producer RAN &amp; got 2xx but the read still wasn't issued in this
+    file (mostly list-lookup producers / cross-service subnet — recover on rerun).</p>
+<p><strong>So the dominant cause is RUNTIME/SCHEDULING (heavy lifecycles gated off this
+run), NOT a linking or substitution bug.</strong> Static ceiling: <strong>292/302 id-GETs are
+fully producer-linked</strong> in the sidecar (after the ancestor-residual fix below);
+only 10–11 are true gaps.</p>
+<p><strong>The 10–11 genuine static gaps are correct WAIVERS</strong> (no producer exists — name-
+addressed / console-only / EOL): scr <code>tags_id</code> family (docker-pushed image tags,
+5 GETs), cloudmonitoring <code>addrbookId</code>, resourcemanager component/tag composite
+paths keyed by <code>{region}/{service}/{resource_type}/{resource_identifier}</code> + <code>key</code>/
+<code>srn</code>. These can only be covered by name-addressing a pre-existing resource.</p>
+<p><strong>The literal-<code>{cloud_function_id}</code> 404 (<code>POST .../privatelink-endpoints</code>) is BY
+DESIGN, not a substitution bug.</strong> It comes from lifecycle <code>scf-privatelink-
+apigateway-coverage</code>, which deliberately NO-OP soft-captures <code>cloud_function_id</code>
+so it stays LITERAL → guaranteed 404 → the write endpoint is still RECORDED
+(catalog <code>_norm_path</code> collapses <code>{..}</code>→<code>*</code>). It never creates a real function (a
+real PL-enable strands the function in 'Creating' and blocks teardown — see that
+lifecycle's <code>_note</code>). The READ probe is safe: <code>_probe_reads</code> filters <code>mapping</code> for
+<code>"{"</code> and <code>_resolve_param</code> returns None → the GET is SKIPPED (never sent with a
+literal brace). Only LIFECYCLE WRITE steps pass unresolved <code>{x}</code> through <code>_fill</code>
+(intentional for these coverage-404 lifecycles).</p>
+<p><strong>Fix applied (durable, purely additive): <code>spec/enrich_catalog.py</code> now applies the
+<code>_RESIDUAL_EXPLICIT</code> map to ANCESTOR params too</strong> (previously self-only via
+<code>name == last</code>). This linked 5 ancestor params that were <code>produced_by=null</code>:
+apigateway <code>resource_id</code> on showmethod/setmethod/deletemethod →
+<code>createresource</code>, and iam <code>srn</code> on set/removepermission → <code>createresourcegroup</code>.
+id-GET static-linkage 291→<strong>292/302</strong>; sidecar self-link 98% (960/979). Offline
+127/127 pass, validator 212/0. The remaining recovery is OPERATIONAL: run the
+heavy lifecycles (<code>SCP_RUN_HEAVY=true</code>) to birth the ~149 producer ids whose
+reads then auto-probe — that is where the bulk of the missing 204 lives.</p>
+<h2>queueservice getqueueattributes — required query params (LIVE-PROVEN 2026-06-18)</h2>
+<p><code>GET /v1/queues/{queue_id}/attributes</code> (catalog key
+<code>application-service/queueservice/getqueueattributes</code>) REQUIRES <strong>two</strong> query
+params: <code>attributes</code> and <code>name</code>.
+- Bare call → 400 <code>ValidationError</code>, <code>detail: ["Field required", "Field required"]</code>.
+- Only one supplied → 400 with a single <code>"Field required"</code>.
+- <code>attributes=All</code> <strong>AND</strong> <code>name=&lt;the queue's own name&gt;</code> → <strong>200</strong> (full attributes
+  payload). <code>attributes</code> is <strong>case-sensitive</strong>: <code>ALL</code>/<code>all</code> → 400.
+The earlier "empty 400 body" was a bare-call ValidationError. This was the one
+failing id-bound GET in queueservice; the suite now exercises it correctly
+(scenario <code>application-queueservice-queue:get-attributes</code> step with
+<code>params:{attributes:"All", name:"regrq{unique}"}</code>, and <code>_probe_reads</code> now feeds
+sidecar-declared REQUIRED query params via <code>_QUERY_DEFAULTS</code> (attributes=All)).
+queueservice catalog coverage: 12/12 endpoints OK.</p>
+<p>queueservice <code>update-deduplication</code> / <code>update-deduplication-scope</code> 400 on a
+<strong>Standard</strong> queue by design: <code>content_based_deduplication</code> and
+<code>deduplication_scope</code> are <strong>FIFO-only</strong> (<code>scp-queueservice.invalid-*</code>, "queue name
+must end with '.fifo'"). The per-service catalog ops 200 elsewhere because they
+ran against a <code>.fifo</code> queue. Not a regression — correctly isolated as optional
+groups in the queue lifecycle (qdedup/qdedupscope), so the create→delete spine
+still passes.</p>
+<h2>apigateway listreports / 503 LISTs / createprivatelinkendpoint — LIVE-PROVEN (2026-06-18)</h2>
+<p><strong>listreports date window (root-caused, FIXED).</strong> <code>GET /v1/apis/{api_id}/reports</code>
+(<code>application-service/apigateway/listreports</code>) takes 3 REQUIRED query params
+<code>stage_name</code>, <code>start_date</code>, <code>end_date</code> (dates <code>YYYY-MM-DD</code>). The 400 was NOT a
+missing-param / entitlement problem — the gateway enforces <strong>two</strong> range rules,
+confirmed live against a throwaway api:
+- <code>start_date=2025-01-01 end_date=2025-12-31</code> → 400
+  <code>scp-application-apigateway.api.invalid-date-range</code> <strong>"Date range cannot exceed 30 days."</strong>
+- any window starting &gt;30 days ago → 400
+  <code>scp-application-apigateway.api.invalid-past-date</code> <strong>"Dates cannot be earlier than 30 days ago."</strong>
+- bare (no <code>stage_name</code>) → 400 <code>ValidationError</code> "stage name should be 3~50 characters …".
+A <strong>rolling 29-day window ending today</strong> satisfies both rules → <strong>200</strong>
+<code>{"count":0,"reports":[],"top_resources":[]}</code> (empty for a no-traffic api, even
+with a not-yet-created stage). Fix: scenario step now uses
+<code>?stage_name=dev&amp;start_date={iso_29d_ago}&amp;end_date={iso_today}</code> (new engine
+placeholders). The old hardcoded calendar-year range always 400'd.</p>
+<p><strong>503 on plain LISTs = transient gateway saturation, NOT a defect.</strong>
+<code>GET /v1/apis</code> (<code>listapis</code>) and <code>GET /v1/privatelink-endpoints</code>
+(<code>listprivatelinkendpoints</code>) intermittently return <strong>503 "upstream connect error
+… connection timeout"</strong> under heavy parallel load (15s connect-timeout). On direct
+re-issue both return <strong>200</strong> consistently (~1s): <code>listapis</code> → <code>{"apis":[],"count":0}</code>,
+<code>listprivatelinkendpoints</code> → <code>{"count":0,"privatelink_endpoints":[]}</code>. The HTTP
+client already retries <code>RETRY_STATUS={502,503,504}</code> with exponential backoff, which
+recovers them in normal conditions; no code change needed (a blanket 5xx→soft would
+mask real server defects). Both recorded OK (covered).</p>
+<p><strong>createprivatelinkendpoint 500 = genuine PRODUCT BUG (PF-23, baselined).</strong>
+<code>POST /v1/privatelink-endpoints</code>. DOCS-VERIFIED our body is CORRECT:
+<code>privatelinkendpointcreaterequest</code> requires exactly <code>{name (^[a-zA-Z0-9]*$,
+min 3 / max 20), privatelink_service_id (required), description? (optional)}</code> and
+the scenario sends precisely that (<code>regrple{ualpha}</code> = 15 lowercase chars, valid).
+A bad/non-existent <code>privatelink_service_id</code> returns <strong>500 ContactAdminForAssistance</strong>
+(req-f088cd1d) instead of the expected 400/404 — same ContactAdmin-class as budget
+createaccountbudget / apigateway setresourcepolicy (PF-19). NOT a body-shape gap we
+can fix. Baselined in <code>known_issues.json</code>; the <code>xcov-pl-create</code> group tolerates 500.</p>
+<p><strong>privatelink approve/connect/request/set/delete 403 = entitlement (NOT coverable).</strong>
+The privatelink mutation ops 403 "You do not have permission to Action" — the
+missing-IAM-action-definition class (PF-01/02/03/15/18). Correctly <code>soft</code>, already
+tolerated in <code>expect_status</code>; the CALL is recorded for coverage. Not a regression.</p>
+<h2>HEAVY_STALL root cause: DB-engine lifecycles env-skipped when shared-VPC env not propagated (2026-06-19, branch adoring-heisenberg)</h2>
+<blockquote>
+<p>conf: 0.9 · seen: 2026-06-19 · obs: 1 (live heavy-dbaas recovery run, 46:41 wall)</p>
+</blockquote>
+<p><strong>Root cause of the 00:18 heavy stall (provisioned the shared VPC, created 0 DB
+clusters, then died).</strong> The shared VPC was provisioned out-of-band at 00:16
+(<code>shared_provision.stderr.log</code>) but its <code>SCP_SHARED_VPC_ID</code> / <code>SCP_RUN_HEAVY</code> env
+were <strong>not propagated into the heavy DB pytest subprocess</strong>. Every DB-engine
+lifecycle is <code>heavy=True</code> with <code>requires=None</code>; with <code>SCP_RUN_HEAVY</code> unset in that
+shell the engine takes the gate at <code>engine.run_lifecycle</code> (<code>engine.py:645</code>,
+"heavy lifecycle — set SCP_RUN_HEAVY=true to run") and returns <code>status='skipped'</code>
+BEFORE firing any create. Smoking gun: the stalled <code>heavy_dbaas.log</code> is literally
+<code>bringing up nodes...\n\ns.....</code> — <code>s</code>=skipped, no creates. The host-reachability
+preflight DNS failures (eventstreams/searchengine 503/NameResolution) were a RED
+HERRING — transient and unrelated to the skip. <strong>Lesson: the env that gates heavy
+lifecycles (<code>SCP_RUN_HEAVY</code> + the three <code>SCP_SHARED_*_ID</code>) must be exported in the
+SAME shell as <code>python -m pytest</code>; a separate provisioning step that only writes
+<code>shared_ids.txt</code> does NOT make pytest adopt them.</strong> <code>provision_shared_vpc</code> IS
+env-aware (<code>engine.py:1185</code>, adopts <code>SCP_SHARED_VPC_ID</code> → no 2nd VPC, no-op
+teardown) — so once the env is correctly exported the adopt path works perfectly.</p>
+<p><strong>Recovery run RESULT (gates+shared-VPC env exported in-shell, <code>-n 6</code>).</strong> 8 real
+billable <code>POST /v1/clusters → 202</code> across mysql/mariadb/epas/cachestore plus the
+<code>heavy-shared-dbaas</code> mariadb/epas/cachestore trio; postgresql <code>createcluster</code>
+500'd (see baseline below). <strong>Peak concurrent live DB clusters = 3</strong> (the
+<code>requires=None</code> engines adopting the same shared VPC fan out under <code>-n 6</code> exactly
+as the 2026-06-18 fact predicted — wall ≈ max(engine), not sum). Each ACTIVE
+cluster let the engine identity-probe fire its id-bound sub-op GETs: <strong>22 distinct
+DB sub-op id-GET 2xx</strong> newly covered — per engine <code>showcluster</code>,
+<code>listbackuphistories</code>, <code>listparametervalues</code> (+ mysql/mariadb/epas also
+<code>listlogexportconfigs</code> / <code>listreplicas</code> / <code>showarchiveconfig</code>; cachestore also
+<code>listcommands</code>). id-bound-GET 2xx coverage <strong>158 → 167 (+9 endpoints)</strong> by the
+fixed-matcher recount (<code>reports/audit/count_idget.py</code>). Lifecycles self-tore-down
+(10× DELETE <code>/v1/clusters/&lt;id&gt;</code> → 202); reconciler sweep + 3 independent rechecks =
+<strong>0 owned billable survivors</strong> incl. the shared VPC <code>regrvpcsh6a348985</code> (DELETE
+204). 4 pytest FAILs were env/backend, not harness: postgresql create 500, and
+3 <code>*-subops-guarded</code> hit <code>upstream connect error / connection timeout</code> (gateway
+resets under the concurrent heavy load).</p>
+<p><strong>NEW PRODUCT BUG: <code>database/postgresql/postgresqlcreatecluster</code> → 500
+ContactAdminForAssistance.</strong> Live 2026-06-19, fired twice (lifecycle create +
+subops-guarded create), both 500 <code>{"code":"ContactAdminForAssistance"}</code>. The other
+4 engines (mysql/mariadb/epas/cachestore) created fine with the identical
+shared-VPC body shape, so this is a postgresql-backend create fault, not a body/
+linking bug. Baselined in <code>known_issues.json</code> (Product Bug). Same <code>ContactAdmin</code>
+class as the already-baselined <code>*registerlogexportconfig</code> 500s.</p></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/validated-facts.md</code></div>

@@ -77,6 +77,27 @@ duplicating. Add a new <code>##</code> section when you take on a new service.</
 <li>public-ip <code>type: IGW</code> → <code>$.publicip.id</code>. internet-gateway needs <code>vpc_id</code>,
   <code>firewall_enabled</code>, <code>type: IGW</code> → <code>$.internet_gateway.id</code>.</li>
 </ul>
+<h2>networking / firewall</h2>
+<ul>
+<li><strong>Host:</strong> regional. 8 endpoints. Firewalls are VPC-bound resources; the account
+  must have at least one VPC/firewall provisioned before most endpoints are reachable.</li>
+<li><code>GET /v1/firewalls</code> (listfirewalls) returns 200 OK even with zero firewalls (empty
+  list). No required query params. Covered in read-only smoke.</li>
+<li><code>GET /v1/firewalls/rules</code> (listfirewallrules) requires <strong><code>firewall_id</code> query param</strong>
+  (marked required in <code>data/api_catalog_params.json</code>); bare call returns 400. Probe
+  with dummy id returns 404 — backend is reachable. Not coverable without a real firewall.</li>
+<li><code>GET /v1/firewalls/{firewall_id}</code> (showfirewall) and
+  <code>GET /v1/firewalls/rules/{firewall_rule_id}</code> (showfirewallrule) return 404 with
+  dummy IDs — backend reachable, no resources provisioned in the test account.</li>
+<li>All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule
+  PUT, deletefirewallrule DELETE) need <code>SCP_ALLOW_MUTATIONS=true</code> (and DELETE needs
+  <code>SCP_ALLOW_DESTRUCTIVE=true</code>) plus existing firewall/rule IDs from a prior create.</li>
+<li><strong>Coverage path:</strong> create a VPC first (networking/vpc agent), then a firewall attaches
+  to the VPC. Capture <code>$.firewalls[0].id</code> from listfirewalls. Use for showfirewall,
+  listfirewallrules. Create a rule (POST /v1/firewalls/rules) to get <code>firewall_rule_id</code>
+  for showfirewallrule, setfirewallrule, deletefirewallrule.</li>
+<li>Covered read-only: 1/8 (listfirewalls). Remaining 7 are mutation-gated this round.</li>
+</ul>
 <h2>networking / security-group</h2>
 <ul>
 <li><strong>Host:</strong> regional, but <strong>account/region-scoped — no VPC needed</strong>. SG
@@ -95,6 +116,52 @@ duplicating. Add a new <code>##</code> section when you take on a new service.</
 <ul>
 <li><strong>Host:</strong> regional. registry/repository id <code>$.id</code>, registry poll <code>$.state</code> →
   <code>Running</code>. <strong>Registry DELETE 500-races</strong> for minutes after create — retry on 500.</li>
+<li><strong>Quota = 1 registry</strong> (<code>CONTAINER_REGISTRY.NON_VISIBILITY.MAX.COUNT applied_value: 1EA</code>);
+  a create when the slot is full returns <strong>403 quota.value.exceeded</strong>, NOT a bug.
+  Coverage lever for id-bound GETs is therefore <strong>borrow-and-read-by-id, no create
+  needed</strong>: list registries → take a <code>Running</code> one → walk its children read-only.</li>
+<li><strong>Live-confirmed borrowable resources (2026-06-18, kr-west1):</strong> registry
+  <code>sample</code> id <code>nayvugfp4154447ab0ab61279cba3d72</code> (Running), repository <code>test</code>
+  id <code>6c910ed5195842739f9c98a569982064</code> (Active). ids drift — re-harvest via
+  <code>GET /v1/container-registries</code> then <code>.../{id}/repositories</code>; don't hardcode.</li>
+<li><strong>Detail envelopes:</strong> <code>showregistry</code> → <code>{"registry": {...}}</code>, <code>showrepository</code>
+  → <code>{"repository": {...}}</code> (single-key wrappers). List shapes:
+  <code>listregistries</code> → <code>{count, registries[]}</code>, <code>listrepositories</code> →
+  <code>{count, repositories[]}</code>, <code>listimages</code> → <code>{count, images[]}</code>,
+  <code>connectable-resources</code> → <code>{count, resources[]}</code>.</li>
+<li><strong><code>checkrepositorynameduplication</code></strong> needs BOTH <code>registry_id</code> + <code>name</code> query
+  params (else 400 <code>Field required</code>); <code>checkregistrynameduplication</code> needs <code>name</code>.</li>
+<li><strong>READ-ONLY coverage ceiling (no docker, no mutations):</strong> 8 GETs reachable —
+  listregistries, showregistry, listrepositories, showregistry's
+  connectable-resources, both check-duplications, showrepository, listimages.
+  All 200 on the borrowed resources.</li>
+<li><strong>Docker-push blocker:</strong> the existing repository has <code>images:[]</code> (count 0), and
+  images/tags are <strong>born only by <code>docker push</code></strong>, not by any REST POST. So
+  <code>showimage</code>, <code>listtagses</code>, <code>showtags</code>, <code>tags-{packages,secrets,vulnerabilities}</code>,
+  <code>downloadmanifest</code>, <code>showimagelifecyclepolicypreview</code>, and every image/tags
+  PUT/DELETE are <strong>needs-docker-push blockers</strong> — not testable from a no-docker
+  runner. (See <code>regression/scr_docker_probe.py</code> for the docker-login hypothesis.)</li>
+<li><strong>Mutating policy PUTs</strong> on registry/repository (description / lock / pull /
+  scan / lifecycle / ACL / public-endpoint) are gated behind <code>SCP_ALLOW_MUTATIONS</code>
+  and would mutate the SHARED borrowed <code>sample</code>/<code>test</code> resources — do NOT fire
+  them just to move coverage; cover via an own-resource lifecycle when the quota
+  slot is free. Several historically returned transient <strong>503 upstream connect
+  timeout</strong> (product/gateway flap, retry-then-classify, not a deterministic bug).</li>
+</ul>
+<h2>networking / gslb (Global Server Load Balancing)</h2>
+<ul>
+<li><strong>Host:</strong> regional (<code>gslb.&lt;region&gt;.&lt;env&gt;.samsungsdscloud.com</code>). Account/global-scoped, VPC-free.</li>
+<li><strong>Region gate:</strong> only kr-west1 and kr-east1 — NOT kr-south1/2/3.</li>
+<li><strong>Quota:</strong> max 20 GSLB domains per account; max 8 connectable resources per domain.</li>
+<li><strong>List endpoints (2xx live, 2026-06-19, kr-west1):</strong></li>
+<li><code>GET /v1/gslbs</code> → <code>{count, gslbs:[], page, size, sort}</code> — no required params.</li>
+<li><code>GET /v1/gslbs/routing-control</code> → <code>{count, page, regional_gslbs:[], size, sort}</code> — no required params.</li>
+<li>Both return 200 with empty lists when no resources exist. Initial calls hit transient 503 (gateway flap); retry returns 200.</li>
+<li><strong>Create body (docs-validated, live unproven):</strong> <code>{algorithm:ROUND_ROBIN, description, env_usage:PUBLIC, health_check:{protocol:TCP, service_port:"80", ...}, name:"label.gslb.e.samsungsdscloud.com", resources:[], tags:[]}</code>. Name is FQDN; label must be 4-40 lowercase letters+digits only.</li>
+<li><strong>Health check:</strong> protocol one of ICMP/TCP/HTTP/HTTPS. TCP/HTTP(S) require <code>service_port</code>. HTTP(S) additionally require <code>receive_string</code> (alnum only) and optionally <code>send_string</code> (no <code>&lt;&gt;</code> or <code>#</code>). Use TCP to avoid HTTP(S)-only constraints.</li>
+<li><strong>Capture:</strong> <code>$.gslb.id</code> from create response.</li>
+<li><strong>Lifecycle scenario:</strong> <code>regression/scenarios/lifecycles/networking__gslb.json</code> (id: <code>networking-gslb-service</code>) covers full CRUD chain — POST create → GET show → PUT set → PUT health-check → PUT resources → PUT routing-control → GET resources → DELETE. Enabled, light (heavy:false), needs SCP_ALLOW_MUTATIONS=true + SCP_ALLOW_DESTRUCTIVE=true.</li>
+<li><strong>Coverage 2026-06-19:</strong> 2/10 (2 list GETs covered read-only). Remaining 8 are mutation-gated — scenario ready, no blockers.</li>
 </ul>
 <h2>security / certificatemanager</h2>
 <ul>
@@ -105,11 +172,299 @@ duplicating. Add a new <code>##</code> section when you take on a new service.</
 <ul>
 <li><strong>Host:</strong> <strong>global</strong> (no region segment). resource-group <code>$.resource_group.id</code>
   (+ <code>srn</code> soft capture).</li>
+<li><strong>CRITICAL: SRN and key path segments must be base64-encoded</strong> (confirmed
+  2026-06-19). All endpoints with <code>{srn}</code> or <code>{key}</code> path params require the
+  value to be <code>base64.b64encode(value.encode()).decode()</code> before URL insertion.
+  Plain SRN or plain key yields 400 "SRN decoding error occurred. utf-8 codec
+  can't decode byte...".</li>
+<li><code>GET/PUT/DELETE /v1/tags/{srn}</code> → <code>{srn}</code> = b64(srn)</li>
+<li><code>GET/PUT/DELETE /v1/tags/{srn}/{key}</code> → both = b64(srn) and b64(key)</li>
+<li><code>GET/PUT/DELETE /v1/resources/{srn}</code> → <code>{srn}</code> = b64(srn)</li>
+<li><code>GET/PUT/DELETE /v1/tags/{region}/{service}/{resource_type}/{identifier}/{key}</code>
+    → region/service/resource_type/identifier are PLAIN; only <code>{key}</code> = b64(key)</li>
+<li><code>/v1/tags/bulk</code> (PUT) and <code>/v1/tags</code> (DELETE bulk) use PLAIN SRN in JSON body
+    (not path), so no b64 needed there.</li>
+<li><strong>Engine support (2026-06-19):</strong> the scenario engine now implements a
+    <code>b64_encode</code> step action (<code>{"action":"b64_encode","input":"{rg_srn}",
+    "output":"rg_srn_b64"}</code>) — it base64-encodes a captured ctx var and publishes
+    it as a new placeholder, so <code>resourcemanager-tag-lifecycle</code> is runnable (was
+    referencing undefined <code>*_b64</code> placeholders → 10 validator errors, now fixed).
+    Reusable by any service whose path segments are b64-decoded (e.g. the stuck
+    iam <code>srn</code>-targeted ops: addpermission/setpermission/setresourcepolicy).</li>
+<li><strong>listresources response shape:</strong> <code>$.resources[]</code> (NOT <code>$.contents[]</code>). Fields:
+  <code>region</code>, <code>service</code>, <code>resource_type</code>, <code>id</code> (NOT <code>resource_identifier</code>).</li>
+<li><strong>Coverage 2026-06-19:</strong> 12 → <strong>27/27</strong> (100%). All 27 endpoints covered.
+  No remaining gaps.</li>
 </ul>
 <h2>application-service / queueservice</h2>
 <ul>
 <li><strong>Host:</strong> regional. queue <code>$.id</code>; create body includes retention/size/key-reuse
   periods + units.</li>
+</ul>
+<h2>management / iam</h2>
+<ul>
+<li><strong>Host:</strong> global-ish (management). 62 endpoints. Cross-link
+  <code>validated-facts.md</code>.</li>
+<li><strong>Coverage levers (2026-06-18):</strong></li>
+<li><em>Read-only LISTs (no gate, via smoke):</em> <code>accesskeylist</code>, <code>listendpoints</code>,
+    <code>listgroup</code>, <code>listpolicy</code>, <code>listrole</code>, <code>listsamlprovider</code>,
+    <code>listserviceaccount</code> all return 200 on a bare GET — pure smoke wins.</li>
+<li><em>List→show chains (no gate, via read_chains):</em> <code>showrole</code>,
+    <code>showserviceaccount</code>, <code>accesskeyshow</code>, <code>listrolepolicybindings</code> derive an id
+    from their sibling list and return 200. <code>showgroup</code>/<code>showpolicy</code> likewise.</li>
+<li><em>Account-scoped read:</em> there is <strong>no <code>/v1/accounts</code> or <code>/v1/users</code>
+    collection list</strong> (both 404). <code>account_id</code> is only derivable from a real
+    role's <code>$.role.account_id</code> (a <code>/v1/roles</code> item carries <code>account_id</code>). Use it
+    to call <code>listiamuser</code> = <code>GET /v1/accounts/{account_id}/users</code> (200, returns
+    <code>{users:[], count,page,size,sort}</code>). This is why read_chains can't auto-pair
+    listiamuser/getiamuser/listuserpolicybindings — the parent list doesn't exist.</li>
+<li><em>Group/policy lifecycles (MUTATIONS gate):</em> <code>creategroup</code> → <code>$.group.id</code>,
+    <code>createpolicy</code> → flat <code>$.id</code>. Both delete cleanly. Already enabled.</li>
+<li><strong>Empty-collection blockers (needs-peer-resource):</strong> this account has <strong>0 SAML
+  providers, 0 IAM users, 0 resource-policies</strong> → <code>showsamlprovider</code>,
+  <code>getiamuser</code>, <code>listuserpolicybindings</code>, <code>updateiamuser</code>,
+  <code>updateiamuserpassword</code>, <code>deleteiamuser</code>, <code>showresourcepolicy</code> have no id to
+  target and can't be covered read-only until a peer creates one.</li>
+<li><strong>Product-bug blocker (5xx, baselined):</strong> <code>createrole</code> → 500
+  ContactAdminForAssistance. This blocks the whole role-mutation chain
+  downstream (<code>setrole</code>, <code>addrolepolicybindings</code>, <code>removerolepolicybinding</code>,
+  <code>removebulkrolepolicybindings</code>, <code>setroletrustpolicy</code>, <code>deleterole</code>,
+  <code>deletebulkrole</code>). <code>iam-role</code> lifecycle stays <code>enabled:false</code>.</li>
+<li><strong>Entitlement / validation blockers:</strong> <code>adduserpolicybinding</code> /
+  <code>removeuserpolicybinding</code> → 403; resource-policy mutations
+  (<code>addpermission</code>/<code>setpermission</code>/<code>removepermission</code>/<code>setresourcepolicy</code>/
+  <code>deleteresourcepolicy</code>) → 400 (need a real <code>srn</code> target).</li>
+<li><strong>Coverage 2026-06-18:</strong> 15 → <strong>27 / 62</strong> (read-only levers only; no resources
+  created, account left clean).</li>
+</ul>
+<h2>networking / dns</h2>
+<ul>
+<li><strong>Host:</strong> regional (<code>dns.&lt;region&gt;.&lt;env&gt;...</code>). 22 endpoints. Three resource
+  families: <strong>private-dns</strong>, <strong>hosted-zones</strong> (+ records), <strong>public-domain-names</strong>.
+  Cross-link <code>validated-facts.md</code> (networking quotas).</li>
+<li><strong>Upstream flapping (System Issue, 2026-06-18/19):</strong> the dns host intermittently
+  returns <code>503 upstream connect error / connection timeout</code> at the edge proxy even
+  though auth is fine (vpc 200s with the same creds). It recovers in windows — a
+  read probe that rides 503 with retry eventually gets the 200. Not auth, not our
+  body; an infra reachability blip. If every dns call 503s, retry later rather than
+  treating it as a regression.</li>
+<li><strong>Read-only LISTs (no gate, the live levers):</strong> <code>listhostedzone</code>
+  (<code>GET /v1/hosted-zones</code>), <code>listprivatedns</code> (<code>GET /v1/private-dns</code>),
+  <code>listpublicdomainnames</code> (<code>GET /v1/public-domain-names</code>) all return <strong>200</strong> on a
+  bare GET. Response envelopes (this account is EMPTY — count 0 in all three):
+  <code>{hosted_zones:[],count,page,size,sort}</code>, <code>{private_dns:[],...}</code>,
+  <code>{public_domain_names:[],...}</code>. These are the only dns endpoints coverable
+  read-only; everything else is id-bound or mutating.</li>
+<li><strong>id-bound reads blocked behind a HEAVY create:</strong> <code>showprivatedns</code>,
+  <code>showhostedzone</code>, <code>listhostedzonerecords</code>, <code>showhostedzonerecord</code> need a real
+  private-dns + hosted-zone + record to exist first. The account is empty and
+  private-dns create is a <strong>very slow provisioner (hours, <code>heavy:true</code>)</strong> — so on a
+  no-heavy run there is no id to target. They are covered (modeled, not
+  runtime-proven) by the <code>networking-dns-hosted-zone-private</code> heavy lifecycle.</li>
+<li><strong>createpublicdomainname → 500 (Product Bug, baselined):</strong> <code>POST
+  /v1/public-domain-names</code> returns 500 InternalServerError / ContactAdminForAssistance.
+  <strong>Our body is proven correct</strong> — byte-for-byte the documented <code>createpublicdomainname/1.3</code>
+  request_example with every required field of <code>createpublicdomainrequest</code>
+  (<code>data/api_docs.json</code>): address_type, name, all four <code>domestic_*_address_*</code>, the
+  <code>overseas_*</code> trio, postal_code, register_email/name/telno. Not a malformed-body
+  4xx mis-surfacing — a genuine backend fault, same ContactAdmin class as iam
+  createrole / budget createaccountbudget. Also a REAL PAID DOMAIN REGISTRATION
+  order, so the lifecycle never retry-chains it. Now in <code>data/baselines/known_issues.json</code>.</li>
+<li><strong>Quotas:</strong> Private DNS = 1/account (account-global; a 2nd create 4xx's —
+  <code>validated-facts.md</code>); Hosted Zone = 20/account, 100 records/zone; record types
+  A/AAAA/CNAME/TXT/MX/SPF/NS/SOA.</li>
+<li><strong>Body/capture quirks:</strong> hosted-zone create response is a <strong>bare envelope</strong> —
+  id at <code>$.id</code>, NOT <code>$.hosted_zone.id</code>; record id likewise <code>$.id</code>. private-dns
+  capture is <code>$.private_dns.id</code>. private-dns must reach <code>state: ACTIVE</code> before
+  setters work (400 invalid-state while CREATING). All encoded in
+  <code>regression/scenarios/lifecycles/networking__dns.json</code>.</li>
+<li><strong>Coverage 2026-06-19:</strong> 3 → <strong>6 / 22</strong> observed (the 3 list GETs newly live-200;
+  the public-domain 500 + 2 record-write probes were already observed). Remaining
+  16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind
+  the heavy private-dns create. Account left clean (no resources created).</li>
+</ul>
+<h2>data-analytics / data-ops</h2>
+<ul>
+<li><strong>Host:</strong> regional. 17 endpoints. Provisions and manages Apache Airflow
+  (data-ops-service = cluster, data-ops = workflow/DAG service on top).</li>
+<li><strong>COMPOSITE-CREATE (HEAVY/BILLABLE):</strong> <code>POST /v1/data-ops-services</code> creates a
+  billable Airflow cluster. <code>POST /v1/data-ops</code> creates a data-ops instance on
+  top of an existing service. Both are <code>heavy:true</code> in the lifecycle; never fire
+  without <code>SCP_RUN_HEAVY=true</code>.</li>
+<li><strong>ID formats (live-confirmed 2026-06-19):</strong></li>
+<li>data-ops id: must start with <code>DOPS-</code> (e.g. <code>DOPS-&lt;uuid&gt;</code>)</li>
+<li>data-ops-service id: must start with <code>DOPS_SERVICE-</code> (e.g. <code>DOPS_SERVICE-&lt;uuid&gt;</code>)</li>
+<li>cluster_id: 32-hex-char UUID (no hyphens, e.g. uuid4().hex)</li>
+<li><strong>check-duplication endpoints:</strong> both GET endpoints with name path-params
+  (<code>/v1/data-ops/{data_ops_name}/check-duplication</code> and
+  <code>/v1/data-ops-services/{data_ops_service_name}/check-duplication</code>) return <strong>200</strong>
+  <code>{"result":false}</code> for any valid name including probes. No resource needed.
+  <code>params: {}</code> added to scenario steps so engine records under catalog key.</li>
+<li><strong>id-bound GETs (non-2xx, soft, needs heavy-prereq):</strong></li>
+<li><code>getdataopsdetail</code> (<code>/v1/data-ops/{data_ops_id}</code>) → 404 when resource missing</li>
+<li><code>getdataopsservice</code> (<code>/v1/data-ops-services/{data_ops_service_id}</code>) → 404 when missing</li>
+<li><code>getdataopssubversion</code> (<code>/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions</code>) → <strong>400</strong> (NOT 404!) "dataOps is null" when ID valid format but resource missing</li>
+<li><code>getingresscontrollerlistv1</code> (<code>/v1/data-ops/clusters/{cluster_id}/ingress-controllers</code>) → 404 when cluster missing</li>
+<li><strong>validate-resources POSTs:</strong> dry-run preflight the console calls before create/update.
+  Still classified <code>mutating=True</code> (POST). Need real cluster_id/service_id AND
+  <code>SCP_ALLOW_MUTATIONS=true</code>. Heavy-prereq blockers.</li>
+<li><strong>Response envelope:</strong> list endpoints use <code>{contents:[], total_count}</code>. Detail uses
+  flat object or wrapped object (not yet confirmed — no existing resources).</li>
+<li><strong>image-versions:</strong> <code>GET /v1/data-ops/image-versions</code> → <code>{contents:[{image_id, image_name, version}], total_count}</code>. Currently returns 1 version: <code>4.1.1</code>.</li>
+<li><strong>Coverage 2026-06-19:</strong> 3 → <strong>5/17</strong> read-only. Remaining 12 are heavy-prereq
+  blockers (4 id-bound GETs + 8 mutating writes all depend on existing billable cluster).</li>
+</ul>
+<hr />
+<h2>management / organization</h2>
+<ul>
+<li><strong>Host:</strong> global (<code>organization.e.samsungsdscloud.com</code> — no region segment).
+  37 endpoints covering the full org-tree: organizations, org-units (OUs), member
+  accounts, service-control-policies (SCPs), policy-bindings, delegation-policies,
+  and invitations.</li>
+<li><strong>Account status (2026-06-19, account ec11538abf8f46d2953539521f745366):</strong> this
+  test account is a <strong>MEMBER</strong> (not master/payer) of an existing org.
+  <code>listorganizations</code> returns <code>{count:0, organizations:[]}</code> — member accounts
+  cannot see the org list (only the master can). <code>createorganization</code> returns 409
+  <code>AccountAlreadyExistInOrganization</code> confirming org membership. Most org management
+  operations return <strong>403 Forbidden</strong> (<code>You do not have permission to List/Read/Create</code>)
+  because the test account lacks org-admin IAM actions.</li>
+<li><strong>Coverable read-only (2xx) without org-master:</strong></li>
+<li><code>GET /v1/organizations</code> → 200 <code>{count:0, organizations:[], page, size, sort}</code> (member sees own org slot — empty for non-master)</li>
+<li><code>GET /v1/account-invitations</code> → 200 <code>{account_invitations:[], count:0}</code> (inbound invitations for this account — currently empty)</li>
+<li><strong>Entitlement-403 blockers (7 GET endpoints):</strong> <code>listaccounts</code>, <code>listorganizationunits</code>,
+  <code>listservicecontrolpolicies</code>, <code>listorganizationinvitations</code>, <code>showdelegationpolicy</code>,
+  <code>listpoliciesfortarget</code>, <code>listtargetsforpolicy</code> — all return 403 Forbidden
+  consistently, regardless of query params. These require org-master/admin privilege.</li>
+<li><strong>Id-bound GET blockers (5 endpoints):</strong> <code>showorganization</code>, <code>showorganizationunit</code>,
+  <code>showaccount</code>, <code>showservicecontrolpolicy</code>, <code>listparents</code> — can't get valid IDs
+  without org-master privilege to list the parent resources. <code>showorganizationunit</code>
+  with a fake ID returns 404; others return 403.</li>
+<li><strong>Mutating endpoint classification (live-proven 2026-06-19):</strong></li>
+<li><code>createorganization</code> → 409 (account already in org) — reachable, not 403</li>
+<li><code>createorganizationunit</code>, <code>createservicecontrolpolicy</code>, <code>attachpolicybindings</code>,
+    <code>removepolicybindings</code>, <code>deleteorganizationunits</code>, <code>deleteservicecontrolpolicies</code>,
+    <code>deletedelegationpolicy</code>, <code>setorganizationunit</code>, <code>setservicecontrolpolicy</code>,
+    <code>leaveorganization</code>, <code>deleteorganization</code>, <code>deleteaccount</code> → 403 entitlement</li>
+<li><code>createaccount</code>, <code>createdelegationpolicy</code>, <code>createinvitation</code>, <code>moveaccount</code>,
+    <code>setorganization</code>, <code>setdelegationpolicy</code>, <code>removeaccounts</code> → 400 ValidationError
+    (body shape incomplete but endpoint is reachable)</li>
+<li><code>cancelinvitations</code>, <code>acceptinvitation</code>, <code>declineinvitation</code> → 404 (no pending
+    invitations) — reachable, not 403</li>
+<li><strong>Proven body fields (2026-06-19):</strong></li>
+<li><code>createorganizationunit</code>: needs <code>name</code> + <code>parent_unit_id</code> (validated: these fields
+    move response from 400 to 403, confirming field names are correct)</li>
+<li><code>moveaccount</code>: needs <code>account_id</code> + <code>parent_unit_id</code> (NOT <code>parent_id</code> — <code>parent_id</code>
+    gives 400 "Extra inputs not permitted")</li>
+<li><code>createinvitation</code>: needs <code>organization_id</code> (validated field) + 1 unknown field
+    (docs JS-rendered, not captured; <code>email</code>, <code>message</code>, <code>login_id</code> are all invalid)</li>
+<li><code>listservicecontrolpolicies</code>: required query param <code>organization_id</code></li>
+<li><code>listorganizationunits</code>: required query param <code>parent_unit_id</code> ('ROOT' for root level)</li>
+<li><strong>Response envelopes (live-proven):</strong></li>
+<li><code>listorganizations</code> → <code>$.organizations[0].id</code></li>
+<li><code>listaccountinvitations</code> → <code>$.account_invitations[0].id</code></li>
+<li>Inferred (403 so not confirmed live): <code>organization_units</code>, <code>service_control_policies</code>,
+    <code>organization_accounts</code>, <code>organization_invitations</code></li>
+<li><strong>Coverage ceiling:</strong> 2/37 without org-master privilege. All 37 endpoints probed
+  and observations recorded. The 35-gap is blocked by entitlement-403 (org-master
+  required for most ops). Coverage would rise to potentially 25+ on an org-master
+  account (the read + write ops that return 403 here would return 200/201).</li>
+<li><strong>Coverage 2026-06-19:</strong> 0 → <strong>2 / 37</strong>. All 37 endpoints reached and classified.</li>
+</ul>
+<hr />
+<h2>management / cloudmonitoring</h2>
+<ul>
+<li><strong>Host:</strong> regional (<code>cloudmonitoring.&lt;region&gt;.&lt;env&gt;...</code>). 18 endpoints.
+  EOL service (sunsets 2026-09 → ServiceWatch). All endpoints coverable as
+  static-reachability probes even without deep validation.</li>
+<li><strong>X-ResourceType header (CONFIRMED REQUIRED for multiple endpoints):</strong>
+  Several endpoints require an <code>X-ResourceType: &lt;productTypeCode&gt;</code> HTTP header
+  (NOT a query param <code>resourceType</code>). Without it: 400 <code>InvalidHeaderValue</code>
+  <code>{name:"resourceType", value:"X-ResourceType"}</code>. Confirmed productTypeCodes
+  from <code>GET /v1/cloudmonitorings/product/v1/product-types</code>: <code>VM</code>, <code>Redis</code>,
+  <code>Bare Metal Server</code>, <code>Kubernetes</code>, <code>KAFKA</code>, <code>Object Storage</code>, etc. (37 total).</li>
+<li><code>getaccountproductlist</code> (<code>GET /v1/cloudmonitorings/product/v2/accounts/products</code>):
+    requires <code>X-ResourceType</code> header. Returns 200 (empty list if no resources of
+    that type). Verified live: <code>X-ResourceType: VM</code> → 200.</li>
+<li><code>getproducteventpolicylist</code> (<code>GET /v1/cloudmonitorings/event/v2/event-policies</code>):
+    requires BOTH <code>X-ResourceType</code> header AND <code>productResourceId</code> query param.
+    <code>productResourceId</code> is the resource name (e.g. <code>apitest-logsink</code> for Object
+    Storage). Verified live: <code>X-ResourceType: Object Storage</code> +
+    <code>productResourceId=apitest-logsink</code> → 200 (empty list).</li>
+<li>Likely required for <code>getproducteventlist</code> too but that endpoint also
+    consistently 400s (see bug below).</li>
+<li><strong>Live resources in test account (2026-06-19, kr-west1):</strong></li>
+<li>Object Storage products: <code>productResourceId=apitest-logsink</code> (state=NE),
+    <code>apitest-oplog-permanent</code> (state=NE). Discovered via
+    <code>GET /v1/cloudmonitorings/product/v2/accounts/products</code> with
+    <code>X-ResourceType: Object Storage</code>.</li>
+<li>Block Storage(VM): 1 product (UUID, state=Running). No VMs, no addrbooks.</li>
+<li>All products have state "NE" (not enrolled in monitoring backend) except
+    Block Storage(VM). Even the Running Block Storage product returns 400 for
+    event policy create — the "NE" Object Storage products return "InvalidRequest".</li>
+<li>No addrbooks (totalCount=0). Addrbook steps normalize to placeholder '*' key.</li>
+<li><strong>getaccounteventlist 400 / backend bug (CONFIRMED):</strong>
+  <code>GET /v1/cloudmonitorings/event/v2/accounts/events</code> consistently returns 400
+  <code>InvalidInputValue</code> with <code>{name:"resourceType", value:&lt;queryEndDt-date&gt;}</code> regardless
+  of what params are provided. The API is erroneously treating the queryEndDt query
+  parameter value as the value of the "resourceType" field. This is a backend parameter
+  binding bug — the correct params (eventState, queryStartDt, queryEndDt, X-ResourceType
+  header) all fail the same way. <strong>Classify: validation-400 / backend-param-binding bug.</strong>
+  Dual-recorded in scenario with <code>params</code> so it counts as reached (soft category).</li>
+<li><strong>getproducteventlist 400 / similar bug:</strong>
+  <code>GET /v1/cloudmonitorings/event/v2/events</code> behaves similarly — after providing
+  <code>productResourceId + eventState + queryStartDt</code>, still errors on queryEndDt date.
+  Tried with <code>X-ResourceType</code> header, with/without all params. Backend issue same class.
+  <strong>Classify: validation-400 / needs-real-event-data or backend bug.</strong></li>
+<li><strong>api_catalog_params.json sidecar gaps vs live behavior:</strong></li>
+<li>Sidecar declares <code>getaccounteventlist</code> requires <code>eventState, queryStartDt, queryEndDt</code>
+    but NOT <code>resourceType</code>. Live API also needs <code>resourceType</code> (as header or query)
+    but the backend bug makes it 400 regardless.</li>
+<li>Sidecar declares <code>getaccountproductlist</code> has NO required params. Live API requires
+    <code>X-ResourceType</code> header — sidecar is missing this (header params are outside the
+    sidecar's query_params scope).</li>
+<li><strong>Confirmed 200 endpoints (bare GETs — smoke-covered):</strong></li>
+<li><code>getaccountmembers</code> — bare GET, 200</li>
+<li><code>getadressbooklist</code> — bare GET, 200 (empty)</li>
+<li><code>getmetriclist</code> — bare GET, 200 (3510 metrics across 37 product types)</li>
+<li><code>getproducttypelist</code> — bare GET, 200 (37 product types)</li>
+<li><strong>Id-bound GETs (5 endpoints, getevent<em>/geteventpolicy</em>/getadressbookmember):</strong>
+  Need event-id or eventPolicyId (no events in this account without SCP_RUN_HEAVY)
+  or addrbookId (no addrbooks). Scenario normalizes to '*' placeholder key when
+  no real ID is captured.</li>
+<li><strong>puteventpolicy body shape (CONFIRMED cascade-revealed 2026-06-19):</strong>
+  Must wrap all fields in <code>eventPolicyRequest</code> key. Required cascade-field order:
+  <code>disableYn</code>, <code>isLogMetric</code>, <code>eventLevel</code>, <code>ftCount</code>, <code>eventThreshold</code>. Once all
+  present the API returns <code>{"code":"InvalidRequest","params":[null]}</code> — backend
+  business rule validation fails (products in NE state). Full confirmed body:
+  <code>{"eventPolicyRequest": {"eventPolicyName": "...", "productTypeCode": "Object Storage",
+  "productResourceId": "apitest-logsink", "metricKey": "&lt;key&gt;", "eventLevel": "WARNING",
+  "disableYn": "N", "isLogMetric": false, "eventThreshold": 100.0, "ftCount": 1}}</code>.
+  The <code>InvalidRequest</code> with <code>null</code> params is an account-level blocker (products not
+  enrolled in monitoring). <strong>Classify: account-prereq / entitlement-class blocker.</strong></li>
+<li><strong>getmetricperfdatalist body shape (CONFIRMED cascade-revealed 2026-06-19):</strong>
+  POST <code>/v1/cloudmonitorings/product/v2/metric-data</code>. Required fields:
+  <code>productTypeCode</code>, <code>productResourceId</code>, <code>queryStartDt</code> (ISO 8601 with T/Z suffix),
+  <code>queryEndDt</code> (ISO 8601 with T/Z suffix), <code>metricDataConditions</code> (array of objects).
+  Without T-suffix dates: 400 <code>resourceType=queryStartDt</code> backend bug. With T-suffix
+  dates: 404 <code>productResourceInfos not found</code> — same account-level prereq.
+  Example body: <code>{"productTypeCode":"Object Storage","productResourceId":"apitest-logsink",
+  "queryStartDt":"2026-05-21T00:00:00Z","queryEndDt":"2026-06-19T23:59:59Z",
+  "metricDataConditions":[{"metricKey":"objectstorage.usage.bucketSizeBytes",
+  "statisticType":"AVG","period":3600}]}</code>.
+  <strong>Classify: account-prereq / products not in monitoring backend.</strong></li>
+<li><strong>Mutating endpoints (3):</strong> <code>puteventpolicy</code> (POST create), <code>modifyeventpolicy</code>
+  (PUT), <code>deleteeventpolicy</code> (DELETE). All need <code>SCP_ALLOW_MUTATIONS=true</code> +
+  <code>SCP_ALLOW_DESTRUCTIVE=true</code>. Body shape now confirmed from cascade (see above).
+  Cannot reach 2xx without monitoring-enrolled resources. Blocker: account-prereq.</li>
+<li><strong>Coverage 2026-06-19:</strong> 0 → <strong>6/18</strong> confirmed 200 ok:
+  getaccountmembers, getadressbooklist, getmetriclist, getproducttypelist (smoke),
+  getaccountproductlist, getproducteventpolicylist (X-ResourceType header probes).
+  Remaining 12 blocked by: backend date-parsing bug (getaccounteventlist,
+  getproducteventlist), missing monitoring enrollment (puteventpolicy,
+  modifyeventpolicy, deleteeventpolicy, getmetricperfdatalist), no real resource
+  IDs for id-bound GETs (geteventdetail, geteventnotificationstates,
+  geteventpolicydetail, geteventpolicyhistories, geteventpolicynotification,
+  getadressbookmemberlist).</li>
 </ul>
 <hr />
 <h2>Services not yet deeply explored (stubs — fill in as you go)</h2>
