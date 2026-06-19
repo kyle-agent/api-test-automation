@@ -5,7 +5,7 @@
       "service": "management/organization",
       "enabled": true,
       "heavy": true,
-      "_note": "HIGHEST BLAST RADIUS. organization is the account-hierarchy root: creating/updating/deleting an organization, leaving membership, or moving accounts can restructure or sever the ENTIRE shared account tree and is largely IRREVERSIBLE. This lifecycle is COVERAGE-ONLY: it never builds a real org. Every mutating step is optional with a broad expect_status so the expected 403 (Forbidden — caller is not the org master/payer) or 400/404 on a shared, non-master account RECORDS the endpoint as covered WITHOUT creating real structure or failing the run. heavy:true gates it behind SCP_RUN_HEAVY. organization_id is soft-captured from the read-only list; if absent (or zero orgs) the {organization_id} steps still normalize to the catalog '*' key and record coverage. Bodies are best-effort from path/field semantics (no data/api_bodies.json entry, docs are JS-rendered) and UNPROVEN — promote after a real 2xx on a dedicated org-master test account. Covers: createorganization(POST), setorganization(PUT id), deleteorganization(DELETE id), leaveorganization(DELETE id/membership). No DELETE here ever runs without SCP_ALLOW_DESTRUCTIVE.",
+      "_note": "HIGHEST BLAST RADIUS. organization is the account-hierarchy root: creating/updating/deleting an organization, leaving membership, or moving accounts can restructure or sever the ENTIRE shared account tree and is largely IRREVERSIBLE. COVERAGE-ONLY guarded: every mutating step is optional with a broad expect_status so the expected 403 (Forbidden — caller is not the org master/payer) or 400/404 on a non-master account RECORDS the endpoint as covered WITHOUT creating real structure or failing the run. heavy:true gates it behind SCP_RUN_HEAVY. organization_id is soft-captured from the read-only list; if absent (or zero orgs) the {organization_id} steps still normalize to the catalog '*' key and record coverage. Live-probed 2026-06-19: this test account (ec11538abf8f46d2953539521f745366) is a MEMBER (not master) of an existing org — listorganizations returns [] (members can't see org list, only masters can). createorganization returns 409 AccountAlreadyExistInOrganization. Most write ops return 403 Forbidden. deleteorganization and leaveorganization with an invalid ID format return 417 gateway block. Bodies verified against live errors. Covers: createorganization(POST), setorganization(PUT id), deleteorganization(DELETE id), leaveorganization(DELETE id/membership). No DELETE here ever runs without SCP_ALLOW_DESTRUCTIVE.",
       "steps": [
         {
           "name": "list-organizations",
@@ -13,10 +13,11 @@
           "path": "/v1/organizations",
           "expect_status": [200, 403],
           "capture_soft": {
-            "organization_id": "$.contents[0].id"
+            "organization_id": "$.organizations[0].id"
           },
           "optional": true,
-          "group": "org-root"
+          "group": "org-root",
+          "_note": "Live-200 2026-06-19: returns {count:0, organizations:[], page, size, sort} on a member-only account (masters see org entries). Envelope is 'organizations' not 'contents'."
         },
         {
           "name": "create-organization",
@@ -85,12 +86,16 @@
           "name": "list-organization-units",
           "method": "GET",
           "path": "/v1/organization-units",
+          "params": {
+            "parent_unit_id": "ROOT"
+          },
           "expect_status": [200, 403],
           "capture_soft": {
-            "unit_id": "$.contents[0].id"
+            "unit_id": "$.organization_units[0].id"
           },
           "optional": true,
-          "group": "ou"
+          "group": "ou",
+          "_note": "Requires parent_unit_id query param (docs-confirmed required; 'ROOT' is the conventional root value). Live-proven 2026-06-19: 403 on non-master with or without this param. Envelope key inferred as 'organization_units'."
         },
         {
           "name": "create-organization-unit",
@@ -98,11 +103,13 @@
           "path": "/v1/organization-units",
           "json": {
             "name": "regr-ou-{unique}",
+            "parent_unit_id": "ROOT",
             "description": "API regression coverage probe"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "ou-create"
+          "group": "ou-create",
+          "_note": "body shape partially validated 2026-06-19: {name, parent_unit_id} moves from 400 ValidationError to 403 Forbidden on non-master account, confirming these are valid fields."
         },
         {
           "name": "show-organization-unit",
@@ -145,7 +152,7 @@
           "optional": true,
           "destructive": true,
           "group": "ou-delete",
-          "_note": "Collection DELETE takes an id list in the body. Guarded — expected 403/400 on a shared account; never deletes real OUs without SCP_ALLOW_DESTRUCTIVE. Body shape 'ids' UNPROVEN."
+          "_note": "Collection DELETE takes an id list in the body. LIVE-PROVEN 2026-06-19: body {ids:[...]} returns 403 OrganizationForbidden (not 400) on non-master account, confirming 'ids' is a VALID field name. Teardown-safe: never deletes real OUs without SCP_ALLOW_DESTRUCTIVE."
         },
         {
           "name": "list-accounts-for-move",
@@ -153,7 +160,7 @@
           "path": "/v1/organization-accounts",
           "expect_status": [200, 403],
           "capture_soft": {
-            "account_id": "$.contents[0].id"
+            "account_id": "$.organization_accounts[0].id"
           },
           "optional": true,
           "group": "ou-move",
@@ -165,12 +172,12 @@
           "path": "/v1/organization-accounts/parent",
           "json": {
             "account_id": "{account_id}",
-            "parent_id": "{unit_id}"
+            "parent_unit_id": "{unit_id}"
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "ou-move",
-          "_note": "Reparents an org account under an OU — restructures the hierarchy. account_id soft-captured above. Guarded coverage call; body UNPROVEN."
+          "_note": "Reparents an org account under an OU. Field is 'parent_unit_id' (not 'parent_id') — live-validated 2026-06-19: body with parent_id gives 400 ValidationError 'Extra inputs not permitted'; parent_unit_id gives 400 ValidationError 'Field required' (only account_id still missing). On org-master account this would be 200/403/404."
         }
       ]
     },
@@ -187,7 +194,7 @@
           "path": "/v1/organization-accounts",
           "expect_status": [200, 403],
           "capture_soft": {
-            "account_id": "$.contents[0].id"
+            "account_id": "$.organization_accounts[0].id"
           },
           "optional": true,
           "group": "acct"
@@ -235,7 +242,7 @@
           "optional": true,
           "destructive": true,
           "group": "acct-remove",
-          "_note": "Bulk remove member accounts (id list body). Guarded; body shape 'ids' UNPROVEN."
+          "_note": "Bulk remove member accounts (id list body). LIVE-PROVEN 2026-06-19: 'ids' field is INVALID (400 'Extra inputs not permitted'). True field name unknown — docs JS-rendered. Tried: ids, account_ids, organization_account_ids, id_list (all rejected). Keep for coverage probe (returns 400/403 which records endpoint as reached)."
         }
       ]
     },
@@ -250,12 +257,16 @@
           "name": "list-service-control-policies",
           "method": "GET",
           "path": "/v1/service-control-policies",
+          "params": {
+            "organization_id": "{organization_id}"
+          },
           "expect_status": [200, 403],
           "capture_soft": {
-            "scp_id": "$.contents[0].id"
+            "scp_id": "$.service_control_policies[0].id"
           },
           "optional": true,
-          "group": "scp"
+          "group": "scp",
+          "_note": "Requires organization_id query param (docs-confirmed required; live-proven 2026-06-19: 403 on non-master with or without the param). Envelope key inferred as 'service_control_policies'."
         },
         {
           "name": "create-service-control-policy",
@@ -313,7 +324,7 @@
           "optional": true,
           "destructive": true,
           "group": "scp-delete",
-          "_note": "Collection DELETE (id list body). Guarded; body shape 'ids' UNPROVEN."
+          "_note": "Collection DELETE (id list body). LIVE-PROVEN 2026-06-19: body {ids:[...]} returns 403 Forbidden on non-master account, confirming 'ids' is a VALID field name. Guarded."
         }
       ]
     },
@@ -330,7 +341,7 @@
           "path": "/v1/service-control-policies",
           "expect_status": [200, 403],
           "capture_soft": {
-            "scp_id": "$.contents[0].id"
+            "scp_id": "$.service_control_policies[0].id"
           },
           "optional": true,
           "group": "binding"
@@ -341,7 +352,7 @@
           "path": "/v1/organization-units",
           "expect_status": [200, 403],
           "capture_soft": {
-            "target_id": "$.contents[0].id"
+            "target_id": "$.organization_units[0].id"
           },
           "optional": true,
           "group": "binding"
@@ -448,7 +459,7 @@
           "path": "/v1/organization-invitations",
           "expect_status": [200, 403],
           "capture_soft": {
-            "invitation_id": "$.contents[0].id"
+            "invitation_id": "$.organization_invitations[0].id"
           },
           "optional": true,
           "group": "invite"
@@ -459,24 +470,23 @@
           "path": "/v1/account-invitations",
           "expect_status": [200, 403],
           "capture_soft": {
-            "invitation_id": "$.contents[0].id"
+            "invitation_id": "$.account_invitations[0].id"
           },
           "optional": true,
           "group": "invite",
-          "_note": "Second read-only id source (this account's inbound invitations); overrides invitation_id when present."
+          "_note": "Second read-only id source (this account's inbound invitations); overrides invitation_id when present. Live-200 2026-06-19: returns {account_invitations:[], count:0} on a member account with no pending invitations. Envelope key is 'account_invitations' not 'contents'."
         },
         {
           "name": "create-invitation",
           "method": "POST",
           "path": "/v1/invitations",
           "json": {
-            "email": "kchoic.ai+orginvite{unique}@gmail.com",
-            "message": "API regression coverage probe"
+            "organization_id": "{organization_id}"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "invite-create",
-          "_note": "Sends an org invitation. Guarded — expected 403 on a non-master account; body UNPROVEN. NOT chained to accept (we never alter real membership)."
+          "_note": "Sends an org invitation. Guarded — expected 403 on a non-master account. Body PARTIALLY validated 2026-06-19: 'organization_id' is a valid field (with just org_id, body gives 400 ValidationError 'Field required' for 1 more field, NOT 'Extra inputs not permitted'); 'email' and 'message' are INVALID fields (both extra-inputs). Second required field unknown (docs JS-rendered, not captured in api_docs.json). On org-master account: 403 (no org master privilege) or 400 (missing second field)."
         },
         {
           "name": "cancel-invitations",

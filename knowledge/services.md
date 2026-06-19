@@ -235,6 +235,63 @@ duplicating. Add a new `##` section when you take on a new service.
 
 ---
 
+## management / organization
+
+- **Host:** global (`organization.e.samsungsdscloud.com` — no region segment).
+  37 endpoints covering the full org-tree: organizations, org-units (OUs), member
+  accounts, service-control-policies (SCPs), policy-bindings, delegation-policies,
+  and invitations.
+- **Account status (2026-06-19, account ec11538abf8f46d2953539521f745366):** this
+  test account is a **MEMBER** (not master/payer) of an existing org.
+  `listorganizations` returns `{count:0, organizations:[]}` — member accounts
+  cannot see the org list (only the master can). `createorganization` returns 409
+  `AccountAlreadyExistInOrganization` confirming org membership. Most org management
+  operations return **403 Forbidden** (`You do not have permission to List/Read/Create`)
+  because the test account lacks org-admin IAM actions.
+- **Coverable read-only (2xx) without org-master:**
+  - `GET /v1/organizations` → 200 `{count:0, organizations:[], page, size, sort}` (member sees own org slot — empty for non-master)
+  - `GET /v1/account-invitations` → 200 `{account_invitations:[], count:0}` (inbound invitations for this account — currently empty)
+- **Entitlement-403 blockers (7 GET endpoints):** `listaccounts`, `listorganizationunits`,
+  `listservicecontrolpolicies`, `listorganizationinvitations`, `showdelegationpolicy`,
+  `listpoliciesfortarget`, `listtargetsforpolicy` — all return 403 Forbidden
+  consistently, regardless of query params. These require org-master/admin privilege.
+- **Id-bound GET blockers (5 endpoints):** `showorganization`, `showorganizationunit`,
+  `showaccount`, `showservicecontrolpolicy`, `listparents` — can't get valid IDs
+  without org-master privilege to list the parent resources. `showorganizationunit`
+  with a fake ID returns 404; others return 403.
+- **Mutating endpoint classification (live-proven 2026-06-19):**
+  - `createorganization` → 409 (account already in org) — reachable, not 403
+  - `createorganizationunit`, `createservicecontrolpolicy`, `attachpolicybindings`,
+    `removepolicybindings`, `deleteorganizationunits`, `deleteservicecontrolpolicies`,
+    `deletedelegationpolicy`, `setorganizationunit`, `setservicecontrolpolicy`,
+    `leaveorganization`, `deleteorganization`, `deleteaccount` → 403 entitlement
+  - `createaccount`, `createdelegationpolicy`, `createinvitation`, `moveaccount`,
+    `setorganization`, `setdelegationpolicy`, `removeaccounts` → 400 ValidationError
+    (body shape incomplete but endpoint is reachable)
+  - `cancelinvitations`, `acceptinvitation`, `declineinvitation` → 404 (no pending
+    invitations) — reachable, not 403
+- **Proven body fields (2026-06-19):**
+  - `createorganizationunit`: needs `name` + `parent_unit_id` (validated: these fields
+    move response from 400 to 403, confirming field names are correct)
+  - `moveaccount`: needs `account_id` + `parent_unit_id` (NOT `parent_id` — `parent_id`
+    gives 400 "Extra inputs not permitted")
+  - `createinvitation`: needs `organization_id` (validated field) + 1 unknown field
+    (docs JS-rendered, not captured; `email`, `message`, `login_id` are all invalid)
+  - `listservicecontrolpolicies`: required query param `organization_id`
+  - `listorganizationunits`: required query param `parent_unit_id` ('ROOT' for root level)
+- **Response envelopes (live-proven):**
+  - `listorganizations` → `$.organizations[0].id`
+  - `listaccountinvitations` → `$.account_invitations[0].id`
+  - Inferred (403 so not confirmed live): `organization_units`, `service_control_policies`,
+    `organization_accounts`, `organization_invitations`
+- **Coverage ceiling:** 2/37 without org-master privilege. All 37 endpoints probed
+  and observations recorded. The 35-gap is blocked by entitlement-403 (org-master
+  required for most ops). Coverage would rise to potentially 25+ on an org-master
+  account (the read + write ops that return 403 here would return 200/201).
+- **Coverage 2026-06-19:** 0 → **2 / 37**. All 37 endpoints reached and classified.
+
+---
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
 database (mysql, mariadb), data-analytics, ai-ml, financial-management,
