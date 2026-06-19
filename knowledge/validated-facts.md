@@ -910,3 +910,25 @@ subops-guarded create), both 500 `{"code":"ContactAdminForAssistance"}`. The oth
 shared-VPC body shape, so this is a postgresql-backend create fault, not a body/
 linking bug. Baselined in `known_issues.json` (Product Bug). Same `ContactAdmin`
 class as the already-baselined `*registerlogexportconfig` 500s.
+
+## IAM `DELETE /v1/policies/bulk` fans an UNMATCHED id out to ALL account policies (DANGER)
+
+**Ground truth (run #124, loggingaudit 2026-06-19T08:20:20–52Z):** the
+`iam-policy-extra-writes` lifecycle's `delete-policies-bulk` step sent
+`DELETE /v1/policies/bulk` with a synthetic/unmatched body
+`{"policy_ids": ["000…0"]}`. The SCP backend did NOT 4xx the unmatched id —
+it interpreted the bulk request as **delete-ALL-policies**: 420
+`policy.delete.start` events over **240 distinct NON-test account policy
+names** (AdministratorAccess_ACL, ObjectStorageAccess, Support,
+FullContainerRegistry, MariaDBManageAccess, …) in one 8-second backend batch
+(~52/sec — a single fanned-out call, not a client loop). All 416 non-owned
+deletes were backend-refused (the runner identity can't delete built-ins), so
+**zero damage**, but this is a name-unfiltered mass-delete of account policies
+(Hard Rule 3 violation by proxy).
+
+**Rule:** NEVER send `/v1/policies/bulk` (or any bulk-delete-by-ids endpoint) an
+id we do not OWN. A synthetic/unmatched bulk id is NOT a safe "expect-4xx" probe
+here — the backend treats "no match" as "match everything." The fix
+(`management__iam.json` `pol-bulk` group) creates our OWN throwaway `regrpolb*`
+policy and bulk-deletes THAT captured id; if the create doesn't 2xx the group is
+skipped, so the bulk call never fires with an unfiltered body.
