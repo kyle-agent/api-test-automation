@@ -37,6 +37,13 @@
       "added": "2026-06-13"
     },
     {
+      "key": "application-service/apigateway/createprivatelinkendpoint",
+      "status": 500,
+      "classification": "Product Bug",
+      "note": "PF-23 — POST /v1/privatelink-endpoints -> 500 ContactAdminForAssistance. DOCS VERIFICATION (regression-agent 2026-06-18): the request body is CORRECT — privatelinkendpointcreaterequest model requires exactly {name (pattern ^[a-zA-Z0-9]*$, 3..20), privatelink_service_id (required), description (optional)} and the scenario sends precisely that shape (name 'regrple<ualpha>' = 15 lowercase chars, valid). A bad/non-existent privatelink_service_id MUST yield 400/404, not 500 — same ContactAdmin-class backend fault as budget createaccountbudget / apigateway setresourcepolicy (PF-19). NOT a body-shape bug we can fix; genuine product bug. Muted pending backend fix; the lifecycle's xcov-pl-create group tolerates the 5xx and records the CALL for coverage.",
+      "added": "2026-06-18"
+    },
+    {
       "key": "compute/virtualserver/createvolumetransfer",
       "status": 500,
       "type": "Product Bug",

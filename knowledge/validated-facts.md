@@ -279,8 +279,11 @@ igw needs `vpc_id`, `firewall_enabled`, `type: IGW`.
 > conf: 0.7 · seen: 2026-06-17 · obs: 1
 
 `{unique}` (collision-free token), `{ualpha}` (alpha-only unique), `{region}`,
-`{today}`, `{today_plus_5y}`. Use these instead of hardcoding values, so runs
-don't collide and resources are attributable.
+`{today}` (`YYYYMMDD`), `{today_plus_5y}`, `{iso_today}` (`YYYY-MM-DD`),
+`{iso_29d_ago}` (`YYYY-MM-DD`, today−29d — a rolling in-bounds window for
+bounded report/metric ranges, see apigateway listreports below). Use these
+instead of hardcoding values, so runs don't collide and resources are
+attributable.
 
 ## Teardown races
 
@@ -817,3 +820,46 @@ must end with '.fifo'"). The per-service catalog ops 200 elsewhere because they
 ran against a `.fifo` queue. Not a regression — correctly isolated as optional
 groups in the queue lifecycle (qdedup/qdedupscope), so the create→delete spine
 still passes.
+
+## apigateway listreports / 503 LISTs / createprivatelinkendpoint — LIVE-PROVEN (2026-06-18)
+
+**listreports date window (root-caused, FIXED).** `GET /v1/apis/{api_id}/reports`
+(`application-service/apigateway/listreports`) takes 3 REQUIRED query params
+`stage_name`, `start_date`, `end_date` (dates `YYYY-MM-DD`). The 400 was NOT a
+missing-param / entitlement problem — the gateway enforces **two** range rules,
+confirmed live against a throwaway api:
+- `start_date=2025-01-01 end_date=2025-12-31` → 400
+  `scp-application-apigateway.api.invalid-date-range` **"Date range cannot exceed 30 days."**
+- any window starting >30 days ago → 400
+  `scp-application-apigateway.api.invalid-past-date` **"Dates cannot be earlier than 30 days ago."**
+- bare (no `stage_name`) → 400 `ValidationError` "stage name should be 3~50 characters …".
+A **rolling 29-day window ending today** satisfies both rules → **200**
+`{"count":0,"reports":[],"top_resources":[]}` (empty for a no-traffic api, even
+with a not-yet-created stage). Fix: scenario step now uses
+`?stage_name=dev&start_date={iso_29d_ago}&end_date={iso_today}` (new engine
+placeholders). The old hardcoded calendar-year range always 400'd.
+
+**503 on plain LISTs = transient gateway saturation, NOT a defect.**
+`GET /v1/apis` (`listapis`) and `GET /v1/privatelink-endpoints`
+(`listprivatelinkendpoints`) intermittently return **503 "upstream connect error
+… connection timeout"** under heavy parallel load (15s connect-timeout). On direct
+re-issue both return **200** consistently (~1s): `listapis` → `{"apis":[],"count":0}`,
+`listprivatelinkendpoints` → `{"count":0,"privatelink_endpoints":[]}`. The HTTP
+client already retries `RETRY_STATUS={502,503,504}` with exponential backoff, which
+recovers them in normal conditions; no code change needed (a blanket 5xx→soft would
+mask real server defects). Both recorded OK (covered).
+
+**createprivatelinkendpoint 500 = genuine PRODUCT BUG (PF-23, baselined).**
+`POST /v1/privatelink-endpoints`. DOCS-VERIFIED our body is CORRECT:
+`privatelinkendpointcreaterequest` requires exactly `{name (^[a-zA-Z0-9]*$,
+min 3 / max 20), privatelink_service_id (required), description? (optional)}` and
+the scenario sends precisely that (`regrple{ualpha}` = 15 lowercase chars, valid).
+A bad/non-existent `privatelink_service_id` returns **500 ContactAdminForAssistance**
+(req-f088cd1d) instead of the expected 400/404 — same ContactAdmin-class as budget
+createaccountbudget / apigateway setresourcepolicy (PF-19). NOT a body-shape gap we
+can fix. Baselined in `known_issues.json`; the `xcov-pl-create` group tolerates 500.
+
+**privatelink approve/connect/request/set/delete 403 = entitlement (NOT coverable).**
+The privatelink mutation ops 403 "You do not have permission to Action" — the
+missing-IAM-action-definition class (PF-01/02/03/15/18). Correctly `soft`, already
+tolerated in `expect_status`; the CALL is recorded for coverage. Not a regression.
