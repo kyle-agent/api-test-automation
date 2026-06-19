@@ -216,14 +216,42 @@
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
         },
         {
+          "name": "create-policy-for-bulk",
+          "method": "POST",
+          "path": "/v1/policies",
+          "group": "pol-bulk",
+          "optional": true,
+          "_note": "SAFETY (Hard Rule 3, IB root-cause run #124): DELETE /v1/policies/bulk with a SYNTHETIC/unmatched policy_id is fanned out by the SCP backend into a delete-ALL-policies attempt (ground truth: 420 policy.delete.start over 240 distinct NON-test account policy names — AdministratorAccess_ACL, ObjectStorageAccess, … — all backend-refused, but an unfiltered mass-delete of account policies). NEVER send /v1/policies/bulk an id we do not own. Create our OWN throwaway policy here and bulk-delete THAT captured id so the bulk call can only ever remove an owner-tagged regrpol* resource.",
+          "json": {
+            "policy_name": "regrpolb{ualpha}",
+            "description": "API regression suite (bulk-delete target)",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"bulk_policy_id": "$.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/policies/{bulk_policy_id}", "service": "iam"}
+        },
+        {
           "name": "delete-policies-bulk",
           "method": "DELETE",
           "path": "/v1/policies/bulk",
           "group": "pol-bulk",
           "optional": true,
           "destructive": true,
-          "_note": "Standalone so DELETE /v1/policies/bulk is CALLED regardless. Body policy_ids from convention (no confirmed example) -> synthetic id, expecting 400/404/422.",
-          "json": {"policy_ids": ["00000000000000000000000000000000"]},
+          "_note": "Exercises DELETE /v1/policies/bulk against a policy WE created (bulk_policy_id, regrpolb*). MUST NOT use a synthetic/unmatched id: the backend fans an unmatched bulk delete out across ALL account policies (run #124 ground truth). If create-policy-for-bulk did not 2xx, {bulk_policy_id} stays an unresolved placeholder and this step is skipped by the engine rather than sending an unfiltered bulk.",
+          "json": {"policy_ids": ["{bulk_policy_id}"]},
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
         }
       ]
