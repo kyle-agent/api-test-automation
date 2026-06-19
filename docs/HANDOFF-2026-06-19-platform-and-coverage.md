@@ -41,10 +41,18 @@ Analyzed 16 services; applied the realizable levers, recorded the hard ceilings 
   budgets semaphore, replacing the xdist 2-lane split; 0.1 done → 0.5 → 1.0 path) +
   `docs/run-parallelism-optimization.md`.
 
-## PENDING — what to verify / do next
-1. **Dispatch ONE heavy run on `main`** → verify (a) the 5 DB engines now start
-   CONCURRENTLY (#59 → ~90 min saving) and (b) loggingaudit shows NO mass policy-delete,
-   only one owned policy (#60). Then 0-survivor.
+## VERIFIED — run #125 (27819913805, on `main` @ ea4ade38, 2026-06-19)
+- **#59 ✅ CONCURRENT** — mariadb + epas DB clusters Create-Started **8 seconds apart**
+  (vs run #124's 14–22-min serial gaps). Long-pole-first ordering works.
+- **#60 ✅ owned-only** — loggingaudit showed **3 policy deletes (all owned)**, NOT the
+  416-policy mass-delete. Backend delete-all hazard neutralized.
+- **0 survivors** (VPC count=0; all DB engines / ske / VM clean after teardown).
+- **Coverage up:** clean-coverage metric **64.7%** (run #124 63.2% → run 1 ≈57%); reach ~82.6%.
+- Note: overall wall ~3 h — #59 fixed the DB phase but SKE (~40 min) + the serial VPC-CRUD
+  lane + 503-flakiness still bound the total → makes deferred opts #2/#3 the next levers.
+
+## PENDING — what to do next
+1. ~~Dispatch a run to verify #59/#60~~ — DONE (run #125, both PASS; see above).
 2. **live_watch peering-phase false-stall** — HEAVY_STALL still fires when the only
    activity is the VPC-CRUD lane's peering (0 DB/SKE creates yet). Make the stall detector
    recognize VPC-CRUD-lane activity. Low priority (auto-resolves, noisy).
