@@ -85,14 +85,16 @@ def test_reservation_is_visible_in_another_process(tmp_path):
     out = _ctx.Queue()
     p = _ctx.Process(target=_child_try_acquire,
                      args=(tmp_path, "vpc", 2, out))
-    p.start(); p.join(timeout=10)
+    p.start()
+    p.join(timeout=10)
     assert out.get(timeout=5) is None             # child blocked by parent's slots
 
     sem.release(parent_tokens[0])                 # free one in the parent
     out2 = _ctx.Queue()
     p2 = _ctx.Process(target=_child_try_acquire,
                       args=(tmp_path, "vpc", 2, out2))
-    p2.start(); p2.join(timeout=10)
+    p2.start()
+    p2.join(timeout=10)
     assert out2.get(timeout=5) is not None        # child now gets the freed slot
 
 
@@ -143,7 +145,8 @@ def _child_acquire_then_exit_hard(sem_dir, kind):
 def test_dead_holder_is_reclaimed(tmp_path):
     p = _ctx.Process(target=_child_acquire_then_exit_hard,
                      args=(tmp_path, "vpc"))
-    p.start(); p.join(timeout=10)
+    p.start()
+    p.join(timeout=10)
     assert p.exitcode == 0                         # it grabbed the only slot, then died
 
     sem = _sem(tmp_path)

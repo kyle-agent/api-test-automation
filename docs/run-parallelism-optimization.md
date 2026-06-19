@@ -54,11 +54,25 @@ share ONE VPC count. It BLOCKS until a slot frees (the throttle) rather than ski
 like `Budget`, reclaims slots from crashed holders via PID-liveness, and is OPT-IN
 (nothing calls it yet, so it cannot affect the current run). Tests:
 `tests/offline/test_budgets_semaphore.py` (7, incl. real cross-process + blocking-wait
-+ crash-reclaim). **Remaining cutover (needs a live CI run — do NOT blind-merge):**
-(a) wire `sem.slot(limit=5−shared)` around the engine's VPC-self-create step so
-VPC-CRUD lifecycles acquire/release a slot; (b) delete the separate `regression-vpc-crud`
-job in `.github/workflows/api-test.yml` and fold VPC_CRUD_K into the parallel
-`regression` pool. Validate on a heavy dispatch (peak concurrent VPCs ≤ 5, 0 survivors)
-before merge.
++ crash-reclaim).
+
+**Engine wiring DONE (opt-in, offline-validated):** `regression/scenarios/engine.py`
+— a VPC self-create (budget kind `vpc`) now ACQUIRES a cross-process slot before the
+create and BLOCKS until one frees; on timeout it environmentally skips (Hard Rule 6,
+never fails); the slot is released symmetrically when the VPC is deleted (own DELETE
+step on the happy path, or teardown on failure) so a created-then-deleted VPC never
+leaks its slot. Gated entirely on `SCP_VPC_SEMAPHORE=true` → with it unset the engine
+never touches the semaphore (today's per-process behaviour, serial job intact). Knobs:
+`SCP_VPC_SEMAPHORE` (enable), `SCP_VPC_SHARED_RESERVED` (slots held back for shared
+infra; default 1 when a shared VPC id is present), `SCP_VPC_SEMAPHORE_TIMEOUT` (default
+1800s), `SCP_VPC_SEMAPHORE_POLL` (default 1.0s). Tests:
+`tests/offline/test_engine_vpc_semaphore.py` (3: slot held-then-freed, throttle-skip
+when the cap is held, opt-out no-op).
+
+**Remaining cutover (needs a live CI run — do NOT blind-merge):** in
+`.github/workflows/api-test.yml`, set `SCP_VPC_SEMAPHORE=true` + an appropriate
+`SCP_VPC_SHARED_RESERVED`, delete the separate `regression-vpc-crud` serial job, and
+fold `VPC_CRUD_K` into the parallel `regression` pool. Validate on a heavy dispatch
+(peak concurrent VPCs ≤ 5, 0 survivors) before merge.
 
 ## Projected wall: 141 min → ~35 min (after #1+#2; #3 keeps it there post-#1).
