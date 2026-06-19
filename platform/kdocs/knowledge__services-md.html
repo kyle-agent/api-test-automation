@@ -61,6 +61,42 @@ duplicating. Add a new <code>##</code> section when you take on a new service.</
 <li><strong>Lookups:</strong> images <code>/v1/images?status=active&amp;scp_original_image_type=standard&amp;visibility=public&amp;limit=50</code>;
   server-types <code>/v1/server-types</code> (pick id starting with <code>s</code>).</li>
 </ul>
+<h2>compute / virtualserver — autoscaling</h2>
+<ul>
+<li><strong>28 autoscaling endpoints</strong> (<code>/v1/auto-scaling-groups/...</code>, <code>/v1/launch-configurations/...</code>).
+  Only <strong>2/28 covered</strong> read-only: <code>listautoscalinggroups</code>, <code>listlaunchconfigurations</code>
+  (bare smoke GETs, 200 with empty lists — account has 0 ASGs / 0 LCs).</li>
+<li><strong>Root cause the other 26 are uncovered:</strong> two lifecycles already exist, are
+  <code>enabled: true</code>, and cover them — <code>vs-autoscaling-coverage</code> (26 steps, in
+  <code>regression/scenarios/lifecycles/compute__virtualserver.json</code>) and <code>gen-wave4-asg</code>
+  (28 steps, VPC+subnet chain, <code>desired_server_count: 0</code> to avoid billable VMs, in
+  <code>generated__wave4.json</code>). But <strong>both are mutation-gated</strong>: <code>run_lifecycle()</code> returns
+  <code>status: skipped</code> immediately when <code>SCP_ALLOW_MUTATIONS=false</code> (engine ~line 642),
+  before any step (including the lifecycle's GET steps) runs. So read-only runs never
+  start them; that is why only the 2 bare smoke GETs are covered.</li>
+<li><strong>Levers:</strong></li>
+<li><code>SCP_ALLOW_MUTATIONS=true</code> + <code>SCP_ALLOW_DESTRUCTIVE=true</code> alone → <code>vs-autoscaling-coverage</code>
+    records ~23 catalog keys (LC create/show/delete to 2xx; ASG sub-ops to 4xx via a
+    literal placeholder asg_id, still recorded under their catalog key).</li>
+<li>add <code>SCP_RUN_HEAVY=true</code> + a shared VPC/subnet → <code>gen-wave4-asg</code> takes ASG and all
+    sub-resources to 2xx.</li>
+<li><strong>Form gate:</strong> <code>createautoscalinggroupnotification</code> needs a <code>user_ids</code> array with a
+  REAL account user id (no default) — set a <code>user_id</code> env var from console. Until it
+  creates a notification, the 4 child notification GET/PUT/DELETE endpoints stay blocked.</li>
+<li><strong>Proven create facts:</strong> <code>createlaunchconfiguration</code> PROVEN 2xx (<code>regrlcc1db18b2</code>, CI heavy
+  run 2026-06-19) with a real <code>image_id</code> + real <code>keypair_name</code>. The image is <strong>NOT
+  OS-specific</strong> — any valid <strong>standard</strong> image works (<code>scp_original_image_type=standard</code>, the
+  same image lookup as the plain VM path). Evidence: <code>vs-autoscaling-coverage</code> seeds the image
+  from an UNFILTERED <code>GET /v1/images?limit=50</code> → <code>images[0]</code> and still creates the LC, and
+  <code>gen-wave4-asg</code> uses <code>scp_original_image_type=standard&amp;visibility=public</code>; both succeed.
+  (A prior note claimed a <strong>windows</strong> image was required / non-windows rejected with
+  InvalidImage — that was a <strong>mis-diagnosis, corrected 2026-06-19</strong>; the real constraint is a
+  valid standard image type, not the OS.) volume <code>size</code> must be divisible by 8;
+  <code>delete_on_termination</code> is NOT a valid field. ASG policy <code>comparison_operator: "ge"</code> (short-code, not GREATER_THAN_OR_EQUAL_TO);
+  schedule <code>frequency</code> enum ONCE|DAILY|WEEKLY|MONTHLY. ASG create uses arrays <code>subnet_ids</code>,
+  <code>security_group_ids</code> (not scalar/<code>security_groups</code>); notification id is <code>$.notifications[0].id</code>
+  (list envelope, not <code>$.id</code>).</li>
+</ul>
 <h2>storage / filestorage</h2>
 <ul>
 <li><strong>Host:</strong> regional. Owns NFS volumes.</li>
@@ -162,6 +198,77 @@ duplicating. Add a new <code>##</code> section when you take on a new service.</
 <li><strong>Capture:</strong> <code>$.gslb.id</code> from create response.</li>
 <li><strong>Lifecycle scenario:</strong> <code>regression/scenarios/lifecycles/networking__gslb.json</code> (id: <code>networking-gslb-service</code>) covers full CRUD chain — POST create → GET show → PUT set → PUT health-check → PUT resources → PUT routing-control → GET resources → DELETE. Enabled, light (heavy:false), needs SCP_ALLOW_MUTATIONS=true + SCP_ALLOW_DESTRUCTIVE=true.</li>
 <li><strong>Coverage 2026-06-19:</strong> 2/10 (2 list GETs covered read-only). Remaining 8 are mutation-gated — scenario ready, no blockers.</li>
+</ul>
+<h2>networking / cdn</h2>
+<ul>
+<li><strong>Host:</strong> regional (<code>cdn.&lt;region&gt;.&lt;env&gt;...</code>). VPC-free control-plane resource. 9 endpoints.</li>
+<li><strong>Region gate:</strong> kr-west1 and kr-east1 ONLY (NOT kr-south variants).</li>
+<li><strong>List (2xx live 2026-06-19):</strong> <code>GET /v1/cdns</code> (listcdnservice) → <code>{cdn:[], count, page, size, sort}</code>
+  — array key is <code>cdn</code> (not <code>cdns</code>/<code>items</code>). No required params. Empty list when 0 distributions.
+  First call may 503 (gateway timeout, 2-15s); client retry → 200. Transient, NOT a product bug.</li>
+<li><strong>Create capture:</strong> <code>$.cdn.resource_id</code> (NOT <code>$.id</code>/<code>$.cdn.id</code>). Required fields:
+  <code>cache_expiry_time</code> (3600-2592000s, e.g. "86400"), <code>cache_key_hostname</code>, <code>cdn_origin_hostname</code>,
+  <code>cdn_origin_port</code>, <code>cdn_service_domain_prefix</code> (globally unique), <code>forward_host_header</code>, <code>name</code>,
+  <code>origin_hostname_type</code>. Enum guesses (unvalidated live): cache_key_hostname/forward_host_header=
+  <code>REQUEST_HOST_HEADER</code>, origin_hostname_type=<code>DOMAIN</code>. start/stop/purge use empty body <code>{}</code>.</li>
+<li><strong>Lifecycle:</strong> <code>regression/scenarios/lifecycles/networking__cdn.json</code> covers all 7 writes +
+  detailcdnservice (via read-chain on <code>$.cdn.resource_id</code>). Needs SCP_ALLOW_MUTATIONS +
+  SCP_ALLOW_DESTRUCTIVE.</li>
+<li><strong>Coverage 2026-06-19:</strong> 0→1/9 (listcdnservice). Account has 0 CDN distributions (no borrowable id).</li>
+</ul>
+<h2>networking / direct-connect</h2>
+<ul>
+<li><strong>Host:</strong> regional. 8 endpoints. Direct-connect maps to a physical network circuit
+  (datacenter pre-provisioning) — mutations are likely hardware/entitlement-gated.</li>
+<li><strong>List (2xx live 2026-06-19):</strong> <code>GET /v1/direct-connects</code> (listdirectconnects) →
+  <code>{count:0, direct_connects:[], page, size}</code>. No required params. Account has 0 resources.</li>
+<li><strong>Id-bound GETs (needs-resource):</strong> <code>showdirectconnect</code> (GET <code>/v1/direct-connects/{direct_connect_id}</code>),
+  <code>listroutingrules</code> (GET <code>.../{direct_connect_id}/routing-rules</code>) — <code>single_param_chains</code> already
+  wired; fire automatically once a direct-connect exists. List was empty → no id to derive.</li>
+<li><strong>Writes (mutation-gated):</strong> createdirectconnect (POST), setdirectconnect (PUT), createroutingrule
+  (POST sub), deletedirectconnect/deleteroutingrule (DELETE). Need SCP_ALLOW_MUTATIONS
+  (+SCP_ALLOW_DESTRUCTIVE); check circuit-provisioning entitlement first.</li>
+<li><strong>Note:</strong> doc_url fetches returned 503 during the 2026-06-19 run (docs server down, transient).</li>
+<li><strong>Coverage 2026-06-19:</strong> 0→1/8 (listdirectconnects).</li>
+</ul>
+<h2>networking / vpn</h2>
+<ul>
+<li><strong>Host:</strong> regional. 10 endpoints (gateways + tunnels). Resources are <code>heavy: true</code>
+  (chain: vpc + public-ip → vpn-gateway → vpn-tunnel).</li>
+<li><strong>Region gate:</strong> kr-west1, kr-east1, kr-south3.</li>
+<li><strong>Quota:</strong> max 3 VPN gateways/account, 5 tunnels/gateway.</li>
+<li><strong>Lists (2xx live 2026-06-19):</strong></li>
+<li><code>GET /v1/vpn-gateways</code> (listvpngateways) → <code>{count, page, size, sort, vpn_gateways:[]}</code></li>
+<li><code>GET /v1/vpn-tunnels</code> (listvpntunnels) → <code>{count, page, size, sort, vpn_tunnels:[]}</code></li>
+<li>sort default <code>["name:asc","id:desc"]</code>. No required query params. Both empty (account has 0).</li>
+<li><strong>Id-bound GETs (needs-resource):</strong> showvpngateway/showvpntunnel — fake-id probes 404 with
+  error codes <code>scp-network.vpn-gateway.not-found</code> / <code>vpn-tunnel.not-found</code> (backend reachable).</li>
+<li><strong>Naming constraint:</strong> gateway AND tunnel names = 3-20 <strong>alphanumeric chars ONLY</strong> (no
+  hyphen/underscore). IKE/IPSec enums (phase1/phase2_encryptions, diffie_hellman_groups) are
+  docs-estimates, NOT yet live-validated.</li>
+<li><strong>Lifecycle:</strong> <code>networking-vpn-gateway-tunnel</code> (<code>networking__vpn.json</code>) covers all 8 remaining
+  (2 id-bound GETs + 6 writes). Needs SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE + SCP_RUN_HEAVY,
+  with VPC + public-ip prereqs provisioned first.</li>
+<li><strong>Coverage 2026-06-19:</strong> 0→2/10 (both list GETs).</li>
+</ul>
+<h2>management / cloudcontrol</h2>
+<ul>
+<li><strong>Host:</strong> management. 15 endpoints (6 GETs + 9 writes). <strong>Hard entitlement wall.</strong></li>
+<li><strong>Entitlement-403:</strong> every tested GET returns <code>CloudControl.CloudControlForbidden</code>
+  ("Can not access this cloudcontrol resources.") — identical for all 6. Cloud Control
+  requires a <strong>Landing Zone</strong> to exist on the <strong>Organization management account</strong> (prereqs:
+  Organization + ID Center + Object Storage + Logging&amp;Audit). Shared test account is not the
+  org-master and has no landing zone → all reads AND writes denied. NOT a product bug.</li>
+<li><strong>Required params (already in sidecar, do NOT unlock 2xx on shared account):</strong>
+  <code>listguardrailsfortarget</code> needs <code>target_id</code>; <code>listtargetsforguardrail</code> needs <code>guardrail_id</code> +
+  <code>target_type</code> (e.g. ACCOUNT). Without them → 400 ValidationError; with them → still 403.</li>
+<li><strong>Quirks:</strong> <code>createaccountfactoryaccount</code> (POST /v1/accounts) is BILLABLE + IRREVERSIBLE
+  (provisions a real member account); landing-zone create cannot be cancelled mid-flight;
+  AuditBaseline feature scheduled 2026-07 (endpoints may 404/400 until then).</li>
+<li><strong>Lifecycle:</strong> <code>cloudcontrol-landing-zone-guarded</code> (<code>management__cloudcontrol.json</code>,
+  heavy:true) covers all 9 writes, expects 403 on a shared account.</li>
+<li><strong>Coverage 2026-06-19:</strong> 0/15. Unblock only from an org-master (control-tower admin) account
+  with a Landing Zone provisioned.</li>
 </ul>
 <h2>security / certificatemanager</h2>
 <ul>
@@ -282,6 +389,27 @@ duplicating. Add a new <code>##</code> section when you take on a new service.</
   the public-domain 500 + 2 record-write probes were already observed). Remaining
   16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind
   the heavy private-dns create. Account left clean (no resources created).</li>
+</ul>
+<h2>data-analytics / quick-query</h2>
+<ul>
+<li><strong>Host:</strong> regional (<code>quick-query.&lt;region&gt;.&lt;env&gt;...</code>). 12 endpoints.</li>
+<li><strong>Timeout quirk:</strong> service responds in ~1-2s, but the default client <code>timeout=60s</code>
+  with retries can make a probe appear to hang. Use <code>timeout=5, retry=False</code> for probes.</li>
+<li><strong>Read-only 2xx (live 2026-06-19):</strong></li>
+<li><code>checkduplicationquickquery</code> — <code>GET /v1/quick-query/{quick_query_name}/check-duplication</code>
+    works with a SYNTHETIC name in the path (no resource needed) → <code>{"result":false}</code>.</li>
+<li><code>getquickqueryimageversions</code> — <code>GET /v1/quick-query/image-versions</code>. No params. Returns
+    available image versions.</li>
+<li><code>getquickquerylist</code> — <code>GET /v1/quick-query</code> <strong>requires <code>page</code> + <code>size</code> query params</strong>
+    (both <code>required:true</code> in sidecar). Bare call → 400 ValidationError "Field required". With
+    <code>?page=0&amp;size=10</code> → 200 <code>{contents:[], page, size, sort:["created_dt:desc"], total_count}</code>.
+    Smoke now defaults page=0/size=10 (commit bdd0550e).</li>
+<li><strong>Id-bound GET (needs-resource):</strong> <code>getquickquery</code> (GET <code>/v1/quick-query/{quick_query_id}</code>)
+  → fake id 404 "Quick Query Not Found" (PRODUCT-AI-ANALYTICS-USER-0002). 0 resources in account.</li>
+<li><strong>Writes (mutation-gated, heavy-prereq):</strong> createquickquery + 6 PUT updates + deletequickquery</li>
+<li>validatequickqueryresources. <code>create</code> and <code>validate</code> both require a real <strong>k8s <code>cluster_id</code></strong>
+  (billable cluster prereq) in the body.</li>
+<li><strong>Coverage 2026-06-19:</strong> 1→3/12 (+imageversions, +getquickquerylist; checkduplication already counted).</li>
 </ul>
 <h2>data-analytics / data-ops</h2>
 <ul>
