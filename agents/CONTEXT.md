@@ -103,6 +103,22 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **LATEST (2026-06-19, hand-driven from Claude remote — full handoff:
+  `docs/HANDOFF-2026-06-19-coverage-and-watcher.md`):** published **C3 47.9% →
+  50.1%** (633/1264), C2-called **53.4%** (733/1372). Heavy DBaaS run complete +
+  clean (8 cluster creates, +22 DB sub-op id-GET 2xx, 0 survivors verified). New
+  STANDING designs: **per-service coverage agents** (`.claude/agents/
+  coverage-service.md`, `agents/service-agent.md` standing pattern, ledger
+  `data/coverage_ledger.json` via `tools.coverage_headroom`, ~6–8 concurrency
+  cap); **live-watcher loop** (`.claude/agents/live-watcher.md` +
+  `tools/live_watch.py`: watcher→orchestrator→dev-agent); **record-to-git hard
+  rule** (HARNESS #6). Coverage so far: queueservice 12/12, resourcemanager 27/27,
+  apigateway ~47/55, iam 27/62, cloudmonitoring 6/18 (X-ResourceType CONFIRMED
+  required), dns 6/22, scr 8/39, data-ops 5/17, organization 2/37 (org-master
+  wall). **Next = full heavy batch (compute/network/storage id-GETs — DB done
+  only); cheap batch 3; base64-SRN cross-probe for iam.** Heavy-run gotcha:
+  export gates + `SCP_SHARED_*_ID` in the SAME shell as pytest or the heavy
+  lifecycles skip. Account clean (0 owned billable).
 - Catalog: extracted, 1,372 endpoints, 0 unresolved.
 - **29 base (hand-written) CRUD lifecycles** (full list + flags in
   `knowledge/scenario-catalog.md`). Light: resourcemanager resource-group, quota/
@@ -285,6 +301,15 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   no-shared-VPC adopter skip; truly-light dispatch needs the workflow heavy gate
   fixed (`knowledge/validated-facts.md`). Re-run Tier 0 after the fix to clear
   fail_new → 0 and capture the archivestorage/Wave-A 2xx evidence (promotions).
+- **What to advance next (2026-06-19, supersedes the 2026-06-17 plan below):**
+  see `docs/HANDOFF-2026-06-19-coverage-and-watcher.md` → "What to advance next".
+  Ranked: (1) **full heavy batch** (billable; compute/network/storage heavy
+  lifecycles to recover the rest of the id-GETs — this session only did DB;
+  remember the same-shell env gotcha + arm the live-watcher); (2) **cheap batch
+  3** (`tools.coverage_headroom --cheap-only --exclude <done>`, spawn
+  `coverage-service` agents ≤6–8); (3) **base64-SRN cross-probe** on iam's
+  srn-targeted ops; (4) optimizer per-label windowing; (5) watcher polish.
+  --- earlier (2026-06-17) plan retained for reference: ---
 - **What to advance next:** **re-dispatch Tier 0 (LIGHT) per `docs/COVERAGE-MAX-PLAN.md`**
   once the 27725293499 sweep concludes (lane free) — should land fail_new 0 with the
   archivestorage fix; then promote Wave A docs→VALIDATED and walk Tiers 1→4.
