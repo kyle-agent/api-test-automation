@@ -5,7 +5,7 @@
       "service": "storage/filestorage",
       "enabled": true,
       "heavy": true,
-      "_note": "FileStorage REPLICATION + SNAPSHOT-SCHEDULE + SNAPSHOT-RESTORE lifecycle (billable NFS volume -> heavy, gated by SCP_RUN_HEAVY). Complements the existing 'filestorage-volume' lifecycle (do NOT edit it) by closing its 7 remaining write gaps: POST/PUT/DELETE /v1/replications(/{id}), POST/PUT/DELETE /v1/snapshot-schedules(/{id}), PUT /v1/snapshots/{snapshot_id}/restore. Flow: create a real NFS volume (protocol NFS, type_name HDD -- the only proven filestorage create body, from knowledge/validated-facts.md) -> poll $.state to available -> capture $.volume_id (flat, filestorage-specific) -> create a snapshot of it (capture $.snapshot.id from SnapshotShowResponse) -> restore that snapshot -> create snapshot-schedule (SnapshotScheduleCreateRequest: volume_id + snapshot_schedule{frequency,day_of_week,hour} + snapshot_retention_count) -> set + delete it -> create replication (ReplicationCreateRequest) -> set + delete it -> tear down snapshot + volume. Bodies for replication/schedule/restore from data/api_docs.json model schemas (createvolumereplication also present in data/api_bodies.json); provenance for the new endpoints DOCS-ONLY (no live 2xx). snapshot-schedule CREATE response (SnapshotScheduleCreateResponse) carries NO id, so set/delete-schedule run with an unfilled {snapshot_schedule_id} placeholder (still records coverage for the {snapshot_schedule_id} endpoints). Replication targets a remote region (kr-west1 docs example) -> may 4xx if DR/region unavailable; replication create captures $.replication_id (ReplicationCreateResponse). All replication/schedule/restore steps are optional+grouped so a failing family costs only that group; the volume + snapshot create are the only required-ish (optional) anchors.",
+      "_note": "FileStorage REPLICATION + SNAPSHOT-SCHEDULE + SNAPSHOT-RESTORE lifecycle (billable NFS volume -> heavy, gated by SCP_RUN_HEAVY). Complements the existing 'filestorage-volume' lifecycle (do NOT edit it) by closing its 7 remaining write gaps: POST/PUT/DELETE /v1/replications(/{id}), POST/PUT/DELETE /v1/snapshot-schedules(/{id}), PUT /v1/snapshots/{snapshot_id}/restore. Flow: create a real NFS volume (protocol NFS, type_name HDD -- the only proven filestorage create body, from knowledge/validated-facts.md) -> poll $.state to available -> capture $.volume_id (flat, filestorage-specific) -> create a snapshot of it (capture $.snapshot.id from SnapshotShowResponse) -> restore that snapshot -> create snapshot-schedule (SnapshotScheduleCreateRequest: volume_id + snapshot_schedule{frequency,day_of_week,hour} + snapshot_retention_count) -> set + delete it -> create replication (ReplicationCreateRequest) -> set + delete it -> tear down snapshot + volume. Bodies for replication/schedule/restore from data/api_docs.json model schemas (createvolumereplication also present in data/api_bodies.json); provenance for the new endpoints DOCS-ONLY (no live 2xx). snapshot-schedule CREATE response (SnapshotScheduleCreateResponse) carries NO id, so set/delete-schedule run with an unfilled {snapshot_schedule_id} placeholder (still records coverage for the {snapshot_schedule_id} endpoints). Replication targets a remote region (kr-east1 — the only valid DR target from kr-west1, PROVEN from listvolumereplicationregion live 200) -> may 4xx if DR/region unavailable; replication create captures $.replication_id (ReplicationCreateResponse). All replication/schedule/restore steps are optional+grouped so a failing family costs only that group; the volume + snapshot create are the only required-ish (optional) anchors.",
       "steps": [
         {
           "name": "create-volume",
@@ -39,6 +39,28 @@
           }
         },
         {
+          "name": "set-volume",
+          "method": "PUT",
+          "path": "/v1/volumes/{volume_id}",
+          "service": "filestorage",
+          "group": "fs-volume-config",
+          "optional": true,
+          "json": {"file_unit_recovery_enabled": false},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "Closes setvolume (PUT /v1/volumes/{volume_id}) — no other lifecycle covers it. Body VolumeSetRequest: {file_unit_recovery_enabled: bool}."
+        },
+        {
+          "name": "set-access-rule",
+          "method": "PUT",
+          "path": "/v1/volumes/{volume_id}/access-rules",
+          "service": "filestorage",
+          "group": "fs-volume-config",
+          "optional": true,
+          "json": {"object_id": "00000000-0000-0000-0000-000000000000", "object_type": "VM", "action": "add"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "Closes setaccessrule (PUT /v1/volumes/{volume_id}/access-rules) — no other lifecycle covers it. AccessRuleRequest: {access_rules:[{object_id, object_type VM|BM|GPU|GPU_NODE|ENDPOINT, action add|remove}]}. object_id is a synthetic all-zero VM id (no real server consumed); a 400/404 still records the endpoint as reached. Tolerant expect_status."
+        },
+        {
           "name": "create-snapshot",
           "method": "POST",
           "path": "/v1/snapshots",
@@ -59,6 +81,7 @@
           "path": "/v1/snapshots/{snapshot_id}/restore",
           "group": "fs-snapshot",
           "optional": true,
+          "params": {"volume_id": "{volume_id}"},
           "json": {},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
@@ -77,11 +100,23 @@
           "capture_soft": {"snapshot_schedule_id": "$.snapshot_schedule.id"}
         },
         {
+          "name": "list-snapshot-schedules",
+          "method": "GET",
+          "path": "/v1/snapshot-schedules",
+          "service": "filestorage",
+          "group": "fs-schedule",
+          "optional": true,
+          "params": {"volume_id": "{volume_id}"},
+          "expect_status": [200, 400, 403, 404],
+          "_note": "Closes listsnapshotschedule (GET /v1/snapshot-schedules) — probe_reads skips it (no path params, only the required ?volume_id= query). volume_id is a REQUIRED query param (live 400 without it). PROVEN 200 with a real volume_id."
+        },
+        {
           "name": "set-snapshot-schedule",
           "method": "PUT",
           "path": "/v1/snapshot-schedules/{snapshot_schedule_id}",
           "group": "fs-schedule",
           "optional": true,
+          "params": {"volume_id": "{volume_id}"},
           "json": {
             "snapshot_retention_count": 5,
             "snapshot_schedule": {"frequency": "DAILY", "hour": "12"}
@@ -95,6 +130,7 @@
           "group": "fs-schedule",
           "optional": true,
           "destructive": true,
+          "params": {"volume_id": "{volume_id}"},
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
         },
         {
@@ -106,7 +142,7 @@
           "json": {
             "name": "regrfsrepl{unique}",
             "volume_id": "{volume_id}",
-            "region": "kr-west1",
+            "region": "kr-east1",
             "replication_frequency": "5min",
             "replication_type": "replication",
             "backup_retention_count": 2
@@ -115,13 +151,25 @@
           "capture_soft": {"replication_id": "$.replication_id"}
         },
         {
+          "name": "list-replications",
+          "method": "GET",
+          "path": "/v1/replications",
+          "service": "filestorage",
+          "group": "fs-replication",
+          "optional": true,
+          "params": {"volume_id": "{volume_id}"},
+          "expect_status": [200, 400, 403, 404],
+          "_note": "Closes listvolumereplications (GET /v1/replications) — probe_reads skips it (no path params, only the required ?volume_id= query). volume_id is a REQUIRED query param (live 404 with dummy, backend reachable)."
+        },
+        {
           "name": "get-replication",
           "method": "GET",
           "path": "/v1/replications/{replication_id}",
           "group": "fs-replication",
           "optional": true,
+          "params": {"volume_id": "{volume_id}"},
           "expect_status": [200, 400, 403, 404],
-          "_note": "id-bound read (show replication). Closes the replication_id getid GET /v1/replications/{replication_id}. Keys off the create-replication-captured replication_id; tolerant [200,400,403,404] because replication create targets a remote DR region (kr-west1) and may 4xx (DR/region unavailable), leaving replication_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
+          "_note": "id-bound read (show replication). Closes the replication_id getid GET /v1/replications/{replication_id}. Keys off the create-replication-captured replication_id; tolerant [200,400,403,404] because replication create targets a remote DR region (kr-east1) and may 4xx (DR/region unavailable), leaving replication_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable (complements probe-reads)."
         },
         {
           "name": "set-replication",
@@ -129,6 +177,7 @@
           "path": "/v1/replications/{replication_id}",
           "group": "fs-replication",
           "optional": true,
+          "params": {"volume_id": "{volume_id}"},
           "json": {
             "replication_update_type": "policy",
             "replication_policy": "use",
@@ -144,6 +193,7 @@
           "group": "fs-replication",
           "optional": true,
           "destructive": true,
+          "params": {"volume_id": "{volume_id}"},
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
         },
         {
@@ -157,6 +207,7 @@
           "group": "fs-snapshot",
           "optional": true,
           "destructive": true,
+          "params": {"volume_id": "{volume_id}"},
           "expect_status": [200, 202, 204, 404, 409, 400, 403, 422],
           "retry_on_status": [409, 500],
           "retries": 4,

@@ -133,6 +133,13 @@ _REQUIRED_QUERY_DEFAULTS = {
     "server_category": lambda ep: "VIRTUAL_SERVER",
     "dbType": lambda ep: ep.service,
     "engine": lambda ep: ep.service,
+    # backup-exclusive required-query names (verified 2026-06-19: each marked
+    # required ONLY on storage/backup endpoints in the catalog sidecar, so a
+    # global default cannot leak onto another service). All read-only / create
+    # nothing — a duplicate-name check with an unused name, or a fixed enum.
+    "backup_name": lambda ep: _DUP_NAME,            # checkbackupnameduplicate
+    "restore_server_name": lambda ep: _DUP_NAME,    # checkbackuprestoreservernameduplicate
+    "policy_type": lambda ep: "VM_IMAGE",           # getbackuptargetlist (+ server_category)
 }
 
 try:
@@ -155,6 +162,22 @@ def _required_param_candidates(endpoint: Endpoint) -> list[dict]:
         svc = endpoint.service  # e.g. mysql / postgresql / eventstreams
         return [{"dbType": svc}, {"engine": svc}, {"engineName": svc},
                 {"dbEngine": svc}, {"engineVersion": "1"}, {"version": "1"}]
+    # --- PATH-SPECIFIC required-query cases (2026-06-19) ---------------------
+    # These params have generic names that are ALSO marked required on OTHER
+    # services' endpoints, so they must NOT become global _REQUIRED_QUERY_DEFAULTS
+    # (that would wrongly fire on those other endpoints). Each is matched by its
+    # exact path here; all are read-only and create nothing. Live-proven 200.
+    if "/kms/transit/duplicate" in p:
+        # `name` is also required on queueservice/scf/scr duplicate checks.
+        return [{"name": _DUP_NAME}]
+    if "/replications/regions" in p:
+        # `type_name` is generic; only filestorage's region-list needs this trio.
+        return [{"type_name": "HDD", "source_region_name": _settings.region,
+                 "replication_type": "replication"}]
+    if p.endswith("/agent-install-file-path"):
+        # `os_type` is also required on financial-management/billingplan; keep
+        # this LINUX default scoped to the backup-agent installer-path endpoint.
+        return [{"os_type": "LINUX"}]
     # Sidecar-driven: supply defaults for every REQUIRED query param we know a
     # safe value for (region/category/db-engine). Skip if any required param has
     # no known default (a synthetic guess would just 400 differently).
