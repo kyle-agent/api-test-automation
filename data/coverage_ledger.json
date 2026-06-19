@@ -10,7 +10,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "vpc",
@@ -21,7 +21,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "postgresql",
@@ -29,10 +29,14 @@
       "total": 47,
       "gap": 46,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "blockers": [
+        "product-bug-5xx: createcluster 500 ContactAdmin (other 4 engines create fine w/ identical body -> backend fault, baselined)"
+      ],
+      "next_levers": [
+        "postgresql sub-op id-GETs blocked until createcluster 500 is fixed upstream"
+      ],
+      "notes": "postgresql createcluster 500s (PF, baselined); the 4 other engines covered their sub-ops this run.",
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "baremetal-blockstorage",
@@ -43,18 +47,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
-    },
-    {
-      "service": "mysql",
-      "covered": 5,
-      "total": 45,
-      "gap": 40,
-      "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "mariadb",
@@ -64,8 +57,8 @@
       "heavy": true,
       "blockers": [],
       "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "notes": "mariadb: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "sqlserver",
@@ -76,26 +69,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
-    },
-    {
-      "service": "iam",
-      "covered": 27,
-      "total": 62,
-      "gap": 35,
-      "heavy": false,
-      "blockers": [
-        "product-bug-5xx: createrole 500 ContactAdmin (blocks role mutation chain)",
-        "needs-peer-resource: 0 saml-providers / 0 iam-users / 0 resource-policies in account",
-        "entitlement-403: add/removeuserpolicybinding",
-        "validation-400: addpermission/setpermission/setresourcepolicy need a real srn target"
-      ],
-      "next_levers": [
-        "create an own IAM user (MUTATIONS) to unblock user-bound reads",
-        "create a resource-policy to give srn-targeted ops a real target"
-      ],
-      "notes": "15->27/62 via read-only levers (smoke LISTs + read_chains + account_id from a role). No /v1/accounts or /v1/users collection list exists.",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "organization",
@@ -111,7 +85,7 @@
         "cover remaining 35 on an org-master test account"
       ],
       "notes": "0->2/37. Hard entitlement wall (org member). Body/envelope fixes applied for when a master account is available.",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "epas",
@@ -121,8 +95,27 @@
       "heavy": true,
       "blockers": [],
       "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "notes": "epas: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
+      "updated": "2026-06-19T02:01:07Z"
+    },
+    {
+      "service": "iam",
+      "covered": 28,
+      "total": 62,
+      "gap": 34,
+      "heavy": false,
+      "blockers": [
+        "product-bug-5xx: createrole 500 ContactAdmin (blocks role mutation chain)",
+        "needs-peer-resource: 0 saml-providers / 0 iam-users / 0 resource-policies in account",
+        "entitlement-403: add/removeuserpolicybinding",
+        "validation-400: addpermission/setpermission/setresourcepolicy need a real srn target"
+      ],
+      "next_levers": [
+        "create an own IAM user (MUTATIONS) to unblock user-bound reads",
+        "create a resource-policy to give srn-targeted ops a real target"
+      ],
+      "notes": "15->27/62 via read-only levers (smoke LISTs + read_chains + account_id from a role). No /v1/accounts or /v1/users collection list exists.",
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "loadbalancer",
@@ -133,7 +126,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "iam-identity-center",
@@ -144,7 +137,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "scr",
@@ -161,7 +154,7 @@
         "cover registry/repo policy+ACL via an OWN registry lifecycle when the quota slot frees"
       ],
       "notes": "3->8/39 via borrow-and-read-by-id on the pre-existing sample registry. 503s were transient.",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "backup",
@@ -172,7 +165,18 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
+    },
+    {
+      "service": "mysql",
+      "covered": 19,
+      "total": 45,
+      "gap": 26,
+      "heavy": true,
+      "blockers": [],
+      "next_levers": [],
+      "notes": "mysql: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "archivestorage",
@@ -183,7 +187,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "searchengine",
@@ -194,7 +198,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "ske",
@@ -205,7 +209,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "cachestore",
@@ -215,8 +219,8 @@
       "heavy": true,
       "blockers": [],
       "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "notes": "cachestore: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "dns",
@@ -233,7 +237,7 @@
         "cover the 4 id-bound reads via the networking-dns-hosted-zone-private heavy lifecycle on a SCP_RUN_HEAVY batch"
       ],
       "notes": "3->6/22. 3 bare-list GETs covered live (account empty, count 0). 11 writes authored, gate-only.",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "eventstreams",
@@ -244,7 +248,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "vertica",
@@ -255,7 +259,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "cloudcontrol",
@@ -266,7 +270,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "filestorage",
@@ -277,7 +281,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "data-flow",
@@ -288,7 +292,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "baremetal",
@@ -299,7 +303,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "cloudmonitoring",
@@ -316,7 +320,7 @@
         "enroll a product in monitoring (out of scope) to unlock event-policy + perf-data chain"
       ],
       "notes": "0->6/18. X-ResourceType header CONFIRMED REQUIRED (reconciles prior dispute). puteventpolicy body wraps in eventPolicyRequest; perf-data needs ISO-T/Z dates.",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "data-ops",
@@ -350,7 +354,7 @@
         "Borrow-read: if any data-ops-service or data-ops resource is created by another team, list /v1/data-ops-services to harvest IDs for read-only coverage of getdataopsservice/getdataopsdetail/getdataopssubversion/getingresscontrollerlistv1 without mutation."
       ],
       "notes": "data-ops = Airflow cluster+service. 5/17 read-only. 12 heavy-prereq blockers. See knowledge/services.md data-analytics/data-ops section.",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "multinodegpucluster",
@@ -361,7 +365,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "parallel-filestorage",
@@ -372,7 +376,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "quick-query",
@@ -383,7 +387,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "aimlops-platform",
@@ -394,7 +398,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "billingplan",
@@ -405,7 +409,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "gslb",
@@ -416,7 +420,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "loggingaudit",
@@ -427,7 +431,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "scf",
@@ -438,7 +442,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "vpn",
@@ -449,7 +453,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "cdn",
@@ -460,7 +464,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "cloud-ml",
@@ -471,7 +475,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "apigateway",
@@ -488,7 +492,7 @@
         "privatelink endpoint coverage blocked on entitlement + product-bug; revisit if IAM actions granted"
       ],
       "notes": "~47/55. listapis/listprivatelinkendpoints 503 were transient (client retries -> 200). listreports 400 FIXED: needs a <=30-day, not->30d-old window (rolling {iso_29d_ago}/{iso_today}).",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "direct-connect",
@@ -499,7 +503,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "firewall",
@@ -510,7 +514,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "configinspection",
@@ -521,7 +525,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "servicewatch",
@@ -532,7 +536,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "devopsservice",
@@ -543,7 +547,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "budget",
@@ -554,7 +558,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "kms",
@@ -565,7 +569,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "secretvault",
@@ -576,7 +580,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "product",
@@ -587,7 +591,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "quota",
@@ -598,7 +602,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "support",
@@ -609,7 +613,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "certificatemanager",
@@ -620,7 +624,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "costexplorer",
@@ -631,7 +635,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "pricing",
@@ -642,7 +646,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "secretsmanager",
@@ -653,7 +657,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "sts",
@@ -664,7 +668,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "network-logging",
@@ -675,7 +679,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "security-group",
@@ -686,7 +690,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "queueservice",
@@ -699,7 +703,7 @@
         "fifo-only dedup ops need a .fifo queue (optional groups already isolate)"
       ],
       "notes": "12/12 \u2014 getqueueattributes needs attributes=All (case-sensitive) + name=<queue>. Fixed 41858cb.",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     },
     {
       "service": "resourcemanager",
@@ -710,7 +714,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "12->27/27 (100%). Key finding: {srn} and {key} path segments MUST be base64-encoded. listresources response uses $.resources[] not $.contents[]. All 27 endpoints confirmed 2xx via direct probes.",
-      "updated": "2026-06-19T01:04:28Z"
+      "updated": "2026-06-19T02:01:07Z"
     }
   ]
 }
