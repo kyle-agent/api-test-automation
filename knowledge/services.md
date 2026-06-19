@@ -110,6 +110,21 @@ duplicating. Add a new `##` section when you take on a new service.
   slot is free. Several historically returned transient **503 upstream connect
   timeout** (product/gateway flap, retry-then-classify, not a deterministic bug).
 
+## networking / gslb (Global Server Load Balancing)
+
+- **Host:** regional (`gslb.<region>.<env>.samsungsdscloud.com`). Account/global-scoped, VPC-free.
+- **Region gate:** only kr-west1 and kr-east1 — NOT kr-south1/2/3.
+- **Quota:** max 20 GSLB domains per account; max 8 connectable resources per domain.
+- **List endpoints (2xx live, 2026-06-19, kr-west1):**
+  - `GET /v1/gslbs` → `{count, gslbs:[], page, size, sort}` — no required params.
+  - `GET /v1/gslbs/routing-control` → `{count, page, regional_gslbs:[], size, sort}` — no required params.
+  - Both return 200 with empty lists when no resources exist. Initial calls hit transient 503 (gateway flap); retry returns 200.
+- **Create body (docs-validated, live unproven):** `{algorithm:ROUND_ROBIN, description, env_usage:PUBLIC, health_check:{protocol:TCP, service_port:"80", ...}, name:"label.gslb.e.samsungsdscloud.com", resources:[], tags:[]}`. Name is FQDN; label must be 4-40 lowercase letters+digits only.
+- **Health check:** protocol one of ICMP/TCP/HTTP/HTTPS. TCP/HTTP(S) require `service_port`. HTTP(S) additionally require `receive_string` (alnum only) and optionally `send_string` (no `<>` or `#`). Use TCP to avoid HTTP(S)-only constraints.
+- **Capture:** `$.gslb.id` from create response.
+- **Lifecycle scenario:** `regression/scenarios/lifecycles/networking__gslb.json` (id: `networking-gslb-service`) covers full CRUD chain — POST create → GET show → PUT set → PUT health-check → PUT resources → PUT routing-control → GET resources → DELETE. Enabled, light (heavy:false), needs SCP_ALLOW_MUTATIONS=true + SCP_ALLOW_DESTRUCTIVE=true.
+- **Coverage 2026-06-19:** 2/10 (2 list GETs covered read-only). Remaining 8 are mutation-gated — scenario ready, no blockers.
+
 ## security / certificatemanager
 
 - **Host:** regional. self-sign needs `cn`, `not_before_dt`, `not_after_dt`,
