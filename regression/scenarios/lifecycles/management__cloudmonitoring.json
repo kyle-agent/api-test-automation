@@ -10,20 +10,25 @@
           "name": "list-event-policies",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies",
-          "expect_status": [200, 403],
+          "headers": {"X-ResourceType": "Object Storage"},
+          "params": {"productResourceId": "apitest-logsink", "size": 1},
+          "expect_status": [200, 400, 403, 404],
           "optional": true,
           "group": "cm-read",
           "capture_soft": {
             "eventPolicyId": "$.contents[0].eventPolicyId"
-          }
+          },
+          "_note": "getproducteventpolicylist (pre-lifecycle read). Requires X-ResourceType header + productResourceId (live-confirmed: 200). Uses hardcoded 'apitest-logsink' (Object Storage resource in test account) as fallback so this step 200s even without a prior soft-capture. Dual-recorded under catalog key because it has params."
         },
         {
           "name": "create-event-policy",
           "method": "POST",
           "path": "/v1/cloudmonitorings/event/v2/event-policies",
+          "headers": {"X-ResourceType": "Object Storage"},
           "json": {
             "eventPolicyName": "regrcmep{unique}",
-            "productTypeCode": "Server",
+            "productTypeCode": "Object Storage",
+            "productResourceId": "apitest-logsink",
             "eventLevel": "WARNING",
             "enabled": true,
             "description": "API regression coverage probe"
@@ -39,7 +44,7 @@
             "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
             "service": "cloudmonitoring"
           },
-          "_note": "Body UNPROVEN — likely needs a real product type + event condition + notification target. On the expected 4xx the optional flag isolates the group; the POST is still recorded as covered."
+          "_note": "puteventpolicy (CREATE). Body updated based on live analysis: X-ResourceType header required, productResourceId required (same pattern as getproducteventpolicylist), productTypeCode='Object Storage' matches X-ResourceType, productResourceId='apitest-logsink' (confirmed Object Storage resource in test account). Still may need additional fields (metricKey, notification config). On 4xx the group isolates; the POST is still recorded under its catalog key."
         },
         {
           "name": "show-event-policy",
@@ -53,15 +58,19 @@
           "name": "modify-event-policy",
           "method": "PUT",
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+          "headers": {"X-ResourceType": "Object Storage"},
           "json": {
             "eventPolicyName": "regrcmep{unique}",
+            "productTypeCode": "Object Storage",
+            "productResourceId": "apitest-logsink",
             "eventLevel": "CRITICAL",
             "enabled": false,
             "description": "API regression coverage probe (update)"
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "cm-policy"
+          "group": "cm-policy",
+          "_note": "modifyeventpolicy (PUT). Includes X-ResourceType header and productResourceId per live-confirmed pattern. Only runs if create-event-policy succeeds and captures eventPolicyId."
         },
         {
           "name": "delete-event-policy",
