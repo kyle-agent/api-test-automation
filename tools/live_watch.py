@@ -97,8 +97,10 @@ def detect(events: list[dict]) -> dict:
             found["BILLABLE_SURVIVOR"] = (f"{len(owned_vpc)} owned VPC(s) still ACTIVE with no heavy "
                                           f"batch running ({[v.get('name') for v in owned_vpc]}) — "
                                           f"possible leak / orphaned shared infra.")
-        # A3 — owned infra up but the run went quiet (no events) for a while
-        if owned_vpc and quiet_min > QUIET_MIN and heavy:
+        # A3 — owned infra up but the run went quiet (no events) for a while.
+        # Require real event data (last_evt set) so an empty/mid-write events file
+        # doesn't masquerade as "quiet for 1e9 minutes".
+        if owned_vpc and last_evt and quiet_min > QUIET_MIN and heavy:
             found["INFRA_QUIET"] = (f"owned infra up but no loggingaudit activity for {quiet_min:.0f}m "
                                     f"during an active heavy batch — run may be stuck/dead.")
     except Exception as exc:
@@ -123,12 +125,14 @@ def main(argv=None) -> int:
         except Exception:
             prev = {}
     stamp = datetime.now(timezone.utc).strftime("%H:%M:%SZ")
-    # new or changed anomalies
+    prev_keys = set(prev)
+    # emit an anomaly ONCE when it first appears (not every cycle — the message
+    # carries a changing elapsed-minutes count, so compare on the stable KEY).
     for k, msg in cur.items():
-        if prev.get(k) != msg:
+        if k not in prev_keys:
             print(f"{stamp} ANOMALY {k}: {msg}", flush=True)
-    # resolved anomalies
-    for k in prev:
+    # emit RESOLVED once when it clears
+    for k in prev_keys:
         if k not in cur:
             print(f"{stamp} RESOLVED {k}", flush=True)
     STATE.parent.mkdir(parents=True, exist_ok=True)
