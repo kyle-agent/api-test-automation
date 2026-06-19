@@ -146,6 +146,13 @@ duplicating. Add a new `##` section when you take on a new service.
     → region/service/resource_type/identifier are PLAIN; only `{key}` = b64(key)
   - `/v1/tags/bulk` (PUT) and `/v1/tags` (DELETE bulk) use PLAIN SRN in JSON body
     (not path), so no b64 needed there.
+  - **Engine support (2026-06-19):** the scenario engine now implements a
+    `b64_encode` step action (`{"action":"b64_encode","input":"{rg_srn}",
+    "output":"rg_srn_b64"}`) — it base64-encodes a captured ctx var and publishes
+    it as a new placeholder, so `resourcemanager-tag-lifecycle` is runnable (was
+    referencing undefined `*_b64` placeholders → 10 validator errors, now fixed).
+    Reusable by any service whose path segments are b64-decoded (e.g. the stuck
+    iam `srn`-targeted ops: addpermission/setpermission/setresourcepolicy).
 - **listresources response shape:** `$.resources[]` (NOT `$.contents[]`). Fields:
   `region`, `service`, `resource_type`, `id` (NOT `resource_identifier`).
 - **Coverage 2026-06-19:** 12 → **27/27** (100%). All 27 endpoints covered.

@@ -33,6 +33,7 @@ legacy ``reports/smoke_status.tsv`` so the dashboard keeps working.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -784,6 +785,29 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             grp = step.get("group")
             if grp and grp in failed_groups:
                 continue  # an earlier step in this group failed — skip the rest
+
+            # Pure ctx-transform action steps (no HTTP request). `b64_encode`
+            # base64-encodes a captured value for path segments the API decodes
+            # as base64 — resourcemanager {srn}/{key} path params yield a 400
+            # "SRN decoding error" unless base64-encoded (knowledge/services.md).
+            # The encoded value is published to ctx under step['output'] for
+            # later {placeholder} substitution; the step issues no request.
+            _action = step.get("action")
+            if _action:
+                if _action != "b64_encode":
+                    raise ValueError(
+                        f"[{lifecycle['id']}] unknown step action '{_action}' "
+                        f"(step '{step.get('name')}')")
+                raw = _fill(step.get("input", ""), ctx)
+                if "{" in raw:  # input placeholder unresolved (soft-capture miss)
+                    if step.get("optional"):
+                        continue
+                    raise LifecycleSkip(
+                        f"[{lifecycle['id']}] b64_encode input "
+                        f"'{step.get('input')}' unresolved — cannot encode "
+                        f"(step '{step.get('name')}')")
+                ctx[step["output"]] = base64.b64encode(raw.encode()).decode()
+                continue
 
             # Shared-resource adoption: reuse a session-shared resource instead of
             # creating/deleting our own (so heavy lifecycles share one VPC rather

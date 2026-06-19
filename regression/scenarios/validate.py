@@ -43,6 +43,7 @@ STEP_KEYS = {"name", "method", "path", "service", "json", "params", "headers",
              "expect_status", "capture", "capture_soft", "cleanup", "poll",
              "wait", "retries", "retry_interval", "retry_on_status",
              "group", "optional", "destructive", "adopt", "probe_reads",
+             "action", "input", "output",
              "_note", "_comment"}
 METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 BUILTINS = {"unique", "ualpha", "region", "today", "today_plus_5y",
@@ -135,6 +136,20 @@ def validate(service_filter=None):
                 missing = used - available
                 if missing:
                     warnings.append(f"{sw}: probe_reads uses undefined {sorted(missing)}")
+                continue
+
+            if step.get("action"):
+                # Pure ctx-transform step (e.g. b64_encode): consumes {input} and
+                # publishes its 'output' as a placeholder for later steps. No HTTP,
+                # so it's checked here (input capture-before-use) and skipped from
+                # the path/method checks below.
+                used = _placeholders_in(step.get("input"))
+                missing = used - available
+                if missing:
+                    errors.append(f"{sw}: action input references undefined "
+                                  f"placeholders {sorted(missing)} (capture them earlier?)")
+                if step.get("output"):
+                    available.add(step["output"])
                 continue
 
             method = (step.get("method") or "").upper()
