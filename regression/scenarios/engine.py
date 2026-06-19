@@ -606,15 +606,30 @@ def active_lifecycles() -> list[dict]:
     initial worker assignment starts them all concurrently, so wall-clock
     tends to max(slow) instead of sums.
     """
-    slow_markers = ("database-", "heavy-", "container-ske",
-                    "compute-virtualserver-full", "dns")
+    slow_markers = ("heavy-", "dns")
+    # The genuinely-longest provisioners (tens of minutes each): DB clusters,
+    # SKE k8s, baremetal, full VM, GPU node. These MUST grab the first xdist
+    # workers so they run CONCURRENTLY — otherwise the alphabetical tie-break
+    # below buries them behind lighter "heavy" lifecycles
+    # (aimlops/archivestorage/backup/billingplan) and they serialize. Field:
+    # run 27811864234 (-n 6) had only mysql of the 5 DB engines started 19 min
+    # into the CRUD pass — the other 4 were queued behind alphabetically-earlier
+    # heavy lifecycles. Promoting them to rank 0 starts all long-poles at once,
+    # so the heavy phase is max(longest) not sum.
+    slowest_markers = ("database-", "heavy-shared-dbaas", "-cluster-subops",
+                       "container-ske", "gen-heavy-ske", "gen-wave4-asg",
+                       "baremetal", "compute-virtualserver-full",
+                       "mngc-gpu-node")
 
     def slow_rank(lc: dict) -> int:
+        lid = lc["id"]
+        if lc.get("heavy") and any(m in lid for m in slowest_markers):
+            return 0   # longest provisioners FIRST -> concurrent on the first workers
         if lc.get("heavy"):
-            return 0
-        if any(m in lc["id"] for m in slow_markers):
-            return 1
-        return 2
+            return 1   # other heavy
+        if any(m in lid for m in slow_markers):
+            return 2
+        return 3
 
     return sorted((lc for lc in LIFECYCLES if lc.get("enabled")),
                   key=lambda lc: (slow_rank(lc), lc["id"]))
