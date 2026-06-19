@@ -23,6 +23,36 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Lookups:** images `/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50`;
   server-types `/v1/server-types` (pick id starting with `s`).
 
+## compute / virtualserver — autoscaling
+
+- **28 autoscaling endpoints** (`/v1/auto-scaling-groups/...`, `/v1/launch-configurations/...`).
+  Only **2/28 covered** read-only: `listautoscalinggroups`, `listlaunchconfigurations`
+  (bare smoke GETs, 200 with empty lists — account has 0 ASGs / 0 LCs).
+- **Root cause the other 26 are uncovered:** two lifecycles already exist, are
+  `enabled: true`, and cover them — `vs-autoscaling-coverage` (26 steps, in
+  `regression/scenarios/lifecycles/compute__virtualserver.json`) and `gen-wave4-asg`
+  (28 steps, VPC+subnet chain, `desired_server_count: 0` to avoid billable VMs, in
+  `generated__wave4.json`). But **both are mutation-gated**: `run_lifecycle()` returns
+  `status: skipped` immediately when `SCP_ALLOW_MUTATIONS=false` (engine ~line 642),
+  before any step (including the lifecycle's GET steps) runs. So read-only runs never
+  start them; that is why only the 2 bare smoke GETs are covered.
+- **Levers:**
+  - `SCP_ALLOW_MUTATIONS=true` + `SCP_ALLOW_DESTRUCTIVE=true` alone → `vs-autoscaling-coverage`
+    records ~23 catalog keys (LC create/show/delete to 2xx; ASG sub-ops to 4xx via a
+    literal placeholder asg_id, still recorded under their catalog key).
+  - add `SCP_RUN_HEAVY=true` + a shared VPC/subnet → `gen-wave4-asg` takes ASG and all
+    sub-resources to 2xx.
+- **Form gate:** `createautoscalinggroupnotification` needs a `user_ids` array with a
+  REAL account user id (no default) — set a `user_id` env var from console. Until it
+  creates a notification, the 4 child notification GET/PUT/DELETE endpoints stay blocked.
+- **Proven create facts:** `createlaunchconfiguration` PROVEN 2xx 2026-06-18 with a real
+  windows image_id + real keypair_name (LC create rejects non-windows/standard images with
+  InvalidImage); volume `size` must be divisible by 8; `delete_on_termination` is NOT a
+  valid field. ASG policy `comparison_operator: "ge"` (short-code, not GREATER_THAN_OR_EQUAL_TO);
+  schedule `frequency` enum ONCE|DAILY|WEEKLY|MONTHLY. ASG create uses arrays `subnet_ids`,
+  `security_group_ids` (not scalar/`security_groups`); notification id is `$.notifications[0].id`
+  (list envelope, not `$.id`).
+
 ## storage / filestorage
 
 - **Host:** regional. Owns NFS volumes.
@@ -124,6 +154,77 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Capture:** `$.gslb.id` from create response.
 - **Lifecycle scenario:** `regression/scenarios/lifecycles/networking__gslb.json` (id: `networking-gslb-service`) covers full CRUD chain — POST create → GET show → PUT set → PUT health-check → PUT resources → PUT routing-control → GET resources → DELETE. Enabled, light (heavy:false), needs SCP_ALLOW_MUTATIONS=true + SCP_ALLOW_DESTRUCTIVE=true.
 - **Coverage 2026-06-19:** 2/10 (2 list GETs covered read-only). Remaining 8 are mutation-gated — scenario ready, no blockers.
+
+## networking / cdn
+
+- **Host:** regional (`cdn.<region>.<env>...`). VPC-free control-plane resource. 9 endpoints.
+- **Region gate:** kr-west1 and kr-east1 ONLY (NOT kr-south variants).
+- **List (2xx live 2026-06-19):** `GET /v1/cdns` (listcdnservice) → `{cdn:[], count, page, size, sort}`
+  — array key is `cdn` (not `cdns`/`items`). No required params. Empty list when 0 distributions.
+  First call may 503 (gateway timeout, 2-15s); client retry → 200. Transient, NOT a product bug.
+- **Create capture:** `$.cdn.resource_id` (NOT `$.id`/`$.cdn.id`). Required fields:
+  `cache_expiry_time` (3600-2592000s, e.g. "86400"), `cache_key_hostname`, `cdn_origin_hostname`,
+  `cdn_origin_port`, `cdn_service_domain_prefix` (globally unique), `forward_host_header`, `name`,
+  `origin_hostname_type`. Enum guesses (unvalidated live): cache_key_hostname/forward_host_header=
+  `REQUEST_HOST_HEADER`, origin_hostname_type=`DOMAIN`. start/stop/purge use empty body `{}`.
+- **Lifecycle:** `regression/scenarios/lifecycles/networking__cdn.json` covers all 7 writes +
+  detailcdnservice (via read-chain on `$.cdn.resource_id`). Needs SCP_ALLOW_MUTATIONS +
+  SCP_ALLOW_DESTRUCTIVE.
+- **Coverage 2026-06-19:** 0→1/9 (listcdnservice). Account has 0 CDN distributions (no borrowable id).
+
+## networking / direct-connect
+
+- **Host:** regional. 8 endpoints. Direct-connect maps to a physical network circuit
+  (datacenter pre-provisioning) — mutations are likely hardware/entitlement-gated.
+- **List (2xx live 2026-06-19):** `GET /v1/direct-connects` (listdirectconnects) →
+  `{count:0, direct_connects:[], page, size}`. No required params. Account has 0 resources.
+- **Id-bound GETs (needs-resource):** `showdirectconnect` (GET `/v1/direct-connects/{direct_connect_id}`),
+  `listroutingrules` (GET `.../{direct_connect_id}/routing-rules`) — `single_param_chains` already
+  wired; fire automatically once a direct-connect exists. List was empty → no id to derive.
+- **Writes (mutation-gated):** createdirectconnect (POST), setdirectconnect (PUT), createroutingrule
+  (POST sub), deletedirectconnect/deleteroutingrule (DELETE). Need SCP_ALLOW_MUTATIONS
+  (+SCP_ALLOW_DESTRUCTIVE); check circuit-provisioning entitlement first.
+- **Note:** doc_url fetches returned 503 during the 2026-06-19 run (docs server down, transient).
+- **Coverage 2026-06-19:** 0→1/8 (listdirectconnects).
+
+## networking / vpn
+
+- **Host:** regional. 10 endpoints (gateways + tunnels). Resources are `heavy: true`
+  (chain: vpc + public-ip → vpn-gateway → vpn-tunnel).
+- **Region gate:** kr-west1, kr-east1, kr-south3.
+- **Quota:** max 3 VPN gateways/account, 5 tunnels/gateway.
+- **Lists (2xx live 2026-06-19):**
+  - `GET /v1/vpn-gateways` (listvpngateways) → `{count, page, size, sort, vpn_gateways:[]}`
+  - `GET /v1/vpn-tunnels` (listvpntunnels) → `{count, page, size, sort, vpn_tunnels:[]}`
+  - sort default `["name:asc","id:desc"]`. No required query params. Both empty (account has 0).
+- **Id-bound GETs (needs-resource):** showvpngateway/showvpntunnel — fake-id probes 404 with
+  error codes `scp-network.vpn-gateway.not-found` / `vpn-tunnel.not-found` (backend reachable).
+- **Naming constraint:** gateway AND tunnel names = 3-20 **alphanumeric chars ONLY** (no
+  hyphen/underscore). IKE/IPSec enums (phase1/phase2_encryptions, diffie_hellman_groups) are
+  docs-estimates, NOT yet live-validated.
+- **Lifecycle:** `networking-vpn-gateway-tunnel` (`networking__vpn.json`) covers all 8 remaining
+  (2 id-bound GETs + 6 writes). Needs SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE + SCP_RUN_HEAVY,
+  with VPC + public-ip prereqs provisioned first.
+- **Coverage 2026-06-19:** 0→2/10 (both list GETs).
+
+## management / cloudcontrol
+
+- **Host:** management. 15 endpoints (6 GETs + 9 writes). **Hard entitlement wall.**
+- **Entitlement-403:** every tested GET returns `CloudControl.CloudControlForbidden`
+  ("Can not access this cloudcontrol resources.") — identical for all 6. Cloud Control
+  requires a **Landing Zone** to exist on the **Organization management account** (prereqs:
+  Organization + ID Center + Object Storage + Logging&Audit). Shared test account is not the
+  org-master and has no landing zone → all reads AND writes denied. NOT a product bug.
+- **Required params (already in sidecar, do NOT unlock 2xx on shared account):**
+  `listguardrailsfortarget` needs `target_id`; `listtargetsforguardrail` needs `guardrail_id` +
+  `target_type` (e.g. ACCOUNT). Without them → 400 ValidationError; with them → still 403.
+- **Quirks:** `createaccountfactoryaccount` (POST /v1/accounts) is BILLABLE + IRREVERSIBLE
+  (provisions a real member account); landing-zone create cannot be cancelled mid-flight;
+  AuditBaseline feature scheduled 2026-07 (endpoints may 404/400 until then).
+- **Lifecycle:** `cloudcontrol-landing-zone-guarded` (`management__cloudcontrol.json`,
+  heavy:true) covers all 9 writes, expects 403 on a shared account.
+- **Coverage 2026-06-19:** 0/15. Unblock only from an org-master (control-tower admin) account
+  with a Landing Zone provisioned.
 
 ## security / certificatemanager
 
@@ -244,6 +345,27 @@ duplicating. Add a new `##` section when you take on a new service.
   the public-domain 500 + 2 record-write probes were already observed). Remaining
   16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind
   the heavy private-dns create. Account left clean (no resources created).
+
+## data-analytics / quick-query
+
+- **Host:** regional (`quick-query.<region>.<env>...`). 12 endpoints.
+- **Timeout quirk:** service responds in ~1-2s, but the default client `timeout=60s`
+  with retries can make a probe appear to hang. Use `timeout=5, retry=False` for probes.
+- **Read-only 2xx (live 2026-06-19):**
+  - `checkduplicationquickquery` — `GET /v1/quick-query/{quick_query_name}/check-duplication`
+    works with a SYNTHETIC name in the path (no resource needed) → `{"result":false}`.
+  - `getquickqueryimageversions` — `GET /v1/quick-query/image-versions`. No params. Returns
+    available image versions.
+  - `getquickquerylist` — `GET /v1/quick-query` **requires `page` + `size` query params**
+    (both `required:true` in sidecar). Bare call → 400 ValidationError "Field required". With
+    `?page=0&size=10` → 200 `{contents:[], page, size, sort:["created_dt:desc"], total_count}`.
+    Smoke now defaults page=0/size=10 (commit bdd0550e).
+- **Id-bound GET (needs-resource):** `getquickquery` (GET `/v1/quick-query/{quick_query_id}`)
+  → fake id 404 "Quick Query Not Found" (PRODUCT-AI-ANALYTICS-USER-0002). 0 resources in account.
+- **Writes (mutation-gated, heavy-prereq):** createquickquery + 6 PUT updates + deletequickquery
+  + validatequickqueryresources. `create` and `validate` both require a real **k8s `cluster_id`**
+  (billable cluster prereq) in the body.
+- **Coverage 2026-06-19:** 1→3/12 (+imageversions, +getquickquerylist; checkduplication already counted).
 
 ## data-analytics / data-ops
 
