@@ -37,10 +37,24 @@
           "capture_soft": {"cluster_id": "$.cluster_id"}
         },
         {
+          "name": "capture-ingress-controller",
+          "method": "GET",
+          "path": "/v1/data-flows/clusters/{cluster_id}/ingress-controllers",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {"ingress_controller_name": "$.contents[0].ingress_controller_name"}
+        },
+        {
           "name": "validate-resources-create",
           "method": "POST",
           "path": "/v1/data-flow-services/clusters/{cluster_id}/validate-resources",
-          "json": {"name": "regrdfsvc{ualpha}", "subnet_id": "", "server_type_name": "", "instance_count": 1},
+          "json": {
+            "service_workload": {
+              "nifi": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "1.27.1"},
+              "nifi_registry": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "1.27.1"},
+              "zookeeper": {"cpu": "2000", "memory": "1024", "replica": "3", "version": "3.9.2"}
+            }
+          },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "df-validate"
@@ -49,7 +63,13 @@
           "name": "validate-resources-update",
           "method": "POST",
           "path": "/v1/data-flow-services/{data_flow_service_id}/validate-resources",
-          "json": {"server_type_name": "", "instance_count": 1},
+          "json": {
+            "service_workload": {
+              "nifi": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "1.27.1"},
+              "nifi_registry": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "1.27.1"},
+              "zookeeper": {"cpu": "2000", "memory": "1024", "replica": "3", "version": "3.9.2"}
+            }
+          },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "df-validate"
@@ -59,22 +79,24 @@
           "method": "POST",
           "path": "/v1/data-flow-services",
           "json": {
-            "name": "regrdfsvc{ualpha}",
+            "data_flow_service_name": "regrdfsvc{ualpha}",
+            "data_flow_id": "{data_flow_id}",
+            "domain": "regrdfsvc{ualpha}",
+            "host_alias": {
+              "enabled": false,
+              "host_alias_list": []
+            },
+            "service_workload": {
+              "nifi": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "1.27.1"},
+              "nifi_registry": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "1.27.1"},
+              "zookeeper": {"cpu": "2000", "memory": "1024", "replica": "3", "version": "3.9.2"}
+            },
+            "storage_class_name": "",
             "description": "API regression coverage probe",
-            "dbaas_engine_version_id": "",
-            "subnet_id": "",
-            "nat_enabled": false,
-            "instance_name_prefix": "regrdf",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "instance_groups": [
-              {
-                "role_type": "ACTIVE",
-                "server_type_name": "",
-                "block_storage_groups": [{"role_type": "OS", "size_gb": 104, "volume_type": "SSD"}],
-                "instances": [{"role_type": "ACTIVE", "service_ip_address": "192.168.10.10/32"}]
-              }
-            ],
+            "account": {
+              "account_id": "",
+              "account_password": ""
+            },
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
@@ -104,9 +126,14 @@
           "method": "POST",
           "path": "/v1/data-flows",
           "json": {
-            "name": "regrdf{ualpha}",
+            "data_flow_name": "regrdf{ualpha}",
+            "cluster_id": "{cluster_id}",
+            "domain": "regrdf{ualpha}",
+            "host_alias_list": [],
+            "image_id": "IMAGE-9095b30d-a83b-4764-8a69-8a2c08a4be9a",
+            "ingress_controller_name": "{ingress_controller_name}",
+            "storage_class_name": "",
             "description": "API regression coverage probe",
-            "data_flow_service_id": "{data_flow_service_id}",
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],

@@ -57,13 +57,78 @@
           }
         },
         {
+          "name": "capture-param-id",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "param_id": "$.contents[0].id",
+            "param_old_value": "$.contents[0].applied_value"
+          }
+        },
+        {
+          "name": "set-parameters",
+          "method": "PUT",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "json": {
+            "parameters": [
+              {
+                "id": "{param_id}",
+                "new_value": "256",
+                "old_value": "{param_old_value}"
+              }
+            ]
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "sync-parameters",
+          "method": "POST",
+          "path": "/v1/clusters/{cluster_id}/parameters/sync",
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "optional": true,
+          "group": "param"
+        },
+        {
           "name": "register-log-export-config",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs",
           "json": {
+            "access_key": "",
+            "bucket_name": "regrcoveragebucket",
+            "delete_on_export": true,
             "log_type": "general",
-            "service_watch_log_collection": true,
-            "retention_period_day": "7"
+            "schedule_day_of_month": "28",
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "DAY",
+            "schedule_hour": "12",
+            "secret_key": ""
           },
           "expect_status": [
             200,
@@ -83,8 +148,13 @@
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
           "json": {
-            "service_watch_log_collection": true,
-            "retention_period_day": "14"
+            "access_key": "",
+            "delete_on_export": true,
+            "schedule_day_of_month": "28",
+            "schedule_day_of_week": "MON",
+            "schedule_frequency_type": "DAY",
+            "schedule_hour": "12",
+            "secret_key": ""
           },
           "expect_status": [
             200,
@@ -172,11 +242,32 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/replicas",
           "json": {
-            "name": "regrrepl{ualpha}",
-            "instance_name_prefix": "regrrepl",
-            "subnet_id": "",
-            "server_type_name": "",
-            "service_watch_log_collection": true,
+            "allowable_ip_addresses": [],
+            "replica_count": 1,
+            "replicas": [
+              {
+                "name": "regrrepl{ualpha}",
+                "instance_groups": [
+                  {
+                    "role_type": "ACTIVE",
+                    "server_type_name": "",
+                    "block_storage_groups": [
+                      {
+                        "role_type": "OS",
+                        "size_gb": 104,
+                        "volume_type": "SSD"
+                      }
+                    ],
+                    "instances": [
+                      {
+                        "role_type": "ACTIVE",
+                        "public_ip_id": ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
             "tags": []
           },
           "expect_status": [
@@ -197,13 +288,36 @@
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/replicas/other-region",
           "json": {
-            "name": "regrreplx{ualpha}",
-            "instance_name_prefix": "regrreplx",
+            "allowable_ip_addresses": [],
+            "nat_enabled": false,
             "region": "{region}",
+            "replica_count": 1,
             "subnet_id": "",
-            "server_type_name": "",
-            "service_watch_log_collection": true,
-            "tags": []
+            "tags": [],
+            "replicas": [
+              {
+                "name": "regrreplx{ualpha}",
+                "instance_groups": [
+                  {
+                    "role_type": "ACTIVE",
+                    "server_type_name": "",
+                    "block_storage_groups": [
+                      {
+                        "role_type": "OS",
+                        "size_gb": 104,
+                        "volume_type": "SSD"
+                      }
+                    ],
+                    "instances": [
+                      {
+                        "role_type": "ACTIVE",
+                        "public_ip_id": ""
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           },
           "expect_status": [
             200,
@@ -315,12 +429,7 @@
           "json": {
             "name": "regrrestore{ualpha}",
             "instance_name_prefix": "regrrst",
-            "subnet_id": "",
-            "server_type_name": "",
-            "restore_option": {
-              "restore_type": "DATETIME",
-              "restore_dt": "{today}"
-            },
+            "server_type_name": "db1v2m4",
             "tags": []
           },
           "expect_status": [
@@ -397,13 +506,9 @@
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups",
           "json": {
-            "block_storage_groups": [
-              {
-                "role_type": "DATA",
-                "size_gb": 10,
-                "volume_type": "SSD"
-              }
-            ]
+            "role_type": "DATA",
+            "size_gb": 10,
+            "volume_type": "SSD"
           },
           "expect_status": [
             200,
@@ -473,6 +578,36 @@
           "name": "get-engine-version-properties",
           "method": "GET",
           "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov"
+        },
+        {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov",
+          "capture_soft": {
+            "dbaas_parameter_group_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "list-parameters",
+          "method": "GET",
+          "path": "/v1/parameters",
+          "params": {
+            "dbaas_parameter_group_id": "{dbaas_parameter_group_id}"
+          },
           "expect_status": [
             200,
             400,
