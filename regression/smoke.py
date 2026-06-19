@@ -128,6 +128,8 @@ def _record_param(endpoint: Endpoint, status: int, category: str) -> None:
 # create nothing.
 _REQUIRED_QUERY_DEFAULTS = {
     "region_id": lambda ep: _settings.region,
+    "page": lambda ep: 0,
+    "size": lambda ep: 10,
     "server_category": lambda ep: "VIRTUAL_SERVER",
     "dbType": lambda ep: ep.service,
     "engine": lambda ep: ep.service,
