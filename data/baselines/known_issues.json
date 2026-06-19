@@ -133,6 +133,13 @@
       "classification": "Product Bug",
       "since": "2026-06-18",
       "note": "PUT upgrade-kernel -> 500 ContactAdminForAssistance (heavy n6 DBaaS run, postgresql-cluster-subops-guarded upgrade-kernel). ContactAdmin-class backend fault. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "networking/dns/createpublicdomainname",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-18",
+      "note": "POST /v1/public-domain-names -> 500 InternalServerError / ContactAdminForAssistance (the failed create also surfaces in loggingaudit as a Create Error). Our request body is PROVEN CORRECT: it is byte-for-byte the documented createpublicdomainname/1.3 request_example and carries every required field of the createpublicdomainrequest model (data/api_docs.json) — address_type, name, all four domestic_*_address_*, the overseas_* trio, postal_code, register_email/name/telno. So this is NOT a malformed-body 4xx mis-surfacing as 500; it is a genuine backend fault, same ContactAdmin class as budget createaccountbudget / iam createrole / quick-query validate-resources. Public-domain create is also a REAL PAID DOMAIN REGISTRATION ORDER, so we do not retry-chain it. Tracked upstream, not a suite regression."
     }
   ]
 }

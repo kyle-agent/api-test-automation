@@ -140,6 +140,52 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Coverage 2026-06-18:** 15 → **27 / 62** (read-only levers only; no resources
   created, account left clean).
 
+## networking / dns
+
+- **Host:** regional (`dns.<region>.<env>...`). 22 endpoints. Three resource
+  families: **private-dns**, **hosted-zones** (+ records), **public-domain-names**.
+  Cross-link `validated-facts.md` (networking quotas).
+- **Upstream flapping (System Issue, 2026-06-18/19):** the dns host intermittently
+  returns `503 upstream connect error / connection timeout` at the edge proxy even
+  though auth is fine (vpc 200s with the same creds). It recovers in windows — a
+  read probe that rides 503 with retry eventually gets the 200. Not auth, not our
+  body; an infra reachability blip. If every dns call 503s, retry later rather than
+  treating it as a regression.
+- **Read-only LISTs (no gate, the live levers):** `listhostedzone`
+  (`GET /v1/hosted-zones`), `listprivatedns` (`GET /v1/private-dns`),
+  `listpublicdomainnames` (`GET /v1/public-domain-names`) all return **200** on a
+  bare GET. Response envelopes (this account is EMPTY — count 0 in all three):
+  `{hosted_zones:[],count,page,size,sort}`, `{private_dns:[],...}`,
+  `{public_domain_names:[],...}`. These are the only dns endpoints coverable
+  read-only; everything else is id-bound or mutating.
+- **id-bound reads blocked behind a HEAVY create:** `showprivatedns`,
+  `showhostedzone`, `listhostedzonerecords`, `showhostedzonerecord` need a real
+  private-dns + hosted-zone + record to exist first. The account is empty and
+  private-dns create is a **very slow provisioner (hours, `heavy:true`)** — so on a
+  no-heavy run there is no id to target. They are covered (modeled, not
+  runtime-proven) by the `networking-dns-hosted-zone-private` heavy lifecycle.
+- **createpublicdomainname → 500 (Product Bug, baselined):** `POST
+  /v1/public-domain-names` returns 500 InternalServerError / ContactAdminForAssistance.
+  **Our body is proven correct** — byte-for-byte the documented `createpublicdomainname/1.3`
+  request_example with every required field of `createpublicdomainrequest`
+  (`data/api_docs.json`): address_type, name, all four `domestic_*_address_*`, the
+  `overseas_*` trio, postal_code, register_email/name/telno. Not a malformed-body
+  4xx mis-surfacing — a genuine backend fault, same ContactAdmin class as iam
+  createrole / budget createaccountbudget. Also a REAL PAID DOMAIN REGISTRATION
+  order, so the lifecycle never retry-chains it. Now in `data/baselines/known_issues.json`.
+- **Quotas:** Private DNS = 1/account (account-global; a 2nd create 4xx's —
+  `validated-facts.md`); Hosted Zone = 20/account, 100 records/zone; record types
+  A/AAAA/CNAME/TXT/MX/SPF/NS/SOA.
+- **Body/capture quirks:** hosted-zone create response is a **bare envelope** —
+  id at `$.id`, NOT `$.hosted_zone.id`; record id likewise `$.id`. private-dns
+  capture is `$.private_dns.id`. private-dns must reach `state: ACTIVE` before
+  setters work (400 invalid-state while CREATING). All encoded in
+  `regression/scenarios/lifecycles/networking__dns.json`.
+- **Coverage 2026-06-19:** 3 → **6 / 22** observed (the 3 list GETs newly live-200;
+  the public-domain 500 + 2 record-write probes were already observed). Remaining
+  16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind
+  the heavy private-dns create. Account left clean (no resources created).
+
 ---
 
 ## Services not yet deeply explored (stubs — fill in as you go)
