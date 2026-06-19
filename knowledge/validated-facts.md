@@ -863,3 +863,50 @@ can fix. Baselined in `known_issues.json`; the `xcov-pl-create` group tolerates 
 The privatelink mutation ops 403 "You do not have permission to Action" — the
 missing-IAM-action-definition class (PF-01/02/03/15/18). Correctly `soft`, already
 tolerated in `expect_status`; the CALL is recorded for coverage. Not a regression.
+
+## HEAVY_STALL root cause: DB-engine lifecycles env-skipped when shared-VPC env not propagated (2026-06-19, branch adoring-heisenberg)
+
+> conf: 0.9 · seen: 2026-06-19 · obs: 1 (live heavy-dbaas recovery run, 46:41 wall)
+
+**Root cause of the 00:18 heavy stall (provisioned the shared VPC, created 0 DB
+clusters, then died).** The shared VPC was provisioned out-of-band at 00:16
+(`shared_provision.stderr.log`) but its `SCP_SHARED_VPC_ID` / `SCP_RUN_HEAVY` env
+were **not propagated into the heavy DB pytest subprocess**. Every DB-engine
+lifecycle is `heavy=True` with `requires=None`; with `SCP_RUN_HEAVY` unset in that
+shell the engine takes the gate at `engine.run_lifecycle` (`engine.py:645`,
+"heavy lifecycle — set SCP_RUN_HEAVY=true to run") and returns `status='skipped'`
+BEFORE firing any create. Smoking gun: the stalled `heavy_dbaas.log` is literally
+`bringing up nodes...\n\ns.....` — `s`=skipped, no creates. The host-reachability
+preflight DNS failures (eventstreams/searchengine 503/NameResolution) were a RED
+HERRING — transient and unrelated to the skip. **Lesson: the env that gates heavy
+lifecycles (`SCP_RUN_HEAVY` + the three `SCP_SHARED_*_ID`) must be exported in the
+SAME shell as `python -m pytest`; a separate provisioning step that only writes
+`shared_ids.txt` does NOT make pytest adopt them.** `provision_shared_vpc` IS
+env-aware (`engine.py:1185`, adopts `SCP_SHARED_VPC_ID` → no 2nd VPC, no-op
+teardown) — so once the env is correctly exported the adopt path works perfectly.
+
+**Recovery run RESULT (gates+shared-VPC env exported in-shell, `-n 6`).** 8 real
+billable `POST /v1/clusters → 202` across mysql/mariadb/epas/cachestore plus the
+`heavy-shared-dbaas` mariadb/epas/cachestore trio; postgresql `createcluster`
+500'd (see baseline below). **Peak concurrent live DB clusters = 3** (the
+`requires=None` engines adopting the same shared VPC fan out under `-n 6` exactly
+as the 2026-06-18 fact predicted — wall ≈ max(engine), not sum). Each ACTIVE
+cluster let the engine identity-probe fire its id-bound sub-op GETs: **22 distinct
+DB sub-op id-GET 2xx** newly covered — per engine `showcluster`,
+`listbackuphistories`, `listparametervalues` (+ mysql/mariadb/epas also
+`listlogexportconfigs` / `listreplicas` / `showarchiveconfig`; cachestore also
+`listcommands`). id-bound-GET 2xx coverage **158 → 167 (+9 endpoints)** by the
+fixed-matcher recount (`reports/audit/count_idget.py`). Lifecycles self-tore-down
+(10× DELETE `/v1/clusters/<id>` → 202); reconciler sweep + 3 independent rechecks =
+**0 owned billable survivors** incl. the shared VPC `regrvpcsh6a348985` (DELETE
+204). 4 pytest FAILs were env/backend, not harness: postgresql create 500, and
+3 `*-subops-guarded` hit `upstream connect error / connection timeout` (gateway
+resets under the concurrent heavy load).
+
+**NEW PRODUCT BUG: `database/postgresql/postgresqlcreatecluster` → 500
+ContactAdminForAssistance.** Live 2026-06-19, fired twice (lifecycle create +
+subops-guarded create), both 500 `{"code":"ContactAdminForAssistance"}`. The other
+4 engines (mysql/mariadb/epas/cachestore) created fine with the identical
+shared-VPC body shape, so this is a postgresql-backend create fault, not a body/
+linking bug. Baselined in `known_issues.json` (Product Bug). Same `ContactAdmin`
+class as the already-baselined `*registerlogexportconfig` 500s.
