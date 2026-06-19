@@ -111,7 +111,11 @@ def detect(events: list[dict]) -> dict:
         c = ApiClient(settings)
         j = json.loads((c.get("/v1/vpcs", service="vpc").raw_text) or "{}")
         owned_vpc = [v for v in j.get("vpcs", []) if re.search(r"regr|zznet", str(v.get("name", "")))]
-        for eng in ("mysql", "postgresql", "mariadb", "epas", "cachestore"):
+        # ske + eventstreams also expose /v1/clusters; include them so a phase where
+        # the only billable thing up is a SKE k8s cluster (no DB engine yet) is NOT
+        # mis-flagged as HEAVY_STALL — false fire seen in run 27803424208 at 03:47Z
+        # while SKE cluster regrskebbfcff97 was CREATING.
+        for eng in ("mysql", "postgresql", "mariadb", "epas", "cachestore", "ske", "eventstreams"):
             try:
                 cj = json.loads((c.get("/v1/clusters", service=eng).raw_text) or "{}")
                 lst = next((v for v in cj.values() if isinstance(v, list)), [])
