@@ -44,8 +44,13 @@ Analyzed 16 services; applied the realizable levers, recorded the hard ceilings 
 ## VERIFIED — run #125 (27819913805, on `main` @ ea4ade38, 2026-06-19)
 - **#59 ✅ CONCURRENT** — mariadb + epas DB clusters Create-Started **8 seconds apart**
   (vs run #124's 14–22-min serial gaps). Long-pole-first ordering works.
-- **#60 ✅ owned-only** — loggingaudit showed **3 policy deletes (all owned)**, NOT the
-  416-policy mass-delete. Backend delete-all hazard neutralized.
+- **#60 ❌ FIRST FIX FAILED → re-fixed (commit `9d9a946d`).** The owned-id approach did
+  NOT help: `DELETE /v1/policies/bulk` **ignores the `policy_ids` body and deletes ALL
+  account policies regardless** (run #125: owned bulk-target created, then 422 delete.start
+  /417 delete.error across 237 system policies, all refused). An initial "3 deletes" check
+  was premature — it sampled mid-lifecycle before the 11:21Z fan-out. Correct fix: the
+  endpoint is un-probeable; the `pol-bulk` group was REMOVED and `management/iam/deletepolicies`
+  waived (blast-radius). Backend delete-all hazard recorded in `knowledge/validated-facts.md`.
 - **0 survivors** (VPC count=0; all DB engines / ske / VM clean after teardown).
 - **Coverage up:** clean-coverage metric **64.7%** (run #124 63.2% → run 1 ≈57%); reach ~82.6%.
 - Note: overall wall ~3 h — #59 fixed the DB phase but SKE (~40 min) + the serial VPC-CRUD
