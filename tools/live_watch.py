@@ -49,21 +49,43 @@ def _load_events(path: Path) -> list[dict]:
     return out
 
 
-def _heavy_active() -> tuple[bool, float]:
-    """(is a heavy batch in progress?, minutes since it started)."""
+def _heavy_active() -> tuple[bool, float, float]:
+    """(is a heavy batch in progress?, minutes since it started, start epoch)."""
     try:
         t = datetime.strptime(HEAVY_START.read_text().strip(), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
         mins = (datetime.now(timezone.utc) - t).total_seconds() / 60
-        return (mins < 120, mins)   # a heavy batch is "active" for up to 2h
+        return (mins < 120, mins, t.timestamp())   # a heavy batch is "active" for up to 2h
     except Exception:
-        return (False, 1e9)
+        return (False, 1e9, 0.0)
+
+
+def _recent_db_activity(start_ts: float) -> bool:
+    """Reliable 'the heavy lifecycles ARE running' signal from the results store
+    (not the volatile harvest file): any database/* observation since the batch
+    started means clusters were created+exercised — so a momentarily-empty harvest
+    or a post-teardown 0-clusters reading must NOT be called a stall."""
+    import glob
+    for f in glob.glob(str(ROOT / "reports" / "results" / "observations*.jsonl")):
+        try:
+            for line in open(f):
+                if '"database/' not in line:
+                    continue
+                try:
+                    o = json.loads(line)
+                except Exception:
+                    continue
+                if (o.get("endpoint_key") or "").startswith("database/") and (o.get("ts") or 0) >= start_ts:
+                    return True
+        except FileNotFoundError:
+            continue
+    return False
 
 
 def detect(events: list[dict]) -> dict:
     """Return {anomaly_key: human message} for everything currently wrong."""
     now = datetime.now(timezone.utc)
     found: dict[str, str] = {}
-    heavy, since_min = _heavy_active()
+    heavy, since_min, start_ts = _heavy_active()
 
     # activity from loggingaudit: billable Create-Starts + last event time
     billable_creates = 0
@@ -99,12 +121,17 @@ def detect(events: list[dict]) -> dict:
     except Exception as exc:
         found["WATCH_DEGRADED"] = f"watcher could not reach the API: {exc}"
 
-    # A1 — heavy batch running but NO billable activity, confirmed by BOTH
-    # loggingaudit (0 creates) AND the live API (0 owned clusters) == real stall.
-    if heavy and since_min > HEAVY_STALL_MIN and billable_creates == 0 and owned_clusters == 0:
+    # A1 — heavy batch running but NO billable activity. Only a real stall if
+    # loggingaudit shows 0 creates AND 0 owned clusters live AND the results store
+    # has NO database/* observation since the batch began (the reliable signal —
+    # clusters created+torn-down still leave their sub-op observations behind, so
+    # this won't false-fire after a successful teardown or on an empty harvest).
+    if (heavy and since_min > HEAVY_STALL_MIN and billable_creates == 0
+            and owned_clusters == 0 and not _recent_db_activity(start_ts)):
         found["HEAVY_STALL"] = (f"heavy batch started {since_min:.0f}m ago but 0 billable creates in "
-                                f"loggingaudit AND 0 owned DB clusters live — lifecycles aren't "
-                                f"running (check shared-VPC env, host DNS, pytest selection).")
+                                f"loggingaudit, 0 owned DB clusters live, AND no database/* "
+                                f"observations — lifecycles aren't running (check shared-VPC env, "
+                                f"host DNS, pytest selection).")
 
     # A2 — owned billable survivors when NO heavy batch is active == leak
     try:
