@@ -292,6 +292,72 @@ duplicating. Add a new `##` section when you take on a new service.
 
 ---
 
+## management / cloudmonitoring
+
+- **Host:** regional (`cloudmonitoring.<region>.<env>...`). 18 endpoints.
+  EOL service (sunsets 2026-09 → ServiceWatch). All endpoints coverable as
+  static-reachability probes even without deep validation.
+- **X-ResourceType header (CONFIRMED REQUIRED for multiple endpoints):**
+  Several endpoints require an `X-ResourceType: <productTypeCode>` HTTP header
+  (NOT a query param `resourceType`). Without it: 400 `InvalidHeaderValue`
+  `{name:"resourceType", value:"X-ResourceType"}`. Confirmed productTypeCodes
+  from `GET /v1/cloudmonitorings/product/v1/product-types`: `VM`, `Redis`,
+  `Bare Metal Server`, `Kubernetes`, `KAFKA`, `Object Storage`, etc. (37 total).
+  - `getaccountproductlist` (`GET /v1/cloudmonitorings/product/v2/accounts/products`):
+    requires `X-ResourceType` header. Returns 200 (empty list if no resources of
+    that type). Verified live: `X-ResourceType: VM` → 200.
+  - `getproducteventpolicylist` (`GET /v1/cloudmonitorings/event/v2/event-policies`):
+    requires BOTH `X-ResourceType` header AND `productResourceId` query param.
+    `productResourceId` is the resource name (e.g. `apitest-logsink` for Object
+    Storage). Verified live: `X-ResourceType: Object Storage` +
+    `productResourceId=apitest-logsink` → 200 (empty list).
+  - Likely required for `getproducteventlist` too but that endpoint also
+    consistently 400s (see bug below).
+- **Live resources in test account (2026-06-19, kr-west1):**
+  - Object Storage products: `productResourceId=apitest-logsink` (state=NE).
+    Discovered via `GET /v1/cloudmonitorings/product/v2/accounts/products` with
+    `X-ResourceType: Object Storage`.
+  - No addrbooks (totalCount=0). Addrbook steps normalize to placeholder '*' key.
+- **getaccounteventlist 400 / backend bug (CONFIRMED):**
+  `GET /v1/cloudmonitorings/event/v2/accounts/events` consistently returns 400
+  `InvalidInputValue` with `{name:"resourceType", value:<queryEndDt-date>}` regardless
+  of what params are provided. The API is erroneously treating the queryEndDt query
+  parameter value as the value of the "resourceType" field. This is a backend parameter
+  binding bug — the correct params (eventState, queryStartDt, queryEndDt, X-ResourceType
+  header) all fail the same way. **Classify: validation-400 / backend-param-binding bug.**
+  Dual-recorded in scenario with `params` so it counts as reached (soft category).
+- **getproducteventlist 400 / similar bug:**
+  `GET /v1/cloudmonitorings/event/v2/events` behaves similarly — after providing
+  `productResourceId + eventState + queryStartDt`, still errors on queryEndDt date.
+  Tried with `X-ResourceType` header, with/without all params. Backend issue same class.
+  **Classify: validation-400 / needs-real-event-data or backend bug.**
+- **api_catalog_params.json sidecar gaps vs live behavior:**
+  - Sidecar declares `getaccounteventlist` requires `eventState, queryStartDt, queryEndDt`
+    but NOT `resourceType`. Live API also needs `resourceType` (as header or query)
+    but the backend bug makes it 400 regardless.
+  - Sidecar declares `getaccountproductlist` has NO required params. Live API requires
+    `X-ResourceType` header — sidecar is missing this (header params are outside the
+    sidecar's query_params scope).
+- **Confirmed 200 endpoints (bare GETs — smoke-covered):**
+  - `getaccountmembers` — bare GET, 200
+  - `getadressbooklist` — bare GET, 200 (empty)
+  - `getmetriclist` — bare GET, 200 (3510 metrics across 37 product types)
+  - `getproducttypelist` — bare GET, 200 (37 product types)
+- **Id-bound GETs (5 endpoints, getevent*/geteventpolicy*/getadressbookmember):**
+  Need event-id or eventPolicyId (no events in this account without SCP_RUN_HEAVY)
+  or addrbookId (no addrbooks). Scenario normalizes to '*' placeholder key when
+  no real ID is captured.
+- **Mutating endpoints (3):** `puteventpolicy` (POST create), `modifyeventpolicy`
+  (PUT), `deleteeventpolicy` (DELETE). All need `SCP_ALLOW_MUTATIONS=true` +
+  `SCP_ALLOW_DESTRUCTIVE=true`. Body shape for `puteventpolicy` is UNPROVEN
+  (docs JS-rendered). Body likely needs: `eventPolicyName`, `productTypeCode`,
+  notification targets. Currently classified 400/soft from prior runs.
+- **Coverage 2026-06-19:** 0 → **~8/18** (4 from smoke, ~4 newly reached via
+  scenario params dual-recording for `getaccountproductlist`, `getproducteventpolicylist`,
+  `getaccounteventlist`, and id-bound path-param GETs via '*' placeholder).
+
+---
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
 database (mysql, mariadb), data-analytics, ai-ml, financial-management,
