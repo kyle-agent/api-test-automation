@@ -59,15 +59,17 @@ like `Budget`, reclaims slots from crashed holders via PID-liveness, and is OPT-
 **Engine wiring DONE (opt-in, offline-validated):** `regression/scenarios/engine.py`
 — a VPC self-create (budget kind `vpc`) now ACQUIRES a cross-process slot before the
 create and BLOCKS until one frees; on timeout it environmentally skips (Hard Rule 6,
-never fails); the slot is released symmetrically when the VPC is deleted (own DELETE
-step on the happy path, or teardown on failure) so a created-then-deleted VPC never
-leaks its slot. Gated entirely on `SCP_VPC_SEMAPHORE=true` → with it unset the engine
+never fails); the slot is released **per VPC id** when that VPC is deleted (own DELETE
+step on the happy path, or teardown on failure), so a multi-VPC lifecycle (e.g.
+vpc-peering creates two) frees exactly the slot of the id deleted — no arbitrary-token
+pop, no leak. Gated entirely on `SCP_VPC_SEMAPHORE=true` → with it unset the engine
 never touches the semaphore (today's per-process behaviour, serial job intact). Knobs:
 `SCP_VPC_SEMAPHORE` (enable), `SCP_VPC_SHARED_RESERVED` (slots held back for shared
 infra; default 1 when a shared VPC id is present), `SCP_VPC_SEMAPHORE_TIMEOUT` (default
 1800s), `SCP_VPC_SEMAPHORE_POLL` (default 1.0s). Tests:
-`tests/offline/test_engine_vpc_semaphore.py` (3: slot held-then-freed, throttle-skip
-when the cap is held, opt-out no-op).
+`tests/offline/test_engine_vpc_semaphore.py` (5: slot held-then-freed, throttle-skip
+when the cap is held, opt-out no-op, two-VPC both-held-then-freed, partial-delete frees
+only the deleted id).
 
 **Remaining cutover (needs a live CI run — do NOT blind-merge):** in
 `.github/workflows/api-test.yml`, set `SCP_VPC_SEMAPHORE=true` + an appropriate

@@ -29,10 +29,11 @@ DAG. Adopt incrementally:
   (`core.budgets.CrossProcessSemaphore`, file-backed + `fcntl.flock`, PID-liveness
   reclaim, offline multi-process tests); (2) the engine is wired (opt-in
   `SCP_VPC_SEMAPHORE`: a VPC self-create acquires/blocks/releases a cross-process
-  slot, throttle-skips on timeout, offline-validated). Remaining: drop the
-  `regression-vpc-crud` serial job in `.github/workflows/api-test.yml`, enable the
-  flag, and fold `VPC_CRUD_K` into the parallel pool — that cutover needs a live CI
-  run to validate (do NOT blind-merge; see `docs/run-parallelism-optimization.md` #3).
+  slot per VPC id, throttle-skips on timeout, offline-validated incl. multi-VPC).
+  Remaining: the `.github/workflows/api-test.yml` cutover (enable the flag, drop the
+  `regression-vpc-crud` serial job, fold `VPC_CRUD_K` into the parallel pool) — drafted
+  but needs a flag-on heavy run to validate (peak concurrent VPCs ≤ 5, 0 survivors)
+  before merge; do NOT blind-merge (see `docs/run-parallelism-optimization.md` #3).
 - **1.0** custom DAG runner replacing xdist (leaf-set → closure → topological waves →
   budgets throttle), consuming `suites/*.yaml` / `--service` selections as the leaf set
 

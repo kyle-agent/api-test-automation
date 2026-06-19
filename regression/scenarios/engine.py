@@ -766,22 +766,35 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
     # steps that 4xx; without a cap the retry sleeps alone add ~1 min/step.
     opt_retry_left = float(os.getenv("SCP_OPT_RETRY_BUDGET_S", "240"))
 
-    # v0.5 cross-process VPC throttle (opt-in). A held token per live VPC this
-    # lifecycle created; released symmetrically when the VPC is deleted (own
-    # step or teardown). A stack of interchangeable slots — release is guarded so
-    # it never frees more than acquired, keeping the run-wide count exact.
-    # NOTE (pre-cutover TODO): release pops the stack on ANY /v1/vpcs/{id} delete,
-    # which is exact for well-formed lifecycles (they own-delete every VPC they
-    # create). A malformed lifecycle that creates N VPCs but own-deletes < N on
-    # the success path (teardown skipped) would leak the surplus slot for the run
-    # — mirroring the real cloud-VPC leak it implies. Before enabling the flag in
-    # the workflow, key tokens by created VPC id for precise multi-VPC pairing.
+    # v0.5 cross-process VPC throttle (opt-in). A held slot token per LIVE VPC
+    # this lifecycle created, keyed by the VPC id so release is exact even when
+    # a lifecycle creates several VPCs (e.g. vpc-peering creates two): the slot
+    # is freed for the specific id deleted (own DELETE step or teardown), never
+    # by popping an arbitrary token. `_pending_vpc_tok` holds a token acquired
+    # just before a create but not yet bound to an id (bound at cleanup
+    # registration once the create's delete-path id is known; released if the
+    # create fails). No-op throughout unless SCP_VPC_SEMAPHORE=true.
     _vpc_sem = _vpc_semaphore_cfg()          # (sem, limit, timeout, poll) | None
-    vpc_sem_tokens: list[str] = []
+    vpc_tokens_by_id: dict[str, str] = {}    # live VPC id -> held slot token
+    _pending_vpc_tok: list[str] = []         # acquired, not yet bound to an id
 
-    def _release_vpc_slot():
-        if _vpc_sem is not None and vpc_sem_tokens:
-            _vpc_sem[0].release(vpc_sem_tokens.pop())
+    def _vpc_id_of(path: str) -> str | None:
+        return path.rstrip("/").rsplit("/", 1)[-1] if _is_vpc_delete("DELETE", path) else None
+
+    def _release_pending_vpc_tok():
+        """Give back a slot acquired for a create that did not take effect."""
+        if _vpc_sem is not None and _pending_vpc_tok:
+            _vpc_sem[0].release(_pending_vpc_tok.pop())
+
+    def _release_vpc_for_path(path: str):
+        """Free the slot for the VPC addressed by a /v1/vpcs/{id} delete path
+        (own DELETE step or teardown). No-op when off or that id isn't held."""
+        if _vpc_sem is None:
+            return
+        vid = _vpc_id_of(path)
+        tok = vpc_tokens_by_id.pop(vid, None) if vid else None
+        if tok:
+            _vpc_sem[0].release(tok)
 
     def _run_cleanup(entry):
         label, method, path, svc, cu_json, _grp, bkind = entry
@@ -803,7 +816,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 budget.release(bkind)
                 reserved[bkind] = max(0, reserved.get(bkind, 0) - 1)
                 if bkind == "vpc":   # ...and its cross-process slot (v0.5)
-                    _release_vpc_slot()
+                    _release_vpc_for_path(path)
 
     def _teardown():
         for entry in reversed(cleanups):
@@ -1005,7 +1018,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                         f"[{lifecycle['id']}] VPC quota semaphore: no slot within "
                         f"{_to:.0f}s (limit={_lim}) — skipping rather than racing "
                         f"the account VPC cap")
-                vpc_sem_tokens.append(_tok)
+                _pending_vpc_tok.append(_tok)   # bound to its id at cleanup reg
 
             try:
                 resp = _run_step(client, step, path, body, step_service, ctx,
@@ -1040,8 +1053,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 if bkind:  # roll back the reservation we just took
                     budget.release(bkind)
                     reserved[bkind] = max(0, reserved.get(bkind, 0) - 1)
-                    if bkind == "vpc":
-                        _release_vpc_slot()
+                    if bkind == "vpc":   # the create did not take effect
+                        _release_pending_vpc_tok()
                 _teardown()
                 raise LifecycleSkip(str(exc))
 
@@ -1118,8 +1131,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 if bkind:  # the create did not take effect — give the slot back
                     budget.release(bkind)
                     reserved[bkind] = max(0, reserved.get(bkind, 0) - 1)
-                    if bkind == "vpc":
-                        _release_vpc_slot()
+                    if bkind == "vpc":   # the create did not take effect
+                        _release_pending_vpc_tok()
                 if step.get("optional"):
                     reason = f"{step['name']} -> {resp.status} (env): {resp.raw_text[:300]}"
                     print(f"  optional step '{step['name']}' (group={grp}) hit an "
@@ -1148,8 +1161,8 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 if bkind:  # creation failed — release the reserved slot
                     budget.release(bkind)
                     reserved[bkind] = max(0, reserved.get(bkind, 0) - 1)
-                    if bkind == "vpc":
-                        _release_vpc_slot()
+                    if bkind == "vpc":   # the create did not take effect
+                        _release_pending_vpc_tok()
                 reason = f"{step['name']} -> {resp.status}: {resp.raw_text[:400]}"
                 print(f"  optional step '{step['name']}' (group={grp}) failed "
                       f"-> {resp.status}; skipping group. {resp.raw_text[:200]}")
@@ -1166,8 +1179,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # v0.5 throttle: the happy path deletes its VPC via its OWN step (not
             # teardown), so free the cross-process slot here too — otherwise a
             # created-then-deleted VPC would leak its slot for the whole run.
-            if _is_vpc_delete(step.get("method", ""), path):
-                _release_vpc_slot()
+            _release_vpc_for_path(path)
 
             for var, expr in step.get("capture", {}).items():
                 val = _capture(resp.body, expr)
@@ -1212,6 +1224,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 cu_svc = cu.get("service") or step_service
                 cleanups.append((step["name"], cu["method"], cu_path, cu_svc,
                                  _fill_obj(cu.get("json"), ctx), grp, bkind))
+                # v0.5: bind the slot acquired before this VPC create to the now
+                # known VPC id, so its release (own DELETE or teardown) is exact.
+                if bkind == "vpc" and _pending_vpc_tok:
+                    _vid = _vpc_id_of(cu_path)
+                    if _vid:
+                        vpc_tokens_by_id[_vid] = _pending_vpc_tok.pop()
+                    else:   # unbindable cleanup shape — free it rather than leak
+                        _release_pending_vpc_tok()
                 # crash-safe manifest entry for the reconciler
                 rid = ""
                 for v in step.get("capture", {}):

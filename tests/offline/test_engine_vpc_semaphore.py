@@ -140,3 +140,69 @@ def test_disabled_by_default_ignores_semaphore(monkeypatch):
 
     assert res["status"] == "passed", res
     assert client.has("POST", "/v1/vpcs")
+
+
+# -- multi-VPC precision (the Medium fix: id-keyed release) ------------------
+
+def _two_vpc_lc(delete_both=True):
+    """A peering-shaped lifecycle: self-create TWO VPCs (a, b) then delete a (and
+    optionally b) via own steps — exercises id-keyed slot release."""
+    steps = [
+        {"name": "create-vpc-a", "method": "POST", "path": "/v1/vpcs",
+         "json": {"name": "a", "cidr": "10.1.0.0/20", "tags": []},
+         "capture": {"vpc_a": "$.vpc.id"}, "expect_status": [201],
+         "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_a}", "service": "vpc"}},
+        {"name": "create-vpc-b", "method": "POST", "path": "/v1/vpcs",
+         "json": {"name": "b", "cidr": "10.2.0.0/20", "tags": []},
+         "capture": {"vpc_b": "$.vpc.id"}, "expect_status": [201],
+         "cleanup": {"method": "DELETE", "path": "/v1/vpcs/{vpc_b}", "service": "vpc"}},
+        {"name": "delete-vpc-a", "method": "DELETE", "path": "/v1/vpcs/{vpc_a}",
+         "destructive": True, "expect_status": [200, 202, 204]},
+    ]
+    if delete_both:
+        steps.append({"name": "delete-vpc-b", "method": "DELETE",
+                      "path": "/v1/vpcs/{vpc_b}", "destructive": True,
+                      "expect_status": [200, 202, 204]})
+    return {"id": "two-vpc", "service": "vpc", "heavy": True, "enabled": True,
+            "steps": steps}
+
+
+def _seq_vpc_client(peak_box):
+    """POST /v1/vpcs returns vpc-a, vpc-b, ...; each call records the live slot
+    count so we can assert both VPCs are held concurrently at the peak."""
+    ids = iter(["vpc-a", "vpc-b", "vpc-c"])
+
+    def _post():
+        peak_box[0] = max(peak_box[0], CrossProcessSemaphore("vpc").used())
+        return _r(201, {"vpc": {"id": next(ids)}})
+
+    return FakeClient({("POST", "/v1/vpcs"): _post})
+
+
+def test_two_vpcs_both_held_then_both_freed(monkeypatch):
+    monkeypatch.setenv("SCP_VPC_SEMAPHORE", "true")
+    monkeypatch.setenv("SCP_VPC_SHARED_RESERVED", "0")   # limit = full cap (5)
+
+    peak = [0]
+    client = _seq_vpc_client(peak)
+    res = engine.run_lifecycle(_two_vpc_lc(delete_both=True), client, _cfg())
+
+    assert res["status"] == "passed", res
+    assert peak[0] == 2, "both VPCs must hold a slot concurrently"
+    assert CrossProcessSemaphore("vpc").used() == 0   # both freed by their own DELETEs
+
+
+def test_partial_delete_frees_only_the_deleted_vpc(monkeypatch):
+    # Create two VPCs, own-delete ONLY vpc-a, then succeed. The id-keyed release
+    # frees exactly vpc-a's slot; vpc-b (still live) keeps its slot — mirroring
+    # reality, and proving release is per-id, not pop-an-arbitrary-token.
+    monkeypatch.setenv("SCP_VPC_SEMAPHORE", "true")
+    monkeypatch.setenv("SCP_VPC_SHARED_RESERVED", "0")
+
+    peak = [0]
+    client = _seq_vpc_client(peak)
+    res = engine.run_lifecycle(_two_vpc_lc(delete_both=False), client, _cfg())
+
+    assert res["status"] == "passed", res
+    assert peak[0] == 2
+    assert CrossProcessSemaphore("vpc").used() == 1   # vpc-a freed; vpc-b still held
