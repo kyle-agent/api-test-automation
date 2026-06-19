@@ -54,9 +54,30 @@ def _tag_of(e: dict) -> str:
 
 
 def harvest(start: str, end: str, out: str, max_pages: int = 80) -> str:
-    subprocess.run([sys.executable, "-m", "audit.harvest", "--start", start,
-                    "--end", end, "--out", out, "--service", "loggingaudit",
-                    "--max-pages", str(max_pages)], check=False, timeout=300)
+    """Harvest loggingaudit to ``out``. loggingaudit intermittently returns 0
+    events (503/eventual-consistency); harvest to a temp and only replace ``out``
+    when the new pull is non-empty, so a flaky empty harvest never BLANKS a good
+    live page (it keeps the last good data instead). Retries a couple times."""
+    tmp = out + ".tmp"
+    for _ in range(3):
+        subprocess.run([sys.executable, "-m", "audit.harvest", "--start", start,
+                        "--end", end, "--out", tmp, "--service", "loggingaudit",
+                        "--max-pages", str(max_pages)], check=False, timeout=300)
+        try:
+            n = sum(1 for ln in open(tmp) if ln.strip())
+        except FileNotFoundError:
+            n = 0
+        if n > 0:
+            try:
+                Path(tmp).replace(out)
+            except OSError:
+                pass
+            return out
+    # all attempts empty — keep whatever good data ``out`` already had
+    try:
+        Path(tmp).unlink()
+    except OSError:
+        pass
     return out
 
 
