@@ -202,6 +202,37 @@ duplicating. Add a new `##` section when you take on a new service.
   16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind
   the heavy private-dns create. Account left clean (no resources created).
 
+## data-analytics / data-ops
+
+- **Host:** regional. 17 endpoints. Provisions and manages Apache Airflow
+  (data-ops-service = cluster, data-ops = workflow/DAG service on top).
+- **COMPOSITE-CREATE (HEAVY/BILLABLE):** `POST /v1/data-ops-services` creates a
+  billable Airflow cluster. `POST /v1/data-ops` creates a data-ops instance on
+  top of an existing service. Both are `heavy:true` in the lifecycle; never fire
+  without `SCP_RUN_HEAVY=true`.
+- **ID formats (live-confirmed 2026-06-19):**
+  - data-ops id: must start with `DOPS-` (e.g. `DOPS-<uuid>`)
+  - data-ops-service id: must start with `DOPS_SERVICE-` (e.g. `DOPS_SERVICE-<uuid>`)
+  - cluster_id: 32-hex-char UUID (no hyphens, e.g. uuid4().hex)
+- **check-duplication endpoints:** both GET endpoints with name path-params
+  (`/v1/data-ops/{data_ops_name}/check-duplication` and
+  `/v1/data-ops-services/{data_ops_service_name}/check-duplication`) return **200**
+  `{"result":false}` for any valid name including probes. No resource needed.
+  `params: {}` added to scenario steps so engine records under catalog key.
+- **id-bound GETs (non-2xx, soft, needs heavy-prereq):**
+  - `getdataopsdetail` (`/v1/data-ops/{data_ops_id}`) → 404 when resource missing
+  - `getdataopsservice` (`/v1/data-ops-services/{data_ops_service_id}`) → 404 when missing
+  - `getdataopssubversion` (`/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions`) → **400** (NOT 404!) "dataOps is null" when ID valid format but resource missing
+  - `getingresscontrollerlistv1` (`/v1/data-ops/clusters/{cluster_id}/ingress-controllers`) → 404 when cluster missing
+- **validate-resources POSTs:** dry-run preflight the console calls before create/update.
+  Still classified `mutating=True` (POST). Need real cluster_id/service_id AND
+  `SCP_ALLOW_MUTATIONS=true`. Heavy-prereq blockers.
+- **Response envelope:** list endpoints use `{contents:[], total_count}`. Detail uses
+  flat object or wrapped object (not yet confirmed — no existing resources).
+- **image-versions:** `GET /v1/data-ops/image-versions` → `{contents:[{image_id, image_name, version}], total_count}`. Currently returns 1 version: `4.1.1`.
+- **Coverage 2026-06-19:** 3 → **5/17** read-only. Remaining 12 are heavy-prereq
+  blockers (4 id-bound GETs + 8 mutating writes all depend on existing billable cluster).
+
 ---
 
 ## Services not yet deeply explored (stubs — fill in as you go)

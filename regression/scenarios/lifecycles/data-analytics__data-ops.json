@@ -180,19 +180,21 @@
           "name": "check-data-ops-duplication",
           "method": "GET",
           "path": "/v1/data-ops/regr{ualpha}/check-duplication",
+          "params": {},
           "expect_status": [200, 400, 403, 404],
           "optional": true,
           "group": "do-read",
-          "_note": "id-bound read (checkduplicationdataops). Closes GAP-get-id for GET /v1/data-ops/{data_ops_name}/check-duplication. The catalog path-param {data_ops_name} is a free-form NAME, so we send a templated probe name (regr{ualpha} renders to a valid lowercase name AND, because it contains a {token}, the segment normalizes to the catalog '*' key — a literal segment would NOT match). Tolerant [200,400,403,404]: duplication-check accepts any name -> 200/400, still RECORDED. The GET is CALLED so the endpoint is statically reachable."
+          "_note": "id-bound read (checkduplicationcontrollerv1). Closes GAP-get-id for GET /v1/data-ops/{data_ops_name}/check-duplication. The catalog path-param {data_ops_name} is a free-form NAME, so we send a templated probe name (regr{ualpha} renders to a valid lowercase name AND, because it contains a {token}, the segment normalizes to the catalog '*' key — a literal segment would NOT match). Tolerant [200,400,403,404]: duplication-check accepts any name -> 200/400, returns 200. params:{} added so engine also records under catalog key (checkduplicationcontrollerv1)."
         },
         {
           "name": "check-data-ops-service-duplication",
           "method": "GET",
           "path": "/v1/data-ops-services/regr{ualpha}/check-duplication",
+          "params": {},
           "expect_status": [200, 400, 403, 404],
           "optional": true,
           "group": "do-read",
-          "_note": "id-bound read (checkduplicationdataopsservice). Closes GAP-get-id for GET /v1/data-ops-services/{data_ops_service_name}/check-duplication. Same templated-name rationale as check-data-ops-duplication (free-form NAME path-param; regr{ualpha} normalizes to the catalog '*' key, a literal would not). Tolerant [200,400,403,404]; CALLED so the endpoint is statically reachable."
+          "_note": "id-bound read (checkduplicationcontroller). Closes GAP-get-id for GET /v1/data-ops-services/{data_ops_service_name}/check-duplication. Same templated-name rationale as check-data-ops-duplication (free-form NAME path-param; regr{ualpha} normalizes to the catalog '*' key, a literal would not). Tolerant [200,400,403,404]; returns 200. params:{} added so engine also records under catalog key (checkduplicationcontroller)."
         },
         {
           "name": "capture-cluster-id",
