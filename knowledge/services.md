@@ -314,9 +314,14 @@ duplicating. Add a new `##` section when you take on a new service.
   - Likely required for `getproducteventlist` too but that endpoint also
     consistently 400s (see bug below).
 - **Live resources in test account (2026-06-19, kr-west1):**
-  - Object Storage products: `productResourceId=apitest-logsink` (state=NE).
-    Discovered via `GET /v1/cloudmonitorings/product/v2/accounts/products` with
+  - Object Storage products: `productResourceId=apitest-logsink` (state=NE),
+    `apitest-oplog-permanent` (state=NE). Discovered via
+    `GET /v1/cloudmonitorings/product/v2/accounts/products` with
     `X-ResourceType: Object Storage`.
+  - Block Storage(VM): 1 product (UUID, state=Running). No VMs, no addrbooks.
+  - All products have state "NE" (not enrolled in monitoring backend) except
+    Block Storage(VM). Even the Running Block Storage product returns 400 for
+    event policy create — the "NE" Object Storage products return "InvalidRequest".
   - No addrbooks (totalCount=0). Addrbook steps normalize to placeholder '*' key.
 - **getaccounteventlist 400 / backend bug (CONFIRMED):**
   `GET /v1/cloudmonitorings/event/v2/accounts/events` consistently returns 400
@@ -347,14 +352,40 @@ duplicating. Add a new `##` section when you take on a new service.
   Need event-id or eventPolicyId (no events in this account without SCP_RUN_HEAVY)
   or addrbookId (no addrbooks). Scenario normalizes to '*' placeholder key when
   no real ID is captured.
+- **puteventpolicy body shape (CONFIRMED cascade-revealed 2026-06-19):**
+  Must wrap all fields in `eventPolicyRequest` key. Required cascade-field order:
+  `disableYn`, `isLogMetric`, `eventLevel`, `ftCount`, `eventThreshold`. Once all
+  present the API returns `{"code":"InvalidRequest","params":[null]}` — backend
+  business rule validation fails (products in NE state). Full confirmed body:
+  `{"eventPolicyRequest": {"eventPolicyName": "...", "productTypeCode": "Object Storage",
+  "productResourceId": "apitest-logsink", "metricKey": "<key>", "eventLevel": "WARNING",
+  "disableYn": "N", "isLogMetric": false, "eventThreshold": 100.0, "ftCount": 1}}`.
+  The `InvalidRequest` with `null` params is an account-level blocker (products not
+  enrolled in monitoring). **Classify: account-prereq / entitlement-class blocker.**
+- **getmetricperfdatalist body shape (CONFIRMED cascade-revealed 2026-06-19):**
+  POST `/v1/cloudmonitorings/product/v2/metric-data`. Required fields:
+  `productTypeCode`, `productResourceId`, `queryStartDt` (ISO 8601 with T/Z suffix),
+  `queryEndDt` (ISO 8601 with T/Z suffix), `metricDataConditions` (array of objects).
+  Without T-suffix dates: 400 `resourceType=queryStartDt` backend bug. With T-suffix
+  dates: 404 `productResourceInfos not found` — same account-level prereq.
+  Example body: `{"productTypeCode":"Object Storage","productResourceId":"apitest-logsink",
+  "queryStartDt":"2026-05-21T00:00:00Z","queryEndDt":"2026-06-19T23:59:59Z",
+  "metricDataConditions":[{"metricKey":"objectstorage.usage.bucketSizeBytes",
+  "statisticType":"AVG","period":3600}]}`.
+  **Classify: account-prereq / products not in monitoring backend.**
 - **Mutating endpoints (3):** `puteventpolicy` (POST create), `modifyeventpolicy`
   (PUT), `deleteeventpolicy` (DELETE). All need `SCP_ALLOW_MUTATIONS=true` +
-  `SCP_ALLOW_DESTRUCTIVE=true`. Body shape for `puteventpolicy` is UNPROVEN
-  (docs JS-rendered). Body likely needs: `eventPolicyName`, `productTypeCode`,
-  notification targets. Currently classified 400/soft from prior runs.
-- **Coverage 2026-06-19:** 0 → **~8/18** (4 from smoke, ~4 newly reached via
-  scenario params dual-recording for `getaccountproductlist`, `getproducteventpolicylist`,
-  `getaccounteventlist`, and id-bound path-param GETs via '*' placeholder).
+  `SCP_ALLOW_DESTRUCTIVE=true`. Body shape now confirmed from cascade (see above).
+  Cannot reach 2xx without monitoring-enrolled resources. Blocker: account-prereq.
+- **Coverage 2026-06-19:** 0 → **6/18** confirmed 200 ok:
+  getaccountmembers, getadressbooklist, getmetriclist, getproducttypelist (smoke),
+  getaccountproductlist, getproducteventpolicylist (X-ResourceType header probes).
+  Remaining 12 blocked by: backend date-parsing bug (getaccounteventlist,
+  getproducteventlist), missing monitoring enrollment (puteventpolicy,
+  modifyeventpolicy, deleteeventpolicy, getmetricperfdatalist), no real resource
+  IDs for id-bound GETs (geteventdetail, geteventnotificationstates,
+  geteventpolicydetail, geteventpolicyhistories, geteventpolicynotification,
+  getadressbookmemberlist).
 
 ---
 

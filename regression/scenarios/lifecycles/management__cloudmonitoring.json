@@ -26,12 +26,17 @@
           "path": "/v1/cloudmonitorings/event/v2/event-policies",
           "headers": {"X-ResourceType": "Object Storage"},
           "json": {
-            "eventPolicyName": "regrcmep{unique}",
-            "productTypeCode": "Object Storage",
-            "productResourceId": "apitest-logsink",
-            "eventLevel": "WARNING",
-            "enabled": true,
-            "description": "API regression coverage probe"
+            "eventPolicyRequest": {
+              "eventPolicyName": "regrcmep{unique}",
+              "productTypeCode": "Object Storage",
+              "productResourceId": "apitest-logsink",
+              "metricKey": "objectstorage.usage.bucketSizeBytes",
+              "eventLevel": "WARNING",
+              "disableYn": "N",
+              "isLogMetric": false,
+              "eventThreshold": 100.0,
+              "ftCount": 1
+            }
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
@@ -44,7 +49,7 @@
             "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
             "service": "cloudmonitoring"
           },
-          "_note": "puteventpolicy (CREATE). Body updated based on live analysis: X-ResourceType header required, productResourceId required (same pattern as getproducteventpolicylist), productTypeCode='Object Storage' matches X-ResourceType, productResourceId='apitest-logsink' (confirmed Object Storage resource in test account). Still may need additional fields (metricKey, notification config). On 4xx the group isolates; the POST is still recorded under its catalog key."
+          "_note": "puteventpolicy (CREATE). Body CONFIRMED via cascade probing 2026-06-19: must wrap in 'eventPolicyRequest' key. Required fields confirmed: eventPolicyName, productTypeCode, productResourceId, metricKey, eventLevel, disableYn, isLogMetric, eventThreshold, ftCount. Currently returns 400 InvalidRequest null params because account products have state NE (not enrolled in monitoring backend). Blocker: account-prereq. On 4xx the group isolates; the POST is still recorded under its catalog key."
         },
         {
           "name": "show-event-policy",
@@ -60,17 +65,22 @@
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
           "headers": {"X-ResourceType": "Object Storage"},
           "json": {
-            "eventPolicyName": "regrcmep{unique}",
-            "productTypeCode": "Object Storage",
-            "productResourceId": "apitest-logsink",
-            "eventLevel": "CRITICAL",
-            "enabled": false,
-            "description": "API regression coverage probe (update)"
+            "eventPolicyRequest": {
+              "eventPolicyName": "regrcmep{unique}",
+              "productTypeCode": "Object Storage",
+              "productResourceId": "apitest-logsink",
+              "metricKey": "objectstorage.usage.bucketSizeBytes",
+              "eventLevel": "CRITICAL",
+              "disableYn": "Y",
+              "isLogMetric": false,
+              "eventThreshold": 90.0,
+              "ftCount": 3
+            }
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "cm-policy",
-          "_note": "modifyeventpolicy (PUT). Includes X-ResourceType header and productResourceId per live-confirmed pattern. Only runs if create-event-policy succeeds and captures eventPolicyId."
+          "_note": "modifyeventpolicy (PUT). Body uses same confirmed shape as create-event-policy (eventPolicyRequest wrapper). Only runs if create-event-policy succeeds and captures eventPolicyId. Account-prereq blocker applies."
         },
         {
           "name": "delete-event-policy",
@@ -86,18 +96,24 @@
           "name": "get-metric-perf-data",
           "method": "POST",
           "path": "/v1/cloudmonitorings/product/v2/metric-data",
+          "headers": {"X-ResourceType": "Object Storage"},
           "json": {
-            "productTypeCode": "Server",
-            "metricName": "cpu_usage",
-            "statisticType": "AVG",
-            "period": 300,
-            "startDt": "{today}",
-            "endDt": "{today}"
+            "productTypeCode": "Object Storage",
+            "productResourceId": "apitest-logsink",
+            "queryStartDt": "{iso_29d_ago}T00:00:00Z",
+            "queryEndDt": "{iso_today}T23:59:59Z",
+            "metricDataConditions": [
+              {
+                "metricKey": "objectstorage.usage.bucketSizeBytes",
+                "statisticType": "AVG",
+                "period": 3600
+              }
+            ]
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "cm-metric",
-          "_note": "Coverage-only read-shaped POST (a metric query). Body UNPROVEN. Isolated group so a 4xx never affects the event-policy group."
+          "_note": "Coverage-only read-shaped POST (metric query). Body CONFIRMED via cascade probing 2026-06-19: requires X-ResourceType header; body wraps metric conditions in metricDataConditions array; queryStartDt/queryEndDt must use ISO 8601 T-suffix format (YYYY-MM-DDTHH:MM:SSZ); without T-suffix returns 400 backend date-parsing bug. Currently 404 productResourceInfos = products not enrolled in monitoring backend. Blocker: account-prereq. Isolated group so 4xx never affects the event-policy group."
         }
       ]
     },
