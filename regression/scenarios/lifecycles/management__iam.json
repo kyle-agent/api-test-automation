@@ -140,7 +140,7 @@
       "id": "iam-policy-extra-writes",
       "service": "management/iam",
       "enabled": true,
-      "_note": "Light. Covers policy write ops NOT covered by the base iam-policy lifecycle: PUT /v1/policies/{policy_id}, PUT /v1/policies/{policy_id}/bindings, DELETE /v1/policies/bulk, plus the user/group policy-binding add/remove and resource-policy statement ops. A real USER_DEFINED policy is created (group 'pol-real', body from createpolicy with server-assigned id fields omitted) then set/bound/deleted; all sub-steps optional so a 4xx records coverage. The standalone group 'pol-bulk' exercises DELETE /v1/policies/bulk against a synthetic id so it is CALLED even if create fails. Create envelope is FLAT $.id (confirmed from createpolicy 201 doc example, same as base iam-policy).",
+      "_note": "Light. Covers policy write ops NOT covered by the base iam-policy lifecycle: PUT /v1/policies/{policy_id}, PUT /v1/policies/{policy_id}/bindings, plus the user/group policy-binding add/remove and resource-policy statement ops. A real USER_DEFINED policy is created (group 'pol-real', body from createpolicy with server-assigned id fields omitted) then set/bound/deleted; all sub-steps optional so a 4xx records coverage. Create envelope is FLAT $.id (confirmed from createpolicy 201 doc example, same as base iam-policy). SAFETY (Hard Rule 3): the 'pol-bulk' group exercising DELETE /v1/policies/bulk (management/iam/deletepolicies) was REMOVED — verified on live runs #124 (unmatched synthetic id) AND #125 (a valid OWNED id, body $.id correct) that the SCP backend IGNORES the policy_ids body entirely and fans the call out into a delete-ALL-account-policies attempt (#125: 422 policy.delete.start over 832 attempts / 417 delete.error across 237 distinct NON-test system policies — AdministratorAccess_ACL, ObjectStorageAccess, PaaSCommon-*, …). No request body makes this endpoint safe; it is un-probeable and waived (data/baselines/coverage_waivers.json, class blast-radius).",
       "steps": [
         {
           "name": "create-policy",
@@ -213,45 +213,6 @@
           "group": "pol-real",
           "optional": true,
           "destructive": true,
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
-        },
-        {
-          "name": "create-policy-for-bulk",
-          "method": "POST",
-          "path": "/v1/policies",
-          "group": "pol-bulk",
-          "optional": true,
-          "_note": "SAFETY (Hard Rule 3, IB root-cause run #124): DELETE /v1/policies/bulk with a SYNTHETIC/unmatched policy_id is fanned out by the SCP backend into a delete-ALL-policies attempt (ground truth: 420 policy.delete.start over 240 distinct NON-test account policy names — AdministratorAccess_ACL, ObjectStorageAccess, … — all backend-refused, but an unfiltered mass-delete of account policies). NEVER send /v1/policies/bulk an id we do not own. Create our OWN throwaway policy here and bulk-delete THAT captured id so the bulk call can only ever remove an owner-tagged regrpol* resource.",
-          "json": {
-            "policy_name": "regrpolb{ualpha}",
-            "description": "API regression suite (bulk-delete target)",
-            "policy_category": "IDENTITY_BASED",
-            "policy_type": "USER_DEFINED",
-            "service_type": "scp-iam",
-            "policy_version": {
-              "policy_version_name": "PolicyVersion-1",
-              "policy_document": {
-                "Version": "2024-07-01",
-                "Statement": [
-                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
-                ]
-              }
-            },
-            "tags": []
-          },
-          "expect_status": [200, 201, 202],
-          "capture": {"bulk_policy_id": "$.id"},
-          "cleanup": {"method": "DELETE", "path": "/v1/policies/{bulk_policy_id}", "service": "iam"}
-        },
-        {
-          "name": "delete-policies-bulk",
-          "method": "DELETE",
-          "path": "/v1/policies/bulk",
-          "group": "pol-bulk",
-          "optional": true,
-          "destructive": true,
-          "_note": "Exercises DELETE /v1/policies/bulk against a policy WE created (bulk_policy_id, regrpolb*). MUST NOT use a synthetic/unmatched id: the backend fans an unmatched bulk delete out across ALL account policies (run #124 ground truth). If create-policy-for-bulk did not 2xx, {bulk_policy_id} stays an unresolved placeholder and this step is skipped by the engine rather than sending an unfiltered bulk.",
-          "json": {"policy_ids": ["{bulk_policy_id}"]},
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
         }
       ]
