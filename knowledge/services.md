@@ -45,10 +45,16 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Form gate:** `createautoscalinggroupnotification` needs a `user_ids` array with a
   REAL account user id (no default) — set a `user_id` env var from console. Until it
   creates a notification, the 4 child notification GET/PUT/DELETE endpoints stay blocked.
-- **Proven create facts:** `createlaunchconfiguration` PROVEN 2xx 2026-06-18 with a real
-  windows image_id + real keypair_name (LC create rejects non-windows/standard images with
-  InvalidImage); volume `size` must be divisible by 8; `delete_on_termination` is NOT a
-  valid field. ASG policy `comparison_operator: "ge"` (short-code, not GREATER_THAN_OR_EQUAL_TO);
+- **Proven create facts:** `createlaunchconfiguration` PROVEN 2xx (`regrlcc1db18b2`, CI heavy
+  run 2026-06-19) with a real `image_id` + real `keypair_name`. The image is **NOT
+  OS-specific** — any valid **standard** image works (`scp_original_image_type=standard`, the
+  same image lookup as the plain VM path). Evidence: `vs-autoscaling-coverage` seeds the image
+  from an UNFILTERED `GET /v1/images?limit=50` → `images[0]` and still creates the LC, and
+  `gen-wave4-asg` uses `scp_original_image_type=standard&visibility=public`; both succeed.
+  (A prior note claimed a **windows** image was required / non-windows rejected with
+  InvalidImage — that was a **mis-diagnosis, corrected 2026-06-19**; the real constraint is a
+  valid standard image type, not the OS.) volume `size` must be divisible by 8;
+  `delete_on_termination` is NOT a valid field. ASG policy `comparison_operator: "ge"` (short-code, not GREATER_THAN_OR_EQUAL_TO);
   schedule `frequency` enum ONCE|DAILY|WEEKLY|MONTHLY. ASG create uses arrays `subnet_ids`,
   `security_group_ids` (not scalar/`security_groups`); notification id is `$.notifications[0].id`
   (list envelope, not `$.id`).
