@@ -1715,6 +1715,13 @@
       "reason": "REACHABILITY-ONLY (owner 2026-06-16). Parallel File Storage is gated on a provisioned PFS resource the shared account lacks; reachability (any response incl. 4xx = access confirmed) IS the definition-of-done. Stays in the C3 target as reachability-covered-when-reached, honestly distinct from verified-2xx. Modeled in knowledge/formal/resources/storage__parallel-filestorage.yaml.",
       "provenance": "docs",
       "added": "2026-06-16"
+    },
+    {
+      "key": "management/iam/deletepolicies",
+      "class": "blast-radius",
+      "reason": "DELETE /v1/policies/bulk ignores the policy_ids body and deletes ALL account policies regardless — catastrophic, never probe (verified run #124 + #125). Run #124 sent an unmatched synthetic id and run #125 sent a valid OWNED regrpolb* id (capture $.id correct); BOTH fanned out into a delete-ALL-account-policies attempt (run #125 loggingaudit ground truth: 422 policy.delete.start / 417 policy.delete.error across 237 distinct NON-test system policies — AdministratorAccess_ACL, ObjectStorageAccess, PaaSCommon-*, …). No request body makes this endpoint safe; the pol-bulk group (create-policy-for-bulk + delete-policies-bulk) was REMOVED from regression/scenarios/lifecycles/management__iam.json. Un-probeable, never re-add.",
+      "provenance": "VALIDATED",
+      "added": "2026-06-19"
     }
   ]
 }
