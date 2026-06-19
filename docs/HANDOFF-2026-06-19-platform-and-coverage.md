@@ -1,0 +1,62 @@
+# Handoff — 2026-06-19 (session 2): platform fixes + coverage round
+
+Two parallel tracks this session, both driven by what live testing revealed.
+All code is **merged to `main`** (PRs #57–#61). One verification run is pending.
+
+## Where coverage stands
+- Heavy run #124 (`39dd1ea1`, = up to PR #57) published: **reach 82.7% (1135/1372)**
+  (run 1 was 82.6%/1133), and a **63.2%** clean-coverage metric appeared (run 1 ≈57%)
+  — i.e. PR #57's body fixes realized. Account verified **0 survivors** after teardown.
+- Re-check live numbers: `python -m spec.summary` / published dashboard (Pages).
+
+## TRACK A — service coverage → 100
+Analyzed 16 services; applied the realizable levers, recorded the hard ceilings honestly.
+- **Merged body/lifecycle fixes (PR #57, #61):** 9-service DBaaS/data-analytics body
+  corrections (mysql/mariadb/epas/postgresql/cachestore/eventstreams + data-flow/
+  data-ops/quick-query), `listparameters` free read fix (DB family), eventstreams
+  ZK-quorum (3 nodes), backup/filestorage/kms free read levers (path-specific to avoid
+  polluting other services), filestorage lifecycle (`volume_id` params + kr-east1 DR +
+  new steps → path to 19–21/21).
+- **Hard ceilings (recorded, not fixable in automation):** configinspection 2/7 &
+  secretvault 1/5 (console-issued credentials), certificatemanager 5/7 (real CA cert),
+  cloudcontrol (org-management entitlement). See `knowledge/services.md` + `/tmp/cov-*.md`.
+- **Known transient infra:** kms POST host (createkey/transit) 503-flaps → blocks
+  kms/secretsmanager write coverage until it recovers (NOT a product bug).
+
+## TRACK B — platform improvement
+- **`b64_encode` engine action** (PR #57) — fixed 12 validator errors; resourcemanager
+  tag lifecycle runnable.
+- **Scheduler long-pole-first** (PR #59) — DB/SKE/baremetal/VM now sort to the front so
+  the first `-n 6` workers start them concurrently. Targets the ~103-min serial DB phase
+  (ideal ~11 min). **UNVERIFIED on a live run** (run #124 predates it).
+- **IAM bulk-delete safety fix** (PR #60) — SCP backend treats an **unmatched
+  `DELETE /v1/policies/bulk` id as delete-ALL**; the lifecycle's dummy id fanned out to
+  416 account policies (all refused, zero damage). Fixed to bulk-delete only an owned
+  policy. **UNVERIFIED on a live run.** Backend behavior recorded in `knowledge/validated-facts.md`.
+- **live_view topology** (eec1c38f) — SKE depth, shared-VPC adoption edges, tgw.
+- **live_watch SKE/eventstreams stall fix** (PR #58) — but run #124 showed a SECOND
+  HEAVY_STALL false-fire during the VPC-peering phase (no fix yet — see below).
+- **ADR + design note** — `docs/decisions/2026-06-19-dependency-dag-test-scheduler.md`
+  (target: graph-driven scheduler, closure→shared-roots→topological waves under a
+  budgets semaphore, replacing the xdist 2-lane split; 0.1 done → 0.5 → 1.0 path) +
+  `docs/run-parallelism-optimization.md`.
+
+## PENDING — what to verify / do next
+1. **Dispatch ONE heavy run on `main`** → verify (a) the 5 DB engines now start
+   CONCURRENTLY (#59 → ~90 min saving) and (b) loggingaudit shows NO mass policy-delete,
+   only one owned policy (#60). Then 0-survivor.
+2. **live_watch peering-phase false-stall** — HEAVY_STALL still fires when the only
+   activity is the VPC-CRUD lane's peering (0 DB/SKE creates yet). Make the stall detector
+   recognize VPC-CRUD-lane activity. Low priority (auto-resolves, noisy).
+3. **Deferred optimizations** (docs/run-parallelism-optimization.md): #2 overlap smoke
+   with CRUD (~14 min); #3 quota-aware unification of the VPC-CRUD lane (becomes the
+   bottleneck after #59). Need CI validation before merge.
+4. **Report upstream:** "unmatched bulk-delete id == delete-ALL" is an SCP API design bug
+   (should 404).
+5. Transient anomalies (SCF `updatecloudfunction` modify, KMS HMAC) — only baseline if
+   they RECUR (self-healed in #124).
+
+## Dispatch note
+The Claude integration token CANNOT trigger `workflow_dispatch` (403) — runs are
+dispatched manually (Actions → api-test.yml → Run workflow → branch=main,
+allow_mutations/allow_destructive/run_heavy=true). It CAN merge PRs.
