@@ -23,6 +23,13 @@
       "note": "DELETE /v1/clusters/{id}/backups 401s while every other sub-op in the same live-cluster window 2xxes (run 27346642059, lifecycle database-postgresql-cluster) — matches the known backup-family/query-string HMAC signing suspicion (handoff: '401 backup-family retry'). Harness-side signing fix queued; unmute when it lands."
     },
     {
+      "key": "database/cachestore/cachestoreremovebackuphistories",
+      "status": 401,
+      "type": "Automation Bug",
+      "since": "2026-06-19",
+      "note": "PUT /v1/clusters/{id}/backup-histories 401s with a valid HMAC signature (validated run 27258520218) while sibling sub-ops in the same window 2xx — same backup-family/query-string HMAC signing quirk as database/mysql/mysqlunsetbackup and database/postgresql/postgresqlunsetbackup. Not a body bug; harness-side signing fix queued, unmute when it lands."
+    },
+    {
       "key": "financial-management/budget/createaccountbudget",
       "status": 500,
       "classification": "Product Bug",
@@ -112,6 +119,20 @@
       "classification": "Product Bug",
       "since": "2026-06-18",
       "note": "PUT upgrade-kernel -> 500 ContactAdminForAssistance (heavy n6 DBaaS run, mysql-cluster-subops-guarded upgrade-kernel). ContactAdmin-class backend fault on a DB sub-op. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/mysql/mysqlsetarchiveconfig",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-19",
+      "note": "PUT archive-config -> 500 ContactAdminForAssistance against a real live cluster (mysql-cluster-subops-guarded set-archive). Same ContactAdmin-class backend fault as the mariadb/epas/postgresql setarchiveconfig siblings; the guarded lifecycle soft-skips and still records coverage. Tracked upstream, not a suite regression."
+    },
+    {
+      "key": "database/mysql/mysqlregisterlogexportconfig",
+      "status": 500,
+      "classification": "Product Bug",
+      "since": "2026-06-19",
+      "note": "POST log-export-config -> 500 ContactAdminForAssistance against a real live cluster (mysql-cluster-subops-guarded register-log-export-config). Same ContactAdmin-class backend fault as the mariadb/epas/postgresql registerlogexportconfig siblings. Tracked upstream, not a suite regression."
     },
     {
       "key": "database/postgresql/postgresqlsetarchiveconfig",

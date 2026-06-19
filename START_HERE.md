@@ -34,6 +34,38 @@ implementation blueprint, and [`ROADMAP.md`](ROADMAP.md) for the phase plan
 (coverage 100% → scheduled regression → dedicated-server runs). This file does
 not duplicate them.
 
+## Fresh-container bootstrap (Claude-on-the-web) — read before running anything
+
+A fresh remote container is **not test-ready on clone**. The `SessionStart` hook
+(`.claude/hooks/session-start.sh`, registered in `.claude/settings.json`) now does
+the first three automatically on every web session; the rest are gotchas to know.
+*(이 셋업은 매번 다시 알아내지 말 것 — 훅이 자동 처리하고, 함정은 아래에 고정.)*
+
+1. **Python deps aren't installed** → `python -m pip install -r requirements.txt`.
+   **Install/run with `python -m pip` / `python -m pytest`, NOT bare `pip`/`pytest`** —
+   bare `pytest` resolves to a *different* interpreter that lacks `requests`
+   (`ModuleNotFoundError: requests`). Verified: `python -m pytest` = 9.1.0 (deps
+   present) vs bare `pytest` = 9.0.2 (no deps).
+2. **The clone is shallow** (`git rev-parse --is-shallow-repository` → `true`) →
+   git ancestry/`merge-base`/commit-counts **lie** (truncated history reports
+   "unrelated histories / N-way divergence" that don't exist). `git fetch
+   --unshallow` before reasoning about history.
+3. **Local `main` ref is stale** — it points at the clone-time commit, *not*
+   `origin/main` (which may be many commits ahead). Trust `git ls-remote origin`
+   / `origin/main` (live) over the local ref; the hook re-points local `main` at
+   `origin/main`. **Ground truth = the live remote, never the local ref.**
+4. **Live SCP access works from the web env** (creds arrive as env vars:
+   `SCP_ACCESS_KEY/SECRET_KEY/REGION/ENV`; **no `.env` file** — never create one).
+   Confirm with a single call, not the full smoke:
+   `python -c "import requests; print(requests.get('https://resourcemanager.'+__import__('os').environ['SCP_ENV']+'.samsungsdscloud.com', timeout=10).status_code)"`
+   → expect `200`. Real host = `<svc>.<region>.<env>.samsungsdscloud.com`
+   (regional) / `<svc>.<env>.samsungsdscloud.com` (global) — the `<env>` segment
+   is required (omitting it → DNS `gaierror`).
+5. **The full read-only smoke is ~6 min** (225 sequential GETs × ~1.7 s, no
+   per-request timeout) — it is *slow, not broken*. For a quick liveness check run
+   ONE node, or use a hard `timeout` and a scoped `-k`. Don't read a smoke timeout
+   as a network failure.
+
 ## How a new session should start
 
 1. Read [`agents/CONTEXT.md`](agents/CONTEXT.md) — shared facts every agent needs

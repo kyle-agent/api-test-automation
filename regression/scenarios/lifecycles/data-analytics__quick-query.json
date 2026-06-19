@@ -23,7 +23,26 @@
           "name": "validate-resources",
           "method": "POST",
           "path": "/v1/quick-query/validate-resources",
-          "json": {"name": "regrqq{ualpha}", "subnet_id": "", "server_type_name": "", "instance_count": 1},
+          "json": {
+            "cluster_id": "",
+            "node_pool_validation_request": [
+              {
+                "auto_scale": false,
+                "desired_node_count": 1,
+                "max_node_count": 1,
+                "min_node_count": 1,
+                "scale_name": ""
+              }
+            ],
+            "quick_query_engine_request": {
+              "auto_scale": false,
+              "cluster_size": "",
+              "cpu": "4",
+              "is_engine_type_private": false,
+              "memory": "8",
+              "replica": "1"
+            }
+          },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "qq-validate"
@@ -33,22 +52,42 @@
           "method": "POST",
           "path": "/v1/quick-query",
           "json": {
-            "name": "regrqq{ualpha}",
-            "description": "API regression coverage probe",
-            "dbaas_engine_version_id": "",
-            "subnet_id": "",
-            "nat_enabled": false,
-            "instance_name_prefix": "regrqq",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "instance_groups": [
+            "kubernetes_engine_create_request": {
+              "cloud_logging_enabled": false,
+              "k8s_version": "v1.33.5",
+              "kubernetes_engine_name": "regrqqk8s{ualpha}",
+              "security_group_id_list": [],
+              "subnet_id": "",
+              "volume_id": "",
+              "vpc_id": ""
+            },
+            "node_pool_create_requests": [
               {
-                "role_type": "ACTIVE",
-                "server_type_name": "",
-                "block_storage_groups": [{"role_type": "OS", "size_gb": 104, "volume_type": "SSD"}],
-                "instances": [{"role_type": "ACTIVE", "service_ip_address": "192.168.10.10/32"}]
+                "image_os": "Ubuntu 22.04 (Kubernetes)",
+                "image_os_version": "22.04",
+                "k8s_version": "v1.33.5",
+                "keypair_name": "",
+                "name": "regrqqnp{ualpha}",
+                "scale_name": "",
+                "volume_size": 104,
+                "volume_type_name": "SSD"
               }
             ],
+            "quick_query_create_request": {
+              "domain": "regr.example.com",
+              "dsc_domain": "dsc.regr.example.com",
+              "image_id": "IMAGE-45033889-1f10-4fcf-8d7d-95a39a817c7c",
+              "is_engine_type_private": false,
+              "max_query": "32",
+              "query_engine_spec": {
+                "auto_scale": false,
+                "cpu": "4",
+                "memory": "8",
+                "replica": "1"
+              },
+              "quick_query_name": "regrqq{ualpha}",
+              "version": "1.0.2"
+            },
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],

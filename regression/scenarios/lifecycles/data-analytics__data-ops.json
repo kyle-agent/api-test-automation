@@ -37,10 +37,24 @@
           "capture_soft": {"cluster_id": "$.cluster_id"}
         },
         {
+          "name": "capture-ingress-controller",
+          "method": "GET",
+          "path": "/v1/data-ops/clusters/{cluster_id}/ingress-controllers",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "capture_soft": {"ingress_controller_name": "$.contents[0].ingress_controller_name"}
+        },
+        {
           "name": "validate-resources-create",
           "method": "POST",
           "path": "/v1/data-ops-services/clusters/{cluster_id}/validate-resources",
-          "json": {"name": "regrdosvc{ualpha}", "subnet_id": "", "server_type_name": "", "instance_count": 1},
+          "json": {
+            "service_workload": {
+              "scheduler": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
+              "web_server": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
+              "worker": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"}
+            }
+          },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "do-validate"
@@ -49,32 +63,65 @@
           "name": "validate-resources-update",
           "method": "POST",
           "path": "/v1/data-ops-services/{data_ops_service_id}/validate-resources",
-          "json": {"server_type_name": "", "instance_count": 1},
+          "json": {
+            "service_workload": {
+              "scheduler": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
+              "web_server": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
+              "worker": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"}
+            }
+          },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "do-validate"
+        },
+        {
+          "name": "create-data-ops",
+          "method": "POST",
+          "path": "/v1/data-ops",
+          "json": {
+            "data_ops_name": "regrdo{ualpha}",
+            "cluster_id": "{cluster_id}",
+            "domain": "regrdo{ualpha}",
+            "host_alias_list": [],
+            "image_id": "IMAGE-ef7a8ad7-ec47-41b7-aef9-e6dfe4edfd21",
+            "ingress_controller_name": "{ingress_controller_name}",
+            "storage_class_name": "",
+            "description": "API regression coverage probe",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "do-ops"
+        },
+        {
+          "name": "update-data-ops",
+          "method": "PUT",
+          "path": "/v1/data-ops/{data_ops_id}",
+          "json": {"description": "API regression coverage probe (updated)"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "do-ops"
         },
         {
           "name": "create-data-ops-service",
           "method": "POST",
           "path": "/v1/data-ops-services",
           "json": {
-            "name": "regrdosvc{ualpha}",
+            "data_ops_service_name": "regrdosvc{ualpha}",
+            "data_ops_id": "{data_ops_id}",
+            "domain": "regrdosvc{ualpha}",
+            "host_alias": {
+              "enabled": false,
+              "host_alias_list": []
+            },
+            "service_workload": {
+              "scheduler": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
+              "web_server": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
+              "worker": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"}
+            },
+            "storage_class_name": "",
+            "worker_type": "KubernetesExecutor",
             "description": "API regression coverage probe",
-            "dbaas_engine_version_id": "",
-            "subnet_id": "",
-            "nat_enabled": false,
-            "instance_name_prefix": "regrdo",
-            "timezone": "Asia/Seoul",
-            "allowable_ip_addresses": [],
-            "instance_groups": [
-              {
-                "role_type": "ACTIVE",
-                "server_type_name": "",
-                "block_storage_groups": [{"role_type": "OS", "size_gb": 104, "volume_type": "SSD"}],
-                "instances": [{"role_type": "ACTIVE", "service_ip_address": "192.168.10.10/32"}]
-              }
-            ],
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
@@ -98,29 +145,6 @@
           "optional": true,
           "destructive": true,
           "group": "do-service"
-        },
-        {
-          "name": "create-data-ops",
-          "method": "POST",
-          "path": "/v1/data-ops",
-          "json": {
-            "name": "regrdo{ualpha}",
-            "description": "API regression coverage probe",
-            "data_ops_service_id": "{data_ops_service_id}",
-            "tags": []
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "optional": true,
-          "group": "do-ops"
-        },
-        {
-          "name": "update-data-ops",
-          "method": "PUT",
-          "path": "/v1/data-ops/{data_ops_id}",
-          "json": {"description": "API regression coverage probe (updated)"},
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "optional": true,
-          "group": "do-ops"
         },
         {
           "name": "delete-data-ops",

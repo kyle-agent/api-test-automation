@@ -484,6 +484,28 @@
           "group": "read-cov"
         },
         {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "read-cov",
+          "capture_soft": {
+            "dbaas_parameter_group_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "list-parameters",
+          "method": "GET",
+          "path": "/v1/parameters",
+          "params": {
+            "dbaas_parameter_group_id": "{dbaas_parameter_group_id}"
+          },
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "read-cov"
+        },
+        {
           "name": "probe-reads",
           "probe_reads": {
             "cluster_id": "{cluster_id}",

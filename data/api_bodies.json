@@ -196,16 +196,14 @@
  "data-analytics/eventstreams/eventstreamscreatecluster": {
   "akhq_enabled": false,
   "allowable_ip_addresses": [],
-  "dbaas_engine_version_id": "",
+  "dbaas_engine_version_id": "{engine_version_id}",
   "init_config_option": {
-   "akhq_id": "",
-   "akhq_password": "",
    "broker_port": 9091,
-   "broker_sasl_id": "",
-   "broker_sasl_password": "",
+   "broker_sasl_id": "regruser",
+   "broker_sasl_password": "Regr1ss@2026",
    "zookeeper_port": 2180,
-   "zookeeper_sasl_id": "",
-   "zookeeper_sasl_password": ""
+   "zookeeper_sasl_id": "regruser",
+   "zookeeper_sasl_password": "Regr1ss@2026"
   },
   "instance_groups": [
    {
@@ -219,27 +217,34 @@
     "instances": [
      {
       "public_ip_id": "",
-      "role_type": "ACTIVE",
-      "service_ip_address": "192.168.10.10/32"
+      "role_type": "ZOOKEEPER_BROKER"
+     },
+     {
+      "public_ip_id": "",
+      "role_type": "ZOOKEEPER_BROKER"
+     },
+     {
+      "public_ip_id": "",
+      "role_type": "ZOOKEEPER_BROKER"
      }
     ],
-    "role_type": "ACTIVE",
-    "server_type_name": ""
+    "role_type": "ZOOKEEPER_BROKER",
+    "server_type_name": "db1v2m4"
    }
   ],
-  "instance_name_prefix": "",
-  "is_combined": false,
+  "instance_name_prefix": "regrk",
+  "is_combined": true,
   "maintenance_option": {
    "period_hour": "5",
    "starting_day_of_week": "MON",
    "starting_time": "0000"
   },
-  "name": "",
+  "name": "regrk",
   "nat_enabled": false,
   "service_watch_log_collection": true,
-  "subnet_id": "",
+  "subnet_id": "{subnet_id}",
   "tags": [],
-  "timezone": ""
+  "timezone": "Asia/Seoul"
  },
  "data-analytics/searchengine/searchenginecreatecluster": {
   "allowable_ip_addresses": [],
@@ -439,7 +444,7 @@
  },
  "database/mariadb/mariadbcreatecluster": {
   "allowable_ip_addresses": [],
-  "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+  "dbaas_engine_version_id": "5828d309085e4094808614ce0694e8c6",
   "ha_enabled": false,
   "init_config_option": {
    "audit_enabled": false,
@@ -449,10 +454,10 @@
     "starting_time_hour": "2"
    },
    "database_character_set": "utf8",
-   "database_name": "",
+   "database_name": "regrdb",
    "database_port": 2866,
-   "database_user_name": "",
-   "database_user_password": ""
+   "database_user_name": "regruser",
+   "database_user_password": "Regr1ss@2026"
   },
   "instance_groups": [
    {
@@ -465,13 +470,12 @@
     ],
     "instances": [
      {
-      "public_ip_id": "",
-      "role_type": "ACTIVE",
-      "service_ip_address": "192.168.10.10/32"
+      "public_ip_id": null,
+      "role_type": "ACTIVE"
      }
     ],
     "role_type": "ACTIVE",
-    "server_type_name": ""
+    "server_type_name": "db1v10m20"
    }
   ],
   "instance_name_prefix": "myprefix",
@@ -482,20 +486,20 @@
   },
   "name": "mycluster",
   "nat_enabled": false,
-  "origin_cluster_id": "",
+  "origin_cluster_id": null,
   "service_watch_log_collection": true,
-  "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+  "subnet_id": "{subnet_id}",
   "tags": [],
   "timezone": "Asia/Seoul",
-  "vip_public_ip_id": "",
-  "virtual_ip_address": ""
+  "vip_public_ip_id": null,
+  "virtual_ip_address": null
  },
  "database/mysql/mysqlcreatecluster": {
   "allowable_ip_addresses": [],
-  "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+  "dbaas_engine_version_id": "{engine_version_id}",
   "ha_enabled": false,
   "init_config_option": {
-   "audit_enabled": "",
+   "audit_enabled": null,
    "backup_option": {
     "archive_frequency_minute": "60",
     "retention_period_day": "7",
@@ -503,10 +507,10 @@
    },
    "database_case_sensitive": false,
    "database_character_set": "utf8mb4",
-   "database_name": "",
+   "database_name": "regrdb",
    "database_port": 2866,
-   "database_user_name": "",
-   "database_user_password": ""
+   "database_user_name": "regruser",
+   "database_user_password": "Regr1ss@2026"
   },
   "instance_groups": [
    {
@@ -519,13 +523,12 @@
     ],
     "instances": [
      {
-      "public_ip_id": "",
-      "role_type": "ACTIVE",
-      "service_ip_address": "192.168.10.10/32"
+      "public_ip_id": null,
+      "role_type": "ACTIVE"
      }
     ],
     "role_type": "ACTIVE",
-    "server_type_name": ""
+    "server_type_name": "db1v2m4"
    }
   ],
   "instance_name_prefix": "myprefix",
@@ -536,17 +539,17 @@
   },
   "name": "mycluster",
   "nat_enabled": false,
-  "origin_cluster_id": "",
+  "origin_cluster_id": null,
   "service_watch_log_collection": true,
-  "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+  "subnet_id": "{subnet_id}",
   "tags": [],
   "timezone": "Asia/Seoul",
-  "vip_public_ip_id": "",
-  "virtual_ip_address": ""
+  "vip_public_ip_id": null,
+  "virtual_ip_address": null
  },
  "database/postgresql/postgresqlcreatecluster": {
   "allowable_ip_addresses": [],
-  "dbaas_engine_version_id": "c1b856dd12754c0ba2614a39d0ed3ad1",
+  "dbaas_engine_version_id": "5434da0ceb114fdc9f1602fc77450683",
   "ha_enabled": false,
   "init_config_option": {
    "audit_enabled": false,
@@ -557,10 +560,10 @@
    },
    "database_encoding": "UTF-8",
    "database_locale": "C",
-   "database_name": "",
+   "database_name": "regrpg",
    "database_port": 2866,
-   "database_user_name": "",
-   "database_user_password": ""
+   "database_user_name": "regruser",
+   "database_user_password": "Regr1ss@2026"
   },
   "instance_groups": [
    {
@@ -573,13 +576,12 @@
     ],
     "instances": [
      {
-      "public_ip_id": "",
-      "role_type": "ACTIVE",
-      "service_ip_address": "192.168.10.10/32"
+      "public_ip_id": null,
+      "role_type": "ACTIVE"
      }
     ],
     "role_type": "ACTIVE",
-    "server_type_name": ""
+    "server_type_name": "db1v2m4"
    }
   ],
   "instance_name_prefix": "myprefix",
@@ -590,12 +592,12 @@
   },
   "name": "mycluster",
   "nat_enabled": false,
-  "origin_cluster_id": "",
-  "subnet_id": "1ddd7f1e4a8a43ed8b82d70cade0b321",
+  "origin_cluster_id": null,
+  "subnet_id": "{subnet_id}",
   "tags": [],
   "timezone": "Asia/Seoul",
-  "vip_public_ip_id": "",
-  "virtual_ip_address": ""
+  "vip_public_ip_id": null,
+  "virtual_ip_address": null
  },
  "database/sqlserver/sqlservercreatecluster": {
   "allowable_ip_addresses": [],

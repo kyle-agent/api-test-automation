@@ -254,6 +254,18 @@
       "_note": "SERVICE CONTROL POLICIES (SCPs) are the single most dangerous resource in the platform: an SCP attached at the org/OU root can DENY actions account-wide and lock every member (including admins) out of services — restricting or damaging the whole hierarchy, and the effect is immediate. COVERAGE-ONLY guarded calls: every mutating step is optional with a broad expect_status so the expected 403 on a non-master account records coverage WITHOUT creating a live deny policy. We deliberately DO NOT chain create->attach; an SCP is never attached to a target by this lifecycle. policy_id soft-captured read-only. policy_document mirrors the IAM USER_DEFINED policy shape (Version 2024-07-01) as a best-effort, UNPROVEN guess. Covers: createservicecontrolpolicy(POST), setservicecontrolpolicy(PUT id), deleteservicecontrolpolicies(DELETE collection w/ id list body).",
       "steps": [
         {
+          "name": "list-organizations",
+          "method": "GET",
+          "path": "/v1/organizations",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "organization_id": "$.organizations[0].id"
+          },
+          "optional": true,
+          "group": "scp",
+          "_note": "Soft-capture the caller's organization id for the organization_id-scoped calls below. capture_soft: a member account with no visible org leaves it unfilled and the downstream guarded steps stay 403-tolerant. Envelope key 'organizations' inferred (listorganizations)."
+        },
+        {
           "name": "list-service-control-policies",
           "method": "GET",
           "path": "/v1/service-control-policies",
@@ -453,6 +465,18 @@
       "heavy": true,
       "_note": "Invitations bring an external account into THIS organization (or invite this account into another). Accepting/declining changes real membership. COVERAGE-ONLY guarded calls: optional + broad expect_status, expected 403/400/404 on a shared account, so no real invitation is sent or membership changed. invitation_id soft-captured from the read-only account-invitations/organization-invitations lists. Bodies UNPROVEN. Covers: createinvitation(POST), cancelinvitations(PUT cancel), acceptinvitation(PUT id/accept), declineinvitation(PUT id/decline).",
       "steps": [
+        {
+          "name": "list-organizations",
+          "method": "GET",
+          "path": "/v1/organizations",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "organization_id": "$.organizations[0].id"
+          },
+          "optional": true,
+          "group": "invite",
+          "_note": "Soft-capture the caller's organization id for the create-invitation body. capture_soft: stays unfilled on a member account with no visible org (create-invitation is optional + 403/400-tolerant). Envelope key 'organizations' inferred."
+        },
         {
           "name": "list-organization-invitations",
           "method": "GET",

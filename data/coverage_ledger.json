@@ -7,10 +7,19 @@
       "total": 113,
       "gap": 73,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "26/28 autoscaling endpoints (auto-scaling-groups + launch-configurations)",
+          "reason": "mutation-gated: lifecycles vs-autoscaling-coverage (26 steps) and gen-wave4-asg (28 steps, desired_server_count=0 to avoid billable VMs) BOTH exist + enabled, but run_lifecycle() returns status=skipped immediately when SCP_ALLOW_MUTATIONS=false (engine.py ~642) so read-only runs never start them. The 2 covered (listautoscalinggroups, listlaunchconfigurations) come from bare smoke GETs. createautoscalinggroup additionally needs a VPC/subnet (heavy). createautoscalinggroupnotification needs a real user_ids env var (no default).",
+          "kind": "mutation-gated"
+        }
+      ],
+      "next_levers": [
+        "SCP_ALLOW_MUTATIONS+SCP_ALLOW_DESTRUCTIVE: vs-autoscaling-coverage records ~23 catalog keys (LC create/show/delete to 2xx, ASG sub-ops to 4xx via literal placeholder asg_id)",
+        "SCP_ALLOW_MUTATIONS+DESTRUCTIVE+SCP_RUN_HEAVY + shared VPC: gen-wave4-asg covers all 26 to 2xx (except notification, which needs user_ids)"
+      ],
+      "notes": "Autoscaling 2/28 covered (root cause: both autoscale lifecycles are mutation-gated, skip on read-only). createlaunchconfiguration PROVEN 2xx 2026-06-18 (real windows image + keypair; volume size div by 8, no delete_on_termination field). policy comparison_operator=ge, schedule frequency=ONCE|DAILY|WEEKLY|MONTHLY. See knowledge/services.md compute/virtualserver autoscaling note.",
+      "updated": "2026-06-19T03:10:00Z"
     },
     {
       "service": "vpc",
@@ -267,10 +276,24 @@
       "total": 15,
       "gap": 15,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "ALL 15 endpoints",
+          "reason": "entitlement-403: every tested GET returns CloudControl.CloudControlForbidden ('Can not access this cloudcontrol resources.'). Cloud Control requires a Landing Zone to exist on the Organization management account (prereqs: Organization + ID Center + Object Storage + Logging&Audit). Shared test account is not the org-master and has no landing zone -> all reads AND writes denied. NOT a product bug.",
+          "kind": "entitlement-403"
+        },
+        {
+          "key": "9 write endpoints (create/set/update/delete/enable/disable + addbaselineassignment)",
+          "reason": "mutation-gated + entitlement: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE) and the org-master entitlement above. createaccountfactoryaccount is BILLABLE+IRREVERSIBLE; landing-zone create cannot be cancelled mid-flight. Lifecycle cloudcontrol-landing-zone-guarded exists (heavy:true) expecting 403 on shared account.",
+          "kind": "mutation-gated"
+        }
+      ],
+      "next_levers": [
+        "Cover all GETs from a dedicated Organization management (control-tower admin) account that has a Landing Zone provisioned",
+        "With org-master account: list-guardrails -> capture guardrail_id -> showguardrail; listguardrailsfortarget needs target_id; listtargetsforguardrail needs guardrail_id+target_type (all params already in sidecar)"
+      ],
+      "notes": "0/15. Structural entitlement wall (CloudControl.CloudControlForbidden) on all 6 GETs (4 bare + 2 id-bound, dummy ids); 9 writes also gated. Param fixes (target_id, guardrail_id+target_type) confirmed but do NOT unlock 2xx. See knowledge/services.md management/cloudcontrol.",
+      "updated": "2026-06-19T03:10:00Z"
     },
     {
       "service": "filestorage",
@@ -380,14 +403,28 @@
     },
     {
       "service": "quick-query",
-      "covered": 1,
+      "covered": 3,
       "total": 12,
-      "gap": 11,
+      "gap": 9,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "data-analytics/quick-query/getquickquery",
+          "reason": "needs-resource: GET by id 404s with fake id (PRODUCT-AI-ANALYTICS-USER-0002); 0 quick-query resources in account; covered by CRUD lifecycle read-chain after create.",
+          "kind": "needs-resource"
+        },
+        {
+          "key": "createquickquery + 6 PUT updates + deletequickquery + validatequickqueryresources",
+          "reason": "mutation-gated: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for delete). create + validate are heavy-prereq: need an existing k8s cluster_id (billable). Updates need a real quick_query_id.",
+          "kind": "mutation-gated"
+        }
+      ],
+      "next_levers": [
+        "CRUD lifecycle (SCP_ALLOW_MUTATIONS): POST create (needs cluster_id) -> GET by id -> 5x PUT -> DELETE covers the remaining 8",
+        "validatequickqueryresources may be testable standalone with a cluster_id body (no quick-query resource needed)"
+      ],
+      "notes": "1->3/12. New 2xx: getquickqueryimageversions (GET /v1/quick-query/image-versions) + getquickquerylist (GET /v1/quick-query, requires page+size). checkduplicationquickquery already counted. page=0/size=10 default added to smoke (commit bdd0550e). Use timeout=5,retry=False (default 60s timeout caused false hang).",
+      "updated": "2026-06-19T03:10:00Z"
     },
     {
       "service": "aimlops-platform",
@@ -446,25 +483,51 @@
     },
     {
       "service": "vpn",
-      "covered": 0,
+      "covered": 2,
       "total": 10,
-      "gap": 10,
-      "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "gap": 8,
+      "heavy": true,
+      "blockers": [
+        {
+          "key": "networking/vpn/showvpngateway, networking/vpn/showvpntunnel",
+          "reason": "needs-resource: path-param GETs require a real vpn_gateway_id/vpn_tunnel_id; account has 0 gateways/tunnels (count:0 confirmed). Fake-id probes return 404 (scp-network.vpn-gateway.not-found / vpn-tunnel.not-found). Resource creation is heavy (VPC + public-ip prereqs).",
+          "kind": "needs-resource"
+        },
+        {
+          "key": "createvpngateway, createvpntunnel, setvpngateway, setvpntunnel, deletevpngateway, deletevpntunnel",
+          "reason": "mutation-gated + heavy: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE) + SCP_RUN_HEAVY. Lifecycle networking-vpn-gateway-tunnel ready but IKE/IPSec enum values (phase1/phase2_encryptions, diffie_hellman_groups) are docs-estimates, unvalidated live.",
+          "kind": "mutation-gated"
+        }
+      ],
+      "next_levers": [
+        "Enable SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE + SCP_RUN_HEAVY; provision VPC + public-ip prereqs; run lifecycle networking-vpn-gateway-tunnel (covers all 8 remaining: 2 id-bound GETs + 6 writes)"
+      ],
+      "notes": "0->2/10. New 2xx: listvpngateways + listvpntunnels (bare GETs, empty lists, sort default [name:asc,id:desc]). Region gate: kr-west1/kr-east1/kr-south3. Quota: 3 gateways/account, 5 tunnels/gateway. Gateway+tunnel names 3-20 alphanumeric ONLY (no hyphen/underscore). See knowledge/services.md networking/vpn.",
+      "updated": "2026-06-19T03:10:00Z"
     },
     {
       "service": "cdn",
-      "covered": 0,
+      "covered": 1,
       "total": 9,
-      "gap": 9,
+      "gap": 8,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "networking/cdn/detailcdnservice",
+          "reason": "needs-resource: GET by id requires a real CDN resource_id; account has 0 CDN distributions (GET /v1/cdns count:0). Captured from create at $.cdn.resource_id via lifecycle probe_reads.",
+          "kind": "needs-resource"
+        },
+        {
+          "key": "createcdnservice + update/updatedescription/start/stop/purge/deletecdnservice (7 writes)",
+          "reason": "mutation-gated: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE). Lifecycle networking__cdn.json covers all 7 with tuned body (cache_expiry_time=86400, etc.).",
+          "kind": "mutation-gated"
+        }
+      ],
+      "next_levers": [
+        "Run lifecycle regression/scenarios/lifecycles/networking__cdn.json with SCP_ALLOW_MUTATIONS=true + SCP_ALLOW_DESTRUCTIVE=true; covers all 8 remaining (7 writes + detailcdnservice via read-chain). create may 4xx if entitlement limited."
+      ],
+      "notes": "0->1/9. New 2xx: listcdnservice (GET /v1/cdns -> {cdn:[],count,page,size,sort}, empty). Region gate kr-west1/kr-east1 ONLY. First call may 503 (gateway timeout); retry -> 200 (transient, NOT a product bug). See knowledge/services.md networking/cdn.",
+      "updated": "2026-06-19T03:10:00Z"
     },
     {
       "service": "cloud-ml",
@@ -496,25 +559,80 @@
     },
     {
       "service": "direct-connect",
-      "covered": 0,
+      "covered": 1,
       "total": 8,
-      "gap": 8,
+      "gap": 7,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "networking/direct-connect/showdirectconnect, networking/direct-connect/listroutingrules",
+          "reason": "needs-resource: id-bound GETs; list (GET /v1/direct-connects) returned count:0 so no direct_connect_id to derive. single_param_chains already wired; fire automatically once a resource exists.",
+          "kind": "needs-resource"
+        },
+        {
+          "key": "createdirectconnect, setdirectconnect, createroutingrule, deletedirectconnect, deleteroutingrule",
+          "reason": "mutation-gated: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE). Likely heavy/entitlement — direct-connect maps to a physical network circuit needing datacenter pre-provisioning.",
+          "kind": "mutation-gated"
+        }
+      ],
+      "next_levers": [
+        "With SCP_ALLOW_MUTATIONS=true: createdirectconnect lifecycle -> read-chains auto-cover showdirectconnect + listroutingrules",
+        "Verify the account has circuit-provisioning entitlement before attempting mutations (hardware-gated)"
+      ],
+      "notes": "0->1/8. New 2xx: listdirectconnects (GET /v1/direct-connects -> {count:0,direct_connects:[],page,size}, empty). doc_url fetches 503 during run (docs server down, transient). See knowledge/services.md networking/direct-connect.",
+      "updated": "2026-06-19T03:10:00Z"
     },
     {
       "service": "firewall",
-      "covered": 0,
+      "covered": 1,
       "total": 8,
-      "gap": 8,
+      "gap": 7,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "networking/firewall/listfirewallrules",
+          "reason": "mutation-gated: requires firewall_id from a created firewall resource; no firewalls exist in account; needs SCP_ALLOW_MUTATIONS to create a firewall first",
+          "kind": "needs-peer-resource"
+        },
+        {
+          "key": "networking/firewall/showfirewall",
+          "reason": "mutation-gated: requires an existing firewall_id; no firewalls provisioned in account",
+          "kind": "needs-peer-resource"
+        },
+        {
+          "key": "networking/firewall/showfirewallrule",
+          "reason": "mutation-gated: requires an existing firewall_rule_id; no firewall rules provisioned in account",
+          "kind": "needs-peer-resource"
+        },
+        {
+          "key": "networking/firewall/createfirewallrule",
+          "reason": "mutating (POST); needs SCP_ALLOW_MUTATIONS=true + existing firewall + vpc",
+          "kind": "mutation-gated"
+        },
+        {
+          "key": "networking/firewall/setfirewall",
+          "reason": "mutating (PUT); needs SCP_ALLOW_MUTATIONS=true + existing firewall_id",
+          "kind": "mutation-gated"
+        },
+        {
+          "key": "networking/firewall/setfirewallrule",
+          "reason": "mutating (PUT); needs SCP_ALLOW_MUTATIONS=true + existing firewall_rule_id",
+          "kind": "mutation-gated"
+        },
+        {
+          "key": "networking/firewall/deletefirewallrule",
+          "reason": "destructive (DELETE); needs SCP_ALLOW_DESTRUCTIVE=true + existing firewall_rule_id",
+          "kind": "mutation-gated"
+        }
+      ],
+      "next_levers": [
+        "Enable SCP_ALLOW_MUTATIONS=true, then create a firewall resource via createfirewallrule (POST /v1/firewalls/rules) or check if a VPC-bound firewall auto-exists",
+        "After creating/finding a firewall: capture firewall_id from listfirewalls response, use for showfirewall + listfirewallrules",
+        "After creating a rule: capture firewall_rule_id from createfirewallrule response, use for showfirewallrule + setfirewallrule + deletefirewallrule",
+        "listfirewalls already returns 200 with empty list - re-verify after VPC/firewall creation in a mutations-enabled run"
+      ],
+      "notes": "listfirewalls GET /v1/firewalls -> 200 OK (empty list, account has no firewalls). All path-param GETs (showfirewall, showfirewallrule) return 404 with dummy IDs - backend is reachable. listfirewallrules requires firewall_id query param (required per sidecar); returns 404 with dummy ID. All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule PUT, deletefirewallrule DELETE) require mutation gates and existing resources.",
+      "updated": "2026-06-19T02:51:23Z"
     },
     {
       "service": "configinspection",

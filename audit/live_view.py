@@ -271,6 +271,21 @@ _KIND_ALIAS = {
     "log-stream": "log-streams", "log-group": "log-groups", "security-group": "security-groups",
     "nodepool": "nodepools", "public-ip": "public-ips", "publicip": "public-ips",
     "internet-gateway": "internet-gateways",
+    # networking children loggingaudit emits hyphenated; gen_dep_map keys are
+    # plural. Without these they fall through to _kind_of's pluralizer and (for
+    # transit-gateway, absent from the model) end up parentless at depth 0 —
+    # floating, with no relationship line. Pin them to their model kind so they
+    # get a parent (vpc) + a sensible depth.
+    "transit-gateway": "transit-gateways", "nat-gateway": "nat-gateways",
+    "cluster": "clusters", "k8s-cluster": "clusters", "ske-cluster": "clusters",
+}
+
+
+# Parent overrides for kinds gen_dep_map leaves parentless (the resource model
+# has no plain `requires` edge for them) but which DO have an obvious live
+# parent. transit-gateway attaches to a vpc; without this it has no parent edge.
+_PARENT_OVERRIDE = {
+    "transit-gateways": "vpcs",
 }
 
 
@@ -285,14 +300,57 @@ _DB_ENGINES = {"mysql", "postgresql", "mariadb", "epas", "cachestore", "sqlserve
                "vertica", "searchengine", "eventstreams",
                "cache-store", "search-engine", "event-streams", "sql-server"}
 
+# k8s / SKE clusters collapse to the SAME overloaded kind "clusters" as DB
+# engines (depth 6 = the longest composite chain). A real SKE cluster's chain is
+# only vpc(0) -> subnet(1) -> cluster, so it belongs at subnet+1 (=2); its
+# nodepools sit one deeper at cluster+1 (=3). Without this they render at the
+# static depth 6 (the user's "단계 6" complaint) with empty 3/4/5 between.
+_K8S_CLUSTERS = {"cluster", "k8s-cluster", "ske-cluster", "kubernetes-cluster"}
+_NODEPOOLS = {"nodepool", "node-pool", "nodepools"}
+
 
 def _depth_of(rtype: str, kind: str, depth: dict) -> int:
-    """Display depth for an instance — corrects the overloaded 'clusters' kind so a
-    DB cluster sits directly under its subnet (depth 2), not at the SKE/composite
-    depth 6."""
-    if rtype in _DB_ENGINES:
-        return depth.get("subnets", 1) + 1   # vpc(0) -> subnet(1) -> db cluster(2)
+    """Display depth for an instance. The 'clusters' kind in gen_dep_map is
+    overloaded to depth 6 (longest SKE/composite path), which pushes BOTH DB and
+    k8s clusters far right and leaves the intermediate columns empty. Correct the
+    display depth to each type's REAL dependency chain without disturbing the
+    static dep map:
+
+      * DB engine cluster:  vpc(0) -> subnet(1) -> cluster(2)        == subnet+1
+      * k8s / SKE cluster:  vpc(0) -> subnet(1) -> cluster(2)        == subnet+1
+      * nodepool:           ... -> cluster(2) -> nodepool(3)         == cluster+1
+
+    Falls back to the static kind depth for everything else. Robust to a missing
+    'subnets' key (defaults subnet depth to 1)."""
+    sub = depth.get("subnets", 1)
+    if rtype in _DB_ENGINES or rtype in _K8S_CLUSTERS:
+        return sub + 1                         # cluster directly under its subnet
+    if rtype in _NODEPOOLS:
+        return sub + 2                         # nodepool one deeper than its cluster
     return depth.get(kind, 0)
+
+
+def _parent_of(kind: str, parent: dict) -> str | None:
+    """Parent KIND of a kind, honoring _PARENT_OVERRIDE for kinds the static dep
+    map leaves parentless (e.g. transit-gateways -> vpcs)."""
+    return parent.get(kind) or _PARENT_OVERRIDE.get(kind)
+
+
+# Session-shared infra is named with an 'sh' infix the per-lifecycle resources
+# never carry: the shared VPC is 'regrvpcsh<ts>', the shared subnet 'regrsubsh<ts>'
+# and the DB-lane subnet 'regrsubshdb<ts>' (engine.provision_shared_vpc), while a
+# per-lifecycle vpc/subnet is 'regrvpc<8hex>' / 'regrsub<8hex>' (no 'sh'). The
+# shared VPC's INTERNET-gateway/firewall children embed the same vpc name
+# (IGW_regrvpcsh<ts>), so this infix also catches them. This is the reliable
+# discriminator for "is this the hub that many scenarios adopt?" — its lifecycle
+# key can collide with a normal 8-hex (the ts hex is currently 8 chars), so we do
+# NOT key off _lk for sharing; we key off the name.
+_SHARED_INFRA = re.compile(r"regr(?:vpc|sub)sh")
+
+
+def _is_shared_infra(d: dict) -> bool:
+    """True if this instance is the session-shared (adopted) vpc/subnet hub."""
+    return bool(_SHARED_INFRA.search(d.get("name") or ""))
 
 
 def _kind_of(rtype: str, dep_kinds: set) -> str:
@@ -403,8 +461,10 @@ def render_dag(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
         kinds[k]["states"][st] += 1
         kinds[k]["rtype"] = d["rtype"]
 
-    # x = depth (creation order); fallback depth 0
-    col = {k: depth.get(k, 0) for k in kinds}
+    # x = depth (creation order); fallback depth 0. Use the per-instance depth
+    # correction so the overloaded 'clusters'/'nodepools' kinds sit near their
+    # real parent (subnet+1 / +2) instead of the static SKE depth 6.
+    col = {k: _depth_of(info.get("rtype", ""), k, depth) for k, info in kinds.items()}
     maxc = max(col.values(), default=0)
     bycol = defaultdict(list)
     for k in kinds:
@@ -449,7 +509,7 @@ def render_dag(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
         P.append(f'<text x="{PADX + c*COLW + BW/2}" y="{PADY-22}" fill="#566" font-size="11" text-anchor="middle">단계 {c}</text>')
     # edges: parent -> child (both present)
     for k in kinds:
-        par = parent.get(k)
+        par = _parent_of(k, parent)
         if par in pos and k in pos:
             ax, ay = pos[par]; bx, by = pos[k]
             x1, y1 = ax + BW, ay + BH/2; x2, y2 = bx, by + BH/2
@@ -519,15 +579,30 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
     dep_kinds = set(depth)
 
     # column = creation-order depth of the instance's kind; group col -> kind -> instances
-    col_kind = defaultdict(lambda: defaultdict(list))
     insts = [d for d in spans.values() if d["start"]]
     kind_of = {}                       # id(d) -> kind
     by_kind_lk = defaultdict(list)     # (kind, lifecycle-key) -> [d]
+    by_kind = defaultdict(list)        # kind -> [d]  (for adoption-edge fallback)
+    raw_col = {}                       # id(d) -> raw dependency depth (pre-compaction)
     for d in insts:
         k = _kind_of(d["rtype"], dep_kinds)
         kind_of[id(d)] = k
         by_kind_lk[(k, _lk(d))].append(d)
-        col_kind[_depth_of(d["rtype"], k, depth)][d["rtype"]].append(d)
+        by_kind[k].append(d)
+        raw_col[id(d)] = _depth_of(d["rtype"], k, depth)
+
+    # Compact empty columns: depth correction + the overloaded kinds leave gaps
+    # (resources land only at e.g. 0/1/2/3, never 4/5, or only 0/1/6). Remap the
+    # SET of actually-used raw depths to consecutive 0..N so there are no empty
+    # 단계 columns, while preserving left→right = creation/dependency order.
+    used = sorted(set(raw_col.values()))
+    remap = {raw: i for i, raw in enumerate(used)}
+    col_kind = defaultdict(lambda: defaultdict(list))
+    inst_col = {}                      # id(d) -> compacted column
+    for d in insts:
+        c = remap[raw_col[id(d)]]
+        inst_col[id(d)] = c
+        col_kind[c][d["rtype"]].append(d)
     maxc = max(col_kind, default=0)
 
     COLW, BW, BH, GAP, KGAP, PADX, PADY, HEADY = 226, 200, 26, 5, 22, 24, 96, 60
@@ -564,6 +639,7 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
  /* click-to-highlight a relationship chain */
  svg.sel g.n{opacity:.18} svg.sel g.n.hi{opacity:1}
  svg.sel path.rel{opacity:.06} svg.sel path.rel.hi{opacity:1;stroke:#2b7de9;stroke-width:2.2}
+ path.rel.adopt.hi{stroke:#2b7de9;stroke-dasharray:4 3}
  g.n.hi rect{stroke:#2b7de9;stroke-width:2.6}
  .hint{color:#5b6675;font-size:11px;margin:2px 0 8px}
 </style></head><body>''')
@@ -577,7 +653,8 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
              f'<i style="background:#c8efd4"></i>생성됨 {nstate["created"]}'
              f'<i style="background:#e6e9ee"></i>삭제됨 {nstate["deleted"]}'
              f'<i style="background:#d6dbe2"></i>삭제예정 {nstate["terminating"]}'
-             f'<i style="background:#ffd6d6"></i>생성실패 {nstate["failed"]}</div>')
+             f'<i style="background:#ffd6d6"></i>생성실패 {nstate["failed"]}'
+             f'<span style="margin-left:12px">— 실선=자체생성 · ┄점선=공유인프라 채택</span></div>')
 
     P.append(f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">')
     P.append('<defs><marker id="rel" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">'
@@ -594,32 +671,71 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
             P.append(f'<text x="{PADX + c*COLW}" y="{y+13}" font-size="10.5" font-weight="700" fill="#aab3c0">{html.escape(rt)}</text>')
             y += KGAP + (BH + GAP) * len(col_kind[c][rt]) + 6
 
-    # relationship lines: parent-instance -> child-instance sharing one lifecycle
-    # key. The engine names every resource of a lifecycle with the same 8-hex
-    # unique, so a vpc and its subnet/server/etc. share _lk(); we connect a child
-    # to the parent-KIND instance(s) of its same lifecycle (which vpc owns which
-    # subnet). Drawn first so boxes sit on top.
+    # relationship lines: parent-instance -> child-instance.
+    #
+    # OWN edges (solid): the engine names every resource of ONE lifecycle with the
+    # same 8-hex unique, so a vpc and its subnet/server share _lk(); we connect a
+    # child to the parent-KIND instance of its OWN lifecycle (which vpc owns which
+    # subnet).
+    #
+    # ADOPTION edges (dashed): the run provisions ONE session-shared vpc+subnet
+    # (regrvpcsh*/regrsubsh*, its own tag) that MANY scenarios ADOPT — each adopter
+    # is a different _lk, so its child (an ske cluster, a VM, a tgw, …) never shares
+    # the shared subnet's lifecycle key and would float unconnected. So when a
+    # child finds NO parent-KIND instance in its own _lk, we fall back to the
+    # SHARED parent instance(s) of that kind, making the shared subnet/vpc a hub
+    # that fans out to every concurrent scenario. Drawn first so boxes sit on top.
     xy = {id(d): (px, py) for (px, py, d, rt) in pos.values()}
     nid = {id(d): f"n{i}" for i, (_x, _y, d, _rt) in enumerate(pos.values())}
+    # shared-infra instances per kind — the hub fallback targets
+    shared_by_kind = defaultdict(list)
+    for d in insts:
+        if _is_shared_infra(d):
+            shared_by_kind[kind_of[id(d)]].append(d)
     adj = defaultdict(set)   # node-id -> connected node-ids (undirected, for click highlight)
     edges = 0
+    adopt_edges = 0
+
+    def _emit_edge(pd, d, adopt: bool):
+        nonlocal edges, adopt_edges
+        if pd is d or id(pd) not in nid or id(d) not in nid:
+            return
+        a, b = nid[id(pd)], nid[id(d)]
+        if b in adj[a]:                            # de-dup parallel edges
+            return
+        ax, ay = xy[id(pd)]; bx, by = xy[id(d)]
+        x1, y1 = ax + BW, ay + BH / 2              # parent right edge
+        x2, y2 = bx, by + BH / 2                   # child left edge
+        # adoption edge styled distinctly: dashed + lighter so adopt vs own-create
+        # reads differently; own-create edge is the solid line as before.
+        style = ('stroke="#9fb4d8" stroke-width="1.1" stroke-dasharray="4 3"'
+                 if adopt else 'stroke="#c3ccd9" stroke-width="1.1"')
+        cls = "rel adopt" if adopt else "rel"
+        P.append(f'<path class="{cls}" id="e{edges}" data-a="{a}" data-b="{b}" '
+                 f'd="M{x1:.0f},{y1:.0f} C{x1+34:.0f},{y1:.0f} {x2-34:.0f},{y2:.0f} {x2:.0f},{y2:.0f}" '
+                 f'fill="none" {style} marker-end="url(#rel)"/>')
+        adj[a].add(b); adj[b].add(a)
+        edges += 1
+        if adopt:
+            adopt_edges += 1
+
     for d in insts:
         k = kind_of[id(d)]
-        par = parent.get(k)
+        par = _parent_of(k, parent)
         if not par:
             continue
-        for pd in by_kind_lk.get((par, _lk(d)), []):
-            if pd is d or id(pd) not in nid:
-                continue
-            a, b = nid[id(pd)], nid[id(d)]
-            ax, ay = xy[id(pd)]; bx, by = xy[id(d)]
-            x1, y1 = ax + BW, ay + BH / 2          # parent right edge
-            x2, y2 = bx, by + BH / 2               # child left edge
-            P.append(f'<path class="rel" id="e{edges}" data-a="{a}" data-b="{b}" '
-                     f'd="M{x1:.0f},{y1:.0f} C{x1+34:.0f},{y1:.0f} {x2-34:.0f},{y2:.0f} {x2:.0f},{y2:.0f}" '
-                     f'fill="none" stroke="#c3ccd9" stroke-width="1.1" marker-end="url(#rel)"/>')
-            adj[a].add(b); adj[b].add(a)
-            edges += 1
+        # the shared hub itself attaches upward (shared subnet -> shared vpc) by
+        # its OWN lifecycle key (regrvpcsh/regrsubsh share the ts hex), so the
+        # normal own-lifecycle path links it without any self-adoption.
+        own = [pd for pd in by_kind_lk.get((par, _lk(d)), []) if pd is not d]
+        if own:
+            for pd in own:
+                _emit_edge(pd, d, adopt=False)
+        elif not _is_shared_infra(d):
+            # no parent in our own lifecycle, and we are not the hub — adopt the
+            # shared parent hub of that kind (the fan-out the user expects).
+            for pd in shared_by_kind.get(par, []):
+                _emit_edge(pd, d, adopt=True)
 
     # instance boxes (each gets a node id + onclick to highlight its chain)
     for (x, y, d, rt) in pos.values():
@@ -641,6 +757,7 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
                  f'<text x="{x+BW-6}" y="{y+16}" font-size="9.5" text-anchor="end" fill="#7a8493">{dur}</text></g>')
     P.append('</svg>')
     P.append(f'<div class="sub" style="margin-top:8px">{len(insts)} 인스턴스 · {maxc+1} 단계 · {edges} 연관선 '
+             f'(공유인프라 채택 {adopt_edges}개 점선) '
              f'· <span style="color:#2b7de9">인스턴스 클릭 = 연관관계 강조</span>(빈 곳 클릭 = 해제)</div>')
 
     # click-highlight: BFS the connected component (vpc→subnet→server→volume…) so

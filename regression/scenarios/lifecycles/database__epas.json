@@ -58,6 +58,37 @@
           }
         },
         {
+          "name": "capture-param-id",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}/parameters",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "param_id": "$.contents[0].id",
+            "param_old_value": "$.contents[0].applied_value"
+          }
+        },
+        {
+          "name": "capture-server-type",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "capture_soft": {
+            "server_type_name": "$.contents[0].name"
+          }
+        },
+        {
           "name": "set-maintenance",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/maintenance",
@@ -165,9 +196,9 @@
           "json": {
             "parameters": [
               {
-                "id": "",
+                "id": "{param_id}",
                 "new_value": "256",
-                "old_value": ""
+                "old_value": "{param_old_value}"
               }
             ]
           },
@@ -498,7 +529,7 @@
           "method": "POST",
           "path": "/v1/instance-groups/{instance_group_id}/resize",
           "json": {
-            "server_type_name": ""
+            "server_type_name": "{server_type_name}"
           },
           "expect_status": [
             200,
@@ -568,7 +599,7 @@
               "starting_day_of_week": "MON",
               "starting_time": "0000"
             },
-            "replica_count": "",
+            "replica_count": 1,
             "replicas": [
               {
                 "name": "regrrepl{ualpha}",
@@ -578,7 +609,7 @@
                     "server_type_name": "",
                     "block_storage_groups": [
                       {
-                        "role_type": "OS",
+                        "role_type": "DATA",
                         "size_gb": 104,
                         "volume_type": "SSD"
                       }
@@ -623,7 +654,7 @@
             },
             "nat_enabled": false,
             "region": "{region}",
-            "replica_count": "",
+            "replica_count": 1,
             "subnet_id": "",
             "tags": [],
             "replicas": [
@@ -635,7 +666,7 @@
                     "server_type_name": "",
                     "block_storage_groups": [
                       {
-                        "role_type": "OS",
+                        "role_type": "DATA",
                         "size_gb": 104,
                         "volume_type": "SSD"
                       }
@@ -819,6 +850,36 @@
           "name": "get-engine-version-properties",
           "method": "GET",
           "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov"
+        },
+        {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov",
+          "capture_soft": {
+            "dbaas_parameter_group_id": "$.contents[0].id"
+          }
+        },
+        {
+          "name": "list-parameters",
+          "method": "GET",
+          "path": "/v1/parameters",
+          "params": {
+            "dbaas_parameter_group_id": "{dbaas_parameter_group_id}"
+          },
           "expect_status": [
             200,
             400,
