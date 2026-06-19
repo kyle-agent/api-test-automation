@@ -47,4 +47,18 @@ VPC-CRUD lane becomes the new bottleneck.** Elegant fix: a quota-semaphore in
 inside ONE parallel pool, removing the separate job and letting VPC-CRUD run
 2–3-wide (~48 → ~19 min). Risk: HIGH (scheduler change); design before implementing.
 
+**Progress (2026-06-19):** the enabling primitive is built and offline-validated —
+`core.budgets.CrossProcessSemaphore`: a run-scoped, file-backed counting semaphore
+guarded by `fcntl.flock` so all pytest-xdist workers (same machine, one filesystem)
+share ONE VPC count. It BLOCKS until a slot frees (the throttle) rather than skipping
+like `Budget`, reclaims slots from crashed holders via PID-liveness, and is OPT-IN
+(nothing calls it yet, so it cannot affect the current run). Tests:
+`tests/offline/test_budgets_semaphore.py` (7, incl. real cross-process + blocking-wait
++ crash-reclaim). **Remaining cutover (needs a live CI run — do NOT blind-merge):**
+(a) wire `sem.slot(limit=5−shared)` around the engine's VPC-self-create step so
+VPC-CRUD lifecycles acquire/release a slot; (b) delete the separate `regression-vpc-crud`
+job in `.github/workflows/api-test.yml` and fold VPC_CRUD_K into the parallel
+`regression` pool. Validate on a heavy dispatch (peak concurrent VPCs ≤ 5, 0 survivors)
+before merge.
+
 ## Projected wall: 141 min → ~35 min (after #1+#2; #3 keeps it there post-#1).

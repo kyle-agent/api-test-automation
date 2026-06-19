@@ -25,7 +25,12 @@ concept disappears and "run only these services" is just a smaller leaf set / sm
 DAG. Adopt incrementally:
 - **0.1** long-pole-first ordering heuristic — DONE (commit `6399186b`)
 - **0.5** quota-aware unification of the VPC-CRUD lane (`core.budgets` VPC semaphore;
-  removes the separate serial job)
+  removes the separate serial job) — IN PROGRESS: the enabling primitive landed
+  (`core.budgets.CrossProcessSemaphore`, file-backed + `fcntl.flock`, PID-liveness
+  reclaim, offline multi-process tests). Remaining: wire it into the engine's
+  VPC-self-create path + drop the `regression-vpc-crud` serial job in
+  `.github/workflows/api-test.yml` — that cutover needs a live CI run to validate
+  (do NOT blind-merge; see `docs/run-parallelism-optimization.md` #3).
 - **1.0** custom DAG runner replacing xdist (leaf-set → closure → topological waves →
   budgets throttle), consuming `suites/*.yaml` / `--service` selections as the leaf set
 
@@ -44,7 +49,7 @@ DAG. Adopt incrementally:
 - Selective execution is first-class: a specific-service subset or a `suites/*.yaml` suite is just the leaf set; its closure is a smaller DAG scheduled the same way
 - Generalizes cleanly to multi-service combination tests (the graph just grows)
 - Parallelism bounded only by real dependencies + quota, not by a coarse lane split
-- Reuses existing pieces: `data/dependencies.json`, `dashboard/gen_dep_map.py` (parent/depth DAG, today visualization-only), `regression/scenarios/composer.py`, `core.budgets`, `suites/*.yaml`
+- Reuses existing pieces: `regression/scenarios/dependencies.json`, `dashboard/gen_dep_map.py` (parent/depth DAG, today visualization-only), `regression/scenarios/composer.py`, `core.budgets`, `suites/*.yaml`
 
 **Bad / Constraints:**
 - 1.0 replaces pytest-xdist → significant build; loses xdist's free test distribution + junit reporting (must be re-implemented)
