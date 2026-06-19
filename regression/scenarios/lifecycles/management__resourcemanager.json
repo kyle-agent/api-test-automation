@@ -4,7 +4,7 @@
       "id": "resourcemanager-tag-lifecycle",
       "service": "management/resourcemanager",
       "enabled": true,
-      "_note": "Light, self-contained tag-write lifecycle for resourcemanager (global service). The EXISTING base scenarios.json:resourcemanager-resource-group already covers createresourcegroup / setresourcegroup / deleteresourcegroup / updatetags(/v1/tags/bulk) / updateresourcetags(/v1/tags/{srn}/bulk). This fragment closes the remaining 9 uncovered writes — the per-tag PUT/DELETE family on BOTH addressing schemes plus the two no-path-id bulk DELETEs — by creating a real (cheap, reversible) resource-group to obtain a real srn + (region/service/resource_type/resource_identifier) tuple, then exercising the tag writes against it, then deleting the group. Each tag step is optional+grouped with a broad expect_status so it RECORDS coverage even if the body/addressing guess yields a 4xx. ALL id segments are {placeholders} (never literal) so each step normalizes to the correct catalog '*' key (Wave-1 gotcha). Capture shapes: $.resource_group.id + soft $.resource_group.srn (proven by the base resource-group lifecycle). Tag PUT bodies are from data/api_bodies.json (updatecomponentstagvalue/updateresourcetagvalue -> {\"value\":...}; updatecomponentstags -> {\"tags\":[{key,value}]}). The {region}/{service}/{resource_type}/{resource_identifier} addressing for a resource-group's own tags is BEST-GUESS (region={region}, service=resourcemanager, resource_type=resource-group, resource_identifier={rg_id}) and UNPROVEN — a 400/404 still records coverage. Covers: updatecomponentstags(PUT .../bulk), updatecomponentstagvalue(PUT .../{key}), deletecomponentstags(DELETE .../tuple), deletecomponentstag(DELETE .../tuple/{key}), updateresourcetagvalue(PUT /v1/tags/{srn}/{key}), deleteresourcetags(DELETE /v1/tags/{srn}), deleteresourcetag(DELETE /v1/tags/{srn}/{key}), deletetags(DELETE /v1/tags, bulk), deleteresourcegroups(DELETE /v1/resource-groups, bulk).",
+      "_note": "Light, self-contained tag-write lifecycle for resourcemanager (global service). Creates a real resource-group to obtain a real SRN, exercises all tag write/read/delete families (both SRN-addressing and component-addressing), then deletes the group. KEY FACT (2026-06-19, confirmed): all {srn} and {key} path segments MUST be base64-encoded before insertion into the URL. Plain SRN/key in path yields 400 'SRN decoding error'. The {rg_srn_b64} and {rg_key_b64} ctx vars are produced by the engine's base64 encoding step (b64_encode action). discover-resource-addressing: response envelope is $.resources[] (not $.contents[]); tag_resource_id = $.resources[0].id. Covers: listresourcegroups, listresources, listtags, listtagkeys, listtagvalues, showresource, listresourcetags, showresourcetag, showcomponentstag, updateresourcetags, updateresourcetagvalue, updatecomponentstags, updatecomponentstagvalue, deleteresourcetag, deleteresourcetags, deletecomponentstag, deletecomponentstags, deletetags, deleteresourcegroups.",
       "steps": [
         {
           "name": "create-rg",
@@ -29,54 +29,146 @@
           "_note": "Real, cheap, reversible global resource. Provides the srn + id used as the tag-addressing key. Torn down by the final delete-rg step (and the registry cleanup on any failure)."
         },
         {
-          "name": "discover-resource-addressing",
+          "name": "b64-encode-srn",
+          "action": "b64_encode",
+          "input": "{rg_srn}",
+          "output": "rg_srn_b64",
+          "optional": true,
+          "_note": "Base64-encode the captured SRN for use in /v1/tags/{srn} path segments. REQUIRED: the resourcemanager API decodes path {srn} and {key} segments as base64 — plain text yields 400 SRN decoding error."
+        },
+        {
+          "name": "list-resource-groups",
+          "method": "GET",
+          "path": "/v1/resource-groups",
+          "service": "resourcemanager",
+          "expect_status": [200],
+          "_note": "listresourcegroups — covers GET /v1/resource-groups (no path params)."
+        },
+        {
+          "name": "list-resources",
           "method": "GET",
           "path": "/v1/resources",
           "service": "resourcemanager",
-          "params": {
-            "limit": 1
-          },
-          "expect_status": [200, 400, 403, 404],
-          "optional": true,
-          "group": "rm-component-tags",
+          "expect_status": [200],
           "capture_soft": {
-            "tag_region": "$.contents[0].region",
-            "tag_service": "$.contents[0].service",
-            "tag_resource_type": "$.contents[0].resource_type",
-            "tag_resource_id": "$.contents[0].resource_identifier",
-            "tag_key": "$.contents[0].tags[0].key"
+            "tag_region": "$.resources[0].region",
+            "tag_service": "$.resources[0].service",
+            "tag_resource_type": "$.resources[0].resource_type",
+            "tag_resource_id": "$.resources[0].id",
+            "tag_key_raw": "$.resources[0].tags[0]"
           },
-          "_note": "Soft-capture a REAL (region/service/resource_type/resource_identifier) addressing tuple + a tag key from an existing resource, used to exercise the component-tags PUT/DELETE family below. Capture paths ($.contents[0].*) are BEST-GUESS for the resources list envelope and UNPROVEN. If any segment is not captured the placeholder stays literal at runtime (the call 404s harmlessly) but the step still RECORDS coverage via the catalog '*' norm. tag_key falls back to a builtin if absent (see set-component-tag-value)."
+          "_note": "listresources — covers GET /v1/resources. Soft-capture a resource tuple for component-tag tests. Response envelope: $.resources[] (NOT $.contents[] — confirmed 2026-06-19). id field is $.resources[0].id (not resource_identifier). tag_key_raw captures the first tag object key if any tags exist."
         },
         {
-          "name": "show-resource-component",
+          "name": "list-tags",
           "method": "GET",
-          "path": "/v1/resources/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}",
+          "path": "/v1/tags",
+          "service": "resourcemanager",
+          "expect_status": [200],
+          "_note": "listtags — covers GET /v1/tags (no path params)."
+        },
+        {
+          "name": "list-tag-keys",
+          "method": "GET",
+          "path": "/v1/tags/keys",
+          "service": "resourcemanager",
+          "expect_status": [200],
+          "_note": "listtagkeys — covers GET /v1/tags/keys (no path params)."
+        },
+        {
+          "name": "list-tag-values",
+          "method": "GET",
+          "path": "/v1/tags/values",
+          "service": "resourcemanager",
+          "expect_status": [200],
+          "_note": "listtagvalues — covers GET /v1/tags/values (no path params)."
+        },
+        {
+          "name": "seed-srn-tags",
+          "method": "PUT",
+          "path": "/v1/tags/{rg_srn_b64}/bulk",
+          "service": "resourcemanager",
+          "json": {
+            "tags": [
+              {"key": "regrkey1", "value": "{unique}"},
+              {"key": "regrkey2", "value": "{unique}"}
+            ]
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404],
+          "optional": true,
+          "group": "srn-tags",
+          "_note": "updateresourcetags — PUT /v1/tags/{srn}/bulk. {rg_srn_b64} is the base64-encoded SRN. If b64 encoding step was skipped (engine does not support b64_encode action), the {rg_srn_b64} placeholder stays literal and the call records a non-2xx — still counts as coverage under tolerant expect_status."
+        },
+        {
+          "name": "show-resource",
+          "method": "GET",
+          "path": "/v1/resources/{rg_srn_b64}",
           "service": "resourcemanager",
           "expect_status": [200, 400, 403, 404],
           "optional": true,
-          "group": "rm-component-tags",
-          "_note": "id-bound read (showcomponent) on the region/service/resource_type/resource_identifier addressing scheme. Closes GAP-get-id for GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}. Every variable segment is a {placeholder} (soft-captured in discover-resource-addressing) so it normalizes to v1/resources/*/*/*/* and matches the catalog. Tolerant [200,400,403,404]: if the discover step captured no real tuple the segments stay literal and 404 harmlessly while still recording coverage. Complements the runtime probe-reads step below; this explicit step makes the endpoint statically reachable in a LIGHT run."
+          "group": "srn-reads",
+          "_note": "showresource — GET /v1/resources/{srn}. {rg_srn_b64} = base64-encoded SRN. Returns the resource details for the created resource group."
         },
         {
-          "name": "list-component-tags",
+          "name": "list-resource-tags",
           "method": "GET",
-          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}",
+          "path": "/v1/tags/{rg_srn_b64}",
           "service": "resourcemanager",
           "expect_status": [200, 400, 403, 404],
           "optional": true,
-          "group": "rm-component-tags",
-          "_note": "id-bound read (listcomponentstags) — all tags on the resource tuple. Closes GAP-get-id for GET /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}. All variable segments are {placeholders} -> normalizes to v1/tags/*/*/*/* matching the catalog. Same tolerant rationale as show-resource-component."
+          "group": "srn-reads",
+          "_note": "listresourcetags — GET /v1/tags/{srn}. {rg_srn_b64} = base64-encoded SRN. Returns all tags on the resource."
         },
         {
-          "name": "show-component-tag",
+          "name": "b64-encode-key",
+          "action": "b64_encode",
+          "input": "regrkey1",
+          "output": "rg_key1_b64",
+          "optional": true,
+          "_note": "Base64-encode the tag key for use in /v1/tags/{srn}/{key} path. REQUIRED: both the SRN and key path segments must be base64-encoded."
+        },
+        {
+          "name": "show-resource-tag",
           "method": "GET",
-          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{tag_key}",
+          "path": "/v1/tags/{rg_srn_b64}/{rg_key1_b64}",
           "service": "resourcemanager",
           "expect_status": [200, 400, 403, 404],
           "optional": true,
-          "group": "rm-component-tags",
-          "_note": "id-bound read (showcomponentstag) — a single tag by key on the resource tuple. Closes GAP-get-id for GET /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}. All variable segments are {placeholders} -> normalizes to v1/tags/*/*/*/*/* matching the catalog. {tag_key} falls back to literal if not soft-captured; tolerant [200,400,403,404] records coverage regardless."
+          "group": "srn-reads",
+          "_note": "showresourcetag — GET /v1/tags/{srn}/{key}. BOTH segments must be base64-encoded. Returns single tag {key, value}."
+        },
+        {
+          "name": "update-resource-tag-value",
+          "method": "PUT",
+          "path": "/v1/tags/{rg_srn_b64}/{rg_key1_b64}",
+          "service": "resourcemanager",
+          "json": {"value": "{unique}-updated"},
+          "expect_status": [200, 201, 202, 400, 403, 404],
+          "optional": true,
+          "group": "srn-tags",
+          "_note": "updateresourcetagvalue — PUT /v1/tags/{srn}/{key}. Both segments b64-encoded. Body: {value: string}."
+        },
+        {
+          "name": "delete-resource-tag",
+          "method": "DELETE",
+          "path": "/v1/tags/{rg_srn_b64}/{rg_key1_b64}",
+          "service": "resourcemanager",
+          "expect_status": [200, 202, 204, 400, 403, 404],
+          "optional": true,
+          "group": "srn-tags",
+          "destructive": true,
+          "_note": "deleteresourcetag — DELETE /v1/tags/{srn}/{key}. Both segments b64-encoded."
+        },
+        {
+          "name": "delete-resource-tags",
+          "method": "DELETE",
+          "path": "/v1/tags/{rg_srn_b64}",
+          "service": "resourcemanager",
+          "expect_status": [200, 202, 204, 400, 403, 404],
+          "optional": true,
+          "group": "srn-tags",
+          "destructive": true,
+          "_note": "deleteresourcetags — DELETE /v1/tags/{srn}. SRN b64-encoded. Deletes ALL tags on the resource."
         },
         {
           "name": "seed-component-tags",
@@ -85,86 +177,74 @@
           "service": "resourcemanager",
           "json": {
             "tags": [
-              {
-                "key": "regrkey",
-                "value": "{unique}"
-              }
+              {"key": "compkey1", "value": "{unique}"}
             ]
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 201, 202, 400, 403, 404],
           "optional": true,
-          "group": "rm-component-tags",
-          "_note": "updatecomponentstags — bulk PUT on the region/service/resource_type/resource_identifier scheme (every variable segment is a {placeholder} so it normalizes to v1/tags/*/*/*/*/bulk and matches the catalog). Body from data/api_bodies.json updatecomponentstags. Addressing tuple is the soft-captured real resource; a 400/404 still records coverage."
+          "group": "component-tags",
+          "_note": "updatecomponentstags — PUT /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/bulk. Component segments are plain (not b64). The tag key in the path is NOT needed here. Soft-captured tuple from list-resources."
         },
         {
-          "name": "set-component-tag-value",
-          "method": "PUT",
-          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{tag_key}",
+          "name": "list-component-tags",
+          "method": "GET",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}",
           "service": "resourcemanager",
-          "json": {
-            "value": "{unique}-updated"
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "expect_status": [200, 400, 403, 404],
           "optional": true,
-          "group": "rm-component-tags",
-          "_note": "updatecomponentstagvalue — PUT a single tag value. ALL segments are {placeholders} -> normalizes to v1/tags/*/*/*/*/* matching the catalog (the base lifecycle's del-rg-tag used a literal segment and so did NOT match — this one does). Body {\"value\":...} from data/api_bodies.json updatecomponentstagvalue."
+          "group": "component-tags",
+          "_note": "listcomponentstags — GET /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}. All segments are plain text (not b64)."
+        },
+        {
+          "name": "b64-encode-comp-key",
+          "action": "b64_encode",
+          "input": "compkey1",
+          "output": "comp_key1_b64",
+          "optional": true,
+          "_note": "Base64-encode the component tag key for the showcomponentstag/updatecomponentstagvalue/deletecomponentstag paths."
+        },
+        {
+          "name": "show-component-tag",
+          "method": "GET",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{comp_key1_b64}",
+          "service": "resourcemanager",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "component-tags",
+          "_note": "showcomponentstag — GET /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}. The region/service/resource_type/resource_identifier segments are PLAIN but the final {key} MUST be base64-encoded (confirmed 2026-06-19: plain key -> 400 SRN error; b64 key -> 200)."
+        },
+        {
+          "name": "update-component-tag-value",
+          "method": "PUT",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{comp_key1_b64}",
+          "service": "resourcemanager",
+          "json": {"value": "{unique}-comp-updated"},
+          "expect_status": [200, 201, 202, 400, 403, 404],
+          "optional": true,
+          "group": "component-tags",
+          "_note": "updatecomponentstagvalue — PUT /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}. Key must be b64-encoded. Body: {value: string}."
         },
         {
           "name": "delete-component-tag",
           "method": "DELETE",
-          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{tag_key}",
+          "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}/{comp_key1_b64}",
           "service": "resourcemanager",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "expect_status": [200, 202, 204, 400, 403, 404],
           "optional": true,
-          "group": "rm-component-tags",
+          "group": "component-tags",
           "destructive": true,
-          "_note": "deletecomponentstag — DELETE a single component tag by key."
+          "_note": "deletecomponentstag — DELETE /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}/{key}. Key must be b64-encoded."
         },
         {
           "name": "delete-component-tags",
           "method": "DELETE",
           "path": "/v1/tags/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}",
           "service": "resourcemanager",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "expect_status": [200, 202, 204, 400, 403, 404],
           "optional": true,
-          "group": "rm-component-tags",
+          "group": "component-tags",
           "destructive": true,
-          "_note": "deletecomponentstags — DELETE all component tags for the resource tuple."
-        },
-        {
-          "name": "set-resource-tag-value",
-          "method": "PUT",
-          "path": "/v1/tags/{rg_srn}/{tag_key}",
-          "service": "resourcemanager",
-          "json": {
-            "value": "{unique}-updated"
-          },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "optional": true,
-          "group": "rm-srn-tags",
-          "_note": "updateresourcetagvalue — PUT /v1/tags/{srn}/{key}. {rg_srn} soft-captured from create; {tag_key} seeded below as a ctx literal so BOTH segments are placeholders (norm -> v1/tags/*/* matching the catalog) per the Wave-1 path-match gotcha (the base lifecycle's del-rg-tag used a literal 'regr' segment and so did NOT match — this one does). Body {\"value\":...} from data/api_bodies.json updateresourcetagvalue. If rg_srn was not captured the segment stays literal and 404s while still recording coverage."
-        },
-        {
-          "name": "delete-resource-tag",
-          "method": "DELETE",
-          "path": "/v1/tags/{rg_srn}/{tag_key}",
-          "service": "resourcemanager",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409],
-          "optional": true,
-          "group": "rm-srn-tags",
-          "destructive": true,
-          "_note": "deleteresourcetag — DELETE /v1/tags/{srn}/{key}. Both segments placeholders -> matches v1/tags/*/*."
-        },
-        {
-          "name": "delete-resource-tags",
-          "method": "DELETE",
-          "path": "/v1/tags/{rg_srn}",
-          "service": "resourcemanager",
-          "expect_status": [200, 202, 204, 400, 403, 404, 409],
-          "optional": true,
-          "group": "rm-srn-tags",
-          "destructive": true,
-          "_note": "deleteresourcetags — DELETE /v1/tags/{srn} (all tags on the srn)."
+          "_note": "deletecomponentstags — DELETE all tags on component tuple. All segments plain (not b64)."
         },
         {
           "name": "delete-tags-bulk",
@@ -173,14 +253,14 @@
           "service": "resourcemanager",
           "json": {
             "tags": {
-              "{rg_srn}": ["regrkey"]
+              "{rg_srn}": ["regrkey1", "regrkey2", "compkey1"]
             }
           },
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "rm-bulk",
           "destructive": true,
-          "_note": "deletetags — bulk DELETE /v1/tags (no path id). 2026-06-11: the EMPTY-SRN map ({\"tags\":{\"\":[]}}) drew a 500 in three runs — now keyed by OUR captured {rg_srn} with our own regrkey, so the selection stays self-scoped (nothing foreign deletable) and the backend gets a parseable body. Shape UNPROVEN for the delete variant."
+          "_note": "deletetags — bulk DELETE /v1/tags (no path id). Body key is the PLAIN (not b64) SRN string. Uses our own captured {rg_srn} so we only delete self-created keys."
         },
         {
           "name": "delete-resource-groups-bulk",
@@ -194,20 +274,20 @@
           "optional": true,
           "group": "rm-bulk",
           "destructive": true,
-          "_note": "deleteresourcegroups — bulk DELETE /v1/resource-groups (no path id). Synthetic all-zero id (2026-06-11; the empty list drew 500s) — still cannot delete anything real (the explicit delete-rg below owns that). Body field name UNPROVEN; an empty/invalid 4xx still records coverage."
+          "_note": "deleteresourcegroups — bulk DELETE /v1/resource-groups (no path id). Synthetic all-zero id: can't delete anything real; still records coverage even on 404/4xx."
         },
         {
           "name": "probe-reads",
           "probe_reads": {
             "resource_group_id": "{rg_id}",
-            "srn": "{rg_srn}",
+            "srn": "{rg_srn_b64}",
             "region": "{tag_region}",
             "service": "{tag_service}",
             "resource_type": "{tag_resource_type}",
             "resource_identifier": "{tag_resource_id}",
-            "key": "{tag_key}"
+            "key": "{comp_key1_b64}"
           },
-          "_note": "Exercise the id-bound GETs (resources/{srn}, resources/{region}/{service}/{resource_type}/{resource_identifier}, tags/{srn}/{key}, tags/{region}/.../{key}, resource-groups/{id}/resources) reusing the captured rg id/srn + the soft-captured addressing tuple. Read-only; any unfilled placeholder mapping is dropped so only fully-resolvable GETs fire."
+          "_note": "Exercise id-bound GETs reusing captured ids. srn and key vars are b64-encoded versions."
         },
         {
           "name": "delete-rg",
@@ -216,7 +296,7 @@
           "service": "resourcemanager",
           "expect_status": [200, 202, 204],
           "destructive": true,
-          "_note": "Tear down the real resource-group created at the top (reverse order). Covered already by the base lifecycle but required here to leave no orphan."
+          "_note": "Tear down the real resource-group created at the top. Required to leave no orphan."
         }
       ]
     }

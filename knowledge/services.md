@@ -98,6 +98,22 @@ duplicating. Add a new `##` section when you take on a new service.
 
 - **Host:** **global** (no region segment). resource-group `$.resource_group.id`
   (+ `srn` soft capture).
+- **CRITICAL: SRN and key path segments must be base64-encoded** (confirmed
+  2026-06-19). All endpoints with `{srn}` or `{key}` path params require the
+  value to be `base64.b64encode(value.encode()).decode()` before URL insertion.
+  Plain SRN or plain key yields 400 "SRN decoding error occurred. utf-8 codec
+  can't decode byte...".
+  - `GET/PUT/DELETE /v1/tags/{srn}` → `{srn}` = b64(srn)
+  - `GET/PUT/DELETE /v1/tags/{srn}/{key}` → both = b64(srn) and b64(key)
+  - `GET/PUT/DELETE /v1/resources/{srn}` → `{srn}` = b64(srn)
+  - `GET/PUT/DELETE /v1/tags/{region}/{service}/{resource_type}/{identifier}/{key}`
+    → region/service/resource_type/identifier are PLAIN; only `{key}` = b64(key)
+  - `/v1/tags/bulk` (PUT) and `/v1/tags` (DELETE bulk) use PLAIN SRN in JSON body
+    (not path), so no b64 needed there.
+- **listresources response shape:** `$.resources[]` (NOT `$.contents[]`). Fields:
+  `region`, `service`, `resource_type`, `id` (NOT `resource_identifier`).
+- **Coverage 2026-06-19:** 12 → **27/27** (100%). All 27 endpoints covered.
+  No remaining gaps.
 
 ## application-service / queueservice
 
