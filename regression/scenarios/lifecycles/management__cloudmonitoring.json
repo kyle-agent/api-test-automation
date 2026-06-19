@@ -177,6 +177,54 @@
           "expect_status": [200, 400, 403, 404],
           "group": "cm-ro-addrbook",
           "_note": "id-bound read (getadressbookmemberlist). Closes GAP-get-id for GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members. Keys off the soft-captured addrbookId from list-addrbooks; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+        },
+        {
+          "name": "list-account-products-vm",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "headers": {"X-ResourceType": "VM"},
+          "params": {"size": 1},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-products",
+          "capture_soft": {"productResourceId": "$.contents[0].productResourceId"},
+          "_note": "getaccountproductlist. Requires X-ResourceType header (verified live: 'VM' gives 200). Dual-recorded under catalog key because it has params. Soft-captures productResourceId for use in event-policy and event list steps. Empty if account has no VMs (still 200)."
+        },
+        {
+          "name": "list-account-products-object-storage",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/product/v2/accounts/products",
+          "headers": {"X-ResourceType": "Object Storage"},
+          "params": {"size": 5},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-products",
+          "capture_soft": {"productResourceId": "$.contents[0].productResourceId"},
+          "_note": "getaccountproductlist alternate product type. Object Storage products exist in test account (productResourceId='apitest-logsink' confirmed). Overwrites productResourceId capture if Object Storage has more. Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "list-event-policies-with-resource",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies",
+          "headers": {"X-ResourceType": "Object Storage"},
+          "params": {"productResourceId": "{productResourceId}", "size": 1},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-products",
+          "capture_soft": {"eventPolicyId": "$.contents[0].eventPolicyId"},
+          "_note": "getproducteventpolicylist with real productResourceId from soft-capture. Requires X-ResourceType header AND productResourceId query param (verified live: 200 confirmed). When productResourceId placeholder is un-filled this 400s harmlessly. Dual-recorded under catalog key because it has params. Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "list-account-events",
+          "method": "GET",
+          "path": "/v1/cloudmonitorings/event/v2/accounts/events",
+          "headers": {"X-ResourceType": "Object Storage"},
+          "params": {"eventState": "ALL", "queryStartDt": "{iso_29d_ago}", "queryEndDt": "{iso_today}", "size": 1},
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "group": "cm-ro-products",
+          "capture_soft": {"eventId": "$.contents[0].eventId"},
+          "_note": "getaccounteventlist. Requires X-ResourceType header + eventState + queryStartDt + queryEndDt query params (sidecar-declared). The API consistently 400s with InvalidInputValue/resourceType regardless of params combination (backend bug: reads queryEndDt date value as the 'resourceType' validation error value — see knowledge/services.md). Dual-recorded under catalog key because it has params. Tolerant — 400 still counts as reachable. queryStartDt uses {iso_29d_ago}, queryEndDt uses {iso_today}."
         }
       ]
     }
