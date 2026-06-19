@@ -244,11 +244,34 @@ _KIND_ALIAS = {
     "postgresql": "clusters", "mysql": "clusters", "mariadb": "clusters",
     "epas": "clusters", "cachestore": "clusters", "sqlserver": "clusters",
     "vertica": "clusters", "searchengine": "clusters", "eventstreams": "clusters",
+    "cache-store": "clusters", "search-engine": "clusters", "event-streams": "clusters",
+    "sql-server": "clusters",
     "instance-group": "instance-groups", "block-storage-group": "block-storage-groups",
     "log-stream": "log-streams", "log-group": "log-groups", "security-group": "security-groups",
     "nodepool": "nodepools", "public-ip": "public-ips", "publicip": "public-ips",
     "internet-gateway": "internet-gateways",
 }
+
+
+# DB engine resource_types all collapse to the overloaded kind "clusters" in
+# gen_dep_map, whose depth (6) is the longest path of the DEEPEST user of that
+# name (SKE/k8s + composite quick-query/data-ops chains). A real DB cluster only
+# needs vpc->subnet(->db-subnet), so it belongs at depth 2 (subnet+1). Correct the
+# display depth for these without disturbing the static dep map.
+# loggingaudit emits some of these HYPHENATED (cache-store / search-engine /
+# event-streams) — include both forms so they don't fall through to depth 0.
+_DB_ENGINES = {"mysql", "postgresql", "mariadb", "epas", "cachestore", "sqlserver",
+               "vertica", "searchengine", "eventstreams",
+               "cache-store", "search-engine", "event-streams", "sql-server"}
+
+
+def _depth_of(rtype: str, kind: str, depth: dict) -> int:
+    """Display depth for an instance — corrects the overloaded 'clusters' kind so a
+    DB cluster sits directly under its subnet (depth 2), not at the SKE/composite
+    depth 6."""
+    if rtype in _DB_ENGINES:
+        return depth.get("subnets", 1) + 1   # vpc(0) -> subnet(1) -> db cluster(2)
+    return depth.get(kind, 0)
 
 
 def _kind_of(rtype: str, dep_kinds: set) -> str:
@@ -483,7 +506,7 @@ def render_flow(spans, now: datetime, meta: dict, refresh: int = 0) -> str:
         k = _kind_of(d["rtype"], dep_kinds)
         kind_of[id(d)] = k
         by_kind_lk[(k, _lk(d))].append(d)
-        col_kind[depth.get(k, 0)][d["rtype"]].append(d)
+        col_kind[_depth_of(d["rtype"], k, depth)][d["rtype"]].append(d)
     maxc = max(col_kind, default=0)
 
     COLW, BW, BH, GAP, KGAP, PADX, PADY, HEADY = 226, 200, 26, 5, 22, 24, 96, 60

@@ -79,13 +79,9 @@ def detect(events: list[dict]) -> dict:
     quiet_min = ((now - datetime.strptime(last_evt, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
                   ).total_seconds() / 60) if last_evt else 1e9
 
-    # A1 — heavy batch running but no billable creates ever appeared == stalled
-    if heavy and since_min > HEAVY_STALL_MIN and billable_creates == 0:
-        found["HEAVY_STALL"] = (f"heavy batch started {since_min:.0f}m ago but loggingaudit shows "
-                                f"0 billable creates — the DB/compute lifecycles aren't running "
-                                f"(check shared-VPC env, host DNS, pytest selection).")
-
-    # A2 — owned billable survivors when NO heavy batch is active == leak
+    # cross-check LIVE state (ground truth) — loggingaudit lags + the shared
+    # _live_view.jsonl can be transiently partial, which would false-fire stalls.
+    owned_vpc, owned_clusters = [], 0
     try:
         from core.config import settings
         from core.http_client import ApiClient
@@ -93,6 +89,25 @@ def detect(events: list[dict]) -> dict:
         c = ApiClient(settings)
         j = json.loads((c.get("/v1/vpcs", service="vpc").raw_text) or "{}")
         owned_vpc = [v for v in j.get("vpcs", []) if re.search(r"regr|zznet", str(v.get("name", "")))]
+        for eng in ("mysql", "postgresql", "mariadb", "epas", "cachestore"):
+            try:
+                cj = json.loads((c.get("/v1/clusters", service=eng).raw_text) or "{}")
+                lst = next((v for v in cj.values() if isinstance(v, list)), [])
+                owned_clusters += sum(1 for x in lst if re.search(r"regr", str(x.get("name", ""))))
+            except Exception:
+                continue
+    except Exception as exc:
+        found["WATCH_DEGRADED"] = f"watcher could not reach the API: {exc}"
+
+    # A1 — heavy batch running but NO billable activity, confirmed by BOTH
+    # loggingaudit (0 creates) AND the live API (0 owned clusters) == real stall.
+    if heavy and since_min > HEAVY_STALL_MIN and billable_creates == 0 and owned_clusters == 0:
+        found["HEAVY_STALL"] = (f"heavy batch started {since_min:.0f}m ago but 0 billable creates in "
+                                f"loggingaudit AND 0 owned DB clusters live — lifecycles aren't "
+                                f"running (check shared-VPC env, host DNS, pytest selection).")
+
+    # A2 — owned billable survivors when NO heavy batch is active == leak
+    try:
         if owned_vpc and not heavy:
             found["BILLABLE_SURVIVOR"] = (f"{len(owned_vpc)} owned VPC(s) still ACTIVE with no heavy "
                                           f"batch running ({[v.get('name') for v in owned_vpc]}) — "
