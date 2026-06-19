@@ -39,6 +39,27 @@ duplicating. Add a new `##` section when you take on a new service.
 - public-ip `type: IGW` → `$.publicip.id`. internet-gateway needs `vpc_id`,
   `firewall_enabled`, `type: IGW` → `$.internet_gateway.id`.
 
+## networking / firewall
+
+- **Host:** regional. 8 endpoints. Firewalls are VPC-bound resources; the account
+  must have at least one VPC/firewall provisioned before most endpoints are reachable.
+- `GET /v1/firewalls` (listfirewalls) returns 200 OK even with zero firewalls (empty
+  list). No required query params. Covered in read-only smoke.
+- `GET /v1/firewalls/rules` (listfirewallrules) requires **`firewall_id` query param**
+  (marked required in `data/api_catalog_params.json`); bare call returns 400. Probe
+  with dummy id returns 404 — backend is reachable. Not coverable without a real firewall.
+- `GET /v1/firewalls/{firewall_id}` (showfirewall) and
+  `GET /v1/firewalls/rules/{firewall_rule_id}` (showfirewallrule) return 404 with
+  dummy IDs — backend reachable, no resources provisioned in the test account.
+- All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule
+  PUT, deletefirewallrule DELETE) need `SCP_ALLOW_MUTATIONS=true` (and DELETE needs
+  `SCP_ALLOW_DESTRUCTIVE=true`) plus existing firewall/rule IDs from a prior create.
+- **Coverage path:** create a VPC first (networking/vpc agent), then a firewall attaches
+  to the VPC. Capture `$.firewalls[0].id` from listfirewalls. Use for showfirewall,
+  listfirewallrules. Create a rule (POST /v1/firewalls/rules) to get `firewall_rule_id`
+  for showfirewallrule, setfirewallrule, deletefirewallrule.
+- Covered read-only: 1/8 (listfirewalls). Remaining 7 are mutation-gated this round.
+
 ## networking / security-group
 
 - **Host:** regional, but **account/region-scoped — no VPC needed**. SG

@@ -507,14 +507,55 @@
     },
     {
       "service": "firewall",
-      "covered": 0,
+      "covered": 1,
       "total": 8,
-      "gap": 8,
+      "gap": 7,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "networking/firewall/listfirewallrules",
+          "reason": "mutation-gated: requires firewall_id from a created firewall resource; no firewalls exist in account; needs SCP_ALLOW_MUTATIONS to create a firewall first",
+          "kind": "needs-peer-resource"
+        },
+        {
+          "key": "networking/firewall/showfirewall",
+          "reason": "mutation-gated: requires an existing firewall_id; no firewalls provisioned in account",
+          "kind": "needs-peer-resource"
+        },
+        {
+          "key": "networking/firewall/showfirewallrule",
+          "reason": "mutation-gated: requires an existing firewall_rule_id; no firewall rules provisioned in account",
+          "kind": "needs-peer-resource"
+        },
+        {
+          "key": "networking/firewall/createfirewallrule",
+          "reason": "mutating (POST); needs SCP_ALLOW_MUTATIONS=true + existing firewall + vpc",
+          "kind": "mutation-gated"
+        },
+        {
+          "key": "networking/firewall/setfirewall",
+          "reason": "mutating (PUT); needs SCP_ALLOW_MUTATIONS=true + existing firewall_id",
+          "kind": "mutation-gated"
+        },
+        {
+          "key": "networking/firewall/setfirewallrule",
+          "reason": "mutating (PUT); needs SCP_ALLOW_MUTATIONS=true + existing firewall_rule_id",
+          "kind": "mutation-gated"
+        },
+        {
+          "key": "networking/firewall/deletefirewallrule",
+          "reason": "destructive (DELETE); needs SCP_ALLOW_DESTRUCTIVE=true + existing firewall_rule_id",
+          "kind": "mutation-gated"
+        }
+      ],
+      "next_levers": [
+        "Enable SCP_ALLOW_MUTATIONS=true, then create a firewall resource via createfirewallrule (POST /v1/firewalls/rules) or check if a VPC-bound firewall auto-exists",
+        "After creating/finding a firewall: capture firewall_id from listfirewalls response, use for showfirewall + listfirewallrules",
+        "After creating a rule: capture firewall_rule_id from createfirewallrule response, use for showfirewallrule + setfirewallrule + deletefirewallrule",
+        "listfirewalls already returns 200 with empty list - re-verify after VPC/firewall creation in a mutations-enabled run"
+      ],
+      "notes": "listfirewalls GET /v1/firewalls -> 200 OK (empty list, account has no firewalls). All path-param GETs (showfirewall, showfirewallrule) return 404 with dummy IDs - backend is reachable. listfirewallrules requires firewall_id query param (required per sidecar); returns 404 with dummy ID. All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule PUT, deletefirewallrule DELETE) require mutation gates and existing resources.",
+      "updated": "2026-06-19T02:51:23Z"
     },
     {
       "service": "configinspection",
