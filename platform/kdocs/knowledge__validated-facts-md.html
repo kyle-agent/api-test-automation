@@ -1086,7 +1086,26 @@ subops-guarded create), both 500 <code>{"code":"ContactAdminForAssistance"}</cod
 4 engines (mysql/mariadb/epas/cachestore) created fine with the identical
 shared-VPC body shape, so this is a postgresql-backend create fault, not a body/
 linking bug. Baselined in <code>known_issues.json</code> (Product Bug). Same <code>ContactAdmin</code>
-class as the already-baselined <code>*registerlogexportconfig</code> 500s.</p></div>
+class as the already-baselined <code>*registerlogexportconfig</code> 500s.</p>
+<h2>IAM <code>DELETE /v1/policies/bulk</code> fans an UNMATCHED id out to ALL account policies (DANGER)</h2>
+<p><strong>Ground truth (run #124, loggingaudit 2026-06-19T08:20:20–52Z):</strong> the
+<code>iam-policy-extra-writes</code> lifecycle's <code>delete-policies-bulk</code> step sent
+<code>DELETE /v1/policies/bulk</code> with a synthetic/unmatched body
+<code>{"policy_ids": ["000…0"]}</code>. The SCP backend did NOT 4xx the unmatched id —
+it interpreted the bulk request as <strong>delete-ALL-policies</strong>: 420
+<code>policy.delete.start</code> events over <strong>240 distinct NON-test account policy
+names</strong> (AdministratorAccess_ACL, ObjectStorageAccess, Support,
+FullContainerRegistry, MariaDBManageAccess, …) in one 8-second backend batch
+(~52/sec — a single fanned-out call, not a client loop). All 416 non-owned
+deletes were backend-refused (the runner identity can't delete built-ins), so
+<strong>zero damage</strong>, but this is a name-unfiltered mass-delete of account policies
+(Hard Rule 3 violation by proxy).</p>
+<p><strong>Rule:</strong> NEVER send <code>/v1/policies/bulk</code> (or any bulk-delete-by-ids endpoint) an
+id we do not OWN. A synthetic/unmatched bulk id is NOT a safe "expect-4xx" probe
+here — the backend treats "no match" as "match everything." The fix
+(<code>management__iam.json</code> <code>pol-bulk</code> group) creates our OWN throwaway <code>regrpolb*</code>
+policy and bulk-deletes THAT captured id; if the create doesn't 2xx the group is
+skipped, so the bulk call never fires with an unfiltered body.</p></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/validated-facts.md</code></div>
