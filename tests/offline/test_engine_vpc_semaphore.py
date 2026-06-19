@@ -206,3 +206,20 @@ def test_partial_delete_frees_only_the_deleted_vpc(monkeypatch):
     assert res["status"] == "passed", res
     assert peak[0] == 2
     assert CrossProcessSemaphore("vpc").used() == 1   # vpc-a freed; vpc-b still held
+
+
+def test_pending_slot_freed_when_create_fails_capture(monkeypatch):
+    # A VPC create that returns an expected status but whose capture yields None
+    # raises out of the step (not via a handled branch) -> the slot was acquired
+    # but never bound to an id. run_lifecycle re-raises a genuine assert (after
+    # best-effort teardown), but the lifecycle-exit invariant must STILL free the
+    # pending slot before it does — no run-wide leak.
+    monkeypatch.setenv("SCP_VPC_SEMAPHORE", "true")
+    monkeypatch.setenv("SCP_VPC_SHARED_RESERVED", "0")
+
+    # 201 OK, but body lacks $.vpc.id so capture {"vpc_id": ...} -> None.
+    client = FakeClient({("POST", "/v1/vpcs"): _r(201, {"nope": {}})})
+    with pytest.raises(AssertionError, match="could not capture"):
+        engine.run_lifecycle(_vpc_lc(), client, _cfg())
+
+    assert CrossProcessSemaphore("vpc").used() == 0   # pending slot not leaked

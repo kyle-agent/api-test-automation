@@ -1253,6 +1253,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                         name=(body or {}).get("name", "") if isinstance(body, dict) else "",
                         res_id=rid, lifecycle=lifecycle["id"], parent=_parent)
     except LifecycleSkip as exc:
+        # Invariant: a slot acquired for a create that never bound to a VPC id
+        # (e.g. raised between acquire and cleanup registration) is freed on any
+        # lifecycle exit — no run-wide leak. Idempotent (no-op when empty).
+        _release_pending_vpc_tok()
         if _oplog:
             _oplog.emit_resource("lifecycle-end", service=service or "",
                                  name=lifecycle["id"], lifecycle=lifecycle["id"],
@@ -1261,6 +1265,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
         return {"id": lifecycle["id"], "status": "skipped", "reason": str(exc),
                 "failed_groups": sorted(failed_groups), "created": created_count}
     except Exception as exc:
+        _release_pending_vpc_tok()   # same invariant on the failure path
         print(f"\n[{lifecycle['id']}] failed — attempting teardown of created resources:")
         _teardown()
         return _finish(lifecycle, "failed", failed_groups, group_fail_reason,
