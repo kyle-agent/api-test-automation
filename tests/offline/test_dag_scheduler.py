@@ -163,6 +163,30 @@ def test_adopters_dispatched_longest_first():
         f"not longest-first across free+adopt: {order}")
 
 
+def test_long_selfcreator_not_buried_behind_free_wave():
+    """Regression for the 2026-06-20 self-creator-tail bug: a LONG self-creator
+    (slot node) must be dispatched EARLY by priority, not queued behind the entire
+    free wave. The old two-phase submission ran all zero-slot nodes first, so a
+    21-min vpc-peering started ~72 min in and tailed the makespan ~28 min. The
+    unified dispatcher must pick the long self-creator among the first."""
+    plan = _plan(free=[f"light{i}" for i in range(10)], adopters=[],
+                 self_creators={"long-sc": ["vpc"]}, vpc_cap=5)
+    durations = {"long-sc": {"avg_s": 1000.0, "n": 1}}
+    for i in range(10):
+        durations[f"light{i}"] = {"avg_s": 10.0, "n": 1}
+    order, lock = [], threading.Lock()
+
+    def ex(lid):
+        with lock:
+            order.append(lid)
+        time.sleep(0.01)
+        return LifecycleOutcome(lid, "passed")
+
+    dag_scheduler.run_dynamic(plan, ex, max_workers=2, durations=durations)
+    # the long self-creator (1000s) outranks every 10s light node -> starts first.
+    assert order[0] == "long-sc", f"long self-creator buried behind free wave: {order[:3]}"
+
+
 def test_heavy_stagger_spaces_heavy_submissions():
     """burst-stagger: with heavy_stagger_s>0, consecutive HEAVY (prio>=threshold)
     lifecycles must START at least ~stagger apart (their create-burst is spread),

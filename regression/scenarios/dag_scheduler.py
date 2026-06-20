@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 
 from regression.scenarios import dag_planner, schedule_optimizer
 from regression.scenarios.dag_runner import LifecycleOutcome, RunResult, WaveResult
@@ -140,45 +139,66 @@ def run_dynamic(plan: dag_planner.Plan, executor, *, provisioner=None,
                                 "reason": o.reason, "duration_s": o.duration_s})
         return o
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        # Submit the zero-slot batch longest-first. Optional BURST STAGGER: when
-        # heavy_stagger_s > 0, space consecutive HEAVY submissions (prio >=
-        # heavy_threshold_s) at least that far apart so their create-time API bursts
-        # don't all hit the gateway at t=0. (Measured 2026-06-20: longest-first
-        # dispatches every heavy DB/K8s/VM create within ~4 s, concentrating the API
-        # burst and aggravating the 502/503 gateway storm — heavy adopters start
-        # EARLY as intended but the simultaneous burst worsens transient 5xx. Stagger
-        # trades a small upfront delay for a flatter burst.) Light jobs never wait.
-        futs = []
-        _last_heavy = 0.0
-        for lid in zero:
-            if heavy_stagger_s > 0 and prio.get(lid, default_duration) >= heavy_threshold_s:
-                if _last_heavy:
-                    gap = heavy_stagger_s - (time.monotonic() - _last_heavy)
-                    if gap > 0:
-                        time.sleep(gap)
-                _last_heavy = time.monotonic()
-            futs.append(pool.submit(run_one, lid))
-        # Dispatch slot nodes in priority order; acquiring is BLOCKING so the
-        # highest-priority node always claims the next freed slot (no barrier). The
-        # done-callback releases the slot and wakes the next waiter.
-        for lid in slot:
-            need = demand[lid]
-            with cv:
-                while avail[0] < need:
-                    cv.wait()
-                avail[0] -= need
+    # UNIFIED priority dispatch (fixes the 2026-06-20 self-creator-tail bug): ONE
+    # longest-first ready list over ALL nodes; ``workers`` worker threads each pop the
+    # highest-priority node whose VPC-slot demand is currently free (zero-slot nodes
+    # are always ready). This is the resource-constrained list scheduler — a long
+    # self-creator (heavy-shared-networking ~24 min, vpc-peering ~21 min) is picked
+    # EARLY alongside the heavy adopters instead of queueing behind the whole free
+    # wave. (The earlier two-phase version submitted every zero-slot node to the pool
+    # FIRST, so self-creators sat at the BACK of the queue and started ~72 min in,
+    # tailing the makespan ~28 min — measured live, dynamic run #2.)
+    #
+    # Optional BURST STAGGER (``heavy_stagger_s`` > 0): space the START of consecutive
+    # HEAVY nodes (prio >= ``heavy_threshold_s``) at least that far apart so their
+    # create-time API bursts don't all hit the gateway at once (longest-first packs
+    # every heavy DB/K8s/VM create into ~4 s, aggravating the 502/503 storm). Light
+    # nodes never wait.
+    pending = sorted(zero + slot, key=lambda x: prio.get(x, default_duration),
+                     reverse=True)
+    stagger_lock = threading.Lock()
+    last_heavy = [0.0]
 
-            def _release(_f, n=need):
+    def _take() -> str | None:
+        """Pop the highest-priority node whose slots are free (zero-slot always free).
+        Blocks until one is takeable; returns None only when nothing remains."""
+        with cv:
+            while pending:
+                for i, lid in enumerate(pending):
+                    if avail[0] >= demand.get(lid, 0):
+                        avail[0] -= demand.get(lid, 0)
+                        pending.pop(i)
+                        return lid
+                cv.wait(timeout=2.0)   # all remaining need a slot; wait for a release
+            return None
+
+    def _stagger(lid: str) -> None:
+        if heavy_stagger_s <= 0 or prio.get(lid, default_duration) < heavy_threshold_s:
+            return
+        with stagger_lock:
+            gap = heavy_stagger_s - (time.monotonic() - last_heavy[0])
+            if last_heavy[0] and gap > 0:
+                time.sleep(gap)
+            last_heavy[0] = time.monotonic()
+
+    def _worker() -> None:
+        while True:
+            lid = _take()
+            if lid is None:
+                return
+            try:
+                _stagger(lid)
+                run_one(lid)
+            finally:
                 with cv:
-                    avail[0] += n
+                    avail[0] += demand.get(lid, 0)
                     cv.notify_all()
 
-            f = pool.submit(run_one, lid)
-            f.add_done_callback(_release)
-            futs.append(f)
-        for f in futs:
-            f.result()
+    threads = [threading.Thread(target=_worker, daemon=True) for _ in range(workers)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
 
     if provisioner is not None:
         try:
