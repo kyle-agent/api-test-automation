@@ -172,6 +172,17 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
+          "name": "set-description",
+          "service": "kms",
+          "method": "PUT",
+          "path": "/v1/kms/transit/{key_id}/description",
+          "group": "xcov-kms-description",
+          "optional": true,
+          "_note": "updatedescription (PUT /v1/kms/transit/{key_id}/description). Key body field is 'description' (KeyDescriptionRequest, doc request_example verified 2026-06-20). key_id resolved from create step. Tolerant [200,400,403,404] — state Active expected so 200; if key entered To_Be_Terminated 400/404 is acceptable.",
+          "json": {"description": "API regression suite (updated)"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
           "name": "set-managed-key-description",
           "service": "kms",
           "method": "PUT",
