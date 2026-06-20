@@ -1150,3 +1150,17 @@ API**. Evidence (controlled concurrency burst from the Claude-remote container):
 4. Residual uncertainty: could not capture the 503 from an alternate network path
    to 100% exclude an SCP outermost-edge Envoy; but the total absence of SCP
    headers + the transparent-proxy env strongly favours the egress path.
+
+#### Egress proxy is TRANSPARENT + policy-enforced — cannot be bypassed in-container (2026-06-20)
+Every outbound connection from the Claude-remote container egresses via a synthetic
+namespace (local socket src `192.0.2.2`, TEST-NET-1/RFC5737) — confirmed for SCP AND
+api.github.com; arbitrary dests (8.8.8.8:53) are blocked. So the egress proxy is a
+TRANSPARENT network-layer control (no HTTP_PROXY to unset, no NO_PROXY bypass; the
+env's network policy). Therefore the 503 storm CANNOT be avoided by app-level config
+from here. Storm-free heavy validation must run on a DIFFERENT egress path:
+  * CI / GitHub Actions (api-test.yml) — runner is on GitHub infra, NOT this proxy →
+    no storm. (Local-only because the Claude token gets 403 on workflow_dispatch; an
+    owner-triggered dispatch uses the clean path.)
+  * the M4 dedicated runner/worker on a direct network.
+Local in-container heavy runs are intrinsically storm-prone; the dynamic-dispatcher /
+stagger validations are sound but their makespan is confounded by this egress storm.
