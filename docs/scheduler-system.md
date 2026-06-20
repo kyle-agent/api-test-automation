@@ -187,6 +187,10 @@ python -m regression.scenarios.dag_runner --service vpc       # live behind SCP_
 # Parity gate against xdist
 python -m regression.scenarios.dag_diff --junit run.xml --runresult run.json
 
+# Live run + DAG-run dashboard + adaptive concurrency (writes ./dag-run.html)
+python tools/dag_run_live.py ALL              # full plan, AIMD on by default
+python tools/dag_run_live.py ske-cluster      # a target's closure only
+
 # Self-learning optimizer report
 python -m regression.scenarios.optimizer_report
 python -m regression.scenarios.optimizer_report --json
@@ -200,8 +204,45 @@ The live runner refuses to build its adapters unless `SCP_ALLOW_MUTATIONS=true`
 lifecycles) — CLAUDE.md Hard Rule 1. The planner, report, diff and graph paths are
 pure/offline and never need credentials.
 
+## Adaptive concurrency (AIMD) — finding the sustainable parallelism
+
+`dag_runner_live.AdaptiveLimiter` (gated by `SCP_ADAPTIVE=true`) self-tunes live
+concurrency to whatever the gateway sustains: every `SCP_ADAPTIVE_INTERVAL`
+seconds it reads `core.http_client.retry_status_count()` (cumulative 502/503/504)
+and either **halves** the limit (any new transient since last check, floor
+`SCP_ADAPTIVE_MIN`) or **probes +1** (healthy, ceiling = `max_workers`). Lifecycles
+`acquire()` a slot before running, so live concurrency *is* the current limit and
+**converges to the sustainable level — watching where it settles is how we find the
+optimal concurrency.** Unit-tested offline: `tests/offline/test_adaptive_limiter.py`.
+
+Run the experiment (live dashboard at `./dag-run.html`, AIMD on by default):
+
+```bash
+# start mid, probe up to a high ceiling, back off on gateway 503s
+python tools/dag_run_live.py ALL
+# sweep a different envelope:
+SCP_ADAPTIVE_START=8 SCP_ADAPTIVE_MIN=4 CATRUN_MAX_WORKERS=24 \
+  SCP_ADAPTIVE_INTERVAL=15 python tools/dag_run_live.py ALL
+```
+
+The dashboard surfaces the live `adaptive limit / ceiling`, the `503/502/504`
+counter, and a sparkline of the limit over time. **Default envelope:** start=10,
+min=4, ceiling=20, interval=15s.
+
+> **Status (2026-06-20):** harness wired + verified; AIMD probed 10→11 cleanly with
+> 503=0 in an early window before the run was stopped. The settling point (=
+> optimal concurrency) is **not yet measured** over a full run — that's the next
+> session's job (see Open items). Note: shared-root provisioning (`vpc → subnet,
+> subnet#db`) is a ~7–8 min serial prelude before any wave runs — the SCP subnets
+> sit in `CREATING` a long time — so budget for it when reading the trajectory.
+
 ## Open items
 
+- **Adaptive sweet-spot, full run** — let `tools/dag_run_live.py ALL` run to
+  completion with AIMD on and record where `limit` settles (and whether it
+  oscillates against a 503 ceiling). That settling value is the optimal
+  `max_workers`. Re-run across a couple of `SCP_ADAPTIVE_START`/ceiling envelopes to
+  confirm it's stable.
 - **Self-create ∥ adopt overlap** — the ~93 → ~49 min win. The current planner runs
   the adopt wave and the self-create waves back-to-back in the pipeline; overlapping
   them (the cap permits it once the shared VPC's slot is accounted for) is the
