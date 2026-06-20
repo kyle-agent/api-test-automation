@@ -128,7 +128,7 @@
       "id": "servicewatch-dashboard",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "Dashboard lifecycle: create -> read -> PUT update -> bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createdashboard (+setdashboard). UNPROVEN: create response envelope ($.dashboard.id assumed). Create is optional+grouped so a 4xx still records POST /v1/dashboards coverage and skips dependents. DELETE /v1/dashboards (deletebulkdashboards) assumed {ids:[...]}; unproven.",
+      "_note": "Dashboard lifecycle: create -> read -> PUT update -> bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createdashboard (+setdashboard). FIX 2026-06-20: create response envelope is FLAT $.id (per doc response_example; NOT $.dashboard.id). FIX: delete body uses 'dashboard_ids' (per doc) NOT 'ids'. Create is optional+capture_soft so a 4xx still records POST /v1/dashboards coverage and skips dependents.",
       "steps": [
         {
           "name": "create-dashboard",
@@ -177,15 +177,15 @@
             ]
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {
-            "dashboard_id": "$.dashboard.id"
+          "capture_soft": {
+            "dashboard_id": "$.id"
           },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/dashboards",
             "service": "servicewatch",
             "json": {
-              "ids": ["{dashboard_id}"]
+              "dashboard_ids": ["{dashboard_id}"]
             }
           }
         },
@@ -252,8 +252,9 @@
           "group": "dashboard",
           "optional": true,
           "destructive": true,
+          "_note": "deletebulkdashboards: body uses 'dashboard_ids' (NOT 'ids') per doc request_example.",
           "json": {
-            "ids": ["{dashboard_id}"]
+            "dashboard_ids": ["{dashboard_id}"]
           },
           "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
         }

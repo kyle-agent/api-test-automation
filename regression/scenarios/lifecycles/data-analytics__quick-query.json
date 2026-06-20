@@ -125,19 +125,21 @@
           "name": "update-engine",
           "method": "PUT",
           "path": "/v1/quick-query/{quick_query_id}/engine",
-          "json": {"server_type_name": ""},
+          "json": {"cpu": "4", "memory": "8", "replica": "1"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "qq-engine"
+          "group": "qq-engine",
+          "_note": "quickqueryupdateenginerequest requires cpu+memory+replica (all required strings). cpu pattern ^(0|4|6|8|10|12|14|16|18|20|22|24)$, memory pattern ^(0|8|16|32|64|128|192|256)$, replica pattern ^(0|1|2|3|4|5|6|7|8|9)$. Verified from api_docs.json models 2026-06-20."
         },
         {
           "name": "update-host-alias",
           "method": "PUT",
           "path": "/v1/quick-query/{quick_query_id}/host-alias",
-          "json": {"host_aliases": []},
+          "json": {"host_alias_list": []},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "qq-host-alias"
+          "group": "qq-host-alias",
+          "_note": "quickqueryhostaliasrequest uses field 'host_alias_list' (array[HostAliasList] with hostnames+ip), NOT 'host_aliases'. Verified from api_docs.json models 2026-06-20."
         },
         {
           "name": "delete-quick-query",
