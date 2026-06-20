@@ -757,8 +757,19 @@ duplicating. Add a new `##` section when you take on a new service.
   - `generated__heavy-aimlops.json`: full live-provision (needs SKE cluster + nodepool + aimlops release; very heavy/billable).
 - **Coverage 2026-06-20:** 2 → **6 / 12** (images 200, list 200, check-duplication 200 w/ release_name, check-version 200 w/ real cluster+version param, validate-namespaces 200 w/ real cluster, validate-resources 200 w/ real cluster+product_type=enterprise). Remaining 6 gaps: internal/nodes, internal/storageclasses (needs installed release), getaimlopsplatformv1 (needs real release), POST/PUT/DELETE (mutation-gated+heavy).
 
+## platform / product
+
+CONFIRMED LIVE 2026-06-20. Global account-scoped catalog service. All 4 endpoints are read-only GETs. No mutations. No heavy prereqs. 4/4 covered.
+
+- `listproductcategories` (GET /v1/product-categories) -> 200, count:14. Response: `{count, current_page, product_categories:[{category_id, display_name, display_name_ko, icon_file_id, is_exposed_menu, seq, service_group_color_id, created_at, modified_at}]}`. No required query params (all optional: limit, page, sort, display_name, etc.).
+- `listproducts` (GET /v1/products) -> 200, count:20. Response: `{count, current_page, products:[{product_id, display_name, display_name_ko, kind, product_category_id, product_category_name, created_at, modified_at}], total_count, total_pages}`. No required query params (optional: product_category_id, product_id, display_name, kind, sort, etc.).
+- `showproduct` (GET /v1/products/{product_id}) -> 200. product_id is a string SLUG, NOT a UUID (e.g. `ESS`, `PRICING`, `SECRETSMANAGER`, `FPMS`, `ORACLESERVICES`). Captured from listproducts `$.products[0].product_id`.
+- `showproductcategory` (GET /v1/product-categories/{category_id}) -> 200. category_id is a string SLUG (e.g. `FINANCIAL_MANAGEMENT`, `APPLICATION_SERVICE`, `HYBRID_CLOUD`, `AI-ML`, `DEVOPS_TOOLS`, `SECURITY`). Captured from listproductcategories `$.product_categories[0].category_id`.
+- The sidecar (`data/api_catalog_params.json`) correctly declares `produced_by` for both id-bound GETs — probe_reads auto-resolves them. No aliases needed.
+- Fragment: `regression/scenarios/lifecycles/platform__product.json` (product-catalog-readonly lifecycle).
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
 database (mysql, mariadb), data-analytics, financial-management,
-platform, devops-tools, and the long tail of management/networking/storage.
+devops-tools, and the long tail of management/networking/storage.
 These have the most uncovered endpoints — see `scenario-catalog.md` gap list.

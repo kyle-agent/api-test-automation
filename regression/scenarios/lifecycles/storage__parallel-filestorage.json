@@ -105,6 +105,17 @@
           }
         },
         {
+          "name": "list-snapshots",
+          "method": "GET",
+          "path": "/v1/snapshots",
+          "service": "parallel-filestorage",
+          "group": "pfs-snapshot",
+          "optional": true,
+          "params": {"volume_id": "{volume_id}"},
+          "expect_status": [200, 400, 403, 404],
+          "_note": "Closes listsnapshots (GET /v1/snapshots) — probe_reads skips it (no path params, only the required ?volume_id= query param). volume_id is a REQUIRED query param (live 400 without it; 404 with a fake UUID confirms the endpoint IS reachable). Expected 200 when a real volume exists; 404 if volume not yet active."
+        },
+        {
           "name": "restore-snapshot",
           "method": "PUT",
           "path": "/v1/snapshots/{snapshot_id}/restore",

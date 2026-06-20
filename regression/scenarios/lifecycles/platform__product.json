@@ -1,0 +1,61 @@
+{
+  "lifecycles": [
+    {
+      "id": "product-catalog-readonly",
+      "service": "platform/product",
+      "enabled": true,
+      "_note": "FIRST ANALYSIS 2026-06-20. ALL 4 product endpoints are read-only GETs (no mutations, no heavy prereqs). The product catalog is a global account-scoped meta-service — it returns SCP's own product/category registry. listproductcategories (GET /v1/product-categories) -> 200 count:14 categories (string slugs like FINANCIAL_MANAGEMENT, SECURITY). listproducts (GET /v1/products) -> 200 count:20 products (product_id string slugs like ESS, PRICING, SECRETSMANAGER). No required query params on either list. showproduct (GET /v1/products/{product_id}) uses product_id captured from $.products[0].product_id (sidecar produced_by: platform/product/listproducts). showproductcategory (GET /v1/product-categories/{category_id}) uses category_id from $.product_categories[0].category_id (sidecar produced_by: platform/product/listproductcategories). All 4 confirmed 200 live 2026-06-20. IDs are human-readable slugs, NOT UUIDs. No query params required. Pure read-only catalog service.",
+      "steps": [
+        {
+          "name": "list-product-categories",
+          "method": "GET",
+          "path": "/v1/product-categories",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "product-read",
+          "capture_soft": {
+            "category_id": "$.product_categories[0].category_id"
+          },
+          "_note": "listproductcategories: 200 count:14. Response envelope: {count, current_page, product_categories:[{category_id, display_name, ...}]}. category_id is a string slug (e.g. FINANCIAL_MANAGEMENT, SECURITY). Captured for showproductcategory probe_reads."
+        },
+        {
+          "name": "list-products",
+          "method": "GET",
+          "path": "/v1/products",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "product-read",
+          "capture_soft": {
+            "product_id": "$.products[0].product_id"
+          },
+          "_note": "listproducts: 200 count:20. Response envelope: {count, current_page, products:[{product_id, display_name, product_category_id, kind, ...}], total_count, total_pages}. product_id is a string slug (e.g. ESS, PRICING, SECRETSMANAGER). Captured for showproduct probe_reads."
+        },
+        {
+          "name": "show-product-category",
+          "method": "GET",
+          "path": "/v1/product-categories/{category_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "product-read",
+          "_note": "showproductcategory: 200 with real category_id slug (e.g. SECURITY). category_id captured from list-product-categories step ($.product_categories[0].category_id). Confirmed live 2026-06-20."
+        },
+        {
+          "name": "show-product",
+          "method": "GET",
+          "path": "/v1/products/{product_id}",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "product-read",
+          "_note": "showproduct: 200 with real product_id slug (e.g. ESS). product_id captured from list-products step ($.products[0].product_id). Confirmed live 2026-06-20."
+        },
+        {
+          "name": "probe-reads",
+          "probe_reads": {
+            "product_id": "{product_id}",
+            "category_id": "{category_id}"
+          }
+        }
+      ]
+    }
+  ]
+}
