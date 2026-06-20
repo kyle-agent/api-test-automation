@@ -65,3 +65,57 @@ Revisit if multi-service combination tests and selective/suite runs don't materi
 (then the 2-lane split is adequate and the 1.0 runner isn't worth the build), or if
 pytest-xdist gains dependency-aware scheduling, or if `dependencies.json` proves too
 incomplete to drive a real scheduler. Cross-link: `docs/run-parallelism-optimization.md`.
+
+## As-built (2026-06-20)
+
+The full 1.0 runner shipped, and the work went *beyond* the original ADR with a
+full-graph catalog layer and a self-learning optimizer. Canonical overview:
+[`docs/scheduler-system.md`](../scheduler-system.md).
+
+**Shipped:**
+- **0.1** long-pole-first ordering heuristic — DONE (per above).
+- **0.5** cross-process VPC semaphore (`core.budgets`) — primitive + engine wiring
+  landed and the workflow cutover (drop the serial `regression-vpc-crud` job, fold
+  `VPC_CRUD_K` into the parallel pool) was VALIDATED. The wave structure is now the
+  primary cap guard; the semaphore stays as defense-in-depth.
+- **1.0-a** DAG-completeness gate — `regression.scenarios.validate_dag` derives
+  `adopt_edges` + `self_creates` from the composed lifecycles and proves
+  `dependencies.json` (`adopt_edges` + `shared_roots`) is a complete DAG;
+  `--check` is wired as a CI gate in `.github/workflows/validate.yml`.
+- **1.0-b** offline planner — `dag_planner` turns a leaf set into cap-safe
+  topological waves (provision / free / adopt / VPC-cap-sized self-create). Pure,
+  credential-free.
+- **1.0-c** executor — `dag_runner` (orchestration core) + `dag_runner_live` (the
+  engine/shared-VPC adapters, behind `SCP_ALLOW_MUTATIONS`). The free wave runs
+  concurrently with the provision→adopt→self-create pipeline; a shared thread-safe
+  `_SharedBudget` coordinates capped-kind quotas across threads.
+- **1.0-d** parity — `dag_diff` compares the runner's pass/fail against the
+  pytest-xdist JUnit; the DAG runner matched xdist exactly on a validation leaf set
+  (`vpc-endpoint` + 2 self-creators, all passed both sides).
+
+**Beyond the ADR:**
+- **Catalog full-graph generalization** — `catalog_planner` plans over the WHOLE
+  resource model (~275 nodes / ~303 `requires` edges), and `catalog_run` makes
+  "press execute on a topology node" (`--target X`) the entry point: node → closure
+  → lifecycle leaf set → planner → runner. `dag_plan_graph` previews any plan as a
+  topological SVG/HTML.
+- **Self-learning optimizer** — `schedule_optimizer` keeps a rolling per-node
+  duration store (`data/optimizer/durations.json`, fed each run by `dag_runner`),
+  and re-derives the critical path (wall-time floor), longest-tail-first priority
+  and a cap-aware greedy makespan; `optimizer_report` renders the actionable view.
+
+**Measured (full live run of all 184 enabled lifecycles):** 157 passed / 24 failed
+/ 3 skipped, **peak VPC 5/5 (cap never breached)**. Failures were NOT
+dependency-ordering — lifecycles are self-contained; ~10–12 were concurrency-adjacent
+(503 + a private-dns race, addressed by stronger 503 retry + the shared budget), the
+rest individual per-service backend issues (many in the #125 baseline). The learned
+critical path is `gen-heavy-aimlops` (~49 min) + the DB clusters (~42–46 min), not
+private-dns — a correction the measured data produced.
+
+**Open items:**
+- **Self-create ∥ adopt overlap** — the current planner runs adopt and self-create
+  waves back-to-back; overlapping them is the remaining ~93 min → ~49 min (~47%)
+  makespan win.
+- **Cutover** — retiring xdist for the live runner in production still needs a
+  flag-on CI heavy run (peak VPC ≤ 5, 0 survivors) to validate before the cutover
+  commit merges. Do NOT blind-merge.

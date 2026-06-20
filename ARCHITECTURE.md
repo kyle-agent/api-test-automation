@@ -75,6 +75,27 @@ deterministic (AI sits at authoring time and post-run only).
    precondition for the ADR's `closure → shared-roots → topological-waves` 1.0
    scheduler.
 
+   ### Dependency-DAG scheduler + optimizer
+
+   The 1.0 scheduler replaces the two hard-coded xdist lanes (ADOPT-parallel /
+   VPC-CRUD-serial) with **one dependency graph** read by four overlays — Catalog →
+   Plan → Run → Optimize. `catalog_planner` works the full resource model
+   (`composer.load_model`, ~275 nodes) to map a selected resource node to its
+   dependency closure and the lifecycles that exercise it; `catalog_run` chains that
+   to execution (`--target X`); `dag_planner` turns the resulting leaf set into
+   cap-safe topological waves (provision shared roots / free-parallel / adopt /
+   VPC-cap-sized self-create); `dag_runner` (+ live adapters in `dag_runner_live`,
+   behind `SCP_ALLOW_MUTATIONS`) executes them — the free wave concurrently with the
+   provision→adopt→self-create pipeline, a shared thread-safe budget coordinating
+   capped-kind quotas across threads; `dag_diff` is the pytest-xdist parity gate;
+   and `schedule_optimizer` + `optimizer_report` add the self-learning layer — a
+   rolling per-node duration store (`data/optimizer/durations.json`, fed each run)
+   from which the critical path, longest-tail-first priority and optimal-vs-current
+   makespan are re-derived. `dag_plan_graph` renders any plan as a topological
+   SVG/HTML preview. Cap-safety is **structural** (the planner sizes each
+   self-create wave to `vpc_cap − shared_vpc`, so a wave can never breach the cap).
+   Full design + measured results: [`docs/scheduler-system.md`](docs/scheduler-system.md).
+
 2. **`conformance/` — is the API well designed & implemented?** Find design/impl
    defects via (a) **static** analysis of the spec and (b) **runtime** probes
    (read-only / empty-body) that never create resources. Defects are emitted as
