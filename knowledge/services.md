@@ -560,6 +560,28 @@ duplicating. Add a new `##` section when you take on a new service.
 
 ---
 
+---
+
+## management/network-logging
+
+- **Host / service key:** `network-logging`
+- **Catalog endpoints (4):** `listnetworkloggingconfigurations` (GET /v1/network-logging/configurations), `listnetworkloggingstorages` (GET /v1/network-logging/storages), `createnetworkloggingstorage` (POST), `deletenetworkloggingstorage` (DELETE).
+- **REQUIRED query param for both GETs:** `resource_type`. Valid enum values (confirmed live 2026-06-20): `FIREWALL`, `SECURITY_GROUP`, `NAT`. The value `VPC_FLOW_LOG` is REJECTED with 400 ("Input should be 'FIREWALL', 'SECURITY_GROUP' or 'NAT'").
+- **Backend stability:** Both GET endpoints exhibit transient 503s (no body). In a healthy window they return 200 with empty lists (`count:0`). The client engine retries handle this; scenarios use `expect_status: [200, 403]` so 503 retry path does not red the run.
+- **Scenario file:** `regression/scenarios/lifecycles/management__network-logging.json`; both GET steps now carry `"params": {"resource_type": "FIREWALL"}`.
+- **Coverage 2026-06-20:** 2 existing + 2 GET list steps now have correct `resource_type` param fix applied (was missing -> 400 ValidationError; fixed to FIREWALL -> 200 in healthy window).
+
+---
+
+## container/ske
+
+- **Host / service key:** `ske`
+- **listimages (GET /v1/images):** `scp_original_image_type` is REQUIRED. Only confirmed valid value: `k8s`. Without the param: 400 ValidationError "Field required". With `k8s`: 200, returns `nodepool_images` array (count:15 on 2026-06-20).
+- **Scenario files updated:** `container__ske.json` (added `list-images` step with `params: {scp_original_image_type: k8s}` to `ske-read-coverage` lifecycle); `generated__heavy-ske.json` (converted inline query-string path to `params` dict for `create-ske-image` and `verify-ske-image-images-page` steps).
+- **Coverage 2026-06-20:** `listimages` unblocked — 400→200 confirmed live.
+
+---
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
 database (mysql, mariadb), data-analytics, ai-ml, financial-management,
