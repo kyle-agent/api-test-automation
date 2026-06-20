@@ -73,14 +73,28 @@ def _build_client(cfg, pool_size: int | None = None):
     """Build a live ApiClient bound to the shared cfg. When ``pool_size`` is given,
     size the underlying urllib3 connection pool to it so a SHARED client can serve
     that many concurrent threads without exhausting connections (the default
-    requests pool is 10). Credentials are required only here."""
+    requests pool is 10). Credentials are required only here.
+
+    Connection REUSE is the lever against the transparent egress proxy's
+    ``upstream connect error … connection timeout`` 503s (2026-06-20 finding): every
+    NEW connection through the proxy is a fresh upstream connect that can fail under
+    burst. urllib3 caches ``pool_connections`` HOST pools (LRU); we hit ~60 SCP
+    service hosts, so a small value evicts host pools and a re-hit host REOPENS a
+    connection. Keeping a warm pool PER host (pool_connections >> #hosts) + headroom
+    per host (pool_maxsize) maximises reuse and cuts the proxy's cold upstream
+    connects. Both env-tunable (SCP_POOL_CONNECTIONS / SCP_POOL_MAXSIZE)."""
     from core.http_client import ApiClient
     cfg.require_credentials()
     client = ApiClient(cfg)
     if pool_size:
+        import os
         from requests.adapters import HTTPAdapter
-        n = max(int(pool_size), 10)
-        adapter = HTTPAdapter(pool_connections=n, pool_maxsize=n)
+        per_host = max(int(pool_size), 10)
+        # keep ALL ~60 service host pools warm (default 96 >> #hosts) so a re-hit
+        # host reuses its connection instead of a fresh proxy upstream connect.
+        pool_connections = max(int(os.environ.get("SCP_POOL_CONNECTIONS", "96")), per_host)
+        pool_maxsize = max(int(os.environ.get("SCP_POOL_MAXSIZE", str(per_host * 2))), per_host)
+        adapter = HTTPAdapter(pool_connections=pool_connections, pool_maxsize=pool_maxsize)
         client.session.mount("http://", adapter)
         client.session.mount("https://", adapter)
     return client
