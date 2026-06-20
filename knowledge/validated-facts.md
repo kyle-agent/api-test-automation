@@ -1164,3 +1164,21 @@ from here. Storm-free heavy validation must run on a DIFFERENT egress path:
   * the M4 dedicated runner/worker on a direct network.
 Local in-container heavy runs are intrinsically storm-prone; the dynamic-dispatcher /
 stagger validations are sound but their makespan is confounded by this egress storm.
+
+#### In-container heavy runs are storm-DOMINATED and time-variable — mitigations are second-order (2026-06-20)
+Cross-run evidence that the egress-proxy 503 storm cannot be tuned away in-container:
+- run#2 (NO mitigations): all 4 big DB creates PASSED (postgres/mysql/dbaas/aimlops).
+- run#4 (ALL mitigations: warm pool pool_connections=96 + heavy-stagger 5s + AIMD):
+  all 4 big DB creates FAILED — each on a 503 `upstream connect error` at a required
+  step (find-engine-version / create-kubernetes-version / wait-subnet = first-contact
+  cold connect to the service host under burst).
+So MORE mitigation produced a WORSE outcome — proof that the storm severity is
+TIME-VARIABLE (depends on the egress proxy's momentary load) and DOMINATES; our
+levers (AIMD/stagger/warm pool) are second-order and cannot make in-container heavy
+runs reliable. Warm pooling reduces REPEAT-host cold connects but cannot prevent the
+FIRST-contact 503 to each of ~60 service hosts when longest-first bursts them.
+CONCLUSION: do not chase 503 reliability with more in-container tuning. The dynamic
+dispatcher + stagger + warm-pool are validated offline and the early-start hypothesis
+is proven live (postgres dispatched +0s vs +7.9min static), but storm-free heavy
+validation REQUIRES a different egress path — CI/GitHub Actions (owner workflow_dispatch)
+or the M4 dedicated runner. Local in-container heavy = coverage-noisy, makespan-confounded.
