@@ -140,6 +140,11 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
   (deprioritize further cloudmonitoring investment).
 - CM event grades = {Fatal, Warning, Information}; comparison = 7 (GE/GT/LE/LT/EQ/NE + Range).
 - **loggingaudit**: trail_name 5-26 alnum+hyphen; **bucket region immutable** post-create.
+  **Shared test Object-Storage bucket = `do-not-delete-apitest`** (owner-provisioned
+  2026-06-20, do NOT delete) — use as `object_storage_bucket_name` for `createtrail`
+  and any test that needs a real, pre-existing OBS bucket. Object Storage itself is
+  NOT in the tested catalog (no objectstorage service), so this bucket is the only
+  way to supply a real bucket ref on the shared account.
 - **resourcemanager**: tags ≤50 per resource.
 - **resourcemanager `showresourcebycomponents`** (`GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}`) — **LIVE-VERIFIED 200, 2026-06-20.** Component-addressed sibling of `showresource` (which uses a b64 `{srn}`). The 4 path segments are **PLAIN, not base64** (unlike `{srn}`/`{key}`), and the 4th segment is the resource **`id`** — in the `/v1/resources` list response `$.resources[i].resource_identifier` is **null**, so capture `$.resources[i].id`. Returns `$.resource` (singular). Wired into `resourcemanager-tag-lifecycle` (step `show-resource-by-components`); closed the last resourcemanager id-GET reachability gap.
 
