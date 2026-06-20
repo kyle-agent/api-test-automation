@@ -103,7 +103,18 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-06-19, hand-driven from Claude remote — full handoff:
+- **LATEST (2026-06-20, hand-driven from Claude remote):** closed the last
+  id-bound GET **reachability** gap — wired `showresourcebycomponents`
+  (`GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}`)
+  into `resourcemanager-tag-lifecycle` and **LIVE-VERIFIED 200** (read-only probe,
+  no mutations). Static ceiling now **1371/1372 reachable (99.9%)**; the single
+  remaining static gap is the **blast-radius-waived** iam `deletepolicies` (DELETE
+  /v1/policies/bulk — un-probeable, correctly excluded, NOT a backlog item). So
+  reachability is effectively MAXED. Fact recorded (`knowledge/validated-facts.md`:
+  segments PLAIN not b64, 4th seg = `$.resources[].id`, list `resource_identifier`
+  is null). **The frontier from here is LIVE C3 (~50%), which is dispatch-gated**
+  (free cheap batch vs billable heavy batch — see "What to advance next").
+- **PRIOR (2026-06-19, hand-driven from Claude remote — full handoff:
   `docs/HANDOFF-2026-06-19-coverage-and-watcher.md`):** published **C3 47.9% →
   50.1%** (633/1264), C2-called **53.4%** (733/1372). Heavy DBaaS run complete +
   clean (8 cluster creates, +22 DB sub-op id-GET 2xx, 0 survivors verified). New

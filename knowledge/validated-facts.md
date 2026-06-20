@@ -141,6 +141,7 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
 - CM event grades = {Fatal, Warning, Information}; comparison = 7 (GE/GT/LE/LT/EQ/NE + Range).
 - **loggingaudit**: trail_name 5-26 alnum+hyphen; **bucket region immutable** post-create.
 - **resourcemanager**: tags ≤50 per resource.
+- **resourcemanager `showresourcebycomponents`** (`GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}`) — **LIVE-VERIFIED 200, 2026-06-20.** Component-addressed sibling of `showresource` (which uses a b64 `{srn}`). The 4 path segments are **PLAIN, not base64** (unlike `{srn}`/`{key}`), and the 4th segment is the resource **`id`** — in the `/v1/resources` list response `$.resources[i].resource_identifier` is **null**, so capture `$.resources[i].id`. Returns `$.resource` (singular). Wired into `resourcemanager-tag-lifecycle` (step `show-resource-by-components`); closed the last resourcemanager id-GET reachability gap.
 
 ## Id / capture shapes (where the id lives in the response)
 
