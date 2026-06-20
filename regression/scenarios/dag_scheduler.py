@@ -38,7 +38,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from regression.scenarios import dag_planner, dag_runner, schedule_optimizer
+from regression.scenarios import dag_planner, schedule_optimizer
 from regression.scenarios.dag_runner import LifecycleOutcome, RunResult, WaveResult
 
 
@@ -115,7 +115,7 @@ def run_dynamic(plan: dag_planner.Plan, executor, *, provisioner=None,
             + [lid for lid in plan.adopters]
             + [lid for lid in plan.self_creators if demand.get(lid, 0) == 0])
     slot = sorted((lid for lid in plan.self_creators if demand.get(lid, 0) > 0),
-                  key=lambda l: prio.get(l, default_duration), reverse=True)  # longest first
+                  key=lambda x: prio.get(x, default_duration), reverse=True)  # longest first
 
     outcomes: list[LifecycleOutcome] = []
     out_lock = threading.Lock()
@@ -204,20 +204,20 @@ def simulate_selfcreate(plan: dag_planner.Plan, durations: dict | None = None,
 
     # STATIC: planner order (-vpc_slots, lid) == alphabetical here, packed into
     # cap-sized waves WITH a barrier (next wave waits for the slowest in this wave).
-    static_order = sorted(slot, key=lambda l: (-demand[l], l))
+    static_order = sorted(slot, key=lambda lid: (-demand[lid], lid))
     static_make = 0.0
     static_sched: dict[str, tuple[float, float]] = {}
     t = 0.0
     for i in range(0, len(static_order), budget):
         wave = static_order[i:i + budget]
-        wmax = max(dur[l] for l in wave)
-        for l in wave:
-            static_sched[l] = (t, t + dur[l])
+        wmax = max(dur[lid] for lid in wave)
+        for lid in wave:
+            static_sched[lid] = (t, t + dur[lid])
         t += wmax            # barrier: whole wave must finish before the next
     static_make = t
 
     # DYNAMIC: longest-job-first onto `budget` slots, no barrier.
-    dyn_jobs = sorted(((l, dur[l]) for l in slot), key=lambda x: x[1], reverse=True)
+    dyn_jobs = sorted(((lid, dur[lid]) for lid in slot), key=lambda x: x[1], reverse=True)
     dyn_make, dyn_sched = _sim_machines(dyn_jobs, budget)
 
     return {
@@ -239,7 +239,7 @@ def format_comparison(sim: dict) -> str:
     L.append(f"  SAVING                                   : {sim['saving_s']/60:6.1f} min "
              f"({100*sim['saving_s']/s['makespan_s']:.0f}% of self-create portion)" if s['makespan_s'] else "")
     L.append("  per-node start time (min into the self-create portion):")
-    for lid in sorted(sim["durations_s"], key=lambda l: sim["durations_s"][l], reverse=True):
+    for lid in sorted(sim["durations_s"], key=lambda x: sim["durations_s"][x], reverse=True):
         ss = s["schedule"].get(lid, (0, 0))[0] / 60
         ds = d["schedule"].get(lid, (0, 0))[0] / 60
         L.append(f"    {lid:38} dur {sim['durations_s'][lid]/60:5.1f}m   "
