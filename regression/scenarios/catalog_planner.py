@@ -27,20 +27,34 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
 
+def _entry_ids(entry) -> list[str]:
+    """Graph-node ids referenced by one ``requires`` entry. Handles the model's
+    real forms: a bare id string; a multiplicity dict ``{ref: id, count: n}``;
+    ``{id: ...}``; and a branch dict ``{one_of/and/any/all: [members...]}`` whose
+    members are themselves strings or ``{ref}``/``{id}`` dicts (recursed). A
+    credential-only entry (``{credential: ...}`` with no ref/id) is NOT a graph
+    node and contributes nothing. (one_of branches are collected too, so closure
+    stays a safe superset.)"""
+    if isinstance(entry, str):
+        return [entry]
+    if not isinstance(entry, dict):
+        return []
+    out: list[str] = []
+    if entry.get("ref"):
+        out.append(entry["ref"])
+    if entry.get("id"):
+        out.append(entry["id"])
+    for key in ("one_of", "and", "any", "all"):
+        for m in entry.get(key, []) or []:
+            out.extend(_entry_ids(m))
+    return out
+
+
 def _requires_ids(task: dict) -> list[str]:
-    """Normalized dependency ids of a node. A ``requires`` entry is usually a bare
-    id string; tolerate dict forms ({id}/{one_of:[...]}/{and:[...]}) by collecting
-    every id mentioned (closure stays a superset, which is the safe direction)."""
+    """Normalized dependency ids of a node across all its ``requires`` entries."""
     out: list[str] = []
     for entry in (task.get("requires") or []):
-        if isinstance(entry, str):
-            out.append(entry)
-        elif isinstance(entry, dict):
-            if entry.get("id"):
-                out.append(entry["id"])
-            for key in ("one_of", "and", "any", "all"):
-                for m in entry.get(key, []) or []:
-                    out.append(m if isinstance(m, str) else m.get("id"))
+        out.extend(_entry_ids(entry))
     return [x for x in out if x]
 
 
