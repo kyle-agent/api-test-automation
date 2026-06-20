@@ -126,10 +126,16 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   duration-prioritized (longest-job-first via `schedule_optimizer` tail-length),
   VPC-slot-semaphore-gated dispatch — applies priority to BOTH self-create AND adopt,
   no wave barrier. `simulate_full` DES projects 64.3→51.8 min (19%, ~floor) at
-  workers=8. 7 offline tests. **NOT yet wired** — `dag_run_live.py:234` still calls
-  static `dag_runner.run_plan`; **DAG remaining = A1 wire `run_dynamic` + A2
-  `update_durations` into `dag_run_live`, A3 on_event/dashboard compat, then 1.0-d CI
-  cutover — all need a live heavy run to validate (DEFERRED: heavy lane busy).**
+  workers=8. 7 offline tests. **A1/A2/A3 NOW WIRED** (commit 26ad0241): `dag_run_live`
+  dispatches via `run_dynamic` by default (`SCP_DAG_DYNAMIC=true`, set false for static
+  fallback), folds measured wall-times via `update_durations` (was never done — nodes
+  stayed n:1), and marks dashboard bands active for the dynamic path. **Remaining =
+  FIRST live validation on a clean storm-free heavy run + 1.0-d CI cutover — DEFERRED
+  (heavy lane busy, owner rule; not run here).** Also **merged origin/main coverage
+  waves 3–5** (25 commits): 222 lifecycles / 0 errors; reconciled `validate_dag` (+4
+  adopt_edges: vpc-internet-gateway/nat-gateway/port/privatelink-endpoint) → green.
+  Static ceiling now 1370/1372; the 2 gaps = waived iam `deletepolicies` + a NEW
+  `budget` id-GET from main's coverage work (informational, not a gate, budget-owner item).
   Optimizer TIER-D structural fixes VERIFIED: servicewatch-201 + filestorage-teardown
   were **mis-diagnoses** (code already correct); apigw-privatelink IP is a real
   **dual-mode** issue (adopt-fallback → own-block IP vs shared subnet) needing the

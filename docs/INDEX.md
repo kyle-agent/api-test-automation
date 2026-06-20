@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 44 docs · 31 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 45 docs · 32 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -56,6 +56,7 @@
 | [`working/trackers/COVERAGE-C3-ANALYSIS-2026-06-20.md`](working/trackers/COVERAGE-C3-ANALYSIS-2026-06-20.md) | coverage | C3 Coverage Analysis & Plan — 2026-06-20 | 🟢 active |
 | [`working/trackers/IMPROVEMENT-BACKLOG.md`](working/trackers/IMPROVEMENT-BACKLOG.md) | orchestrator | Planner가 유지하는 개선 계획 | 🟢 active |
 | [`working/trackers/LIVE-READINESS-GATES.md`](working/trackers/LIVE-READINESS-GATES.md) | all | disabled-lifecycle inventory (IB-023) | 🟢 active |
+| [`working/trackers/POSTRUN-2026-06-20-fullheavy.md`](working/trackers/POSTRUN-2026-06-20-fullheavy.md) | all | Post-run Analysis: Full Heavy DAG Run — 2026-06-20 | 🟢 active |
 | [`working/trackers/PRODUCT-FINDINGS.md`](working/trackers/PRODUCT-FINDINGS.md) | validation | consolidated ledger of product/API findings | 🟢 active |
 | [`working/trackers/READ-REACHABILITY.md`](working/trackers/READ-REACHABILITY.md) | coverage | id-bound GET reachability from the resource model | 🟢 active |
 | [`working/trackers/SERVICE-GAP-REPORTS.md`](working/trackers/SERVICE-GAP-REPORTS.md) | coverage | 서비스별 커버리지 갭 리포트 (병렬 agent 분석, 2026-06-13) | 🟢 active |
