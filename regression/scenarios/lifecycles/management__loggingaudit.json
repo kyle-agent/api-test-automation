@@ -19,10 +19,22 @@
           "method": "POST",
           "path": "/v1/trails",
           "json": {
-            "name": "regrtrail{unique}",
-            "description": "API regression coverage probe",
-            "object_storage_bucket_name": "regrtrail{unique}",
-            "is_multi_region": false,
+            "trail_name": "regrtrail{unique}",
+            "trail_description": "API regression coverage probe",
+            "trail_save_type": "JSON",
+            "bucket_name": "do-not-delete-apitest",
+            "bucket_region": "{region}",
+            "region_total_yn": "Y",
+            "region_names": [],
+            "log_type_total_yn": "N",
+            "target_log_types": [],
+            "resource_type_total_yn": "Y",
+            "target_resource_types": [],
+            "user_total_yn": "Y",
+            "target_users": [],
+            "service_watch_yn": "Y",
+            "organization_trail_yn": "N",
+            "log_verification_yn": "N",
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
@@ -36,7 +48,7 @@
             "path": "/v1/trails/{trail_id}",
             "service": "loggingaudit"
           },
-          "_note": "Body UNPROVEN — createtrail likely needs a pre-existing object-storage bucket. On the expected 4xx the optional flag isolates the group; the POST is still recorded as covered. tags[] receives owner tags via the engine."
+          "_note": "Body from api_docs.json request_example (createtrail, 2026-06-20). Field names confirmed: trail_name (not name), bucket_name (not object_storage_bucket_name), bucket_region (required, uses {region} placeholder to match trail region — bucket region immutable post-create per validated-facts). Shared test OBS bucket = do-not-delete-apitest (owner-provisioned, do NOT delete). All yn-flag arrays are required per doc schema. Response envelope: $.trail.id (confirmed by response_example). tags[] receives owner tags via engine. Capture $.trail.id -> trail_id unlocks the 5 id-bound sub-ops (show/set/start/stop/delete trail)."
         },
         {
           "name": "show-trail",
@@ -51,12 +63,24 @@
           "method": "PUT",
           "path": "/v1/trails/{trail_id}",
           "json": {
-            "description": "API regression coverage probe (update)",
-            "is_multi_region": false
+            "trail_description": "API regression coverage probe (update)",
+            "trail_save_type": "JSON",
+            "region_total_yn": "Y",
+            "region_names": [],
+            "log_type_total_yn": "N",
+            "target_log_types": [],
+            "resource_type_total_yn": "Y",
+            "target_resource_types": [],
+            "user_total_yn": "Y",
+            "target_users": [],
+            "service_watch_yn": "Y",
+            "organization_trail_yn": "N",
+            "log_verification_yn": "N"
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "la-trail"
+          "group": "la-trail",
+          "_note": "Body from api_docs.json settrail request_example (2026-06-20). No bucket_name/bucket_region on update (immutable). Fields match the PUT schema: trail_description, trail_save_type, and all yn-flag arrays."
         },
         {
           "name": "start-trail",
