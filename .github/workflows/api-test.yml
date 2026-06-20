@@ -325,25 +325,18 @@ jobs:
     name: AXIS1 regression (smoke + read-chains, opt-in CRUD)
     needs: spec
     runs-on: ubuntu-latest
-    # SHARED-INFRA PARALLEL design, JOB A of the A∥B split. This job runs smoke
-    # + read-chains (read-only), then the ADOPT-class CRUD pass (PARALLEL_K):
-    # one shared VPC + one shared subnet provisioned ONCE, every lifecycle
-    # adopts them (SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env so every xdist
-    # worker adopts the SAME live infra) and creates only its own child ->
-    # safe with pytest-xdist `-n 6` (re-raised from -n 2 on 2026-06-18 — see the
-    # adopt-pass step comment + CONTEXT.md "Parallel-scheduling principle"; a
-    # provision miss can no longer fan out into a create-VPC race because IB-049
-    # skips adopters that lack a shared-VPC id under xdist).
-    # The complementary VPC-CRUD class (VPC_CRUD_K — lifecycles that MUST
-    # self-create/mutate/peer VPCs) runs in the PARALLEL `regression-vpc-crud`
-    # job (B) so the full run's wall-clock is max(A, B), not A+B.
-    # VPC math while A∥B overlap: account cap = 5 (VALIDATED live, run
-    # 27306490231). A holds exactly 1 (shared) VPC; B is serial and its worst
-    # lifecycle holds 2 (vpc-peering) -> 3 of 5, leaving headroom for leftovers
-    # and the slow heavy-shared-networking teardown. PARALLEL_K and
-    # VPC_CRUD_K are exact complements (derived from dependencies.json via
-    # shared_infra --print-filters) so A+B partition ALL enabled CRUD
-    # lifecycles with no overlap/orphan.
+    # SHARED-INFRA design (v0.5: ONE unified CRUD pool, no A∥B split). This job
+    # runs smoke + read-chains (read-only), then the full CRUD pass: one shared
+    # VPC + one shared subnet provisioned ONCE; adopt-class lifecycles adopt them
+    # (SCP_SHARED_VPC_ID/SCP_SHARED_SUBNET_ID env so every xdist worker adopts the
+    # SAME live infra) and create only their own child, while VPC-self-creating
+    # lifecycles (formerly the serial regression-vpc-crud job) run in the SAME
+    # pool — the SCP_VPC_SEMAPHORE cross-process throttle caps concurrent VPC
+    # creates to (5 - SCP_VPC_SHARED_RESERVED), so -n 6 never races the 5-VPC
+    # account cap (VALIDATED live, run 27306490231). The shared VPC holds 1 slot;
+    # reserve 1 -> 4 self-creators concurrent (4 + 1 = 5 = cap). A provision miss
+    # can't fan out into a create-VPC race (IB-049 skips adopters lacking a
+    # shared-VPC id under xdist); self-creators are gated by the semaphore.
     timeout-minutes: 300
     permissions:
       contents: read
@@ -355,6 +348,19 @@ jobs:
       SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
       # Heavy lifecycles run ONLY via dispatch run_heavy=true (or repo var).
       SCP_RUN_HEAVY: ${{ (github.event.inputs.run_heavy == 'true' || needs.spec.outputs.req_heavy == 'true' || vars.SCP_RUN_HEAVY == 'true') }}
+      # --- v0.5 cutover: unified single-pool CRUD --------------------------
+      # VPC-self-creating lifecycles now run in THIS parallel pool (no separate
+      # serial job); the cross-process VPC semaphore throttles concurrent VPC
+      # creates to (5 - shared) so the account cap is never exceeded. The shared
+      # VPC this job provisions holds 1 slot -> reserve 1, leaving 4 for
+      # self-creators (4 + 1 shared = 5 = cap).
+      SCP_VPC_SEMAPHORE: "true"
+      SCP_VPC_SHARED_RESERVED: "1"
+      # Wait (don't skip) for a VPC slot for most of the job window: heavy-shared-
+      # networking can hold its VPC for hours, so a short acquire timeout would
+      # spuriously skip VPC-CRUD lifecycles queued behind it. 4h < the 300-min job
+      # timeout, so a genuinely stuck acquire still surfaces rather than hangs.
+      SCP_VPC_SEMAPHORE_TIMEOUT: "14400"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -559,13 +565,15 @@ jobs:
             fi
           fi
 
-      - name: Run ADOPT-class CRUD (parallel)
+      - name: Run unified CRUD (parallel, VPC-throttled)
         id: crud
-        # PARALLEL_K selects every CRUD lifecycle that is NOT a vpc-crud one (the
-        # adopt-class + all non-VPC CRUD). They adopt the shared VPC+subnet via
-        # env ids, so they only create their own child resource -> safe to run in
-        # parallel with pytest-xdist -n 6. A manual crud_filter (dispatch) or the
-        # heavy.txt self-trigger filter is ANDed in to NARROW within the pass.
+        # v0.5 cutover: ONE parallel pool for ALL enabled CRUD lifecycles. The
+        # adopt-class adopts the shared VPC+subnet (env ids); VPC-self-creating
+        # lifecycles (formerly the serial regression-vpc-crud job) now run here
+        # too, with SCP_VPC_SEMAPHORE throttling concurrent VPC creates to
+        # (5 - SCP_VPC_SHARED_RESERVED) so the 5-VPC account cap is never raced.
+        # No PARALLEL_K restriction -> the full set runs; a manual crud_filter
+        # (dispatch) or the heavy.txt self-trigger filter still NARROWS the pass.
         #
         # PARALLELISM (2026-06-18): independent lifecycles (each engine requires=
         # None, adopts the same shared VPC/subnet) must fan out to minimise TOTAL
@@ -580,10 +588,12 @@ jobs:
         env:
           CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}
         run: |
-          echo "Running ADOPT-class CRUD in parallel (-n 6)" | tee reports/crud.log
+          echo "Running unified CRUD in parallel (-n 6, VPC semaphore on)" | tee reports/crud.log
           MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
-          if [ -n "$MANUAL" ]; then FILTER="($PARALLEL_K) and ($MANUAL)"; else FILTER="$PARALLEL_K"; fi
-          echo "adopt-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
+          # unified pool: no PARALLEL_K restriction -> all enabled CRUD lifecycles;
+          # only a manual filter narrows the pass.
+          if [ -n "$MANUAL" ]; then FILTER="$MANUAL"; else FILTER=""; fi
+          echo "unified-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
           ARGS=(tests/crud -m crud -n 6 --junitxml=reports/junit-crud-parallel.xml)
           [ -n "$FILTER" ] && ARGS+=(-k "$FILTER")
           set -o pipefail
@@ -628,8 +638,8 @@ jobs:
                   for s in shards:
                       out.write(s.read_text()); s.unlink()
               print(f"merged {len(shards)} smoke TSV shard(s)")
-          # fold this job's CRUD junit shard(s) into one junit-crud.xml (the
-          # serial VPC-CRUD pass produces its own in the regression-vpc-crud job)
+          # fold this job's CRUD junit shard(s) into one junit-crud.xml
+          # (v0.5: the unified pool is the only CRUD pass — no separate job B)
           import glob, xml.etree.ElementTree as ET
           cases = []
           for f in sorted(glob.glob("reports/junit-crud-*.xml")):
@@ -695,143 +705,14 @@ jobs:
           if-no-files-found: warn
 
   # ---------------------------------------------------------------------------
-  # AXIS 1 · regression/ — JOB B of the A∥B split: the VPC-CRUD class, run in
-  # PARALLEL with job A so the full run's wall-clock is max(A, B) instead of
-  # A+B (formerly this pass ran serially inside the regression job after the
-  # adopt pass finished).
-  # VPC_CRUD_K lifecycles MUST self-create their own VPC/subnet (their purpose
-  # is vpc/subnet/peering creation, they mutate a VPC, or they need >1 VPC), so
-  # they run SERIALLY (-n 0). Capacity while A∥B overlap: account cap = 5
-  # (VALIDATED live, run 27306490231); A holds 1 (shared) VPC, B's worst single
-  # lifecycle holds 2 (vpc-peering). Each VPC-creating lifecycle uses a UNIQUE,
-  # non-overlapping CIDR (knowledge/domain-constraints.md).
-  # ---------------------------------------------------------------------------
-  regression-vpc-crud:
-    name: AXIS1 regression (VPC-CRUD class, serial)
-    needs: spec
-    # Pure CRUD job: nothing to do on read-only runs (smoke lives in job A).
-    if: ${{ !cancelled() && (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 300
-    permissions:
-      contents: read
-    env:
-      SCP_ALLOW_MUTATIONS: ${{ (github.event.inputs.allow_mutations == 'true' || needs.spec.outputs.req_mutations == 'true' || vars.SCP_RUN_CRUD == 'true') }}
-      SCP_ALLOW_DESTRUCTIVE: ${{ (github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
-      SCP_RUN_HEAVY: ${{ (github.event.inputs.run_heavy == 'true' || needs.spec.outputs.req_heavy == 'true' || vars.SCP_RUN_HEAVY == 'true') }}
-      # VPC-CRUD lifecycles never adopt the shared VPC — suppress the conftest
-      # fixture's single-process self-provisioning so this job doesn't burn a
-      # 3rd VPC slot while job A's shared VPC is live.
-      SCP_SHARED_VPC_DISABLE: "true"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-      - name: Apply environment profile
-        if: ${{ (github.event.inputs.profile || needs.spec.outputs.req_profile) != '' }}
-        run: |
-          P="${{ github.event.inputs.profile || needs.spec.outputs.req_profile }}"
-          python -m core.profiles export "$P" >> "$GITHUB_ENV"
-          echo "applied environment profile: $P"
-      - name: Verify configuration
-        run: |
-          if [ -z "$SCP_ACCESS_KEY" ] || [ -z "$SCP_SECRET_KEY" ]; then
-            echo "::error::Missing credentials. Set SCP_ACCESS_KEY and SCP_SECRET_KEY in repo Settings > Secrets."
-            exit 1
-          fi
-      - name: Heavy self-trigger (file flag)
-        # Mirrors job A so a heavy.txt filter narrows this pass identically.
-        run: |
-          if [ -s .github/heavy.txt ]; then
-            f="$(grep -vE '^[[:space:]]*#' .github/heavy.txt | head -1 | tr -d '[:space:]')"
-            if [ -n "$f" ]; then
-              echo "SCP_RUN_HEAVY=true" >> "$GITHUB_ENV"
-              echo "HEAVY_FILTER_FILE=$f" >> "$GITHUB_ENV"
-              echo "heavy self-trigger active: run_heavy=true, crud_filter=$f"
-            fi
-          fi
-      - name: Derive lane filters (adopt vs vpc-crud partition)
-        run: |
-          python -m regression.scenarios.shared_infra --print-filters >> "$GITHUB_ENV"
-          echo "derived ADOPT_K / VPC_CRUD_K / PARALLEL_K -> \$GITHUB_ENV"
-      - name: Run VPC-CRUD class (serial)
-        id: vpccrud
-        # Two sequential pytest passes: everything except heavy-shared-networking
-        # first, then heavy-shared-networking LAST — it is the slow-provisioner
-        # lifecycle (private-dns create/delete can take hours; flows.yaml
-        # slow-provisioners-isolated) and it holds its VPC while it grinds, so
-        # running it last keeps VPC slots free for the cheap lifecycles (run
-        # 27306490231 hit the 5-VPC account cap and skipped 3 lifecycles when it
-        # ran early).
-        env:
-          CRUD_FILTER: ${{ github.event.inputs.crud_filter || needs.spec.outputs.req_crud_filter }}
-        run: |
-          mkdir -p reports
-          echo "Running VPC-CRUD class serially (-n 0; heavy-shared-networking last)" | tee reports/crud.log
-          MANUAL="${CRUD_FILTER:-$HEAVY_FILTER_FILE}"
-          overall=0
-          for PASS in "not heavy-shared-networking" "heavy-shared-networking"; do
-            FILTER="($VPC_CRUD_K) and ($PASS)"
-            [ -n "$MANUAL" ] && FILTER="$FILTER and ($MANUAL)"
-            echo "vpc-crud-pass -> -k \"$FILTER\"" | tee -a reports/crud.log
-            ARGS=(tests/crud -m crud -n 0 --junitxml="reports/junit-crud-$(echo "$PASS" | tr -dc 'a-z-').xml")
-            ARGS+=(-k "$FILTER")
-            set -o pipefail
-            rc=0; python -m pytest "${ARGS[@]}" 2>&1 | tee -a reports/crud.log || rc=$?
-            # exit 5 = no tests matched the filter — normal for scoped runs, not a failure
-            if [ "$rc" = "5" ]; then echo "no lifecycles matched this pass's filter — skipping" | tee -a reports/crud.log; rc=0; fi
-            [ "$rc" != "0" ] && overall="$rc"
-          done
-          # fold the two junit files into the canonical junit-crud.xml
-          python - <<'PY'
-          import glob, xml.etree.ElementTree as ET
-          cases = []
-          for f in sorted(glob.glob("reports/junit-crud-*.xml")):
-              try: cases.extend(ET.parse(f).getroot().iter("testcase"))
-              except (ET.ParseError, OSError): pass
-          if cases:
-              suites = ET.Element("testsuites")
-              suite = ET.SubElement(suites, "testsuite", {"name": "crud", "tests": str(len(cases))})
-              for tc in cases: suite.append(tc)
-              ET.ElementTree(suites).write("reports/junit-crud.xml", encoding="utf-8", xml_declaration=True)
-              print(f"merged {len(cases)} crud testcase(s) into reports/junit-crud.xml")
-          PY
-          exit "$overall"
-      - name: Oplog — VPC-CRUD milestone
-        if: ${{ always() }}
-        continue-on-error: true
-        run: |
-          python -m core.oplog emit --stage vpc-crud --status "${{ steps.vpccrud.outcome }}" --job regression-B \
-            --detail "$(tail -3 reports/crud.log 2>/dev/null | tr '\n' ' ' | head -c 300)" || true
-
-      - name: Upload VPC-CRUD reports + results store
-        # Separate artifact (same inner layout as regression-reports): the
-        # dashboard job downloads it NEXT TO job A's and concatenates the
-        # observations + smoke TSV before building.
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: regression-reports-vpccrud
-          path: |
-            reports/junit-crud.xml
-            reports/smoke_status.tsv
-            reports/results
-            reports/registry
-          if-no-files-found: warn
-
-  # ---------------------------------------------------------------------------
   # support C · cleanup/  — registry-driven reconciler sweep. Deletes ONLY this
   # run's tagged resources (owner+run). Needs SCP_ALLOW_DESTRUCTIVE.
   # ---------------------------------------------------------------------------
   sweep:
     name: Sweep (cleanup.reconciler, tag-scoped)
-    # Must wait for BOTH regression jobs (A∥B) so the sweep never reaps while a
-    # mutating pass is still live.
-    needs: [spec, regression, regression-vpc-crud]
+    # Must wait for the regression job so the sweep never reaps while a mutating
+    # pass is still live (v0.5: single unified CRUD pool, no separate job B).
+    needs: [spec, regression]
     if: ${{ always() && (github.event.inputs.allow_mutations == 'true' || github.event.inputs.allow_destructive == 'true' || needs.spec.outputs.req_mutations == 'true' || needs.spec.outputs.req_destructive == 'true' || vars.SCP_RUN_CRUD == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -869,15 +750,9 @@ jobs:
         with:
           # The reconciler sweeps the ACCOUNT by owner tag (is_owned +
           # is_expired) and never reads these manifests — this download (and
-          # the job-B one below) is for completeness / debugging only.
+          # is for completeness / debugging only.
           name: regression-reports
           path: reports
-      - name: Download VPC-CRUD registry manifest (job B)
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: regression-reports-vpccrud
-          path: reports-vpccrud
       - name: Reconcile leftover resources (tag-scoped)
         continue-on-error: true
         run: |
@@ -1081,7 +956,7 @@ jobs:
     name: Build + publish dashboard
     # spec is in needs (its outputs carry suite/profile for the snapshot);
     # regression already depends on it, so this adds no serialization.
-    needs: [spec, regression, regression-vpc-crud, conformance]
+    needs: [spec, regression, conformance]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -1124,26 +999,6 @@ jobs:
           # the dashboard reads them directly.
           name: regression-reports
           path: reports
-      - name: Download VPC-CRUD results (job B)
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          # Job B (the parallel VPC-CRUD pass) writes the SAME inner layout, so
-          # it lands in a sibling dir and gets concatenated below.
-          name: regression-reports-vpccrud
-          path: reports-vpccrud
-      - name: Fold job B results into job A's canonical files
-        continue-on-error: true
-        run: |
-          mkdir -p reports/results
-          for f in results/observations.jsonl results/findings.jsonl smoke_status.tsv; do
-            if [ -s "reports-vpccrud/$f" ]; then
-              cat "reports-vpccrud/$f" >> "reports/$f"
-              echo "folded reports-vpccrud/$f"
-            fi
-          done
-          # keep B's junit visible to the summary step under a distinct name
-          [ -s reports-vpccrud/junit-crud.xml ] && cp reports-vpccrud/junit-crud.xml reports/junit-crud-vpccrud.xml || true
       - name: Download conformance results
         continue-on-error: true
         uses: actions/download-artifact@v4

@@ -915,6 +915,10 @@
             "virtual_ip_address": "10.132.9.6"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_retry_note": "Under parallel CRUD (v0.5 unified pool) the subnet can read ACTIVE from wait-subnet yet the VIP endpoint still sees it CREATING (scp-network.subnet.not-active-state) due to backend consistency lag, 400ing the create -> vip_id never captured -> vip group skipped. Retry the transient 400/409 so the id is captured and the group runs (live: run 27306490231 serial passed; the parallel cutover surfaced this race).",
+          "retry_on_status": [400, 409],
+          "retries": 6,
+          "retry_interval": 15,
           "capture": {"vip_id": "$.subnet_vip.id"},
           "cleanup": {"method": "DELETE", "path": "/v1/subnets/{subnet_id}/vips/{vip_id}", "service": "vpc"}
         },

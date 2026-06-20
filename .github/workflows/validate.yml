@@ -29,6 +29,8 @@ jobs:
         run: pip install -r requirements.txt
       - name: Validate scenario data (merged fragments, ids, paths)
         run: python -m regression.scenarios.validate
+      - name: Validate dependency DAG (adopt_edges + shared_roots match lifecycles)
+        run: python -m regression.scenarios.validate_dag --check
       - name: Validate formal domain knowledge (3-layer model + waivers)
         run: python knowledge/formal/validate.py
       - name: Validate suites + environment profiles

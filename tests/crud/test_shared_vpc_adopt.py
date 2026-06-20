@@ -24,7 +24,8 @@ class FakeClient:
         self.routes = routes
         self.calls: list[tuple[str, str]] = []
 
-    def request(self, method, path, *, json=None, service=None, params=None):
+    def request(self, method, path, *, json=None, service=None, params=None,
+                **kwargs):  # tolerate headers= etc. the engine passes through
         self.calls.append((method.upper(), path))
         for (m, pfx), resp in self.routes.items():
             if method.upper() == m and path.startswith(pfx):
@@ -141,7 +142,10 @@ def test_provision_shared_vpc_creates_subnet_and_tears_down_child_first():
         ("GET", "/v1/subnets/"): _r(200, {"subnet": {"id": "sub-1", "state": "ACTIVE"}}),
     })
     shared, teardown = engine.provision_shared_vpc(client, _cfg())
-    assert shared == {"shared_vpc_id": "shared-1", "shared_subnet_id": "sub-1"}, shared
+    # the DB-lane shared subnet (engine ~_ENV_SHARED_DB_SUBNET) reuses the one
+    # subnet this single-subnet fake returns, so it resolves to sub-1 too.
+    assert shared == {"shared_vpc_id": "shared-1", "shared_subnet_id": "sub-1",
+                      "shared_db_subnet_id": "sub-1"}, shared
     assert ("POST", "/v1/subnets") in client.calls
     teardown()
     # teardown deletes the SUBNET before the VPC (child before parent)
