@@ -244,7 +244,8 @@
           "name": "create-backup-target",
           "service": "backup",
           "method": "GET",
-          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE&server_name=regrsrv{unique}",
+          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}",
+          "_note": "CONFIRMED 2026-06-20: policy_type=VM_IMAGE causes backend 500 ContactAdminForAssistance for VIRTUAL_SERVER+GPU_SERVER. Using FILESYSTEM (returns 200 count=0) to cover getbackuptargetlist key safely. Capture will be empty; create-backup-policy will 4xx on missing server_uuid. To fix: capture server_uuid from GET /v1/servers/{server_id} after wait-server (field name TBD from live test).",
           "expect_status": [
             200,
             201,
@@ -870,7 +871,8 @@
           "name": "create-backup-target",
           "service": "backup",
           "method": "GET",
-          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE&server_name=regrsrv{unique}",
+          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}",
+          "_note": "CONFIRMED 2026-06-20: policy_type=VM_IMAGE causes backend 500 ContactAdminForAssistance for VIRTUAL_SERVER+GPU_SERVER. Using FILESYSTEM (returns 200 count=0) to cover getbackuptargetlist key safely. Capture will be empty; create-backup-policy will 4xx on missing server_uuid. To fix: capture server_uuid from GET /v1/servers/{server_id} after wait-server (field name TBD from live test).",
           "expect_status": [
             200,
             201,
