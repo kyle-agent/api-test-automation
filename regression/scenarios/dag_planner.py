@@ -90,6 +90,7 @@ class Plan:
     waves: list[Wave] = field(default_factory=list)
     adopters: list[str] = field(default_factory=list)
     self_creators: dict = field(default_factory=dict)   # {lid: [kinds]}
+    free: list[str] = field(default_factory=list)       # neither adopt nor self-create
     vpc_cap: int = _DEFAULT_VPC_CAP
     shared_vpc_count: int = _SHARED_VPC_COUNT
 
@@ -180,15 +181,18 @@ def plan(leaf_set=None, deps=None, lifecycles=None, vpc_cap=None) -> Plan:
     # ---- 2. classify leaves into adopters vs self-creators -----------------
     adopters: list[str] = []
     self_creators: dict = {}
+    free: list[str] = []
     for lid in leaves:
         d = derived[lid]
         if d["self_creates"]:
             self_creators[lid] = list(d["self_creates"])
         elif d["adopts"]:
             adopters.append(lid)
-        # a leaf that neither adopts nor self-creates touches no shared root and
-        # no capped kind — it is unconstrained by THIS planner, so we omit it
-        # from the VPC-cap waves (it can run any time, fully parallel).
+        else:
+            # a leaf that neither adopts nor self-creates touches no shared root
+            # and no capped kind — it is unconstrained: no root dependency, no VPC
+            # slot, so it runs fully parallel in its own 'free' wave.
+            free.append(lid)
 
     shared_vpc_count = _SHARED_VPC_COUNT if _VPC_KIND in expanded else 0
 
@@ -197,6 +201,7 @@ def plan(leaf_set=None, deps=None, lifecycles=None, vpc_cap=None) -> Plan:
         shared_roots=ordered_roots,
         adopters=sorted(adopters),
         self_creators=dict(sorted(self_creators.items())),
+        free=sorted(free),
         vpc_cap=vpc_cap,
         shared_vpc_count=shared_vpc_count,
     )
@@ -206,6 +211,11 @@ def plan(leaf_set=None, deps=None, lifecycles=None, vpc_cap=None) -> Plan:
     if ordered_roots:
         p.waves.append(Wave(kind="provision", lifecycles=list(ordered_roots),
                             vpc_slots=shared_vpc_count))
+
+    # free wave: VPC-independent leaves, fully parallel, no shared-root dependency
+    # (placed before the VPC pipeline; the runner bounds concurrency via max_workers).
+    if free:
+        p.waves.append(Wave(kind="free", lifecycles=sorted(free)))
 
     # adopt wave: all adopters in parallel (non-VPC quotas out of scope).
     if adopters:
