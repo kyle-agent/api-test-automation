@@ -670,6 +670,23 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Crypto ops (all require active key):** encrypt → `{ciphertext: "vault:v.."}`; decrypt/rewrap ← ciphertext; sign → `{signature}`; verify ← signature + input; hmac ← `{input: base64}` → `{hmac: "vault:v1/.."}`.
 - **Coverage 2026-06-20:** 15/20. Gaps: hmac (sym key unproven), datakey (sym key unproven), updatemanagedkeydescription (0 managed keys), plus any missed sub-ops. Lifecycle `security-kms-transit-crypto` covers 17 write ops total.
 
+## security / secretsmanager
+
+- **Host:** regional (`secretsmanager.<region>.<env>...`). 15 endpoints total (3 read, 12 write).
+- **Read-only coverage (smoke + read-chains, no mutations needed):**
+  - `listsecretsmanager` (`GET /v1/secrets`) — smoke GET, 200 confirmed 2026-06-20.
+  - `showsecretsmanager` (`GET /v1/secrets/{secret_id}`) — read-chain (list→show), 200 confirmed 2026-06-20.
+  - `listversion` (`GET /v1/secrets/{secret_id}/versions`) — read-chain (list→versions), 200 confirmed 2026-06-20.
+- **All write endpoints require `SCP_ALLOW_MUTATIONS=true`** (lifecycle `security-secretsmanager-writes`).
+- **Create body quirks:** `private_acl_enabled` is STRING `"false"` (not boolean). `secret_value` is a JSON STRING (e.g. `"{\"k\":\"v\"}"` not an object). `kms_id` required (must be a real transit KMS key id). `acl_cidr` is a comma-separated CIDR string.
+- **version_list response:** `GET /v1/secrets/{secret_id}/versions` returns `{"count": N, "version_list": ["<version_id_string>", ...]}`. Items are bare version_id strings (NOT objects). Capture with `$.version_list[0]` (not `.id` field). Confirmed from response_example in api_docs.json.
+- **setsecretsmanagerlabel body:** `{"label": "<name>", "move_to_version_id": "<version_id>"}`. Using only `move_to_version_id` adds the label; using only `remove_from_version_id` removes it. Both together moves a label from one version to another. Label `CURRENT` is reserved for the active version; use custom label names like `PREVIOUS` for moves.
+- **showsecretsmanagersecretvalue (reveal):** `POST /v1/secrets/{secret_id}/values` with body `{"label": "CURRENT"}` or `{"version_id": "<id>"}`. This is distinct from `updatesecretsmanagersecretvalue` (`PUT .../values`).
+- **soft-delete / restore:** `DELETE /v1/secrets/{secret_id}` requires body `{"waiting_time_ndays": 7}` (NOT a plain DELETE). Soft-deleted secret can be restored via `PUT /v1/secrets/{secret_id}/restore` within the recovery window.
+- **setsecretsmanagerkmskey (`POST /v1/secrets/kms-key`):** Provisions a service-level KMS key for secrets manager. Body `{"service_name": ""}`. Returns 400/403 if service-level key already exists or permissions missing. Treat as optional (grouped).
+- **Lifecycle coverage:** `security-secretsmanager-writes` covers all 12 write endpoints. 5 endpoints added 2026-06-20: setsecretdescription, setsecretaclcidr, setprivateacl, updatesecretsmanagersecretvalue, setsecretsmanagerlabel (with list-versions capture step). 7 previously existed: createsecretsmanager, createsecretsmanagerkmskey, generaterandompassword, deletesecretsmanager, showsecretsmanagersecretvalue, setkmsid, restoresecretsmanager.
+- **Coverage 2026-06-20 (read-only run):** 3/15 (listsecretsmanager, showsecretsmanager, listversion). 12/15 expected when lifecycle runs with `SCP_ALLOW_MUTATIONS=true`. No entitlement blockers identified.
+
 ## management / servicewatch
 
 - **Host:** regional (`servicewatch.<region>.<env>...`). 31 endpoints (alerts, dashboards, event-rules, log-groups/streams, metrics, custom ingest).
