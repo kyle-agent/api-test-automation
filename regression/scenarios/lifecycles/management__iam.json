@@ -214,6 +214,15 @@
           "optional": true,
           "destructive": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "query-policy",
+          "method": "POST",
+          "path": "/v1/policies/list",
+          "optional": true,
+          "_note": "querypolicy — POST /v1/policies/list. Standalone (not group-gated so it fires even if pol-real fails). All query and body params optional; excluded_policy_ids is a best-effort filter only. Confirmed 200 on this account (runtime_status run, count=27 policies). Body from api_bodies.json (querypolicy). Closes GAP-mut for management/iam/querypolicy via the lifecycle file (also wired in scenarios.json xcov-querypolicy group but lives here for the iam-lifecycle batch).",
+          "json": {"excluded_policy_ids": []},
+          "expect_status": [200, 201, 202, 400, 403, 422]
         }
       ]
     },
@@ -233,6 +242,16 @@
           "expect_status": [200, 201, 202],
           "capture": {"group_id": "$.group.id"},
           "cleanup": {"method": "DELETE", "path": "/v1/groups/{group_id}", "service": "iam"}
+        },
+        {
+          "name": "set-group",
+          "method": "PUT",
+          "path": "/v1/groups/{group_id}",
+          "group": "grp-bind",
+          "optional": true,
+          "_note": "setgroup — PUT /v1/groups/{group_id}. Update description on the real group created above. Closes GAP-mut for PUT /v1/groups/{group_id} (management/iam/setgroup). Body: description only; name unchanged to avoid collision. Tolerant [200,202,400,403,404,409,422] so a 4xx on group-create propagates cleanly.",
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
         },
         {
           "name": "add-group-member",

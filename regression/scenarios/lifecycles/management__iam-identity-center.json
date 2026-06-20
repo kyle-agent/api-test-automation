@@ -178,11 +178,15 @@
      "path": "/v1/users",
      "group": "idc-user",
      "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345"
+     },
      "expect_status": [
       200,
       403,
       404
-     ]
+     ],
+     "_note": "REACHABILITY-ONLY: instance_id=ssoins-12345 synthetic (no real SSO instance) -> 404 ResourceNotFound. With a real instance_id (when SCP_ALLOW_MUTATIONS runs create-instance to 2xx), this returns 200. Required query param proven 2026-06-20."
     },
     {
      "name": "show-user",
@@ -325,11 +329,15 @@
      "path": "/v1/groups",
      "group": "idc-group",
      "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345"
+     },
      "expect_status": [
       200,
       403,
       404
-     ]
+     ],
+     "_note": "REACHABILITY-ONLY: instance_id=ssoins-12345 synthetic -> 404 ResourceNotFound. Required query param proven 2026-06-20."
     },
     {
      "name": "list-group-users",
@@ -515,11 +523,15 @@
      "path": "/v1/permission-sets",
      "group": "idc-permission-set",
      "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345"
+     },
      "expect_status": [
       200,
       403,
       404
-     ]
+     ],
+     "_note": "REACHABILITY-ONLY: instance_id=ssoins-12345 synthetic -> 404 ResourceNotFound. Required query param proven 2026-06-20."
     },
     {
      "name": "show-permission-set",
@@ -715,11 +727,16 @@
      "path": "/v1/account-assignments",
      "group": "idc-account-assignment",
      "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345",
+      "target_account_id": "00000000000000000000000000000000"
+     },
      "expect_status": [
       200,
       403,
       404
-     ]
+     ],
+     "_note": "REACHABILITY-ONLY: BOTH instance_id AND target_account_id are required (proven 2026-06-20 live test: without target_account_id -> 400 ValidationError; with both synthetic ids -> 404 ResourceNotFound). Synthetic ids so no real grant is exposed."
     },
     {
      "name": "delete-account-assignment",
@@ -765,6 +782,93 @@
       422
      ],
      "_note": "Bulk delete body (instance_id + account_assignment_ids[]) inferred — UNPROVEN. Separate group so it always fires for coverage."
+    }
+   ]
+  },
+  {
+   "id": "idc-read-coverage",
+   "service": "management/iam-identity-center",
+   "enabled": true,
+   "heavy": false,
+   "_note": "READ-ONLY (non-heavy) coverage probe for the 5 direct-GET IdC endpoints. listinstances needs no params and returns 200 (empty list when no SSO instance is provisioned — this is the correct API response, not an error). The other 4 list endpoints each require instance_id as a required query param (proven 2026-06-20: bare call returns 400 ValidationError; with instance_id=ssoins-12345 returns 404 ResourceNotFound — the service IS reached). listaccountassignments additionally requires target_account_id (proven 2026-06-20: instance_id alone -> 400; both synthetic ids -> 404). All 5 steps are optional and accept 200/403/404 so this lifecycle is always green regardless of account state. No mutations, no path params, no destructive operations.",
+   "steps": [
+    {
+     "name": "list-instances",
+     "method": "GET",
+     "path": "/v1/instances",
+     "service": "iam-identity-center",
+     "optional": true,
+     "expect_status": [
+      200,
+      403,
+      404
+     ],
+     "_note": "No required query params. Returns 200 with empty list when no SSO instance exists. Proven 200 2026-06-20."
+    },
+    {
+     "name": "list-groups",
+     "method": "GET",
+     "path": "/v1/groups",
+     "service": "iam-identity-center",
+     "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345"
+     },
+     "expect_status": [
+      200,
+      403,
+      404
+     ],
+     "_note": "instance_id required query param. Synthetic id -> 404 ResourceNotFound (service reached). 404 accepted as soft hit."
+    },
+    {
+     "name": "list-permission-sets",
+     "method": "GET",
+     "path": "/v1/permission-sets",
+     "service": "iam-identity-center",
+     "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345"
+     },
+     "expect_status": [
+      200,
+      403,
+      404
+     ],
+     "_note": "instance_id required query param. Synthetic id -> 404 (service reached)."
+    },
+    {
+     "name": "list-users",
+     "method": "GET",
+     "path": "/v1/users",
+     "service": "iam-identity-center",
+     "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345"
+     },
+     "expect_status": [
+      200,
+      403,
+      404
+     ],
+     "_note": "instance_id required query param. Synthetic id -> 404 (service reached)."
+    },
+    {
+     "name": "list-account-assignments",
+     "method": "GET",
+     "path": "/v1/account-assignments",
+     "service": "iam-identity-center",
+     "optional": true,
+     "params": {
+      "instance_id": "ssoins-12345",
+      "target_account_id": "00000000000000000000000000000000"
+     },
+     "expect_status": [
+      200,
+      403,
+      404
+     ],
+     "_note": "BOTH instance_id AND target_account_id required (proven 2026-06-20). Synthetic ids -> 404 (service reached)."
     }
    ]
   }
