@@ -74,6 +74,7 @@ def priorities(plan: dag_planner.Plan, durations: dict | None = None,
 def run_dynamic(plan: dag_planner.Plan, executor, *, provisioner=None,
                 max_workers: int | None = None, durations: dict | None = None,
                 default_duration: float = schedule_optimizer._DEFAULT_S,
+                heavy_stagger_s: float = 0.0, heavy_threshold_s: float = 300.0,
                 on_event=None) -> RunResult:
     """Execute ``plan`` with dynamic, duration-prioritized, slot-gated dispatch.
 
@@ -140,7 +141,24 @@ def run_dynamic(plan: dag_planner.Plan, executor, *, provisioner=None,
         return o
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futs = [pool.submit(run_one, lid) for lid in zero]
+        # Submit the zero-slot batch longest-first. Optional BURST STAGGER: when
+        # heavy_stagger_s > 0, space consecutive HEAVY submissions (prio >=
+        # heavy_threshold_s) at least that far apart so their create-time API bursts
+        # don't all hit the gateway at t=0. (Measured 2026-06-20: longest-first
+        # dispatches every heavy DB/K8s/VM create within ~4 s, concentrating the API
+        # burst and aggravating the 502/503 gateway storm — heavy adopters start
+        # EARLY as intended but the simultaneous burst worsens transient 5xx. Stagger
+        # trades a small upfront delay for a flatter burst.) Light jobs never wait.
+        futs = []
+        _last_heavy = 0.0
+        for lid in zero:
+            if heavy_stagger_s > 0 and prio.get(lid, default_duration) >= heavy_threshold_s:
+                if _last_heavy:
+                    gap = heavy_stagger_s - (time.monotonic() - _last_heavy)
+                    if gap > 0:
+                        time.sleep(gap)
+                _last_heavy = time.monotonic()
+            futs.append(pool.submit(run_one, lid))
         # Dispatch slot nodes in priority order; acquiring is BLOCKING so the
         # highest-priority node always claims the next freed slot (no barrier). The
         # done-callback releases the slot and wakes the next waiter.

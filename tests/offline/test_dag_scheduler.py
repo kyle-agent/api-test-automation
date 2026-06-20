@@ -163,6 +163,41 @@ def test_adopters_dispatched_longest_first():
         f"not longest-first across free+adopt: {order}")
 
 
+def test_heavy_stagger_spaces_heavy_submissions():
+    """burst-stagger: with heavy_stagger_s>0, consecutive HEAVY (prio>=threshold)
+    lifecycles must START at least ~stagger apart (their create-burst is spread),
+    while light jobs are not delayed. Proof by timing the first-call timestamps."""
+    plan = _plan(free=["light-a", "light-b"],
+                 adopters=["db1", "db2", "db3"], self_creators={}, shared_roots=())
+    durations = {"db1": {"avg_s": 2000.0, "n": 1}, "db2": {"avg_s": 1900.0, "n": 1},
+                 "db3": {"avg_s": 1800.0, "n": 1},
+                 "light-a": {"avg_s": 10.0, "n": 1}, "light-b": {"avg_s": 10.0, "n": 1}}
+    starts, lock = {}, threading.Lock()
+
+    def ex(lid):
+        with lock:
+            starts[lid] = time.monotonic()
+        return LifecycleOutcome(lid, "passed")
+
+    dag_scheduler.run_dynamic(plan, ex, max_workers=8, durations=durations,
+                              heavy_stagger_s=0.10, heavy_threshold_s=300.0)
+    # the three heavy creates (longest-first db1,db2,db3) must be ~0.10s apart
+    hs = sorted(starts[h] for h in ("db1", "db2", "db3"))
+    assert hs[1] - hs[0] >= 0.08, "db2 not staggered behind db1"
+    assert hs[2] - hs[1] >= 0.08, "db3 not staggered behind db2"
+
+
+def test_heavy_stagger_zero_is_no_op():
+    """Default heavy_stagger_s=0 must not delay anything (no behaviour change)."""
+    plan = _plan(adopters=["db1", "db2"], self_creators={}, shared_roots=())
+    durations = {"db1": {"avg_s": 2000.0, "n": 1}, "db2": {"avg_s": 1900.0, "n": 1}}
+    t0 = time.monotonic()
+    r = dag_scheduler.run_dynamic(plan, lambda lid: LifecycleOutcome(lid, "passed"),
+                                  max_workers=4, durations=durations)
+    assert (time.monotonic() - t0) < 1.0
+    assert r.by_status() == {"passed": 2}
+
+
 def test_simulate_full_dynamic_beats_baseline_under_contention():
     """Full-run DES: with the heavy adopters far longer than the light wave and a
     worker bottleneck, longest-job-first must beat duration-blind order, and never

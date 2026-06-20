@@ -245,9 +245,12 @@ def main():
         for w in state["waves"]:
             if w["kind"] != "provision":
                 w["active"] = True
-        log(f"dispatch=DYNAMIC (longest-first, slot-gated; SCP_DAG_DYNAMIC) workers={mw}")
+        stagger = float(os.environ.get("SCP_HEAVY_STAGGER_S", "0"))
+        log(f"dispatch=DYNAMIC (longest-first, slot-gated; SCP_DAG_DYNAMIC) "
+            f"workers={mw} heavy_stagger={stagger}s")
         result = dag_scheduler.run_dynamic(plan, executor, provisioner=provisioner,
-                                           max_workers=mw, on_event=on_event)
+                                           max_workers=mw, heavy_stagger_s=stagger,
+                                           on_event=on_event)
     else:
         log(f"dispatch=STATIC (run_plan, wave-barrier) workers={mw}")
         result = dag_runner.run_plan(plan, executor, provisioner=provisioner,
