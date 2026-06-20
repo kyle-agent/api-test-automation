@@ -529,27 +529,19 @@
   },
   {
    "service": "cdn",
-   "covered": 1,
+   "covered": 2,
    "total": 9,
-   "gap": 8,
+   "gap": 7,
    "heavy": false,
    "blockers": [
-    {
-     "key": "networking/cdn/detailcdnservice",
-     "reason": "needs-resource: GET by id requires a real CDN resource_id; account has 0 CDN distributions (GET /v1/cdns count:0). Captured from create at $.cdn.resource_id via lifecycle probe_reads.",
-     "kind": "needs-resource"
-    },
-    {
-     "key": "createcdnservice + update/updatedescription/start/stop/purge/deletecdnservice (7 writes)",
-     "reason": "mutation-gated: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE). Lifecycle networking__cdn.json covers all 7 with tuned body (cache_expiry_time=86400, etc.).",
-     "kind": "mutation-gated"
-    }
+    "mutation-gated: 7 writes (create/update/updatedescription/start/stop/purge/delete); lifecycle networking__cdn.json covers all. No entitlement/heavy walls (account already has 2 ACTIVE CDNs)."
    ],
    "next_levers": [
-    "Run lifecycle regression/scenarios/lifecycles/networking__cdn.json with SCP_ALLOW_MUTATIONS=true + SCP_ALLOW_DESTRUCTIVE=true; covers all 8 remaining (7 writes + detailcdnservice via read-chain). create may 4xx if entitlement limited."
+    "MUTATIONS+DESTRUCTIVE: networking__cdn.json -> all 7 writes; create may 403 if entitlement-limited",
+    "purge body needs custom_url+target_content+target_url (not {})"
    ],
-   "notes": "0->1/9. New 2xx: listcdnservice (GET /v1/cdns -> {cdn:[],count,page,size,sort}, empty). Region gate kr-west1/kr-east1 ONLY. First call may 503 (gateway timeout); retry -> 200 (transient, NOT a product bug). See knowledge/services.md networking/cdn.",
-   "updated": "2026-06-19T03:10:00Z"
+   "notes": "1->2/9 (detailcdnservice via read-chain; account has 2 ACTIVE CDNs regrcampkpfc/regriknbddbg). listcdnservice items use id (not resource_id). purge body fixed. Region gate kr-west1/kr-east1. createcdnservice captures $.cdn.resource_id.",
+   "updated": "2026-06-20T13:16:54Z"
   },
   {
    "service": "cloud-ml",
@@ -564,20 +556,21 @@
   },
   {
    "service": "apigateway",
-   "covered": 47,
+   "covered": 44,
    "total": 55,
-   "gap": 8,
+   "gap": 11,
    "heavy": false,
    "blockers": [
-    "product-bug-5xx: createprivatelinkendpoint 500 ContactAdmin (PF-23, body docs-verified correct)",
-    "product-bug-5xx: setresourcepolicy 500 (PF-19)",
-    "entitlement-403: privatelink approve/connect/request/set/delete (missing IAM action defs)"
+    "product-bug-5xx: createprivatelinkendpoint 500 ContactAdmin (PF-23, body docs-verified).",
+    "product-bug-5xx: setresourcepolicy 500 (PF-19, 2026-06-13) -> cascades to deleteresourcepolicy SKIP (xcov-resource-policy group fails; 500 not in expect_status).",
+    "entitlement-403: 7 privatelink ops (approve/connect/request/set/delete + showprivatelinkendpoint + listconnectedprivatelinkendpoints) - missing IAM action defs (show+listconnected live-verified 2026-06-20)."
    ],
    "next_levers": [
-    "privatelink endpoint coverage blocked on entitlement + product-bug; revisit if IAM actions granted"
+    "PF-19 fix: add 500 to expect_status so group survives + deleteresourcepolicy runs",
+    "entitlement: grant privatelink IAM actions -> 7 PL endpoints coverable"
    ],
-   "notes": "~47/55. listapis/listprivatelinkendpoints 503 were transient (client retries -> 200). listreports 400 FIXED: needs a <=30-day, not->30d-old window (rolling {iso_29d_ago}/{iso_today}).",
-   "updated": "2026-06-19T02:01:07Z"
+   "notes": "read-only floor 2/55 (listapis+listprivatelinkendpoints only directly-testable). mutation ceiling 44/55 (stale 47 was pre-PF-19). setapidescription step added (body {description}). NEW entitlement-403: showprivatelinkendpoint, listconnectedprivatelinkendpoints.",
+   "updated": "2026-06-20T13:16:54Z"
   },
   {
    "service": "direct-connect",
@@ -658,14 +651,22 @@
   },
   {
    "service": "configinspection",
-   "covered": 0,
+   "covered": 2,
    "total": 7,
-   "gap": 7,
+   "gap": 5,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "mutation-gated+needs-account-prereq: creatediagnosisobject needs auth_key_id for an inspectable account; diagnosisrequest needs that + target CSP creds.",
+    "needs-resource: getdiagnosisobjectdetail + getdiagnosisresultdetail need real diagnosis_id (backend reachable, 404 with fake).",
+    "mutation-gated+destructive: terminatediagnosisobject."
+   ],
+   "next_levers": [
+    "MUTATIONS+DESTRUCTIVE: security-configinspection-diagnosis (all 4xx unless real auth_key_id)",
+    "Account prereq: auth_key_id for a secondary inspectable SCP account unblocks the chain",
+    "Foreign CSP: diagnosisrequest can target AWS/Azure with real creds"
+   ],
+   "notes": "FIRST ANALYSIS 0->2/7. configinspectionlist+getdiagnosisresultlist 200 (empty). getdiagnosisresultdetail needs diagnosis_id+diagnosis_request_sequence (both REQUIRED). diagnosis_id format DIA-<32hex>. Added configinspection-read-coverage lifecycle. Service transiently 503s.",
+   "updated": "2026-06-20T13:16:54Z"
   },
   {
    "service": "servicewatch",
@@ -687,14 +688,20 @@
   },
   {
    "service": "devopsservice",
-   "covered": 0,
+   "covered": 2,
    "total": 6,
-   "gap": 6,
+   "gap": 4,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "needs-create: showdevopsservice + checkdeletabledevopsservice need devops_service_id (list empty).",
+    "mutation-gated+credential-prereq: createdevopsservice needs members[] with >=1 real IAM user id; deletedevopsservice destructive."
+   ],
+   "next_levers": [
+    "MUTATIONS + real IAM user id in members[] -> create + 2 id-GETs (+3)",
+    "smoke.py: add devopsservice /check-duplication case ({tenant_code}) to fix soft/400"
+   ],
+   "notes": "FIRST ANALYSIS 0->2/6. listdevopsservices 200 + checkduplicationdevopsservice 200 (needs EXACTLY ONE of tenant_code OR tenant_name). Fixed check-name-duplication step (tenant_code only). PF-05 root cause CONFIRMED: body DevOpsServiceCreateRequest{tenant_name,tenant_code,members} not {name,description}. Account quota 1/account.",
+   "updated": "2026-06-20T13:16:54Z"
   },
   {
    "service": "budget",
@@ -771,14 +778,21 @@
   },
   {
    "service": "certificatemanager",
-   "covered": 4,
+   "covered": 1,
    "total": 7,
-   "gap": 3,
+   "gap": 6,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "backend-validation-blocked: validatecertificate + createcertificate -> 400 pem-format-private-key-error for ALL PEM key formats (RSA PKCS#1/PKCS#8/EC); need real CA-chain-signed cert+key.",
+    "needs-resource: detailcertificate needs cert_id (0 certs; unblocked by selfsign).",
+    "mutation-gated: checknameduplication + selfsigncert + deletecertificate."
+   ],
+   "next_levers": [
+    "MUTATIONS+DESTRUCTIVE: security-certificatemanager-selfsign -> +4 2xx -> ceiling 5/7",
+    "create/validate need external CA cert material (unsolvable in CI without injected cert)"
+   ],
+   "notes": "read-only 1/7 (ledger 4 stale). selfsigncert body confirmed (9 fields, YYYYMMDD dates, $.certificate.id, synchronous VALID). checknameduplication needs {name}. mutation ceiling 5/7; absolute max 5/7.",
+   "updated": "2026-06-20T13:16:54Z"
   },
   {
    "service": "costexplorer",
@@ -804,14 +818,19 @@
   },
   {
    "service": "secretsmanager",
-   "covered": 12,
+   "covered": 3,
    "total": 15,
-   "gap": 3,
+   "gap": 12,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "mutation-gated: 12 write endpoints; lifecycle security-secretsmanager-writes models all 12 but engine ~691 skips when allow_mutations=false. No entitlement/product-bug walls."
+   ],
+   "next_levers": [
+    "MUTATIONS+DESTRUCTIVE: security-secretsmanager-writes -> 15/15 (needs KMS transit key, created/torn-down internally)",
+    "version_list items are bare version_id strings -> capture $.version_list[0]"
+   ],
+   "notes": "read-only 3/15 (ledger 12 stale, from prior mutation run). 3 read GETs (list/show/listversion). Added 5 MISSING write steps: setdescription, setaclcidr, setprivateacl, updatevalue, setlabel. private_acl_enabled is STRING; secret_value is JSON STRING; soft-delete needs {waiting_time_ndays}.",
+   "updated": "2026-06-20T13:16:54Z"
   },
   {
    "service": "sts",
@@ -831,28 +850,31 @@
    "gap": 2,
    "heavy": false,
    "blockers": [
-    {
-     "key": "listnetworkloggingconfigurations + listnetworkloggingstorages",
-     "reason": "transient-503: backend intermittently 503s even with correct resource_type param. Param fix applied (FIREWALL) — 200 confirmed in healthy window. Will auto-recover on retry. NOT a parameter bug.",
-     "kind": "transient-backend"
-    }
+    "mutation-gated: createnetworkloggingstorage (MUTATIONS) + deletenetworkloggingstorage (DESTRUCTIVE); create body fields unproven, needs real object-storage bucket.",
+    "tooling-gap: smoke omits resource_type default -> 2 list GETs show 400/soft in smoke (covered via direct probe)."
    ],
    "next_levers": [
-    "createnetworkloggingstorage (POST) + deletenetworkloggingstorage (DELETE) need SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE; body fields: name, log_type (VPC_FLOW_LOG etc.), object_storage_bucket_name, description"
+    "MUTATIONS+DESTRUCTIVE: network-logging-storage (needs real bucket name for 200)",
+    "smoke.py: add resource_type default for the 2 list GETs"
    ],
-   "notes": "listnetworkloggingconfigurations and listnetworkloggingstorages: resource_type REQUIRED query param, valid enums: FIREWALL, SECURITY_GROUP, NAT (NOT VPC_FLOW_LOG — rejected 400). Scenarios updated 2026-06-20 to use resource_type=FIREWALL. Backend transiently 503s; 200 confirmed in healthy windows.",
-   "updated": "2026-06-20T04:00:00Z"
+   "notes": "2/4 confirmed (both list GETs 200 with resource_type=FIREWALL; enum FIREWALL|SECURITY_GROUP|NAT, VPC_FLOW_LOG invalid). Backend transiently 503s. create body 'Field required' x2 (likely name + log_type/bucket).",
+   "updated": "2026-06-20T13:16:54Z"
   },
   {
    "service": "security-group",
-   "covered": 7,
+   "covered": 4,
    "total": 9,
-   "gap": 2,
+   "gap": 5,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "mutation-gated: 5 writes (createSG, createrule, setSG, deleteSG, deleterule); both lifecycles cover when MUTATIONS+DESTRUCTIVE. No entitlement/heavy walls."
+   ],
+   "next_levers": [
+    "MUTATIONS+DESTRUCTIVE: networking-security-group + networking-security-group-update -> 9/9",
+    "listsecuritygrouprules needs security_group_id REQUIRED query (smoke can't auto-supply dynamic id) -> fragment list-rules step covers it"
+   ],
+   "notes": "read-only 4/9 (ledger 7 stale). listsecuritygroups+showsecuritygroup (smoke/read-chain) + listsecuritygrouprules+showsecuritygrouprule (live via real SKE-managed SG cf5d390a, 14 rules). setsecuritygroup body {description,loggable} only (name invalid). Added list-rules + probe-sg-reads steps.",
+   "updated": "2026-06-20T13:16:54Z"
   },
   {
    "service": "queueservice",
