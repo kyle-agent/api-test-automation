@@ -108,7 +108,27 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-06-20, hand-driven from Claude remote):** closed the last
+- **LATEST (2026-06-20, session 2 — `claude/start-here-review-5z8jt2`, bootstrap
+  review + scheduler-state verification, NO live run):** START_HERE spot-check
+  done; corrected two stale references (current observed state wins):
+  (1) **static ceiling is 99.9%, not 100%** — `python -m spec.coverage_gap` →
+  **1371/1372 reachable, GAP=1** = the blast-radius-**waived** iam `deletepolicies`
+  (`DELETE /v1/policies/bulk`, un-probeable, correctly excluded — NOT a backlog
+  item). The "static ceiling 100.0% (1372/1372) / gap 0" wording in the 2026-06-17
+  blocks below is superseded by this. (2) **The ADR-1.0 dependency-DAG scheduler is
+  already BUILT & merged on main** — `regression/scenarios/dag_planner.py` (1.0-b
+  closure + topological-wave planner), `dag_runner.py` + `dag_runner_live.py`
+  (1.0-c, flag-gated `SCP_DAG_RUNNER`, with AIMD adaptive concurrency),
+  `dag_plan_graph.py`, `schedule_optimizer.py`; **93 offline tests green**
+  (`pytest tests/offline/test_dag_*.py`). So the 2026-06-20 cutover handoff's
+  "Path to 1.0 → start at 1.0-a/b" is STALE: 1.0-a (`validate_dag --check`, COMPLETE
+  DAG / 0 gaps), 1.0-b and 1.0-c are all DONE. **The only remaining scheduler step
+  is 1.0-d:** the CI workflow (`api-test.yml`) is still on the **v0.5 cutover**
+  (one `-n 6` xdist pool + `SCP_VPC_SEMAPHORE` throttle, serial vpc-crud job
+  dropped); switching it from xdist to `dag_runner_live` needs a validated heavy CI
+  run and is **dispatch-gated** (Claude token can't `workflow_dispatch` → 403).
+  **Do NOT rebuild the planner/runner** — verify, then drive 1.0-d.
+- **PRIOR LATEST (2026-06-20, hand-driven from Claude remote):** closed the last
   id-bound GET **reachability** gap — wired `showresourcebycomponents`
   (`GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}`)
   into `resourcemanager-tag-lifecycle` and **LIVE-VERIFIED 200** (read-only probe,
