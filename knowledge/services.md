@@ -253,8 +253,41 @@ duplicating. Add a new `##` section when you take on a new service.
 
 ## security / certificatemanager
 
-- **Host:** regional. self-sign needs `cn`, `not_before_dt`, `not_after_dt`,
-  `organization`, `region`, `timezone` → `$.certificate.id`. Synchronous.
+- **Host:** regional (`certificatemanager.<region>.<env>.samsungsdscloud.com`).
+- **Endpoints (7 total):** `listcertificates` (GET), `detailcertificate` (GET/{id}),
+  `checknameduplication` (POST), `createcertificate` (POST), `selfsigncert` (POST),
+  `validatecertificate` (POST), `deletecertificate` (DELETE/{id}).
+- **`selfsigncert` (POST /v1/certificatemanager/self-sign):** required fields:
+  `cn`, `name`, `not_before_dt`, `not_after_dt`, `organization`, `recipients=[]`,
+  `region`, `tags=[]`, `timezone`. Date format is `YYYYMMDD` (engine `{today}` =
+  `%Y%m%d` — correct). Returns 201 with `$.certificate.id` (UUID without hyphens).
+  `cert_kind: DEV`, `key_bit_size: 2048`. Synchronous (state=VALID immediately).
+  CONFIRMED 2xx 2026-06-20 with real call.
+- **`checknameduplication` (POST /v1/certificatemanager/check-duplication):**
+  only `{name: 'any-string'}` required. Returns 200 `{"result": false}` for
+  available name. Non-destructive (no resource created). CONFIRMED 200 2026-06-20.
+- **`validatecertificate` (POST /v1/certificatemanager/check-validation):**
+  requires `cert_body` + `private_key` (and optionally `cert_chain`). CONFIRMED
+  BLOCKER 2026-06-20: returns 400 `scp-security.certificate.pem-format-private-key-error`
+  ("This private key is not a PEM format") for ALL private key PEM formats tested:
+  RSA PKCS#1 (`BEGIN RSA PRIVATE KEY`), PKCS#8 (`BEGIN PRIVATE KEY`), EC
+  (`BEGIN EC PRIVATE KEY`). Self-signed certs and real OpenSSL-generated keys all
+  rejected. Endpoint IS reachable (not 403). Requires a real CA-chain-signed cert
+  from an external authority.
+- **`createcertificate` (POST /v1/certificatemanager):** import an external cert.
+  Required body includes: `cert_body`, `cert_chain`, `name`, `private_key`,
+  `recipients=[]`, `region`, `tags=[]`. One additional required field not yet
+  identified (7 of above = 1 still missing per validation error count). Also
+  rejects all PEM key formats same as validatecertificate.
+- **`listcertificates` (GET /v1/certificatemanager):** 200 with empty list
+  (`count:0`) on fresh account. Response shape: `{certificates:[], count, page, size, sort}`.
+  Optional query params: `size`, `page`, `sort`, `isMine`, `name`, `cn`, `state`.
+- **`detailcertificate` (GET /v1/certificatemanager/{certificate_id}):** needs a
+  real `certificate_id` from selfsign/create. Capture path: `$.certificate.id`.
+- **Coverage ceiling (2026-06-20):** read-only floor = 1/7 (listcertificates).
+  With SCP_ALLOW_MUTATIONS: selfsigncert→detailcertificate→listcertificates→
+  checknameduplication→deletecertificate = 5/7. Remaining 2 (createcertificate,
+  validatecertificate) blocked by CA-cert requirement.
 
 ## management / resourcemanager
 
