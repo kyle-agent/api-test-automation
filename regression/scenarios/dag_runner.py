@@ -135,49 +135,62 @@ def run_plan(
                 "reason": outcome.reason, "duration_s": outcome.duration_s})
         return outcome
 
-    def _run_wave(idx: int, wave) -> WaveResult:
+    def _run_wave(idx: int, wave, pool) -> WaveResult:
         ids = list(wave.lifecycles)
         emit("wave_start", {"index": idx, "kind": wave.kind, "lifecycles": ids})
         t0 = time.monotonic()
-        workers = max_workers or max(1, len(ids))
-        if workers == 1 or len(ids) <= 1:
+        if pool is None or len(ids) <= 1:
             outcomes = [_run_one(i) for i in ids]
         else:
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                outcomes = list(pool.map(_run_one, ids))
+            # submit to the SHARED pool so total concurrency stays bounded
+            futs = [pool.submit(_run_one, i) for i in ids]
+            outcomes = [f.result() for f in futs]
         wr = WaveResult(kind=wave.kind, outcomes=outcomes,
                         duration_s=time.monotonic() - t0)
         emit("wave_done", {"index": idx, "kind": wave.kind, "duration_s": wr.duration_s})
         return wr
 
-    # A 'free' wave (VPC-independent leaves) has NO dependency on the shared roots
-    # or the VPC cap, so it must NOT block the provision→adopt→self-create pipeline.
-    # Run free waves CONCURRENTLY in a background thread; the cap-constrained
-    # pipeline runs sequentially. Both join before teardown.
-    free_waves = [(i, w) for i, w in enumerate(plan.waves) if w.kind == "free"]
-    free_results: list[WaveResult] = []
-    free_thread = None
-    if free_waves:
-        def _run_free():
-            for i, w in free_waves:
-                free_results.append(_run_wave(i, w))
-        free_thread = threading.Thread(target=_run_free, daemon=True)
-        free_thread.start()
+    # After provisioning the shared roots, the remaining work splits into THREE
+    # independent tracks that all run CONCURRENTLY (only provision→adopt is a hard
+    # edge; free / adopt / self-create do not depend on each other):
+    #   * free        — VPC-independent leaves (no slot)
+    #   * adopt       — adopt the shared VPC (no NEW slot)
+    #   * self-create — hold a VPC slot; its waves are pre-sized to ``vpc_cap -
+    #                   shared`` and run SEQUENTIALLY *within* the track, so at most
+    #                   `budget` self-created VPCs ever coexist (+1 shared = cap).
+    # Running self-create concurrently with adopt (not after it) collapses the
+    # makespan toward the critical path — vpc-peering overlaps the DB clusters
+    # instead of tailing them. CRUCIAL: all three tracks submit to ONE shared
+    # ThreadPoolExecutor(max_workers), so total in-flight stays bounded to
+    # max_workers — overlapping the tracks does NOT multiply concurrency (an
+    # earlier per-track-pool version tripled it and exhausted connections, breaking
+    # the heavy adopters). Cap-safety stays STRUCTURAL (self-create wave sizing).
+    result.waves.append(WaveResult(kind="provision", outcomes=[], duration_s=0.0))
+    tracks: dict[str, list] = {"free": [], "adopt": [], "self-create": []}
+    for idx, wave in enumerate(plan.waves):
+        if wave.kind in tracks:
+            tracks[wave.kind].append((idx, wave))
+
+    track_results: dict[str, list[WaveResult]] = {k: [] for k in tracks}
+    workers = max(1, max_workers or 8)
+
+    def _run_track(kind: str, pool):
+        for idx, wave in tracks[kind]:   # self-create waves stay cap-sequential here
+            track_results[kind].append(_run_wave(idx, wave, pool))
 
     try:
-        for idx, wave in enumerate(plan.waves):
-            if wave.kind == "provision":
-                # roots are stood up by the provisioner, not executed as lifecycles
-                result.waves.append(WaveResult(kind="provision",
-                                               outcomes=[], duration_s=0.0))
-            elif wave.kind == "free":
-                continue  # running concurrently in the background thread
-            else:
-                result.waves.append(_run_wave(idx, wave))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            threads = []
+            for kind, waves in tracks.items():
+                if waves:
+                    t = threading.Thread(target=_run_track, args=(kind, pool), daemon=True)
+                    t.start()
+                    threads.append(t)
+            for t in threads:
+                t.join()
     finally:
-        if free_thread is not None:
-            free_thread.join()
-            result.waves.extend(free_results)
+        for kind in ("free", "adopt", "self-create"):
+            result.waves.extend(track_results[kind])
         if provisioner is not None:
             try:
                 provisioner.teardown()
