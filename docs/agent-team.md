@@ -22,14 +22,14 @@ status) and `data/coordination/ledger.json` (the machine blackboard).
 | Role | What it does | Runs as |
 |------|--------------|---------|
 | **Orchestrator** | Plans the next slice, delegates it, integrates results, keeps shared state current | **the lead session** (not a spawned worker) |
-| **Spec-Intel** | Keeps `data/` (catalog/bodies/docs) fresh; diffs versions; flags affected endpoints | `Task` |
-| **Domain-Knowledge** | Curates `knowledge/` + declarative scenario data (call order, deps, quotas) | `Task` |
+| **Spec-Intel** | Keeps `data/` (catalog/bodies/docs) fresh; diffs versions; flags affected endpoints | `.claude/agents/spec-intel` |
+| **Domain-Knowledge** | Curates `knowledge/` + declarative scenario data (call order, deps, quotas) | `Task` (ad hoc) |
 | **Service agent** | Per-service expert; raises one service's coverage by any legitimate means | `.claude/agents/coverage-service` |
 | **Regression** (AXIS 1) | Smoke + CRUD lifecycles; widen coverage toward 100%, record observations | activity (pytest), lead-driven |
-| **Conformance** (AXIS 2) | Static + runtime defect detection vs a baseline (only NEW defects alarm) | `Task` |
-| **AI-Evaluator** | "Can a third-party AI use this API?" lens → feeds conformance | `Task` |
-| **Dashboard** | Build + publish the unified dashboard from the results store | `Task` |
-| **Coverage-Validator** | Standing loop: promote `docs`→`VALIDATED` nodes on a real 2xx (masked-defect-safe) | `Task` |
+| **Conformance** (AXIS 2) | Static + runtime defect detection vs a baseline (only NEW defects alarm) | `.claude/agents/conformance` |
+| **AI-Evaluator** | "Can a third-party AI use this API?" lens → feeds conformance | `.claude/agents/ai-evaluator` |
+| **Dashboard** | Build + publish the unified dashboard from the results store | `.claude/agents/dashboard` |
+| **Coverage-Validator** | Standing loop: promote `docs`→`VALIDATED` nodes on a real 2xx (masked-defect-safe) | `.claude/agents/coverage-validator` |
 | **Optimizer** | After every run, mine the logs → ranked improvements (never relaxes a gate) | `.claude/agents/log-optimizer` |
 | **Live-Watcher** | Watches in-flight runs for anomalies (stall/leak/orphan); reports, never fixes | `.claude/agents/live-watcher` |
 
@@ -201,15 +201,19 @@ recorded. Live validation is deferred to a CI run; the coordinator flips the led
 |------|--------------------------|-------|
 | Orchestrator | — (the lead session) | Meta-Orchestrator |
 | Service agent | `coverage-service` | ② Coverage |
+| Spec-Intel | `spec-intel` | ② Coverage |
+| Coverage-Validator | `coverage-validator` | ② Coverage (consumer of `live-verifier`) |
+| Conformance | `conformance` | ④ Problem-Finder / AXIS 2 |
+| AI-Evaluator | `ai-evaluator` | ④ Problem-Finder / AXIS 2 |
+| Dashboard | `dashboard` | ① Platform |
 | Optimizer | `log-optimizer` | post-run (cross-cutting) |
 | Live-Watcher | `live-watcher` | ③ Watcher |
-| Spec-Intel · Domain-Knowledge | (`Task`, ad hoc) | ② Coverage |
-| Conformance · AI-Evaluator | (`Task`, ad hoc) | ④ Problem-Finder / AXIS 2 |
-| Coverage-Validator | (`Task`, ad hoc) | ② Coverage (consumer of `live-verifier`) |
-| Dashboard | (`Task`, ad hoc) | ① Platform |
+| Domain-Knowledge | (`Task`, ad hoc) | ② Coverage |
 | Regression | pytest activity (lead-driven) | ② Coverage |
 
 > Only roles that genuinely dispatch as bounded autonomous workers earn a
 > `.claude/agents/` file; the rest are hats the lead session wears. New executable
 > agents are added there (frontmatter + a system prompt that **points to this doc**,
-> not a re-paste).
+> not a re-paste). **8 today:** `coverage-service` · `spec-intel` · `conformance` ·
+> `coverage-validator` · `dashboard` · `ai-evaluator` · `log-optimizer` ·
+> `live-watcher`.
