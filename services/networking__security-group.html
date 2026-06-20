@@ -145,7 +145,7 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 <div class="hero">
   <div class="gauge">
     <div class="ring"><span>89%</span></div>
-    <div class="lbl">검증(2xx) 커버<br><b>8 / 9</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 1</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>8 / 9</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 0</span></div>
   </div>
   <h1>security-group <span class="tag">networking</span></h1>
   <div class="split">
@@ -200,11 +200,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-20 09:00 KST · branch <code>claude/handover-document-review-f7hpyc</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-20 13:57 KST · branch <code>claude/ecstatic-ride-m3vv7z</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/security-group-rules/{security_group_rule_id}", "api": "deletesecuritygrouprule", "c": "y", "s": 204, "t": 1.1, "src": "", "d": []}, {"m": "DELETE", "p": "/v1/security-groups/{security_group_id}", "api": "deletesecuritygroup", "c": "y", "s": 204, "t": 1.8, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-group-rules", "api": "listsecuritygrouprules", "c": "p", "s": 400, "t": 1.4, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-group-rules/{security_group_rule_id}", "api": "showsecuritygrouprule", "c": "y", "s": 200, "t": 1.0, "src": "ea4ade3", "d": []}, {"m": "GET", "p": "/v1/security-groups", "api": "listsecuritygroups", "c": "y", "s": 200, "t": 0.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-groups/{security_group_id}", "api": "showsecuritygroup", "c": "y", "s": 200, "t": 1.0, "src": "ea4ade3", "d": []}, {"m": "POST", "p": "/v1/security-group-rules", "api": "createsecuritygrouprule", "c": "y", "s": 201, "t": 2.1, "src": "", "d": []}, {"m": "POST", "p": "/v1/security-groups", "api": "createsecuritygroup", "c": "y", "s": 201, "t": 3.3, "src": "", "d": []}, {"m": "PUT", "p": "/v1/security-groups/{security_group_id}", "api": "setsecuritygroup", "c": "y", "s": 200, "t": 1.6, "src": "ea4ade3", "d": []}];
+var R=[{"m": "DELETE", "p": "/v1/security-group-rules/{security_group_rule_id}", "api": "deletesecuritygrouprule", "c": "y", "s": 204, "t": 1.3, "src": "", "d": []}, {"m": "DELETE", "p": "/v1/security-groups/{security_group_id}", "api": "deletesecuritygroup", "c": "y", "s": 204, "t": 1.9, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-group-rules", "api": "listsecuritygrouprules", "c": "n", "s": 400, "t": 1.4, "src": "58379cb", "d": []}, {"m": "GET", "p": "/v1/security-group-rules/{security_group_rule_id}", "api": "showsecuritygrouprule", "c": "y", "s": 200, "t": 1.0, "src": "", "d": []}, {"m": "GET", "p": "/v1/security-groups", "api": "listsecuritygroups", "c": "y", "s": 200, "t": 0.9, "src": "58379cb", "d": []}, {"m": "GET", "p": "/v1/security-groups/{security_group_id}", "api": "showsecuritygroup", "c": "y", "s": 200, "t": 1.0, "src": "", "d": []}, {"m": "POST", "p": "/v1/security-group-rules", "api": "createsecuritygrouprule", "c": "y", "s": 201, "t": 2.0, "src": "", "d": []}, {"m": "POST", "p": "/v1/security-groups", "api": "createsecuritygroup", "c": "y", "s": 201, "t": 2.5, "src": "", "d": []}, {"m": "PUT", "p": "/v1/security-groups/{security_group_id}", "api": "setsecuritygroup", "c": "y", "s": 200, "t": 1.8, "src": "", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
