@@ -135,16 +135,16 @@ def run_plan(
                 "reason": outcome.reason, "duration_s": outcome.duration_s})
         return outcome
 
-    def _run_wave(idx: int, wave) -> WaveResult:
+    def _run_wave(idx: int, wave, pool) -> WaveResult:
         ids = list(wave.lifecycles)
         emit("wave_start", {"index": idx, "kind": wave.kind, "lifecycles": ids})
         t0 = time.monotonic()
-        workers = max_workers or max(1, len(ids))
-        if workers == 1 or len(ids) <= 1:
+        if pool is None or len(ids) <= 1:
             outcomes = [_run_one(i) for i in ids]
         else:
-            with ThreadPoolExecutor(max_workers=workers) as pool:
-                outcomes = list(pool.map(_run_one, ids))
+            # submit to the SHARED pool so total concurrency stays bounded
+            futs = [pool.submit(_run_one, i) for i in ids]
+            outcomes = [f.result() for f in futs]
         wr = WaveResult(kind=wave.kind, outcomes=outcomes,
                         duration_s=time.monotonic() - t0)
         emit("wave_done", {"index": idx, "kind": wave.kind, "duration_s": wr.duration_s})
@@ -158,10 +158,13 @@ def run_plan(
     #   * self-create — hold a VPC slot; its waves are pre-sized to ``vpc_cap -
     #                   shared`` and run SEQUENTIALLY *within* the track, so at most
     #                   `budget` self-created VPCs ever coexist (+1 shared = cap).
-    # Running self-create concurrently with adopt (not after it) is what collapses
-    # the makespan toward the critical path — e.g. vpc-peering overlaps the DB
-    # clusters instead of tailing them. Cap-safety stays STRUCTURAL: only the
-    # self-create track consumes slots and only its own wave sizing bounds it.
+    # Running self-create concurrently with adopt (not after it) collapses the
+    # makespan toward the critical path — vpc-peering overlaps the DB clusters
+    # instead of tailing them. CRUCIAL: all three tracks submit to ONE shared
+    # ThreadPoolExecutor(max_workers), so total in-flight stays bounded to
+    # max_workers — overlapping the tracks does NOT multiply concurrency (an
+    # earlier per-track-pool version tripled it and exhausted connections, breaking
+    # the heavy adopters). Cap-safety stays STRUCTURAL (self-create wave sizing).
     result.waves.append(WaveResult(kind="provision", outcomes=[], duration_s=0.0))
     tracks: dict[str, list] = {"free": [], "adopt": [], "self-create": []}
     for idx, wave in enumerate(plan.waves):
@@ -169,20 +172,22 @@ def run_plan(
             tracks[wave.kind].append((idx, wave))
 
     track_results: dict[str, list[WaveResult]] = {k: [] for k in tracks}
+    workers = max(1, max_workers or 8)
 
-    def _run_track(kind: str):
+    def _run_track(kind: str, pool):
         for idx, wave in tracks[kind]:   # self-create waves stay cap-sequential here
-            track_results[kind].append(_run_wave(idx, wave))
+            track_results[kind].append(_run_wave(idx, wave, pool))
 
-    threads = []
     try:
-        for kind, waves in tracks.items():
-            if waves:
-                t = threading.Thread(target=_run_track, args=(kind,), daemon=True)
-                t.start()
-                threads.append(t)
-        for t in threads:
-            t.join()
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            threads = []
+            for kind, waves in tracks.items():
+                if waves:
+                    t = threading.Thread(target=_run_track, args=(kind, pool), daemon=True)
+                    t.start()
+                    threads.append(t)
+            for t in threads:
+                t.join()
     finally:
         for kind in ("free", "adopt", "self-create"):
             result.waves.extend(track_results[kind])
