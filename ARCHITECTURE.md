@@ -68,6 +68,12 @@ deterministic (AI sits at authoring time and post-run only).
    *ordering & scenarios* — service prerequisites and account quotas (e.g. 5-VPC
    cap) are modelled as **data** (`scenarios/dependencies.json`, `core/budgets`),
    not baked into code, so a scheduler can serialize/parallelize safely.
+   `dependencies.json` now also carries the **dependency DAG** (`shared_roots` +
+   `adopt_edges` — which lifecycle adopts which shared upstream root), kept in sync
+   with the composed lifecycles by `regression.scenarios.validate_dag` and
+   CI-gated (`--check` fails the PR if the graph drifts). That complete DAG is the
+   precondition for the ADR's `closure → shared-roots → topological-waves` 1.0
+   scheduler.
 
 2. **`conformance/` — is the API well designed & implemented?** Find design/impl
    defects via (a) **static** analysis of the spec and (b) **runtime** probes

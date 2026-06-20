@@ -349,7 +349,11 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   observed working in run 27735741382). **Validate on the next heavy run** — the
   audit-optimizer measures per-run wall-time, so DBaaS phase sum→max(engine) is
   directly verifiable. Full plan + end-state multi-VPC lane model:
-  `docs/PARALLEL-EXECUTION-PLAN.md`.
+  `docs/PARALLEL-EXECUTION-PLAN.md`. **DAG gate (1.0-a):**
+  `dependencies.json` now carries the dependency DAG (`shared_roots` +
+  `adopt_edges`); `python -m regression.scenarios.validate_dag --check` is the
+  CI gate (in `validate.yml`) that keeps it in sync with the lifecycles, the
+  precondition for the closure→shared-roots→topological-waves 1.0 scheduler.
 
 > When you finish a unit of work that changes any of the above, update this
 > section (and the relevant `knowledge/` file) in the same commit.

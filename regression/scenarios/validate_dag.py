@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -91,18 +90,20 @@ class Report:
     adopt_missing: list = field(default_factory=list)    # (lid, derived, declared) adopt_edges wrong/absent
     adopt_extra: list = field(default_factory=list)      # (lid, declared) declared for a non-enabled lifecycle
     root_undefined: list = field(default_factory=list)   # (lid, root) adopted root absent from shared_roots
+    vpc_crud_missing: list = field(default_factory=list)  # (lid,) VPC self-creator not in vpc_schedule.vpc_crud_lifecycles
     # informational (scheduler input, not gaps):
     shared_roots: dict = field(default_factory=dict)     # {root: [dependents]}
     self_creators: dict = field(default_factory=dict)    # {lid: [kinds]} slot-consumers
 
     @property
     def ok(self) -> bool:
-        return not (self.adopt_missing or self.adopt_extra or self.root_undefined)
+        return not (self.adopt_missing or self.adopt_extra or self.root_undefined
+                    or self.vpc_crud_missing)
 
     @property
     def gap_count(self) -> int:
         return (len(self.adopt_missing) + len(self.adopt_extra)
-                + len(self.root_undefined))
+                + len(self.root_undefined) + len(self.vpc_crud_missing))
 
 
 def build_report(lifecycles: list[dict], deps: dict) -> Report:
@@ -130,6 +131,17 @@ def build_report(lifecycles: list[dict], deps: dict) -> Report:
     for lid in declared_adopt:
         if lid not in enabled_ids:
             r.adopt_extra.append((lid, sorted(declared_adopt[lid])))
+
+    # partition safety: the legacy vpc_schedule.vpc_crud_lifecycles list (which
+    # shared_infra --print-filters turns into VPC_CRUD_K, the SERIAL lane in the
+    # pre-cutover workflow) must contain every lifecycle that self-creates a VPC.
+    # A VPC self-creator NOT listed there falls into PARALLEL_K and self-creates a
+    # VPC in the parallel adopt lane -> races the account VPC cap. Keep the
+    # hand-list honest against the derived DAG so it can't silently drift.
+    vpc_crud = set(deps.get("vpc_schedule", {}).get("vpc_crud_lifecycles", []))
+    for lid, d in derived.items():
+        if "vpc" in d["self_creates"] and lid not in vpc_crud:
+            r.vpc_crud_missing.append((lid,))
     return r
 
 
@@ -160,6 +172,9 @@ def format_report(r: Report, *, verbose: bool = False) -> str:
         L.append(f"  [shared_roots] {lid} adopts '{root}' which is not defined in shared_roots")
     for lid, cv in r.adopt_extra:
         L.append(f"  [stale adopt_edges]  {lid} declared {cv} but is not an enabled lifecycle")
+    for (lid,) in r.vpc_crud_missing:
+        L.append(f"  [vpc_crud_lifecycles] {lid} self-creates a VPC but is missing from "
+                 f"vpc_schedule.vpc_crud_lifecycles -> would race the cap in the parallel lane")
     if verbose:
         L.append("\n-- derived edges --")
         for lid in sorted(r.derived):
