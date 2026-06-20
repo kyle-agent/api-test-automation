@@ -34,6 +34,7 @@ file per id-stamped path). Nothing mutable is shared between threads.
 from __future__ import annotations
 
 import os
+import threading
 import time
 
 from regression.scenarios import dag_planner, engine
@@ -213,6 +214,61 @@ class _SharedBudget:
         return getattr(object.__getattribute__(self, "_b"), name)
 
 
+class AdaptiveLimiter:
+    """AIMD concurrency limiter that self-tunes to the backend's sustainable level.
+
+    Every ``interval`` seconds: if any NEW transient gateway response (502/503/504,
+    via core.http_client.retry_status_count) appeared, MULTIPLICATIVELY decrease the
+    limit (halve, floor ``lo``); otherwise ADDITIVELY probe up (+1, ceil ``hi``).
+    Lifecycles acquire a slot before running, so live concurrency == the current
+    limit and converges to the max the gateway tolerates — which is also how we
+    *find* the right concurrency (watch where ``limit`` settles)."""
+
+    def __init__(self, start, lo, hi, err_source, interval=20.0):
+        self._limit = float(max(lo, min(hi, start)))
+        self._lo, self._hi = lo, hi
+        self._active = 0
+        self._cv = threading.Condition()
+        self._errs = err_source
+        self._last_err = err_source()
+        self._last_adj = time.monotonic()
+        self._interval = interval
+        self.history = []   # (t, limit, active, err_delta) for observability
+
+    def _adjust(self):   # caller holds self._cv
+        now = time.monotonic()
+        if now - self._last_adj < self._interval:
+            return
+        cur = self._errs()
+        delta = cur - self._last_err
+        old = self._limit
+        if delta > 0:
+            self._limit = max(self._lo, self._limit / 2.0)
+        else:
+            self._limit = min(self._hi, self._limit + 1.0)
+        self._last_err, self._last_adj = cur, now
+        self.history.append((round(now, 1), round(self._limit, 1), self._active, delta))
+        if self._limit > old:
+            self._cv.notify_all()
+
+    def acquire(self):
+        with self._cv:
+            self._adjust()
+            while self._active >= self._limit:
+                self._cv.wait(timeout=2.0)
+                self._adjust()
+            self._active += 1
+
+    def release(self):
+        with self._cv:
+            self._active -= 1
+            self._cv.notify()
+
+    @property
+    def limit(self) -> float:
+        return self._limit
+
+
 def _make_executor(cfg, max_workers: int | None = None):
     """Build the executor closure bound to the shared cfg. It shares ONE pooled
     ApiClient AND one thread-safe Budget across all concurrent lifecycle threads:
@@ -234,6 +290,21 @@ def _make_executor(cfg, max_workers: int | None = None):
     shared_budget = _SharedBudget()   # coordinates vpc/private-dns quota across threads
     client = _build_client(cfg, pool_size=max_workers or 8)   # ONE pooled client, reused
 
+    # Optional adaptive concurrency: when SCP_ADAPTIVE=true, gate live concurrency
+    # by an AIMD limiter that backs off on gateway 502/503/504 and probes up when
+    # healthy — so the run self-tunes to the sustainable concurrency (and reveals
+    # the sweet spot). Ceiling = max_workers (run_plan's thread pool); floor/start
+    # via env. When unset, no gating (the pool bound alone applies).
+    limiter = None
+    if os.environ.get("SCP_ADAPTIVE") == "true":
+        from core import http_client
+        limiter = AdaptiveLimiter(
+            start=int(os.environ.get("SCP_ADAPTIVE_START", "8")),
+            lo=int(os.environ.get("SCP_ADAPTIVE_MIN", "4")),
+            hi=max_workers or 8,
+            err_source=http_client.retry_status_count,
+            interval=float(os.environ.get("SCP_ADAPTIVE_INTERVAL", "20")))
+
     def executor(lifecycle_id: str) -> LifecycleOutcome:
         t0 = time.monotonic()
         lifecycle = _LIFECYCLE_BY_ID.get(lifecycle_id)
@@ -243,6 +314,8 @@ def _make_executor(cfg, max_workers: int | None = None):
                 reason=f"unknown lifecycle id '{lifecycle_id}' (not in "
                        f"engine.LIFECYCLES)",
                 duration_s=time.monotonic() - t0)
+        if limiter is not None:
+            limiter.acquire()
         try:
             result = engine.run_lifecycle(
                 lifecycle, client, cfg,
@@ -259,7 +332,11 @@ def _make_executor(cfg, max_workers: int | None = None):
                 lifecycle_id, "failed",
                 reason=f"{type(exc).__name__}: {exc}",
                 duration_s=time.monotonic() - t0)
+        finally:
+            if limiter is not None:
+                limiter.release()
 
+    executor.limiter = limiter   # exposed for live observability (dashboard/report)
     return executor
 
 

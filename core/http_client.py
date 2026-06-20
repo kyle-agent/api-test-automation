@@ -23,6 +23,24 @@ from .config import Settings, settings
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 DESTRUCTIVE = {"DELETE"}
 RETRY_STATUS = {502, 503, 504}
+
+# Process-wide count of transient gateway responses (502/503/504). A concurrency
+# controller reads the delta to back off when the backend is overloaded. Thread-safe.
+import threading as _threading
+_retry_status_hits = 0
+_rsh_lock = _threading.Lock()
+
+
+def retry_status_count() -> int:
+    """Cumulative 502/503/504 responses seen across all ApiClients this process."""
+    with _rsh_lock:
+        return _retry_status_hits
+
+
+def _bump_retry_status() -> None:
+    global _retry_status_hits
+    with _rsh_lock:
+        _retry_status_hits += 1
 # Non-idempotent verbs must NOT be retried after a timeout / connection error:
 # the server may have applied the change while the response was lost (e.g. a
 # slow SKE cluster create that exceeds the client timeout), so a blind retry
@@ -120,10 +138,12 @@ class ApiClient:
                     backoff = min(backoff * 2, 16)
                     continue
                 raise
-            if resp.status_code in RETRY_STATUS and attempt < _max:
-                time.sleep(backoff)
-                backoff = min(backoff * 2, 16)
-                continue
+            if resp.status_code in RETRY_STATUS:
+                _bump_retry_status()
+                if attempt < _max:
+                    time.sleep(backoff)
+                    backoff = min(backoff * 2, 16)
+                    continue
             elapsed = (time.monotonic() - start) * 1000
             try:
                 parsed = resp.json()
