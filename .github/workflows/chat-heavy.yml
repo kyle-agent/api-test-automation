@@ -1,0 +1,109 @@
+name: Chat heavy (push-triggered, cancellable)
+
+# Dedicated CHAT-DRIVEN heavy run that a Claude session can CREATE and STOP using
+# only `git push` — no workflow_dispatch (the MCP/integration token gets 403) and
+# no hosted control plane. Runs on GitHub's own runners, so it egresses on
+# GitHub's network, NOT the Claude-remote container's transparent proxy — i.e. it
+# does NOT hit the egress-proxy 503 storm that makes in-container heavy runs
+# unreliable (knowledge/validated-facts.md, 2026-06-20).
+#
+# CREATE:  edit .github/chat-heavy-request -> `action=run`  (+ gate/filter lines) -> push
+# STOP:    edit .github/chat-heavy-request -> `action=stop` -> push
+#          (the `concurrency` block cancels the in-flight run; this stop-run then
+#           runs the reconciler sweep so nothing leaks)
+#
+# The control file is KEY=VALUE (parsed below): action, mutations, destructive,
+# heavy, crud_filter, category, service. Initial `action=noop` is a harmless no-op
+# (exits before any SCP call or sweep) so adding this workflow never starts a run.
+on:
+  push:
+    paths: [".github/chat-heavy-request"]
+
+# Only ONE chat-heavy run at a time; a new push (e.g. action=stop) CANCELS the
+# in-flight one — this is the git-only "stop" lever.
+concurrency:
+  group: chat-heavy
+  cancel-in-progress: true
+
+env:
+  SCP_REGION: ${{ vars.SCP_REGION || 'kr-west1' }}
+  SCP_ENV: ${{ vars.SCP_ENV || 'e' }}
+  SCP_HOST_TEMPLATE: ${{ vars.SCP_HOST_TEMPLATE }}
+  SCP_SERVICE_HOSTS: ${{ vars.SCP_SERVICE_HOSTS }}
+  SCP_BASE_URL: ${{ secrets.SCP_BASE_URL }}
+  SCP_ACCESS_KEY: ${{ secrets.SCP_ACCESS_KEY }}
+  SCP_SECRET_KEY: ${{ secrets.SCP_SECRET_KEY }}
+  SCP_PROJECT_ID: ${{ secrets.SCP_PROJECT_ID }}
+  SCP_AUTH_SCHEME: ${{ vars.SCP_AUTH_SCHEME || 'hmac' }}
+  SCP_TIMEOUT: ${{ vars.SCP_TIMEOUT || '20' }}
+  SCP_MAX_RETRIES: ${{ vars.SCP_MAX_RETRIES || '2' }}
+  PYTHONPATH: ${{ github.workspace }}
+  APITEST_RUN_ID: gha-chatheavy-${{ github.run_id }}
+
+jobs:
+  heavy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse control file
+        id: req
+        run: |
+          F=.github/chat-heavy-request
+          get() { grep -E "^$1=" "$F" | head -1 | cut -d= -f2- | tr -d '"' | xargs || true; }
+          echo "action=$(get action)"        >> "$GITHUB_OUTPUT"
+          echo "mutations=$(get mutations)"   >> "$GITHUB_OUTPUT"
+          echo "destructive=$(get destructive)">> "$GITHUB_OUTPUT"
+          echo "heavy=$(get heavy)"           >> "$GITHUB_OUTPUT"
+          echo "crud_filter=$(get crud_filter)">> "$GITHUB_OUTPUT"
+          echo "category=$(get category)"     >> "$GITHUB_OUTPUT"
+          echo "service=$(get service)"       >> "$GITHUB_OUTPUT"
+          echo "----- chat-heavy-request -----"; cat "$F" || true
+
+      - name: No-op / stop (skip the heavy work)
+        if: steps.req.outputs.action != 'run'
+        run: echo "action='${{ steps.req.outputs.action }}' — not 'run'; skipping heavy work (cleanup sweep still runs below)."
+
+      - name: Setup Python + deps
+        if: steps.req.outputs.action == 'run'
+        uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Install
+        if: steps.req.outputs.action == 'run'
+        run: python -m pip install -r requirements.txt
+
+      - name: Run heavy CRUD lifecycles
+        if: steps.req.outputs.action == 'run'
+        env:
+          SCP_ALLOW_MUTATIONS: ${{ steps.req.outputs.mutations || 'true' }}
+          SCP_ALLOW_DESTRUCTIVE: ${{ steps.req.outputs.destructive || 'true' }}
+          SCP_RUN_HEAVY: ${{ steps.req.outputs.heavy || 'true' }}
+          SCP_CRUD_CATEGORY: ${{ steps.req.outputs.category }}
+          SCP_CRUD_SERVICE: ${{ steps.req.outputs.service }}
+        run: |
+          K="${{ steps.req.outputs.crud_filter }}"
+          if [ -n "$K" ]; then
+            python -m pytest tests/crud -m crud -k "$K" -o addopts="" -q || true
+          else
+            python -m pytest tests/crud -m crud -o addopts="" -q || true
+          fi
+
+      # ALWAYS reclaim our tag-scoped resources for a 'run' or 'stop' — on success,
+      # on heavy failure, AND when this run was CANCELLED by a later action=stop push
+      # (the stop lever). NEVER sweep on 'noop' (it would touch a concurrent run's
+      # resources). 'stop' needs its own python/deps since the heavy steps were skipped.
+      - name: Setup Python + deps (for stop-sweep)
+        if: always() && steps.req.outputs.action == 'stop'
+        uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Install (for stop-sweep)
+        if: always() && steps.req.outputs.action == 'stop'
+        run: python -m pip install -r requirements.txt
+      - name: Reconciler sweep (tag-scoped cleanup)
+        if: always() && (steps.req.outputs.action == 'run' || steps.req.outputs.action == 'stop')
+        env:
+          SCP_ALLOW_MUTATIONS: 'true'
+          SCP_ALLOW_DESTRUCTIVE: 'true'
+          SCP_SWEEP_NOWAIT: 'true'
+        run: python -m cleanup.reconciler || true

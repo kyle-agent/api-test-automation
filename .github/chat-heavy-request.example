@@ -1,0 +1,11 @@
+# Copy to .github/chat-heavy-request and PUSH to trigger the chat-heavy workflow.
+# action=run  -> start a heavy run on GitHub's runners (storm-free egress)
+# action=stop -> cancel the in-flight run (concurrency) + reconciler sweep
+# action=noop -> no-op (no SCP, no sweep)
+action=noop
+mutations=true
+destructive=true
+heavy=true
+crud_filter=
+category=
+service=
