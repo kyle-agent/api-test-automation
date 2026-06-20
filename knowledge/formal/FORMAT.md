@@ -224,6 +224,6 @@ regression/scenarios/*.json   what the engine actually executes
 core/budgets.py               quota limits enforced at runtime
 ```
 
-Long-term direction (see `ROADMAP.md`): the formal files become the source of
+Long-term direction (see `docs/ROADMAP.md`): the formal files become the source of
 truth from which `dependencies.json` entries are **generated**; until then the
 validator keeps the two consistent.

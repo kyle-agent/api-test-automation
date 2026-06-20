@@ -94,7 +94,7 @@ deterministic (AI sits at authoring time and post-run only).
    makespan are re-derived. `dag_plan_graph` renders any plan as a topological
    SVG/HTML preview. Cap-safety is **structural** (the planner sizes each
    self-create wave to `vpc_cap − shared_vpc`, so a wave can never breach the cap).
-   Full design + measured results: [`docs/scheduler-system.md`](docs/scheduler-system.md).
+   Full design + measured results: [`docs/scheduler-system.md`](scheduler-system.md).
 
 2. **`conformance/` — is the API well designed & implemented?** Find design/impl
    defects via (a) **static** analysis of the spec and (b) **runtime** probes

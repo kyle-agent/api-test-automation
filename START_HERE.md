@@ -29,8 +29,8 @@ under [`knowledge/`](knowledge/).
    best practices) **and** is easy for an AI agent to consume. Evidence comes
    from **static analysis + real runtime probes**.
 
-See [`README.md`](README.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md) for the
-implementation blueprint, and [`ROADMAP.md`](ROADMAP.md) for the phase plan
+See [`README.md`](README.md) and [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the
+implementation blueprint, and [`ROADMAP.md`](docs/ROADMAP.md) for the phase plan
 (coverage 100% → scheduled regression → dedicated-server runs). This file does
 not duplicate them.
 

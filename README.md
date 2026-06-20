@@ -27,8 +27,8 @@ What started as a catalog-driven test suite is now a full platform with
 
 The suite remains **catalog-driven** (the API Reference is parsed once into a
 machine-readable inventory; tests are generated from it) and organised around
-**two axes** on a shared kernel. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the
-full blueprint, [`ROADMAP.md`](ROADMAP.md) for the phase plan,
+**two axes** on a shared kernel. See [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the
+full blueprint, [`ROADMAP.md`](docs/ROADMAP.md) for the phase plan,
 [`docs/PLATFORM-PLAN.md`](docs/PLATFORM-PLAN.md) for the platform milestones
 (M0–M5), and [`agents/`](agents/README.md) for the multi-agent team that does
 the engineering.

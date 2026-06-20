@@ -5,13 +5,13 @@
 > 전용 서버 실행)와 각 에이전트의 자리를 한눈에 보여주는 로드맵입니다.
 
 This repository develops and tests the **Samsung Cloud Platform (SCP) Open
-APIs** with a **multi-agent AI team** (roster in [`agents/`](agents/README.md)).
+APIs** with a **multi-agent AI team** (roster in [`agents/`](../agents/README.md)).
 The phases below are the operating plan; each phase's "done-when" is concrete
 so any session can tell where we are.
 
 > **Platform milestone status at a glance** (detail:
-> [`docs/PLATFORM-PLAN.md`](docs/PLATFORM-PLAN.md) ·
-> [`docs/RESOURCE-MODEL-PLAN.md`](docs/RESOURCE-MODEL-PLAN.md)):
+> [`docs/PLATFORM-PLAN.md`](PLATFORM-PLAN.md) ·
+> [`docs/RESOURCE-MODEL-PLAN.md`](RESOURCE-MODEL-PLAN.md)):
 > **M0–M3 DONE** (engine groundwork · control-plane MVP · ops/intervention ·
 > authoring + AI pipelines) · **M4 built, cutover deliberately LAST**
 > (`runner/worker.py` + Docker Compose await live/docker verification) ·
@@ -101,7 +101,7 @@ scenarios, ② multi-service combination scenarios, ③ option/parameter
 variations (C4 coverage in `docs/COVERAGE-CRITERIA.md`). For now only the
 docs needed for coverage 100% are prioritized — the full backlog with
 priorities and per-service status lives in
-[`knowledge/formal/INGESTION.md`](knowledge/formal/INGESTION.md)
+[`knowledge/formal/INGESTION.md`](../knowledge/formal/INGESTION.md)
 (짬짬이 ingest: any session picks P1 rows and converts them into
 `knowledge/formal/services/` files).
 

@@ -1,7 +1,7 @@
 # SCP API Regression Test Platform — 업그레이드 계획
 
 > 현재의 "엔진 + GitHub Actions" 시스템을 **완결된 플랫폼**으로 승격하는 계획.
-> [ROADMAP.md](../ROADMAP.md)의 Phase 2(스케줄 회귀)·Phase 3(전용 서버)을
+> [ROADMAP.md](ROADMAP.md)의 Phase 2(스케줄 회귀)·Phase 3(전용 서버)을
 > 포괄하면서, 그 위에 **관리 UI·실행 개입·히스토리 리포팅**을 얹는다.
 >
 > **상태 (2026-06-12): M0~M3 DONE, M4 DONE(live/docker 검증 대기 — 컷오버는

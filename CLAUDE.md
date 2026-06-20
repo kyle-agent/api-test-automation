@@ -11,7 +11,7 @@ The **SCP API Regression Test Platform** — tests the Samsung Cloud Platform Op
 APIs (13 categories / ~60 services / 1,372 endpoints) on two axes (regression =
 "does it work?", conformance = "is it well-designed & AI-usable?"). Engineered by
 a **team of AI agents**. Full picture: `START_HERE.md`, `README.md`,
-`ARCHITECTURE.md`.
+`docs/ARCHITECTURE.md`.
 
 ## Start here (entry path)
 
