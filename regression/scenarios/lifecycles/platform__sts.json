@@ -4,49 +4,56 @@
       "id": "sts-token-issuance-coverage",
       "service": "platform/sts",
       "enabled": true,
-      "_note": "COVERAGE-ONLY, light (NOT yet runtime-proven). STS (Security Token Service) issues SHORT-LIVED CREDENTIALS. Closes all 3 sts writes: POST /v1/assume-role (assumerole), POST /v1/assume-role-with-saml (assumerolewithsaml), POST /v1/object-store-authorization (objectstoreauthorization). Each is a stateless token-MINT (no resource created/deleted, nothing to clean up), so there is no create->delete chain. SAFETY: this lifecycle deliberately does NOT capture or persist any returned token/credential (no capture/capture_soft on the responses) — it only records the HTTP status for coverage and NEVER exfiltrates real creds. Each write is optional+grouped+broad expect_status so the expected 400/403/422 (synthetic/unauthorized role_arn or SAML assertion, missing object-store scope) records the endpoint as covered without minting a usable credential. No data/api_bodies.json entries exist for sts; bodies are best-effort from STS field semantics (role_arn, role_session_name, duration_seconds, saml_assertion, object/bucket scope) and are UNPROVEN.",
+      "_note": "COVERAGE-ONLY (mutation-gated). STS (Security Token Service) issues short-lived credentials. Closes all 3 sts writes: POST /v1/assume-role (assumerole), POST /v1/assume-role-with-saml (assumerolewithsaml), POST /v1/object-store-authorization (objectstoreauthorization). Each is a stateless token-mint (no resource created/deleted, nothing to clean up), so there is no create->delete chain. SAFETY: this lifecycle deliberately does NOT capture or persist any returned token/credential (no capture/capture_soft on responses) so it never exfiltrates real creds. Each step is optional+grouped+broad expect_status so expected 400/403/404/422 (bad role_indicator pattern, missing SAML provider, invalid session token for object-store) records the endpoint as coverage-reached without minting a usable credential. BODY SHAPES CONFIRMED from api_docs.json models (2026-06-20): assumerole uses role_indicator (NOT role_arn), format [offering:account_id:role_name] pattern ^[^:]+:[^:]+:[^:]+$ minLength 32; assumerolewithsaml uses role_indicator+principal_indicator+saml_assertion; objectstoreauthorization uses method+url+x_amz_content_sha256+x_amz_date (NOT bucket_name). role_session_name minLength 1, maxLength 64. STS host: sts.<region>.e.samsungsdscloud.com (regional, NOT global). Prior fragment had wrong field names (role_arn/principal_arn/bucket_name) — corrected 2026-06-20 from api_docs.json request_example and model schemas.",
       "steps": [
         {
           "name": "assume-role",
           "method": "POST",
           "path": "/v1/assume-role",
+          "service": "sts",
           "json": {
-            "role_arn": "srn:scp:iam::regr:role/nonexistent-regr-role-{unique}",
-            "role_session_name": "regr-sts-{ualpha}",
+            "role_indicator": "e:ec11538abf8f46d2953539521f745366:OrganizationAccountAccessRole",
+            "role_session_name": "regr-sts-session",
             "duration_seconds": 900
           },
           "expect_status": [200, 201, 400, 401, 403, 404, 409, 422],
           "optional": true,
           "group": "sts-assume-role",
-          "_note": "Mints temporary creds for a role. role_arn deliberately points at a NONEXISTENT role so no usable credential is issued; expected 400/403/404. Body (role_arn/role_session_name/duration_seconds) UNPROVEN. No token captured (safety)."
+          "_note": "assumerole: mints temporary creds for a role. FIELD: role_indicator (NOT role_arn) format [offering:account_id:role_name] pattern ^[^:]+:[^:]+:[^:]+$ minLength 32. Using real account_id ec11538abf8f46d2953539521f745366 and existing role OrganizationAccountAccessRole. Expected: 200 if this account can assume the role (trust policy allows), or 400/403/404 if not (role trust policy only allows Account 73eab1a74c6347c1be9c892efc7f1102 to assume, so 403/404 likely). role_session_name min 1 char max 64. No token captured (safety — session_token/access_key_id not captured)."
         },
         {
           "name": "assume-role-with-saml",
           "method": "POST",
           "path": "/v1/assume-role-with-saml",
+          "service": "sts",
           "json": {
-            "role_arn": "srn:scp:iam::regr:role/nonexistent-regr-role-{unique}",
-            "principal_arn": "srn:scp:iam::regr:saml-provider/nonexistent-regr-{unique}",
-            "saml_assertion": "regr-placeholder-not-a-real-assertion",
+            "role_indicator": "e:ec11538abf8f46d2953539521f745366:OrganizationAccountAccessRole",
+            "principal_indicator": "e:ec11538abf8f46d2953539521f745366:nonexistent-saml-provider",
+            "saml_assertion": "PHNhbWxwOlJlc3BvbnNlPjwvc2FtbHA6UmVzcG9uc2U+",
             "duration_seconds": 900
           },
           "expect_status": [200, 201, 400, 401, 403, 404, 409, 422],
           "optional": true,
           "group": "sts-assume-role-saml",
-          "_note": "Federated SAML token mint. saml_assertion is an obvious placeholder (NOT a real base64 SAML doc) so no usable credential is issued; expected 400/422. Body (role_arn/principal_arn/saml_assertion/duration_seconds) UNPROVEN. No token captured (safety)."
+          "_note": "assumerolewithsaml: federated SAML token mint. FIELDS: role_indicator (same format as assumerole), principal_indicator ([offering:account_id:principal_name] pattern ^[^:]+:[^:]+:[^:]+$ minLength 32), saml_assertion (base64 SAML doc, minLength 1). Using placeholder base64 value (NOT a real SAML assertion) and nonexistent principal_indicator so no usable credential can be issued. Expected: 400/422 (invalid/fake SAML assertion) or 404 (no SAML provider). Account has 0 SAML providers confirmed. No token captured (safety)."
         },
         {
           "name": "object-store-authorization",
           "method": "POST",
           "path": "/v1/object-store-authorization",
+          "service": "sts",
           "json": {
-            "bucket_name": "regr-nonexistent-bucket-{unique}",
-            "duration_seconds": 900
+            "method": "GET",
+            "region": "kr-west1",
+            "service": "s3",
+            "url": "https://nonexistent-regr-bucket.kr-west1.object.samsungsdscloud.com/test-key",
+            "x_amz_content_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "x_amz_date": "20260620T000000Z"
           },
           "expect_status": [200, 201, 400, 401, 403, 404, 409, 422],
           "optional": true,
           "group": "sts-object-store-auth",
-          "_note": "Mints an object-store access token scoped to a bucket. bucket_name points at a NONEXISTENT bucket so no usable scoped credential is issued; expected 400/403/404. Body (bucket_name/duration_seconds) UNPROVEN. No token captured (safety)."
+          "_note": "objectstoreauthorization: creates an S3-compatible Authorization header signature using the caller's session token. FIELDS: method (REQUIRED, HTTP verb), url (REQUIRED, full object-store URL), x_amz_content_sha256 (REQUIRED, SHA256 of request body — empty body SHA256 is the well-known constant), x_amz_date (REQUIRED, AMZ date format YYYYMMDDTHHmmssZ), region (optional default kr-west1), service (optional default s3). CRITICAL: this endpoint does NOT take bucket_name/duration_seconds (prior fragment was wrong). x_amz_content_sha256 uses the SHA256 of empty string (UNSIGNED-PAYLOAD alternative). Expected: 200 if valid session token in HMAC auth header (this account is using access_key not session_token, so likely 400/401/403). No Authorization header value captured (safety — would be a temporary credential)."
         }
       ]
     }

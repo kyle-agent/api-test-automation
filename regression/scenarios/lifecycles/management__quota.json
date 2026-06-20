@@ -1,0 +1,50 @@
+{
+  "lifecycles": [
+    {
+      "id": "quota-read-coverage",
+      "service": "management/quota",
+      "enabled": true,
+      "_note": "Read-only coverage for all 4 quota endpoints. quota is a global (account-scoped) service with no mutating endpoints — all 4 ops are GET. listaccountquota and listquotarequests are directly covered by smoke; showaccountquota is covered by the read_chain (account-quotas list is non-empty). showquotarequest is data-dependent: it requires a real request_id, which only exists when a user has submitted a quota-increase request via the UI — the regression account currently has no quota requests (confirmed: GET /v1/quota-requests returns count:0). This lifecycle exercises list->show for account-quotas (confirms read_chain path), and attempts showquotarequest via soft-capture (silently skipped when list is empty). No mutations, no cleanup. Response envelope confirmed: $.account_quotas[].id (proven 200 in run 2026-06-20).",
+      "steps": [
+        {
+          "name": "list-account-quotas",
+          "service": "quota",
+          "method": "GET",
+          "path": "/v1/account-quotas",
+          "expect_status": [200],
+          "capture": {
+            "account_quota_id": "$.account_quotas[0].id"
+          }
+        },
+        {
+          "name": "show-account-quota",
+          "service": "quota",
+          "method": "GET",
+          "path": "/v1/account-quotas/{account_quota_id}",
+          "group": "account-quota",
+          "expect_status": [200]
+        },
+        {
+          "name": "list-quota-requests",
+          "service": "quota",
+          "method": "GET",
+          "path": "/v1/quota-requests",
+          "expect_status": [200],
+          "capture_soft": {
+            "request_id": "$.quota_requests[0].id"
+          }
+        },
+        {
+          "name": "show-quota-request",
+          "service": "quota",
+          "method": "GET",
+          "path": "/v1/quota-requests/{request_id}",
+          "group": "quota-request",
+          "optional": true,
+          "_note": "Data-dependent blocker: showquotarequest requires a real request_id from an existing quota-increase request. The regression account has no quota requests (GET /v1/quota-requests -> count:0). No API exists to create quota requests — they are submitted through the SCP UI. This step silently skips when capture_soft yields no request_id.",
+          "expect_status": [200, 404]
+        }
+      ]
+    }
+  ]
+}

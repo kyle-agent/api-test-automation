@@ -4,7 +4,7 @@
       "id": "security-certificatemanager-import-cover",
       "service": "security/certificatemanager",
       "enabled": true,
-      "_note": "COVERAGE-ONLY lifecycle for the 2 uncovered certificatemanager WRITE ops: POST /v1/certificatemanager (import an external cert) and POST /v1/certificatemanager/check-validation. These are KNOWN-UNSATISFIABLE on this account: per docs/working/handoffs/HANDOFF-crud-setter-validation.md the SCP check-validation/import endpoints reject a runtime-minted self-signed keypair regardless of PEM encoding (400 'This private key is not a PEM format'), and CI has no real CA-signed cert. The existing 'security-certificatemanager-import' lifecycle (enabled:false) attempts a REAL import via engine._self_signed_pem() and is therefore disabled. This sibling does NOT try to make import succeed: both writes are GUARDED OPTIONAL calls with broad expect_status so they merely CALL the endpoint (recording coverage for the (POST,/v1/certificatemanager) and (POST,/v1/certificatemanager/check-validation) catalog keys) and 4xx as expected. No resource is created (import is expected to fail validation), so there is nothing to capture/clean up; each call is isolated in its own group so a 4xx is a warning, not a run failure. cert_body/private_key are doc-placeholder strings (api_docs.json certificatecreaterequest / certificatevalidaterequestv1dot1 examples) — _UNPROVEN, expected to be rejected. NOTE: do NOT add needs_cert_material here — that would gate the whole lifecycle on openssl availability and a real (still-rejected) import attempt; static placeholders guarantee the endpoints are always CALLED for coverage.",
+      "_note": "Coverage probe for 2 write-only certificatemanager ops that cannot reach 2xx read-only: POST /v1/certificatemanager/check-validation (validatecertificate) and POST /v1/certificatemanager (createcertificate/import). CONFIRMED LIVE 2026-06-20: validatecertificate returns 400 scp-security.certificate.pem-format-private-key-error for ALL key types (RSA PKCS#1 BEGIN RSA PRIVATE KEY, PKCS#8 BEGIN PRIVATE KEY, EC BEGIN EC PRIVATE KEY) — this is a backend-side validation that rejects any private key regardless of format. The selfsign lifecycle (security-certificatemanager-selfsign in scenarios.json) covers the self-sign + read + delete path. The import lifecycle (security-certificatemanager-import in scenarios.json) is blocked until real CA-signed cert material is available. This fragment merely CALLS the two write ops with placeholder bodies as guarded optional steps (4xx expected, recorded as reached) so they appear in coverage when mutations are enabled. BODY FACTS (YYYYMMDD date format, confirmed 2026-06-20): selfsigncert requires cn, name, not_before_dt=YYYYMMDD, not_after_dt=YYYYMMDD, organization, recipients=[], region, tags=[], timezone='Asia/Seoul'. checknameduplication requires only {name}: returns 200 {result:false} (non-destructive read-style POST).",
       "steps": [
         {
           "name": "check-validation",
@@ -16,9 +16,10 @@
           "json": {
             "cert_body": "-----BEGIN CERTIFICATE-----\nMIIB-regression-placeholder\n-----END CERTIFICATE-----",
             "cert_chain": "",
-            "private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIIE-regression-placeholder\n-----END RSA PRIVATE KEY-----"
+            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIE-regression-placeholder\n-----END PRIVATE KEY-----"
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "CONFIRMED 2026-06-20: returns 400 scp-security.certificate.pem-format-private-key-error for ALL PEM private key formats. Backend validation rejects every key type. Endpoint IS reachable (not 403 entitlement). Category: backend-validation-400, not a product bug per se — requires a real CA-chain-signed cert+key pair."
         },
         {
           "name": "import",
@@ -31,12 +32,13 @@
             "cert_body": "-----BEGIN CERTIFICATE-----\nMIIB-regression-placeholder\n-----END CERTIFICATE-----",
             "cert_chain": "",
             "name": "regrcertimp{unique}",
-            "private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIIE-regression-placeholder\n-----END RSA PRIVATE KEY-----",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIE-regression-placeholder\n-----END PRIVATE KEY-----",
             "recipients": [],
             "region": "{region}",
             "tags": []
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "CONFIRMED 2026-06-20: 5 required fields (cert_body, name, private_key, recipients, region) + cert_chain optional. One additional required field unknown beyond these 7. Also rejects all PEM key formats same as check-validation. Needs real CA-signed cert material."
         }
       ]
     }

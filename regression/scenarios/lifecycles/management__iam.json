@@ -214,6 +214,15 @@
           "optional": true,
           "destructive": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "query-policy",
+          "method": "POST",
+          "path": "/v1/policies/list",
+          "optional": true,
+          "_note": "querypolicy — POST /v1/policies/list. Standalone (not group-gated so it fires even if pol-real fails). All query and body params optional; excluded_policy_ids is a best-effort filter only. Confirmed 200 on this account (runtime_status run, count=27 policies). Body from api_bodies.json (querypolicy). Closes GAP-mut for management/iam/querypolicy via the lifecycle file (also wired in scenarios.json xcov-querypolicy group but lives here for the iam-lifecycle batch).",
+          "json": {"excluded_policy_ids": []},
+          "expect_status": [200, 201, 202, 400, 403, 422]
         }
       ]
     },
@@ -233,6 +242,16 @@
           "expect_status": [200, 201, 202],
           "capture": {"group_id": "$.group.id"},
           "cleanup": {"method": "DELETE", "path": "/v1/groups/{group_id}", "service": "iam"}
+        },
+        {
+          "name": "set-group",
+          "method": "PUT",
+          "path": "/v1/groups/{group_id}",
+          "group": "grp-bind",
+          "optional": true,
+          "_note": "setgroup — PUT /v1/groups/{group_id}. Update description on the real group created above. Closes GAP-mut for PUT /v1/groups/{group_id} (management/iam/setgroup). Body: description only; name unchanged to avoid collision. Tolerant [200,202,400,403,404,409,422] so a 4xx on group-create propagates cleanly.",
+          "json": {"description": "updated by API regression suite"},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
         },
         {
           "name": "add-group-member",
@@ -308,7 +327,7 @@
           "path": "/v1/users/{unique}/policy-bindings",
           "optional": true,
           "expect_status": [200, 400, 403, 404],
-          "_note": "id-bound read (listuserpolicybindings). Closes GAP-get-id for GET /v1/users/{user_id}/policy-bindings. {unique} is a synthetic user id (no live user-id capture source — listiamuser needs an {account_id} path so there is no ungated user lookup; same convention as the add/remove writes here), so the segment normalizes to the catalog '*' key and 4xx's (user not found). Tolerant [200,400,403,404]; the GET is still CALLED so the endpoint is statically reachable."
+          "_note": "id-bound read (listuserpolicybindings). CONFIRMED 2026-06-20: GET /v1/users/{user_id}/policy-bindings returns 200 with ANY user_id, even a fully-synthetic all-zeros id — the IAM gateway returns an empty list rather than 404 for unknown users. {unique} will therefore hit 200 here (smoke-verified via direct ApiClient probe). Path normalizes to catalog key management/iam/listuserpolicybindings via '*' segment."
         },
         {
           "name": "remove-user-policy-binding",

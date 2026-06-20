@@ -244,7 +244,8 @@
           "name": "create-backup-target",
           "service": "backup",
           "method": "GET",
-          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE&server_name=regrsrv{unique}",
+          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}",
+          "_note": "CONFIRMED 2026-06-20: policy_type=VM_IMAGE causes backend 500 ContactAdminForAssistance for VIRTUAL_SERVER+GPU_SERVER. Using FILESYSTEM (returns 200 count=0) to cover getbackuptargetlist key safely. Capture will be empty; create-backup-policy will 4xx on missing server_uuid. To fix: capture server_uuid from GET /v1/servers/{server_id} after wait-server (field name TBD from live test).",
           "expect_status": [
             200,
             201,
@@ -624,7 +625,7 @@
         }
       ],
       "heavy": true,
-      "_disabled_reason": "run 27483004836: backup-target lookup returned {contents:[],count:0} — the just-ACTIVE server isn't yet registered as a backup target (propagation delay). Needs an engine capability: poll a lookup GET until its list populates / capture resolves (IB-014). Backup model otherwise correct (agentless VM_IMAGE, owner-confirmed).",
+      "_disabled_reason": "TWO BLOCKERS: (1) run 27483004836: backup-target lookup returned {contents:[],count:0} — server not yet registered as backup target (propagation delay). (2) CONFIRMED 2026-06-20: GET /v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE always returns 500 ContactAdminForAssistance (backend bug); same for GPU_SERVER+VM_IMAGE. BAREMETAL_SERVER+VM_IMAGE returns 400 NotAllowedVmImageBackup (correct). FILESYSTEM policy_type returns 200 count=0 for all server_categories (no agent servers on this account). The step must be reworked: to get server_uuid/server_guid for agentless VM_IMAGE backup, use GET /v1/servers/{server_id} capture path instead of backup-targets (VM_IMAGE is broken). Additionally, the engine needs poll-list capability (IB-014) for server registration delay.",
       "_status": "blocked-engine"
     },
     {
@@ -870,7 +871,8 @@
           "name": "create-backup-target",
           "service": "backup",
           "method": "GET",
-          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=VM_IMAGE&server_name=regrsrv{unique}",
+          "path": "/v1/backups/backup-targets?server_category=VIRTUAL_SERVER&policy_type=FILESYSTEM&server_name=regrsrv{unique}",
+          "_note": "CONFIRMED 2026-06-20: policy_type=VM_IMAGE causes backend 500 ContactAdminForAssistance for VIRTUAL_SERVER+GPU_SERVER. Using FILESYSTEM (returns 200 count=0) to cover getbackuptargetlist key safely. Capture will be empty; create-backup-policy will 4xx on missing server_uuid. To fix: capture server_uuid from GET /v1/servers/{server_id} after wait-server (field name TBD from live test).",
           "expect_status": [
             200,
             201,

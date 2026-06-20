@@ -241,13 +241,53 @@
           "_note": "id-bound read (showloadbalancercertificate). Closes the lb_certificate_id getid GET /v1/loadbalancers/certificates/{lb_certificate_id} — the service's only remaining static gap. Keys off lb_certificate_id soft-captured from list-lb-certificates (no LB-side create exists for it). Tolerant [200,400,403,404]: a real 2xx needs a pre-existing certificatemanager-issued LB cert on the shared account; absent that the id stays a placeholder and 4xx's, which still records the endpoint as reached."
         },
         {
+          "name": "lb-listener-create",
+          "method": "POST",
+          "path": "/v1/lb-listeners",
+          "group": "lblistener",
+          "optional": true,
+          "json": {
+            "listener": {
+              "name": "regrls{ualpha}",
+              "description": "API regression lb",
+              "loadbalancer_id": "{loadbalancer_id}",
+              "protocol": "TCP",
+              "routing_action": "LB_SERVER_GROUP",
+              "server_group_id": "{lb_server_group_id}",
+              "service_port": 80,
+              "session_duration_time": 120,
+              "support_http2": false,
+              "tags": []
+            }
+          },
+          "capture_soft": {"listener_id": "$.listener.id"},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "cleanup": {"method": "DELETE", "path": "/v1/lb-listeners/{listener_id}", "service": "loadbalancer"},
+          "_note": "createlblistener: requires loadbalancer_id + routing_action enum (LB_SERVER_GROUP|URL_REDIRECT). service_port is integer (1-65534). server_group_id is optional. Captures listener_id for probe_reads -> showlblistener catalog coverage. Protocol enum: TCP|UDP|HTTP|HTTPS|TLS|TCP_PROXY. name pattern ^[a-zA-Z0-9-_]* 3-63 chars."
+        },
+        {
           "name": "probe-lb-reads",
           "probe_reads": {
             "loadbalancer_id": "{loadbalancer_id}",
             "lb_server_group_id": "{lb_server_group_id}",
             "lb_health_check_id": "{lb_health_check_id}",
+            "listener_id": "{listener_id}",
+            "lb_certificate_id": "{lb_certificate_id}",
             "member_id": "{member_id}"
-          }
+          },
+          "_note": "probe_reads records all id-bound GETs under their catalog keys (required for coverage counting). listener_id from lb-listener-create covers showlblistener. lb_certificate_id from list-lb-certificates covers showloadbalancercertificate (2xx only if account has a cert registered via certificatemanager; otherwise 4xx=soft). member_id from members-add covers showlbservergroupmember."
+        },
+        {
+          "name": "lb-listener-delete",
+          "method": "DELETE",
+          "path": "/v1/lb-listeners/{listener_id}",
+          "group": "lblistener",
+          "optional": true,
+          "destructive": true,
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "retry_on_status": [409],
+          "retries": 5,
+          "retry_interval": 10
         },
         {
           "name": "lb-servergroup-delete",

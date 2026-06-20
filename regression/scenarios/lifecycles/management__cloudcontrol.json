@@ -49,6 +49,31 @@
           "_note": "id-bound read (showlandingzone). Closes GAP-get-id for GET /v1/landing-zones/{landing_zone_id}. Keys off landing_zone_id soft-captured from list-landing-zones (or, on a successful but-unlikely create, the create capture). Tolerant [200,400,403,404]: on a shared/non-admin account the list returns no landing zone (403/empty) so the segment stays a placeholder (normalizes to the catalog '*' key, still records coverage). Makes the endpoint statically reachable in a LIGHT run (complements the runtime list capture)."
         },
         {
+          "name": "list-guardrails-for-target",
+          "method": "GET",
+          "path": "/v1/guardrail-bindings/guardrails",
+          "params": {
+            "target_id": "probe-target-id"
+          },
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cc-read",
+          "_note": "listguardrailsfortarget: target_id is REQUIRED (confirmed live 2026-06-20 — omitting it returns 400 ValidationError 'Field required'; with any value it returns 403 CloudControlForbidden on a non-org-master account). Dummy value 'probe-target-id' is intentional: it passes param validation so the response code accurately reflects the entitlement state (403) rather than param validation (400). Covers the catalog key management/cloudcontrol/listguardrailsfortarget for the lifecycle runner."
+        },
+        {
+          "name": "list-targets-for-guardrail",
+          "method": "GET",
+          "path": "/v1/guardrail-bindings/targets",
+          "params": {
+            "guardrail_id": "probe-guardrail-id",
+            "target_type": "ACCOUNT"
+          },
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "cc-read",
+          "_note": "listtargetsforguardrail: guardrail_id + target_type are REQUIRED (confirmed live 2026-06-20 — omitting them returns 400 ValidationError 'Field required'; target_type enum is 'ACCOUNT' or 'OU' (NOT 'ROOT' -> 400)). With correct params -> 403 CloudControlForbidden on a non-org-master account. Dummy guardrail_id is intentional: passes param validation, response code accurately reflects entitlement (403) not param error (400)."
+        },
+        {
           "name": "create-landing-zone",
           "method": "POST",
           "path": "/v1/landing-zones",
