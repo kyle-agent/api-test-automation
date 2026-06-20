@@ -327,7 +327,7 @@
           "path": "/v1/users/{unique}/policy-bindings",
           "optional": true,
           "expect_status": [200, 400, 403, 404],
-          "_note": "id-bound read (listuserpolicybindings). Closes GAP-get-id for GET /v1/users/{user_id}/policy-bindings. {unique} is a synthetic user id (no live user-id capture source — listiamuser needs an {account_id} path so there is no ungated user lookup; same convention as the add/remove writes here), so the segment normalizes to the catalog '*' key and 4xx's (user not found). Tolerant [200,400,403,404]; the GET is still CALLED so the endpoint is statically reachable."
+          "_note": "id-bound read (listuserpolicybindings). CONFIRMED 2026-06-20: GET /v1/users/{user_id}/policy-bindings returns 200 with ANY user_id, even a fully-synthetic all-zeros id — the IAM gateway returns an empty list rather than 404 for unknown users. {unique} will therefore hit 200 here (smoke-verified via direct ApiClient probe). Path normalizes to catalog key management/iam/listuserpolicybindings via '*' segment."
         },
         {
           "name": "remove-user-policy-binding",
