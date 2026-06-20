@@ -150,34 +150,42 @@ def run_plan(
         emit("wave_done", {"index": idx, "kind": wave.kind, "duration_s": wr.duration_s})
         return wr
 
-    # A 'free' wave (VPC-independent leaves) has NO dependency on the shared roots
-    # or the VPC cap, so it must NOT block the provision→adopt→self-create pipeline.
-    # Run free waves CONCURRENTLY in a background thread; the cap-constrained
-    # pipeline runs sequentially. Both join before teardown.
-    free_waves = [(i, w) for i, w in enumerate(plan.waves) if w.kind == "free"]
-    free_results: list[WaveResult] = []
-    free_thread = None
-    if free_waves:
-        def _run_free():
-            for i, w in free_waves:
-                free_results.append(_run_wave(i, w))
-        free_thread = threading.Thread(target=_run_free, daemon=True)
-        free_thread.start()
+    # After provisioning the shared roots, the remaining work splits into THREE
+    # independent tracks that all run CONCURRENTLY (only provision→adopt is a hard
+    # edge; free / adopt / self-create do not depend on each other):
+    #   * free        — VPC-independent leaves (no slot)
+    #   * adopt       — adopt the shared VPC (no NEW slot)
+    #   * self-create — hold a VPC slot; its waves are pre-sized to ``vpc_cap -
+    #                   shared`` and run SEQUENTIALLY *within* the track, so at most
+    #                   `budget` self-created VPCs ever coexist (+1 shared = cap).
+    # Running self-create concurrently with adopt (not after it) is what collapses
+    # the makespan toward the critical path — e.g. vpc-peering overlaps the DB
+    # clusters instead of tailing them. Cap-safety stays STRUCTURAL: only the
+    # self-create track consumes slots and only its own wave sizing bounds it.
+    result.waves.append(WaveResult(kind="provision", outcomes=[], duration_s=0.0))
+    tracks: dict[str, list] = {"free": [], "adopt": [], "self-create": []}
+    for idx, wave in enumerate(plan.waves):
+        if wave.kind in tracks:
+            tracks[wave.kind].append((idx, wave))
 
+    track_results: dict[str, list[WaveResult]] = {k: [] for k in tracks}
+
+    def _run_track(kind: str):
+        for idx, wave in tracks[kind]:   # self-create waves stay cap-sequential here
+            track_results[kind].append(_run_wave(idx, wave))
+
+    threads = []
     try:
-        for idx, wave in enumerate(plan.waves):
-            if wave.kind == "provision":
-                # roots are stood up by the provisioner, not executed as lifecycles
-                result.waves.append(WaveResult(kind="provision",
-                                               outcomes=[], duration_s=0.0))
-            elif wave.kind == "free":
-                continue  # running concurrently in the background thread
-            else:
-                result.waves.append(_run_wave(idx, wave))
+        for kind, waves in tracks.items():
+            if waves:
+                t = threading.Thread(target=_run_track, args=(kind,), daemon=True)
+                t.start()
+                threads.append(t)
+        for t in threads:
+            t.join()
     finally:
-        if free_thread is not None:
-            free_thread.join()
-            result.waves.extend(free_results)
+        for kind in ("free", "adopt", "self-create"):
+            result.waves.extend(track_results[kind])
         if provisioner is not None:
             try:
                 provisioner.teardown()
