@@ -59,6 +59,22 @@ duplicating. Add a new `##` section when you take on a new service.
   `security_group_ids` (not scalar/`security_groups`); notification id is `$.notifications[0].id`
   (list envelope, not `$.id`).
 
+## storage / backup
+
+- **Host:** regional. Service key: `backup`.
+- **checkfilesystemduplication** (`GET /v1/backups/check-filesystem-duplication`):
+  requires BOTH `filesystem_path` (string) AND `server_uuid` (UUID of a VM) as query params.
+  CONFIRMED LIVE (2026-06-20): returns 404 `Backup.NotFoundCreatedBackupAgent` for any
+  `server_uuid` when no backup agent is installed on that server. NOT a missing-param issue —
+  the params are correct per `api_catalog_params.json`. This endpoint is a **heavy-prereq blocker**:
+  needs a real VM + backup agent installation (not REST-provisionable). Cannot be covered
+  in a read-only or light-mutation run. Waiver candidate.
+- **checkbackupnameduplicate** (`GET /v1/backups/check-name-duplication`):
+  requires `backup_name` query param (NOT `name`). CONFIRMED LIVE 200 (2026-06-20):
+  `?backup_name=regrtest` → `{"result":false}`.
+- **listbackups** list envelope: `{contents:[], count}` (NOT `{backups:[], ...}`).
+- **createbackup** returns 500 `ContactAdminForAssistance` — product-bug (baselined).
+
 ## storage / filestorage
 
 - **Host:** regional. Owns NFS volumes.
@@ -129,10 +145,13 @@ duplicating. Add a new `##` section when you take on a new service.
   `connectable-resources` → `{count, resources[]}`.
 - **`checkrepositorynameduplication`** needs BOTH `registry_id` + `name` query
   params (else 400 `Field required`); `checkregistrynameduplication` needs `name`.
-- **READ-ONLY coverage ceiling (no docker, no mutations):** 8 GETs reachable —
+  CONFIRMED LIVE 200 (2026-06-20): `GET /v1/repositories/check-duplication/name?registry_id=nayvugfp4154447ab0ab61279cba3d72&name=regrcheck` → `{"result":false}`.
+  Added step `check-repository-name-duplication` to `scr-read-coverage` lifecycle in
+  `container__scr.json`; step fires immediately after `list-registries-harvest` captures `registry_id`.
+- **READ-ONLY coverage ceiling (no docker, no mutations):** 9 GETs reachable —
   listregistries, showregistry, listrepositories, showregistry's
-  connectable-resources, both check-duplications, showrepository, listimages.
-  All 200 on the borrowed resources.
+  connectable-resources, both check-duplications (checkrepositorynameduplication now fixed),
+  showrepository, listimages. All 200 on the borrowed resources.
 - **Docker-push blocker:** the existing repository has `images:[]` (count 0), and
   images/tags are **born only by `docker push`**, not by any REST POST. So
   `showimage`, `listtagses`, `showtags`, `tags-{packages,secrets,vulnerabilities}`,

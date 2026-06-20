@@ -150,9 +150,9 @@
     },
     {
       "service": "scr",
-      "covered": 8,
+      "covered": 9,
       "total": 39,
-      "gap": 31,
+      "gap": 30,
       "heavy": false,
       "blockers": [
         "needs-docker-push: ~16 image/tags-id ops (repo images:[] \u2014 born only by docker push)",
@@ -162,8 +162,8 @@
       "next_levers": [
         "cover registry/repo policy+ACL via an OWN registry lifecycle when the quota slot frees"
       ],
-      "notes": "3->8/39 via borrow-and-read-by-id on the pre-existing sample registry. 503s were transient.",
-      "updated": "2026-06-19T02:01:07Z"
+      "notes": "8->9/39. Added check-repo-name-dup step to scr-read-coverage lifecycle (container__scr.json). Confirmed live 200 for GET /v1/repositories/check-duplication/name?registry_id=nayvugfp4154447ab0ab61279cba3d72&name=regrcheck -> {result:false}. registry_id captured from list-registries-harvest ($.registries[0].id). 503s on SCR are transient; endpoint proven 2xx when service is up.",
+      "updated": "2026-06-20T00:00:00Z"
     },
     {
       "service": "backup",
@@ -171,10 +171,14 @@
       "total": 31,
       "gap": 30,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        "heavy-prereq: checkfilesystemduplication (GET /v1/backups/check-filesystem-duplication) requires server_uuid of a VM that has a backup agent installed. Account has 0 backup agents. Returns 404 Backup.NotFoundCreatedBackupAgent for any server_uuid. NOT a missing-param fix \u2014 need a real server+agent (heavy billable prereq). Cannot be covered with read-only edits."
+      ],
+      "next_levers": [
+        "SCP_RUN_HEAVY: provision a real VM + install backup agent -> capture server_uuid -> call checkfilesystemduplication with real server_uuid + filesystem_path"
+      ],
+      "notes": "checkfilesystemduplication CONFIRMED params correct (filesystem_path + server_uuid from catalog_params). BUT 404 NotFoundCreatedBackupAgent for any server_uuid \u2014 needs a real VM with backup agent (heavy). Not a free Tier-0 fix. Blocker recorded.",
+      "updated": "2026-06-20T00:00:00Z"
     },
     {
       "service": "mysql",
