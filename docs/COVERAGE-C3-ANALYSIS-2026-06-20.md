@@ -113,3 +113,38 @@ delivering the first ~80 endpoints for ≈ $0.
 - a real **Object-Storage bucket name** (loggingaudit `createtrail`)
 - a real **IAM member/user id** (devopsservice `members[]`)
 - confirm using the runner's **`SCP_ACCESS_KEY`** as secretvault `access_key_id`
+
+---
+
+## Light run #1 — ground truth (2026-06-20, local, 26 lifecycles)
+
+`SCP_ALLOW_MUTATIONS+DESTRUCTIVE`, heavy OFF, VPC-disabled. **22 passed / 4 failed
+(transient 503s) / 14m33s. Teardown verified: 0 owned survivors** (55 ok deletes;
+14 non-ok deletes were all 404 on never-created [400'd] resources; KMS/secrets are
+by-design scheduled-deletion). Recorded ~69 light catalog endpoints 2xx (mostly
+re-verifying the already-covered light surface: resourcemanager 18, kms 14,
+secretsmanager 12, security-group 7, apigateway 7, servicewatch-alert 6, scf 4).
+
+**The analysis over-predicted: 5 "light wins" did NOT 2xx. Exact 400s + fixes:**
+- **gslb** `creategslb` 400 — health-check ranges (interval 5-299, timeout 6-300,
+  probe-timeout 5-300). FIX = clamp the numbers. (cheapest; likely 2xx after.)
+- **cdn** `createcdnservice` 400 — field type/enum errors (protocol must be HTTP|HTTPS,
+  an integer field sent as string, a dict field sent as scalar). FIX = correct body shape.
+- **loggingaudit** `createtrail` 400 ValidationError "Field required" — still a missing
+  required field after the schema rewrite. FIX = diff body vs the real required set.
+- **iam** `setresourcepolicy`/`addpermission` 400 `Iam.UnSupportedActionInPolicy`:
+  "action [iam:*] not supported for the resource-based policy attached to service
+  [servicewatch]". **The b64-SRN decode SUCCEEDED — the 'SRN decoding error' is gone;
+  the resourcemanager base64 finding IS cross-cutting to iam (confirmed live).** Residual
+  fix = the policy `Action` must match the target resource's service (we captured a
+  servicewatch SRN; iam:* is invalid there) — pick an SRN whose service matches the
+  action, or set a service-appropriate action.
+- **secretvault** `createsecretvault` 400 `accesskey-error` "access key ID not found":
+  {env:SCP_ACCESS_KEY} resolved and was sent, but secretvault wants a different/console-
+  issued access-key id (credential precondition, like cloud-ml scr-auth-key). Harder.
+
+**Genuinely exercised this session (live 2xx):** scf function+apigw-trigger+method+
+resource (createcloudfunctionapigatewaytrigger NEW), servicewatch alert CRUD,
+kms symmetric crypto, resourcemanager tag/components, secretsmanager. **Net-new vs the
+published baseline is modest** — most of the 69 were already-covered re-verifications.
+Round 2 = the 4 cheap body fixes above (gslb/cdn/loggingaudit/iam-action), then re-run.
