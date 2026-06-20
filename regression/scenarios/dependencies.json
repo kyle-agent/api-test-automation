@@ -62,6 +62,36 @@
     "/v1/vpcs": "vpc",
     "/v1/private-dns": "private-dns"
   },
+  "_dag_comment": "1.0-a (scheduler DAG): shared_roots + adopt_edges are DERIVED from the lifecycle adopt steps and VALIDATED by regression.scenarios.validate_dag (--check). adopt_edges[lifecycle]=shared roots it reuses (the DAG edges); shared_roots[root].parent chains them (subnet/subnet#db under vpc). self_creates (cap slot-consumers) are derived live, not stored. Regenerate after adding/removing adopt steps: python -m regression.scenarios.validate_dag --check.",
+  "shared_roots": {
+    "subnet": {"parent": "vpc", "provisioned_by": "regression.scenarios.shared_infra"},
+    "subnet#db": {"parent": "vpc", "provisioned_by": "regression.scenarios.shared_infra"},
+    "vpc": {"parent": null, "provisioned_by": "regression.scenarios.shared_infra"}
+  },
+  "adopt_edges": {
+    "compute-virtualserver-full": ["subnet", "vpc"],
+    "container-ske-cluster-nodepool": ["subnet", "vpc"],
+    "database-mysql-cluster": ["subnet#db", "vpc"],
+    "database-postgresql-cluster": ["subnet#db", "vpc"],
+    "gen-cloudml-chain": ["subnet", "vpc"],
+    "gen-heavy-aimlops": ["subnet", "vpc"],
+    "gen-heavy-lb-members": ["subnet", "vpc"],
+    "gen-heavy-ske-upgrade": ["subnet", "vpc"],
+    "gen-heavy-vs-netops": ["subnet", "vpc"],
+    "gen-pilot-net-basics": ["subnet", "vpc"],
+    "gen-wave4-asg": ["subnet", "vpc"],
+    "gen-wave5-apigw-privatelink": ["subnet", "vpc"],
+    "heavy-shared-dbaas": ["subnet#db", "vpc"],
+    "networking-direct-connect-routing": ["vpc"],
+    "networking-dns-hosted-zone-private": ["vpc"],
+    "networking-loadbalancer-members-nat": ["subnet", "vpc"],
+    "networking-vpn-gateway-tunnel": ["vpc"],
+    "vpc-cidr-secondary": ["vpc"],
+    "vpc-endpoint": ["subnet", "vpc"],
+    "vpc-peering": ["vpc"],
+    "vpc-privatelink-service": ["subnet", "vpc"],
+    "vpc-transit-gateway-children": ["vpc"]
+  },
   "vpc_schedule": {
     "_comment": "Strategy to keep runs from colliding on the account VPC cap (=5, VALIDATED live: 'The number(5) of VPCs ... exceeded', run 27306490231; per-run cap 4 leaves 1 slot of headroom for leftovers / the A-parallel-B overlap). See knowledge/domain-constraints.md + knowledge/vpc-scheduling-strategy.md. VPCs must NOT overlap CIDRs and a subnet's CIDR must be a sub-range of its VPC's CIDR (see knowledge/domain-constraints.md allocation table). 'per_run_vpc_cap' is the max concurrent live VPCs a single run should hold. In the shared-infra parallel design the shared VPC (1) is torn down BEFORE the serial VPC-CRUD pass, so that pass gets the full cap (e.g. vpc-peering needs 2 at once). 'cross_run_policy' = how to stop concurrent runs from competing for VPCs.",
     "vpc_limit": 5,
