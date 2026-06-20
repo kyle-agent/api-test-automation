@@ -101,18 +101,6 @@ def _shared_ctx_from_env() -> dict:
     return ctx
 
 
-def _live_budget():
-    """A per-call Budget seeded from the live limits (DEFAULT_LIMITS + any
-    SCP_BUDGET_LIMITS env overrides — the same source the engine uses). We do not
-    pre-``sync`` observed usage here: cap-safety in the DAG runner is STRUCTURAL
-    (the planner pre-sizes each self-create wave to ``vpc_cap - shared``), so the
-    Budget is defense-in-depth for the engine's own per-create reserve, and an
-    un-synced Budget conservatively assumes the account is empty of OUR creates
-    at wave start (the shared VPC having been provisioned out-of-band)."""
-    from core import budgets
-    return budgets.Budget()
-
-
 class SharedInfraProvisioner:
     """Provisioner adapter (dag_runner.Provisioner protocol) over the real shared
     VPC+subnets.
@@ -187,12 +175,44 @@ class SharedInfraProvisioner:
             self._provisioned_keys = []
 
 
+class _SharedBudget:
+    """ONE process-wide, thread-safe Budget shared by every concurrent executor
+    thread, so the engine's per-create reservations of CAPPED kinds (vpc,
+    private-dns, …) COORDINATE across lifecycles instead of each thread seeing its
+    own empty budget. An over-cap create then skips environmentally (reserve ->
+    False) rather than erroring with e.g. scp-network.private-dns.max-count-exceed.
+    Delegates everything else to the wrapped Budget under the lock."""
+
+    def __init__(self):
+        from core import budgets
+        object.__setattr__(self, "_b", budgets.Budget())
+        object.__setattr__(self, "_lock", __import__("threading").Lock())
+
+    def reserve(self, kind, n: int = 1) -> bool:
+        with self._lock:
+            return self._b.reserve(kind, n)
+
+    def release(self, kind, n: int = 1) -> None:
+        with self._lock:
+            self._b.release(kind, n)
+
+    def available(self, kind) -> int:
+        with self._lock:
+            return self._b.available(kind)
+
+    def __getattr__(self, name):  # limits, etc.
+        return getattr(object.__getattribute__(self, "_b"), name)
+
+
 def _make_executor(cfg):
     """Build the executor closure bound to the shared cfg. Each invocation builds
-    its own client / budget / registry (thread-safe by isolation — see module
-    docstring) and converts the engine's result dict OR a raised error into a
-    LifecycleOutcome. NEVER raises (dag_runner.Executor contract)."""
+    its own client / registry (thread-safe by isolation — see module docstring),
+    but shares ONE thread-safe Budget so capped-kind quotas coordinate across
+    concurrent lifecycles. Converts the engine's result dict OR a raised error
+    into a LifecycleOutcome. NEVER raises (dag_runner.Executor contract)."""
     from core.registry import ResourceRegistry
+
+    shared_budget = _SharedBudget()   # coordinates vpc/private-dns quota across threads
 
     def executor(lifecycle_id: str) -> LifecycleOutcome:
         t0 = time.monotonic()
@@ -207,7 +227,7 @@ def _make_executor(cfg):
             client = _build_client(cfg)
             result = engine.run_lifecycle(
                 lifecycle, client, cfg,
-                budget=_live_budget(),
+                budget=shared_budget,
                 resource_registry=ResourceRegistry(),
                 shared_ctx=_shared_ctx_from_env(),
             )
