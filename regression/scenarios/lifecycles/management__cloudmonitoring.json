@@ -127,12 +127,13 @@
           "name": "list-events",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/events",
-          "params": {"eventState": "ACTIVE", "queryStartDt": "{today}", "queryEndDt": "{today}", "size": 1},
+          "headers": {"X-ResourceType": "Object Storage"},
+          "params": {"productResourceId": "apitest-logsink", "eventState": "ALL", "queryStartDt": "{iso_29d_ago}", "queryEndDt": "{iso_today}", "size": 1},
           "optional": true,
           "expect_status": [200, 400, 403, 404],
           "group": "cm-ro-event",
           "capture_soft": {"eventId": "$.contents[0].eventId"},
-          "_note": "getproducteventlist. Events are data-dependent (a fresh account may have NONE) and this list requires productResourceId (req, not available coverage-only) on top of eventState/queryStartDt/queryEndDt — so it typically 400s/empties and eventId stays a placeholder that normalizes to the catalog '*' key. Soft-capture $.contents[0].eventId (OpenApiEventResponse.eventId) drives show-event + show-event-notification-states when a real event exists. Tolerant [200,400,403,404]."
+          "_note": "getproducteventlist. CONFIRMED BACKEND BUG 2026-06-20: ANY date value in queryStartDt/queryEndDt (YYYY-MM-DD, ISO-T-Z, compact YYYYMMDD, int-epoch) triggers 400 InvalidInputValue with params[name=resourceType, value=<date>]. This happens regardless of X-ResourceType header presence. The API incorrectly reads date param values as the 'resourceType' field during validation routing. Result is always 400 - this endpoint is unreachable with correct params. Tolerant [200,400,403,404] so group continues. Event ID format is NUMERIC (not UUID - confirmed: 404 ResourceNotFound with numeric id). Without productResourceId: 400 'value: queryStartDt' (missing). Without dates: 400 'Validation failure'. All combinations 400."
         },
         {
           "name": "show-event",
@@ -156,22 +157,23 @@
           "name": "list-event-policies-ro",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies",
-          "params": {"size": 1},
+          "headers": {"X-ResourceType": "Object Storage"},
+          "params": {"productResourceId": "apitest-logsink", "size": 1},
           "optional": true,
           "expect_status": [200, 400, 403, 404],
           "group": "cm-ro-policy",
           "capture_soft": {"eventPolicyId": "$.contents[0].eventPolicyId"},
-          "_note": "getproducteventpolicylist. Soft-captures a REAL eventPolicyId ($.contents[0].eventPolicyId) to drive the two id-bound policy reads below. This list requires productResourceId (req, not available coverage-only) so it typically 400s/empties and eventPolicyId stays a placeholder (normalizes to the catalog '*' key). Tolerant [200,400,403,404]."
+          "_note": "getproducteventpolicylist. CONFIRMED 200 2026-06-20 with X-ResourceType: Object Storage header + productResourceId query param. eventPolicyId is NUMERIC (not UUID) per 404-probe. Soft-captures eventPolicyId to drive the two id-bound policy reads below. Account has 0 event policies (state NE, not enrolled in monitoring backend) so capture is empty and placeholder normalizes to catalog '*'. Tolerant [200,400,403,404]."
         },
         {
           "name": "show-event-policy-histories",
           "method": "GET",
           "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories",
-          "params": {"queryStartDt": "{today}", "queryEndDt": "{today}", "size": 1},
+          "params": {"queryStartDt": "{iso_today}", "queryEndDt": "{iso_today}", "size": 1},
           "optional": true,
           "expect_status": [200, 400, 403, 404],
           "group": "cm-ro-policy",
-          "_note": "id-bound read (geteventpolicyhistories). Closes GAP-get-id for GET /v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}/histories. Requires queryStartDt/queryEndDt (sent {today}). Keys off the soft-captured eventPolicyId; placeholder when uncaptured (normalizes to catalog '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+          "_note": "id-bound read (geteventpolicyhistories). CONFIRMED BACKEND BUG 2026-06-20: ALL date formats for queryStartDt/queryEndDt trigger 400 InvalidInputValue params[name=resourceType, value=<date>] — same misparse bug as getproducteventlist/getaccounteventlist. Without dates: 400 Validation failure. So this endpoint is ALWAYS 400 regardless of input. Keys off soft-captured eventPolicyId from list-event-policies-ro (or placeholder '*'). Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
         },
         {
           "name": "show-event-policy-notifications",
@@ -249,7 +251,7 @@
           "expect_status": [200, 400, 403, 404],
           "group": "cm-ro-products",
           "capture_soft": {"eventId": "$.contents[0].eventId"},
-          "_note": "getaccounteventlist. Requires X-ResourceType header + eventState + queryStartDt + queryEndDt query params (sidecar-declared). The API consistently 400s with InvalidInputValue/resourceType regardless of params combination (backend bug: reads queryEndDt date value as the 'resourceType' validation error value — see knowledge/services.md). Dual-recorded under catalog key because it has params. Tolerant — 400 still counts as reachable. queryStartDt uses {iso_29d_ago}, queryEndDt uses {iso_today}."
+          "_note": "getaccounteventlist. CONFIRMED BACKEND BUG 2026-06-20: ALL date values for queryStartDt/queryEndDt (YYYY-MM-DD, ISO-T-Z, YYYYMMDD, int-epoch) trigger 400 InvalidInputValue params[name=resourceType, value=<date>]. Header X-ResourceType IS properly forwarded (confirmed by request debug trace). The bug is server-side: the middleware routing reads the queryEndDt value as 'resourceType' validation field. Affects getproducteventlist, getaccounteventlist, and geteventpolicyhistories equally. No client-side workaround exists. Tolerant — 400 counts as reachable endpoint."
         }
       ]
     }
