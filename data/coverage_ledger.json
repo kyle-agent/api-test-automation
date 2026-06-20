@@ -130,14 +130,20 @@
   },
   {
    "service": "loadbalancer",
-   "covered": 0,
+   "covered": 6,
    "total": 34,
-   "gap": 34,
+   "gap": 28,
    "heavy": true,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "needs-resource: 8 id-GETs (showloadbalancer/lblistener/servergroup/member/natip etc.) - 0 LBs in account (404 not 403); showloadbalancercertificate needs a cert from certificatemanager.",
+    "mutation-gated+heavy: 20 writes need MUTATIONS+DESTRUCTIVE+RUN_HEAVY; 2 lifecycles model all."
+   ],
+   "next_levers": [
+    "HEAVY+MUTATIONS+DESTRUCTIVE: gen-heavy-lb-members (full VPC->subnet->HC->LB->SG->listener->member->static-nat) -> ~33/34",
+    "Pre-provision LB cert for showloadbalancercertificate; private-static-nat needs vpc/nat ids"
+   ],
+   "notes": "0->6/34. 5 smoke GETs + showlbhealthcheck (5 real system HC ids). HC before SG (LbHealthCheckNotFound). Listener routing_action enum LB_SERVER_GROUP|URL_REDIRECT. Added listener create/delete + listener_id to probe_reads (GET verify steps don't credit catalog keys; only probe_reads). Account 0 LBs/listeners/SGs/members/certs.",
+   "updated": "2026-06-20T14:09:49Z"
   },
   {
    "service": "iam-identity-center",
@@ -177,18 +183,22 @@
   },
   {
    "service": "backup",
-   "covered": 1,
+   "covered": 8,
    "total": 31,
-   "gap": 30,
+   "gap": 23,
    "heavy": true,
    "blockers": [
-    "heavy-prereq: checkfilesystemduplication (GET /v1/backups/check-filesystem-duplication) requires server_uuid of a VM that has a backup agent installed. Account has 0 backup agents. Returns 404 Backup.NotFoundCreatedBackupAgent for any server_uuid. NOT a missing-param fix — need a real server+agent (heavy billable prereq). Cannot be covered with read-only edits."
+    "heavy-prereq: checkfilesystemduplication needs a server with backup agent (404 NotFoundCreatedBackupAgent; 0 agents).",
+    "heavy-prereq: 10 path-param GETs + 12 mutating need RUN_HEAVY + real backup_id/agent_id (0 backups/agents).",
+    "product-bug: getbackuptargetlist 500 for VM_IMAGE+VIRTUAL_SERVER/GPU (baselined); FILESYSTEM works.",
+    "blocked-engine: gen-heavy-backup double-blocked (VM_IMAGE 500 + IB-014 poll-until-list); agent family (8) owner-waived."
    ],
    "next_levers": [
-    "SCP_RUN_HEAVY: provision a real VM + install backup agent -> capture server_uuid -> call checkfilesystemduplication with real server_uuid + filesystem_path"
+    "HEAVY: fix gen-heavy-backup to capture server_uuid from GET /v1/servers/{id} + poll-retry; covers create+backup_id GETs",
+    "smoke.py: change getbackuptargetlist policy_type default VM_IMAGE->FILESYSTEM (shared file)"
    ],
-   "notes": "checkfilesystemduplication CONFIRMED params correct (filesystem_path + server_uuid from catalog_params). BUT 404 NotFoundCreatedBackupAgent for any server_uuid — needs a real VM with backup agent (heavy). Not a free Tier-0 fix. Blocker recorded.",
-   "updated": "2026-06-20T00:00:00Z"
+   "notes": "7->8/31. getbackuptargetlist 200 via FILESYSTEM (VM_IMAGE 500 baselined in known_issues.json). 8 bare GETs covered. showinstallfilepath returns NetBackup 10.4.0.1 installer URL. listbackupregionrelationship 4 region pairs. create-backup-target steps switched to FILESYSTEM.",
+   "updated": "2026-06-20T14:09:49Z"
   },
   {
    "service": "mysql",
@@ -207,10 +217,15 @@
    "total": 25,
    "gap": 25,
    "heavy": true,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "entitlement-403: ALL 25 endpoints return 401 gateway reject ('Service Account catalog has not target endpoint: scp-archivestorage_hmac') - subscription/catalog reject before routing, NOT an HMAC error. No param/body fix unblocks."
+   ],
+   "next_levers": [
+    "When archivestorage subscribed: heavy lifecycle covers all 25 (already 25/25 modeled)",
+    "Investigate transient 503s on 4/6 direct GETs"
+   ],
+   "notes": "0/25. Gateway entitlement-401 wall (scp-archivestorage_hmac not in service-account catalog). reachability-only owner override. Fragment now models all 25/25 endpoints. 6 direct GETs 401 soft; 6 id-GETs skip (parent 401); 13 mutating gated+401.",
+   "updated": "2026-06-20T14:09:49Z"
   },
   {
    "service": "searchengine",
@@ -239,14 +254,20 @@
   },
   {
    "service": "cachestore",
-   "covered": 11,
+   "covered": 6,
    "total": 32,
-   "gap": 21,
+   "gap": 26,
    "heavy": true,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "cachestore: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "heavy-prereq: 4 id-bound cluster GETs (backuphistories/commands/parametervalues/showcluster) need live cluster_id (0 clusters; 404 with placeholder).",
+    "heavy-prereq: showrequest needs request_id from async op (/v1/requests 403); 400 with placeholder.",
+    "heavy-prereq: 21 mutating need MUTATIONS+RUN_HEAVY + live cluster; cachestore-cluster-subops-guarded models them."
+   ],
+   "next_levers": [
+    "HEAVY+MUTATIONS: cachestore-cluster-subops-guarded -> ~27/32 (remove-backup-histories has known 401-with-valid-HMAC quirk)"
+   ],
+   "notes": "4->6/32. NEW: listengineversionproperties (read_chain) + listparameters (dbaas_parameter_group_id from /v1/parameter-groups). /v1/parameters needs dbaas_parameter_group_id (not parameter_group_id). 2 param groups (Redis 7, Valkey 8). cluster sub-GETs 404 with placeholder (routed OK). Added dbaas_parameter_group_id to probe_reads.",
+   "updated": "2026-06-20T14:09:49Z"
   },
   {
    "service": "dns",
@@ -308,14 +329,19 @@
   },
   {
    "service": "filestorage",
-   "covered": 6,
+   "covered": 8,
    "total": 21,
-   "gap": 15,
+   "gap": 13,
    "heavy": true,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "mutation-gated+heavy: 13 writes (create/snapshot/schedule/replication/setaccessrule/restore/delete) need MUTATIONS+RUN_HEAVY; lifecycle filestorage-replication-schedule models all 13."
+   ],
+   "next_levers": [
+    "HEAVY+MUTATIONS+DESTRUCTIVE: filestorage-replication-schedule -> all 13",
+    "snapshot_schedule_id from $.snapshot_schedule[0].id (list); replication_id from $.replications[0].replication_id"
+   ],
+   "notes": "4->8/21. NEW 4 2xx via real volume_id (account has 7 live volumes + live kr-west1->kr-east1 replication): listsnapshots+listsnapshotschedule+listvolumereplications+showvolumereplication. These 3 lists REQUIRE volume_id query. Added capture_soft fallbacks for schedule/replication ids.",
+   "updated": "2026-06-20T14:09:49Z"
   },
   {
    "service": "data-flow",
@@ -516,22 +542,15 @@
    "gap": 8,
    "heavy": true,
    "blockers": [
-    {
-     "key": "networking/vpn/showvpngateway, networking/vpn/showvpntunnel",
-     "reason": "needs-resource: path-param GETs require a real vpn_gateway_id/vpn_tunnel_id; account has 0 gateways/tunnels (count:0 confirmed). Fake-id probes return 404 (scp-network.vpn-gateway.not-found / vpn-tunnel.not-found). Resource creation is heavy (VPC + public-ip prereqs).",
-     "kind": "needs-resource"
-    },
-    {
-     "key": "createvpngateway, createvpntunnel, setvpngateway, setvpntunnel, deletevpngateway, deletevpntunnel",
-     "reason": "mutation-gated + heavy: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE) + SCP_RUN_HEAVY. Lifecycle networking-vpn-gateway-tunnel ready but IKE/IPSec enum values (phase1/phase2_encryptions, diffie_hellman_groups) are docs-estimates, unvalidated live.",
-     "kind": "mutation-gated"
-    }
+    "needs-resource: showvpngateway+showvpntunnel need real ids (0 gateways/tunnels; 404 not 403).",
+    "mutation-gated+heavy: 6 writes need MUTATIONS+DESTRUCTIVE+RUN_HEAVY + VPC+public-ip."
    ],
    "next_levers": [
-    "Enable SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE + SCP_RUN_HEAVY; provision VPC + public-ip prereqs; run lifecycle networking-vpn-gateway-tunnel (covers all 8 remaining: 2 id-bound GETs + 6 writes)"
+    "HEAVY+MUTATIONS+DESTRUCTIVE: networking-vpn-gateway-tunnel -> 10/10 (create needs VPC+public-ip)",
+    "IKE/IPSec enum values (phase1/phase2) still docs-estimates"
    ],
-   "notes": "0->2/10. New 2xx: listvpngateways + listvpntunnels (bare GETs, empty lists, sort default [name:asc,id:desc]). Region gate: kr-west1/kr-east1/kr-south3. Quota: 3 gateways/account, 5 tunnels/gateway. Gateway+tunnel names 3-20 alphanumeric ONLY (no hyphen/underscore). See knowledge/services.md networking/vpn.",
-   "updated": "2026-06-19T03:10:00Z"
+   "notes": "2/10 read-only ceiling. listvpngateways+listvpntunnels 200 empty. id-GETs 404 not-found (no entitlement). createvpngateway needs name/ip_id/ip_type/vpc_id/description; createvpntunnel needs name/vpn_gateway_id/phase1/phase2. Region kr-west1/east1/south3.",
+   "updated": "2026-06-20T14:09:49Z"
   },
   {
    "service": "cdn",
