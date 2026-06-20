@@ -395,14 +395,20 @@
   },
   {
    "service": "parallel-filestorage",
-   "covered": 0,
+   "covered": 1,
    "total": 11,
-   "gap": 11,
-   "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "gap": 10,
+   "heavy": true,
+   "blockers": [
+    "needs-heavy-prereq: listsnapshots(volume_id REQUIRED query)+showvolume+listaccessrule need a volume (0 volumes; billable).",
+    "needs-heavy-lifecycle: 7 mutating (create/snapshot/setcapacity/restore/setaccessrule/delete x2) - billable parallel volume (1TB min)."
+   ],
+   "next_levers": [
+    "HEAVY+MUTATIONS+DESTRUCTIVE: parallel-filestorage-capacity-restore -> all 10",
+    "setaccessrule body shape unknown"
+   ],
+   "notes": "0->1/11 (listvolumes 200; list field is parallel_filestorages not volumes). Added list-snapshots step (volume_id required, probe_reads can't supply query params). deletesnapshot ALSO needs ?volume_id. capture $.snapshot.id. heavy:true (billable).",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "quick-query",
@@ -548,11 +554,18 @@
    "covered": 0,
    "total": 9,
    "gap": 9,
-   "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "heavy": true,
+   "blockers": [
+    "entitlement-product-not-subscribed: cloud-ml is a PREMIUM optional product not subscribed in account; ALL paths 404 (routing, not 403). Both directly-testable GETs 404.",
+    "needs-resource+entitlement: 4 id-bound GETs (cluster*/getcloudml) 404 with fake ids (routes exist).",
+    "mutation-gated+heavy: createcloudml/update/delete need subscription + RUNNING SKE cluster + SCR registry secrets + product_group_id."
+   ],
+   "next_levers": [
+    "OWNER: subscribe cloud-ml product (product_group_id) -> 2 read GETs 200",
+    "HEAVY+MUTATIONS + 5 env secrets (SCP_SCR_*, SCP_CLOUDML_PRODUCT_GROUP_ID): gen-cloudml-chain covers all 9 (~60min)"
+   ],
+   "notes": "FIRST ANALYSIS 0/9. Product-routing 404 when not subscribed (NOT 403). cloud_ml attaches to existing SKE cluster. Scenarios already model lifecycle.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "apigateway",
@@ -579,23 +592,15 @@
    "gap": 7,
    "heavy": false,
    "blockers": [
-    {
-     "key": "networking/direct-connect/showdirectconnect, networking/direct-connect/listroutingrules",
-     "reason": "needs-resource: id-bound GETs; list (GET /v1/direct-connects) returned count:0 so no direct_connect_id to derive. single_param_chains already wired; fire automatically once a resource exists.",
-     "kind": "needs-resource"
-    },
-    {
-     "key": "createdirectconnect, setdirectconnect, createroutingrule, deletedirectconnect, deleteroutingrule",
-     "reason": "mutation-gated: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE). Likely heavy/entitlement — direct-connect maps to a physical network circuit needing datacenter pre-provisioning.",
-     "kind": "mutation-gated"
-    }
+    "needs-resource: showdirectconnect+listroutingrules need direct_connect_id (list count:0; 404 with fake id, no entitlement wall).",
+    "mutation-gated: 5 writes (create/set/createroutingrule/delete x2); physical circuit but no entitlement wall confirmed."
    ],
    "next_levers": [
-    "With SCP_ALLOW_MUTATIONS=true: createdirectconnect lifecycle -> read-chains auto-cover showdirectconnect + listroutingrules",
-    "Verify the account has circuit-provisioning entitlement before attempting mutations (hardware-gated)"
+    "MUTATIONS+DESTRUCTIVE: networking-direct-connect-routing -> create auto-covers show+listroutingrules -> 8/8",
+    "Verify circuit-provisioning entitlement (control-plane create may succeed independently)"
    ],
-   "notes": "0->1/8. New 2xx: listdirectconnects (GET /v1/direct-connects -> {count:0,direct_connects:[],page,size}, empty). doc_url fetches 503 during run (docs server down, transient). See knowledge/services.md networking/direct-connect.",
-   "updated": "2026-06-19T03:10:00Z"
+   "notes": "1/8 (listdirectconnects 200, empty). CONFIRMED: id-GETs 404 ResourceNotFound (not 403). 503s transient. mutation ceiling 8/8.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "firewall",
@@ -604,50 +609,15 @@
    "gap": 7,
    "heavy": false,
    "blockers": [
-    {
-     "key": "networking/firewall/listfirewallrules",
-     "reason": "mutation-gated: requires firewall_id from a created firewall resource; no firewalls exist in account; needs SCP_ALLOW_MUTATIONS to create a firewall first",
-     "kind": "needs-peer-resource"
-    },
-    {
-     "key": "networking/firewall/showfirewall",
-     "reason": "mutation-gated: requires an existing firewall_id; no firewalls provisioned in account",
-     "kind": "needs-peer-resource"
-    },
-    {
-     "key": "networking/firewall/showfirewallrule",
-     "reason": "mutation-gated: requires an existing firewall_rule_id; no firewall rules provisioned in account",
-     "kind": "needs-peer-resource"
-    },
-    {
-     "key": "networking/firewall/createfirewallrule",
-     "reason": "mutating (POST); needs SCP_ALLOW_MUTATIONS=true + existing firewall + vpc",
-     "kind": "mutation-gated"
-    },
-    {
-     "key": "networking/firewall/setfirewall",
-     "reason": "mutating (PUT); needs SCP_ALLOW_MUTATIONS=true + existing firewall_id",
-     "kind": "mutation-gated"
-    },
-    {
-     "key": "networking/firewall/setfirewallrule",
-     "reason": "mutating (PUT); needs SCP_ALLOW_MUTATIONS=true + existing firewall_rule_id",
-     "kind": "mutation-gated"
-    },
-    {
-     "key": "networking/firewall/deletefirewallrule",
-     "reason": "destructive (DELETE); needs SCP_ALLOW_DESTRUCTIVE=true + existing firewall_rule_id",
-     "kind": "mutation-gated"
-    }
+    "needs-peer-resource: listfirewallrules(firewall_id REQUIRED query)+showfirewall+showfirewallrule - 0 firewalls in account (404 with fake id, not entitlement).",
+    "mutation-gated: createfirewallrule/setfirewall/setfirewallrule/deletefirewallrule need VPC+firewall."
    ],
    "next_levers": [
-    "Enable SCP_ALLOW_MUTATIONS=true, then create a firewall resource via createfirewallrule (POST /v1/firewalls/rules) or check if a VPC-bound firewall auto-exists",
-    "After creating/finding a firewall: capture firewall_id from listfirewalls response, use for showfirewall + listfirewallrules",
-    "After creating a rule: capture firewall_rule_id from createfirewallrule response, use for showfirewallrule + setfirewallrule + deletefirewallrule",
-    "listfirewalls already returns 200 with empty list - re-verify after VPC/firewall creation in a mutations-enabled run"
+    "MUTATIONS: create VPC with firewall_enabled:true -> capture firewall_id -> rules chain unlocks",
+    "firewall_id has no safe synthetic default for smoke"
    ],
-   "notes": "listfirewalls GET /v1/firewalls -> 200 OK (empty list, account has no firewalls). All path-param GETs (showfirewall, showfirewallrule) return 404 with dummy IDs - backend is reachable. listfirewallrules requires firewall_id query param (required per sidecar); returns 404 with dummy ID. All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule PUT, deletefirewallrule DELETE) require mutation gates and existing resources.",
-   "updated": "2026-06-19T02:51:23Z"
+   "notes": "1/8 (listfirewalls 200, empty). No standalone POST /v1/firewalls (firewall auto-attaches to VPC). setfirewall body {flavor_name:EXSMALL,loggable}. createfirewallrule captures $.firewall_rule.id. 503s transient.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "configinspection",
@@ -705,14 +675,20 @@
   },
   {
    "service": "budget",
-   "covered": 0,
+   "covered": 1,
    "total": 5,
-   "gap": 5,
+   "gap": 4,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "needs-resource: showaccountbudget needs budget_id (0 budgets; probe_reads ready).",
+    "mutation-gated: createaccountbudget/setaccountbudget; deleteaccountbudget destructive. No entitlement/heavy walls."
+   ],
+   "next_levers": [
+    "MUTATIONS+DESTRUCTIVE: budget-account-budget -> 5/5 (create body fixed -> 201 expected)",
+    "Remove createaccountbudget from known_issues.json after mutation run confirms 201 (was a body-shape bug, not product bug)"
+   ],
+   "notes": "FIRST ANALYSIS 0->1/5. listaccountbudgets 200 (empty, envelope $.budgets not $.contents). KEY: prior 500 was WRONG body fields (budget_amount/currency/period_type) not a product bug; corrected to BudgetCreateRequest{amount,name,start_month,unit}. Fixed capture path + probe_reads. Account-unique (1 budget, 409 if exists).",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "kms",
@@ -734,47 +710,58 @@
   },
   {
    "service": "secretvault",
-   "covered": 0,
+   "covered": 1,
    "total": 5,
-   "gap": 5,
+   "gap": 4,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "needs-resource: showsecretvault needs vault_id (0 vaults; coverable with mutations).",
+    "entitlement/credential: gettemporarykey needs vault-issued headers (Svaccesskey/Svsignature/Svtimestamp/Svclienttype) - NOT derivable from SCP creds; PERMANENT blocker without vault-token injection.",
+    "mutation-gated: createsecretvault + terminatedsecretvault."
+   ],
+   "next_levers": [
+    "MUTATIONS: security-secretvault-vault -> create+show+terminate (4/5); gettemporarykey stays blocked",
+    "createsecretvault body access_key_id={env:SCP_ACCESS_KEY}, name ^[a-z0-9]* 3-63, ttls; capture $.secret_vault.id"
+   ],
+   "notes": "1/5 (listsecretvault 200, empty). gettemporarykey PERMANENT credential blocker (vault-issued headers). WAF 417 on non-UUID path. terminate body {waiting_time_ndays:7-30} (only deletion path). 503 transient.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "product",
-   "covered": 0,
+   "covered": 4,
    "total": 4,
-   "gap": 4,
+   "gap": 0,
    "heavy": false,
    "blockers": [],
    "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "notes": "ALL 4 COVERED (100%) 2026-06-20. Pure read-only catalog (global). listproductcategories(14)+listproducts(20)+showproduct(ESS)+showproductcategory(SECURITY). IDs are string slugs not UUIDs. Fragment platform__product.json. No mutations/heavy.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "quota",
-   "covered": 0,
+   "covered": 3,
    "total": 4,
-   "gap": 4,
+   "gap": 1,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "needs-data: showquotarequest needs request_id; quota-requests list empty (count:0); no API to create (UI-only). Self-heals when a request is UI-submitted."
+   ],
+   "next_levers": [
+    "When account gains a UI-submitted quota request, showquotarequest auto-covers via read_chain"
+   ],
+   "notes": "0->3/4. All read-only GETs (global, no mutating endpoints). listaccountquota+listquotarequests+showaccountquota 200 (showaccountquota id from $.account_quotas[0].id). Fragment management__quota.json created. showquotarequest 404 with fake UUID, 417 WAF on malformed.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "support",
-   "covered": 0,
+   "covered": 4,
    "total": 4,
-   "gap": 4,
+   "gap": 0,
    "heavy": false,
    "blockers": [],
    "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "notes": "ALL 4 COVERED (100%) 2026-06-20. All GETs (global management), no mutating ops (no createInquiry API). getinquirylist+getservicerequestlist (smoke) + showinquiry+showservicerequest (read_chains auto-derived). Account has >=1 inquiry+service-request. No fragment needed.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "certificatemanager",
@@ -796,25 +783,25 @@
   },
   {
    "service": "costexplorer",
-   "covered": 0,
+   "covered": 3,
    "total": 3,
-   "gap": 3,
+   "gap": 0,
    "heavy": false,
    "blockers": [],
    "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "notes": "ALL 3 COVERED (100%) 2026-06-20. Pure read-only GETs (global), no required params. listbills(empty)+listusages(count:20)+showpaymentmonthly(empty). Covered by catalog smoke. No fragment needed.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "pricing",
-   "covered": 0,
+   "covered": 3,
    "total": 3,
-   "gap": 3,
+   "gap": 0,
    "heavy": false,
    "blockers": [],
    "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "notes": "ALL 3 COVERED (100%) 2026-06-20. Pure public read GETs (global) under /v1/reports/. listbillingitemids(232 ids)+listoffering(PP/PS/PG)+listreportprice(83k records, paginated). No params/path/entitlement. No fragment needed.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "secretsmanager",
@@ -838,10 +825,18 @@
    "total": 3,
    "gap": 3,
    "heavy": false,
-   "blockers": [],
-   "next_levers": [],
-   "notes": "",
-   "updated": "2026-06-19T02:01:07Z"
+   "blockers": [
+    "mutation-gated: all 3 are POST (assumerole/assumerolewithsaml/objectstoreauthorization) - structural 0/3 read-only ceiling (no GETs).",
+    "entitlement-403-likely: assumerole - existing roles' trust policies don't allow our account; createrole 500 (IAM PF-bug) blocks making a self-assumable role.",
+    "needs-saml-provider: assumerolewithsaml needs real SAML provider+assertion.",
+    "needs-sts-session-token: objectstoreauthorization needs a session_token from a prior assumerole 200 (sequential dep)."
+   ],
+   "next_levers": [
+    "MUTATIONS: sts-token-issuance-coverage records 4xx (reached, not 2xx)",
+    "TRUE 2xx needs: fix IAM createrole 500 -> create self-assumable role -> assumerole 200 -> objectstoreauthorization 200"
+   ],
+   "notes": "0/3 read-only (all POST). FIXED 3 invented bodies: assumerole role_indicator (e:ACCOUNT:ROLE, not role_arn); assumerolewithsaml role_indicator+principal_indicator+saml_assertion(b64); objectstoreauthorization method+url+x_amz_content_sha256+x_amz_date (not bucket_name). STS host REGIONAL not global.",
+   "updated": "2026-06-20T13:41:06Z"
   },
   {
    "service": "network-logging",
