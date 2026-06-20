@@ -1,10 +1,50 @@
 {
   "lifecycles": [
     {
+      "id": "configinspection-read-coverage",
+      "service": "security/configinspection",
+      "enabled": true,
+      "_note": "Read-only coverage probe for configinspection GET endpoints. configinspectionlist and getdiagnosisresultlist return 200 (empty list, account has 0 diagnosis objects). getdiagnosisresultdetail needs diagnosis_id (REQUIRED) + diagnosis_request_sequence (REQUIRED) — 404 with fake ids. getdiagnosisobjectdetail is path-param GET covered by read_chains / probe_reads in the mutation lifecycle. Backend intermittently 503s (transient, retried by client). Confirmed live 2026-06-20.",
+      "steps": [
+        {
+          "name": "list-diagnoses",
+          "service": "configinspection",
+          "method": "GET",
+          "path": "/v1/configinspection/diagnosis/list",
+          "group": "config-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404, 503]
+        },
+        {
+          "name": "list-diagnosis-results",
+          "service": "configinspection",
+          "method": "GET",
+          "path": "/v1/configinspection/report/diagnosis/list",
+          "group": "config-reads",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404, 503]
+        },
+        {
+          "name": "get-diagnosis-result-detail",
+          "service": "configinspection",
+          "method": "GET",
+          "path": "/v1/configinspection/report/diagnosis/detail",
+          "group": "config-reads-probe",
+          "optional": true,
+          "params": {
+            "diagnosis_id": "DIA-943731CB8E3045C289BAECAEC3532097",
+            "diagnosis_request_sequence": "1"
+          },
+          "expect_status": [200, 400, 403, 404, 503],
+          "_note": "REQUIRED query params: diagnosis_id + diagnosis_request_sequence. With fake diagnosis_id: 404 ConfigDiagnosisIdNotFoundError. Needs real id from creatediagnosisobject (mutation-gated). Step exercises the endpoint with correct param signature."
+        }
+      ]
+    },
+    {
       "id": "security-configinspection-diagnosis",
       "service": "security/configinspection",
       "enabled": true,
-      "_note": "COVERAGE-ONLY lifecycle for the 3 uncovered configinspection WRITE ops: POST /v1/configinspection/diagnosis/save (create a diagnosis object), POST /v1/configinspection/diagnosis/request (run a diagnosis), DELETE /v1/configinspection/diagnosis/terminate/{diagnosis_id} (terminate). Config Inspection diagnoses a CLOUD ACCOUNT (csp_type SCP or a foreign CSP) and the request/save bodies need REAL credentials of the account being inspected (diagnosisrequest: access_key/secret_key/tenant_id; diagnosisobjectrequest: a nested auth_key_request with a real auth_key_id, plus diagnosis_account_id). We do NOT have a throwaway inspectable account + auth key, so every write is a GUARDED OPTIONAL call with doc-sample ids and broad expect_status: it CALLS the endpoint (recording coverage for the 3 catalog keys) and 4xx's as expected. Bodies/field rules from data/api_docs.json (diagnosisobjectrequest, diagnosisrequest, diagnosisschedulerequest, authkeyrequest) — _UNPROVEN. save returns FLAT $.diagnosis_id (configinspectioncreateresponse) — soft-captured so that, if save unexpectedly succeeds, probe-reads can exercise GET .../diagnosis/detail/{diagnosis_id} and the terminate DELETE targets the real id; otherwise terminate fires against the doc-sample {diagnosis_id} (still records the DELETE write, 4xx). diagnosis_name pattern ^[a-zA-Z0-9-_]+$. Each write is isolated in its own group so a 4xx is a warning, not a run failure; nothing real is created so teardown is the terminate call itself (no separate cleanup resource).",
+      "_note": "COVERAGE-ONLY lifecycle for the 3 uncovered configinspection WRITE ops: POST /v1/configinspection/diagnosis/save (create a diagnosis object), POST /v1/configinspection/diagnosis/request (run a diagnosis), DELETE /v1/configinspection/diagnosis/terminate/{diagnosis_id} (terminate). Config Inspection diagnoses a CLOUD ACCOUNT (csp_type SCP or a foreign CSP) and the request/save bodies need REAL credentials of the account being inspected (diagnosisrequest: access_key/secret_key/tenant_id; diagnosisobjectrequest: a nested auth_key_request with a real auth_key_id, plus diagnosis_account_id). We do NOT have a throwaway inspectable account + auth key, so every write is a GUARDED OPTIONAL call with doc-sample ids and broad expect_status: it CALLS the endpoint (recording coverage for the 3 catalog keys) and 4xx's as expected. Bodies/field rules from data/api_docs.json (diagnosisobjectrequest, diagnosisrequest, diagnosisschedulerequest, authkeyrequest) — _UNPROVEN. save returns FLAT $.diagnosis_id (configinspectioncreateresponse) — soft-captured so that, if save unexpectedly succeeds, probe-reads can exercise GET .../diagnosis/detail/{diagnosis_id} and the terminate DELETE targets the real id; otherwise terminate fires against the doc-sample {diagnosis_id} (still records the DELETE write, 4xx). diagnosis_name pattern ^[a-zA-Z0-9-_]+$. Each write is isolated in its own group so a 4xx is a warning, not a run failure; nothing real is created so teardown is the terminate call itself (no separate cleanup resource). CONFIRMED PARAMS 2026-06-20: getdiagnosisresultdetail requires diagnosis_id + diagnosis_request_sequence (both REQUIRED, validated via live probing). getdiagnosisobjectdetail path-param id format: DIA-<32hex-uppercase>.",
       "steps": [
         {
           "name": "save",
@@ -62,6 +102,20 @@
           "optional": true,
           "expect_status": [200, 400, 403, 404],
           "_note": "id-bound read (show diagnosis detail). Closes the diagnosis_id getid GET /v1/configinspection/diagnosis/detail/{diagnosis_id}. Keys off the save-captured diagnosis_id ($.diagnosis_id, flat); tolerant [200,400,403,404] because save needs a real inspectable-account auth_key and 4xx's in a LIGHT run, leaving the id a doc-sample placeholder (normalizes to catalog '*'). Makes the endpoint statically reachable in a LIGHT run (complements probe-reads)."
+        },
+        {
+          "name": "get-diagnosis-result-detail-post-save",
+          "service": "configinspection",
+          "method": "GET",
+          "path": "/v1/configinspection/report/diagnosis/detail",
+          "group": "xcov-config-read",
+          "optional": true,
+          "params": {
+            "diagnosis_id": "{diagnosis_id}",
+            "diagnosis_request_sequence": "1"
+          },
+          "expect_status": [200, 400, 403, 404],
+          "_note": "REQUIRED params: diagnosis_id + diagnosis_request_sequence. Uses captured diagnosis_id from save step (falls back to doc-sample DIA-... placeholder). Will 404 unless save 2xx'd with a real account. Exercises getdiagnosisresultdetail with correct param shape."
         },
         {
           "name": "probe-reads",
