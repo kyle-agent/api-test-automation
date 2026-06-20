@@ -115,16 +115,20 @@ class LoggingExecutor:
 
 
 # --------------------------------------------------------------------------- #
-# 1. wave ordering — waves strictly sequential, provision wave runs no lifecycles
+# 1. wave ordering — the REAL cap guard is self-create wave SEQUENCING WITHIN the
+#    self-create track (not a strict total order across tracks). The runner
+#    deliberately OVERLAPS the free / adopt / self-create tracks (commit 75ce8e6c)
+#    to collapse the makespan; adopt/free consume no NEW vpc slot, so only the
+#    self-create track's intra-track wave sequencing bounds concurrent self-created
+#    VPCs to one cap-sized wave. (An earlier test here asserted a strict
+#    a-before-s TOTAL order; that is NOT what the runner guarantees and passed only
+#    because an instantaneous fake executor never let the tracks interleave —
+#    giving 2ms of work made it flaky. Replaced by the two invariants below.)
 # --------------------------------------------------------------------------- #
-def test_waves_dispatched_strictly_in_order():
-    """All of wave N's ids must be dispatched before ANY of wave N+1's.
-
-    This is the cap-safety invariant: each self-create wave is pre-sized to the
-    VPC budget, and that bound only holds if waves never overlap. We build a
-    provision wave + an adopt wave + two self-create waves and assert that the
-    flattened dispatch order respects wave boundaries.
-    """
+def test_provision_wave_runs_no_lifecycles_and_each_runs_once():
+    """The provision wave stands up roots via the provisioner — its 'lifecycles'
+    (vpc/subnet) must NEVER reach the executor — and every real lifecycle runs
+    exactly once. (Ordering across tracks is asserted separately below.)"""
     plan = make_plan(
         dag_planner.Wave(kind="provision", lifecycles=["vpc", "subnet"]),
         dag_planner.Wave(kind="adopt", lifecycles=["a1", "a2", "a3"]),
@@ -135,29 +139,133 @@ def test_waves_dispatched_strictly_in_order():
     ex = RecordingExecutor()
     result = dag_runner.run_plan(plan, ex)
 
-    # The provision wave executes NO lifecycles — its roots are stood up by the
-    # provisioner, not run as lifecycles. So 'vpc'/'subnet' must never reach the
-    # executor.
+    # Roots are provisioned, not executed as lifecycles.
     assert "vpc" not in ex.ids and "subnet" not in ex.ids
+    # The provision wave is recorded as an empty-outcome WaveResult.
+    assert result.waves[0].kind == "provision"
+    assert result.waves[0].outcomes == []
+    # Every non-provision lifecycle appears exactly once (any track order).
+    assert sorted(ex.ids) == ["a1", "a2", "a3", "s1", "s2", "s3", "s4"]
 
-    # Group the dispatched ids by which wave they belong to and assert the LAST
-    # dispatch of wave N happened before the FIRST dispatch of wave N+1.
-    wave_groups = [["a1", "a2", "a3"], ["s1", "s2"], ["s3", "s4"]]
-    # map id -> dispatch timestamp
-    ts = {lid: t for lid, t in ex.calls}
-    for n in range(len(wave_groups) - 1):
-        last_of_n = max(ts[i] for i in wave_groups[n])
-        first_of_next = min(ts[i] for i in wave_groups[n + 1])
-        assert last_of_n <= first_of_next, (
-            f"wave {n} overlapped wave {n + 1}: cap-safety broken")
 
-    # And the provision wave is recorded as an empty-outcome WaveResult.
-    prov_wave = result.waves[0]
-    assert prov_wave.kind == "provision"
-    assert prov_wave.outcomes == []
+def test_self_create_waves_run_sequentially_within_track():
+    """THE cap-safety invariant: within the self-create track, wave N must FULLY
+    complete before wave N+1 begins, because each self-create wave is pre-sized to
+    the VPC budget — overlapping two of them would blow the account cap.
 
-    # Every non-provision lifecycle appears exactly once, in wave order.
-    assert ex.ids == ["a1", "a2", "a3", "s1", "s2", "s3", "s4"]
+    Deterministic by construction: ``_run_wave`` joins all of a wave's futures
+    before the track loop submits the next wave, so this holds regardless of
+    timing (we record start/end events and assert every wave-1 END precedes every
+    wave-2 START). Isolated to the self-create track so adopt/free overlap can't
+    confound it.
+    """
+    plan = make_plan(
+        dag_planner.Wave(kind="provision", lifecycles=["vpc"]),
+        dag_planner.Wave(kind="self-create", lifecycles=["s1", "s2"]),
+        dag_planner.Wave(kind="self-create", lifecycles=["s3", "s4"]),
+        shared_roots=["vpc"],
+    )
+    events: list[tuple[str, str]] = []
+    lock = threading.Lock()
+
+    def ex(lid: str) -> LifecycleOutcome:
+        with lock:
+            events.append(("start", lid))
+        time.sleep(0.02)
+        with lock:
+            events.append(("end", lid))
+        return LifecycleOutcome(lid, "passed")
+
+    class _Prov:
+        def provision(self): pass
+        def teardown(self): pass
+
+    dag_runner.run_plan(plan, ex, provisioner=_Prov(), max_workers=4)
+
+    order = [lid for _, lid in events]  # positional index of each event
+    starts = {lid: order.index(lid) for _, lid in events}  # first occurrence = start
+    ends = {lid: i for i, (k, lid) in enumerate(events) if k == "end"}
+    wave1, wave2 = ["s1", "s2"], ["s3", "s4"]
+    assert max(ends[i] for i in wave1) < min(starts[i] for i in wave2), (
+        "self-create wave 2 started before wave 1 finished — the cap-sized wave "
+        "bound is broken (two cap-sized self-create waves could coexist)")
+
+
+def test_adopt_track_may_overlap_self_create_track():
+    """The perf property the overlap refactor (75ce8e6c) bought, locked in so it
+    can't silently regress to serial: adopt (no new vpc slot) runs CONCURRENTLY
+    with the self-create track, not strictly before/after it. Proof: an adopt
+    lifecycle is in flight while a self-create lifecycle is also in flight."""
+    plan = make_plan(
+        dag_planner.Wave(kind="provision", lifecycles=["vpc"]),
+        dag_planner.Wave(kind="adopt", lifecycles=["a1"]),
+        dag_planner.Wave(kind="self-create", lifecycles=["s1"]),
+        shared_roots=["vpc"],
+    )
+    inflight: set[str] = set()
+    overlapped = threading.Event()
+    lock = threading.Lock()
+
+    def ex(lid: str) -> LifecycleOutcome:
+        with lock:
+            inflight.add(lid)
+            if "a1" in inflight and "s1" in inflight:
+                overlapped.set()
+        time.sleep(0.05)
+        with lock:
+            inflight.discard(lid)
+        return LifecycleOutcome(lid, "passed")
+
+    class _Prov:
+        def provision(self): pass
+        def teardown(self): pass
+
+    dag_runner.run_plan(plan, ex, provisioner=_Prov(), max_workers=4)
+    assert overlapped.is_set(), (
+        "adopt and self-create never overlapped — the runner serialized the "
+        "tracks (overlap refactor regressed)")
+
+
+def test_peak_in_flight_never_exceeds_max_workers():
+    """Regression guard for commit 4004b1b7: the three concurrent tracks (free /
+    adopt / self-create) all submit to ONE shared ThreadPoolExecutor, so total
+    in-flight executor calls never exceed ``max_workers``. An earlier per-track
+    pool tripled concurrency and exhausted the connection pool, which delayed
+    sends past the HMAC timestamp window (401) and broke the heavy adopters.
+    Without this test that regression passes silently."""
+    plan = make_plan(
+        dag_planner.Wave(kind="provision", lifecycles=["vpc"]),
+        dag_planner.Wave(kind="free", lifecycles=[f"f{i}" for i in range(8)]),
+        dag_planner.Wave(kind="adopt", lifecycles=[f"a{i}" for i in range(8)]),
+        dag_planner.Wave(kind="self-create", lifecycles=["s1", "s2"]),
+        dag_planner.Wave(kind="self-create", lifecycles=["s3", "s4"]),
+        shared_roots=["vpc"],
+    )
+
+    class _Prov:
+        def provision(self): pass
+        def teardown(self): pass
+
+    state = {"cur": 0, "peak": 0}
+    lock = threading.Lock()
+
+    def ex(lid: str) -> LifecycleOutcome:
+        with lock:
+            state["cur"] += 1
+            state["peak"] = max(state["peak"], state["cur"])
+        time.sleep(0.01)
+        with lock:
+            state["cur"] -= 1
+        return LifecycleOutcome(lid, "passed")
+
+    for workers in (3, 8):
+        state["cur"], state["peak"] = 0, 0
+        dag_runner.run_plan(plan, ex, provisioner=_Prov(), max_workers=workers)
+        assert state["peak"] <= workers, (
+            f"peak in-flight {state['peak']} exceeded the shared-pool bound "
+            f"{workers} — tracks are not sharing ONE pool")
+        # and the bound is actually exercised (concurrency really happened).
+        assert state["peak"] >= 2, "no concurrency observed — tracks ran serially"
 
 
 # --------------------------------------------------------------------------- #
