@@ -4,7 +4,7 @@
       "id": "resourcemanager-tag-lifecycle",
       "service": "management/resourcemanager",
       "enabled": true,
-      "_note": "Light, self-contained tag-write lifecycle for resourcemanager (global service). Creates a real resource-group to obtain a real SRN, exercises all tag write/read/delete families (both SRN-addressing and component-addressing), then deletes the group. KEY FACT (2026-06-19, confirmed): all {srn} and {key} path segments MUST be base64-encoded before insertion into the URL. Plain SRN/key in path yields 400 'SRN decoding error'. The {rg_srn_b64} and {rg_key_b64} ctx vars are produced by the engine's base64 encoding step (b64_encode action). discover-resource-addressing: response envelope is $.resources[] (not $.contents[]); tag_resource_id = $.resources[0].id. Covers: listresourcegroups, listresources, listtags, listtagkeys, listtagvalues, showresource, listresourcetags, showresourcetag, showcomponentstag, updateresourcetags, updateresourcetagvalue, updatecomponentstags, updatecomponentstagvalue, deleteresourcetag, deleteresourcetags, deletecomponentstag, deletecomponentstags, deletetags, deleteresourcegroups.",
+      "_note": "Light, self-contained tag-write lifecycle for resourcemanager (global service). Creates a real resource-group to obtain a real SRN, exercises all tag write/read/delete families (both SRN-addressing and component-addressing), then deletes the group. KEY FACT (2026-06-19, confirmed): all {srn} and {key} path segments MUST be base64-encoded before insertion into the URL. Plain SRN/key in path yields 400 'SRN decoding error'. The {rg_srn_b64} and {rg_key_b64} ctx vars are produced by the engine's base64 encoding step (b64_encode action). discover-resource-addressing: response envelope is $.resources[] (not $.contents[]); tag_resource_id = $.resources[0].id. Covers: listresourcegroups, listresources, listtags, listtagkeys, listtagvalues, showresource, listresourcetags, showresourcetag, showcomponentstag, updateresourcetags, updateresourcetagvalue, updatecomponentstags, updatecomponentstagvalue, deleteresourcetag, deleteresourcetags, deletecomponentstag, deletecomponentstags, deletetags, deleteresourcegroups, showresourcebycomponents.",
       "steps": [
         {
           "name": "create-rg",
@@ -194,6 +194,16 @@
           "optional": true,
           "group": "component-tags",
           "_note": "listcomponentstags — GET /v1/tags/{region}/{service}/{resource_type}/{resource_identifier}. All segments are plain text (not b64)."
+        },
+        {
+          "name": "show-resource-by-components",
+          "method": "GET",
+          "path": "/v1/resources/{tag_region}/{tag_service}/{tag_resource_type}/{tag_resource_id}",
+          "service": "resourcemanager",
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "component-reads",
+          "_note": "showresourcebycomponents — GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}. Component-addressed sibling of show-resource (which uses {srn}). Reuses the soft-captured tuple from list-resources ($.resources[0]); segments are PLAIN (not b64), same convention as the component-tag reads above. LIVE-VERIFIED 200 (2026-06-20): /v1/resources/kr-west1/scf/cloud-function/{id} returned the full resource envelope ($.resource). NOTE: the list response's resource_identifier field is null — the 4th segment is $.resources[0].id, NOT .resource_identifier. Closes the last resourcemanager id-GET reachability gap."
         },
         {
           "name": "b64-encode-comp-key",

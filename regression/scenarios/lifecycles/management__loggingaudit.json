@@ -4,7 +4,7 @@
       "id": "loggingaudit-trail",
       "service": "management/loggingaudit",
       "enabled": true,
-      "_note": "Light governance lifecycle for loggingaudit (audit trails / CloudTrail-equivalent). Covers all 6 uncovered writes: createtrail(POST /v1/trails), settrail(PUT /v1/trails/{trail_id}), starttrail(POST /v1/trails/{trail_id}/start), stoptrail(POST /v1/trails/{trail_id}/stop), deletetrail(DELETE /v1/trails/{trail_id}), downloadlogs(POST /v1/logs/download). No data/api_bodies.json entry for loggingaudit and docs are JS-rendered, so create/set bodies (target object-storage bucket + log selectors) are BEST-GUESS and UNPROVEN — promote after a real 2xx. createtrail typically requires a real object-storage bucket to receive logs, so a 400/403/422 is expected on a shared account; every mutating step is optional with a broad expect_status so it RECORDS coverage without failing. trail_id capture path $.trail.id is a guess; if absent the id-bound steps still normalize to the catalog '*' key. start/stop are POSTs without a body. downloadlogs is a coverage-only POST (it may stream a file on success; we only assert it is reachable). DELETE is destructive (gated).",
+      "_note": "Light governance lifecycle for loggingaudit (audit trails / CloudTrail-equivalent). Covers all 6 uncovered writes: createtrail(POST /v1/trails), settrail(PUT /v1/trails/{trail_id}), starttrail(POST /v1/trails/{trail_id}/start), stoptrail(POST /v1/trails/{trail_id}/stop), deletetrail(DELETE /v1/trails/{trail_id}), downloadlogs(POST /v1/logs/download). Body validated 2026-06-20 against TrailCreateRequestV1dot1 schema (data/api_docs.json key management/loggingaudit/trailcreaterequestv1dot1): required fields are account_id, bucket_name, bucket_region, trail_name, trail_save_type. A capture-account-id pre-step (GET /v1/access-keys via iam service) soft-captures the caller's account_id before createtrail fires. createtrail typically requires a real object-storage bucket to receive logs, so a 400/403/422 is still expected on the shared account; every mutating step is optional with a broad expect_status so it RECORDS coverage without failing. trail_id capture path $.trail.id confirmed by response_example. start/stop are POSTs without a body. downloadlogs is a coverage-only POST (it may stream a file on success; we only assert it is reachable). DELETE is destructive (gated).",
       "steps": [
         {
           "name": "list-trails",
@@ -15,15 +15,41 @@
           "group": "la-read"
         },
         {
+          "name": "capture-account-id",
+          "method": "GET",
+          "path": "/v1/access-keys",
+          "service": "iam",
+          "expect_status": [200, 403],
+          "optional": true,
+          "group": "la-trail",
+          "capture_soft": {
+            "account_id": "$.access_keys[0].account_id"
+          },
+          "_note": "Cross-service pre-step (iam host, read-only). Soft-captures caller's account_id from the IAM access-key list ($.access_keys[0].account_id) — the same pattern as iam-readonly-shows lifecycle (management__iam.json line 580). account_id is REQUIRED by createtrail schema (TrailCreateRequestV1dot1, api_docs.json) — the 400 ValidationError 'Field required' in the prior light run was caused by its absence. If the list returns empty or 403, account_id stays a literal {account_id} placeholder; createtrail will still 400 (no worse than before) while remaining callable."
+        },
+        {
           "name": "create-trail",
           "method": "POST",
           "path": "/v1/trails",
           "json": {
-            "name": "regrtrail{unique}",
-            "description": "API regression coverage probe",
-            "object_storage_bucket_name": "regrtrail{unique}",
-            "is_multi_region": false,
-            "tags": []
+            "account_id": "{account_id}",
+            "trail_name": "regrtrail{unique}",
+            "trail_description": "API regression coverage probe",
+            "trail_save_type": "JSON",
+            "bucket_name": "do-not-delete-apitest",
+            "bucket_region": "{region}",
+            "region_total_yn": "Y",
+            "region_names": [],
+            "log_type_total_yn": "Y",
+            "target_log_types": [],
+            "resource_type_total_yn": "Y",
+            "target_resource_types": [],
+            "user_total_yn": "Y",
+            "target_users": [],
+            "service_watch_yn": "Y",
+            "organization_trail_yn": "N",
+            "log_verification_yn": "N",
+            "tag_create_requests": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
@@ -36,7 +62,7 @@
             "path": "/v1/trails/{trail_id}",
             "service": "loggingaudit"
           },
-          "_note": "Body UNPROVEN — createtrail likely needs a pre-existing object-storage bucket. On the expected 4xx the optional flag isolates the group; the POST is still recorded as covered. tags[] receives owner tags via the engine."
+          "_note": "Body fixed 2026-06-20: (1) added account_id (REQUIRED per TrailCreateRequestV1dot1 schema in api_docs.json — was causing 400 ValidationError 'Field required'); captured from iam capture-account-id pre-step. (2) changed log_type_total_yn N->Y for consistency (when N, target_log_types must be non-empty per API semantics; Y with empty array is safe). (3) replaced tags->tag_create_requests (correct field name per schema; 'tags' is not a valid TrailCreateRequest field). Source: data/api_docs.json key management/loggingaudit/trailcreaterequestv1dot1 (required fields: account_id, bucket_name, bucket_region, trail_name, trail_save_type). Response envelope $.trail.id confirmed by response_example. Shared test OBS bucket = do-not-delete-apitest (owner-provisioned, do NOT delete)."
         },
         {
           "name": "show-trail",
@@ -51,12 +77,24 @@
           "method": "PUT",
           "path": "/v1/trails/{trail_id}",
           "json": {
-            "description": "API regression coverage probe (update)",
-            "is_multi_region": false
+            "trail_description": "API regression coverage probe (update)",
+            "trail_save_type": "JSON",
+            "region_total_yn": "Y",
+            "region_names": [],
+            "log_type_total_yn": "Y",
+            "target_log_types": [],
+            "resource_type_total_yn": "Y",
+            "target_resource_types": [],
+            "user_total_yn": "Y",
+            "target_users": [],
+            "service_watch_yn": "Y",
+            "organization_trail_yn": "N",
+            "log_verification_yn": "N"
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "la-trail"
+          "group": "la-trail",
+          "_note": "Body from api_docs.json settrail request_example (2026-06-20). No bucket_name/bucket_region on update (immutable). Fields match the PUT schema: trail_description, trail_save_type, and all yn-flag arrays. log_type_total_yn changed N->Y (consistent with createtrail fix: when N the API may require non-empty target_log_types)."
         },
         {
           "name": "start-trail",

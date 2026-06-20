@@ -241,6 +241,19 @@
           }
         },
         {
+          "name": "check-repository-name-duplication",
+          "method": "GET",
+          "path": "/v1/repositories/check-duplication/name",
+          "params": {
+            "registry_id": "{registry_id}",
+            "name": "regrcheck"
+          },
+          "expect_status": [200, 400, 403, 404],
+          "optional": true,
+          "group": "scr-read",
+          "_note": "checkrepositorynameduplication: requires registry_id (captured from list-registries-harvest) + name. Returns 200 {result:false} when registry_id is real; falls back to 400 if registry_id placeholder stays unfilled."
+        },
+        {
           "name": "get-registry-repositories",
           "method": "GET",
           "path": "/v1/container-registries/{registry_id}/repositories",

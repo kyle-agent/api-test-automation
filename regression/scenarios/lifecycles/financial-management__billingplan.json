@@ -20,6 +20,22 @@
           "_note": "List envelope = PlannedComputeListResponse.planned_computes[] (PlannedComputeDTO.id). Corrected from the previous WRONG capture $.contents[0].id — the response has no `contents` field."
         },
         {
+          "name": "list-planned-compute-instances",
+          "method": "GET",
+          "path": "/v1/planned-computes/instances",
+          "params": {
+            "service_id": "VIRTUAL_SERVER",
+            "os_type": "OPEN_SOURCE",
+            "server_type": "s1v1m2",
+            "start_date": "2026-01",
+            "end_date": "2026-06"
+          },
+          "expect_status": [200, 400, 403, 404, 500],
+          "optional": true,
+          "group": "pc-instances",
+          "_note": "GET /v1/planned-computes/instances (listplannedcomputeinstances). 5 required query params: service_id, os_type, server_type, start_date, end_date. os_type enum (per os-types endpoint): OPEN_SOURCE/RHEL/WINDOWS/SLES (uppercase token); lowercase 'opensource' rejected with 400 'Invalid os_type value'. server_type valid set comes from GET /v1/planned-computes/server-types which itself 500s (baselined Product Bug). PRODUCT BUG (2026-06-20): with os_type=OPEN_SOURCE (passes frontend validation) and any server_type value, the backend returns 500 ContactAdminForAssistance — same bug as listplannedcomputeservertypes. expect_status includes 500 so the optional step records as CALLED without failing the lifecycle. Until backend is fixed this endpoint cannot return 2xx. Live-probed 2026-06-20."
+        },
+        {
           "name": "show-cancellation-fee",
           "method": "POST",
           "path": "/v1/planned-computes/cancellation-fee",

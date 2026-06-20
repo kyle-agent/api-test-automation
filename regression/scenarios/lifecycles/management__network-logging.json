@@ -10,9 +10,13 @@
           "name": "list-configurations",
           "method": "GET",
           "path": "/v1/network-logging/configurations",
+          "params": {
+            "resource_type": "FIREWALL"
+          },
           "expect_status": [200, 403],
           "optional": true,
-          "group": "nl-read"
+          "group": "nl-read",
+          "_note": "resource_type is REQUIRED; valid enums are FIREWALL, SECURITY_GROUP, NAT (VPC_FLOW_LOG is not accepted — confirmed live 2026-06-20)"
         },
         {
           "name": "create-storage",
@@ -41,9 +45,13 @@
           "name": "list-storages",
           "method": "GET",
           "path": "/v1/network-logging/storages",
+          "params": {
+            "resource_type": "FIREWALL"
+          },
           "expect_status": [200, 403],
           "optional": true,
-          "group": "nl-storage"
+          "group": "nl-storage",
+          "_note": "resource_type is REQUIRED; valid enums are FIREWALL, SECURITY_GROUP, NAT (VPC_FLOW_LOG is not accepted — confirmed live 2026-06-20)"
         },
         {
           "name": "delete-storage",

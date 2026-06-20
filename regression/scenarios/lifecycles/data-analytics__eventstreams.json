@@ -171,6 +171,30 @@
           "_note": "request_id capture_soft is DELIBERATELY a path that never matches this response — see lifecycle _note."
         },
         {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "es-read",
+          "capture_soft": {
+            "dbaas_parameter_group_id": "$.contents[0].id"
+          },
+          "_note": "eventstreamslistparametergroups — captures dbaas_parameter_group_id (required param for list-parameters below). Confirmed 200 live: returns contents[0].id."
+        },
+        {
+          "name": "list-parameters",
+          "method": "GET",
+          "path": "/v1/parameters",
+          "params": {
+            "dbaas_parameter_group_id": "{dbaas_parameter_group_id}"
+          },
+          "expect_status": [200, 400, 404],
+          "optional": true,
+          "group": "es-read",
+          "_note": "eventstreamslistparameters — requires dbaas_parameter_group_id (required per catalog params). Confirmed 200 live when id captured from list-parameter-groups above."
+        },
+        {
           "name": "get-engine-version-properties",
           "method": "GET",
           "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties",
