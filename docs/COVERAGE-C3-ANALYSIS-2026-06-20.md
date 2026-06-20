@@ -148,3 +148,32 @@ resource (createcloudfunctionapigatewaytrigger NEW), servicewatch alert CRUD,
 kms symmetric crypto, resourcemanager tag/components, secretsmanager. **Net-new vs the
 published baseline is modest** — most of the 69 were already-covered re-verifications.
 Round 2 = the 4 cheap body fixes above (gslb/cdn/loggingaudit/iam-action), then re-run.
+
+---
+
+## Round 2 + session close (2026-06-20)
+
+Applied the run-#1 body fixes from the exact live 400s:
+- **cdn** `createcdnservice` — **CONFIRMED 2xx** on the focused re-run (POST 202 + detail 200).
+  Fix: protocol/port types, caching/content enums, custom_headers as `{}` objects.
+- **gslb** `creategslb` — validation 400 (health-check ranges) **cleared**; fix committed
+  (interval 30 / timeout 10 / probe 10 on create + set-health-check). The focused re-run
+  hit a transient gateway **503**, so the 2xx is committed-but-unverified.
+- **loggingaudit** `createtrail` — "Field required" 400 **cleared** by adding the missing
+  required `account_id` (captured from GET /v1/access-keys) + schema field rename
+  (`tags`→`tag_create_requests`). Re-run also 503-flapped → committed-but-unverified.
+
+**Teardown: 0 owned survivors** (comprehensive live scan across every created kind;
+KMS/secrets are by-design scheduled-deletion). No billable infra was created (heavy OFF).
+
+**Published coverage:** hand-driven `tools/publish_dashboard.sh` twice →
+**C3 50.1% → 50.9% (run #1) → 51.1% (646/1264, round 2)**; +7 net-new cumulative verified.
+
+**For the next (per-service) session:**
+1. Re-run `-k "gslb or loggingaudit-trail"` when the gateway is stable to capture the two
+   committed fixes as 2xx (cdn already proved the pattern), then re-publish.
+2. iam resource-policy residual: the base64-SRN **decode is solved** (cross-cutting from
+   resourcemanager, live-confirmed); remaining 400 is a policy-`Action` vs target-resource
+   service mismatch — pick an SRN whose service matches the action.
+3. Heavy tier (DB engines first, proven `*-cluster-subops-guarded`) is the big frontier —
+   arm live-watcher, 0-survivor verify, owner-rule sequenced.
