@@ -1,7 +1,12 @@
+---
+status: active
+for: all
+---
+
 # SCP API Regression Test Platform — 업그레이드 계획
 
 > 현재의 "엔진 + GitHub Actions" 시스템을 **완결된 플랫폼**으로 승격하는 계획.
-> [ROADMAP.md](../ROADMAP.md)의 Phase 2(스케줄 회귀)·Phase 3(전용 서버)을
+> [ROADMAP.md](ROADMAP.md)의 Phase 2(스케줄 회귀)·Phase 3(전용 서버)을
 > 포괄하면서, 그 위에 **관리 UI·실행 개입·히스토리 리포팅**을 얹는다.
 >
 > **상태 (2026-06-12): M0~M3 DONE, M4 DONE(live/docker 검증 대기 — 컷오버는
@@ -28,7 +33,7 @@ Plane)이 없다.** 시나리오는 선언적 JSON이고, 할당량·의존성�
 | 진행현황 대시보드 | `dashboard/ops.html` (S3 oplog viewer) | **실행 중** run의 라이브 뷰 없음, run 도중 개입(인스턴스 정리·중단) 불가 |
 | 리소스 조치 | `cleanup.reconciler` (태그 기반 전량 sweep) | 특정 리소스 1개만 골라서 삭제하는 액션 없음 (콘솔 로그인 필요) |
 | 결과 리포팅 | `dashboard/build.py` → GitHub Pages, `history.jsonl` | run별 결과가 **덮어써짐** — run 목록 → 클릭 → 그 시점 대시보드 복원이 안 됨 |
-| AI 활용 | `agents/*.md` 역할 정의 (Claude Code 세션, 수동 위임) | API 통합 없음 — triage·시나리오 초안·spec 영향분석이 사람이 띄우는 세션에 의존 |
+| AI 활용 | `docs/agent-team.md` 역할 정의 (Claude Code 세션, 수동 위임) | API 통합 없음 — triage·시나리오 초안·spec 영향분석이 사람이 띄우는 세션에 의존 |
 
 ---
 
@@ -231,7 +236,7 @@ Regression과 Conformance는 이미 같은 결과 스키마를 쓰므로 **실�
 | DB | **SQLite** (파일 기반) | 호스트 불문 요구에 부합 — 외부 DB 의존 없음. runs/schedules 규모상 충분 |
 | 실행기 | **개발 기간: GitHub Actions** (dispatch API) → **배포 전환(M4): 동일 호스트 worker** | 개발 중에는 git push가 협업 매체라 Actions가 자연스러움. 파일 직접 편집 모델(§3.1)이 켜지는 시점에 worker로 전환 (ROADMAP Phase 3 Step 2) |
 | 결과 저장 | 기존 JSONL 유지 + run별 스냅샷 (호스트 디스크, S3는 선택 백업) | 스키마 변경 없음 — `dashboard.build`가 이미 JSONL만 읽음 |
-| AI 통합 | **Claude Agent SDK** (headless) | `agents/*.md` 역할 정의를 그대로 시스템 프롬프트로 재사용 가능 |
+| AI 통합 | **Claude Agent SDK** (headless) | `docs/agent-team.md` 역할 정의를 그대로 시스템 프롬프트로 재사용 가능 |
 
 ### 3.1 파일 기반 편집 모델 (최종 형태 — 배포 직전 M4에서 전환)
 
@@ -262,7 +267,7 @@ run은 어떤 시나리오/knowledge 버전으로 돌았나" 추적 가능. 실�
 설계 원칙: **테스트 실행의 정상 경로(핫패스)에는 AI를 넣지 않는다.**
 regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은 입력에 같은
 결과가 나와야 "새 fail = 진짜 변화"라는 신호가 성립한다. AI는 (A) 저작
-시점, (B) run 후처리, (C) 옵트인 탐색 모드에 배치한다. 현재 `agents/`의
+시점, (B) run 후처리, (C) 옵트인 탐색 모드에 배치한다. 현재 `docs/agent-team.md`의
 8개 역할이 사실상 이 지도다 — 수동 Claude Code 세션을 플랫폼이 호출하는
 파이프라인으로 승격하는 것.
 
@@ -280,7 +285,7 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 
 | # | 작업 | AI 역할 | 비고 |
 |---|---|---|---|
-| B1 | **실패 triage 자동화** | new-fail을 분류: ① 환경/할당량 이슈 ② spec 변경 ③ 테스트(body) 버그 ④ 진짜 regression. known_issues 갱신·재실행·시나리오 수정 PR을 각각 제안 | 현재 `docs/HANDOFF-fail-new-triage.md` 수작업의 자동화 — **가장 먼저 만들 것**. run을 블로킹하지 않는 비동기 후처리 |
+| B1 | **실패 triage 자동화** | new-fail을 분류: ① 환경/할당량 이슈 ② spec 변경 ③ 테스트(body) 버그 ④ 진짜 regression. known_issues 갱신·재실행·시나리오 수정 PR을 각각 제안 | 현재 `docs/working/handoffs/HANDOFF-fail-new-triage.md` 수작업의 자동화 — **가장 먼저 만들 것**. run을 블로킹하지 않는 비동기 후처리 |
 | B2 | 리포트 자연어 요약 | run 결과 → 경영/팀 보고용 한 문단 + 주요 변화 하이라이트, 알림에 첨부 | 저비용·즉시 효과 |
 | B3 | 테스트 버그 자동수정 PR | triage가 ③으로 판정한 건의 시나리오 JSON 수정 PR 생성 → 사람 리뷰 | B1의 확장, 사람 게이트 필수 |
 
@@ -329,7 +334,7 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       `/api/ingest/events` → run 상태 자동 전이 + 마일스톤 타임라인
 - [x] **AI B1: 실패 triage 후처리** — baseline 외 신규 fail을 Claude
       (claude-opus-4-8, structured output)가 environment/spec_change/
-      test_bug/real_regression으로 분류, `agents/regression-agent.md`를
+      test_bug/real_regression으로 분류, `docs/agent-team.md`를
       시스템 프롬프트에 재사용. 수동 버튼 + `PLATFORM_AUTO_TRIAGE` 자동 훅
 - [x] B2 요약 알림 — `PLATFORM_NOTIFY_WEBHOOK` (Slack 호환)
 - 배포 절차: 서버 기동(`controlplane/README.md`) + repo Variables에
@@ -425,14 +430,14 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       notes에 문서화(콘솔-전용 id → M5 Planning 폼 입력 경로)
 - [x] **R3 검증 웨이브 2 + heavy 윈도우** (2026-06-12) — vpc-free 체인
       9종으로 id-bound GET verify 레버 실행(gap_getid 151→130,
-      `docs/COVERAGE-GETID-PLAN.md`): 웨이브 2 3회전(27399448835 →
+      `docs/working/plans/COVERAGE-GETID-PLAN.md`): 웨이브 2 3회전(27399448835 →
       27401527554 → 27417986669) + heavy 2회전(+rev 3 디스패치,
       27421363609). 합성 roster **안정 green ~10개**(pilot/vslight/apigw/
       dashboard/queue/sec/rg/iam/scf/volume), heavy VS 체인은 서버 폐포 +
       port attach/detach까지 증명, static NAT 필드 1개(`publicip_id`) 반영.
       합성기/엔진 능력 추가: step `headers`, delete retry/json passthrough,
       lookup 노드 ~7종, lifecycle `credentials` 표면화. 제품 발견은
-      **`docs/PRODUCT-FINDINGS.md` 통합 원장(12건)**으로 이관 — 미문서 필수
+      **`docs/working/trackers/PRODUCT-FINDINGS.md` 통합 원장(12건)**으로 이관 — 미문서 필수
       헤더(X-ResourceType)라는 신규 결함 클래스와 masked-defect 교훈 포함.
       SCR docker-auth 1-step 실험(`regression/scr_docker_probe.py`,
       run-request `docker_probe=true`)은 quota 403으로 INCONCLUSIVE →

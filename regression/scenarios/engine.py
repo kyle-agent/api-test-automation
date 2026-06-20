@@ -951,7 +951,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 # exercises the read of every child resource this lifecycle just
                 # created, for all services at once. (Historically each lifecycle
                 # hand-seeded one id, so nested child-id GETs were never probed; see
-                # docs/COVERAGE-GETID-PLAN.md §7.) Explicit probe_reads entries still
+                # docs/working/plans/COVERAGE-GETID-PLAN.md §7.) Explicit probe_reads entries still
                 # apply ON TOP — for name-addressed segments that are not captured
                 # vars (e.g. stage_name: "stg{unique}"). Only scalar ctx values are
                 # usable as path-param substitutes; unfilled placeholders are dropped.

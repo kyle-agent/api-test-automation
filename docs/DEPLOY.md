@@ -1,3 +1,8 @@
+---
+status: active
+for: human-ops
+---
+
 # DEPLOY — 호스트 불문 단일 패키지 배포 runbook (M4)
 
 > docs/PLATFORM-PLAN.md §1 원칙 5 · §3 · M4. AWS EC2든 로컬 PC든 사내 VM이든

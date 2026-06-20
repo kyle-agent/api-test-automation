@@ -8,14 +8,14 @@ Invoke from any session with `/<skill-name>` (e.g. `/pre-push`).
 Adapted from **[AlexZio00/claude-code-skills](https://github.com/AlexZio00/claude-code-skills)**
 (MIT License, © 2026 AlexZio00). Six of the upstream 13 skills were vendored —
 the ones that add value here without colliding with this repo's existing custom
-multi-agent harness (`agents/`, `START_HERE.md`, `knowledge/`).
+multi-agent harness (`docs/agent-team.md`, `START_HERE.md`, `knowledge/`).
 
 ## Adopted skills
 
 | Skill | What it does | Repo adaptation |
 |-------|--------------|-----------------|
 | `/adr` | Record an architecture/design decision (context, alternatives, consequences) | writes to `docs/decisions/` |
-| `/pre-push` | Pre-push secrets scan + tests + lint + AI review gate | scans via local `scan_secrets.pl`; runs read-only `pytest -m smoke`; honors `agents/HARNESS.md` SCP safety gates; never pushes to `main` |
+| `/pre-push` | Pre-push secrets scan + tests + lint + AI review gate | scans via local `scan_secrets.pl`; runs read-only `pytest -m smoke`; honors `docs/agent-team.md` SCP safety gates; never pushes to `main` |
 | `/retro` | Milestone retrospective → actionable lessons | writes to `docs/lessons.md` |
 | `/brief` | Lock a feature scope (IN/OUT/exit criteria) before coding | writes to `drafts/BRIEF.md` |
 | `/freeze` | Declare the editable zone; everything else is read-only | in-context only (no file output) |
@@ -28,11 +28,11 @@ a parallel, conflicting system:
 
 | Upstream skill | Why skipped |
 |----------------|-------------|
-| `harness-init` | `agents/HARNESS.md` is the canonical custom harness |
-| `team-init` | already a multi-agent team (`agents/orchestrator.md` + roles) |
-| `session-start` | `START_HERE.md` + `agents/CONTEXT.md` already do this |
-| `session-checkpoint` | `docs/SESSION-HANDOFF*.md` + `agents/coordination/ledger.json` |
-| `project-init` | `ROADMAP.md` / `ARCHITECTURE.md` already exist (overwrite risk) |
+| `harness-init` | `docs/agent-team.md` is the canonical custom harness |
+| `team-init` | already a multi-agent team (`docs/agent-team.md` + roles) |
+| `session-start` | `START_HERE.md` + `docs/working/CONTEXT.md` already do this |
+| `session-checkpoint` | `docs/SESSION-HANDOFF*.md` + `data/coordination/ledger.json` |
+| `project-init` | `docs/ROADMAP.md` / `docs/ARCHITECTURE.md` already exist (overwrite risk) |
 | `collab-audit` | generic; low priority |
 
 **Note — ideas were still mined from these.** We skipped the *skills*, but
@@ -40,7 +40,7 @@ backported 9 concrete techniques from `session-start` / `session-checkpoint` /
 `harness-init` / `team-init` into the repo's own docs (Memory discipline, subagent
 STATUS enum, handoff resume-command rule, stale-reference check, severity→merge
 table, output-drift check, `conf·seen·obs` fact metadata, adversarial safety
-tests). See `agents/CONTEXT.md` "프로세스/하니스 도구 추가 (2026-06-17)".
+tests). See `docs/working/CONTEXT.md` "프로세스/하니스 도구 추가 (2026-06-17)".
 
 ## Notes
 

@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # Lessons
 
 Process / meta lessons (how the agent team works), written by `/retro`. Distinct

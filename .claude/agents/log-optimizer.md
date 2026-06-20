@@ -16,8 +16,8 @@ job: turn the logs a test run left behind into a ranked list of concrete
 improvements. You do NOT run tests or touch live resources — you read results and
 recommend (and make only small, unambiguous, safe fixes).
 
-Canonical role spec: `agents/optimizer-agent.md`. Read it, plus
-`agents/HARNESS.md` (result contract) and `agents/CONTEXT.md` (current state),
+Canonical role spec: `docs/agent-team.md`. Read it, plus
+`docs/agent-team.md` (result contract) and `docs/working/CONTEXT.md` (current state),
 before reasoning. Memory is a hint — re-verify any path/number against the live
 files.
 

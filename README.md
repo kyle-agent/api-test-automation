@@ -27,10 +27,10 @@ What started as a catalog-driven test suite is now a full platform with
 
 The suite remains **catalog-driven** (the API Reference is parsed once into a
 machine-readable inventory; tests are generated from it) and organised around
-**two axes** on a shared kernel. See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the
-full blueprint, [`ROADMAP.md`](ROADMAP.md) for the phase plan,
+**two axes** on a shared kernel. See [`ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the
+full blueprint, [`ROADMAP.md`](docs/ROADMAP.md) for the phase plan,
 [`docs/PLATFORM-PLAN.md`](docs/PLATFORM-PLAN.md) for the platform milestones
-(M0–M5), and [`agents/`](agents/README.md) for the multi-agent team that does
+(M0–M5), and [`docs/agent-team.md`](docs/agent-team.md) for the multi-agent team that does
 the engineering.
 
 ```
@@ -68,14 +68,13 @@ runner/       worker.py — same-host executor for the M4 cutover (queue consume
 suites/       named suites (smoke/full/full-heavy/conformance) — run = suite × profile
 environments/ environment profiles (stage/prod × region; credential *references* only)
 tests/        thin pytest entrypoints that drive the regression engines
-agents/       the multi-agent system: roster · shared context · harness · per-agent prompts
 knowledge/    SCP domain knowledge (human-readable, AI-maintained) + formal/ (editable YAML)
               formal/resources/  ← M5 resource-task model (275 nodes / 60 files; composer input)
 drafts/       AI/composer outputs awaiting human review (never auto-enabled)
 data/         api_catalog.json · api_bodies.json · api_docs.json · conformance.json
               baselines/known_issues.json · baselines/coverage_waivers.json (per-profile
               suffixed siblings supported: known_issues.<profile>.json)
-docs/         plans + session handoff notes (see docs/INDEX.md)
+docs/         design specs (ARCHITECTURE · agent-team · scheduler-system) + working/ (handoffs · trackers · plans) + decisions/  — see docs/INDEX.md
 reports/      per-run output (gitignored): results/*.jsonl, registry/*.jsonl, dashboard/
 .github/workflows/api-test.yml   one orchestrator (spec → regression → sweep + conformance → dashboard → snapshot)
 ```
@@ -215,7 +214,7 @@ unmodified — composed output is just another lifecycle. Live-proven via the
 R3 verification waves (`regression/scenarios/lifecycles/generated__*.json` —
 ~10 composed chains stably green incl. the full apigw bundle); see
 `docs/RESOURCE-MODEL-PLAN.md` §6 for wave results and
-`docs/PRODUCT-FINDINGS.md` for the ledger of product/API findings the waves
+`docs/working/trackers/PRODUCT-FINDINGS.md` for the ledger of product/API findings the waves
 surfaced.
 
 > **Self-trigger for heavy runs:** a committed `.github/heavy.txt` (first

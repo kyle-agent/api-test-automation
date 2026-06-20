@@ -1,0 +1,74 @@
+---
+status: active
+for: validation
+---
+
+# PRODUCT-FINDINGS — consolidated ledger of product/API findings
+
+- Date: 2026-06-12 · Status: **active** (append-only — new findings get the next id)
+- Scope: things the R3 verification waves found that are **about the product,
+  not about our tests** — backend bugs, spec/docs defects, IAM-policy gaps,
+  service quirks, and live confirmations of userguide facts. One row per
+  finding. The per-node detail (exact bodies, retry semantics) stays in the
+  node `notes` of `knowledge/formal/resources/*.yaml` and in
+  `data/baselines/known_issues.json`; this file is the cross-service index.
+- Relationship to other docs: wave-level narrative in
+  `docs/RESOURCE-MODEL-PLAN.md` §6; baselined entries (muted on the dashboard)
+  in `data/baselines/known_issues.json`; AXIS-2 conformance findings
+  (`reports/results/findings.jsonl`) are a separate, automated stream — this
+  ledger is the curated, human-triaged one.
+
+## Ledger
+
+| id | service / endpoint | symptom | evidence (run id) | class | status |
+|----|--------------------|---------|-------------------|-------|--------|
+| PF-01 | management/servicewatch · `GET /v1/log-groups/{id}/log-streams` (LIST) | 403 `Action definition is not found` — the LIST is unauthorizable while the per-id GET works | 27394211896 | missing-IAM-action-definition | open — verify rerouted to per-id GET (node note) |
+| PF-02 | application-service/apigateway · `GET …/api-keys/{key_id}` (per-id) | 403 `Action definition is not found` — per-id GET unauthorizable while LIST works | 27394211896 | missing-IAM-action-definition | open — verify keeps `[200,403]` to track it |
+| PF-03 | storage/filestorage · `GET /v1/snapshots/{id}` (per-id) | 403 `Action definition is not found` — third case of the same class | 27399448835 | missing-IAM-action-definition | open (node note) |
+| PF-04 | financial-management/budget · `POST /v1/budgets/account` | 500 `ContactAdminForAssistance` on a complete-looking body — a validation problem must not 500 | 27395331657 | product-bug (5xx on valid-shaped input) | **baselined** Product Bug in `known_issues.json`; node out of composed waves |
+| PF-05 | devops-tools/devopsservice · `POST /v1/devops-services` | 400 ValidationError with `["Field required"]`×3 **without field names** — the error schema hides which fields are missing | 27394211896 | error-schema-defect (also an AI-usability case) | open — node disabled pending userguide research |
+| PF-06 | compute/scf · `GET /v1/cloud-functions/{id}/logs` · `/metrics` | `must select either time or period` — docs mark **all** params optional, but one of time/period is required (format undocumented) | 27399448835 | undiscoverable-params | worked around (`?time=1h`); docs fix needed |
+| PF-07 | management/cloudmonitoring · `GET /v1/cloudmonitorings/accounts/products…` | 400 `InvalidHeaderValue 'X-ResourceType'` — a **required header that appears nowhere in the docs** | 27399448835 | undocumented-required-header (new defect class) | worked around — model carries `headers: {X-ResourceType: INSTANCE}`; header accepted in rev 2 |
+| PF-08 | container/scr · `PUT /v1/container-registries/{id}/private-acl` | 500 `ContactAdminForAssistance` on a doc-valid body — reproduced 3× | 27401527554 · 27417986669 · 27421363609 | product-defect candidate (5xx, possibly an Editing-state race) | open — verify removed from the composed chain; retry-style verify is an R3 follow-up |
+| PF-09 | security/kms + security/secretsmanager · `DELETE` key/secret | Deletion is **scheduled**, not immediate: deleted (2xx) items stay in lists for their pending-deletion window (gone from console) | 27401527554 (sweep log, 5 rounds) | service-quirk (scheduled deletion) | recorded in service quirks; sweep no longer counts re-deletes as progress |
+| PF-10 | container/scr · `POST /v1/container-registries` | 403 quota `CONTAINER_REGISTRY.NON_VISIBILITY.MAX` **1EA** — live confirmation of the userguide's max-2-per-account (1 per visibility type) rule | 27421363609 (docker probe) | userguide-fact-confirmed (not a defect) | closed — probe now borrows an existing Running registry on quota-403 |
+| PF-11 | compute/scf · `DELETE /v1/triggers/{id}` body `trigger_type` | API requires `'cron'`; the hand-written probe sent `'cronjob'` and had been **silently 400ing for weeks** behind a tolerant `expect [.., 400]` | 27417986669 (unmasked) | masked-defect (harness) | fixed — model sends `cron`; lesson below |
+| PF-12 | compute/virtualserver · `POST …/interfaces/{port_id}/static-nats` body | Real field is `publicip_id`; the probe's `public_ip_id` had been silently 400ing behind a tolerant expect — the live ValidationError handed us the field name | 27421363609 | masked-defect (harness) | fixed — model sends `publicip_id` (heavy rev 3 dispatched) |
+| PF-13 | compute/virtualserver · `POST …/interfaces/{port_id}/static-nats` | 400 `VirtualServer.InvalidVpcPublicIp` "The VPC should have at least one **Internet Gateway** when attaching Internet NAT" — precondition not in the userguide/API docs for this endpoint | 27424991237 | undiscoverable-params (undocumented prerequisite) | fixed — `internet-gateway` added to `server-static-nat` requires; heavy rev 4 |
+| PF-14 | container/scr · `GET /v1/repositories/check-duplication/name` | `name` alone → 400 `ValidationError ["Field required"]` without naming the field; repo names are registry-scoped so `registry_id` is required — neither the requirement nor the field name is discoverable from the error or docs | 27424991237 | error-schema-defect + undiscoverable-params | fixed — model sends `registry_id` query param |
+| PF-15 | compute/virtualserver · `GET …/static-nats/{nat_id}` | 403 "Action definition is not found" on the per-id read right after a successful create — 4th instance of the missing-IAM-action-definition class (with servicewatch log-streams LIST, iam api-key per-id GET, fs snapshot read) | 27450089575 | missing-IAM-action-definition | worked around — verify expects [200,403] with this note |
+
+| PF-16 | container/scr · docker `login` to the registry endpoint | DNS resolved + registry reachable, but SCP access/secret keys → `unauthorized: authentication required`. **Settled**: SCP platform keys are NOT the docker credential — a separate console-issued SCR auth key is required (owner hypothesis 2026-06-12 disproven) | 27452095757 | entitlement (console-issued credential) | closed — cloud-ml chain stays gated on scr-auth-key; probe retired |
+| PF-17 | compute/virtualserver · `POST /v1/servers/{id}/password` | 400 `VirtualServer.InvalidPrivateKeyValue` 'Failed to decrypt' on a Linux/ubuntu server with the correct keypair private_key — Linux servers have no encrypted admin password to decrypt (Windows-only feature) | 27452095757 | service-quirk (OS-conditional op) | worked around — verify [200,400] with note |
+| PF-18 | management/resourcemanager · `GET /v1/resources/{srn}` (show-resource) | 403 `Forbidden / You do not have permission to Action` — 5th instance of the missing-IAM-action-definition class (with servicewatch log-streams LIST PF-01, fs snapshot read PF-03, VS static-NAT per-id read PF-15) | 27466988779 | missing-IAM-action-definition | worked around — verify expects [200,403] with this note |
+| PF-19 | application-service/apigateway · `PUT /v1/apis/{api_id}/resource-policies` (setresourcepolicy) | 500 `ContactAdminForAssistance` with the proven policy_document shape — a write previously thought VERIFIED now 5xxes | 27466988779 | product-bug (5xx on valid-shaped input) | **baselined** Product Bug in `known_issues.json`; composed step tolerates 500 |
+| PF-20 | management/iam · `POST /v1/roles` (createrole) | 500 `ContactAdminForAssistance` even with a self-created policy bound — the earlier policy_ids: [] hypothesis was wrong; it 5xxes with a bound policy too | 27466988779 | product-bug (5xx on valid-shaped input) | chain `gen-wave5-iam-role` disabled (enabled:false + _disabled_reason); iam-role node kept modeled |
+| PF-21 | compute/virtualserver · `POST /v1/volume-transfer` (create-volume-transfer, gen-wave2-volume) | 500 `InternalServerError` on a complete-looking body (name + real volume_id) — a NEW 5xx-on-create; req-bc27a3b6 | 27540589368 (req-bc27a3b6) + 27583285457 (req-78aec306) | **CONFIRMED 2026-06-15 (2nd repro run 27583285457); baselined in known_issues.json** | baselined Product Bug `compute/virtualserver/createvolumetransfer` in `known_issues.json`; the virtualserver model `volume-transfer` create tolerates 500 (`optional:true, expect_status:[200,202,500]`) so the chain survives. |
+| PF-22 | networking/dns · `POST /v1/public-domains` (create-public-domain, networking-dns-public-domain) | 500 `InternalServerError` on create — a NEW 5xx-on-create (1 sighting); req-cfff60bb-5e1d-4b66-94d4-c7f7eef548ff. Step is already optional/group-skipped so it is NOT a test failure, just logged. | 27593608514 (req-cfff60bb-5e1d-4b66-94d4-c7f7eef548ff) | product-bug candidate (5xx on create) | **UNCONFIRMED — pending 2nd repro; not baselined** (NOT in known_issues.json yet; no tolerance edit needed — already optional/group-skipped) |
+| PF-23 | application-service/apigateway · `POST /v1/privatelink-endpoints` (createprivatelinkendpoint) | 500 `ContactAdminForAssistance` on a **docs-correct** body. Live docs verification (regression-agent 2026-06-18, req-f088cd1d / req-44f443c7): `privatelinkendpointcreaterequest` requires exactly `{name (^[a-zA-Z0-9]*$, 3..20), privatelink_service_id, description?}` and the scenario sends precisely that — NOT a body-shape gap. A bad/non-existent `privatelink_service_id` must return 400/404, not 500. Same ContactAdmin-class as budget createaccountbudget / apigateway setresourcepolicy (PF-19). | direct probe 2026-06-18 (req-f088cd1d-35bd-4e2c-a5d6-43b7e60162b6) | product-bug (5xx on valid-shaped input) | **baselined** Product Bug `application-service/apigateway/createprivatelinkendpoint` in `known_issues.json`; the `xcov-pl-create` group tolerates 500 (`expect_status` now includes 500) so the lifecycle records the CALL and survives |
+
+## The masked-defect lesson (PF-11 · PF-12)
+
+Tolerant expectations (`expect_status: [200, 400]` etc.) on hand-written
+"coverage probes" can hide that a step has **never once succeeded** — the row
+stays green while the call 400s forever. Two such cases surfaced only when the
+composed (model-driven) chains demanded a real 2xx:
+
+- scf trigger delete `trigger_type: cronjob` → the API wants `cron` (PF-11);
+- VS static-NAT `public_ip_id` → the API wants `publicip_id` (PF-12).
+
+Rules of thumb adopted: ① composed verify/teardown steps expect success —
+widen an expect list only WITH a finding note explaining why (the PF-02
+pattern); ② when a live error names a field/enum, encode it in the model
+immediately with the run id; ③ treat any long-green tolerant-expect step as
+unverified until a 2xx is on record.
+
+## Conventions
+
+- **id** — `PF-NN`, append-only, never reused.
+- **class** — missing-IAM-action-definition · product-bug ·
+  error-schema-defect · undiscoverable-params · undocumented-required-header ·
+  service-quirk · userguide-fact-confirmed · masked-defect.
+- **status** — open · worked around · baselined · fixed · closed.
+- A finding that gets muted on the dashboard must ALSO be a row in
+  `data/baselines/known_issues.json` (PF-04 is the model case).

@@ -15,8 +15,8 @@ prompt — e.g. `iam`, `dns`, `scr`). You own that service's coverage and nothin
 else. Your job each run: make its covered-endpoint count go UP, safely, and record
 why anything still isn't covered so next run resumes from there.
 
-Role spec: `agents/service-agent.md` (per-service expert template). Runtime + safety:
-`agents/HARNESS.md`. Your service's durable facts: `knowledge/services.md`. Your
+Role spec: `docs/agent-team.md` (per-service expert template). Runtime + safety:
+`docs/agent-team.md`. Your service's durable facts: `knowledge/services.md`. Your
 resumable state: your row in `data/coverage_ledger.json` (`blockers`, `next_levers`).
 
 ## Mandate — raise YOUR service's coverage by any means

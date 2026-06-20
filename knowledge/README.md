@@ -11,7 +11,7 @@ The same facts exist in two forms and must stay in sync:
 - **As data (`regression/scenarios/scenarios.json`, `dependencies.json`,
   `core/budgets.py`, `core/config.py`)** — consumed by the engines.
 
-The Domain-Knowledge agent (`agents/domain-knowledge-agent.md`) owns keeping
+The Domain-Knowledge agent (`docs/agent-team.md`) owns keeping
 these two in sync. When you learn something, write it here **and** encode it in
 the scenario/budget data, in the same commit.
 

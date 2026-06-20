@@ -486,7 +486,7 @@ deleting its parent (e.g. subnet 404 before vpc delete).</p>
 <hr />
 <h2>Coverage campaign — Wave 1 facts (2026-06-08, NOT yet runtime-proven)</h2>
 <blockquote>
-<p>Authored by parallel service-agents (see <code>agents/CAMPAIGN.md</code>). Bodies/envelopes
+<p>Authored by parallel service-agents (see <code>docs/agent-team.md</code>). Bodies/envelopes
 below are docs-derived best-effort; promote to "validated" only after a live 2xx.</p>
 </blockquote>
 <p><strong>Engine coverage-matching gotcha (confirmed, applies to all authors):</strong></p>
@@ -627,7 +627,7 @@ cachestore/postgresql <code>PUT .../backup-histories</code>, mysql/postgresql
 <code>DELETE .../backups</code> — while sibling sub-ops on the same cluster path 400.
 Also 401: the two query-param GETs (<code>scr check-duplication/name</code>, devops
 <code>check-duplication</code>) — suspect HMAC-vs-query-string signing on our side.
-Triage: <code>docs/HANDOFF-fail-new-triage.md</code>.</p>
+Triage: <code>docs/working/handoffs/HANDOFF-fail-new-triage.md</code>.</p>
 <p><strong>Sweep/cleanup behavior (run ca493bd sweep log):</strong>
 - <code>/v1/log-groups</code>: <strong>15 listed / 0 deletable</strong> every round — the per-service
   auto-created log groups (<code>/scp/ske/...</code>, <code>/scp/&lt;engine&gt;/.../slowlog|alertlog</code>)
@@ -704,8 +704,8 @@ sweep 마일스톤만 누락된 원인.)</p>
 <h2>2026-06-11 — coverage-expansion authoring (docs-derived, NOT yet runtime-proven)</h2>
 <blockquote>
 <p>conf: 0.3 · seen: 2026-06-11 · obs: 1</p>
-<p>Levers ①③④ of <code>docs/SESSION-HANDOFF-run6-and-ops.md</code>; full analysis in
-<code>docs/COVERAGE-WAVE-PLAN.md</code>. Promote after a live 2xx.</p>
+<p>Levers ①③④ of <code>docs/working/handoffs/SESSION-HANDOFF-run6-and-ops.md</code>; full analysis in
+<code>docs/working/plans/COVERAGE-WAVE-PLAN.md</code>. Promote after a live 2xx.</p>
 </blockquote>
 <ul>
 <li><strong>gap_write 32 = 100% waived/disabled</strong> (idc 19 blast-radius + archivestorage 13

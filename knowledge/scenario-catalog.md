@@ -59,7 +59,7 @@ safety gates. Re-derive flags with the snippet at the bottom.
 > **29 lifecycles total** (24 enabled, 3 disabled here + the heavy ones gated by
 > `SCP_RUN_HEAVY`). The setter-coverage expansion (26 write steps, in-place
 > updates) added in the trusting-curie merge lives inside several existing
-> lifecycles as extra steps — see `docs/HANDOFF-crud-setter-validation.md`.
+> lifecycles as extra steps — see `docs/working/handoffs/HANDOFF-crud-setter-validation.md`.
 
 ## Coverage gap (drive AXIS 1 to 100%)
 
@@ -82,7 +82,7 @@ python3 -c "import json;[print(f\"{l['id']:45} enabled={l.get('enabled')} heavy=
 
 Add a scenario = add an entry to `scenarios.json` (no new Python; the engine
 drives it) + declare any quota kinds in `dependencies.json` + record validated
-facts in `validated-facts.md`. See `agents/domain-knowledge-agent.md`.
+facts in `validated-facts.md`. See `docs/agent-team.md`.
 
 ---
 
@@ -91,7 +91,7 @@ facts in `validated-facts.md`. See `agents/domain-knowledge-agent.md`.
 Per-service CRUD lifecycles now also live in
 `regression/scenarios/lifecycles/<category>__<service>.json` fragments (merged by
 `regression/scenarios/loader.py`; one file per service-agent → no collisions).
-See `agents/CAMPAIGN.md`. Wave 1 closed **151 write ops across 6 services**,
+See `docs/agent-team.md`. Wave 1 closed **151 write ops across 6 services**,
 raising the static coverage ceiling **43.0% → 55.4%** (write gap 547 → ~390).
 
 | Fragment | Lifecycles | Writes | Flags |
@@ -106,7 +106,7 @@ raising the static coverage ceiling **43.0% → 55.4%** (write gap 547 → ~390)
 Remaining write-op gap after Wave 1: **~390 across 47 services** (top: compute/
 virtualserver 41, networking/vpc 38, then database epas/mariadb/mysql/postgresql
 ~17 each, storage/archivestorage, security/kms, …). Track in
-`agents/coordination/ledger.json`. All Wave-1 bodies are docs-derived and pending
+`data/coordination/ledger.json`. All Wave-1 bodies are docs-derived and pending
 live validation — see `knowledge/validated-facts.md` "Wave 1 facts".
 
 ## Coverage campaign — Wave 2 (2026-06-08)
@@ -145,7 +145,7 @@ ceiling into measured coverage.
 
 ## Coverage expansion — 2026-06-11 (levers ①③④, docs-derived)
 
-No new lifecycles; existing ones extended (see `docs/COVERAGE-WAVE-PLAN.md`):
+No new lifecycles; existing ones extended (see `docs/working/plans/COVERAGE-WAVE-PLAN.md`):
 
 - **DBaaS sub-op window prep (①)**: `database-mysql-cluster` + `database-postgresql-cluster`
   gained conservative-only window groups (`mysql-subop-window`/`mysql-restart`/
@@ -189,7 +189,7 @@ heavy window, runs 27394211896 … 27421363609):
 | `gen-cloudml-chain` | 24 | disabled (gated-ready) — full chain composed, blocked on SCR auth key (console credential — docker-probe experiment running) + heavy |
 
 Live wave findings + blocked classes: `docs/RESOURCE-MODEL-PLAN.md` §6;
-the consolidated product/API findings ledger is `docs/PRODUCT-FINDINGS.md`
+the consolidated product/API findings ledger is `docs/working/trackers/PRODUCT-FINDINGS.md`
 (12 rows). Current static ceiling per `python -m spec.coverage_gap`:
 **88.1% (1,209/1,372)** (gap_getid 130 · gap_write 33); latest published run
 C3 **44.79%** (cov_op 36.73), fail_new 0, 249 waivers. R3 direction:

@@ -2,7 +2,7 @@
 
 Every service-agent runs this on its fragment before handing back; the
 coordinator runs it on the whole merged set before integrating. It is the
-machine-checkable half of the "definition of done" in agents/CAMPAIGN.md.
+machine-checkable half of the "definition of done" in docs/agent-team.md.
 
 Checks (errors fail with exit 1; warnings are advisory):
   * the loader merges cleanly — no duplicate lifecycle ids across base+fragments;
@@ -35,7 +35,7 @@ LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps", "credentials",
                   "needs_cert_material", "_note", "_comment", "_disabled_reason",
                   "_status"}
 # Machine-readable disposition for enabled:false lifecycles (IB-030). Derived
-# from docs/LIVE-READINESS-GATES.md. Advisory only — a missing/invalid _status
+# from docs/working/trackers/LIVE-READINESS-GATES.md. Advisory only — a missing/invalid _status
 # is a WARNING, never an error (must not break the offline gate for others).
 STATUS_ENUM = {"done-modeled", "timing-gated", "blocked-engine",
                "blocked-owner", "stale"}

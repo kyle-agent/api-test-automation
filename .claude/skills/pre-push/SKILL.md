@@ -21,7 +21,7 @@ metadata:
 
 > ⛔ **BLOCKING REQUIREMENT**: Complete this pipeline and resolve all Critical/High issues BEFORE executing `git push`.
 
-> 🛰️ **Repo adaptation (SCP API test platform)** — see `agents/HARNESS.md` safety rails:
+> 🛰️ **Repo adaptation (SCP API test platform)** — see `docs/agent-team.md` safety rails:
 > - This repo develops on `claude/*` branches and **never** pushes to `main`/`master` (the protected-branch gate in Step 1 still applies as a backstop).
 > - Step 4 tests: run the **read-only** suite only — `pytest tests/smoke -m smoke -q`. **Never** set `SCP_ALLOW_MUTATIONS` / `SCP_ALLOW_DESTRUCTIVE` / `SCP_RUN_HEAVY` to make a push pass; CRUD/heavy/destructive tests are deliberate, explicit opt-ins and must not run inside pre-push.
 > - This is a Python project: linters are `ruff`/`flake8` (Step 5a) and the test runner is `pytest` (degrades to SKIPPED if absent).
