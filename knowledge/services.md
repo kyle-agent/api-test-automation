@@ -768,6 +768,23 @@ CONFIRMED LIVE 2026-06-20. Global account-scoped catalog service. All 4 endpoint
 - The sidecar (`data/api_catalog_params.json`) correctly declares `produced_by` for both id-bound GETs — probe_reads auto-resolves them. No aliases needed.
 - Fragment: `regression/scenarios/lifecycles/platform__product.json` (product-catalog-readonly lifecycle).
 
+## platform / sts (Security Token Service)
+
+FIRST ANALYSIS 2026-06-20. 3 endpoints, ALL POST (mutating). 0 coverable read-only. Coverage requires SCP_ALLOW_MUTATIONS=true.
+
+- **Host:** `sts.<region>.e.samsungsdscloud.com` (REGIONAL, NOT in global_services). Host template: `https://sts.kr-west1.e.samsungsdscloud.com/v1/...`
+- **All 3 endpoints are POST (mutating):** smoke skips them (`is_mutating=True`), lifecycle engine skips them when `allow_mutations=False` (engine.py line ~691). Read-only coverage = structural 0/3.
+- **CRITICAL body field correction (2026-06-20):** Prior fragment used wrong field names. Correct field names from `api_docs.json` models:
+  - `assumerole` (POST /v1/assume-role): `role_indicator` (REQUIRED, NOT `role_arn`), `role_session_name` (REQUIRED, 1-64 chars), `duration_seconds` (optional, default 900). `role_indicator` format: `[offering:account_id:role_name]`, pattern `^[^:]+:[^:]+:[^:]+$`, minLength 32. Example: `e:ec11538abf8f46d2953539521f745366:OrganizationAccountAccessRole`.
+  - `assumerolewithsaml` (POST /v1/assume-role-with-saml): `role_indicator` (REQUIRED), `principal_indicator` (REQUIRED, same format as role_indicator, [offering:account_id:principal_name]), `saml_assertion` (REQUIRED base64 SAML doc, minLength 1), `duration_seconds` (optional). Account has 0 SAML providers.
+  - `objectstoreauthorization` (POST /v1/object-store-authorization): `method` (REQUIRED, HTTP verb), `url` (REQUIRED, full object-store URL), `x_amz_content_sha256` (REQUIRED, SHA256 of request body), `x_amz_date` (REQUIRED, AMZ date format YYYYMMDDTHHmmssZ), `region` (optional, default kr-west1), `service` (optional, default s3). NOT bucket_name/duration_seconds (old fragment was wrong). This generates an S3-compatible Authorization header from the caller's STS session token.
+- **Role indicator format:** `e:ACCOUNT_ID:ROLE_NAME`. IAM roles do NOT expose an `srn`/`arn`/`role_arn` field in the list/show response — only `id` (32-hex UUID) and `name`. The offering code `e` matches `SCP_ENV=e`.
+- **Existing roles (2026-06-20):** `SCPServiceRoleForScf`, `SCPServiceRoleForApiGateway`, `OrganizationAccountAccessRole` (id: f07f5921c1df42089e59c90408599261, trust policy allows Account 73eab1a74c6347c1be9c892efc7f1102). assuemRole likely 403 (trust policy does not allow our account to assume roles for itself).
+- **Blocker:** assume-role likely 403 unless the role's trust policy allows our account. objectstoreauthorization requires a valid session_token in the caller's HMAC auth (not just access_key). No plain-key call can 200 on objectstoreauthorization.
+- **Safety:** lifecycle does NOT capture session_token/access_key_id/secret_access_key from any 200 response (safety hard rule: no credential exfiltration).
+- **Fragment:** `regression/scenarios/lifecycles/platform__sts.json` (sts-token-issuance-coverage lifecycle, corrected 2026-06-20).
+- **Coverage 2026-06-20 (read-only):** 0/3. All 3 endpoints POST-only, mutation-gated. With SCP_ALLOW_MUTATIONS: expect 400/403 on assumerole (trust policy mismatch), 400/422 on assumerolewithsaml (no real SAML provider + fake assertion), 400/401/403 on objectstoreauthorization (no session_token in auth). Coverage counting requires category=ok (2xx); 4xx from invalid credentials does NOT count.
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
 database (mysql, mariadb), data-analytics, financial-management,
