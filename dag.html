@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta http-equiv="refresh" content="2">
+<title>DAG Runner 1.0-d live</title>
+<style>body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:24px;color:#1f2328;background:#fff}
+h1{font-size:20px;margin:0 0 4px} h2{font-size:15px;margin:18px 0 6px;border-bottom:1px solid #d0d7de;padding-bottom:4px}
+table{border-collapse:collapse;font-size:14px} td{padding:1px 0}
+.k{display:inline-block;min-width:120px;color:#57606a}</style></head><body>
+<h1>🔭 DAG Runner — 1.0-d live validation</h1>
+<div style="color:#57606a;margin-bottom:10px">scheduler ADR · executing a dependency-DAG plan, diffed against pytest-xdist</div>
+<div><span class="k">phase</span> <b>Phase A · xdist baseline</b></div>
+<div><span class="k">elapsed</span> 7m58s &nbsp;·&nbsp; <span class="k">live VPCs</span>
+     <b style="color:#1a7f37">2 / 5</b> &nbsp;·&nbsp; <span class="k">leaf set</span> vpc-endpoint, networking-vpc-subnet, networking-vpc-internet-gateway</div>
+<h2>Phase B · dag_runner (live waves)</h2>
+<table><tr><td colspan="3" style="color:#6e7781">waiting…</td></tr></table>
+
+<h2>log</h2><div style="font-family:ui-monospace,monospace;font-size:12px;color:#57606a">04:17:33  Phase A: provisioning shared VPC for the xdist baseline<br>04:21:39  shared VPC provisioned: a52a5220eb60…<br>04:21:39  Phase A: pytest -k 'vpc-endpoint or networking-vpc-subnet or networking-vpc-internet-gateway' -n3 (xdist)</div>
+<div style="margin-top:14px;color:#8c959f;font-size:12px">auto-refresh 2s · updated 04:25:31</div>
+</body></html>
