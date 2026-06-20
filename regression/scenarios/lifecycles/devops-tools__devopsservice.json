@@ -10,11 +10,11 @@
           "name": "check-name-duplication",
           "method": "GET",
           "path": "/v1/devops-services/check-duplication",
-          "params": {"tenant_code": "regrdevops{ualpha}", "tenant_name": "regrdevops{ualpha}"},
+          "params": {"tenant_code": "regrdevops{ualpha}"},
           "expect_status": [200, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "devops",
-          "_note": "checkduplicationdevopsservice: query params tenant_code/tenant_name (both optional, pattern ^[a-z0-9\\-]*$), result:boolean. Corrected from the previous WRONG ?name= param (no `name` query exists on this endpoint)."
+          "_note": "checkduplicationdevopsservice: LIVE-VERIFIED 2026-06-20 — only ONE of tenant_code OR tenant_name may be sent; sending both returns 400 'Tenant name, Tenant code [required only one of both]'. Using tenant_code alone yields 200 {result: false}. Pattern ^[a-z0-9\\-]*$. Corrected from the previous WRONG dual-param send."
         },
         {
           "name": "list-devops-services",
