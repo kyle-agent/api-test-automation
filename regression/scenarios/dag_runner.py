@@ -248,10 +248,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     # live path: lazily import the credential-bearing adapters
-    from regression.scenarios import dag_runner_live
+    from regression.scenarios import dag_runner_live, schedule_optimizer
     executor, provisioner = dag_runner_live.build(plan, max_workers=args.max_workers)
     result = run_plan(plan, executor, provisioner=provisioner, max_workers=args.max_workers)
     print(format_run(result))
+    # learn: fold this run's measured wall-times into the duration store so the
+    # next schedule's critical path / priorities improve.
+    try:
+        schedule_optimizer.update_durations(schedule_optimizer.measured_from_result(result))
+    except Exception:  # noqa: BLE001 — learning must never fail the run
+        pass
     return 0 if result.ok else 1
 
 

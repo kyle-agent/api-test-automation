@@ -67,6 +67,17 @@ def duration_of(node: str, durations: dict, default: float = _DEFAULT_S) -> floa
     return float(e["avg_s"]) if e and e.get("avg_s") else default
 
 
+def measured_from_result(run_result) -> dict:
+    """Extract ``{lifecycle_id: wall_seconds}`` from a dag_runner RunResult — the
+    accurate per-lifecycle wall-time the executor measured. Fold this into the
+    store after each live run so the schedule learns real durations."""
+    out = {}
+    for o in getattr(run_result, "outcomes", []):
+        if getattr(o, "duration_s", 0):
+            out[o.lifecycle_id] = o.duration_s
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # 2. critical path (longest duration-weighted path through the dependency DAG)
 # --------------------------------------------------------------------------- #
