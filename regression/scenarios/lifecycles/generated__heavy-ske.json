@@ -102,7 +102,12 @@
           "name": "create-ske-image",
           "service": "ske",
           "method": "GET",
-          "path": "/v1/images?scp_original_image_type=k8s&size=20&page=0",
+          "path": "/v1/images",
+          "params": {
+            "scp_original_image_type": "k8s",
+            "size": "20",
+            "page": "0"
+          },
           "expect_status": [
             200,
             201,
@@ -113,7 +118,12 @@
           "name": "verify-ske-image-images-page",
           "service": "ske",
           "method": "GET",
-          "path": "/v1/images?scp_original_image_type=k8s&size=20&page=0",
+          "path": "/v1/images",
+          "params": {
+            "scp_original_image_type": "k8s",
+            "size": "20",
+            "page": "0"
+          },
           "expect_status": [
             200
           ],

@@ -59,6 +59,22 @@ duplicating. Add a new `##` section when you take on a new service.
   `security_group_ids` (not scalar/`security_groups`); notification id is `$.notifications[0].id`
   (list envelope, not `$.id`).
 
+## storage / backup
+
+- **Host:** regional. Service key: `backup`.
+- **checkfilesystemduplication** (`GET /v1/backups/check-filesystem-duplication`):
+  requires BOTH `filesystem_path` (string) AND `server_uuid` (UUID of a VM) as query params.
+  CONFIRMED LIVE (2026-06-20): returns 404 `Backup.NotFoundCreatedBackupAgent` for any
+  `server_uuid` when no backup agent is installed on that server. NOT a missing-param issue —
+  the params are correct per `api_catalog_params.json`. This endpoint is a **heavy-prereq blocker**:
+  needs a real VM + backup agent installation (not REST-provisionable). Cannot be covered
+  in a read-only or light-mutation run. Waiver candidate.
+- **checkbackupnameduplicate** (`GET /v1/backups/check-name-duplication`):
+  requires `backup_name` query param (NOT `name`). CONFIRMED LIVE 200 (2026-06-20):
+  `?backup_name=regrtest` → `{"result":false}`.
+- **listbackups** list envelope: `{contents:[], count}` (NOT `{backups:[], ...}`).
+- **createbackup** returns 500 `ContactAdminForAssistance` — product-bug (baselined).
+
 ## storage / filestorage
 
 - **Host:** regional. Owns NFS volumes.
@@ -129,10 +145,13 @@ duplicating. Add a new `##` section when you take on a new service.
   `connectable-resources` → `{count, resources[]}`.
 - **`checkrepositorynameduplication`** needs BOTH `registry_id` + `name` query
   params (else 400 `Field required`); `checkregistrynameduplication` needs `name`.
-- **READ-ONLY coverage ceiling (no docker, no mutations):** 8 GETs reachable —
+  CONFIRMED LIVE 200 (2026-06-20): `GET /v1/repositories/check-duplication/name?registry_id=nayvugfp4154447ab0ab61279cba3d72&name=regrcheck` → `{"result":false}`.
+  Added step `check-repository-name-duplication` to `scr-read-coverage` lifecycle in
+  `container__scr.json`; step fires immediately after `list-registries-harvest` captures `registry_id`.
+- **READ-ONLY coverage ceiling (no docker, no mutations):** 9 GETs reachable —
   listregistries, showregistry, listrepositories, showregistry's
-  connectable-resources, both check-duplications, showrepository, listimages.
-  All 200 on the borrowed resources.
+  connectable-resources, both check-duplications (checkrepositorynameduplication now fixed),
+  showrepository, listimages. All 200 on the borrowed resources.
 - **Docker-push blocker:** the existing repository has `images:[]` (count 0), and
   images/tags are **born only by `docker push`**, not by any REST POST. So
   `showimage`, `listtagses`, `showtags`, `tags-{packages,secrets,vulnerabilities}`,
@@ -302,9 +321,27 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Entitlement / validation blockers:** `adduserpolicybinding` /
   `removeuserpolicybinding` → 403; resource-policy mutations
   (`addpermission`/`setpermission`/`removepermission`/`setresourcepolicy`/
-  `deleteresourcepolicy`) → 400 (need a real `srn` target).
-- **Coverage 2026-06-18:** 15 → **27 / 62** (read-only levers only; no resources
-  created, account left clean).
+  `deleteresourcepolicy`) were 400 (SRN decoding error) — **FIXED 2026-06-20** (see
+  below).
+- **b64-SRN fix (2026-06-20):** The iam gateway decodes `{srn}` path segments
+  as base64, the same way resourcemanager does. Plain SRN in
+  `/v1/resource-policies/{srn}` yields 400 "SRN decoding error". The fix mirrors
+  the resourcemanager pattern: `GET /v1/resources` (resourcemanager cross-service
+  step) soft-captures `$.resources[0].srn` → `iam_srn`; a `b64_encode` step
+  produces `iam_srn_b64`; all 5 srn-targeted write paths use `{iam_srn_b64}`:
+  - `PUT /v1/resource-policies/{iam_srn_b64}` (setresourcepolicy)
+  - `GET /v1/resource-policies/{iam_srn_b64}` (showresourcepolicy)
+  - `POST /v1/resource-policies/{iam_srn_b64}/statements` (addpermission)
+  - `PUT /v1/resource-policies/{iam_srn_b64}/statements/{unique}` (setpermission)
+  - `DELETE /v1/resource-policies/{iam_srn_b64}/statements/{unique}` (removepermission)
+  - `DELETE /v1/resource-policies/{iam_srn_b64}` (deleteresourcepolicy)
+  The `{sid}` path segment (`{unique}`) does NOT need b64 encoding. After the fix
+  the calls will pass the SRN decoder; they may still 404 (no resource-policy on
+  that resource) or 403 (no write permission). The b64_encode step is `optional`
+  so a missed capture degrades gracefully to a placeholder that still calls the
+  endpoint. Wired in `iam-resource-policy` lifecycle (`management__iam.json`).
+- **Coverage 2026-06-18 → 2026-06-20:** 15 → **28 / 62** (read-only levers +
+  wave5-iam-bindings; b64-SRN fix is pre-mutation and awaits the light CRUD run).
 
 ## networking / dns
 
@@ -559,6 +596,56 @@ duplicating. Add a new `##` section when you take on a new service.
   getadressbookmemberlist).
 
 ---
+
+---
+
+## management/network-logging
+
+- **Host / service key:** `network-logging`
+- **Catalog endpoints (4):** `listnetworkloggingconfigurations` (GET /v1/network-logging/configurations), `listnetworkloggingstorages` (GET /v1/network-logging/storages), `createnetworkloggingstorage` (POST), `deletenetworkloggingstorage` (DELETE).
+- **REQUIRED query param for both GETs:** `resource_type`. Valid enum values (confirmed live 2026-06-20): `FIREWALL`, `SECURITY_GROUP`, `NAT`. The value `VPC_FLOW_LOG` is REJECTED with 400 ("Input should be 'FIREWALL', 'SECURITY_GROUP' or 'NAT'").
+- **Backend stability:** Both GET endpoints exhibit transient 503s (no body). In a healthy window they return 200 with empty lists (`count:0`). The client engine retries handle this; scenarios use `expect_status: [200, 403]` so 503 retry path does not red the run.
+- **Scenario file:** `regression/scenarios/lifecycles/management__network-logging.json`; both GET steps now carry `"params": {"resource_type": "FIREWALL"}`.
+- **Coverage 2026-06-20:** 2 existing + 2 GET list steps now have correct `resource_type` param fix applied (was missing -> 400 ValidationError; fixed to FIREWALL -> 200 in healthy window).
+
+---
+
+## container/ske
+
+- **Host / service key:** `ske`
+- **listimages (GET /v1/images):** `scp_original_image_type` is REQUIRED. Only confirmed valid value: `k8s`. Without the param: 400 ValidationError "Field required". With `k8s`: 200, returns `nodepool_images` array (count:15 on 2026-06-20).
+- **Scenario files updated:** `container__ske.json` (added `list-images` step with `params: {scp_original_image_type: k8s}` to `ske-read-coverage` lifecycle); `generated__heavy-ske.json` (converted inline query-string path to `params` dict for `create-ske-image` and `verify-ske-image-images-page` steps).
+- **Coverage 2026-06-20:** `listimages` unblocked — 400→200 confirmed live.
+
+---
+
+## security / kms
+
+- **Host:** regional (`kms.<region>.<env>...`). 20 endpoints (18 user-managed + 2 managed-kms).
+- **Key creation:** `POST /v1/kms/transit` with `key_type: advanced`, `purpose: <spec>`, `auto_rotate: Y`, `rotate_cycle: 7`. Capture `$.key.id`. Response also at `$.key.purpose`, `$.key.state`.
+- **Purpose / key type matrix (PARTIALLY VALIDATED as of 2026-06-20):**
+  - `purpose: rsa-2048` — CONFIRMED live 2xx. Asymmetric. Supports: sign/verify, encrypt/decrypt. Does NOT support hmac/datakey.
+  - `purpose: aes-256` — UNPROVEN (grounded in resource model knowledge/formal/resources/security__kms.yaml). Expected symmetric. Should support: hmac, datakey. Confirm live in first light CRUD run.
+  - `purpose: ecdsa` — UNPROVEN. Sign/verify only (no encrypt).
+  - `purpose: hmac` — UNPROVEN alternate string for HMAC-purpose key (may be the actual API value vs aes-256).
+  - Account had only `rsa-2048` keys as of 2026-06-20 (50 total, all To_Be_Terminated from prior runs).
+- **HMAC/datakey require symmetric key:** `POST /v1/kms/openapi/hmac/{key_id}` and `/datakey/{key_id}` return 400 when fired against an RSA-2048 key. Must route to an aes-256 (or HMAC-type) key. The `security-kms-transit-crypto` lifecycle now creates a separate symmetric key (`create-sym` step) and routes hmac+datakey to `sym_key_id`.
+- **Managed keys:** `GET /v1/managed-kms/transit` (listmanagedkeys) returns `{count, keys[], page, size, sort}`. Account had count=0 as of 2026-06-20. `updatemanagedkeydescription` (`PUT /v1/managed-kms/transit/{key_id}/description`) requires an existing managed key id — the account must have system-managed keys for this to 2xx.
+- **Delete:** Scheduled delete (not immediate); key enters `To_Be_Terminated` state and stays in list for days. Reconciler sees state but key is functionally gone. `DELETE /v1/kms/transit/{key_id}` returns 200/202. Cleanup in lifecycle teardown is safe.
+- **Crypto ops (all require active key):** encrypt → `{ciphertext: "vault:v.."}`; decrypt/rewrap ← ciphertext; sign → `{signature}`; verify ← signature + input; hmac ← `{input: base64}` → `{hmac: "vault:v1/.."}`.
+- **Coverage 2026-06-20:** 15/20. Gaps: hmac (sym key unproven), datakey (sym key unproven), updatemanagedkeydescription (0 managed keys), plus any missed sub-ops. Lifecycle `security-kms-transit-crypto` covers 17 write ops total.
+
+## management / servicewatch
+
+- **Host:** regional (`servicewatch.<region>.<env>...`). 31 endpoints (alerts, dashboards, event-rules, log-groups/streams, metrics, custom ingest).
+- **Metric catalog lookup:** `POST /v1/metrics` with `{}` body (listmetricinfos) returns `{count, namespaces[{id, name, dimensions[{metrics[{id, name, namespace_id, ...}]}]}]}`. This is a POST-as-read (no mutation, no teardown). Use to get real `namespace_id` = `$.namespaces[0].id` and `metric_id` = `$.namespaces[0].dimensions[0].metrics[0].id`. Required for `createalert` — fake doc-sample IDs cause 400.
+- **Alert create:** `POST /v1/alerts` — response envelope is FLAT: `{created_at, created_by, id}` (NOT `{alert.id}`). Capture `$.id`. AlertCreateRequest required: `level, metric_id, name, namespace_id, operator, period, statistic`. RANGE operator: use `lower_bound`/`upper_bound` NOT `threshold` (live 400 conflict). `recipient_ids: []` (valid empty). `dimensions`/`individual_items` optional (account-specific, drop for portability).
+- **Alert show path:** `GET /v1/alerts/{id}` — the catalog param name is `{id}` (not `{alert_id}`); engine resolves by value so captured `alert_id` variable works.
+- **Event-rule create:** `POST /v1/event-rules` — `event_ids`/`resource_type_id`/`service_id` are PLATFORM-GLOBAL catalog values (VALIDATED: `createeventrule` 2xx in prior runs). `recipient_ids: []` valid. `srn_list: []` valid. Response: `{event_rule: {id, ...}}` — capture `$.event_rule.id`.
+- **Event-rule GET list:** No list-all endpoint for event-rules (GET /v1/event-rules returns 404). Cannot borrow existing event-rule IDs read-only — create must succeed to get an id for showeventrule.
+- **Dashboard capture:** `$.id` (flat, VALIDATED 2026-06-15). Dashboard delete uses field `dashboard_ids` (NOT `ids`) in the bulk DELETE body. All other bulk deletes (alerts, event-rules, log-groups, log-streams) use `ids`.
+- **OTLP custom metrics:** `POST /v1/metrics/custom` — `as_int` integer value (not `as_double`), `time_unix_nano` must be a recent epoch (use 1780272000000000000 = 2026-06-01 UTC; 15mo retention). resource.attributes routing key for namespace is `namespace` (UNPROVEN — may still 400). Broad 202/400 tolerance recommended.
+- **Coverage 2026-06-20:** 24/31. Remaining gaps: showalert (blocked on createalert needing real metric ids — now fixed in lifecycle), showeventrule (blocked on createeventrule; get-event-rule decoupled from group so it fires), createcustommetrics 400 (OTLP namespace routing unresolved). Target +2 on next light CRUD run.
 
 ## Services not yet deeply explored (stubs — fill in as you go)
 

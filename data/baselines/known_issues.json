@@ -9,6 +9,13 @@
       "note": "SCP backend 500 on /v1/planned-computes/server-types; tracked upstream, not a regression in our suite."
     },
     {
+      "key": "financial-management/billingplan/listplannedcomputeinstances",
+      "status": 500,
+      "type": "Product Bug",
+      "since": "2026-06-20",
+      "note": "GET /v1/planned-computes/instances 500 ContactAdminForAssistance with all 5 required query params present and valid (service_id=VIRTUAL_SERVER, os_type=OPEN_SOURCE [uppercase enum; lowercase rejected 400], server_type from any value, start_date/end_date). Same backend-500 family as listplannedcomputeservertypes (its server-types feed also 500s). Live-probed 2026-06-20; not a regression in our suite."
+    },
+    {
       "key": "database/mysql/mysqlunsetbackup",
       "status": 401,
       "type": "Automation Bug",

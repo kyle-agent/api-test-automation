@@ -217,7 +217,15 @@
     "networking-dns-hosted-zone-private": [
       "vpc",
       "private-dns"
+    ],
+    "gen-cloudml-chain": [
+      "ske-cluster",
+      "container-registry"
+    ],
+    "cloud-ml-write-coverage": [
+      "ske-cluster",
+      "container-registry"
     ]
   },
-  "notes": "Quota kinds come from core.budgets.DEFAULT_LIMITS (vpc=5, private-dns=3). networking-dns-hosted-zone (scenarios.json) stays disabled — superseded 2026-06-11 by networking-dns-hosted-zone-private (lifecycles/networking__dns.json), an ADOPT-class heavy lifecycle that declares [vpc, private-dns] (it ADOPTS the shared VPC for the private-dns connect step and self-creates only the private-dns, which the engine budget-gates via POST /v1/private-dns; fallback self-create VPC block 10.142.0.0/20). private-dns provisioning is VERY slow (hours observed) so the lifecycle is heavy and must not have others serialized behind it. The four heavy lifecycles each stand up their own VPC inline, so under the 5-VPC cap a scheduler must serialize them (and the two light VPC lifecycles) rather than run them concurrently. The engine reserves a slot in core.budgets before each /v1/vpcs (and /v1/private-dns) create and releases it on teardown; a multi-process scheduler should first Budget.sync() each kind from a live list call, then gate concurrency on Budget.available(kind)."
+  "notes": "Quota kinds come from core.budgets.DEFAULT_LIMITS (vpc=5, private-dns=3). networking-dns-hosted-zone (scenarios.json) stays disabled — superseded 2026-06-11 by networking-dns-hosted-zone-private (lifecycles/networking__dns.json), an ADOPT-class heavy lifecycle that declares [vpc, private-dns] (it ADOPTS the shared VPC for the private-dns connect step and self-creates only the private-dns, which the engine budget-gates via POST /v1/private-dns; fallback self-create VPC block 10.142.0.0/20). private-dns provisioning is VERY slow (hours observed) so the lifecycle is heavy and must not have others serialized behind it. The four heavy lifecycles each stand up their own VPC inline, so under the 5-VPC cap a scheduler must serialize them (and the two light VPC lifecycles) rather than run them concurrently. The engine reserves a slot in core.budgets before each /v1/vpcs (and /v1/private-dns) create and releases it on teardown; a multi-process scheduler should first Budget.sync() each kind from a live list call, then gate concurrency on Budget.available(kind). | cloud-ml PREREQUISITE (owner clarification 2026-06-20): cloud-ml requires a CONTAINER REGISTRY created beforehand PLUS that registry's console-issued auth key (credential scr-auth-key) — this is why cloud-ml POST/GET 404 on a bare account. gen-cloudml-chain stands the registry up inline (/v1/container-registries create→show→delete); cloud-ml-write-coverage (coverage-only) does NOT, so for it the registry + scr-auth-key are EXTERNAL preconditions (the scr-auth-key credential is not a created resource, so it is documented here rather than listed as a prerequisite family). Canonical model: knowledge/formal/resources/ai-ml__cloud-ml.yaml (cloud-ml.requires: container-registry + {credential: scr-auth-key})."
 }

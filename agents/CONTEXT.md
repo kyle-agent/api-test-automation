@@ -103,7 +103,26 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-06-19, hand-driven from Claude remote — full handoff:
+- **LATEST (2026-06-20, hand-driven from Claude remote):** closed the last
+  id-bound GET **reachability** gap — wired `showresourcebycomponents`
+  (`GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}`)
+  into `resourcemanager-tag-lifecycle` and **LIVE-VERIFIED 200** (read-only probe,
+  no mutations). Static ceiling now **1371/1372 reachable (99.9%)**; the single
+  remaining static gap is the **blast-radius-waived** iam `deletepolicies` (DELETE
+  /v1/policies/bulk — un-probeable, correctly excluded, NOT a backlog item). So
+  reachability is effectively MAXED. Fact recorded (`knowledge/validated-facts.md`:
+  segments PLAIN not b64, 4th seg = `$.resources[].id`, list `resource_identifier`
+  is null). **The frontier from here is LIVE C3 (~50%), which is dispatch-gated**
+  (free cheap batch vs billable heavy batch — see "What to advance next").
+  **Full per-service C3 analysis done** (13 parallel read-only coverage agents):
+  `docs/COVERAGE-C3-ANALYSIS-2026-06-20.md`. Raw 2xx = 566/1372 (41.3%). 560
+  non-waived uncovered sort into 4 tiers: **Tier 0 FREE** (~11 read-only param-fix/
+  read-chain edits), **Tier 1 LIGHT** (~78 non-billable mutations — gslb/cdn +8 each,
+  vs-image +11, vpc-light +11, iam b64-SRN +9, scf +5, loggingaudit +6, …),
+  **Tier 2 HEAVY** (~120+ billable: DB engines biggest, then compute/network/storage),
+  **Tier 3 BLOCKED** (~90: entitlement/product-bug/console-only → waive, don't chase).
+  Recommended order free→light→heavy. CI lane confirmed clear (owner-rule OK).
+- **PRIOR (2026-06-19, hand-driven from Claude remote — full handoff:
   `docs/HANDOFF-2026-06-19-coverage-and-watcher.md`):** published **C3 47.9% →
   50.1%** (633/1264), C2-called **53.4%** (733/1372). Heavy DBaaS run complete +
   clean (8 cluster creates, +22 DB sub-op id-GET 2xx, 0 survivors verified). New

@@ -115,16 +115,16 @@
       "heavy": false,
       "blockers": [
         "product-bug-5xx: createrole 500 ContactAdmin (blocks role mutation chain)",
-        "needs-peer-resource: 0 saml-providers / 0 iam-users / 0 resource-policies in account",
         "entitlement-403: add/removeuserpolicybinding",
-        "validation-400: addpermission/setpermission/setresourcepolicy need a real srn target"
+        "needs-peer-resource: saml-providers require multipart/form-data (engine-multipart-blocked)",
+        "post-fix uncertainty: addpermission/setpermission/setresourcepolicy may 404 (no policy on target resource) or 403 (no write permission) after b64 fix clears the SRN decoder 400 — recorded as coverage but may not reach 2xx"
       ],
       "next_levers": [
-        "create an own IAM user (MUTATIONS) to unblock user-bound reads",
-        "create a resource-policy to give srn-targeted ops a real target"
+        "b64-SRN fix landed (2026-06-20): iam-resource-policy lifecycle now captures real SRN from resourcemanager GET /v1/resources and b64-encodes it for the 5 srn-targeted write steps (addpermission, setpermission, setresourcepolicy, removepermission, deleteresourcepolicy) — eliminates the 400 SRN decoding error; run under SCP_ALLOW_MUTATIONS to verify",
+        "create own IAM user (MUTATIONS) to unblock user-bound reads (getiamuser, listuserpolicybindings, removeuserpolicybinding)"
       ],
-      "notes": "15->27/62 via read-only levers (smoke LISTs + read_chains + account_id from a role). No /v1/accounts or /v1/users collection list exists.",
-      "updated": "2026-06-19T02:01:07Z"
+      "notes": "28/62 covered. b64-SRN fix applied 2026-06-20: iam-resource-policy lifecycle now uses base64-encoded real SRN from resourcemanager /v1/resources for the 5 srn-targeted write paths (was plain SRN -> 400 SRN decoding error). Same decoder as resourcemanager (confirmed by resourcemanager b64 finding). Prior note: 15->27/62 via read-only levers; 28th via wave5-iam-bindings.",
+      "updated": "2026-06-20T04:18:57Z"
     },
     {
       "service": "loadbalancer",
@@ -150,20 +150,20 @@
     },
     {
       "service": "scr",
-      "covered": 8,
+      "covered": 9,
       "total": 39,
-      "gap": 31,
+      "gap": 30,
       "heavy": false,
       "blockers": [
-        "needs-docker-push: ~16 image/tags-id ops (repo images:[] \u2014 born only by docker push)",
+        "needs-docker-push: ~16 image/tags-id ops (repo images:[] — born only by docker push)",
         "entitlement/quota: createregistry 403 quota.value.exceeded (1 registry cap, slot full)",
         "gated-mutation: ~14 policy/ACL PUT/DELETE would clobber the shared borrowed sample registry"
       ],
       "next_levers": [
         "cover registry/repo policy+ACL via an OWN registry lifecycle when the quota slot frees"
       ],
-      "notes": "3->8/39 via borrow-and-read-by-id on the pre-existing sample registry. 503s were transient.",
-      "updated": "2026-06-19T02:01:07Z"
+      "notes": "8->9/39. Added check-repo-name-dup step to scr-read-coverage lifecycle (container__scr.json). Confirmed live 200 for GET /v1/repositories/check-duplication/name?registry_id=nayvugfp4154447ab0ab61279cba3d72&name=regrcheck -> {result:false}. registry_id captured from list-registries-harvest ($.registries[0].id). 503s on SCR are transient; endpoint proven 2xx when service is up.",
+      "updated": "2026-06-20T00:00:00Z"
     },
     {
       "service": "backup",
@@ -171,10 +171,14 @@
       "total": 31,
       "gap": 30,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        "heavy-prereq: checkfilesystemduplication (GET /v1/backups/check-filesystem-duplication) requires server_uuid of a VM that has a backup agent installed. Account has 0 backup agents. Returns 404 Backup.NotFoundCreatedBackupAgent for any server_uuid. NOT a missing-param fix — need a real server+agent (heavy billable prereq). Cannot be covered with read-only edits."
+      ],
+      "next_levers": [
+        "SCP_RUN_HEAVY: provision a real VM + install backup agent -> capture server_uuid -> call checkfilesystemduplication with real server_uuid + filesystem_path"
+      ],
+      "notes": "checkfilesystemduplication CONFIRMED params correct (filesystem_path + server_uuid from catalog_params). BUT 404 NotFoundCreatedBackupAgent for any server_uuid — needs a real VM with backup agent (heavy). Not a free Tier-0 fix. Blocker recorded.",
+      "updated": "2026-06-20T00:00:00Z"
     },
     {
       "service": "mysql",
@@ -216,9 +220,12 @@
       "gap": 22,
       "heavy": true,
       "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "next_levers": [
+        "listimages now has scp_original_image_type=k8s param — should count as covered on next smoke run",
+        "Remaining 21 gaps need SCP_ALLOW_MUTATIONS + SCP_RUN_HEAVY (cluster+nodepool lifecycle)"
+      ],
+      "notes": "listimages (GET /v1/images): scp_original_image_type=k8s is REQUIRED (400 without; 200 with, count:15). Fixed in container__ske.json (new list-images step) and generated__heavy-ske.json (inline params -> params dict). Confirmed 200 live 2026-06-20.",
+      "updated": "2026-06-20T04:00:00Z"
     },
     {
       "service": "cachestore",
@@ -651,10 +658,25 @@
       "total": 31,
       "gap": 7,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "showalert (GET /v1/alerts/{id})",
+          "reason": "Blocked on createalert 2xx: create needs real metric_id/namespace_id from the metric catalog. list-metric-catalog step (POST /v1/metrics {}) now harvests real ids. If the account has no metric-emitting resources (namespaces[] empty), catalog returns no ids and createalert still 4xx. Expected 2xx on a live account with VMs/services.",
+          "kind": "needs-catalog-data"
+        },
+        {
+          "key": "showeventrule (GET /v1/event-rules/{event_rule_id})",
+          "reason": "Blocked on createeventrule 2xx in the group. FIX: get-event-rule moved to separate group event-rule-read so it fires even when create 4xx (records endpoint). Real 2xx for showeventrule requires createeventrule 2xx (resource model says VALIDATED with doc-sample event_ids). No list endpoint for event-rules to borrow existing id.",
+          "kind": "group-mechanism"
+        }
+      ],
+      "next_levers": [
+        "Run light CRUD: list-metric-catalog POST /v1/metrics {} -> if account has metric-emitting resources (VMs), captures real namespace_id/metric_id -> createalert 2xx -> showalert + setalert covered.",
+        "Run light CRUD: createeventrule with doc-sample platform-global event_ids (VALIDATED) -> showeventrule covered.",
+        "createcustommetrics: time_unix_nano updated to 2026-06-01 epoch, as_int format; still 400 if namespace routing is wrong (known unknown)."
+      ],
+      "notes": "C3 Tier-1 fix 2026-06-20: (1) alert lifecycle: list-metric-catalog step added to harvest real namespace_id/metric_id; capture changed from $.alert.id to $.id (flat, per doc); set-alert body uses captured ids. (2) event-rule lifecycle: get-event-rule moved to group event-rule-read (decoupled from create failure); createeventrule uses capture_soft. (3) createcustommetrics: updated OTLP body (as_int, 2026-06-01 timestamp). +2 target: showalert + showeventrule.",
+      "updated": "2026-06-20T00:00:00Z"
     },
     {
       "service": "devopsservice",
@@ -684,10 +706,24 @@
       "total": 20,
       "gap": 5,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "updatemanagedkeydescription (PUT /v1/managed-kms/transit/{key_id}/description)",
+          "reason": "Account has 0 managed keys as of 2026-06-20 (GET /v1/managed-kms/transit returned count:0, keys:[]). Managed keys are SYSTEM-managed — no create API exists. Step fires with unresolved placeholder -> 4xx. Auto-upgrades to 2xx if account gains a managed key.",
+          "kind": "needs-resource (system-managed)"
+        },
+        {
+          "key": "hmac (POST /v1/kms/openapi/hmac/{key_id}) + datakey (POST /v1/kms/openapi/datakey/{key_id})",
+          "reason": "Required SYMMETRIC (aes-256) key create: purpose=aes-256 is UNPROVEN (grounded in resource model). If aes-256 purpose value is wrong, create-sym 4xx -> sym_key_id unresolved -> hmac/datakey fire against placeholder and 4xx. Will be 2xx once aes-256 purpose string is confirmed live.",
+          "kind": "unproven-purpose-enum"
+        }
+      ],
+      "next_levers": [
+        "Run light CRUD: create-sym step (purpose=aes-256) will confirm or reject the aes-256 purpose string live. If 4xx, adjust purpose to hmac or aria based on error message.",
+        "For managed-key: account needs a system-managed key (cannot provision via API). Monitor account for managed key presence."
+      ],
+      "notes": "C3 Tier-1 fix 2026-06-20: hmac+datakey routed to symmetric key (create-sym step, purpose=aes-256 UNPROVEN); set-managed-key-description routes to soft-captured managed_key_id from list-managed-keys; account has 0 managed keys. +2 target endpoints: hmac + updatemanagedkeydescription. Expected gain: +2 if aes-256 purpose is valid and/or account has managed key; immediate gain +0 until confirmed live.",
+      "updated": "2026-06-20T00:00:00Z"
     },
     {
       "service": "secretvault",
@@ -794,10 +830,18 @@
       "total": 4,
       "gap": 2,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-19T02:01:07Z"
+      "blockers": [
+        {
+          "key": "listnetworkloggingconfigurations + listnetworkloggingstorages",
+          "reason": "transient-503: backend intermittently 503s even with correct resource_type param. Param fix applied (FIREWALL) — 200 confirmed in healthy window. Will auto-recover on retry. NOT a parameter bug.",
+          "kind": "transient-backend"
+        }
+      ],
+      "next_levers": [
+        "createnetworkloggingstorage (POST) + deletenetworkloggingstorage (DELETE) need SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE; body fields: name, log_type (VPC_FLOW_LOG etc.), object_storage_bucket_name, description"
+      ],
+      "notes": "listnetworkloggingconfigurations and listnetworkloggingstorages: resource_type REQUIRED query param, valid enums: FIREWALL, SECURITY_GROUP, NAT (NOT VPC_FLOW_LOG — rejected 400). Scenarios updated 2026-06-20 to use resource_type=FIREWALL. Backend transiently 503s; 200 confirmed in healthy windows.",
+      "updated": "2026-06-20T04:00:00Z"
     },
     {
       "service": "security-group",
@@ -820,7 +864,7 @@
       "next_levers": [
         "fifo-only dedup ops need a .fifo queue (optional groups already isolate)"
       ],
-      "notes": "12/12 \u2014 getqueueattributes needs attributes=All (case-sensitive) + name=<queue>. Fixed 41858cb.",
+      "notes": "12/12 — getqueueattributes needs attributes=All (case-sensitive) + name=<queue>. Fixed 41858cb.",
       "updated": "2026-06-19T02:01:07Z"
     },
     {
