@@ -475,6 +475,9 @@
           "name": "aimlops-check-version",
           "method": "GET",
           "path": "/v1/aimlops-platform/clusters/{cluster_id}/check-version",
+          "params": {
+            "version": "1.9.2"
+          },
           "expect_status": [
             200,
             400,
@@ -485,7 +488,7 @@
           ],
           "optional": true,
           "group": "aimlops-precond",
-          "_note": "precondition GET against the REAL cluster_id — expect 200 now that the cluster is RUNNING; tolerate 4xx (optional+grouped) so a precondition hiccup does not abandon the cluster before teardown."
+          "_note": "version is REQUIRED query param (confirmed live 2026-06-20: omitting it -> 400 ValidationError 'Field required'). Use the known available image version '1.9.2' (from /v1/aimlops-platform/images base_image field). Returns {result:false} when cluster exists and no aimlops release is installed yet."
         },
         {
           "name": "aimlops-validate-namespaces",
@@ -506,6 +509,9 @@
           "name": "aimlops-validate-resources",
           "method": "GET",
           "path": "/v1/aimlops-platform/clusters/{cluster_id}/validate-resources",
+          "params": {
+            "product_type": "enterprise"
+          },
           "expect_status": [
             200,
             400,
@@ -515,7 +521,8 @@
             422
           ],
           "optional": true,
-          "group": "aimlops-precond"
+          "group": "aimlops-precond",
+          "_note": "product_type is REQUIRED. Valid values: enterprise|mini (NOT KUBEFLOW — confirmed live 2026-06-20: KUBEFLOW -> 400 'product_type [enterprise|mini]'). Returns {result:false} when cluster exists but is insufficiently sized."
         },
         {
           "name": "aimlops-internal-nodes",
@@ -554,9 +561,10 @@
           "expect_status": [
             200
           ],
-          "_note": "live 27520649710: response wrapper is $.contents[] (not $.images[]); item has base_image/category/created_*; id field assumed 'id'. capture_soft so a wrong field doesn't hard-fail — the guarded release records its real response.",
+          "_note": "CONFIRMED live 2026-06-20: response uses $.contents[] wrapper. image_id field is 'image_id' (NOT 'id') with format 'IMAGE-R=HXHY3ccc9f3TSVtPpPFR' (has '=' char, non-UUID). 2 images: 'AIMLOps Platform 1.9.2' (enterprise) and 'Kubeflow Mini 1.9.1' (mini). Also captures base_image (version string like 'sdskubeflow-enterprise:1.9.2') for knowledge.",
           "capture_soft": {
-            "image_id": "$.contents[0].id"
+            "image_id": "$.contents[0].image_id",
+            "image_base": "$.contents[0].base_image"
           }
         },
         {

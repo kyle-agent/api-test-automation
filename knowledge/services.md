@@ -562,10 +562,20 @@ duplicating. Add a new `##` section when you take on a new service.
   - `getadressbooklist` — bare GET, 200 (empty)
   - `getmetriclist` — bare GET, 200 (3510 metrics across 37 product types)
   - `getproducttypelist` — bare GET, 200 (37 product types)
-- **Id-bound GETs (5 endpoints, getevent*/geteventpolicy*/getadressbookmember):**
-  Need event-id or eventPolicyId (no events in this account without SCP_RUN_HEAVY)
-  or addrbookId (no addrbooks). Scenario normalizes to '*' placeholder key when
-  no real ID is captured.
+- **Id-bound GETs (6 endpoints: geteventdetail, geteventnotificationstates, geteventpolicydetail, geteventpolicyhistories, geteventpolicynotification, getadressbookmemberlist):**
+  CONFIRMED REACHABLE 2026-06-20 via direct numeric-ID probes: ALL return 404
+  `ResourceNotFound` (not 400/400 resourceType-misparse). Key facts:
+  - eventPolicyId is **NUMERIC** (not UUID). Confirmed: numeric 12345 -> 404 ResourceNotFound.
+    UUID-format -> 400 resourceType-misparse (server treats UUID chars as date-like string).
+  - eventId is also **NUMERIC** per same probe.
+  - addrbookId is also **NUMERIC** per same probe.
+  - geteventpolicyhistories ALSO has the date-misparse bug (400 when queryStartDt/queryEndDt
+    provided in any format). Without dates: 400 Validation failure.
+  - addrbook read_chain in smoke uses WRONG list path (/v2/addrbooks instead of /v2/users/addrbooks)
+    -> 404 path-not-found -> chain skips. This is a catalog/API structural mismatch that
+    the auto-derive cannot handle. The lifecycle uses the CORRECT path (/v2/users/addrbooks).
+  Account has 0 events, 0 event-policies, 0 addrbooks. Scenario uses numeric placeholder,
+  normalizes to catalog '*' key.
 - **puteventpolicy body shape (CONFIRMED cascade-revealed 2026-06-19):**
   Must wrap all fields in `eventPolicyRequest` key. Required cascade-field order:
   `disableYn`, `isLogMetric`, `eventLevel`, `ftCount`, `eventThreshold`. Once all
@@ -591,15 +601,34 @@ duplicating. Add a new `##` section when you take on a new service.
   (PUT), `deleteeventpolicy` (DELETE). All need `SCP_ALLOW_MUTATIONS=true` +
   `SCP_ALLOW_DESTRUCTIVE=true`. Body shape now confirmed from cascade (see above).
   Cannot reach 2xx without monitoring-enrolled resources. Blocker: account-prereq.
-- **Coverage 2026-06-19:** 0 → **6/18** confirmed 200 ok:
-  getaccountmembers, getadressbooklist, getmetriclist, getproducttypelist (smoke),
-  getaccountproductlist, getproducteventpolicylist (X-ResourceType header probes).
-  Remaining 12 blocked by: backend date-parsing bug (getaccounteventlist,
-  getproducteventlist), missing monitoring enrollment (puteventpolicy,
-  modifyeventpolicy, deleteeventpolicy, getmetricperfdatalist), no real resource
-  IDs for id-bound GETs (geteventdetail, geteventnotificationstates,
-  geteventpolicydetail, geteventpolicyhistories, geteventpolicynotification,
-  getadressbookmemberlist).
+- **Backend date-misparse bug scope (EXPANDED 2026-06-20):**
+  The date-misparse bug (400 `params[name=resourceType, value=<date>]`) affects:
+  getaccounteventlist, getproducteventlist, AND geteventpolicyhistories.
+  Also geteventmetricperfdatalist POST without T-suffix on dates (confirmed prior).
+  All date formats tried for affected endpoints: YYYY-MM-DD, ISO-T-Z
+  (YYYY-MM-DDTHH:MM:SSZ), YYYYMMDD compact, int epoch. ALL fail with same error.
+  The X-ResourceType header IS correctly forwarded (confirmed by debug trace of
+  request headers). This is a server-side routing/validation bug where the query
+  parameter value is mapped to the 'resourceType' validation field.
+- **CRUD lifecycle engine / read-only lifecycle interaction:**
+  The `regression.scenarios.engine.run_lifecycle()` function requires
+  `SCP_ALLOW_MUTATIONS=true` to run ANY lifecycle (line 691), including read-only
+  ones. This means `cloudmonitoring-readonly-shows` and `cloudmonitoring-event-policy`
+  lifecycles only run during the CRUD pass (not the smoke pass). The smoke test
+  records what it can (bare GETs), and direct probes fill in the rest.
+- **Coverage 2026-06-20:** **6/18** confirmed 2xx ok:
+  getaccountmembers, getadressbooklist, getmetriclist, getproducttypelist (smoke);
+  getaccountproductlist (X-ResourceType: Object Storage -> 200 confirmed + recorded);
+  getproducteventpolicylist (X-ResourceType + productResourceId -> 200 confirmed + recorded).
+  ALL 14 non-mutating endpoints now have observations.jsonl entries.
+  Remaining 12 gap:
+  - backend-bug: getaccounteventlist, getproducteventlist, geteventpolicyhistories
+    (date-misparse, no workaround)
+  - account-prereq: puteventpolicy, modifyeventpolicy, deleteeventpolicy,
+    getmetricperfdatalist (products not enrolled in monitoring backend)
+  - no-real-id: geteventdetail, geteventnotificationstates, geteventpolicydetail,
+    geteventpolicynotification, getadressbookmemberlist (0 events/policies/addrbooks)
+    — all REACHABLE (404 with numeric id), will 2xx when real IDs exist.
 
 ---
 
@@ -653,8 +682,33 @@ duplicating. Add a new `##` section when you take on a new service.
 - **OTLP custom metrics:** `POST /v1/metrics/custom` — `as_int` integer value (not `as_double`), `time_unix_nano` must be a recent epoch (use 1780272000000000000 = 2026-06-01 UTC; 15mo retention). resource.attributes routing key for namespace is `namespace` (UNPROVEN — may still 400). Broad 202/400 tolerance recommended.
 - **Coverage 2026-06-20:** 24/31. Remaining gaps: showalert (blocked on createalert needing real metric ids — now fixed in lifecycle), showeventrule (blocked on createeventrule; get-event-rule decoupled from group so it fires), createcustommetrics 400 (OTLP namespace routing unresolved). Target +2 on next light CRUD run.
 
+## ai-ml / aimlops-platform
+
+- **Host:** regional (`aimlops-platform.<region>.<env>...`). 12 endpoints (3 GETs, 6 id-bound GETs, 3 writes).
+- **What it is:** Provisions an AI/ML-Ops platform (KubeFlow-based) onto an existing SKE (k8s) cluster. A "release" = a KubeFlow/mini install on the cluster. BILLABLE, slow, requires a running cluster.
+- **Images endpoint:** `GET /v1/aimlops-platform/images` returns `$.contents[]` (NOT `$.images[]`). Each item has:
+  - `image_id`: ID to pass to POST body, format `IMAGE-<base64-like>` (e.g. `IMAGE-R=HXHY3ccc9f3TSVtPpPFR`). NOT a UUID.
+  - `base_image`: version string (e.g. `sdskubeflow-enterprise:1.9.2`, `sdskubeflow-mini:1.9.1`)
+  - `image_name`: human-readable (e.g. `AIMLOps Platform 1.9.2`)
+  - 2 images available as of 2026-06-20: enterprise 1.9.2 and mini 1.9.1
+- **check-duplication:** `GET /v1/aimlops-platform/check-duplication` requires `release_name` query param (NOT `name`). Returns `{"result":false}` → 200 for a non-existing name. Smoke engine tries `name` (400), not `release_name` — smoke records 400 soft. Fix: probe directly with `release_name`.
+- **Cluster-bound preconditions (cluster_id format is CRITICAL):**
+  - `cluster_id` must be a **32-char hex UUID without hyphens** (str(uuid4()).replace('-','')). API returns 400 "Cluster ID should be 32-letter UUID format" for shorter/hyphenated ids.
+  - `checkaimlopsplatformversionv1` (`GET /v1/aimlops-platform/clusters/{cluster_id}/check-version`): requires `version` query param (e.g. `1.9.2`). Returns `{"result":false}` for a real cluster → 200.
+  - `validateclusternamespaceforaimlopsplatformv1` (`GET /v1/aimlops-platform/clusters/{cluster_id}/validate-namespaces`): no query params needed. Returns `{"result":false}` → 200 with real cluster.
+  - `validateclusterresourcesizeforaimlopsplatformv1` (`GET /v1/aimlops-platform/clusters/{cluster_id}/validate-resources`): requires `product_type` query param. **Valid values: `enterprise` or `mini` ONLY** (NOT KUBEFLOW/AMP). `product_type=KUBEFLOW` → 400 "product_type [enterprise|mini]". Returns `{"result":false}` → 200 with real cluster.
+- **Internal endpoints (needs aimlops release):**
+  - `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes` and `/storageclasses`: return 404 even with a real running SKE cluster. These proxy INTO the aimlops release itself (need an installed release). 404 error code `NotFound` (different from cluster-not-found code `PRODUCT-AI-ANALYTICS-USER-0002`).
+- **Release list:** `GET /v1/aimlops-platform` returns `{"contents":[],"total_count":0}` (account has 0 releases). No `id` field to derive for read-chains.
+- **Release by id:** 404 `PRODUCT-AI-ANALYTICS-USER-0002` "Kubeflow (id)" for non-existent release_id.
+- **POST body (unproven, best-effort):** `{release_name, cluster_id, image_id, namespace, description, cpu, memory, storage_class_name, volume_size}`.
+- **Lifecycle files:**
+  - `ai-ml__aimlops-platform.json`: read-only probe-reads lifecycle (heavy:true as gate). Probes id-bound GETs with fake 32-char UUID + required query params.
+  - `generated__heavy-aimlops.json`: full live-provision (needs SKE cluster + nodepool + aimlops release; very heavy/billable).
+- **Coverage 2026-06-20:** 2 → **6 / 12** (images 200, list 200, check-duplication 200 w/ release_name, check-version 200 w/ real cluster+version param, validate-namespaces 200 w/ real cluster, validate-resources 200 w/ real cluster+product_type=enterprise). Remaining 6 gaps: internal/nodes, internal/storageclasses (needs installed release), getaimlopsplatformv1 (needs real release), POST/PUT/DELETE (mutation-gated+heavy).
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
-database (mysql, mariadb), data-analytics, ai-ml, financial-management,
+database (mysql, mariadb), data-analytics, financial-management,
 platform, devops-tools, and the long tail of management/networking/storage.
 These have the most uncovered endpoints — see `scenario-catalog.md` gap list.
