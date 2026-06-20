@@ -367,6 +367,76 @@
           ]
         },
         {
+          "name": "list-archiving-histories",
+          "method": "GET",
+          "path": "/v1/archiving-histories",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404
+          ],
+          "_note": "reachability-only: returns 401 gateway-entitlement reject (scp-archivestorage_hmac not in service account catalog); soft-tolerated, observed 2026-06-20"
+        },
+        {
+          "name": "list-archiving-policies",
+          "method": "GET",
+          "path": "/v1/archiving-policies",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404
+          ],
+          "_note": "reachability-only: returns 401 gateway-entitlement reject (scp-archivestorage_hmac not in service account catalog); soft-tolerated, observed 2026-06-20"
+        },
+        {
+          "name": "list-recovery-histories",
+          "method": "GET",
+          "path": "/v1/recovery-histories",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404
+          ],
+          "_note": "reachability-only: returns 401 gateway-entitlement reject (scp-archivestorage_hmac not in service account catalog); soft-tolerated, observed 2026-06-20"
+        },
+        {
+          "name": "show-archiving-history-detail",
+          "method": "GET",
+          "path": "/v1/archiving-histories/detail",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404
+          ],
+          "_note": "reachability-only: returns 401 gateway-entitlement reject (scp-archivestorage_hmac not in service account catalog); soft-tolerated, observed 2026-06-20"
+        },
+        {
+          "name": "show-recovery-history-detail",
+          "method": "GET",
+          "path": "/v1/recovery-histories/detail",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            401,
+            403,
+            404
+          ],
+          "_note": "reachability-only: returns 401 gateway-entitlement reject (scp-archivestorage_hmac not in service account catalog); soft-tolerated, observed 2026-06-20"
+        },
+        {
           "name": "cancel-archiving",
           "method": "PUT",
           "path": "/v1/archiving-histories/cancel-archiving",
