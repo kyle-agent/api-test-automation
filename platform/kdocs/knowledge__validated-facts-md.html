@@ -1087,25 +1087,35 @@ subops-guarded create), both 500 <code>{"code":"ContactAdminForAssistance"}</cod
 shared-VPC body shape, so this is a postgresql-backend create fault, not a body/
 linking bug. Baselined in <code>known_issues.json</code> (Product Bug). Same <code>ContactAdmin</code>
 class as the already-baselined <code>*registerlogexportconfig</code> 500s.</p>
-<h2>IAM <code>DELETE /v1/policies/bulk</code> fans an UNMATCHED id out to ALL account policies (DANGER)</h2>
-<p><strong>Ground truth (run #124, loggingaudit 2026-06-19T08:20:20–52Z):</strong> the
-<code>iam-policy-extra-writes</code> lifecycle's <code>delete-policies-bulk</code> step sent
-<code>DELETE /v1/policies/bulk</code> with a synthetic/unmatched body
-<code>{"policy_ids": ["000…0"]}</code>. The SCP backend did NOT 4xx the unmatched id —
-it interpreted the bulk request as <strong>delete-ALL-policies</strong>: 420
-<code>policy.delete.start</code> events over <strong>240 distinct NON-test account policy
-names</strong> (AdministratorAccess_ACL, ObjectStorageAccess, Support,
-FullContainerRegistry, MariaDBManageAccess, …) in one 8-second backend batch
-(~52/sec — a single fanned-out call, not a client loop). All 416 non-owned
-deletes were backend-refused (the runner identity can't delete built-ins), so
-<strong>zero damage</strong>, but this is a name-unfiltered mass-delete of account policies
-(Hard Rule 3 violation by proxy).</p>
-<p><strong>Rule:</strong> NEVER send <code>/v1/policies/bulk</code> (or any bulk-delete-by-ids endpoint) an
-id we do not OWN. A synthetic/unmatched bulk id is NOT a safe "expect-4xx" probe
-here — the backend treats "no match" as "match everything." The fix
-(<code>management__iam.json</code> <code>pol-bulk</code> group) creates our OWN throwaway <code>regrpolb*</code>
-policy and bulk-deletes THAT captured id; if the create doesn't 2xx the group is
-skipped, so the bulk call never fires with an unfiltered body.</p></div>
+<h2>IAM <code>DELETE /v1/policies/bulk</code> deletes ALL account policies REGARDLESS of body — un-probeable, step REMOVED (DANGER)</h2>
+<p><strong>Backend behavior (verified across TWO live runs):</strong> <code>DELETE /v1/policies/bulk</code>
+(catalog key <code>management/iam/deletepolicies</code>) <strong>ignores the <code>policy_ids</code> request
+body entirely</strong> and fans the call out into a delete-ALL-account-policies attempt.
+There is <strong>NO request body that makes this endpoint safe.</strong></p>
+<ul>
+<li><strong>Run #124</strong> (2026-06-19T08:20:20–52Z): body was a synthetic/unmatched id
+  <code>{"policy_ids": ["000…0"]}</code> → 420 <code>policy.delete.start</code> over 240 distinct
+  NON-test policy names. First read as "unmatched id == delete-all."</li>
+<li><strong>Run #125</strong> (main @ ea4ade38, 2026-06-19T11:21Z): the EARLIER "fix" was in
+  place — <code>create-policy-for-bulk</code> created an OWNED <code>regrpolb*</code> policy (Create
+  End=1 at 11:21:25Z, capture <code>$.id</code> correct, same as the working <code>create-policy</code>
+  step) and the body carried that <strong>real owned id</strong>. The mass-delete fired ANYWAY:
+  3s after the create, at 11:21:28Z, a wave of <strong>422 <code>policy.delete.start</code></strong> (28→58/sec)
+  / <strong>417 <code>policy.delete.error</code></strong> hit <strong>237 distinct NON-test SYSTEM policies</strong>
+  (AdministratorAccess_ACL, ObjectStorageAccess, PaaSCommon-*, OperatorAccess_ACL,
+  Support, …). The owned-id body did NOT scope it.</li>
+</ul>
+<p>So the correct finding is stronger than the run-#124 reading: the endpoint
+<strong>deletes ALL regardless of body</strong>, not just on an unmatched id. All non-owned
+deletes are backend-refused (runner identity can't delete built-ins → zero
+damage so far), but this is an unfiltered mass-delete of account policies every
+time it is called (Hard Rule 3 hazard).</p>
+<p><strong>Rule:</strong> <code>DELETE /v1/policies/bulk</code> is <strong>un-probeable safely — never call it.</strong>
+The first fix (owned bulk-target id) was proven INSUFFICIENT on run #125. The
+<code>pol-bulk</code> group (<code>create-policy-for-bulk</code> + <code>delete-policies-bulk</code>) <strong>has been
+removed</strong> from <code>management__iam.json</code>, and <code>management/iam/deletepolicies</code> is
+waived (<code>data/baselines/coverage_waivers.json</code>, class <code>blast-radius</code>) so it is
+never re-added. There is no body shape that scopes this endpoint.</p></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/validated-facts.md</code></div>
