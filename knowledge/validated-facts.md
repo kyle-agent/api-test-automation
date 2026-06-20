@@ -949,3 +949,148 @@ The first fix (owned bulk-target id) was proven INSUFFICIENT on run #125. The
 removed** from `management__iam.json`, and `management/iam/deletepolicies` is
 waived (`data/baselines/coverage_waivers.json`, class `blast-radius`) so it is
 never re-added. There is no body shape that scopes this endpoint.
+
+## 2026-06-20 — Full heavy DAG run (tools/dag_run_live.py ALL, 4118s wall)
+
+### 503 gateway storm = load-induced Envoy saturation (NOT our request bug)
+> conf: 0.9 · seen: 2026-06-20 · obs: 117
+
+**Pattern:** 117 of 152 obs-level failures (77%) share the exact error string
+`upstream connect error or disconnect/reset before headers. retried and the latest
+reset reason: connection timeout` or `reset reason: connection timeout`. This is
+the Envoy sidecar's upstream-connect timeout, triggered server-side when the
+backend service pool is saturated. It is **not** a request shape or HMAC issue.
+
+**Time window:** concentrated 12:07–12:25 KST (run minutes 7–25) when AIMD
+concurrency peaked, then clamped to floor 4.
+
+**Affected services during the storm:** aimlops-platform, billingplan, budget,
+cachestore-read, certmanager-import, data-flow-read, eventstreams-read, gslb,
+loggingaudit-trail, mngc-gpu-node, networking-security-group-create,
+quick-query-read, scf-create, ske-create, sts-token, vertica-read, vpc-peering-approve.
+
+**Key rule:** a 503 `upstream connect error … connection timeout` on an
+*optional step* is NOT a lifecycle failure — the step skips its group and the
+spine continues. A 503 on a *required step* causes lifecycle failure. Under
+AIMD floor=4, the storm self-limited after ~18 min.
+
+**Do NOT baseline 503s as product bugs unless they reproduce at low concurrency
+(≤4) outside the storm window.** The http_client already retries `{502,503,504}`
+with exponential backoff (3 retries). A persistent 503 at low concurrency =
+real backend issue; a cluster of 503s under peak concurrency = load-induced saturation.
+
+### Heavy lifecycle failure pattern: storm-transient vs structural
+> conf: 0.8 · seen: 2026-06-20 · obs: 8
+
+Of the 8 heavy adopter/self-creator failures in the 2026-06-20 full heavy run:
+- **Storm-transient (no code fix needed, safe to re-run):**
+  - `gen-heavy-aimlops` (all groups 503-skipped during storm)
+  - `gen-heavy-ske-upgrade` (transport timeout on `create-ske-cluster`)
+  - `container-ske-cluster-nodepool` (transport timeout on `create-ske-cluster`)
+  - `compute-virtualserver-full` (likely storm-hit during VM create polling)
+  - `gen-heavy-vs-netops` (cascade from storm-killed LB create)
+- **Structural (require a code fix):**
+  - `gen-heavy-lb-members` → 400 `SubnetNotAssociatedWithLoadBalancer`: the
+    shared subnet `ddcfcc23a22546aab8fa16d7e1d8a2fe` does not contain a Load
+    Balancer. The LB must pre-exist in the subnet before `lb-healthcheck-create`.
+  - `gen-wave5-apigw-privatelink` → 400 `ip-address-overlap`: hardcoded IP
+    `10.163.8.5` is outside the shared subnet CIDR (`10.124.0.0/24`). Must use
+    an IP inside the subnet range (e.g. `10.124.0.10`).
+  - `gen-wave4-asg` → 400 `InvalidAutoScalingGroupLaunchConfigurationId`: the
+    ASG group create rejected the LC ID captured in the prior step. Investigate
+    capture ordering.
+
+The 3 big DBaaS lifecycles (`database-mysql-cluster` 2544s,
+`database-postgresql-cluster` 2744s, `heavy-shared-dbaas` 929s) all PASSED
+despite the storm — their long polling windows rode out the 18-min storm window.
+
+### Scheduling-tail measurement: vpc-peering under static vs dynamic scheduler
+> conf: 0.9 · seen: 2026-06-20 · obs: 1 (measured + simulation-confirmed)
+
+`vpc-peering` measured duration: **1267.9s (21.1 min)** in this run
+(`data/optimizer/durations.json`). Under the static wave scheduler
+(`dag_runner.run_plan`) it was placed in the LAST self-create wave (alphabetical
+ordering) and ran as the final lifecycle, adding ~15 min to the tail.
+
+`dag_scheduler.simulate_selfcreate` (pure simulation, no execution) confirms:
+- **Static (cap-packed, alpha, wave-barrier): ~44.1 min** self-create portion
+- **Dynamic (longest-first, slot-gated): ~23.0 min** self-create portion
+- **Expected saving: ~21 min (48% of self-create portion)**
+
+**The fix is pending wiring** — `dag_scheduler.run_dynamic` exists and is
+unit-tested but `tools/dag_run_live.py:234` still calls `dag_runner.run_plan`.
+Switch is a 3-line change (import + replace the call, same RunResult shape).
+
+### dag_run_live.py does NOT call schedule_optimizer.update_durations (gap)
+> conf: 0.9 · seen: 2026-06-20 · obs: 1
+
+`tools/dag_run_live.py` calls `dag_runner.run_plan` directly and exits without
+calling `schedule_optimizer.update_durations`. As a result, all entries in
+`data/optimizer/durations.json` have `n:1` — the rolling average never learns.
+`dag_runner.main()` (lines 270–273) does call `update_durations`, but
+`dag_run_live.py` bypasses `dag_runner.main()`.
+
+**Fix:** add after the `result = ...` call in `dag_run_live.py main()`:
+```python
+try:
+    from regression.scenarios import schedule_optimizer
+    schedule_optimizer.update_durations(
+        schedule_optimizer.measured_from_result(result))
+except Exception:
+    pass
+```
+
+### filestorage-volume teardown conflict (deterministic, not storm)
+> conf: 0.8 · seen: 2026-06-20 · obs: 2
+
+`filestorage-volume` lifecycle `delete-volume` step hits
+`filestorage.BadRequest.Invalid.volume.purpose: Cannot delete volume because
+replication is in use. Delete Policy from replication or backup volume.`
+The replication policy (created in `create-replication` step) must be deleted
+BEFORE the volume. This is deterministic — it recurs every run with replication
+enabled. Fix: add a `delete-replication-policy` step before `delete-volume` in
+the filestorage lifecycle teardown sequence.
+
+### PrivateLink Service IP must be within the shared subnet CIDR
+> conf: 0.9 · seen: 2026-06-20 · obs: 1 (400 `ip-address-overlap`)
+
+`gen-wave5-apigw-privatelink` lifecycle: `POST /v1/privatelink-services` body
+carries `ip_address: "10.163.8.5"` which is **outside** the shared subnet CIDR
+`10.124.0.0/24`. Backend returns 400
+`scp-network.privatelink-service.ip-address-overlap: The requested PrivateLink
+Service IP Address does not overlap with the requested subnet CIDR.`
+**Fix:** change the `ip_address` field in the `create-privatelink-service` step
+body to an address within the shared subnet range (e.g. `10.124.0.10`).
+This failure is deterministic regardless of concurrency or gateway load.
+
+### IAM Identity Center (idc-*) requires instance_id for all operations
+> conf: 0.8 · seen: 2026-06-20 · obs: 4 (idc-group, idc-user, idc-account-assignment, idc-permission-set)
+
+All four `idc-*` lifecycles fail their first list step with 400 `Field required`
+(one or two `Field required` detail entries). The missing required field is
+`instance_id` — the IdC instance ID is a required query parameter for all IdC
+list/CRUD operations. The lifecycles currently soft-capture from a
+`list-instances` step that finds nothing (no IdC instance in the account), so
+`{instance_id}` stays unresolved and every subsequent call 400s.
+These are **not storm failures** — they occur at the very start of the lifecycle
+before any storm window. Fix: either gate the entire lifecycle on a
+`soft-capture instance_id` from `list-instances` (skip if nothing found) or
+supply a known instance ID as a default parameter.
+
+### LB health-check requires a Load Balancer pre-existing in the same subnet
+> conf: 0.8 · seen: 2026-06-20 · obs: 2 (gen-heavy-lb-members, heavy-shared-networking)
+
+`POST /v1/lb-health-checks` returns 400
+`scp-loadbalancer.lb-health-checks.SubnetNotAssociatedWithLoadBalancer: Unable to
+process the request because the chosen subnet does not contain a Load Balancer
+(subnet_id: '<id>'). Please ensure a Load Balancer exists within the subnet before
+attempting again.`
+
+This means `lb-healthcheck-create` REQUIRES a Load Balancer to already exist in
+the target subnet. The cross-service.yaml entry `lb-health-check requires
+[vpc, subnet, lb-health-check]` from the 2026-06-17 reconciliation was correct
+in listing `lb-health-check` as a lookup, but this evidence shows the LB itself
+must pre-exist in the subnet as a physical resource (not just as an ID reference).
+Fix: add a `create-loadbalancer-in-subnet` step before `lb-healthcheck-create`
+in both `gen-heavy-lb-members` and `heavy-shared-networking` lifecycles, or use
+a dedicated LB subnet instead of the shared general subnet.
