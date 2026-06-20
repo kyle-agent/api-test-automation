@@ -444,5 +444,55 @@ def test_format_run_renders_provision_error():
     assert "summary:" not in text  # early return before the summary line
 
 
+# --------------------------------------------------------------------------- #
+# 7. on_event — progress callback for live observability
+# --------------------------------------------------------------------------- #
+def test_on_event_fires_progress_in_order():
+    """run_plan streams provision/wave/lifecycle/teardown events so a live
+    dashboard can render progress. Events must arrive in a sane order and the
+    lifecycle_done events must cover every executed lifecycle exactly once."""
+    plan = make_plan(
+        dag_planner.Wave(kind="provision", lifecycles=["vpc"]),
+        dag_planner.Wave(kind="adopt", lifecycles=["a1", "a2"]),
+        shared_roots=["vpc"],
+    )
+
+    class _Prov:
+        def provision(self): pass
+        def teardown(self): pass
+
+    events = []
+    lock = threading.Lock()
+
+    def on_event(kind, payload):
+        with lock:  # lifecycle_done can fire from worker threads
+            events.append((kind, payload.get("lifecycle_id") or payload.get("index")))
+
+    dag_runner.run_plan(plan, passing_executor, provisioner=_Prov(),
+                        on_event=on_event)
+
+    kinds = [e[0] for e in events]
+    assert kinds[0] == "provision_start"
+    assert "provision_done" in kinds[:2]
+    assert kinds[-1] == "teardown_done"
+    assert kinds.index("wave_start") < kinds.index("wave_done")
+    # every executed lifecycle reported exactly once
+    done = sorted(e[1] for e in events if e[0] == "lifecycle_done")
+    assert done == ["a1", "a2"]
+
+
+def test_on_event_failure_does_not_break_run():
+    """A throwing on_event callback must never sink the run (observability is
+    best-effort)."""
+    plan = make_plan(dag_planner.Wave(kind="adopt", lifecycles=["a1"]))
+
+    def boom(kind, payload):
+        raise ValueError("dashboard exploded")
+
+    result = dag_runner.run_plan(plan, passing_executor, on_event=boom)
+    assert result.ok is True
+    assert [o.status for o in result.outcomes] == ["passed"]
+
+
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q", "-o", "addopts="]))

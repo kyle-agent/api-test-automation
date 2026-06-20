@@ -88,47 +88,79 @@ def run_plan(
     *,
     provisioner: Provisioner | None = None,
     max_workers: int | None = None,
+    on_event: Callable[[str, dict], None] | None = None,
 ) -> RunResult:
     """Execute a plan: provision shared roots, run each non-provision wave (in
     order; lifecycles within a wave concurrently), then tear roots down.
 
     Cap-safety is structural — each wave is pre-sized by the planner. ``executor``
     must be side-effect-isolated per lifecycle and must not raise.
+
+    ``on_event(kind, payload)`` (optional) fires progress events for live
+    observability: 'provision_start'/'provision_done', 'wave_start'/'wave_done',
+    'lifecycle_done' (per lifecycle, may fire concurrently — the callback must be
+    thread-safe), and 'teardown_done'. It must never raise.
     """
+    import threading
+
+    def emit(kind: str, payload: dict) -> None:
+        if on_event is not None:
+            try:
+                on_event(kind, payload)
+            except Exception:  # noqa: BLE001 — observability must not break the run
+                pass
+
+    _emit_lock = threading.Lock()
+
     result = RunResult(shared_roots=list(plan.shared_roots))
 
     if provisioner is not None:
+        emit("provision_start", {"roots": list(plan.shared_roots)})
         try:
             provisioner.provision()
         except Exception as exc:  # provisioning failure aborts the run cleanly
             result.provision_error = f"{type(exc).__name__}: {exc}"
+            emit("provision_done", {"error": result.provision_error})
             return result
+        emit("provision_done", {})
+
+    def _run_one(lid: str) -> LifecycleOutcome:
+        outcome = executor(lid)
+        with _emit_lock:
+            emit("lifecycle_done", {
+                "lifecycle_id": outcome.lifecycle_id, "status": outcome.status,
+                "reason": outcome.reason, "duration_s": outcome.duration_s})
+        return outcome
 
     try:
-        for wave in plan.waves:
+        for idx, wave in enumerate(plan.waves):
             if wave.kind == "provision":
                 # roots are stood up by the provisioner, not executed as lifecycles
                 result.waves.append(WaveResult(kind="provision",
                                                outcomes=[], duration_s=0.0))
                 continue
             ids = list(wave.lifecycles)
+            emit("wave_start", {"index": idx, "kind": wave.kind, "lifecycles": ids})
             t0 = time.monotonic()
             workers = max_workers or max(1, len(ids))
             if workers == 1 or len(ids) <= 1:
-                outcomes = [executor(i) for i in ids]
+                outcomes = [_run_one(i) for i in ids]
             else:
                 with ThreadPoolExecutor(max_workers=workers) as pool:
                     # preserve input order in the results
-                    outcomes = list(pool.map(executor, ids))
-            result.waves.append(WaveResult(
-                kind=wave.kind, outcomes=outcomes,
-                duration_s=time.monotonic() - t0))
+                    outcomes = list(pool.map(_run_one, ids))
+            wr = WaveResult(kind=wave.kind, outcomes=outcomes,
+                            duration_s=time.monotonic() - t0)
+            result.waves.append(wr)
+            emit("wave_done", {"index": idx, "kind": wave.kind,
+                               "duration_s": wr.duration_s})
     finally:
         if provisioner is not None:
             try:
                 provisioner.teardown()
             except Exception:  # noqa: BLE001 — teardown is best-effort
                 pass
+            emit("teardown_done", {})
     return result
 
 
