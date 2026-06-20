@@ -33,7 +33,7 @@ account verified 0 owned billable survivors.**
    mandate is to raise that service's coverage by any means (docs/test/logs/
    peer-ask). Spawnable: `.claude/agents/coverage-service.md`. Standing pattern +
    the hard **~6–8 concurrency cap** (14 concurrent saturated the gateway):
-   `agents/service-agent.md`. Targeting + resumable state:
+   `docs/agent-team.md`. Targeting + resumable state:
    `python -m tools.coverage_headroom` → `data/coverage_ledger.json` (per-service
    `covered/total/gap` + agent-authored `blockers` + `next_levers`).
 2. **live-watcher loop** — `.claude/agents/live-watcher.md` + `tools/live_watch.py`

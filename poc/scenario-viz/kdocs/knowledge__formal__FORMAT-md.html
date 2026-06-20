@@ -111,7 +111,7 @@ only when, off the id its <code>create</code> captures, it exercises:
 3. <strong>delete</strong> (reverse-order teardown) — every created resource is owned and torn down.</p>
 <p>The read side (this section's focus + <code>docs/working/plans/PROBE-READS-PLAN.md</code>, gap_getid=80) is
 the remaining open axis; the write side is structurally in place via the
-<code>*-write-coverage</code> lifecycles. <code>agents/validation-agent.md</code> uses this complete
+<code>*-write-coverage</code> lifecycles. <code>docs/agent-team.md</code> uses this complete
 4-stage shape as each node's <strong>done-when</strong>.</p>
 <p><strong>Rule.</strong> Every node whose <code>create</code> captures an id MUST attach, as <code>verify</code>
 read steps, the <strong>id-bound GET endpoints that key off that id</strong> — the per-id
@@ -206,7 +206,7 @@ yet probe-read-covered — parent node, service, already-wired status, and the
 cheapest (already-VALIDATED-parent) wins — lives in
 <a href="../../docs/working/plans/PROBE-READS-PLAN.md"><code>docs/working/plans/PROBE-READS-PLAN.md</code></a>. Regenerate the gap
 total any time with <code>python -m spec.coverage_gap</code> (the <code>gap_getid</code> line). The
-validation agent (<code>agents/validation-agent.md</code>) closes each row by validating the
+validation agent (<code>docs/agent-team.md</code>) closes each row by validating the
 parent create, then adding the one-line verify read.</p>
 <h2>Layer 1 — <code>services/&lt;category&gt;__&lt;service&gt;.yaml</code></h2>
 <p>One file per service (same naming as <code>regression/scenarios/lifecycles/</code>

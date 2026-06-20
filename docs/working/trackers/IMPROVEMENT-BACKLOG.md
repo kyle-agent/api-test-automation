@@ -1,6 +1,6 @@
 # IMPROVEMENT-BACKLOG — Planner가 유지하는 개선 계획
 
-- 소유: Planner tier (agents/orchestrator.md "자율 운영 루프" 참조).
+- 소유: Planner tier (docs/agent-team.md "자율 운영 루프" 참조).
 - 갱신: 매 윈도우 머지 후 + 일 1회 스윕. 입력 = PRODUCT-FINDINGS.md,
   SERVICE-GAP-REPORTS.md, tools/retirement.py 매트릭스, dashboard/history.jsonl.
 - 형식: `id | area | problem | proposed-fix | size | status`.
@@ -19,7 +19,7 @@ owner가 3개 Claude Code 창을 병렬로 운영: ① 기존 테스트 창 ② 
 - **라이브 run/디스패치는 테스트 창 전용.** 이 창은 `.github/run-request` 등 어떤
   run-트리거도 push하지 않는다(CI는 main의 run-request push에만 트리거됨 → 피처
   브랜치 push는 안전).
-- **건드리지 않는 파일**: `agents/CONTEXT.md`(특히 "Current state"/run 결과 =
+- **건드리지 않는 파일**: `docs/working/CONTEXT.md`(특히 "Current state"/run 결과 =
   테스트 창 소유), `dashboard/`·`controlplane/`(= UI 창 소유).
 - **이 창의 상태 기록처**: 이 파일(BACKLOG) + `data/coordination/ledger.json`
   자기 행(行)만. 그 외 공유 인덱스는 통합 담당이 정리.

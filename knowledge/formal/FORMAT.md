@@ -53,7 +53,7 @@ only when, off the id its `create` captures, it exercises:
 
 The read side (this section's focus + `docs/working/plans/PROBE-READS-PLAN.md`, gap_getid=80) is
 the remaining open axis; the write side is structurally in place via the
-`*-write-coverage` lifecycles. `agents/validation-agent.md` uses this complete
+`*-write-coverage` lifecycles. `docs/agent-team.md` uses this complete
 4-stage shape as each node's **done-when**.
 
 **Rule.** Every node whose `create` captures an id MUST attach, as `verify`
@@ -113,7 +113,7 @@ yet probe-read-covered — parent node, service, already-wired status, and the
 cheapest (already-VALIDATED-parent) wins — lives in
 [`docs/working/plans/PROBE-READS-PLAN.md`](../../docs/working/plans/PROBE-READS-PLAN.md). Regenerate the gap
 total any time with `python -m spec.coverage_gap` (the `gap_getid` line). The
-validation agent (`agents/validation-agent.md`) closes each row by validating the
+validation agent (`docs/agent-team.md`) closes each row by validating the
 parent create, then adding the one-line verify read.
 
 ## Layer 1 — `services/<category>__<service>.yaml`

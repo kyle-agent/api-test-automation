@@ -323,7 +323,7 @@ dashboard→루트+`services/`). D.2 수정 후 둘은 단일 발행 파이프�
 
 ### E.1 루프 형태 (이미 있는 역할 위에 codify)
 
-`agents/orchestrator.md`가 이미 **Assess→Plan→Delegate→Integrate→Record** 사이클과
+`docs/agent-team.md`가 이미 **Assess→Plan→Delegate→Integrate→Record** 사이클과
 가드레일(게이트 완화 금지, teardown 스킵 금지)을 정의하고, `ledger.json`이
 status 라이프사이클(`todo→claimed→authored→integrated→live-validated`)을 추적한다.
 M6f는 이를 **Planner/Coordinator/Executors 3역할**로 명문화한다.
@@ -403,7 +403,7 @@ acceptance gate 약어: **R1**=`python knowledge/formal/validate.py`,
 | T1 | **tools/new_service.py** 스캐폴더 (M6a) | M | `tools/new_service.py`(신규), 읽기: `data/api_catalog.json`,`data/api_docs.json` | OFF(새 단위테스트), R1(생성 stub가 통과) |
 | T2 | **expand_targets + target= 문법** (M6b/c) | M | `regression/scenarios/targets.py`(신규) | OFF(`tests/offline/test_targets.py`) |
 | T4 | **plan-manifest emit** (M6d) | S | `core/oplog.py`(`emit_plan`/`runs/<id>/plan.json`), regression job run-start step | OFF |
-| T6 | **Planner cadence + IMPROVEMENT-BACKLOG.md scaffold** (M6f) | S | `docs/working/trackers/IMPROVEMENT-BACKLOG.md`(신규), `agents/orchestrator.md`(역할 명문화) | (문서) |
+| T6 | **Planner cadence + IMPROVEMENT-BACKLOG.md scaffold** (M6f) | S | `docs/working/trackers/IMPROVEMENT-BACKLOG.md`(신규), `docs/agent-team.md`(역할 명문화) | (문서) |
 
 ### 후속 (배치1 의존)
 
@@ -459,6 +459,6 @@ acceptance gate 약어: **R1**=`python knowledge/formal/validate.py`,
   Pages 읽기전용), `controlplane/static_export.py`(212 Pages, TestClient),
   `controlplane/templates/base.html`(Overview/Plan/Run/Report 셸), `dashboard/build.py`
   (coverage index/drilldown, `untestable_services.json` 회색), `dashboard/history.jsonl`(트렌드).
-- 자율 루프: `agents/orchestrator.md`, `data/coordination/ledger.json`(status 전이),
+- 자율 루프: `docs/agent-team.md`, `data/coordination/ledger.json`(status 전이),
   `tools/retirement.py`(RETIRE/NEAR 매트릭스), `docs/working/trackers/PRODUCT-FINDINGS.md`,
   `docs/working/trackers/SERVICE-GAP-REPORTS.md`, `docs/working/trackers/IMPROVEMENT-BACKLOG.md`(신규).

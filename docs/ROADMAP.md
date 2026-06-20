@@ -5,7 +5,7 @@
 > 전용 서버 실행)와 각 에이전트의 자리를 한눈에 보여주는 로드맵입니다.
 
 This repository develops and tests the **Samsung Cloud Platform (SCP) Open
-APIs** with a **multi-agent AI team** (roster in [`agents/`](../agents/README.md)).
+APIs** with a **multi-agent AI team** (roster in [`docs/agent-team.md`](agent-team.md)).
 The phases below are the operating plan; each phase's "done-when" is concrete
 so any session can tell where we are.
 
@@ -125,7 +125,7 @@ adjust it.
 
 ## Agent roster ↔ phases
 
-| Agent (`agents/`) | Phase 1 | Phase 2 | Phase 3 |
+| Agent (`docs/agent-team.md`) | Phase 1 | Phase 2 | Phase 3 |
 |---|---|---|---|
 | Orchestrator | drives coverage waves | owns the schedule | owns the server runbook |
 | Spec-Intel | keeps catalog fresh | spec-diff triggers partial re-runs | same, on-server |

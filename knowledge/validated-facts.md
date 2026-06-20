@@ -305,7 +305,7 @@ deleting its parent (e.g. subnet 404 before vpc delete).
 
 ## Coverage campaign — Wave 1 facts (2026-06-08, NOT yet runtime-proven)
 
-> Authored by parallel service-agents (see `agents/CAMPAIGN.md`). Bodies/envelopes
+> Authored by parallel service-agents (see `docs/agent-team.md`). Bodies/envelopes
 > below are docs-derived best-effort; promote to "validated" only after a live 2xx.
 
 **Engine coverage-matching gotcha (confirmed, applies to all authors):**

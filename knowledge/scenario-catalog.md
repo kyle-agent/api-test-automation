@@ -82,7 +82,7 @@ python3 -c "import json;[print(f\"{l['id']:45} enabled={l.get('enabled')} heavy=
 
 Add a scenario = add an entry to `scenarios.json` (no new Python; the engine
 drives it) + declare any quota kinds in `dependencies.json` + record validated
-facts in `validated-facts.md`. See `agents/domain-knowledge-agent.md`.
+facts in `validated-facts.md`. See `docs/agent-team.md`.
 
 ---
 
@@ -91,7 +91,7 @@ facts in `validated-facts.md`. See `agents/domain-knowledge-agent.md`.
 Per-service CRUD lifecycles now also live in
 `regression/scenarios/lifecycles/<category>__<service>.json` fragments (merged by
 `regression/scenarios/loader.py`; one file per service-agent → no collisions).
-See `agents/CAMPAIGN.md`. Wave 1 closed **151 write ops across 6 services**,
+See `docs/agent-team.md`. Wave 1 closed **151 write ops across 6 services**,
 raising the static coverage ceiling **43.0% → 55.4%** (write gap 547 → ~390).
 
 | Fragment | Lifecycles | Writes | Flags |

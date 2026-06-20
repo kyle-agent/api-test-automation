@@ -2,7 +2,7 @@
 
 Every service-agent runs this on its fragment before handing back; the
 coordinator runs it on the whole merged set before integrating. It is the
-machine-checkable half of the "definition of done" in agents/CAMPAIGN.md.
+machine-checkable half of the "definition of done" in docs/agent-team.md.
 
 Checks (errors fail with exit 1; warnings are advisory):
   * the loader merges cleanly — no duplicate lifecycle ids across base+fragments;

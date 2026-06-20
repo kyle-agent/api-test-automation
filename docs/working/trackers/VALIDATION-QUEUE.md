@@ -1,6 +1,6 @@
 # VALIDATION-QUEUE — prioritized order for the coverage-validator
 
-> Owner: the **coverage-validator** agent (`agents/validation-agent.md`). This is
+> Owner: the **coverage-validator** agent (`docs/agent-team.md`). This is
 > the work queue that turns `provenance: docs` model nodes into `VALIDATED` one
 > service / small batch at a time, cheapest verification first.
 >

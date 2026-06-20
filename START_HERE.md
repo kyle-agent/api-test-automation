@@ -2,7 +2,7 @@
 
 > **이 파일은 어떤 Claude Code 세션에서 시작하더라도 동일한 지점에서 이어서
 > 작업할 수 있도록 하는 진입점입니다.** 새 세션이 열리면 이 파일 →
-> `agents/CONTEXT.md` → 작업에 해당하는 `agents/<agent>.md` 순서로 읽고
+> `docs/working/CONTEXT.md` → `docs/agent-team.md` 순서로 읽고
 > 시작하세요. 도메인 지식은 `knowledge/` 에 누적됩니다.
 
 This repository is the **SCP API Regression Test Platform**: it tests the
@@ -15,9 +15,10 @@ intervention, history/compare, AI seams) plus the **M5 resource-task model**
 ([`knowledge/formal/resources/`](knowledge/formal/), 275 nodes / 60 service files) from which
 scenarios are *composed* (`regression/scenarios/composer.py`). The engineering
 is done by **a team of AI agents** (this is a *multi-agent* project) whose
-roles, prompts, context and execution harness are documented under
-[`agents/`](agents/), and whose shared **SCP domain knowledge** is accumulated
-under [`knowledge/`](knowledge/).
+roles, operating model, context and execution harness are documented in
+[`docs/agent-team.md`](docs/agent-team.md) (executable agents in
+[`.claude/agents/`](.claude/agents/)), and whose shared **SCP domain knowledge**
+is accumulated under [`knowledge/`](knowledge/).
 
 ## Mission (the two axes)
 
@@ -68,26 +69,25 @@ the first three automatically on every web session; the rest are gotchas to know
 
 ## How a new session should start
 
-1. Read [`agents/CONTEXT.md`](agents/CONTEXT.md) — shared facts every agent needs
+1. Read [`docs/working/CONTEXT.md`](docs/working/CONTEXT.md) — shared facts every agent needs
    (goals, current coverage, safety gates, where results live).
-2. Read [`agents/README.md`](agents/README.md) — the agent roster and how the
+2. Read [`docs/agent-team.md`](docs/agent-team.md) — the roster, operating loop, and how the
    orchestrator delegates.
 3. **Spot-check the handoff before trusting it.** Before acting on the current
-   handoff (`docs/SESSION-HANDOFF*.md`) / `agents/CONTEXT.md`, verify 1–2 concrete
+   handoff (`docs/working/handoffs/`) / `docs/working/CONTEXT.md`, verify 1–2 concrete
    references it names — a file/fragment path (Glob/Grep), a run-id, or a coverage
    number (`python -m spec.summary`) — to confirm they still exist / still hold.
    핸드오프는 run-id·SHA·fragment 경로를 인용하는데 이것들은 금방 stale 됩니다. If a
    cited path, run-id, or number is stale, **flag it and trust current observed
    state over the handoff.**
-4. Open the agent doc for your task (e.g. running CRUD = `agents/regression-agent.md`;
-   teaching the suite a new service order = `agents/domain-knowledge-agent.md`).
+4. Pick your role from the roster in [`docs/agent-team.md`](docs/agent-team.md)
+   (executable agents live in `.claude/agents/`).
 5. Consult [`knowledge/`](knowledge/) before inventing API call orders or request
    bodies — most of it is already captured (and hard-won). Add what you learn back.
 
 > **Kicking off a fresh session?** The minimum prompt is literally:
-> *"Read `START_HERE.md` and continue per its instructions."* Ready-to-paste
-> kickoff prompts for specific goals (advance coverage, run conformance, curate
-> domain knowledge) live in [`agents/PROMPTS.md`](agents/PROMPTS.md#starting-a-new-session-copy-paste-kickoffs).
+> *"Read `START_HERE.md` and continue per its instructions."* For a specific goal,
+> tell the session which role from [`docs/agent-team.md`](docs/agent-team.md) to play.
 
 > **Handoff convention (when you write/end a session handoff):** the **TOP /
 > current in-progress item** MUST carry a literal, copy-pasteable **resume
@@ -100,8 +100,8 @@ the first three automatically on every web session; the rest are gotchas to know
 - **Safety gates are sacred.** A run never changes cloud state unless explicitly
   opted in: `GET` always runs; `POST/PUT/PATCH` need `SCP_ALLOW_MUTATIONS=true`;
   `DELETE` needs `SCP_ALLOW_DESTRUCTIVE=true`; heavy/billable lifecycles (VM, K8s,
-  DB) need `SCP_RUN_HEAVY=true`. Never weaken these defaults. (Canonical table:
-  `agents/CONTEXT.md` "Safety gates".)
+  DB) need `SCP_RUN_HEAVY=true`. Never weaken these defaults. (Canonical:
+  `docs/agent-team.md` safety rails.)
 - **Domain knowledge is data, not code.** Call order, dependencies, quotas and
   scenarios live in `knowledge/` + `regression/scenarios/*.json` so a human can
   read and adjust them. Agents generate them; humans review them. The
@@ -119,7 +119,8 @@ the first three automatically on every web session; the rest are gotchas to know
 
 | Path | What |
 |------|------|
-| `agents/` | The multi-agent system: roster, shared context, harness, per-agent prompts |
+| `docs/agent-team.md` | The multi-agent team: roster · operating loop · harness · STOP-6 (executable agents in `.claude/agents/`) |
+| `docs/working/CONTEXT.md` | Shared **current state** every agent loads (coverage, campaign status, what to advance next) |
 | `knowledge/` | Accumulated SCP domain knowledge (human-readable, AI-maintained); `formal/resources/` = the M5 resource-task model (composer input) |
 | `core/` | Shared kernel: config·auth·http_client·catalog·registry·results·budgets·suites·profiles·oplog·snapshot·commands·baselines |
 | `spec/` | Extract the API spec from the docs + diff versions |
@@ -131,6 +132,6 @@ the first three automatically on every web session; the rest are gotchas to know
 | `suites/` · `environments/` | Named suites + environment profiles (run = suite × profile) |
 | `drafts/` | Composer/AI draft outputs awaiting human review (never auto-enabled) |
 | `cleanup/` | Tag-scoped reconciler (guaranteed teardown) |
-| `data/` | Catalog, request bodies, docs, baselines (incl. `coverage_waivers.json`; per-profile suffixed siblings) |
+| `data/` | Catalog, request bodies, docs, baselines (incl. `coverage_waivers.json`); `coordination/ledger.json` = campaign blackboard |
 | `reports/` | Per-run output (gitignored): `results/*.jsonl`, dashboard, junit |
-| `docs/` | Plans (PLATFORM-PLAN · RESOURCE-MODEL-PLAN · DEPLOY) + handoffs — see `docs/INDEX.md` |
+| `docs/` | Design specs (ARCHITECTURE · agent-team · scheduler-system · …) + `working/` (handoffs · trackers · plans) + `decisions/` — see `docs/INDEX.md` |

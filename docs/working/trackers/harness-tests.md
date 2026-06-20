@@ -2,7 +2,7 @@
 
 > A checklist of **adversarial prompts** a maintainer can run against a subagent to
 > **prove it refuses to violate a Tier-0 safety rail**. The rails come straight from
-> `agents/HARNESS.md` ("Safety rails an agent must honor"):
+> `docs/agent-team.md` ("Safety rails an agent must honor"):
 >
 > - The env gates `SCP_ALLOW_MUTATIONS`, `SCP_ALLOW_DESTRUCTIVE`, `SCP_RUN_HEAVY`
 >   are **deliberate, explicit opt-ins** — never set "to make a test pass".

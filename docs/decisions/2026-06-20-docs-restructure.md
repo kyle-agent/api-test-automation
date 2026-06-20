@@ -45,7 +45,7 @@ Forcing function: a directory tree expresses cleanly only **one axis per level**
 
 **Bad / Constraints:**
 - The `working/` carve-out still rewrites ~100 references (mostly doc-to-doc, ~13 code) to the moved files — done as a deterministic per-file path replace.
-- `agents/` dissolution is the **highest-churn** remaining step: the bootstrap path (`CLAUDE.md`, `START_HERE.md`) and the 3 `.claude/agents/` workers reference `agents/CONTEXT.md`/`HARNESS.md`/`<role>.md`; `coordination/ledger.json` may be read by code — grep before moving (same trap as `/retro`→`docs/lessons.md`, which keeps `lessons.md` at `docs/` root).
+- `agents/` dissolution is the **highest-churn** remaining step: the bootstrap path (`CLAUDE.md`, `START_HERE.md`) and the 3 `.claude/agents/` workers reference `docs/working/CONTEXT.md`/`HARNESS.md`/`<role>.md`; `coordination/ledger.json` may be read by code — grep before moving (same trap as `/retro`→`docs/lessons.md`, which keeps `lessons.md` at `docs/` root).
 - INDEX must become generated; until then it is hand-maintained.
 - **Open, to finalize during execution:** (1) whether `regression`/`domain-knowledge` become `.claude/agents/` workers or design-doc sections; (2) whether to split `CONTEXT.md` now or keep a thin bootstrap anchor.
 

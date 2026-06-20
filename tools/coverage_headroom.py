@@ -2,7 +2,7 @@
 standing per-service coverage agents.
 
 Every service owns an agent whose single job is to raise THAT service's coverage
-(see `.claude/agents/coverage-service.md` / `agents/service-agent.md`). This
+(see `.claude/agents/coverage-service.md` / `docs/agent-team.md`). This
 module gives the fan-out two things:
 
   * `headroom()` — per-service (covered / total / gap) from the catalog + the

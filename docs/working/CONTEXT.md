@@ -127,7 +127,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   50.1%** (633/1264), C2-called **53.4%** (733/1372). Heavy DBaaS run complete +
   clean (8 cluster creates, +22 DB sub-op id-GET 2xx, 0 survivors verified). New
   STANDING designs: **per-service coverage agents** (`.claude/agents/
-  coverage-service.md`, `agents/service-agent.md` standing pattern, ledger
+  coverage-service.md`, `docs/agent-team.md` standing pattern, ledger
   `data/coverage_ledger.json` via `tools.coverage_headroom`, ~6–8 concurrency
   cap); **live-watcher loop** (`.claude/agents/live-watcher.md` +
   `tools/live_watch.py`: watcher→orchestrator→dev-agent); **record-to-git hard
@@ -152,7 +152,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   **write-setter / in-place-update** steps (coverage expansion) — see
   `docs/working/handoffs/HANDOFF-crud-setter-validation.md`.
 - Auth/host resolution: implemented & configurable; confirm against a live `200`.
-- **Coverage campaign (multi-agent) — RUNNING.** `agents/CAMPAIGN.md` is the
+- **Coverage campaign (multi-agent) — RUNNING.** `docs/agent-team.md` is the
   operating model; `data/coordination/ledger.json` is the blackboard. Per-service
   CRUD fragments now live in `regression/scenarios/lifecycles/*.json` (merged by
   `regression/scenarios/loader.py`; validate with
@@ -273,7 +273,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   no-progress detector) and **6 human-needed STOP criteria**, plus a **3-lane
   parallel pipeline** (A result-wait/triage · B guide/domain · C compose/prep)
   with read-before-claim on the shared VPC — codified in
-  `agents/orchestrator.md` (IB-015/016). Lane B ran **3 parallel waves (15
+  `docs/agent-team.md` (IB-015/016). Lane B ran **3 parallel waves (15
   services)** that **closed the entire P1 `knowledge/formal/INGESTION.md`
   backlog** (now 0 `—` P1 rows): mariadb·epas·sqlserver·VS-volume ·
   searchengine·vertica·quick-query·data-flow·data-ops·cloudmonitoring·

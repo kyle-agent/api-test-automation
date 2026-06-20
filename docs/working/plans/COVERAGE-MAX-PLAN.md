@@ -14,7 +14,7 @@
 |---|---|---|
 | C1 static reachability (heavy ON) | **100.0%** (1372/1372, gap 0) | `python -m spec.coverage_gap` |
 | C1 static reachability (heavy OFF) | **52.9%** (726/1372) | `python -m spec.coverage_gap --no-heavy` |
-| Last published live coverage | **C3 ≈ 44.79% / cov_op ≈ 36.73%** | `agents/CONTEXT.md` (run history) |
+| Last published live coverage | **C3 ≈ 44.79% / cov_op ≈ 36.73%** | `docs/working/CONTEXT.md` (run history) |
 | Resource model | 275 nodes, **131 VALIDATED / 144 docs** | `python knowledge/formal/validate.py` |
 
 So: *authoring* (writing scenarios that can reach an endpoint) is finished —
@@ -157,12 +157,12 @@ or carry blast-radius/cost the shared account shouldn't absorb:
 ## After every run (the triage→promote loop)
 1. Confirm the run + sweep concluded; pull `reports/results/*.jsonl` (or oplog).
 2. `fail_new` must stay 0 — triage each new fail via the L0→L3 ladder
-   (`agents/orchestrator.md`): body fix → re-dispatch, or baseline/waiver a
+   (`docs/agent-team.md`): body fix → re-dispatch, or baseline/waiver a
    confirmed product bug (never relax a gate to make a test pass).
 3. Promote docs→VALIDATED on a real 2xx (IB-041 evidence), strike the
    VALIDATION-QUEUE row, surface unblocked dependents.
 4. Replace the matching hand-written lifecycle with the validated `gen-*` once
-   green (M5 goal), update `agents/CONTEXT.md` + `knowledge/`.
+   green (M5 goal), update `docs/working/CONTEXT.md` + `knowledge/`.
 
 ## What "100%" honestly looks like
 `C3 + waived(C2) == 1372`. A realistic terminal state is **C3 on every

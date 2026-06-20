@@ -16,7 +16,7 @@
 | Catalog size | **1,372** endpoints, 0 unresolved | `python -m spec.summary` |
 | C1 static reachability (heavy **ON**) | **100.0%** (1372/1372), **GAP = 0** | `python -m spec.coverage_gap` |
 | C1 static reachability (heavy **OFF**) | **52.9%** (726/1372), GAP = **646** | `python -m spec.coverage_gap --no-heavy` |
-| Last published live coverage | **C3 ≈ 44.79% / cov_op ≈ 36.73%** | `agents/CONTEXT.md` (run history, run 27725293499 era) |
+| Last published live coverage | **C3 ≈ 44.79% / cov_op ≈ 36.73%** | `docs/working/CONTEXT.md` (run history, run 27725293499 era) |
 | Approved waivers | **249** | `data/baselines/coverage_waivers.json` |
 
 Verbatim `python -m spec.coverage_gap` (heavy ON):
@@ -223,7 +223,7 @@ target as covered-when-reached (4xx = access evidence), so a reachability run
 ## Sources cited
 - `python -m spec.coverage_gap` / `--no-heavy` (run this session — outputs quoted §1)
 - `python -m spec.summary` (run this session — 1372 endpoints, method split)
-- `agents/CONTEXT.md` (published C3 ≈ 44.79% / cov_op ≈ 36.73; Tier-0 run 27725293499 triage)
+- `docs/working/CONTEXT.md` (published C3 ≈ 44.79% / cov_op ≈ 36.73; Tier-0 run 27725293499 triage)
 - `docs/working/plans/COVERAGE-MAX-PLAN.md` (heavy-only frontier table; dispatch tiers)
 - `data/baselines/coverage_waivers.json` (249 waivers; class breakdown)
 - `reports/results/observations.jsonl` (107 smoke obs, 66 distinct 2xx keys — latest-run residue)

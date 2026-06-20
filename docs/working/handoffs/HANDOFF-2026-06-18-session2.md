@@ -5,7 +5,7 @@
 > disabled there). It lands the engine **identity-based create→show probe**, an
 > **enrichment residual pass** (producer-match 90.9%→98.1%), a **FAST sweep mode**,
 > and fixes a **cosmetic `-n 6` CI bug**. Read `CLAUDE.md` → `START_HERE.md` →
-> `agents/CONTEXT.md` first; this file is the session delta + literal resume
+> `docs/working/CONTEXT.md` first; this file is the session delta + literal resume
 > commands. All work is on branch `claude/adoring-heisenberg-7sem6u`.
 
 ## 0. Headline

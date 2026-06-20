@@ -252,13 +252,13 @@ python3 -c &quot;import json;[print(f\&quot;{l['id']:45} enabled={l.get('enabled
 </code></pre>
 <p>Add a scenario = add an entry to <code>scenarios.json</code> (no new Python; the engine
 drives it) + declare any quota kinds in <code>dependencies.json</code> + record validated
-facts in <code>validated-facts.md</code>. See <code>agents/domain-knowledge-agent.md</code>.</p>
+facts in <code>validated-facts.md</code>. See <code>docs/agent-team.md</code>.</p>
 <hr />
 <h2>Coverage campaign — fragment lifecycles (Wave 1, 2026-06-08)</h2>
 <p>Per-service CRUD lifecycles now also live in
 <code>regression/scenarios/lifecycles/&lt;category&gt;__&lt;service&gt;.json</code> fragments (merged by
 <code>regression/scenarios/loader.py</code>; one file per service-agent → no collisions).
-See <code>agents/CAMPAIGN.md</code>. Wave 1 closed <strong>151 write ops across 6 services</strong>,
+See <code>docs/agent-team.md</code>. Wave 1 closed <strong>151 write ops across 6 services</strong>,
 raising the static coverage ceiling <strong>43.0% → 55.4%</strong> (write gap 547 → ~390).</p>
 <table>
 <thead>

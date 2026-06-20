@@ -2,7 +2,7 @@
 
 > Pick-up note for a fresh session that has the SCP env vars configured. This
 > session moved live execution **off CI onto the Claude remote environment**.
-> Read `CLAUDE.md` → `START_HERE.md` → `agents/CONTEXT.md` first; this file is the
+> Read `CLAUDE.md` → `START_HERE.md` → `docs/working/CONTEXT.md` first; this file is the
 > session-specific delta + the literal commands to run the suite by hand.
 
 ## 0. Headline decision (DONE, on `main`)
@@ -80,7 +80,7 @@ Notes:
 | **Create→show coverage** | `spec/enrich_catalog.py` → `data/api_catalog_params.json` (per-endpoint path/query param + producer); engine auto-probe seeded from full ctx + `_PARAM_ALIASES`, bounded by `timeout=8/retry=False/cap` | merged |
 | **Heavy de-dup** | disabled 5 redundant composed heavy-DBaaS drafts (~5 clusters/run) | `3390d72` |
 | **http client** | `request(... timeout=, retry=)` so best-effort probes cost one short deadline | merged |
-| **Docs** | `docs/working/plans/PARALLEL-EXECUTION-PLAN.md`, `docs/working/plans/COVERAGE-GETID-PLAN.md`, `agents/CONTEXT.md`, `docs/working/trackers/IMPROVEMENT-BACKLOG.md` (IB-050 note) | merged |
+| **Docs** | `docs/working/plans/PARALLEL-EXECUTION-PLAN.md`, `docs/working/plans/COVERAGE-GETID-PLAN.md`, `docs/working/CONTEXT.md`, `docs/working/trackers/IMPROVEMENT-BACKLOG.md` (IB-050 note) | merged |
 
 ## 3. Key facts learned this session
 

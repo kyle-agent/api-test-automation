@@ -1,7 +1,7 @@
 # SESSION HANDOFF — 2026-06-17 ~01:00 UTC
 
 다른 세션이 이어받기 위한 현재 상태 스냅샷. (orchestrator 역할 = Coordinator;
-자율 루프는 agents/orchestrator.md "자율 운영 루프" 참조.)
+자율 루프는 docs/agent-team.md "자율 운영 루프" 참조.)
 *(이 위 블록은 2026-06-17 세션 갱신분. 29행 이하 LIVE-PROVEN/모델교훈/백로그는
 역사적 참조용 — 여전히 유효하나 날짜는 6-14 기준.)*
 
