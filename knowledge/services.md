@@ -321,9 +321,27 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Entitlement / validation blockers:** `adduserpolicybinding` /
   `removeuserpolicybinding` → 403; resource-policy mutations
   (`addpermission`/`setpermission`/`removepermission`/`setresourcepolicy`/
-  `deleteresourcepolicy`) → 400 (need a real `srn` target).
-- **Coverage 2026-06-18:** 15 → **27 / 62** (read-only levers only; no resources
-  created, account left clean).
+  `deleteresourcepolicy`) were 400 (SRN decoding error) — **FIXED 2026-06-20** (see
+  below).
+- **b64-SRN fix (2026-06-20):** The iam gateway decodes `{srn}` path segments
+  as base64, the same way resourcemanager does. Plain SRN in
+  `/v1/resource-policies/{srn}` yields 400 "SRN decoding error". The fix mirrors
+  the resourcemanager pattern: `GET /v1/resources` (resourcemanager cross-service
+  step) soft-captures `$.resources[0].srn` → `iam_srn`; a `b64_encode` step
+  produces `iam_srn_b64`; all 5 srn-targeted write paths use `{iam_srn_b64}`:
+  - `PUT /v1/resource-policies/{iam_srn_b64}` (setresourcepolicy)
+  - `GET /v1/resource-policies/{iam_srn_b64}` (showresourcepolicy)
+  - `POST /v1/resource-policies/{iam_srn_b64}/statements` (addpermission)
+  - `PUT /v1/resource-policies/{iam_srn_b64}/statements/{unique}` (setpermission)
+  - `DELETE /v1/resource-policies/{iam_srn_b64}/statements/{unique}` (removepermission)
+  - `DELETE /v1/resource-policies/{iam_srn_b64}` (deleteresourcepolicy)
+  The `{sid}` path segment (`{unique}`) does NOT need b64 encoding. After the fix
+  the calls will pass the SRN decoder; they may still 404 (no resource-policy on
+  that resource) or 403 (no write permission). The b64_encode step is `optional`
+  so a missed capture degrades gracefully to a placeholder that still calls the
+  endpoint. Wired in `iam-resource-policy` lifecycle (`management__iam.json`).
+- **Coverage 2026-06-18 → 2026-06-20:** 15 → **28 / 62** (read-only levers +
+  wave5-iam-bindings; b64-SRN fix is pre-mutation and awaits the light CRUD run).
 
 ## networking / dns
 

@@ -115,16 +115,16 @@
       "heavy": false,
       "blockers": [
         "product-bug-5xx: createrole 500 ContactAdmin (blocks role mutation chain)",
-        "needs-peer-resource: 0 saml-providers / 0 iam-users / 0 resource-policies in account",
         "entitlement-403: add/removeuserpolicybinding",
-        "validation-400: addpermission/setpermission/setresourcepolicy need a real srn target"
+        "needs-peer-resource: saml-providers require multipart/form-data (engine-multipart-blocked)",
+        "post-fix uncertainty: addpermission/setpermission/setresourcepolicy may 404 (no policy on target resource) or 403 (no write permission) after b64 fix clears the SRN decoder 400 \u2014 recorded as coverage but may not reach 2xx"
       ],
       "next_levers": [
-        "create an own IAM user (MUTATIONS) to unblock user-bound reads",
-        "create a resource-policy to give srn-targeted ops a real target"
+        "b64-SRN fix landed (2026-06-20): iam-resource-policy lifecycle now captures real SRN from resourcemanager GET /v1/resources and b64-encodes it for the 5 srn-targeted write steps (addpermission, setpermission, setresourcepolicy, removepermission, deleteresourcepolicy) \u2014 eliminates the 400 SRN decoding error; run under SCP_ALLOW_MUTATIONS to verify",
+        "create own IAM user (MUTATIONS) to unblock user-bound reads (getiamuser, listuserpolicybindings, removeuserpolicybinding)"
       ],
-      "notes": "15->27/62 via read-only levers (smoke LISTs + read_chains + account_id from a role). No /v1/accounts or /v1/users collection list exists.",
-      "updated": "2026-06-19T02:01:07Z"
+      "notes": "28/62 covered. b64-SRN fix applied 2026-06-20: iam-resource-policy lifecycle now uses base64-encoded real SRN from resourcemanager /v1/resources for the 5 srn-targeted write paths (was plain SRN -> 400 SRN decoding error). Same decoder as resourcemanager (confirmed by resourcemanager b64 finding). Prior note: 15->27/62 via read-only levers; 28th via wave5-iam-bindings.",
+      "updated": "2026-06-20T04:18:57Z"
     },
     {
       "service": "loadbalancer",
@@ -221,7 +221,7 @@
       "heavy": true,
       "blockers": [],
       "next_levers": [
-        "listimages now has scp_original_image_type=k8s param — should count as covered on next smoke run",
+        "listimages now has scp_original_image_type=k8s param \u2014 should count as covered on next smoke run",
         "Remaining 21 gaps need SCP_ALLOW_MUTATIONS + SCP_RUN_HEAVY (cluster+nodepool lifecycle)"
       ],
       "notes": "listimages (GET /v1/images): scp_original_image_type=k8s is REQUIRED (400 without; 200 with, count:15). Fixed in container__ske.json (new list-images step) and generated__heavy-ske.json (inline params -> params dict). Confirmed 200 live 2026-06-20.",
@@ -578,7 +578,7 @@
         },
         {
           "key": "createdirectconnect, setdirectconnect, createroutingrule, deletedirectconnect, deleteroutingrule",
-          "reason": "mutation-gated: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE). Likely heavy/entitlement — direct-connect maps to a physical network circuit needing datacenter pre-provisioning.",
+          "reason": "mutation-gated: require SCP_ALLOW_MUTATIONS (+SCP_ALLOW_DESTRUCTIVE for DELETE). Likely heavy/entitlement \u2014 direct-connect maps to a physical network circuit needing datacenter pre-provisioning.",
           "kind": "mutation-gated"
         }
       ],
@@ -804,14 +804,14 @@
       "blockers": [
         {
           "key": "listnetworkloggingconfigurations + listnetworkloggingstorages",
-          "reason": "transient-503: backend intermittently 503s even with correct resource_type param. Param fix applied (FIREWALL) — 200 confirmed in healthy window. Will auto-recover on retry. NOT a parameter bug.",
+          "reason": "transient-503: backend intermittently 503s even with correct resource_type param. Param fix applied (FIREWALL) \u2014 200 confirmed in healthy window. Will auto-recover on retry. NOT a parameter bug.",
           "kind": "transient-backend"
         }
       ],
       "next_levers": [
         "createnetworkloggingstorage (POST) + deletenetworkloggingstorage (DELETE) need SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE; body fields: name, log_type (VPC_FLOW_LOG etc.), object_storage_bucket_name, description"
       ],
-      "notes": "listnetworkloggingconfigurations and listnetworkloggingstorages: resource_type REQUIRED query param, valid enums: FIREWALL, SECURITY_GROUP, NAT (NOT VPC_FLOW_LOG — rejected 400). Scenarios updated 2026-06-20 to use resource_type=FIREWALL. Backend transiently 503s; 200 confirmed in healthy windows.",
+      "notes": "listnetworkloggingconfigurations and listnetworkloggingstorages: resource_type REQUIRED query param, valid enums: FIREWALL, SECURITY_GROUP, NAT (NOT VPC_FLOW_LOG \u2014 rejected 400). Scenarios updated 2026-06-20 to use resource_type=FIREWALL. Backend transiently 503s; 200 confirmed in healthy windows.",
       "updated": "2026-06-20T04:00:00Z"
     },
     {
