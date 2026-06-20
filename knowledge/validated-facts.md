@@ -993,9 +993,11 @@ Of the 8 heavy adopter/self-creator failures in the 2026-06-20 full heavy run:
   - `gen-heavy-lb-members` → 400 `SubnetNotAssociatedWithLoadBalancer`: the
     shared subnet `ddcfcc23a22546aab8fa16d7e1d8a2fe` does not contain a Load
     Balancer. The LB must pre-exist in the subnet before `lb-healthcheck-create`.
-  - `gen-wave5-apigw-privatelink` → 400 `ip-address-overlap`: hardcoded IP
-    `10.163.8.5` is outside the shared subnet CIDR (`10.124.0.0/24`). Must use
-    an IP inside the subnet range (e.g. `10.124.0.10`).
+  - `gen-wave5-apigw-privatelink` → 400 `ip-address-overlap`: DUAL-MODE pitfall,
+    NOT a simple IP swap — see the corrected "PrivateLink Service IP must match the
+    BOUND subnet" fact below. The lifecycle adopt-falls-back to the shared subnet
+    but keeps its own-block IP; proper fix derives the IP from the bound subnet's
+    live CIDR. Needs live validation.
   - `gen-wave4-asg` → 400 `InvalidAutoScalingGroupLaunchConfigurationId`: the
     ASG group create rejected the LC ID captured in the prior step. Investigate
     capture ordering.
@@ -1051,17 +1053,36 @@ BEFORE the volume. This is deterministic — it recurs every run with replicatio
 enabled. Fix: add a `delete-replication-policy` step before `delete-volume` in
 the filestorage lifecycle teardown sequence.
 
-### PrivateLink Service IP must be within the shared subnet CIDR
-> conf: 0.9 · seen: 2026-06-20 · obs: 1 (400 `ip-address-overlap`)
+### PrivateLink Service IP must match the BOUND subnet (dual-mode pitfall) — NOT a simple IP swap
+> conf: 0.9 · seen: 2026-06-20 · obs: 1 (400 `ip-address-overlap`) · CORRECTED 2026-06-20 (orchestrator verification)
 
-`gen-wave5-apigw-privatelink` lifecycle: `POST /v1/privatelink-services` body
-carries `ip_address: "10.163.8.5"` which is **outside** the shared subnet CIDR
-`10.124.0.0/24`. Backend returns 400
-`scp-network.privatelink-service.ip-address-overlap: The requested PrivateLink
-Service IP Address does not overlap with the requested subnet CIDR.`
-**Fix:** change the `ip_address` field in the `create-privatelink-service` step
-body to an address within the shared subnet range (e.g. `10.124.0.10`).
-This failure is deterministic regardless of concurrency or gateway load.
+`gen-wave5-apigw-privatelink` `create-privatelink-service` sends
+`service_ip_address: "10.163.8.5"` and got 400
+`scp-network.privatelink-service.ip-address-overlap`. **Root cause is subtler than
+"IP outside shared subnet" — the lifecycle is DUAL-MODE.** Its `create-vpc` /
+`create-subnet` steps carry `adopt: vpc` / `adopt: subnet`, so:
+- **self-create mode** (no shared VPC): it creates its OWN block — vpc `10.163.0.0/20`,
+  subnet `10.163.8.0/24` — and `10.163.8.5` IS inside that subnet → **correct**.
+- **adopt mode** (full heavy run, shared VPC present): it adopts the SHARED subnet
+  `10.124.0.0/24`, but `{subnet_id}` then points at the shared subnet while the IP
+  is still the own-block `10.163.8.5` → **deterministic 400 overlap**. This is what
+  failed in run 2026-06-20.
+
+**Do NOT just swap the hardcoded IP** — `10.124.0.x` would fix adopt mode but BREAK
+self-create mode (outside `10.163.8.0/24`). `fixed_ip_map` in dependencies.json is
+metadata-only (the engine does NOT consume it), so there is no runtime re-home.
+**Correct fix = the `_note`'s "R3": derive service/connected IPs from the live CIDR
+of whichever subnet is actually bound** (capture subnet CIDR → compute a free host),
+OR force the lifecycle self-contained (drop the adopt so it always self-creates its
+own block, at the cost of a VPC cap slot). Either needs a live run to validate —
+deferred (do not apply a blind one-liner).
+
+**Optimizer TIER-D mis-diagnoses (verified false 2026-06-20, no change made):**
+`servicewatch-dashboard:create-dashboard` already lists 201 in `expect_status`
+(`[200,201,202,400,403,404,409,422]`); ALL four dashboard lifecycles include 201.
+`filestorage-replication-schedule` already deletes `delete-replication` BEFORE
+`delete-volume` — teardown order is already correct; the `createvolume` ×2 fails
+were 503-storm-transient, not a teardown conflict.
 
 ### IAM Identity Center (idc-*) requires instance_id for all operations
 > conf: 0.8 · seen: 2026-06-20 · obs: 4 (idc-group, idc-user, idc-account-assignment, idc-permission-set)

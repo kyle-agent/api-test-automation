@@ -108,6 +108,32 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **LATEST (2026-06-20, session 2b — live FULL-HEAVY run + makespan scheduler work,
+  `claude/start-here-review-5z8jt2`):** ran the full heavy DAG live via
+  `tools/dag_run_live.py ALL` (dynamic AIMD, all gates on). **184/184 · 156P/25F/3S ·
+  wall 68.6 min · all 3 big DBs (mysql/postgres/dbaas) PASSED.** A load-induced 503
+  gateway storm (12:07–12:25) caused **8/20 heavy failures** (77% of all fails were
+  Envoy `upstream connect error … connection timeout`); AIMD clamped to floor 4 and
+  rode it. Survivors reconciled to **0** (took 3 passes — DELETE needs BOTH
+  `SCP_ALLOW_MUTATIONS`+`SCP_ALLOW_DESTRUCTIVE`; the run-end "shared VPC deleted" was
+  premature, reconciler backstopped it). Analysis: `docs/working/trackers/
+  POSTRUN-2026-06-20-fullheavy.md` + facts in `knowledge/validated-facts.md`.
+  **Makespan finding (data-grounded):** floor = 50.7 min (postgres single create);
+  actual 68.9 min ⇒ **18.2 min (26%) recoverable**. Dominant waste was NOT the
+  vpc-peering tail but `heavy-shared-dbaas` (45-min critical create) starting **22.9
+  min late** — starved by 162 light free-wave nodes under the storm-clamped slots.
+  **New module `regression/scenarios/dag_scheduler.py`** (`run_dynamic`): dynamic,
+  duration-prioritized (longest-job-first via `schedule_optimizer` tail-length),
+  VPC-slot-semaphore-gated dispatch — applies priority to BOTH self-create AND adopt,
+  no wave barrier. `simulate_full` DES projects 64.3→51.8 min (19%, ~floor) at
+  workers=8. 7 offline tests. **NOT yet wired** — `dag_run_live.py:234` still calls
+  static `dag_runner.run_plan`; **DAG remaining = A1 wire `run_dynamic` + A2
+  `update_durations` into `dag_run_live`, A3 on_event/dashboard compat, then 1.0-d CI
+  cutover — all need a live heavy run to validate (DEFERRED: heavy lane busy).**
+  Optimizer TIER-D structural fixes VERIFIED: servicewatch-201 + filestorage-teardown
+  were **mis-diagnoses** (code already correct); apigw-privatelink IP is a real
+  **dual-mode** issue (adopt-fallback → own-block IP vs shared subnet) needing the
+  R3 dynamic-IP fix, not a swap (deferred).
 - **LATEST (2026-06-20, session 2 — `claude/start-here-review-5z8jt2`, bootstrap
   review + scheduler-state verification, NO live run):** START_HERE spot-check
   done; corrected two stale references (current observed state wins):
