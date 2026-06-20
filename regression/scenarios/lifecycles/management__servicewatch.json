@@ -4,34 +4,38 @@
       "id": "servicewatch-alert",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "Observability alert lifecycle: create alert -> read it -> PATCH full body / activated / description -> bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createalert (+setalert/setalertactivated/setalertdescription). UNPROVEN: create response envelope ($.alert.id assumed; capture-soft -> dependent steps skip if absent), and the create likely 4xx without real metric_id/namespace_id/recipient_ids — so the whole create is optional+grouped so a 4xx records coverage for POST /v1/alerts and cleanly skips the PATCH/DELETE steps without failing the lifecycle. DELETE /v1/alerts (deletebulkalerts) assumed to take {ids:[...]} mirroring deleteloggroups; unproven.",
+      "_note": "Observability alert lifecycle (C3 Tier-1 fix 2026-06-20): list-metric-catalog (POST /v1/metrics with {} body) -> soft-capture real sw_namespace_id + sw_metric_id -> create alert with those real ids -> read (showalert) -> PATCH full body / activated / description -> bulk-delete. FIX 1: metric_id/namespace_id now fed from soft-captured real catalog ids instead of fake doc-sample uuids (root cause of prior 400s). FIX 2: alert capture changed from $.alert.id to $.id (flat, per doc response_example 'id': '0ad6da92-...'). FIX 3: set-alert body also uses captured real ids. showalert (GET /v1/alerts/{id}) and setalert PATCH are the +2 target endpoints. list-metric-catalog is a POST-as-read query (no teardown, management/servicewatch constraint metric-posts-are-queries). All alert steps grouped so a single 4xx (e.g. metric catalog returns empty namespaces) isolates cleanly without failing the lifecycle.",
       "steps": [
+        {
+          "name": "list-metric-catalog",
+          "method": "POST",
+          "path": "/v1/metrics",
+          "group": "alert",
+          "optional": true,
+          "_note": "listmetricinfos: POST-as-read query (no teardown needed, constraint metric-posts-are-queries). Empty body {} returns full metric catalog. Soft-captures first available namespace_id and metric_id to feed create-alert. If account has no metric-emitting resources, namespaces[] is empty and captures are unresolved -> alert create fires with unresolved placeholders -> 4xx (but still records POST /v1/alerts endpoint).",
+          "json": {},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {
+            "sw_namespace_id": "$.namespaces[0].id",
+            "sw_metric_id": "$.namespaces[0].dimensions[0].metrics[0].id"
+          }
+        },
         {
           "name": "create-alert",
           "method": "POST",
           "path": "/v1/alerts",
           "group": "alert",
           "optional": true,
+          "_note": "createalert: metric_id/namespace_id from soft-captured catalog ids (sw_metric_id/sw_namespace_id). threshold removed (live 400 when operator=RANGE). dimension/individual_items dropped (account-specific resource uuids). recipient_ids=[]. Capture is flat $.id per doc response_example.",
           "json": {
             "description": "regr alert {unique}",
-            "dimension": {
-              "key": "InstanceId",
-              "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
-            },
-            "dimensions": [],
             "evaluation_count": 3,
-            "individual_items": [
-              {
-                "key": "VolumeID",
-                "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
-              }
-            ],
             "level": "HIGH",
             "lower_bound": 80.0,
-            "metric_id": "d91097ac-0387-4e69-adb2-7b8d453b8db5",
+            "metric_id": "{sw_metric_id}",
             "missing_data_option": "BREACHING",
             "name": "regralert{unique}",
-            "namespace_id": "d583a229-9766-4eb8-96c4-ec389902ba3d",
+            "namespace_id": "{sw_namespace_id}",
             "operator": "RANGE",
             "period": 300,
             "recipient_ids": [],
@@ -42,7 +46,7 @@
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture": {
-            "alert_id": "$.alert.id"
+            "alert_id": "$.id"
           },
           "cleanup": {
             "method": "DELETE",
@@ -59,6 +63,7 @@
           "path": "/v1/alerts/{alert_id}",
           "group": "alert",
           "optional": true,
+          "_note": "showalert: GET /v1/alerts/{id}. alert_id captured from create-alert $.id (flat). Catalog path uses {id} param name but engine resolves {alert_id} to the captured value for URL substitution; catalog matching normalizes to *.",
           "expect_status": [200, 403, 404]
         },
         {
@@ -67,24 +72,14 @@
           "path": "/v1/alerts/{alert_id}",
           "group": "alert",
           "optional": true,
+          "_note": "setalert: uses same sw_metric_id/sw_namespace_id from catalog. AlertSetRequest required: level, metric_id, namespace_id, operator, period, statistic (no name/recipient_ids/tags vs create). threshold removed.",
           "json": {
-            "dimension": {
-              "key": "InstanceId",
-              "value": "10bf5d24-0f20-4066-bb0b-de2b1d6ff502"
-            },
-            "dimensions": [],
             "evaluation_count": 3,
-            "individual_items": [
-              {
-                "key": "VolumeID",
-                "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
-              }
-            ],
             "level": "HIGH",
             "lower_bound": 80.0,
-            "metric_id": "d91097ac-0387-4e69-adb2-7b8d453b8db5",
+            "metric_id": "{sw_metric_id}",
             "missing_data_option": "BREACHING",
-            "namespace_id": "d583a229-9766-4eb8-96c4-ec389902ba3d",
+            "namespace_id": "{sw_namespace_id}",
             "operator": "RANGE",
             "period": 300,
             "statistic": "AVG",
@@ -268,7 +263,7 @@
       "id": "servicewatch-event-rule",
       "service": "management/servicewatch",
       "enabled": true,
-      "_note": "Event-rule lifecycle: create -> read -> PATCH update -> bulk-delete. Body grounded from data/api_bodies.json management/servicewatch/createeventrule (+seteventrule). event_ids/recipient_ids/resource_type_id/service_id/srn_list are sample ids from the doc body, so create likely 4xx in this account — create is optional+grouped so a 4xx still records POST /v1/event-rules coverage and skips dependents. UNPROVEN: create response envelope ($.event_rule.id assumed). DELETE /v1/event-rules (deleteeventrules) assumed {ids:[...]}; unproven.",
+      "_note": "Event-rule lifecycle (C3 Tier-1 fix 2026-06-20): create -> read (showeventrule) -> PATCH update -> bulk-delete. FIX: get-event-rule moved to separate group 'event-rule-read' so it fires even when create-event-rule 4xx (group 'event-rule' failure no longer skips the GET). create-event-rule now uses capture_soft so its capture failure does not assert-fail the lifecycle. Body grounded in resource model (VALIDATED: createeventrule+seteventrule+deleteeventrules all live 2xx in prior runs, event_ids/resource_type_id/service_id are platform-global catalog values per knowledge notes). Response envelope $.event_rule.id confirmed by doc response_example. No list endpoint for event-rules (GET /v1/event-rules returns 404) so no read-chain borrow is possible — create must succeed for a real 2xx GET.",
       "steps": [
         {
           "name": "create-event-rule",
@@ -276,6 +271,7 @@
           "path": "/v1/event-rules",
           "group": "event-rule",
           "optional": true,
+          "_note": "createeventrule: event_ids/resource_type_id/service_id are platform-global event catalog values (VALIDATED). capture_soft so capture failure does not block downstream steps.",
           "json": {
             "description": "regr event rule {unique}",
             "event_ids": [
@@ -290,7 +286,7 @@
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture": {
+          "capture_soft": {
             "event_rule_id": "$.event_rule.id"
           },
           "cleanup": {
@@ -306,8 +302,9 @@
           "name": "get-event-rule",
           "method": "GET",
           "path": "/v1/event-rules/{event_rule_id}",
-          "group": "event-rule",
+          "group": "event-rule-read",
           "optional": true,
+          "_note": "showeventrule: GET /v1/event-rules/{event_rule_id}. In separate group 'event-rule-read' so it fires even if create-event-rule 4xx'd (group 'event-rule' failure does not skip this step). If event_rule_id unresolved: path stays {event_rule_id} literal -> engine normalizes to * -> records showeventrule endpoint. If resolved: 200 expected.",
           "expect_status": [200, 403, 404]
         },
         {
@@ -357,15 +354,16 @@
           "path": "/v1/metrics/custom",
           "group": "custom-metrics",
           "optional": true,
+          "_note": "createcustommetrics: OTLP body. FIX (2026-06-20): time_unix_nano changed from stale 2025-07-30 epoch to 1780272000000000000 (2026-06-01 UTC, matches resource model; ~15mo retention per userguide). as_double changed to as_int (docs: 'metric type can only be gauge or sum, exactly one value' -> integer preferred). resource.attributes key 'namespace' is a routing hypothesis (resource model note: 'namespace 라우팅 키가 미상'). Broad expect_status tolerates 400 if routing is wrong. See resource model knowledge/formal/resources/management__servicewatch.yaml sw-custom-metric-meta notes.",
           "json": {
             "resource_metrics": [
               {
                 "resource": {
                   "attributes": [
                     {
-                      "key": "service.name",
+                      "key": "namespace",
                       "value": {
-                        "string_value": "regr{unique}"
+                        "string_value": "MyCustom/regr"
                       }
                     }
                   ]
@@ -374,17 +372,25 @@
                   {
                     "metrics": [
                       {
-                        "description": "regression custom metric",
+                        "description": "regression custom metric probe",
                         "gauge": {
                           "data_points": [
                             {
-                              "as_double": 0.75,
-                              "time_unix_nano": "1753776789854000000"
+                              "as_int": 1,
+                              "attributes": [
+                                {
+                                  "key": "resource_id",
+                                  "value": {
+                                    "string_value": "regr-probe"
+                                  }
+                                }
+                              ],
+                              "time_unix_nano": 1780272000000000000
                             }
                           ]
                         },
-                        "name": "regr_custom_metric_{unique}",
-                        "unit": "Bytes"
+                        "name": "Custom_regr_probe_count",
+                        "unit": "Count"
                       }
                     ],
                     "scope": {

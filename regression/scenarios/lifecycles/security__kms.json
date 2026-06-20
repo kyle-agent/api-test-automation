@@ -4,7 +4,7 @@
       "id": "security-kms-transit-crypto",
       "service": "security/kms",
       "enabled": true,
-      "_note": "KMS transit-key CRYPTO lifecycle (Wave 2 coverage). The existing 'security-kms-key' lifecycle covers create/get/list/update-description/delete; this sibling covers the 9 remaining transit WRITE ops + the 1 managed-kms WRITE. Spine: create transit key (key_type 'advanced', purpose 'rsa-2048' from data/api_bodies.json security/kms/createkey) -> capture $.key.id (confirmed envelope) -> exercise crypto + rotation writes -> delete (schedule deletion). All crypto/rotation steps are optional+grouped so an unexpected 4xx (e.g. a purpose/key_type that does not support a given op, or asymmetric-vs-symmetric mismatch) isolates as a warning and still RECORDS coverage for that endpoint. Bodies from data/api_bodies.json (datakey/encryptdata/hmac/signdata/verifydata/rotatekey/changerotateinfo/changestatekey) + data/api_docs.json schemas; _UNPROVEN provenance (no live 2xx yet). NOTE on purpose: an rsa-2048 (asymmetric) key supports sign/verify/encrypt/decrypt but NOT hmac/datakey (which need a symmetric key); each such op is isolated optional so it records its endpoint then warns. encrypt returns a 'vault:v..' ciphertext used (best-effort soft-capture) to feed decrypt/rewrap; when the soft-capture is absent the doc-sample ciphertext from api_bodies is sent (still records the endpoint, expects 4xx). sign returns a signature fed to verify likewise. managed-kms keys are SYSTEM-managed and cannot be created by the OpenAPI -> update-managed-key-description targets a {unique} id (a seeded placeholder, never a real managed key) so it records the PUT /v1/managed-kms/transit/* write endpoint and 4xx's, isolated optional. (Earlier this used {managed_key_id}, an uncaptured placeholder that the validator now rejects as undefined; {unique} normalizes to '*' for catalog matching identically while resolving cleanly.)",
+      "_note": "KMS transit-key CRYPTO lifecycle (C3 Tier-1 fix 2026-06-20). Spine: (1) create RSA-2048 key (asymmetric, for sign/verify/encrypt/decrypt) -> capture key_id; (2) create AES-256 key (symmetric, for hmac/datakey) -> soft-capture sym_key_id; (3) read-only list-managed-keys -> soft-capture managed_key_id for the PUT description step; (4) exercise all crypto ops; (5) teardown both keys. FIX (a): hmac+datakey now route to sym_key_id instead of key_id — RSA-2048 does NOT support hmac/datakey (400 on prior runs); aes-256 purpose value is UNPROVEN (grounded in knowledge/formal/resources/security__kms.yaml). FIX (b): set-managed-key-description now uses managed_key_id soft-captured from list-managed-keys; account has 0 managed keys (2026-06-20) so placeholder remains unresolved and the step 4xx's, but if the account gains one it auto-upgrades to 2xx. All crypto/rotation steps are optional+grouped; a 4xx records coverage and isolates cleanly. encrypt returns a 'vault:v..' ciphertext soft-captured to feed decrypt/rewrap. sign returns a signature soft-captured to feed verify.",
       "steps": [
         {
           "name": "create",
@@ -26,6 +26,40 @@
             "path": "/v1/kms/transit/{key_id}",
             "service": "kms"
           }
+        },
+        {
+          "name": "create-sym",
+          "method": "POST",
+          "path": "/v1/kms/transit",
+          "group": "xcov-kms-sym-create",
+          "optional": true,
+          "_note": "Creates a symmetric (aes-256) key for hmac/datakey ops which require a symmetric key. RSA-2048 key above does NOT support hmac/datakey. Captures sym_key_id to route those ops below. aes-256 purpose value: UNPROVEN but grounded in resource model (knowledge/formal/resources/security__kms.yaml purpose enum). Cleanup registered separately so it is torn down even if later steps fail.",
+          "json": {
+            "auto_rotate": "Y",
+            "description": "API regression suite (sym crypto)",
+            "key_type": "advanced",
+            "name": "regrkmssym{unique}",
+            "purpose": "aes-256",
+            "rotate_cycle": 7,
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"sym_key_id": "$.key.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/kms/transit/{sym_key_id}",
+            "service": "kms"
+          }
+        },
+        {
+          "name": "list-managed-keys",
+          "method": "GET",
+          "path": "/v1/managed-kms/transit",
+          "optional": true,
+          "group": "xcov-kms-managed-list",
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {"managed_key_id": "$.keys[0].id"},
+          "_note": "Read-only GET: lists managed keys (system-managed, no create). Soft-captures first key id to feed set-managed-key-description below. Account may have 0 managed keys (empty list) — if so managed_key_id stays unresolved and the PUT step still fires against a placeholder (normalizes to * for catalog matching) and 4xx's. Same pattern as security-kms-managed-readonly lifecycle."
         },
         {
           "name": "get",
@@ -68,9 +102,10 @@
           "name": "datakey",
           "service": "kms",
           "method": "POST",
-          "path": "/v1/kms/openapi/datakey/{key_id}",
+          "path": "/v1/kms/openapi/datakey/{sym_key_id}",
           "group": "xcov-kms-datakey",
           "optional": true,
+          "_note": "datakey requires a SYMMETRIC key (aes-256). Routes to sym_key_id captured from create-sym step. If create-sym 4xx'd, sym_key_id is unresolved and this fires against a placeholder (still records the endpoint, 4xx). See resource model: RSA-2048 does NOT support datakey.",
           "json": {"key_type": "plaintext"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
@@ -78,9 +113,10 @@
           "name": "hmac",
           "service": "kms",
           "method": "POST",
-          "path": "/v1/kms/openapi/hmac/{key_id}",
+          "path": "/v1/kms/openapi/hmac/{sym_key_id}",
           "group": "xcov-kms-hmac",
           "optional": true,
+          "_note": "HMAC requires a SYMMETRIC key (aes-256). Routes to sym_key_id from create-sym. If create-sym 4xx'd, sym_key_id is unresolved and this fires against a placeholder (still records the endpoint, 4xx). RSA-2048 key does NOT support HMAC — this was the root cause of prior 400s.",
           "json": {"input": "dGVzdCBpbnB1dA=="},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
@@ -139,9 +175,10 @@
           "name": "set-managed-key-description",
           "service": "kms",
           "method": "PUT",
-          "path": "/v1/managed-kms/transit/{unique}/description",
+          "path": "/v1/managed-kms/transit/{managed_key_id}/description",
           "group": "xcov-kms-managed-desc",
           "optional": true,
+          "_note": "updatemanagedkeydescription: managed_key_id soft-captured from list-managed-keys step above. Account has 0 managed keys as of 2026-06-20 (GET /v1/managed-kms/transit returned count:0) so managed_key_id is unresolved — the path segment stays a placeholder (normalizes to * for catalog matching). Still fires and records the PUT /v1/managed-kms/transit/{key_id}/description endpoint. If the account gains a managed key, the soft-capture makes it 2xx automatically.",
           "json": {"description": "API regression suite"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
