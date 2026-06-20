@@ -231,11 +231,38 @@ def main():
     log(f"adaptive={'on' if _LIM['ref'] is not None else 'off'} "
         f"start={os.environ.get('SCP_ADAPTIVE_START')} ceil={mw} "
         f"min={os.environ.get('SCP_ADAPTIVE_MIN')} interval={os.environ.get('SCP_ADAPTIVE_INTERVAL')}s")
-    result = dag_runner.run_plan(plan, executor, provisioner=provisioner,
-                                 max_workers=mw, on_event=on_event)
+    # A1: dispatch via the DYNAMIC scheduler (longest-job-first, slot-gated, no wave
+    # barrier) by default — set SCP_DAG_DYNAMIC=false to fall back to the static-wave
+    # run_plan. The dynamic path projects ~50-52 min vs ~64 min static at healthy
+    # concurrency (regression.scenarios.dag_scheduler.simulate_full). PENDING first
+    # live validation on a clean (storm-free) heavy run.
+    use_dynamic = os.environ.get("SCP_DAG_DYNAMIC", "true") == "true"
+    if use_dynamic:
+        from regression.scenarios import dag_scheduler
+        # the dashboard bands pulse from wave "active"; the dynamic runner has no
+        # static waves, so mark every non-provision band active up front (per-node
+        # lifecycle_done still overrides each chip to its final colour).
+        for w in state["waves"]:
+            if w["kind"] != "provision":
+                w["active"] = True
+        log(f"dispatch=DYNAMIC (longest-first, slot-gated; SCP_DAG_DYNAMIC) workers={mw}")
+        result = dag_scheduler.run_dynamic(plan, executor, provisioner=provisioner,
+                                           max_workers=mw, on_event=on_event)
+    else:
+        log(f"dispatch=STATIC (run_plan, wave-barrier) workers={mw}")
+        result = dag_runner.run_plan(plan, executor, provisioner=provisioner,
+                                     max_workers=mw, on_event=on_event)
     state["phase"] = "DONE"
     by = result.by_status()
     log(f"DONE — {by}")
+    # A2: fold this run's measured wall-times into the duration store so the next
+    # schedule's critical-path / longest-first priority improves (dag_run_live never
+    # did this before — every node stayed n:1). Learning must never fail the run.
+    try:
+        from regression.scenarios import schedule_optimizer
+        schedule_optimizer.update_durations(schedule_optimizer.measured_from_result(result))
+    except Exception:  # noqa: BLE001
+        pass
     time.sleep(2)
     stop.set()
     render()
