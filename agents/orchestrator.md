@@ -67,7 +67,7 @@ the next obvious objective is named for the following session.
 
 | tier | 역할 | 산출물 |
 |---|---|---|
-| **Planner** | 만들어진 결과물을 계속 검토하고 개선계획을 수립 | `docs/IMPROVEMENT-BACKLOG.md` 갱신, 다음 티켓 |
+| **Planner** | 만들어진 결과물을 계속 검토하고 개선계획을 수립 | `docs/working/trackers/IMPROVEMENT-BACKLOG.md` 갱신, 다음 티켓 |
 | **Coordinator** | 세부 실행계획 수립·분배, worktree 머지, 게이트 검증 | 커밋된 증분, 윈도우 디스패치 |
 | **Executor** | 세부 실행 (모델링·합성·도구 작성) | worktree 변경분 + 보고 |
 
@@ -75,8 +75,8 @@ the next obvious objective is named for the following session.
 
 - **매 윈도우 머지 후**: 그 윈도우가 드러낸 것(신규 PF, 그린 전환, 게이트
   해제 후보)을 backlog에 반영.
-- **일 1회 스윕**: 입력 = `docs/PRODUCT-FINDINGS.md`,
-  `docs/SERVICE-GAP-REPORTS.md`, `tools/retirement.py` 매트릭스,
+- **일 1회 스윕**: 입력 = `docs/working/trackers/PRODUCT-FINDINGS.md`,
+  `docs/working/trackers/SERVICE-GAP-REPORTS.md`, `tools/retirement.py` 매트릭스,
   `dashboard/history.jsonl` 커버리지 트렌드. 출력 = backlog 우선순위 갱신 +
   다음 배치 티켓(의존 순서·병렬 가능 표시).
 
@@ -140,7 +140,7 @@ justification bias 차단), ② 누구도 run 결과를 기다리며 놀지 않�
   recompose → 재시도.
 - **L3 자기판단** — 그래도 실패면 아래 **사람-필요 기준**과 대조.
   - 하나라도 해당 → **STOP + 에스컬레이션**: IB 티켓 + (제품결함이면)
-    `docs/PRODUCT-FINDINGS.md` 기록, 그 단위는 비활성/waive하고 **다음 슬라이스로
+    `docs/working/trackers/PRODUCT-FINDINGS.md` 기록, 그 단위는 비활성/waive하고 **다음 슬라이스로
     이동**(파이프라인 안 막음).
   - 아니면 → 한도 내 1회 추가 재시도, 그래도 실패면 STOP.
 

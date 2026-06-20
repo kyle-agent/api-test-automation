@@ -9,7 +9,7 @@
 - Source: `python -m spec.coverage_gap` (the `gap_getid` line) →
   **80 id-bound GET endpoints still uncovered** across 26 services. Provenance
   per parent node read from `knowledge/formal/resources/*.yaml`. Detailed
-  A/B/C/D classification: `docs/COVERAGE-GETID-PLAN.md` (this doc is the
+  A/B/C/D classification: `docs/working/plans/COVERAGE-GETID-PLAN.md` (this doc is the
   endpoint→parent→action map keyed on the probe-read rule).
 - Regenerate the total any time: `python -m spec.coverage_gap` (heavy=on);
   current ceiling 91.8% reachable, gap 113 = 80 getid + 33 write.
@@ -292,7 +292,7 @@ wired, this one or a sibling still missing; **no** = not wired.
   BM entitlement; bodies UNPROVEN.
 - **new-node items** (subnet-vip, dns-record, volume-type lookup, lb-certificate,
   managed-kms lookup, image-member, addrbook, logging_id source) — cheap modeling
-  (mostly read-only lookup nodes); see `docs/COVERAGE-GETID-PLAN.md` §4.
+  (mostly read-only lookup nodes); see `docs/working/plans/COVERAGE-GETID-PLAN.md` §4.
 
 ## 4 · How a row gets closed (handoff to validation-agent)
 
@@ -307,4 +307,4 @@ wired, this one or a sibling still missing; **no** = not wired.
    Adding a verify on an UNPROVEN create is dead weight — the composer must not
    run unproven creates.
 4. **D rows** — stay parked until the owner/console/entitlement changes; tracked
-   in `docs/COVERAGE-GETID-PLAN.md` §5.
+   in `docs/working/plans/COVERAGE-GETID-PLAN.md` §5.

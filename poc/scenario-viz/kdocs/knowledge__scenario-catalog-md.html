@@ -233,7 +233,7 @@ safety gates. Re-derive flags with the snippet at the bottom.</p>
 <p><strong>29 lifecycles total</strong> (24 enabled, 3 disabled here + the heavy ones gated by
 <code>SCP_RUN_HEAVY</code>). The setter-coverage expansion (26 write steps, in-place
 updates) added in the trusting-curie merge lives inside several existing
-lifecycles as extra steps — see <code>docs/HANDOFF-crud-setter-validation.md</code>.</p>
+lifecycles as extra steps — see <code>docs/working/handoffs/HANDOFF-crud-setter-validation.md</code>.</p>
 </blockquote>
 <h2>Coverage gap (drive AXIS 1 to 100%)</h2>
 <p>Use <code>python -m spec.summary</code> for live numbers. As of last check: 225
@@ -342,7 +342,7 @@ static figure. All bodies are docs-derived and <strong>pending live validation</
 <code>validated-facts.md</code>). Next step: a lane-scheduled live CI run to convert the static
 ceiling into measured coverage.</p>
 <h2>Coverage expansion — 2026-06-11 (levers ①③④, docs-derived)</h2>
-<p>No new lifecycles; existing ones extended (see <code>docs/COVERAGE-WAVE-PLAN.md</code>):</p>
+<p>No new lifecycles; existing ones extended (see <code>docs/working/plans/COVERAGE-WAVE-PLAN.md</code>):</p>
 <ul>
 <li><strong>DBaaS sub-op window prep (①)</strong>: <code>database-mysql-cluster</code> + <code>database-postgresql-cluster</code>
   gained conservative-only window groups (<code>mysql-subop-window</code>/<code>mysql-restart</code>/
@@ -447,7 +447,7 @@ heavy window, runs 27394211896 … 27421363609):</p>
 </tbody>
 </table>
 <p>Live wave findings + blocked classes: <code>docs/RESOURCE-MODEL-PLAN.md</code> §6;
-the consolidated product/API findings ledger is <code>docs/PRODUCT-FINDINGS.md</code>
+the consolidated product/API findings ledger is <code>docs/working/trackers/PRODUCT-FINDINGS.md</code>
 (12 rows). Current static ceiling per <code>python -m spec.coverage_gap</code>:
 <strong>88.1% (1,209/1,372)</strong> (gap_getid 130 · gap_write 33); latest published run
 C3 <strong>44.79%</strong> (cov_op 36.73), fail_new 0, 249 waivers. R3 direction:

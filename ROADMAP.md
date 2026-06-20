@@ -18,7 +18,7 @@ so any session can tell where we are.
 > **M5 resource-task model: R1 done** (128 nodes / 50 files) · **R2 done**
 > (composer live-proven) · **R3 verification waves IN PROGRESS**
 > (waves 1·2 + heavy window: ~10 composed chains stably green, 56 nodes
-> VALIDATED — findings ledgered in `docs/PRODUCT-FINDINGS.md`) ·
+> VALIDATED — findings ledgered in `docs/working/trackers/PRODUCT-FINDINGS.md`) ·
 > **R4 (C4 variants) pending**.
 
 ## Phase 1 — Coverage to 100% (CURRENT)
@@ -29,7 +29,7 @@ so any session can tell where we are.
 - ✅ Static write-op ceiling reached **85.6%** (every write op reachable by an
   enabled lifecycle — see `knowledge/scenario-catalog.md`, Wave 1–3), since
   raised to **88.1% (1,209/1,372)** by explicit-GET conversions and the M5
-  verify-step waves (gap_getid 151 → 130, `docs/COVERAGE-GETID-PLAN.md`;
+  verify-step waves (gap_getid 151 → 130, `docs/working/plans/COVERAGE-GETID-PLAN.md`;
   `python -m spec.coverage_gap`).
 - Measured (live) coverage as of the latest published run: **C3 44.79%**
   (cov_op 36.73) · reachable ceiling 88.1% · **fail_new 0 policy holding** ·

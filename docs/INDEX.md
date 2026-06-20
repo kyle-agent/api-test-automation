@@ -18,36 +18,36 @@ work-in-progress notes.
 |-----|-------|--------|
 | [`PLATFORM-PLAN.md`](PLATFORM-PLAN.md) | The platform upgrade plan: control plane + execution plane, milestones M0–M5 | **adopted** — M0–M3 done, M4 built (cutover last), M5 R3 in progress |
 | [`RESOURCE-MODEL-PLAN.md`](RESOURCE-MODEL-PLAN.md) | M5 resource-task model → composer (scenarios generated from the model); §6 = live wave findings | **adopted** — R1·R2 done, R3 waves live |
-| [`PRODUCT-FINDINGS.md`](PRODUCT-FINDINGS.md) | **Consolidated product/API findings ledger** — one row per finding (id · endpoint · symptom · evidence run · class · status); masked-defect lesson | **active** — append-only, 12 rows (PF-01…PF-12) |
+| [`PRODUCT-FINDINGS.md`](working/trackers/PRODUCT-FINDINGS.md) | **Consolidated product/API findings ledger** — one row per finding (id · endpoint · symptom · evidence run · class · status); masked-defect lesson | **active** — append-only, 12 rows (PF-01…PF-12) |
 | [`COVERAGE-CRITERIA.md`](COVERAGE-CRITERIA.md) | The C0–C4 coverage ladder + waiver mechanism — what "100%" means | **adopted** (2026-06-09) |
-| [`COVERAGE-GETID-PLAN.md`](COVERAGE-GETID-PLAN.md) | The id-bound GET gap classified (A/B/C/D buckets) + verify-step wave plan | active — gap_getid 151 → **130** via waves 2/heavy |
+| [`COVERAGE-GETID-PLAN.md`](working/plans/COVERAGE-GETID-PLAN.md) | The id-bound GET gap classified (A/B/C/D buckets) + verify-step wave plan | active — gap_getid 151 → **130** via waves 2/heavy |
 | [`DEPLOY.md`](DEPLOY.md) | Operations runbook: Docker Compose bundle, executor switch, host migration (M4) | **adopted** — awaiting live/docker verification |
 | [`OPS-DASHBOARD.md`](OPS-DASHBOARD.md) | 영구 oplog 버킷 + 정적 ops 뷰어 (의존순서 라이브 자원 트리 · run 필터 · verdict) | active |
-| [`PARALLEL-EXECUTION-PLAN.md`](PARALLEL-EXECUTION-PLAN.md) | Staged foundations + per-VPC lanes — cut wall-clock to max(lane) instead of sum | **draft** (현 구현 A∥B split + shared adopt가 부분 반영; 전면 일반화는 미승인) |
-| [`harness-tests.md`](harness-tests.md) | 적대적 Tier-0 안전레일 거부 테스트 체크리스트 (env 게이트 flip · name-guess 삭제 · `.env` 커밋) | **active** — append-only |
+| [`PARALLEL-EXECUTION-PLAN.md`](working/plans/PARALLEL-EXECUTION-PLAN.md) | Staged foundations + per-VPC lanes — cut wall-clock to max(lane) instead of sum | **draft** (현 구현 A∥B split + shared adopt가 부분 반영; 전면 일반화는 미승인) |
+| [`harness-tests.md`](working/trackers/harness-tests.md) | 적대적 Tier-0 안전레일 거부 테스트 체크리스트 (env 게이트 flip · name-guess 삭제 · `.env` 커밋) | **active** — append-only |
 | [`IA.md`](IA.md) | 플랫폼 UI/IA 정본 (v2) — 2계층(Dashboard 공개메인 / per-service catalog 백엔드) + single-source + 마이그레이션 V1–V6 | **adopted** (2026-06-17) — V1–V6 구현 완료 |
-| [`CATALOG-VALIDATION-STATUS.md`](CATALOG-VALIDATION-STATUS.md) | "합성 only" 목표 대비 catalog 검증 상태 — secured 100% / validated ~48%, 서비스 15/17/27, 합성61/손작성103. `tools/catalog_status.py`로 재생성 | **active** — 검증 웨이브로 갱신 |
+| [`CATALOG-VALIDATION-STATUS.md`](working/trackers/CATALOG-VALIDATION-STATUS.md) | "합성 only" 목표 대비 catalog 검증 상태 — secured 100% / validated ~48%, 서비스 15/17/27, 합성61/손작성103. `tools/catalog_status.py`로 재생성 | **active** — 검증 웨이브로 갱신 |
 
 ## Handoffs
 
 | Doc | Topic | Status |
 |-----|-------|--------|
-| [`HANDOFF-crud-setter-validation.md`](HANDOFF-crud-setter-validation.md) | CRUD write/setter coverage validation (PR #44): env constraints, failures, next steps | **superseded** — by the write-coverage campaign + fail_new triage + M5 waves |
-| [`SESSION-HANDOFF-parallel-crud.md`](SESSION-HANDOFF-parallel-crud.md) | Parallel-adopt CRUD re-architecture (shared VPC + subnet adoption) | **done** — merged (PR #49–52), live-proven (A∥B full runs) |
-| [`HANDOFF-fail-new-triage.md`](HANDOFF-fail-new-triage.md) | The 52 fail_new of the 2026-06-10 full heavy run, classified (body-fix vs domain-hunt vs known-red candidates) | **done** — fail_new 0 policy holding since; residual levers carried into `COVERAGE-WAVE-PLAN.md` |
-| [`SESSION-HANDOFF-run6-and-ops.md`](SESSION-HANDOFF-run6-and-ops.md) | 측정 런 #6 재개 절차 + peering 근원수정 + ops 대시보드 인수인계 | **done** — run #6 landed (27329026254), ops viewer live on Pages |
-| [`COVERAGE-WAVE-PLAN.md`](COVERAGE-WAVE-PLAN.md) | 잔여 정적 갭 전수 분석 (write 32 = 전부 waived/disabled) + 다음 웨이브 (DBaaS 윈도우 prep ①, servicewatch ③ done, eventstreams ④ partial) | active — 신규 커버리지 웨이브는 M5 합성 경로(`crud_filter=gen-wave`, RESOURCE-MODEL-PLAN §6)로 진행 |
+| [`HANDOFF-crud-setter-validation.md`](working/handoffs/HANDOFF-crud-setter-validation.md) | CRUD write/setter coverage validation (PR #44): env constraints, failures, next steps | **superseded** — by the write-coverage campaign + fail_new triage + M5 waves |
+| [`SESSION-HANDOFF-parallel-crud.md`](working/handoffs/SESSION-HANDOFF-parallel-crud.md) | Parallel-adopt CRUD re-architecture (shared VPC + subnet adoption) | **done** — merged (PR #49–52), live-proven (A∥B full runs) |
+| [`HANDOFF-fail-new-triage.md`](working/handoffs/HANDOFF-fail-new-triage.md) | The 52 fail_new of the 2026-06-10 full heavy run, classified (body-fix vs domain-hunt vs known-red candidates) | **done** — fail_new 0 policy holding since; residual levers carried into `COVERAGE-WAVE-PLAN.md` |
+| [`SESSION-HANDOFF-run6-and-ops.md`](working/handoffs/SESSION-HANDOFF-run6-and-ops.md) | 측정 런 #6 재개 절차 + peering 근원수정 + ops 대시보드 인수인계 | **done** — run #6 landed (27329026254), ops viewer live on Pages |
+| [`COVERAGE-WAVE-PLAN.md`](working/plans/COVERAGE-WAVE-PLAN.md) | 잔여 정적 갭 전수 분석 (write 32 = 전부 waived/disabled) + 다음 웨이브 (DBaaS 윈도우 prep ①, servicewatch ③ done, eventstreams ④ partial) | active — 신규 커버리지 웨이브는 M5 합성 경로(`crud_filter=gen-wave`, RESOURCE-MODEL-PLAN §6)로 진행 |
 
 ## Standing / reference docs (auto-registered 2026-06-17 — reconcile status on next touch)
 
 | Doc | Topic | Status |
 |-----|-------|--------|
-| [`SESSION-HANDOFF.md`](SESSION-HANDOFF.md) | 현재 세션 인수인계 스냅샷 (이어받기 절차 + TODO + 시퀀싱) | **active** — 매 세션 갱신 |
-| [`VALIDATION-QUEUE.md`](VALIDATION-QUEUE.md) | coverage-validator의 우선순위 큐 (low-verification-first) | **active** — standing loop |
-| [`IMPROVEMENT-BACKLOG.md`](IMPROVEMENT-BACKLOG.md) | Planner가 유지하는 개선 계획 (IB-### 티켓) | **active** |
+| [`SESSION-HANDOFF.md`](working/handoffs/SESSION-HANDOFF.md) | 현재 세션 인수인계 스냅샷 (이어받기 절차 + TODO + 시퀀싱) | **active** — 매 세션 갱신 |
+| [`VALIDATION-QUEUE.md`](working/trackers/VALIDATION-QUEUE.md) | coverage-validator의 우선순위 큐 (low-verification-first) | **active** — standing loop |
+| [`IMPROVEMENT-BACKLOG.md`](working/trackers/IMPROVEMENT-BACKLOG.md) | Planner가 유지하는 개선 계획 (IB-### 티켓) | **active** |
 | [`M6-DESIGN.md`](M6-DESIGN.md) | 자율 운영 가능한 플랫폼 M6 설계 | active |
-| [`LIVE-READINESS-GATES.md`](LIVE-READINESS-GATES.md) | disabled-lifecycle 인벤토리 (IB-023) | active |
-| [`PROBE-READS-PLAN.md`](PROBE-READS-PLAN.md) | probe-read 원칙 적용 잔여 지점 | active |
-| [`SERVICE-GAP-REPORTS.md`](SERVICE-GAP-REPORTS.md) | 서비스별 커버리지 갭 리포트 (병렬 분석, 2026-06-13) | reference |
-| [`SECOND-ACCOUNT-BACKLOG.md`](SECOND-ACCOUNT-BACKLOG.md) | 2번째 계정 대기 백로그 (owner 차단) | **blocked** — owner 계정 대기 |
+| [`LIVE-READINESS-GATES.md`](working/trackers/LIVE-READINESS-GATES.md) | disabled-lifecycle 인벤토리 (IB-023) | active |
+| [`PROBE-READS-PLAN.md`](working/plans/PROBE-READS-PLAN.md) | probe-read 원칙 적용 잔여 지점 | active |
+| [`SERVICE-GAP-REPORTS.md`](working/trackers/SERVICE-GAP-REPORTS.md) | 서비스별 커버리지 갭 리포트 (병렬 분석, 2026-06-13) | reference |
+| [`SECOND-ACCOUNT-BACKLOG.md`](working/trackers/SECOND-ACCOUNT-BACKLOG.md) | 2번째 계정 대기 백로그 (owner 차단) | **blocked** — owner 계정 대기 |
 | [`quotas-and-budgets.md`](quotas-and-budgets.md) | 계정 쿼터 + `core.budgets` 예약/skip 모델 | reference |

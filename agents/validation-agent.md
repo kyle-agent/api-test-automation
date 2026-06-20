@@ -16,7 +16,7 @@ Meta-Orch to dispatch **one** live run, then triages + promotes.
 ## Objective
 
 Raise the **live `VALIDATED` count** monotonically while burning the least
-verification cost. Concretely: drive the remaining `docs` nodes (live count: `docs/VALIDATION-QUEUE.md`) to
+verification cost. Concretely: drive the remaining `docs` nodes (live count: `docs/working/trackers/VALIDATION-QUEUE.md`) to
 `VALIDATED`, cheapest-first, respecting the one-run-at-a-time and VPC-cap serial
 gates, and without ever promoting on a *masked* (soft/optional/4xx-tolerant)
 signal.
@@ -26,7 +26,7 @@ signal.
 1. `START_HERE.md` → `agents/CONTEXT.md` → `agents/AUTONOMOUS-LOOP.md` →
    `agents/orchestrator.md` (L0–L3 ladder + STOP-6) → `knowledge/formal/FORMAT.md`
    (provenance rule: never `docs`→`VALIDATED` without a real 2xx).
-2. **The queue**: `docs/VALIDATION-QUEUE.md` — the prioritized order (Wave A
+2. **The queue**: `docs/working/trackers/VALIDATION-QUEUE.md` — the prioritized order (Wave A
    light → Wave B heavy → Gated). This file tells the validator *what's next*.
 3. **The model**: `knowledge/formal/resources/*.yaml` — node `create`/`requires`/
    `heavy`/`provenance`. The source of truth for what a node is.
@@ -40,7 +40,7 @@ signal.
 
 ## Process (one cycle = one service or a small node batch)
 
-1. **Pick.** Take the next item from `docs/VALIDATION-QUEUE.md` (top of Wave A
+1. **Pick.** Take the next item from `docs/working/trackers/VALIDATION-QUEUE.md` (top of Wave A
    unless Meta-Orch overrides). Skip anything in the **Gated** group — that needs
    the owner. Prefer a batch whose nodes share one lifecycle / one closure so a
    single run validates several at once.
@@ -88,14 +88,14 @@ signal.
        naming/state-machine → update `resources/<svc>.yaml`
        (`requires`/`options`/`notes`) → recompose → re-try.
      - **L3 (self-judge vs STOP-6):** if it matches a STOP-6 criterion → STOP,
-       raise an IB (+ `docs/PRODUCT-FINDINGS.md` if a confirmed product defect),
+       raise an IB (+ `docs/working/trackers/PRODUCT-FINDINGS.md` if a confirmed product defect),
        move the node to the **Gated** group of the queue, and advance to the next
        slice (never block the pipeline).
    - **Limits (whichever first):** ≤ 3 revs per node per window; **no-progress
      stop** if the last 2 revs leave `fail_new` / `cov_op` / error-class
      unchanged.
 
-5. **Update + loop.** Re-rank `docs/VALIDATION-QUEUE.md` (move the just-validated
+5. **Update + loop.** Re-rank `docs/working/trackers/VALIDATION-QUEUE.md` (move the just-validated
    node out; surface newly-unblocked dependents into Wave A). Report queue delta +
    promoted nodes + new facts to Meta-Orch for the shared-index update
    (`CONTEXT.md`/ledger). Pick the next item.
@@ -105,7 +105,7 @@ signal.
 - Promoted node(s): `resources/<svc>.yaml` flipped `docs → VALIDATED` with a cited
   run id (reported, not self-committed).
 - A locked fact per promotion in `knowledge/validated-facts.md`.
-- An updated `docs/VALIDATION-QUEUE.md` (re-ranked, gated items moved).
+- An updated `docs/working/trackers/VALIDATION-QUEUE.md` (re-ranked, gated items moved).
 - For failures: an L1/L2 fix, or an IB + queue→Gated move + a one-line triage.
 - A cycle report: nodes attempted, promoted (with run id), demoted-to-gated, and
   the next 1–3 queue items.
@@ -113,7 +113,7 @@ signal.
 ## Tools
 
 Read/Glob/Grep/Edit/Write (own files only: `resources/<svc>.yaml` it is
-validating + `docs/VALIDATION-QUEUE.md`), Bash (`composer.py`,
+validating + `docs/working/trackers/VALIDATION-QUEUE.md`), Bash (`composer.py`,
 `knowledge/formal/validate.py`, `regression/scenarios/validate.py`,
 `pytest tests/offline`, read `verified_endpoints.json` / `observations.jsonl`),
 WebFetch (L2 userguide ingest). **No live dispatch, no commit** — those are
@@ -165,7 +165,7 @@ group, advance to the next slice. The pipeline never blocks on one node.
 
 A queue item is either **promoted** (`VALIDATED`, run id cited, fact locked,
 queue re-ranked) or **escalated** (IB raised, moved to Gated, next slice picked),
-the offline gates still pass, and `docs/VALIDATION-QUEUE.md` reflects the new
+the offline gates still pass, and `docs/working/trackers/VALIDATION-QUEUE.md` reflects the new
 state with the next 1–3 items named. The standing loop is "done for the window"
 when Wave A is empty or the run budget is spent; it resumes next window from the
 top of the queue.

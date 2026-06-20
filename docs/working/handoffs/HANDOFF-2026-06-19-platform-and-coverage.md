@@ -39,7 +39,7 @@ Analyzed 16 services; applied the realizable levers, recorded the hard ceilings 
 - **ADR + design note** — `docs/decisions/2026-06-19-dependency-dag-test-scheduler.md`
   (target: graph-driven scheduler, closure→shared-roots→topological waves under a
   budgets semaphore, replacing the xdist 2-lane split; 0.1 done → 0.5 → 1.0 path) +
-  `docs/run-parallelism-optimization.md`.
+  `docs/working/trackers/run-parallelism-optimization.md`.
 
 ## VERIFIED — run #125 (27819913805, on `main` @ ea4ade38, 2026-06-19)
 - **#59 ✅ CONCURRENT** — mariadb + epas DB clusters Create-Started **8 seconds apart**
@@ -61,7 +61,7 @@ Analyzed 16 services; applied the realizable levers, recorded the hard ceilings 
 2. **live_watch peering-phase false-stall** — HEAVY_STALL still fires when the only
    activity is the VPC-CRUD lane's peering (0 DB/SKE creates yet). Make the stall detector
    recognize VPC-CRUD-lane activity. Low priority (auto-resolves, noisy).
-3. **Deferred optimizations** (docs/run-parallelism-optimization.md): #2 overlap smoke
+3. **Deferred optimizations** (docs/working/trackers/run-parallelism-optimization.md): #2 overlap smoke
    with CRUD (~14 min); #3 quota-aware unification of the VPC-CRUD lane (becomes the
    bottleneck after #59). Need CI validation before merge.
 4. **Report upstream:** "unmatched bulk-delete id == delete-ALL" is an SCP API design bug

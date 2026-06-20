@@ -215,7 +215,7 @@ unmodified — composed output is just another lifecycle. Live-proven via the
 R3 verification waves (`regression/scenarios/lifecycles/generated__*.json` —
 ~10 composed chains stably green incl. the full apigw bundle); see
 `docs/RESOURCE-MODEL-PLAN.md` §6 for wave results and
-`docs/PRODUCT-FINDINGS.md` for the ledger of product/API findings the waves
+`docs/working/trackers/PRODUCT-FINDINGS.md` for the ledger of product/API findings the waves
 surfaced.
 
 > **Self-trigger for heavy runs:** a committed `.github/heavy.txt` (first

@@ -2,7 +2,7 @@
 
 - Status: **active** · 모든 코드/지식은 main에 푸시됨 (HEAD `0463fbb`+)
 - 이 세션의 전말: `knowledge/validated-facts.md`의 2026-06-11 섹션,
-  `docs/HANDOFF-fail-new-triage.md`, `docs/OPS-DASHBOARD.md`
+  `docs/working/handoffs/HANDOFF-fail-new-triage.md`, `docs/OPS-DASHBOARD.md`
 
 ## 세션 종료 시점 상태
 

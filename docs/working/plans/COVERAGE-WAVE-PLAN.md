@@ -2,7 +2,7 @@
 
 - Date: 2026-06-11 · Branch: `worktree-agent-ad779d783a70c6b94` · Status: **active**
 - Inputs: `PYTHONPATH=. python3 -m spec.coverage_gap`, `knowledge/scenario-catalog.md`,
-  `docs/HANDOFF-fail-new-triage.md`, `data/baselines/coverage_waivers.json`,
+  `docs/working/handoffs/HANDOFF-fail-new-triage.md`, `data/baselines/coverage_waivers.json`,
   run #6 27329026254 (full heavy) + smoke 27332251482 (ok 188 / soft 66 / fail_new 0).
 - Baseline at session start: ceiling 85.57% (1174/1372) · gap_write 32 · gap_getid 166
   · live C3 43.27% (분모 1130).

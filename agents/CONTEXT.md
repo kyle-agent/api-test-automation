@@ -115,7 +115,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   is null). **The frontier from here is LIVE C3 (~50%), which is dispatch-gated**
   (free cheap batch vs billable heavy batch — see "What to advance next").
   **Full per-service C3 analysis done** (13 parallel read-only coverage agents):
-  `docs/COVERAGE-C3-ANALYSIS-2026-06-20.md`. Raw 2xx = 566/1372 (41.3%). 560
+  `docs/working/trackers/COVERAGE-C3-ANALYSIS-2026-06-20.md`. Raw 2xx = 566/1372 (41.3%). 560
   non-waived uncovered sort into 4 tiers: **Tier 0 FREE** (~11 read-only param-fix/
   read-chain edits), **Tier 1 LIGHT** (~78 non-billable mutations — gslb/cdn +8 each,
   vs-image +11, vpc-light +11, iam b64-SRN +9, scf +5, loggingaudit +6, …),
@@ -123,7 +123,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   **Tier 3 BLOCKED** (~90: entitlement/product-bug/console-only → waive, don't chase).
   Recommended order free→light→heavy. CI lane confirmed clear (owner-rule OK).
 - **PRIOR (2026-06-19, hand-driven from Claude remote — full handoff:
-  `docs/HANDOFF-2026-06-19-coverage-and-watcher.md`):** published **C3 47.9% →
+  `docs/working/handoffs/HANDOFF-2026-06-19-coverage-and-watcher.md`):** published **C3 47.9% →
   50.1%** (633/1264), C2-called **53.4%** (733/1372). Heavy DBaaS run complete +
   clean (8 cluster creates, +22 DB sub-op id-GET 2xx, 0 survivors verified). New
   STANDING designs: **per-service coverage agents** (`.claude/agents/
@@ -150,7 +150,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   cluster, postgresql cluster, shared dbaas, shared networking. Disabled:
   dns-hosted-zone, iam-role, certificatemanager-import. Many lifecycles also carry
   **write-setter / in-place-update** steps (coverage expansion) — see
-  `docs/HANDOFF-crud-setter-validation.md`.
+  `docs/working/handoffs/HANDOFF-crud-setter-validation.md`.
 - Auth/host resolution: implemented & configurable; confirm against a live `200`.
 - **Coverage campaign (multi-agent) — RUNNING.** `agents/CAMPAIGN.md` is the
   operating model; `agents/coordination/ledger.json` is the blackboard. Per-service
@@ -182,7 +182,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   independent of GitHub. Fail/soft-write response bodies now recorded in
   observation notes (self-diagnosing artifacts). Facts: knowledge/validated-facts.md.
 - **Full heavy run landed (2026-06-10, run 27258520218):** cov_op 35.4 / C3 37.5,
-  **fail_new 52 → triaged** in `docs/HANDOFF-fail-new-triage.md` (27 unique:
+  **fail_new 52 → triaged** in `docs/working/handoffs/HANDOFF-fail-new-triage.md` (27 unique:
   6×401 incl. a suspected query-string HMAC signing bug, 8 DBaaS sub-op 500s
   needing a live-cluster window, 5 bulk-body fixes, 8 create/setter fixes).
   Run-time levers since then: optional-step 4xx retries are now capped
@@ -230,7 +230,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   should green) → **131 nodes VALIDATED / 144 docs** (2026-06-17). Heavy VS chain proven
   through server creation + port attach/detach; static NAT one field from
   done (`publicip_id`, live-derived — rev 3 dispatched). Product findings
-  now live in the **consolidated ledger `docs/PRODUCT-FINDINGS.md`** (12
+  now live in the **consolidated ledger `docs/working/trackers/PRODUCT-FINDINGS.md`** (12
   rows: 3× 403 missing-IAM-action-definition, budget 500 baselined, devops
   unnamed-fields 400, scf time-or-period, undocumented header
   X-ResourceType, scr private-acl 500 ×3, KMS/Secrets scheduled deletion,
@@ -242,7 +242,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   fallback added). Wave narrative: `docs/RESOURCE-MODEL-PLAN.md` §6.
 - **Coverage now (2026-06-17):** static ceiling **100.0%** (1,372/1,372,
   `python -m spec.coverage_gap`; GAP=0 — gap_getid **0**, gap_write **0** —
-  `docs/COVERAGE-GETID-PLAN.md`); latest published run **C3 44.79%**
+  `docs/working/plans/COVERAGE-GETID-PLAN.md`); latest published run **C3 44.79%**
   (cov_op 36.73), **fail_new 0 policy holding**, 249 approved waivers
   (incl. 7 PFS `owner-exclusion`). Owner scope: **archivestorage = reachability-only
   coverage (owner override 2026-06-16)** — every endpoint called regardless of 4xx
@@ -293,13 +293,13 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   `regression/scenarios/lifecycles/generated__waveA1.json` (`enabled:true`;
   validator 209 lifecycles / 0 errors). **Awaiting a single light dispatch**
   (`mutations=true destructive=true heavy=false`, scoped `crud_filter` in
-  `docs/HANDOFF-waveA1-dispatch-prep.md`) once the owner-rule lane clears —
+  `docs/working/handoffs/HANDOFF-waveA1-dispatch-prep.md`) once the owner-rule lane clears —
   3 docs→VALIDATED promotion candidates (quick-query-validate unconditional;
   alert + cm-account-resource conditional on a metric-emitting/Running-VM
   account). 7 Wave A.1 nodes stay blocked/gated (sts-token, trail,
   account-budget PF-04, diagnosis, secretvault-vault, certificate-import,
   cm-event-policy — see handoff).
-- **Coverage-max roadmap (2026-06-17): `docs/COVERAGE-MAX-PLAN.md`.** Grounded
+- **Coverage-max roadmap (2026-06-17): `docs/working/plans/COVERAGE-MAX-PLAN.md`.** Grounded
   finding: **offline coverage is MAXED** (C1 100% heavy-on / 52.9% light-only);
   every further C3 gain (last published ~44.79%) is **dispatch-gated**. The 646
   heavy-only endpoints are the frontier (DB engines ~190, networking/vpc 49,
@@ -321,7 +321,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   fixed (`knowledge/validated-facts.md`). Re-run Tier 0 after the fix to clear
   fail_new → 0 and capture the archivestorage/Wave-A 2xx evidence (promotions).
 - **What to advance next (2026-06-19, supersedes the 2026-06-17 plan below):**
-  see `docs/HANDOFF-2026-06-19-coverage-and-watcher.md` → "What to advance next".
+  see `docs/working/handoffs/HANDOFF-2026-06-19-coverage-and-watcher.md` → "What to advance next".
   Ranked: (1) **full heavy batch** (billable; compute/network/storage heavy
   lifecycles to recover the rest of the id-GETs — this session only did DB;
   remember the same-shell env gotcha + arm the live-watcher); (2) **cheap batch
@@ -329,7 +329,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   `coverage-service` agents ≤6–8); (3) **base64-SRN cross-probe** on iam's
   srn-targeted ops; (4) optimizer per-label windowing; (5) watcher polish.
   --- earlier (2026-06-17) plan retained for reference: ---
-- **What to advance next:** **re-dispatch Tier 0 (LIGHT) per `docs/COVERAGE-MAX-PLAN.md`**
+- **What to advance next:** **re-dispatch Tier 0 (LIGHT) per `docs/working/plans/COVERAGE-MAX-PLAN.md`**
   once the 27725293499 sweep concludes (lane free) — should land fail_new 0 with the
   archivestorage fix; then promote Wave A docs→VALIDATED and walk Tiers 1→4.
   Confirm heavy rev 3 (static-NAT
@@ -340,7 +340,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   and progressively replace hand-written lifecycles, then M4 cutover
   verification. Earlier backlog (query-signing fix, DBaaS sub-op windows,
   corrupt `api_bodies.json` entries, servicewatch orphan log groups)
-  remains tracked in `docs/COVERAGE-WAVE-PLAN.md` /
+  remains tracked in `docs/working/plans/COVERAGE-WAVE-PLAN.md` /
   `agents/coordination/ledger.json`.
 
 - **프로세스/하니스 도구 추가 (2026-06-17):** repo 루트에 자동 로드 `CLAUDE.md`
@@ -350,7 +350,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   PROMPTS.md subagent STATUS enum(`DONE|DONE_WITH_CONCERNS|NEEDS_CONTEXT|BLOCKED`)
   +changed-files, orchestrator.md severity→머지 액션 표 + output-drift 체크,
   START_HERE.md stale-reference 점검 + 핸드오프 resume-command 규칙,
-  `knowledge/validated-facts.md` conf·seen·obs 메타, `docs/harness-tests.md`
+  `knowledge/validated-facts.md` conf·seen·obs 메타, `docs/working/trackers/harness-tests.md`
   안전레일 적대 테스트. 출처/미채택 목록: `.claude/skills/README.md`.
 
 - **Parallel-scheduling principle (2026-06-18, audit-confirmed):** scenarios with
@@ -368,7 +368,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   observed working in run 27735741382). **Validate on the next heavy run** — the
   audit-optimizer measures per-run wall-time, so DBaaS phase sum→max(engine) is
   directly verifiable. Full plan + end-state multi-VPC lane model:
-  `docs/PARALLEL-EXECUTION-PLAN.md`. **DAG gate (1.0-a):**
+  `docs/working/plans/PARALLEL-EXECUTION-PLAN.md`. **DAG gate (1.0-a):**
   `dependencies.json` now carries the dependency DAG (`shared_roots` +
   `adopt_edges`); `python -m regression.scenarios.validate_dag --check` is the
   CI gate (in `validate.yml`) that keeps it in sync with the lifecycles, the

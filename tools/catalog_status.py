@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Catalog validation-status rollup (VERIFICATION track).
 
-Reproduces the numbers in ``docs/CATALOG-VALIDATION-STATUS.md``:
+Reproduces the numbers in ``docs/working/trackers/CATALOG-VALIDATION-STATUS.md``:
 
   * per-node provenance totals (VALIDATED vs docs vs other)
   * per-SERVICE 3-way split (full / partial / zero validated)

@@ -338,13 +338,13 @@ Planner   ──(IMPROVEMENT-BACKLOG.md 갱신)──▶ Coordinator ──(dele
 
 - **주기**: ① 머지 윈도우마다(한 묶음 머지 직후) 리뷰, ② 매일 1회 sweep 리뷰.
 - **입력**(전부 기존 산출물):
-  - `docs/PRODUCT-FINDINGS.md` — 제품/API 결함 큐레이션 원장.
-  - `docs/SERVICE-GAP-REPORTS.md` — 서비스별 커버리지 갭(검증/남음/분류 A·B·C·D).
+  - `docs/working/trackers/PRODUCT-FINDINGS.md` — 제품/API 결함 큐레이션 원장.
+  - `docs/working/trackers/SERVICE-GAP-REPORTS.md` — 서비스별 커버리지 갭(검증/남음/분류 A·B·C·D).
   - retirement 매트릭스 — `python -m tools.retirement` 출력(RETIRE/NEAR).
   - 커버리지 트렌드 — `dashboard/history.jsonl`(run당 1행: `cov_op/cov_get/cov_c3/
     fail_new/reachable_pct/gap_write/gap_getid/crud_ran`)의 시계열.
   - `data/baselines/untestable_services.json` — 제외 서비스(회색) 목록.
-- **출력**: `docs/IMPROVEMENT-BACKLOG.md` 갱신(아래 포맷). 행 추가/상태 전이만.
+- **출력**: `docs/working/trackers/IMPROVEMENT-BACKLOG.md` 갱신(아래 포맷). 행 추가/상태 전이만.
 
 ### E.3 Coordinator — worktree-merge 프로토콜 (이미 사용 중)
 
@@ -366,7 +366,7 @@ worktree**에서 작업하는 현행 메커니즘이다. 프로토콜:
 (`plan()`이 반환하는 `credentials` 전제조건, `composer.py:937`), (c) 도메인 지식
 주입(어떤 quota/prereq). 그 외 생성·검증·병합·발행은 agent 루프가 닫는다.
 
-### E.5 `docs/IMPROVEMENT-BACKLOG.md` 포맷
+### E.5 `docs/working/trackers/IMPROVEMENT-BACKLOG.md` 포맷
 
 Planner가 만들고 갱신하는 단일 backlog. 마크다운 표, 한 행 = 한 개선 항목:
 
@@ -403,7 +403,7 @@ acceptance gate 약어: **R1**=`python knowledge/formal/validate.py`,
 | T1 | **tools/new_service.py** 스캐폴더 (M6a) | M | `tools/new_service.py`(신규), 읽기: `data/api_catalog.json`,`data/api_docs.json` | OFF(새 단위테스트), R1(생성 stub가 통과) |
 | T2 | **expand_targets + target= 문법** (M6b/c) | M | `regression/scenarios/targets.py`(신규) | OFF(`tests/offline/test_targets.py`) |
 | T4 | **plan-manifest emit** (M6d) | S | `core/oplog.py`(`emit_plan`/`runs/<id>/plan.json`), regression job run-start step | OFF |
-| T6 | **Planner cadence + IMPROVEMENT-BACKLOG.md scaffold** (M6f) | S | `docs/IMPROVEMENT-BACKLOG.md`(신규), `agents/orchestrator.md`(역할 명문화) | (문서) |
+| T6 | **Planner cadence + IMPROVEMENT-BACKLOG.md scaffold** (M6f) | S | `docs/working/trackers/IMPROVEMENT-BACKLOG.md`(신규), `agents/orchestrator.md`(역할 명문화) | (문서) |
 
 ### 후속 (배치1 의존)
 
@@ -434,7 +434,7 @@ acceptance gate 약어: **R1**=`python knowledge/formal/validate.py`,
 | IB-004 | debt | **96건 "create without delete" 경고**(lookup 노드) — R1 노이즈 | lookup은 `capture_soft:true` 명시로 분류하거나, validator에 lookup 분류 후 경고 억제(R1 규칙 보강) | S |
 | IB-005 | visualize | **gen_dep_map.py 수동 붙여넣기** — DEP-MAP 마커 사이에 손으로 붙임, drift 위험 | 발행 시 gen_dep_map.py 출력을 ops.html에 자동 주입(빌드 step) | S |
 | IB-006 | coverage | **restore/upgrade 체인 게이트** — 위험/과금 체인 비활성 | owner 승인 게이트 + heavy/destructive 분리 배치로 단계 활성화 | M |
-| IB-007 | debt | **second-account backlog** — `docs/SECOND-ACCOUNT-BACKLOG.md`의 미결 항목(VPC cap, 격리 계정) | 별도 계정 credential 발급 후 peak_quota 분할을 계정 차원으로 확장 | L |
+| IB-007 | debt | **second-account backlog** — `docs/working/trackers/SECOND-ACCOUNT-BACKLOG.md`의 미결 항목(VPC cap, 격리 계정) | 별도 계정 credential 발급 후 peak_quota 분할을 계정 차원으로 확장 | L |
 | IB-008 | coverage | SERVICE-GAP-REPORTS의 C 분류(gslb/vpn/cdn/direct-connect 라이브 미증명) | 분류별 다음 윈도우 라이브 투입(placeholder 가능분 우선) | M |
 
 ---
@@ -460,5 +460,5 @@ acceptance gate 약어: **R1**=`python knowledge/formal/validate.py`,
   `controlplane/templates/base.html`(Overview/Plan/Run/Report 셸), `dashboard/build.py`
   (coverage index/drilldown, `untestable_services.json` 회색), `dashboard/history.jsonl`(트렌드).
 - 자율 루프: `agents/orchestrator.md`, `agents/coordination/ledger.json`(status 전이),
-  `tools/retirement.py`(RETIRE/NEAR 매트릭스), `docs/PRODUCT-FINDINGS.md`,
-  `docs/SERVICE-GAP-REPORTS.md`, `docs/IMPROVEMENT-BACKLOG.md`(신규).
+  `tools/retirement.py`(RETIRE/NEAR 매트릭스), `docs/working/trackers/PRODUCT-FINDINGS.md`,
+  `docs/working/trackers/SERVICE-GAP-REPORTS.md`, `docs/working/trackers/IMPROVEMENT-BACKLOG.md`(신규).

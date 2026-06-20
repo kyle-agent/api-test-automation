@@ -7,7 +7,7 @@
 > and dispatching stays with run-dispatch under the one-run-at-a-time owner rule.
 > Built offline (Tier-L) by Track ① platform-improver from a grep of
 > `regression/scenarios/lifecycles/*.json` cross-referenced with
-> `docs/IMPROVEMENT-BACKLOG.md` + `knowledge/validated-facts.md`. Keep in sync when
+> `docs/working/trackers/IMPROVEMENT-BACKLOG.md` + `knowledge/validated-facts.md`. Keep in sync when
 > a lifecycle is enabled, when an `_disabled_reason` changes, or when a blocking IB
 > closes.
 

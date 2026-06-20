@@ -57,9 +57,9 @@ Meta-Orchestrator  (lead 세션 = 사람-Claude pair)
 
 | sub-agent | 책임 | 산출물 |
 |---|---|---|
-| **product-defect-finder** | 최근 N run의 fail/soft를 PF 후보로 클러스터링 → `docs/PRODUCT-FINDINGS.md` 신규 줄 제안 | PR-candidate 목록 |
+| **product-defect-finder** | 최근 N run의 fail/soft를 PF 후보로 클러스터링 → `docs/working/trackers/PRODUCT-FINDINGS.md` 신규 줄 제안 | PR-candidate 목록 |
 | **failure-pattern-clusterer** | `dashboard/history.jsonl` + `reports/results/*.jsonl` 패턴(같은 status code, 같은 path family) | 클러스터 리포트 |
-| **debt-finder** | drift-detector 결과 + 코드 TODO + 오래된 `_disabled_reason` + 만료 waiver → `docs/IMPROVEMENT-BACKLOG.md` 신규 IB | IB 후보 |
+| **debt-finder** | drift-detector 결과 + 코드 TODO + 오래된 `_disabled_reason` + 만료 waiver → `docs/working/trackers/IMPROVEMENT-BACKLOG.md` 신규 IB | IB 후보 |
 
 ## 직렬화 지점 (병렬 안 되는 것)
 
@@ -67,7 +67,7 @@ Meta-Orchestrator  (lead 세션 = 사람-Claude pair)
 
 1. **커밋·푸시** — Meta-Orch만. sub-agent는 변경 보고만, 커밋은 안 함.
 2. **공유 인덱스 파일** — `agents/CONTEXT.md`, `agents/coordination/ledger.json`,
-   `docs/IMPROVEMENT-BACKLOG.md`, `docs/PRODUCT-FINDINGS.md`. Meta-Orch가 머지
+   `docs/working/trackers/IMPROVEMENT-BACKLOG.md`, `docs/working/trackers/PRODUCT-FINDINGS.md`. Meta-Orch가 머지
    시점에 한 번에 갱신.
 3. **live run dispatch** — `.github/run-request` push. owner rule: 한 번에 1 run.
    live-verifier가 큐잉, Meta-Orch가 직렬로 dispatch.

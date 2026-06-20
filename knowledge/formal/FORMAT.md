@@ -51,7 +51,7 @@ only when, off the id its `create` captures, it exercises:
    there as new write ops appear);
 3. **delete** (reverse-order teardown) — every created resource is owned and torn down.
 
-The read side (this section's focus + `docs/PROBE-READS-PLAN.md`, gap_getid=80) is
+The read side (this section's focus + `docs/working/plans/PROBE-READS-PLAN.md`, gap_getid=80) is
 the remaining open axis; the write side is structurally in place via the
 `*-write-coverage` lifecycles. `agents/validation-agent.md` uses this complete
 4-stage shape as each node's **done-when**.
@@ -111,7 +111,7 @@ one composed run.
 **Where it still needs applying:** the repo-wide map of `gap_getid` endpoints not
 yet probe-read-covered — parent node, service, already-wired status, and the
 cheapest (already-VALIDATED-parent) wins — lives in
-[`docs/PROBE-READS-PLAN.md`](../../docs/PROBE-READS-PLAN.md). Regenerate the gap
+[`docs/working/plans/PROBE-READS-PLAN.md`](../../docs/working/plans/PROBE-READS-PLAN.md). Regenerate the gap
 total any time with `python -m spec.coverage_gap` (the `gap_getid` line). The
 validation agent (`agents/validation-agent.md`) closes each row by validating the
 parent create, then adding the one-line verify read.

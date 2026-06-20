@@ -328,7 +328,7 @@ replication-regions 후보), lifecycle `credentials` 표면화(콘솔 발급
 ### 제품 결함 발견 (테스트가 아니라 제품 이슈 — 기록·등재됨)
 
 > 발견이 늘어 **통합 원장으로 이관**: 전체 목록(12건, id·증상·증거 run·
-> class·status)은 [`docs/PRODUCT-FINDINGS.md`](PRODUCT-FINDINGS.md).
+> class·status)은 [`docs/working/trackers/PRODUCT-FINDINGS.md`](PRODUCT-FINDINGS.md).
 > 아래는 웨이브 1 시점의 최초 3건 기록(역사 보존).
 
 - **403 "Action definition is not found"** — IAM action 미정의로 보이는 제품
@@ -379,4 +379,4 @@ heavy rev 3 결과 확인(static NAT `publicip_id` + scr/fs 재합성분) →
 잔여 docs 노드 72개의 웨이브 fan-out 계속 → VALIDATED 승격 → 수작업
 lifecycle 점진 교체(R3 본편) → 전체 회귀 plan 계산 → R4 `vary` 변형.
 id-bound GET 갭은 verify-step 레버로 **151 → 130** 진행
-(`docs/COVERAGE-GETID-PLAN.md`).
+(`docs/working/plans/COVERAGE-GETID-PLAN.md`).

@@ -46,7 +46,7 @@ lbm["_note"] += (" | heavy: the loadbalancer itself is billable/slow; NO "
 
 out = {
     "_comment": ("Composed wave 5 — networking enablement batch "
-                 "(docs/SERVICE-GAP-REPORTS.md group 1, 2026-06-13): implicit "
+                 "(docs/working/trackers/SERVICE-GAP-REPORTS.md group 1, 2026-06-13): implicit "
                  "firewall via IGW firewall_enabled=true + rule chain; "
                  "vpc-endpoint wired to a real FS volume id; private-nat over "
                  "the verified transit-gateway branch; LB member/setter/"

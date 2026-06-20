@@ -106,7 +106,7 @@ quick-query-validate) all have a destructive teardown so nothing is left behind.
    the `quick-query-validate` node so the composer no longer falls back to read-path
    derivation and raises. After the edit: `python knowledge/formal/validate.py` →
    **0 errors** (warnings 84→79); `compose(["quick-query-validate"])` → OK (2 steps).
-2. `docs/HANDOFF-waveA1-dispatch-prep.md` — this file.
+2. `docs/working/handoffs/HANDOFF-waveA1-dispatch-prep.md` — this file.
 3. **`regression/scenarios/lifecycles/generated__waveA1.json` (materialization,
    2026-06-17)** — the 16 READY nodes composed and `enabled: true`. Regenerate with:
    `compose([node]) for node in <16 READY>` → flip `enabled` → write fragment →

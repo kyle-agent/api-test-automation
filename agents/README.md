@@ -31,7 +31,7 @@ here — so the work continues identically across sessions.
 | **Conformance** | [`conformance-agent.md`](conformance-agent.md) | AXIS 2: static + runtime defect detection vs baseline. |
 | **AI-Evaluator** | [`ai-evaluator-agent.md`](ai-evaluator-agent.md) | Third-party "can an AI use this API?" judge; feeds conformance's AI-usability lens. |
 | **Dashboard** | [`dashboard-agent.md`](dashboard-agent.md) | Builds/publishes the unified dashboard from the results store. |
-| **Coverage-Validator** | [`validation-agent.md`](validation-agent.md) | Track ② standing loop: validates one service/node-batch at a time, promotes `docs`→`VALIDATED` on a real 2xx (IB-041 evidence, masked-defect-safe); works `docs/VALIDATION-QUEUE.md` low-verification-first. |
+| **Coverage-Validator** | [`validation-agent.md`](validation-agent.md) | Track ② standing loop: validates one service/node-batch at a time, promotes `docs`→`VALIDATED` on a real 2xx (IB-041 evidence, masked-defect-safe); works `docs/working/trackers/VALIDATION-QUEUE.md` low-verification-first. |
 
 > The 8 roster roles above are the **durable** team. `AUTONOMOUS-LOOP.md`
 > additionally spawns **ephemeral sub-agent types** per track (e.g. docs-mapper,

@@ -80,7 +80,7 @@ Notes:
 | **Create→show coverage** | `spec/enrich_catalog.py` → `data/api_catalog_params.json` (per-endpoint path/query param + producer); engine auto-probe seeded from full ctx + `_PARAM_ALIASES`, bounded by `timeout=8/retry=False/cap` | merged |
 | **Heavy de-dup** | disabled 5 redundant composed heavy-DBaaS drafts (~5 clusters/run) | `3390d72` |
 | **http client** | `request(... timeout=, retry=)` so best-effort probes cost one short deadline | merged |
-| **Docs** | `docs/PARALLEL-EXECUTION-PLAN.md`, `docs/COVERAGE-GETID-PLAN.md`, `agents/CONTEXT.md`, `docs/IMPROVEMENT-BACKLOG.md` (IB-050 note) | merged |
+| **Docs** | `docs/working/plans/PARALLEL-EXECUTION-PLAN.md`, `docs/working/plans/COVERAGE-GETID-PLAN.md`, `agents/CONTEXT.md`, `docs/working/trackers/IMPROVEMENT-BACKLOG.md` (IB-050 note) | merged |
 
 ## 3. Key facts learned this session
 
@@ -111,8 +111,8 @@ Notes:
       (DBaaS phase sum→max(engine)).
 - [ ] **Promote Wave-A docs→VALIDATED** on 2xx evidence once a clean light run lands
       (quick-query-validate, alert, cm-account-resource, gpu-node-image, cloudml-image,
-      volume-type) — see `docs/COVERAGE-MAX-PLAN.md` tiers.
-- [ ] **Walk Tiers 1→4** of `docs/COVERAGE-MAX-PLAN.md` from the remote env now that
+      volume-type) — see `docs/working/plans/COVERAGE-MAX-PLAN.md` tiers.
+- [ ] **Walk Tiers 1→4** of `docs/working/plans/COVERAGE-MAX-PLAN.md` from the remote env now that
       runs are hand-driven.
 - [ ] **Still-live billable resources** from the earlier heavy run (e.g.
       postgresql/regrpgjfofmpmd) — confirm reaped by the sweep; reconcile if not.

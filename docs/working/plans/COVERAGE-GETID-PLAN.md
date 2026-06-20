@@ -7,7 +7,7 @@
   (`generated__wave2.json`) and the heavy VS chain; queue/sec/rg/iam/scf/
   volume green, scr/fs recomposed, heavy rev 3 dispatched — see
   `docs/RESOURCE-MODEL-PLAN.md` §6. Product findings the waves surfaced
-  are ledgered in `docs/PRODUCT-FINDINGS.md` (e.g. PF-03 filestorage 403,
+  are ledgered in `docs/working/trackers/PRODUCT-FINDINGS.md` (e.g. PF-03 filestorage 403,
   PF-06 scf time-or-period — the §2 run-risk note proved right).
 - Input: reproduction of `dashboard.build.reachable_ceiling` (catalog
   `data/api_catalog.json` + `regression/scenarios/loader.load_lifecycles()`,
@@ -234,7 +234,7 @@ redundant-but-harmless.
 ### Piece 2 — read-reachability report (`python -m spec.read_reachability`)
 Static catalog×model join classifying every id-bound GET: cat1-auto /
 cat2-needs-child / query-param / **model-gap**. The model-gap list is Piece 3's
-worklist. Output `docs/READ-REACHABILITY.md`. (in progress)
+worklist. Output `docs/working/trackers/READ-REACHABILITY.md`. (in progress)
 
 ### Piece 3 — burn down model-gaps (IN PROGRESS)
 **3a DONE — central param-alias map** (`engine._PARAM_ALIASES`): the name-mismatch
@@ -265,7 +265,7 @@ because a hand-written lifecycle captures the catalog param directly (e.g.
 Auto-probe issues param-less GETs, so id-bound GETs that ALSO need required query
 params (apigw `reports`, dbaas `check-duplication` by name, date windows) need an
 explicit lifecycle step / model `verify` with the params. Listed in
-`docs/READ-REACHABILITY.md`.
+`docs/working/trackers/READ-REACHABILITY.md`.
 
 ### Piece 3b — PRECISE worklist (89 self-params, no producer; from data/api_catalog_params.json 2026-06-18)
 

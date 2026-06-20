@@ -5,7 +5,7 @@
 > Hard Rule 5, every remembered number was re-verified before use; observed
 > state wins on conflict. The headline metric is **C3 (검증됨 = a real run got a
 > 2xx)** per `docs/COVERAGE-CRITERIA.md`. This is a *status* report (what is
-> uncovered and why), not a dispatch plan — the plan is `docs/COVERAGE-MAX-PLAN.md`.
+> uncovered and why), not a dispatch plan — the plan is `docs/working/plans/COVERAGE-MAX-PLAN.md`.
 
 ---
 
@@ -54,7 +54,7 @@ Closing it is **DISPATCH-GATED**: it requires actually *running* the lifecycles
 on `main` with the mutation/destructive/heavy safety gates opened (which create
 real, billable cloud resources), triaging failures, and fixing bodies. Adding
 more offline scenarios does not move C3. This matches the grounded conclusion in
-`docs/COVERAGE-MAX-PLAN.md` ("offline coverage is already maxed; every further
+`docs/working/plans/COVERAGE-MAX-PLAN.md` ("offline coverage is already maxed; every further
 gain is dispatch-gated").
 
 **The heavy-only frontier.** The single biggest structural driver of the gap is
@@ -224,7 +224,7 @@ target as covered-when-reached (4xx = access evidence), so a reachability run
 - `python -m spec.coverage_gap` / `--no-heavy` (run this session — outputs quoted §1)
 - `python -m spec.summary` (run this session — 1372 endpoints, method split)
 - `agents/CONTEXT.md` (published C3 ≈ 44.79% / cov_op ≈ 36.73; Tier-0 run 27725293499 triage)
-- `docs/COVERAGE-MAX-PLAN.md` (heavy-only frontier table; dispatch tiers)
+- `docs/working/plans/COVERAGE-MAX-PLAN.md` (heavy-only frontier table; dispatch tiers)
 - `data/baselines/coverage_waivers.json` (249 waivers; class breakdown)
 - `reports/results/observations.jsonl` (107 smoke obs, 66 distinct 2xx keys — latest-run residue)
 - `docs/COVERAGE-CRITERIA.md` (C2/C3 definitions, waiver classes)

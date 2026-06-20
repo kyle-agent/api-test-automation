@@ -1,5 +1,5 @@
 {
-  "_note": "Wave A.1 light-batch — materialized from the resource-task model via composer.compose() (one gen-<node> lifecycle per VALIDATION-QUEUE Wave A.1 READY node). Dispatch-ready: enabled flipped to true (composer emits enabled:false by design). 16 nodes; light/non-heavy. See docs/HANDOFF-waveA1-dispatch-prep.md for the per-node readiness table + the scoped crud_filter resume command. 3 docs->VALIDATED promotion candidates: quick-query-validate (unconditional), alert + cm-account-resource (conditional on a metric-emitting / Running-VM account).",
+  "_note": "Wave A.1 light-batch — materialized from the resource-task model via composer.compose() (one gen-<node> lifecycle per VALIDATION-QUEUE Wave A.1 READY node). Dispatch-ready: enabled flipped to true (composer emits enabled:false by design). 16 nodes; light/non-heavy. See docs/working/handoffs/HANDOFF-waveA1-dispatch-prep.md for the per-node readiness table + the scoped crud_filter resume command. 3 docs->VALIDATED promotion candidates: quick-query-validate (unconditional), alert + cm-account-resource (conditional on a metric-emitting / Running-VM account).",
   "lifecycles": [
     {
       "id": "gen-pricing-reads",

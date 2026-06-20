@@ -280,7 +280,7 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 
 | # | 작업 | AI 역할 | 비고 |
 |---|---|---|---|
-| B1 | **실패 triage 자동화** | new-fail을 분류: ① 환경/할당량 이슈 ② spec 변경 ③ 테스트(body) 버그 ④ 진짜 regression. known_issues 갱신·재실행·시나리오 수정 PR을 각각 제안 | 현재 `docs/HANDOFF-fail-new-triage.md` 수작업의 자동화 — **가장 먼저 만들 것**. run을 블로킹하지 않는 비동기 후처리 |
+| B1 | **실패 triage 자동화** | new-fail을 분류: ① 환경/할당량 이슈 ② spec 변경 ③ 테스트(body) 버그 ④ 진짜 regression. known_issues 갱신·재실행·시나리오 수정 PR을 각각 제안 | 현재 `docs/working/handoffs/HANDOFF-fail-new-triage.md` 수작업의 자동화 — **가장 먼저 만들 것**. run을 블로킹하지 않는 비동기 후처리 |
 | B2 | 리포트 자연어 요약 | run 결과 → 경영/팀 보고용 한 문단 + 주요 변화 하이라이트, 알림에 첨부 | 저비용·즉시 효과 |
 | B3 | 테스트 버그 자동수정 PR | triage가 ③으로 판정한 건의 시나리오 JSON 수정 PR 생성 → 사람 리뷰 | B1의 확장, 사람 게이트 필수 |
 
@@ -425,14 +425,14 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
       notes에 문서화(콘솔-전용 id → M5 Planning 폼 입력 경로)
 - [x] **R3 검증 웨이브 2 + heavy 윈도우** (2026-06-12) — vpc-free 체인
       9종으로 id-bound GET verify 레버 실행(gap_getid 151→130,
-      `docs/COVERAGE-GETID-PLAN.md`): 웨이브 2 3회전(27399448835 →
+      `docs/working/plans/COVERAGE-GETID-PLAN.md`): 웨이브 2 3회전(27399448835 →
       27401527554 → 27417986669) + heavy 2회전(+rev 3 디스패치,
       27421363609). 합성 roster **안정 green ~10개**(pilot/vslight/apigw/
       dashboard/queue/sec/rg/iam/scf/volume), heavy VS 체인은 서버 폐포 +
       port attach/detach까지 증명, static NAT 필드 1개(`publicip_id`) 반영.
       합성기/엔진 능력 추가: step `headers`, delete retry/json passthrough,
       lookup 노드 ~7종, lifecycle `credentials` 표면화. 제품 발견은
-      **`docs/PRODUCT-FINDINGS.md` 통합 원장(12건)**으로 이관 — 미문서 필수
+      **`docs/working/trackers/PRODUCT-FINDINGS.md` 통합 원장(12건)**으로 이관 — 미문서 필수
       헤더(X-ResourceType)라는 신규 결함 클래스와 masked-defect 교훈 포함.
       SCR docker-auth 1-step 실험(`regression/scr_docker_probe.py`,
       run-request `docker_probe=true`)은 quota 403으로 INCONCLUSIVE →

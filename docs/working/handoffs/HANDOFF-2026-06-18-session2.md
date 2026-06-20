@@ -1,7 +1,7 @@
 # Handoff — 2026-06-18 session 2 (Claude remote, hand-driven runs)
 
 > Pick-up note for a fresh session with the SCP env vars configured. This session
-> **extends** `docs/HANDOFF-2026-06-18-claude-remote.md` (CI auto-trigger already
+> **extends** `docs/working/handoffs/HANDOFF-2026-06-18-claude-remote.md` (CI auto-trigger already
 > disabled there). It lands the engine **identity-based create→show probe**, an
 > **enrichment residual pass** (producer-match 90.9%→98.1%), a **FAST sweep mode**,
 > and fixes a **cosmetic `-n 6` CI bug**. Read `CLAUDE.md` → `START_HERE.md` →
@@ -156,7 +156,7 @@ disabled · `dab8a41` merge (the one with the cosmetic `-n` bug).
    resourcemanager key/resource_identifier, cloudmonitoring addrbookId EOL, scr
    tags_id docker-pushed) and not a missed producer.
 6. **Carry-overs from prior handoff** (still open): promote Wave-A docs→VALIDATED on
-   a clean light run; walk Tiers 1→4 of `docs/COVERAGE-MAX-PLAN.md`; confirm any
+   a clean light run; walk Tiers 1→4 of `docs/working/plans/COVERAGE-MAX-PLAN.md`; confirm any
    still-live billable resources from the cancelled heavy run (27735741382) were
    reaped by the sweep.
 
