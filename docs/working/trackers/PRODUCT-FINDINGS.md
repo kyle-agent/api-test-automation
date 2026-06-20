@@ -1,3 +1,8 @@
+---
+status: active
+for: validation
+---
+
 # PRODUCT-FINDINGS — consolidated ledger of product/API findings
 
 - Date: 2026-06-12 · Status: **active** (append-only — new findings get the next id)

@@ -1,3 +1,8 @@
+---
+status: draft
+for: all
+---
+
 # Parallel execution plan — staged foundations + per-VPC lanes (DRAFT)
 
 > Status: **draft, awaiting review.** 테스트 시간을 줄이기 위한 단계형 병렬

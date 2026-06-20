@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # Coverage criteria — what does "100%" mean?
 
 > Status: **ADOPTED** (승인 2026-06-09). 대시보드가 이 기준대로 구현되어 있음:

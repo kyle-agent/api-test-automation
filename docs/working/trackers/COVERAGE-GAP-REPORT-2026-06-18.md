@@ -1,3 +1,8 @@
+---
+status: superseded
+for: all
+---
+
 # COVERAGE-GAP-REPORT — what is currently NOT covered (C3 gap)
 
 > Status report, 2026-06-18. **Grounded in live numbers re-measured this session**

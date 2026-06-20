@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # Dependency-DAG scheduler + self-learning optimizer
 
 > Canonical overview of the scheduler subsystem under

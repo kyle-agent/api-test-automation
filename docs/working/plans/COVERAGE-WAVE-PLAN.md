@@ -1,3 +1,8 @@
+---
+status: active
+for: coverage
+---
+
 # COVERAGE-WAVE-PLAN — the remaining static gap, prioritized
 
 - Date: 2026-06-11 · Branch: `worktree-agent-ad779d783a70c6b94` · Status: **active**

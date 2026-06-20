@@ -1,3 +1,8 @@
+---
+status: superseded
+for: all
+---
+
 # HANDOFF — VALIDATION-QUEUE Wave A.1 light-batch dispatch prep
 
 > Prepared OFFLINE by the coverage-validator (2026-06-17). No live run was

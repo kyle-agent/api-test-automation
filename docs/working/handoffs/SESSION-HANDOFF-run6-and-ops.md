@@ -1,3 +1,8 @@
+---
+status: superseded
+for: all
+---
+
 # SESSION HANDOFF — 측정 런 #6 재개 + ops 대시보드 (2026-06-11)
 
 - Status: **active** · 모든 코드/지식은 main에 푸시됨 (HEAD `0463fbb`+)

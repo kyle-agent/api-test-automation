@@ -1,3 +1,8 @@
+---
+status: active
+for: coverage
+---
+
 # COVERAGE-GETID-PLAN — the id-bound GET gap, classified and attacked
 
 - Date: 2026-06-12 · Status: **active — wave A largely landed: gap_getid

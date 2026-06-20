@@ -1,3 +1,8 @@
+---
+status: active
+for: coverage
+---
+
 # C3 Coverage Analysis & Plan — 2026-06-20
 
 > Per-service "what's not working & how to advance" analysis, produced by 13

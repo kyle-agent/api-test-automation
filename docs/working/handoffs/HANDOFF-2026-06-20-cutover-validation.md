@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # Handoff — 2026-06-20: scheduler v0.5 cutover LIVE-VALIDATED + path to 1.0
 
 Branch `claude/handover-document-review-f7hpyc`. Continues the scheduler ADR

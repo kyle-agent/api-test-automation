@@ -1,3 +1,8 @@
+---
+status: active
+for: coverage
+---
+
 # 서비스별 커버리지 갭 리포트 (병렬 agent 분석, 2026-06-13)
 
 > 산출 방법: origin/dashboard-data의 verified_endpoints.json(라이브 2xx 증명 집합)

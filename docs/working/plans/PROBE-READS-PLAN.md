@@ -1,3 +1,8 @@
+---
+status: active
+for: coverage
+---
+
 # PROBE-READS-PLAN — where the probe-read principle still needs applying
 
 - Date: **2026-06-15** · Owner: coverage-coordinator (Track ② Coverage).

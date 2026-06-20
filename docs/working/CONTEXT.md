@@ -1,3 +1,8 @@
+---
+status: active
+for: orchestrator
+---
+
 # Shared Context (CONTEXT.md)
 
 > Every agent loads this. It is the single source of *current state* and the

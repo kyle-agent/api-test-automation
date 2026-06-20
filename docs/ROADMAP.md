@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # ROADMAP — where this project is going
 
 > 이 저장소는 **AI multi-agent 팀**이 SCP Open API를 개발·테스트하는

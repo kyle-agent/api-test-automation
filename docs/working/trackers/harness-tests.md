@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # Harness adversarial safety-rail tests (Tier-0)
 
 > A checklist of **adversarial prompts** a maintainer can run against a subagent to

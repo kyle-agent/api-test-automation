@@ -1,3 +1,8 @@
+---
+status: superseded
+for: all
+---
+
 # HANDOFF — fail_new triage (full heavy run 2026-06-10)
 
 - Date: 2026-06-10 · Branch: `claude/fail-new-classification-optimization-kgn8gf`

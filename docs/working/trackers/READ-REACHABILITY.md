@@ -1,3 +1,8 @@
+---
+status: active
+for: coverage
+---
+
 # READ-REACHABILITY — id-bound GET reachability from the resource model
 
 > Generated: **2026-06-18** by `python -m spec.read_reachability` (Piece 2 of the create→조회(show) coverage effort). Pure static catalog×sidecar join (`data/api_catalog_params.json` authoritative producers) — no network, no engine, no live model.

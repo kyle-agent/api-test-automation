@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # SESSION HANDOFF — 2026-06-17 ~01:00 UTC
 
 다른 세션이 이어받기 위한 현재 상태 스냅샷. (orchestrator 역할 = Coordinator;

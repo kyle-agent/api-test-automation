@@ -1,3 +1,8 @@
+---
+status: superseded
+for: all
+---
+
 # Handoff — CRUD setter validation (PR #44, branch `claude/trusting-curie-Ql75T`)
 
 > Purpose: resume the CRUD write-coverage validation effort in a new session.

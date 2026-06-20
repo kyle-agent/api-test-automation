@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # LIVE-READINESS-GATES — disabled-lifecycle inventory (IB-023)
 
 > **Owner / reader.** This doc is read by the **run-dispatch session** (Meta-Orch,

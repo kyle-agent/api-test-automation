@@ -1,3 +1,8 @@
+---
+status: superseded
+for: all
+---
+
 # Session handoff — parallel-adopt CRUD re-architecture
 
 State for continuing in a new session. Everything below is **already merged to

@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # Heavy-run wall-clock optimization (2026-06-19)
 
 Source: log-optimizer analysis of run `27803424208` (141 min) + live evidence from

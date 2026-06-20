@@ -1,3 +1,8 @@
+---
+status: active
+for: orchestrator
+---
+
 # IMPROVEMENT-BACKLOG — Planner가 유지하는 개선 계획
 
 - 소유: Planner tier (docs/agent-team.md "자율 운영 루프" 참조).

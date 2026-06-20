@@ -1,3 +1,8 @@
+---
+status: active
+for: coverage
+---
+
 # CATALOG-VALIDATION-STATUS.md — 검증 되었는지 보고 (verification track)
 
 > **Scope:** measured, reproducible status of the catalog (resource-task model)

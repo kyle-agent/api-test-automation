@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # Handoff — 2026-06-19 (Claude remote): coverage push, per-service agents, live-watcher
 
 Session driven hand-from the Claude remote env (CI auto-trigger OFF). Branch

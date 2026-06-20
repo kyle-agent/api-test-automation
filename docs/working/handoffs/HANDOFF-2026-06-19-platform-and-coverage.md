@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # Handoff — 2026-06-19 (session 2): platform fixes + coverage round
 
 Two parallel tracks this session, both driven by what live testing revealed.

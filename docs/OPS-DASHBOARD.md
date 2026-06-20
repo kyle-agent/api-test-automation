@@ -1,3 +1,8 @@
+---
+status: active
+for: human-ops
+---
+
 # Ops dashboard — 영구 oplog 버킷(apitest-oplog-permanent) + 정적 뷰어
 
 > Status: **active** (2026-06-11 도입, 오너 제안). 워크플로 전체 진행현황과

@@ -1,3 +1,8 @@
+---
+status: superseded
+for: all
+---
+
 # Handoff — 2026-06-18 (→ next session: Claude remote, env vars set)
 
 > Pick-up note for a fresh session that has the SCP env vars configured. This

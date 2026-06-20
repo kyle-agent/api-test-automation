@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # SCP API Regression Test Platform — Architecture
 
 The platform is split into a **control plane** (manage/observe/intervene) and an

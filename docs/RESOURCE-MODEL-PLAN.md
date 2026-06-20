@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # 자원 모델 기반 시나리오 합성 (Resource Task Model) — 설계
 
 > 제안 (owner, 2026-06-11): 자원 타입별로 "최소 의존조건 + 생성 옵션"을

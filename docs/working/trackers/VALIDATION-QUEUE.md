@@ -1,3 +1,8 @@
+---
+status: active
+for: validation
+---
+
 # VALIDATION-QUEUE — prioritized order for the coverage-validator
 
 > Owner: the **coverage-validator** agent (`docs/agent-team.md`). This is

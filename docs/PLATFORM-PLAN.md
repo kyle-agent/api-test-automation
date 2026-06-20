@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # SCP API Regression Test Platform — 업그레이드 계획
 
 > 현재의 "엔진 + GitHub Actions" 시스템을 **완결된 플랫폼**으로 승격하는 계획.

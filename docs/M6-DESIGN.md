@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # M6 설계 — 자율 운영 가능한 SCP API 회귀 테스트 플랫폼
 
 > 작성: Planner agent · 2026-06-13 · 의사결정 문서 (구현 명세 아님)

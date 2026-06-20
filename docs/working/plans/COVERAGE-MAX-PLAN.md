@@ -1,3 +1,8 @@
+---
+status: superseded
+for: coverage
+---
+
 # COVERAGE-MAX-PLAN — how to drive C3 coverage to its ceiling
 
 > Written 2026-06-17 (autonomous session). Grounded in **live** numbers

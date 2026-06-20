@@ -1,3 +1,8 @@
+---
+status: active
+for: all
+---
+
 # IA.md — one-graph / step-overlay console (v3, 2026-06-17)
 
 > **v3 adopts the Claude-design directive** (preview-v2 IA 수정 지시서). Supersedes
