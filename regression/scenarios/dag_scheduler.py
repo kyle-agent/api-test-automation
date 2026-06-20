@@ -111,9 +111,17 @@ def run_dynamic(plan: dag_planner.Plan, executor, *, provisioner=None,
     workers = max(1, max_workers or 8)
 
     # partition: zero-slot nodes run freely (pool-bounded); slot nodes are gated.
-    zero = ([lid for lid in plan.free]
-            + [lid for lid in plan.adopters]
-            + [lid for lid in plan.self_creators if demand.get(lid, 0) == 0])
+    # BOTH partitions are dispatched LONGEST-FIRST: under worker/slot contention the
+    # critical-path heavy ADOPTERS (DB clusters etc.) must grab the first slots, or
+    # they start late behind the light free wave and tail the run. (Measured
+    # 2026-06-20: heavy-shared-dbaas, a 46-min critical-path create, started 22.9 min
+    # late because it competed with 162 light free nodes for the storm-clamped slots —
+    # ~18 min of the run's 26% overhead. Priority on the zero-slot batch fixes that.)
+    zero = sorted(
+        [lid for lid in plan.free]
+        + [lid for lid in plan.adopters]
+        + [lid for lid in plan.self_creators if demand.get(lid, 0) == 0],
+        key=lambda x: prio.get(x, default_duration), reverse=True)  # longest-first
     slot = sorted((lid for lid in plan.self_creators if demand.get(lid, 0) > 0),
                   key=lambda x: prio.get(x, default_duration), reverse=True)  # longest first
 
@@ -247,12 +255,98 @@ def format_comparison(sim: dict) -> str:
     return "\n".join(L)
 
 
+# --------------------------------------------------------------------------- #
+# full-run makespan DES — worker pool + VPC slots, baseline vs longest-first
+# --------------------------------------------------------------------------- #
+def _des(order: list[str], dur: dict, demand: dict, workers: int, budget: int):
+    """Discrete-event list-schedule: dispatch jobs in ``order`` priority subject to
+    ``workers`` concurrent slots and ``budget`` VPC slots; a job holds 1 worker +
+    ``demand[job]`` VPC slots for ``dur[job]``. Returns (makespan, {job: start}).
+    Scan-ahead is allowed (a ready low-demand job may pass a slot-blocked one) —
+    standard non-blocking list scheduling."""
+    import heapq
+    pending = list(order)
+    free_w, free_s = workers, budget
+    running: list[tuple[float, str]] = []
+    start: dict[str, float] = {}
+
+    def dispatch(now: float):
+        nonlocal free_w, free_s
+        i = 0
+        while i < len(pending):
+            j = pending[i]
+            if free_w >= 1 and free_s >= demand.get(j, 0):
+                free_w -= 1
+                free_s -= demand.get(j, 0)
+                start[j] = now
+                heapq.heappush(running, (now + dur.get(j, 0.0), j))
+                pending.pop(i)
+            else:
+                i += 1
+
+    dispatch(0.0)
+    t = 0.0
+    while running:
+        t, j = heapq.heappop(running)
+        free_w += 1
+        free_s += demand.get(j, 0)
+        dispatch(t)
+    return t, start
+
+
+def simulate_full(plan: dag_planner.Plan, durations: dict | None = None, *,
+                  workers: int = 8, default: float = schedule_optimizer._DEFAULT_S) -> dict:
+    """Project the FULL-run makespan under baseline (alphabetical, duration-blind)
+    vs dynamic (longest-job-first) order, at a given effective ``workers``
+    concurrency, holding the same VPC-slot budget. Isolates the effect of duration
+    priority on when the heavy critical-path adopters start."""
+    durations = durations if durations is not None else schedule_optimizer.load_durations()
+    demand = _vpc_demand(plan)
+    budget = max(1, plan.self_create_budget)
+    nodes = list(plan.free) + list(plan.adopters) + list(plan.self_creators)
+    dur = {n: schedule_optimizer.duration_of(n, durations, default) for n in nodes}
+    crit = max(dur.values()) if dur else 0.0
+
+    base_order = sorted(nodes)                                   # duration-blind
+    dyn_order = sorted(nodes, key=lambda n: dur[n], reverse=True)  # longest-first
+    base_make, base_start = _des(base_order, dur, demand, workers, budget)
+    dyn_make, dyn_start = _des(dyn_order, dur, demand, workers, budget)
+    return {
+        "workers": workers, "budget": budget, "n_nodes": len(nodes),
+        "critical_path_s": crit,
+        "baseline_makespan_s": base_make, "dynamic_makespan_s": dyn_make,
+        "saving_s": base_make - dyn_make,
+        "baseline_start": base_start, "dynamic_start": dyn_start, "dur": dur,
+    }
+
+
+def format_full(sim: dict, watch: list[str] | None = None) -> str:
+    L = [f"full-run makespan projection — workers={sim['workers']}, "
+         f"vpc-budget={sim['budget']}, {sim['n_nodes']} nodes, "
+         f"critical-path floor {sim['critical_path_s']/60:.1f} min"]
+    b, d = sim["baseline_makespan_s"], sim["dynamic_makespan_s"]
+    L.append(f"  BASELINE (duration-blind order): {b/60:6.1f} min")
+    L.append(f"  DYNAMIC  (longest-job-first)   : {d/60:6.1f} min")
+    L.append(f"  SAVING                         : {sim['saving_s']/60:6.1f} min "
+             f"({100*sim['saving_s']/b:.0f}%)" if b else "")
+    for lid in (watch or []):
+        bs = sim["baseline_start"].get(lid)
+        ds = sim["dynamic_start"].get(lid)
+        if bs is not None:
+            L.append(f"    {lid:30} dur {sim['dur'][lid]/60:5.1f}m  "
+                     f"start {bs/60:5.1f}m → {ds/60:5.1f}m")
+    return "\n".join(L)
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
     ap = argparse.ArgumentParser(
-        description="Compare static-wave vs dynamic self-create makespan (pure, no exec).")
+        description="Compare static-wave vs dynamic makespan (pure, no exec).")
     ap.add_argument("--service", help="restrict the leaf set to one service")
     ap.add_argument("--vpc-cap", type=int, default=None)
+    ap.add_argument("--full", action="store_true",
+                    help="also project FULL-run makespan (baseline vs longest-first) at --workers")
+    ap.add_argument("--workers", type=int, default=8, help="effective concurrency for --full")
     args = ap.parse_args(argv)
     leaf = None
     if args.service:
@@ -260,6 +354,11 @@ def main(argv: list[str] | None = None) -> int:
         leaf = dag_planner._service_leaf_set(args.service, validate_dag._load_lifecycles())
     plan = dag_planner.plan(leaf_set=leaf, vpc_cap=args.vpc_cap)
     print(format_comparison(simulate_selfcreate(plan)))
+    if args.full:
+        print()
+        watch = ["database-postgresql-cluster", "heavy-shared-dbaas",
+                 "database-mysql-cluster", "vpc-peering"]
+        print(format_full(simulate_full(plan, workers=args.workers), watch=watch))
     return 0
 
 

@@ -142,6 +142,43 @@ def test_no_barrier_freed_slot_dispatches_next_immediately():
     assert max_with_slow["n"] >= 1, "no fast job overlapped the slow one"
 
 
+def test_adopters_dispatched_longest_first():
+    """The zero-slot batch (free + adopt) must also dispatch longest-duration-first
+    so heavy critical-path ADOPTERS (DB clusters) grab worker slots before the light
+    free wave (the 2026-06-20 finding: dbaas started 22.9 min late behind 162 light
+    nodes). With max_workers=1 the dispatch order == execution order."""
+    plan = _plan(free=["light-a", "light-b"],
+                 adopters=["db-long", "db-mid"], self_creators={}, shared_roots=())
+    durations = {"db-long": {"avg_s": 2700.0, "n": 1}, "db-mid": {"avg_s": 1500.0, "n": 1},
+                 "light-a": {"avg_s": 30.0, "n": 1}, "light-b": {"avg_s": 20.0, "n": 1}}
+    order, lock = [], threading.Lock()
+
+    def ex(lid):
+        with lock:
+            order.append(lid)
+        return LifecycleOutcome(lid, "passed")
+
+    dag_scheduler.run_dynamic(plan, ex, max_workers=1, durations=durations)
+    assert order == ["db-long", "db-mid", "light-a", "light-b"], (
+        f"not longest-first across free+adopt: {order}")
+
+
+def test_simulate_full_dynamic_beats_baseline_under_contention():
+    """Full-run DES: with the heavy adopters far longer than the light wave and a
+    worker bottleneck, longest-job-first must beat duration-blind order, and never
+    finish below the critical-path floor."""
+    plan = _plan(free=[f"light{i}" for i in range(12)],
+                 adopters=["db-long", "db-mid"], self_creators={}, shared_roots=())
+    durations = {"db-long": {"avg_s": 3000.0, "n": 1}, "db-mid": {"avg_s": 1800.0, "n": 1}}
+    for i in range(12):
+        durations[f"light{i}"] = {"avg_s": 60.0, "n": 1}
+    sim = dag_scheduler.simulate_full(plan, durations, workers=2)
+    assert sim["dynamic_makespan_s"] <= sim["baseline_makespan_s"]
+    assert sim["dynamic_makespan_s"] >= sim["critical_path_s"]  # cannot beat the floor
+    # longest adopter starts at t=0 under dynamic, not behind the light wave
+    assert sim["dynamic_start"]["db-long"] == 0.0
+
+
 def test_simulate_selfcreate_dynamic_no_worse_than_static():
     """The pure makespan estimator must never make the self-create portion worse:
     dynamic (LPT, no barrier) <= static (cap-packed, barrier) for any durations."""
