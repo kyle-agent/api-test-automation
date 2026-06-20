@@ -193,6 +193,37 @@ def plan(targets=None, graph: dict[str, Node] | None = None, caps: dict | None =
                        capped=capped, shared=shared, heavy=heavy, caps=dict(caps))
 
 
+def lifecycles_for(targets, *, graph: dict[str, Node] | None = None,
+                   model: dict | None = None, include_closure: bool = True,
+                   enabled_only: bool = True) -> list[str]:
+    """Map target resource node(s) to the composed lifecycle(s) that EXERCISE them.
+
+    Each resource node carries ``source.lifecycle`` (the scenario that creates +
+    tests it). Selecting ``ske-cluster`` with ``include_closure`` therefore yields
+    every lifecycle needed to stand up + test ske-cluster AND its dependency
+    closure (vpc/subnet, security-group, keypair, filestorage-volume, …). This is
+    the bridge from "pick a node on the topology" to the runnable leaf set that
+    dag_planner schedules and dag_runner executes.
+    """
+    if model is None:
+        from regression.scenarios import composer
+        model = composer.load_model() or {}
+    if graph is None:
+        graph = load_graph(model)
+    nodes = closure(targets, graph) if include_closure else {t for t in targets if t in graph}
+    lcs: set[str] = set()
+    for n in nodes:
+        src = model.get(n, {}).get("source") or {}
+        lc = src.get("lifecycle") if isinstance(src, dict) else None
+        if lc:
+            lcs.add(lc)
+    if enabled_only:
+        from regression.scenarios import engine
+        enabled = {lc["id"] for lc in engine.LIFECYCLES if lc.get("enabled")}
+        lcs &= enabled
+    return sorted(lcs)
+
+
 def format_plan(p: CatalogPlan, *, graph: dict[str, Node] | None = None) -> str:
     L = [f"catalog plan: {len(p.targets)} target(s) → closure {len(p.closure)} "
          f"resource(s) in {len(p.layers)} create-layer(s)"]
