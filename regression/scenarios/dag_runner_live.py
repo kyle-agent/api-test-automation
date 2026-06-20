@@ -68,12 +68,21 @@ def engine_settings():
     return Settings()
 
 
-def _build_client(cfg):
-    """Build a FRESH live ApiClient bound to the shared cfg (see module docstring
-    thread-safety note). Credentials are required only here."""
+def _build_client(cfg, pool_size: int | None = None):
+    """Build a live ApiClient bound to the shared cfg. When ``pool_size`` is given,
+    size the underlying urllib3 connection pool to it so a SHARED client can serve
+    that many concurrent threads without exhausting connections (the default
+    requests pool is 10). Credentials are required only here."""
     from core.http_client import ApiClient
     cfg.require_credentials()
-    return ApiClient(cfg)
+    client = ApiClient(cfg)
+    if pool_size:
+        from requests.adapters import HTTPAdapter
+        n = max(int(pool_size), 10)
+        adapter = HTTPAdapter(pool_connections=n, pool_maxsize=n)
+        client.session.mount("http://", adapter)
+        client.session.mount("https://", adapter)
+    return client
 
 
 def _shared_ctx_from_env() -> dict:
@@ -204,15 +213,26 @@ class _SharedBudget:
         return getattr(object.__getattribute__(self, "_b"), name)
 
 
-def _make_executor(cfg):
-    """Build the executor closure bound to the shared cfg. Each invocation builds
-    its own client / registry (thread-safe by isolation — see module docstring),
-    but shares ONE thread-safe Budget so capped-kind quotas coordinate across
-    concurrent lifecycles. Converts the engine's result dict OR a raised error
-    into a LifecycleOutcome. NEVER raises (dag_runner.Executor contract)."""
+def _make_executor(cfg, max_workers: int | None = None):
+    """Build the executor closure bound to the shared cfg. It shares ONE pooled
+    ApiClient AND one thread-safe Budget across all concurrent lifecycle threads:
+
+    * the client's urllib3 connection pool is sized to the fan-out, so concurrent
+      lifecycles REUSE keep-alive connections instead of each opening a fresh
+      requests.Session — the per-call-client version exhausted sockets under the
+      overlap, which delayed sends past the HMAC signature's timestamp window
+      (401 AuthNFailed) and timed connections out, breaking the heavy adopters.
+      The client is safe to share: HmacSigner is stateless and request() never
+      mutates shared session state (only the urllib3 pool, which is thread-safe).
+    * the Budget coordinates capped-kind quotas (vpc/private-dns) across threads.
+
+    Per-call only the ResourceRegistry (cheap, isolates created-resource tracking).
+    Converts the engine's result dict OR a raised error into a LifecycleOutcome.
+    NEVER raises (dag_runner.Executor contract)."""
     from core.registry import ResourceRegistry
 
     shared_budget = _SharedBudget()   # coordinates vpc/private-dns quota across threads
+    client = _build_client(cfg, pool_size=max_workers or 8)   # ONE pooled client, reused
 
     def executor(lifecycle_id: str) -> LifecycleOutcome:
         t0 = time.monotonic()
@@ -224,7 +244,6 @@ def _make_executor(cfg):
                        f"engine.LIFECYCLES)",
                 duration_s=time.monotonic() - t0)
         try:
-            client = _build_client(cfg)
             result = engine.run_lifecycle(
                 lifecycle, client, cfg,
                 budget=shared_budget,
@@ -248,10 +267,10 @@ def build(plan: dag_planner.Plan, max_workers: int | None = None):
     """Build the (executor, provisioner) pair for a live run of ``plan``.
 
     LIVE PATH — refuses to proceed unless SCP_ALLOW_MUTATIONS=true (raises a
-    clear RuntimeError naming the gate; CLAUDE.md Hard Rule 1). ``max_workers`` is
-    accepted to match ``dag_runner.main``'s call signature; the actual fan-out
-    cap is applied by ``run_plan`` (the wave structure is the primary cap guard),
-    so this adapter does not need it — it is documented here and ignored.
+    clear RuntimeError naming the gate; CLAUDE.md Hard Rule 1). ``max_workers``
+    sizes the shared client's connection pool to the run's fan-out (run_plan
+    applies the same cap to its thread pool), so concurrent lifecycles reuse
+    keep-alive connections rather than exhausting sockets.
 
     Returns ``(executor, provisioner)`` ready to pass to
     ``dag_runner.run_plan(plan, executor, provisioner=provisioner,
@@ -259,6 +278,6 @@ def build(plan: dag_planner.Plan, max_workers: int | None = None):
     """
     _require_mutation_gate("build live DAG-runner adapters")
     cfg = engine_settings()
-    executor = _make_executor(cfg)
+    executor = _make_executor(cfg, max_workers=max_workers)
     provisioner = SharedInfraProvisioner(plan, cfg)
     return executor, provisioner
