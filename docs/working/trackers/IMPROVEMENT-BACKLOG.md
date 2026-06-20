@@ -21,7 +21,7 @@ owner가 3개 Claude Code 창을 병렬로 운영: ① 기존 테스트 창 ② 
   브랜치 push는 안전).
 - **건드리지 않는 파일**: `agents/CONTEXT.md`(특히 "Current state"/run 결과 =
   테스트 창 소유), `dashboard/`·`controlplane/`(= UI 창 소유).
-- **이 창의 상태 기록처**: 이 파일(BACKLOG) + `agents/coordination/ledger.json`
+- **이 창의 상태 기록처**: 이 파일(BACKLOG) + `data/coordination/ledger.json`
   자기 행(行)만. 그 외 공유 인덱스는 통합 담당이 정리.
 
 ## 백로그

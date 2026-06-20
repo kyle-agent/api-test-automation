@@ -106,7 +106,7 @@ raising the static coverage ceiling **43.0% → 55.4%** (write gap 547 → ~390)
 Remaining write-op gap after Wave 1: **~390 across 47 services** (top: compute/
 virtualserver 41, networking/vpc 38, then database epas/mariadb/mysql/postgresql
 ~17 each, storage/archivestorage, security/kms, …). Track in
-`agents/coordination/ledger.json`. All Wave-1 bodies are docs-derived and pending
+`data/coordination/ledger.json`. All Wave-1 bodies are docs-derived and pending
 live validation — see `knowledge/validated-facts.md` "Wave 1 facts".
 
 ## Coverage campaign — Wave 2 (2026-06-08)

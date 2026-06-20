@@ -66,7 +66,7 @@ Meta-Orchestrator  (lead 세션 = 사람-Claude pair)
 세상엔 동시화 못 하는 게 3가지뿐이다:
 
 1. **커밋·푸시** — Meta-Orch만. sub-agent는 변경 보고만, 커밋은 안 함.
-2. **공유 인덱스 파일** — `agents/CONTEXT.md`, `agents/coordination/ledger.json`,
+2. **공유 인덱스 파일** — `agents/CONTEXT.md`, `data/coordination/ledger.json`,
    `docs/working/trackers/IMPROVEMENT-BACKLOG.md`, `docs/working/trackers/PRODUCT-FINDINGS.md`. Meta-Orch가 머지
    시점에 한 번에 갱신.
 3. **live run dispatch** — `.github/run-request` push. owner rule: 한 번에 1 run.

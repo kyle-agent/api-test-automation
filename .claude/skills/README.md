@@ -31,7 +31,7 @@ a parallel, conflicting system:
 | `harness-init` | `agents/HARNESS.md` is the canonical custom harness |
 | `team-init` | already a multi-agent team (`agents/orchestrator.md` + roles) |
 | `session-start` | `START_HERE.md` + `agents/CONTEXT.md` already do this |
-| `session-checkpoint` | `docs/SESSION-HANDOFF*.md` + `agents/coordination/ledger.json` |
+| `session-checkpoint` | `docs/SESSION-HANDOFF*.md` + `data/coordination/ledger.json` |
 | `project-init` | `docs/ROADMAP.md` / `docs/ARCHITECTURE.md` already exist (overwrite risk) |
 | `collab-audit` | generic; low priority |
 

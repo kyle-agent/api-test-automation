@@ -36,7 +36,7 @@ signal.
    NOT (see masked-defect rule).
 5. The node's lifecycle id (`source.lifecycle`, usually `gen-<service>*`) and the
    shared-resource state: `regression/scenarios/dependencies.json:vpc_schedule`
-   + `agents/coordination/ledger.json:shared_contracts`.
+   + `data/coordination/ledger.json:shared_contracts`.
 
 ## Process (one cycle = one service or a small node batch)
 

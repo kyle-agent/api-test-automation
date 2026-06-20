@@ -459,6 +459,6 @@ acceptance gate 약어: **R1**=`python knowledge/formal/validate.py`,
   Pages 읽기전용), `controlplane/static_export.py`(212 Pages, TestClient),
   `controlplane/templates/base.html`(Overview/Plan/Run/Report 셸), `dashboard/build.py`
   (coverage index/drilldown, `untestable_services.json` 회색), `dashboard/history.jsonl`(트렌드).
-- 자율 루프: `agents/orchestrator.md`, `agents/coordination/ledger.json`(status 전이),
+- 자율 루프: `agents/orchestrator.md`, `data/coordination/ledger.json`(status 전이),
   `tools/retirement.py`(RETIRE/NEAR 매트릭스), `docs/working/trackers/PRODUCT-FINDINGS.md`,
   `docs/working/trackers/SERVICE-GAP-REPORTS.md`, `docs/working/trackers/IMPROVEMENT-BACKLOG.md`(신규).

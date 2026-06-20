@@ -123,7 +123,7 @@ def section_coverage() -> list[str]:
 
 def section_ledger() -> list[str]:
     out = ["[LEDGER]"]
-    path = ROOT / "agents" / "coordination" / "ledger.json"
+    path = ROOT / "data" / "coordination" / "ledger.json"
     if not path.exists():
         out.append("  (missing)")
         return out
@@ -217,7 +217,7 @@ def section_stop_flags() -> list[str]:
 
     # 2) ledger.json: services whose notes carry a STOP keyword AND are not
     #    yet integrated/live-validated.
-    ledger_path = ROOT / "agents" / "coordination" / "ledger.json"
+    ledger_path = ROOT / "data" / "coordination" / "ledger.json"
     if ledger_path.exists():
         try:
             data = json.loads(ledger_path.read_text(encoding="utf-8"))

@@ -153,7 +153,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   `docs/working/handoffs/HANDOFF-crud-setter-validation.md`.
 - Auth/host resolution: implemented & configurable; confirm against a live `200`.
 - **Coverage campaign (multi-agent) — RUNNING.** `agents/CAMPAIGN.md` is the
-  operating model; `agents/coordination/ledger.json` is the blackboard. Per-service
+  operating model; `data/coordination/ledger.json` is the blackboard. Per-service
   CRUD fragments now live in `regression/scenarios/lifecycles/*.json` (merged by
   `regression/scenarios/loader.py`; validate with
   `python -m regression.scenarios.validate`). Real target = the **547 uncovered
@@ -341,7 +341,7 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
   verification. Earlier backlog (query-signing fix, DBaaS sub-op windows,
   corrupt `api_bodies.json` entries, servicewatch orphan log groups)
   remains tracked in `docs/working/plans/COVERAGE-WAVE-PLAN.md` /
-  `agents/coordination/ledger.json`.
+  `data/coordination/ledger.json`.
 
 - **프로세스/하니스 도구 추가 (2026-06-17):** repo 루트에 자동 로드 `CLAUDE.md`
   (얇은 진입 인덱스 — Hard Rules + Quick Ref + Compact 지침). `.claude/skills/`에

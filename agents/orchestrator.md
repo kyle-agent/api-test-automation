@@ -171,7 +171,7 @@ run은 owner 룰상 한 번에 하나지만, **비-디스패치 작업은 항상
 | **B 가이드/도메인** | userguide ingest → resource 노드 모델링/정련(미검증·미인입 우선) | **무관(항상 가동)** |
 | **C 합성/준비** | 신규 노드 compose → 오프라인 게이트 → 다음 Run request 큐잉(디스패치는 A의 run 종료 후) | 부분 |
 
-세 레인은 git 블랙보드(`agents/coordination/ledger.json`, `INGESTION.md` status,
+세 레인은 git 블랙보드(`data/coordination/ledger.json`, `INGESTION.md` status,
 `CONTEXT.md`)로만 통신한다. **공유자원(VPC 5캡 등) 점유는
 `regression/scenarios/dependencies.json:vpc_schedule` + ledger `shared_contracts`를
 read-before-claim** — B/C가 heavy 슬라이스를 준비할 때 A가 잡은 슬롯을 반드시

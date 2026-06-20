@@ -66,5 +66,5 @@ Write through `core.results` — `record(Observation(...))` for AXIS 1,
 When context is compressed, carry forward: (1) the **Hard Rules** above;
 (2) the **active branch + uncommitted/in-flight files** and the literal next
 command to resume; (3) **pending tasks** — see `agents/CONTEXT.md` "What to advance
-next" + `agents/coordination/ledger.json`; (4) any **open decision** not yet
+next" + `data/coordination/ledger.json`; (4) any **open decision** not yet
 recorded. Do not drop a safety gate or a run-sequencing constraint to save tokens.
