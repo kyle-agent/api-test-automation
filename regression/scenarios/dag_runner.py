@@ -90,11 +90,14 @@ def run_plan(
     max_workers: int | None = None,
     on_event: Callable[[str, dict], None] | None = None,
 ) -> RunResult:
-    """Execute a plan: provision shared roots, run each non-provision wave (in
-    order; lifecycles within a wave concurrently), then tear roots down.
+    """Execute a plan: provision shared roots, run the cap-constrained pipeline
+    (adopt → self-create) sequentially while the VPC-independent ``free`` wave runs
+    CONCURRENTLY in the background (it depends on nothing, so it must not block the
+    pipeline), then join both and tear roots down.
 
-    Cap-safety is structural — each wave is pre-sized by the planner. ``executor``
-    must be side-effect-isolated per lifecycle and must not raise.
+    Cap-safety is structural — each self-create wave is pre-sized by the planner and
+    ``free`` consumes no VPC slot. ``executor`` must be side-effect-isolated per
+    lifecycle and must not raise.
 
     ``on_event(kind, payload)`` (optional) fires progress events for live
     observability: 'provision_start'/'provision_done', 'wave_start'/'wave_done',
@@ -132,29 +135,49 @@ def run_plan(
                 "reason": outcome.reason, "duration_s": outcome.duration_s})
         return outcome
 
+    def _run_wave(idx: int, wave) -> WaveResult:
+        ids = list(wave.lifecycles)
+        emit("wave_start", {"index": idx, "kind": wave.kind, "lifecycles": ids})
+        t0 = time.monotonic()
+        workers = max_workers or max(1, len(ids))
+        if workers == 1 or len(ids) <= 1:
+            outcomes = [_run_one(i) for i in ids]
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                outcomes = list(pool.map(_run_one, ids))
+        wr = WaveResult(kind=wave.kind, outcomes=outcomes,
+                        duration_s=time.monotonic() - t0)
+        emit("wave_done", {"index": idx, "kind": wave.kind, "duration_s": wr.duration_s})
+        return wr
+
+    # A 'free' wave (VPC-independent leaves) has NO dependency on the shared roots
+    # or the VPC cap, so it must NOT block the provision→adopt→self-create pipeline.
+    # Run free waves CONCURRENTLY in a background thread; the cap-constrained
+    # pipeline runs sequentially. Both join before teardown.
+    free_waves = [(i, w) for i, w in enumerate(plan.waves) if w.kind == "free"]
+    free_results: list[WaveResult] = []
+    free_thread = None
+    if free_waves:
+        def _run_free():
+            for i, w in free_waves:
+                free_results.append(_run_wave(i, w))
+        free_thread = threading.Thread(target=_run_free, daemon=True)
+        free_thread.start()
+
     try:
         for idx, wave in enumerate(plan.waves):
             if wave.kind == "provision":
                 # roots are stood up by the provisioner, not executed as lifecycles
                 result.waves.append(WaveResult(kind="provision",
                                                outcomes=[], duration_s=0.0))
-                continue
-            ids = list(wave.lifecycles)
-            emit("wave_start", {"index": idx, "kind": wave.kind, "lifecycles": ids})
-            t0 = time.monotonic()
-            workers = max_workers or max(1, len(ids))
-            if workers == 1 or len(ids) <= 1:
-                outcomes = [_run_one(i) for i in ids]
+            elif wave.kind == "free":
+                continue  # running concurrently in the background thread
             else:
-                with ThreadPoolExecutor(max_workers=workers) as pool:
-                    # preserve input order in the results
-                    outcomes = list(pool.map(_run_one, ids))
-            wr = WaveResult(kind=wave.kind, outcomes=outcomes,
-                            duration_s=time.monotonic() - t0)
-            result.waves.append(wr)
-            emit("wave_done", {"index": idx, "kind": wave.kind,
-                               "duration_s": wr.duration_s})
+                result.waves.append(_run_wave(idx, wave))
     finally:
+        if free_thread is not None:
+            free_thread.join()
+            result.waves.extend(free_results)
         if provisioner is not None:
             try:
                 provisioner.teardown()

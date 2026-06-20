@@ -481,6 +481,43 @@ def test_on_event_fires_progress_in_order():
     assert done == ["a1", "a2"]
 
 
+def test_free_wave_runs_concurrently_with_pipeline():
+    """A 'free' wave (VPC-independent leaves) must NOT block the provision→adopt→
+    self-create pipeline — it runs in the background. Proof: with a free wave and a
+    later adopt wave, the adopt lifecycle is dispatched BEFORE the free lifecycles
+    finish (they overlap), and every lifecycle still runs exactly once."""
+    plan = make_plan(
+        dag_planner.Wave(kind="provision", lifecycles=["vpc"]),
+        dag_planner.Wave(kind="free", lifecycles=["f1", "f2"]),
+        dag_planner.Wave(kind="adopt", lifecycles=["a1"]),
+        shared_roots=["vpc"],
+    )
+
+    class _Prov:
+        def provision(self): pass
+        def teardown(self): pass
+
+    events = []
+    lock = threading.Lock()
+
+    def ex(lid):
+        with lock:
+            events.append(("start", lid))
+        time.sleep(0.25)
+        with lock:
+            events.append(("end", lid))
+        return LifecycleOutcome(lid, "passed")
+
+    result = dag_runner.run_plan(plan, ex, provisioner=_Prov(), max_workers=4)
+
+    # adopt 'a1' starts while free f1/f2 are still in flight (not strictly after them)
+    f_ends = [i for i, (k, lid) in enumerate(events) if k == "end" and lid in ("f1", "f2")]
+    a1_start_evt = [i for i, (k, lid) in enumerate(events) if k == "start" and lid == "a1"][0]
+    assert a1_start_evt < max(f_ends), "adopt waited for the free wave — not concurrent"
+    assert result.ok is True
+    assert sorted(o.lifecycle_id for o in result.outcomes) == ["a1", "f1", "f2"]
+
+
 def test_on_event_failure_does_not_break_run():
     """A throwing on_event callback must never sink the run (observability is
     best-effort)."""
