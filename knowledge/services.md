@@ -438,8 +438,14 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Response envelope:** list endpoints use `{contents:[], total_count}`. Detail uses
   flat object or wrapped object (not yet confirmed — no existing resources).
 - **image-versions:** `GET /v1/data-ops/image-versions` → `{contents:[{image_id, image_name, version}], total_count}`. Currently returns 1 version: `4.1.1`.
-- **Coverage 2026-06-19:** 3 → **5/17** read-only. Remaining 12 are heavy-prereq
-  blockers (4 id-bound GETs + 8 mutating writes all depend on existing billable cluster).
+- **Coverage 2026-06-20 (this run):** confirmed 3 → **5/17** read-only via direct probes:
+  `checkduplicationcontroller` and `checkduplicationcontrollerv1` both return `200 {"result":false}`
+  for any probe name (e.g. `apiregr-probe`). Recorded via `core.results.record(Observation(...))` with
+  `source=read_chain`. Remaining 12 are heavy-prereq blockers (4 id-bound GETs + 8 mutating writes).
+- **Entitlement-403 for parent paths:** `/v1/data-ops-services/data-ops` and `/v1/data-ops/clusters`
+  both return 403 `Action definition is not found` — these are IAM-unregistered paths for ROOT user.
+  `getdataopssubversion` and `getingresscontrollerlistv1` are thus doubly-blocked (entitlement-403 on
+  parent listing AND heavy-prereq for the actual resource ids).
 
 ---
 

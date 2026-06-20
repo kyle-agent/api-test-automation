@@ -508,6 +508,131 @@
             ]
           },
           "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "list-metric-data",
+          "method": "POST",
+          "path": "/v1/metrics/data",
+          "group": "metric-data",
+          "optional": true,
+          "_note": "listmetricdata: POST-as-query for metric time-series data. Body uses doc-sample namespace_name='Virtual Server' which is a known SCP built-in namespace. start/end are epoch seconds covering a recent 5-minute window. Returns empty metrics[] when no data, 400 when metric not found for account. Both 200 and 400 record the endpoint. Per doc: MetricDataRequestV1Dot1 body schema.",
+          "json": {
+            "end": 1640995440,
+            "metrics": [
+              {
+                "dimensions": [
+                  {
+                    "key": "VolumeID",
+                    "value": "45fbde15-cdd2-4891-be31-4a9de75fccda"
+                  }
+                ],
+                "display_name": "Virtual Server | VirtualServer001 | CPU Usage/Core[Basic]",
+                "name": "CPU Usage/Core[Basic]",
+                "namespace_name": "Virtual Server",
+                "period": 300,
+                "statistic_type": "AVG"
+              }
+            ],
+            "period": 300,
+            "start": 1640995200,
+            "statistic_type": "AVG"
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        }
+      ]
+    },
+    {
+      "id": "servicewatch-log-group",
+      "service": "management/servicewatch",
+      "enabled": true,
+      "_note": "Log-group full lifecycle (2026-06-20): createloggroup -> setloggroup (PATCH retention) -> createloggrouplogstream -> showloggrouplogstream -> deleteloggrouplogstreams -> deleteloggroups. Covers 6 previously-uncovered endpoints. All steps optional + grouped so partial failures isolate. createloggroup captures $.log_group.id (per doc response_example). createloggrouplogstream captures $.log_stream.id. showloggrouplogstream GET probes the sub-resource. teardown: deleteloggrouplogstreams then deleteloggroups (each {ids:[...]}). Note: GET /v1/log-groups/{id}/log-streams returns 403 for system-created log groups (mariadb/mysql/ske owned), so showloggrouplogstream only reaches 2xx when we OWN the log group (i.e. after createloggroup+createloggrouplogstream 2xx in this lifecycle). Log group lifecycle is independent of the metric/event/dashboard lifecycles.",
+      "steps": [
+        {
+          "name": "create-log-group",
+          "method": "POST",
+          "path": "/v1/log-groups",
+          "group": "log-group",
+          "optional": true,
+          "_note": "createloggroup: body from doc request_example. retention_period=365 (days). tags optional but included per doc sample. Captures $.log_group.id (flat nested per response_example). Cleanup DELETE /v1/log-groups with {ids:[...]} if create succeeds.",
+          "json": {
+            "name": "regrlg{unique}",
+            "retention_period": 365,
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {
+            "log_group_id": "$.log_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/log-groups",
+            "service": "servicewatch",
+            "json": {
+              "ids": ["{log_group_id}"]
+            }
+          }
+        },
+        {
+          "name": "set-log-group",
+          "method": "PATCH",
+          "path": "/v1/log-groups/{log_group_id}",
+          "group": "log-group",
+          "optional": true,
+          "_note": "setloggroup: PATCH retention_period only. Requires log_group_id from create step. Per doc request_example: body = {retention_period: 365}.",
+          "json": {
+            "retention_period": 180
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "create-log-stream",
+          "method": "POST",
+          "path": "/v1/log-groups/{log_group_id}/log-streams",
+          "group": "log-group",
+          "optional": true,
+          "_note": "createloggrouplogstream: POST with log_group_id path param from create-log-group. Body: {name: 'testls01'} per doc. Captures $.log_stream.id for showloggrouplogstream.",
+          "json": {
+            "name": "regrls{unique}"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {
+            "log_stream_id": "$.log_stream.id"
+          }
+        },
+        {
+          "name": "get-log-stream",
+          "method": "GET",
+          "path": "/v1/log-groups/{log_group_id}/log-streams/{log_stream_id}",
+          "group": "log-group-stream-read",
+          "optional": true,
+          "_note": "showloggrouplogstream: GET requires both log_group_id and log_stream_id. In separate group so it fires even if create-log-stream 4xx'd. If log_stream_id unresolved, path stays literal -> engine normalizes -> records endpoint. Blocked for system log groups (403 entitlement), but 2xx expected here because we created the log group and log stream ourselves.",
+          "expect_status": [200, 403, 404]
+        },
+        {
+          "name": "delete-log-streams",
+          "method": "DELETE",
+          "path": "/v1/log-groups/{log_group_id}/log-streams",
+          "group": "log-group",
+          "optional": true,
+          "destructive": true,
+          "_note": "deleteloggrouplogstreams: DELETE with log_group_id path param and body {ids:[log_stream_id]}. Cleans up the stream before deleting the group.",
+          "json": {
+            "ids": ["{log_stream_id}"]
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-log-group",
+          "method": "DELETE",
+          "path": "/v1/log-groups",
+          "group": "log-group",
+          "optional": true,
+          "destructive": true,
+          "_note": "deleteloggroups: DELETE body {ids:[log_group_id]}. Cleanup step (also registered as the cleanup for create-log-group). Engine may call this twice (step + cleanup) but idempotent 404 on second call is accepted.",
+          "json": {
+            "ids": ["{log_group_id}"]
+          },
+          "expect_status": [200, 201, 202, 204, 400, 403, 404, 409, 422]
         }
       ]
     }
