@@ -42,7 +42,12 @@
           "group": "pubdomain",
           "optional": true,
           "expect_status": [200, 400, 403, 404],
-          "_note": "id-bound read (showpublicdomainname). Closes the public_domain_id getid GET /v1/public-domain-names/{public_domain_id}. A non-destructive READ is safe to chain here (unlike the set/transfer WRITES, which the lifecycle deliberately fires against builtin {unique} segments). Keys off the soft-captured public_domain_id from create-public-domain; tolerant [200,400,403,404] because create is a REAL PAID DOMAIN REGISTRATION ORDER that 4xx's on a shared LIGHT account without billing/registrant context, leaving the id a placeholder (normalizes to the catalog '*' key, still records coverage). Makes the endpoint statically reachable in a LIGHT run."
+          "_note": "id-bound read (showpublicdomainname). Keys off the soft-captured public_domain_id from create-public-domain. IMPORTANT: a plain GET step in a lifecycle records under '{lifecycle_id}:{step_name}' (NOT the catalog key) unless it carries explicit 'params'. Coverage credit for showpublicdomainname under its catalog key comes from the probe-public-domain-reads step below, which uses auto-seed to call the endpoint under e.key. When create-public-domain 4xx's (REAL PAID DOMAIN REGISTRATION ORDER on a shared account), public_domain_id is absent from ctx and probe_reads skips showpublicdomainname gracefully."
+        },
+        {
+          "name": "probe-public-domain-reads",
+          "probe_reads": {},
+          "_note": "Auto-seed probe_reads: fires every catalog GET for dns whose path-params are resolvable from the current ctx. When create-public-domain succeeds and captures public_domain_id, this records showpublicdomainname (GET /v1/public-domain-names/{public_domain_id}) under its catalog key so it counts toward coverage. When create-public-domain fails (expected: PAID DOMAIN REGISTRATION ORDER blocked on shared account), public_domain_id is absent from ctx and the probe fires no DNS id-bound GETs (graceful no-op). Also consistent with the probe_reads pattern used in networking-dns-hosted-zone-private for hosted-zone/record/private-dns coverage."
         },
         {
           "name": "set-public-domain",
