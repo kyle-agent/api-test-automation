@@ -96,21 +96,28 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Host:** regional. 8 endpoints. Firewalls are VPC-bound resources; the account
   must have at least one VPC/firewall provisioned before most endpoints are reachable.
 - `GET /v1/firewalls` (listfirewalls) returns 200 OK even with zero firewalls (empty
-  list). No required query params. Covered in read-only smoke.
+  list `{"count":0,"firewalls":[],"page":0,"size":20}`). No required query params.
+  Covered in read-only smoke. **Live confirmed 2026-06-20: account has 0 firewalls.**
 - `GET /v1/firewalls/rules` (listfirewallrules) requires **`firewall_id` query param**
   (marked required in `data/api_catalog_params.json`); bare call returns 400. Probe
-  with dummy id returns 404 — backend is reachable. Not coverable without a real firewall.
-- `GET /v1/firewalls/{firewall_id}` (showfirewall) and
-  `GET /v1/firewalls/rules/{firewall_rule_id}` (showfirewallrule) return 404 with
-  dummy IDs — backend reachable, no resources provisioned in the test account.
+  with dummy id returns 404 `ResourceNotFound` — backend is reachable. Not coverable
+  read-only without a real firewall_id. `firewall_id` not in smoke _REQUIRED_QUERY_DEFAULTS
+  (no safe synthetic value — any guess returns 404, not 200).
+- `GET /v1/firewalls/{firewall_id}` (showfirewall) returns 404 `ResourceNotFound` with
+  dummy id. `GET /v1/firewalls/rules/{firewall_rule_id}` (showfirewallrule) also 404.
+  Both backend-reachable; no resources provisioned in account. **Live confirmed 2026-06-20.**
 - All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule
   PUT, deletefirewallrule DELETE) need `SCP_ALLOW_MUTATIONS=true` (and DELETE needs
   `SCP_ALLOW_DESTRUCTIVE=true`) plus existing firewall/rule IDs from a prior create.
-- **Coverage path:** create a VPC first (networking/vpc agent), then a firewall attaches
-  to the VPC. Capture `$.firewalls[0].id` from listfirewalls. Use for showfirewall,
-  listfirewallrules. Create a rule (POST /v1/firewalls/rules) to get `firewall_rule_id`
-  for showfirewallrule, setfirewallrule, deletefirewallrule.
-- Covered read-only: 1/8 (listfirewalls). Remaining 7 are mutation-gated this round.
+- **Intermittent 503s** are normal transient gateway timeouts; the client retries and
+  the smoke test picks up 200 on retry. Not a persistent backend bug.
+- **Coverage path (mutations required):** firewalls are auto-created with a VPC when
+  `firewall_enabled: true`; use `$.firewalls[0].id` from listfirewalls response.
+  `showfirewall` + `listfirewallrules?firewall_id=X` unlock. Create a rule via
+  POST /v1/firewalls/rules to get `$.firewall_rule.id` → `showfirewallrule`,
+  `setfirewallrule`, `deletefirewallrule`. `setfirewall` body: `{flavor_name, loggable}`.
+- **Read-only ceiling: 1/8** (listfirewalls). 7 remaining are mutation-gated or
+  require a real resource id (no firewalls in account). Confirmed 2026-06-20.
 
 ## networking / security-group
 
