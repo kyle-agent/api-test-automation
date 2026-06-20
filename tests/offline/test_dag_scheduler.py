@@ -45,7 +45,8 @@ def test_runs_every_node_once_with_provision_and_teardown():
     seen, lock = [], threading.Lock()
 
     def ex(lid):
-        with lock: seen.append(lid)
+        with lock:
+            seen.append(lid)
         return LifecycleOutcome(lid, "passed")
 
     prov = _Prov()
@@ -68,7 +69,8 @@ def test_peak_concurrent_selfcreators_never_exceeds_budget():
 
     def ex(lid):
         with lock:
-            cur["n"] += 1; cur["peak"] = max(cur["peak"], cur["n"])
+            cur["n"] += 1
+            cur["peak"] = max(cur["peak"], cur["n"])
         time.sleep(0.02)
         with lock:
             cur["n"] -= 1
@@ -92,7 +94,8 @@ def test_longest_duration_selfcreator_dispatched_first():
     order, lock = [], threading.Lock()
 
     def ex(lid):
-        with lock: order.append(lid)
+        with lock:
+            order.append(lid)
         return LifecycleOutcome(lid, "passed")
 
     dag_scheduler.run_dynamic(plan, ex, max_workers=4, durations=durations)
