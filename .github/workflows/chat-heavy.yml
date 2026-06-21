@@ -59,6 +59,7 @@ jobs:
           echo "crud_filter=$(get crud_filter)">> "$GITHUB_OUTPUT"
           echo "category=$(get category)"     >> "$GITHUB_OUTPUT"
           echo "service=$(get service)"       >> "$GITHUB_OUTPUT"
+          echo "parallel=$(get parallel)"     >> "$GITHUB_OUTPUT"
           echo "----- chat-heavy-request -----"; cat "$F" || true
 
       - name: No-op / stop (skip the heavy work)
@@ -73,7 +74,24 @@ jobs:
         if: steps.req.outputs.action == 'run'
         run: python -m pip install -r requirements.txt
 
-      - name: Run heavy CRUD lifecycles
+      # Provision ONE shared VPC + subnet and export SCP_SHARED_* so every xdist
+      # worker ADOPTS the same infra (api-test.yml's proven pattern) — this is what
+      # makes -n parallelism safe against the 5-VPC cap. Without it, plain pytest is
+      # SEQUENTIAL: the v1 chat-heavy run took 80 min = mysql(36) + postgres(44) as a
+      # SUM; with a shared VPC + -n the independent DBs overlap → ~max(36,44) ≈ 44 min.
+      - name: Provision shared VPC + subnet (export for xdist adopt)
+        if: steps.req.outputs.action == 'run'
+        run: |
+          for i in $(seq 1 8); do
+            python -m regression.scenarios.shared_infra --provision > shared_ids.txt 2>/dev/null || true
+            if grep -qE '^SCP_SHARED_VPC_ID=.+' shared_ids.txt; then
+              grep -E '^SCP_SHARED_[A-Za-z0-9_]+=.+' shared_ids.txt >> "$GITHUB_ENV"
+              echo "shared VPC provisioned (attempt $i):"; cat shared_ids.txt; break
+            fi
+            echo "provision attempt $i: no VPC id yet — retry in 30s"; sleep 30
+          done
+
+      - name: Run heavy CRUD lifecycles (parallel)
         if: steps.req.outputs.action == 'run'
         env:
           SCP_ALLOW_MUTATIONS: ${{ steps.req.outputs.mutations || 'true' }}
@@ -81,12 +99,17 @@ jobs:
           SCP_RUN_HEAVY: ${{ steps.req.outputs.heavy || 'true' }}
           SCP_CRUD_CATEGORY: ${{ steps.req.outputs.category }}
           SCP_CRUD_SERVICE: ${{ steps.req.outputs.service }}
+          # the shared VPC holds 1 of 5 slots; reserve it so concurrent self-creators
+          # never race the cap (SCP_VPC_SEMAPHORE throttles VPC creates to 5-reserved).
+          SCP_VPC_SHARED_RESERVED: '1'
         run: |
           K="${{ steps.req.outputs.crud_filter }}"
+          N="${{ steps.req.outputs.parallel }}"; N="${N:-6}"   # xdist workers (completion = max, not sum)
+          ARGS="tests/crud -m crud -n $N -o addopts= -q"
           if [ -n "$K" ]; then
-            python -m pytest tests/crud -m crud -k "$K" -o addopts="" -q || true
+            python -m pytest $ARGS -k "$K" || true
           else
-            python -m pytest tests/crud -m crud -o addopts="" -q || true
+            python -m pytest $ARGS || true
           fi
 
       # ALWAYS reclaim our tag-scoped resources for a 'run' or 'stop' — on success,
