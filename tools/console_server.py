@@ -61,15 +61,16 @@ def _run_worker(rec: dict) -> None:
             f.flush()
             rc = subprocess.run(_pytest_cmd(rec["crud_ids"], rec["parallel"]),
                                 cwd=str(ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
-            f.write("\n=== reconciler sweep (cleanup) ===\n"); f.flush()
+            f.write("\n=== reconciler sweep (cleanup) ===\n")
+            f.flush()
             sweep_env = {**env, "SCP_SWEEP_NOWAIT": "true"}
             subprocess.run([sys.executable, "-m", "cleanup.reconciler"],
                            cwd=str(ROOT), env=sweep_env, stdout=f, stderr=subprocess.STDOUT)
         with _LOCK:
-            rec["status"] = "done"; rec["rc"] = rc; rec["ended"] = time.time()
+            rec["status"], rec["rc"], rec["ended"] = "done", rc, time.time()
     except Exception as exc:  # noqa: BLE001 — surface the failure to the UI, never crash the server
         with _LOCK:
-            rec["status"] = "error"; rec["error"] = str(exc); rec["ended"] = time.time()
+            rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
 
 
 def _start_run(crud_ids: list[str], parallel: int, heavy: bool) -> dict:
@@ -103,8 +104,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _json(self, code: int, obj: dict) -> None:
         body = json.dumps(obj).encode()
-        self.send_response(code); self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body))); self.end_headers()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
@@ -159,7 +162,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "not found"})
         self.send_response(200)
         self.send_header("Content-Type", _CT.get(path.suffix, "application/octet-stream"))
-        self.send_header("Content-Length", str(len(data))); self.end_headers()
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
         self.wfile.write(data)
 
 
