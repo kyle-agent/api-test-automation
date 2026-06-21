@@ -72,6 +72,20 @@ class ApiClient:
         self.cfg = cfg or settings
         self.signer = build_signer(self.cfg)
         self.session = requests.Session()
+        # Warm per-host connection pool — FUNDAMENTAL, so every execution path (pytest
+        # CRUD / xdist, the dag dynamic dispatcher, smoke, coverage probes) reuses it
+        # rather than it living only in one driver. urllib3 caches ``pool_connections``
+        # HOST pools (LRU); we hit ~60 SCP service hosts, so the default 10 evicts host
+        # pools and a re-hit host REOPENS a connection — a fresh cold connect that can
+        # 503 under a gateway/proxy connection burst. Keep ALL service host pools warm
+        # (>> #hosts) with per-host headroom. Env-tunable.
+        import os as _os
+        from requests.adapters import HTTPAdapter as _HTTPAdapter
+        _adapter = _HTTPAdapter(
+            pool_connections=int(_os.getenv("SCP_POOL_CONNECTIONS", "96")),
+            pool_maxsize=int(_os.getenv("SCP_POOL_MAXSIZE", "40")))
+        self.session.mount("http://", _adapter)
+        self.session.mount("https://", _adapter)
 
     # -- safety --------------------------------------------------------------
     def _guard(self, method: str) -> None:

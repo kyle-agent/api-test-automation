@@ -1196,3 +1196,20 @@ CONCLUSION (now empirical, conf 0.95): SCP creates DB clusters perfectly when re
 over a clean network path. The 503 storm that fails in-container heavies is 100% the
 Claude-remote container's transparent egress proxy. Storm-sensitive heavy validation
 MUST run via the chat-heavy CI workflow (or M4 dedicated runner), never in-container.
+
+#### ARCHITECTURE RULE: optimizations live in SHARED code, never a single driver (2026-06-21)
+Root-cause of "the improvement disappeared in CI": perf/behaviour optimizations were
+siloed in the dag driver (`dag_run_live` / `dag_scheduler` / `dag_runner_live`), while
+CI (`api-test.yml`) and the standard tests run `pytest tests/crud` (xdist). So the
+optimizations applied on the LOCAL/dag path but NOT the pytest/CI path — they "vanished"
+depending on which engine ran. FIX = move them into shared code so EVERY path inherits:
+  * warm per-host connection pool -> ``core.http_client.ApiClient.__init__`` (was only
+    in ``dag_runner_live._build_client``). Every ApiClient — pytest, dag, smoke,
+    coverage — now reuses host pools. Env: SCP_POOL_CONNECTIONS(96)/SCP_POOL_MAXSIZE(40).
+  * longest-job-first ordering -> ``tests/crud/conftest.py`` pytest_collection_modifyitems
+    sorts lifecycle cases by ``data/optimizer/durations.json`` avg_s desc (was only the
+    dag dispatcher's longest-first). Under xdist the big DB/K8s clusters now lead the
+    distribution (start at t=0) instead of running late in collection order.
+Engine is also unified: chat-heavy uses the SAME pytest-xdist path as api-test.yml (no
+divergent driver). RULE going forward: if an optimization helps, put it where ALL paths
+see it (core/* or conftest), and unify engines — do NOT improve one driver in isolation.

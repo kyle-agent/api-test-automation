@@ -74,25 +74,43 @@ jobs:
         if: steps.req.outputs.action == 'run'
         run: python -m pip install -r requirements.txt
 
-      - name: Run heavy lifecycles (DYNAMIC dispatcher — longest-first + warm pool + stagger)
+      # Provision ONE shared VPC + subnet (api-test.yml's pattern) so xdist workers
+      # ADOPT it instead of each self-creating — keeps -n safe under the 5-VPC cap.
+      - name: Provision shared VPC + subnet (export for xdist adopt)
+        if: steps.req.outputs.action == 'run'
+        run: |
+          for i in $(seq 1 8); do
+            python -m regression.scenarios.shared_infra --provision > shared_ids.txt 2>/dev/null || true
+            if grep -qE '^SCP_SHARED_VPC_ID=.+' shared_ids.txt; then
+              grep -E '^SCP_SHARED_[A-Za-z0-9_]+=.+' shared_ids.txt >> "$GITHUB_ENV"
+              echo "shared VPC provisioned (attempt $i):"; cat shared_ids.txt; break
+            fi
+            echo "provision attempt $i: no VPC id yet — retry in 30s"; sleep 30
+          done
+
+      # SAME engine as api-test.yml (pytest-xdist) — NO divergent driver. The
+      # optimizations now live in SHARED code so this path gets them automatically:
+      #   * longest-first ordering -> tests/crud/conftest.py (big DB/K8s lead the
+      #     xdist distribution, so they start at t=0 instead of late);
+      #   * warm per-host connection pool -> core.http_client.ApiClient.
+      - name: Run heavy CRUD lifecycles (xdist — shared longest-first + warm pool)
         if: steps.req.outputs.action == 'run'
         env:
           SCP_ALLOW_MUTATIONS: ${{ steps.req.outputs.mutations || 'true' }}
           SCP_ALLOW_DESTRUCTIVE: ${{ steps.req.outputs.destructive || 'true' }}
           SCP_RUN_HEAVY: ${{ steps.req.outputs.heavy || 'true' }}
-          # the optimizations the pytest-xdist path LACKS (they live in dag_scheduler /
-          # dag_runner_live, not tests/crud): unified longest-first slot-gated dispatch
-          # so the big DB/K8s clusters start at t=0 (xdist ran them late in collection
-          # order), heavy burst-stagger, warm per-host connection pool, AIMD limiter.
-          SCP_DAG_DYNAMIC: 'true'
-          SCP_HEAVY_STAGGER_S: '5'
-          CATRUN_MAX_WORKERS: ${{ steps.req.outputs.parallel || '10' }}
+          SCP_CRUD_CATEGORY: ${{ steps.req.outputs.category }}
+          SCP_CRUD_SERVICE: ${{ steps.req.outputs.service }}
+          SCP_VPC_SHARED_RESERVED: '1'
         run: |
-          # dag_run_live provisions the shared VPC internally and records observations.
-          # crud_filter (blank = ALL) is space-separated TARGET IDS here (e.g.
-          # "database-mysql-cluster database-postgresql-cluster"), not a pytest -k expr.
-          T="${{ steps.req.outputs.crud_filter }}"
-          python tools/dag_run_live.py ${T:-ALL} || true
+          K="${{ steps.req.outputs.crud_filter }}"
+          N="${{ steps.req.outputs.parallel }}"; N="${N:-6}"
+          ARGS="tests/crud -m crud -n $N -o addopts= -q"
+          if [ -n "$K" ]; then
+            python -m pytest $ARGS -k "$K" || true
+          else
+            python -m pytest $ARGS || true
+          fi
 
       # ALWAYS reclaim our tag-scoped resources for a 'run' or 'stop' — on success,
       # on heavy failure, AND when this run was CANCELLED by a later action=stop push
