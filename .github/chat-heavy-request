@@ -1,7 +1,7 @@
-# rerun 123436Z
+# combo 204021Z
 action=run
 mutations=true
 destructive=true
 heavy=true
-crud_filter=ske
-parallel=2
+crud_filter=nodepool or peering or (mysql and cluster and not subops)
+parallel=3
