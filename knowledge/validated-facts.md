@@ -1182,3 +1182,17 @@ dispatcher + stagger + warm-pool are validated offline and the early-start hypot
 is proven live (postgres dispatched +0s vs +7.9min static), but storm-free heavy
 validation REQUIRES a different egress path — CI/GitHub Actions (owner workflow_dispatch)
 or the M4 dedicated runner. Local in-container heavy = coverage-noisy, makespan-confounded.
+
+#### EMPIRICAL CONFIRMATION: 503 storm is the egress proxy, NOT SCP — CI heavy passed (2026-06-20)
+End-to-end proof via the dedicated chat-heavy CI workflow (GitHub-runner egress,
+NOT the Claude-remote proxy), run 27884093268 — conclusion SUCCESS:
+- in-container iteration-4 (warm pool + stagger 5): mysql AND postgresql both FAILED
+  at create on egress-proxy 503 (lifespan 0).
+- CI same SCP account, clean egress: mysql regrdbadophepa created 21:19:55Z, full
+  lifecycle, deleted 21:55:56Z (lived 36m, 14 ops); postgresql regrpgamhkdaae 21:56→
+  22:40 (lived 44m, 26 ops). Both created→lifecycle→teardown cleanly; reconciler
+  sweep reclaimed everything (survivors 0). Heavy-CRUD step + sweep step both green.
+CONCLUSION (now empirical, conf 0.95): SCP creates DB clusters perfectly when reached
+over a clean network path. The 503 storm that fails in-container heavies is 100% the
+Claude-remote container's transparent egress proxy. Storm-sensitive heavy validation
+MUST run via the chat-heavy CI workflow (or M4 dedicated runner), never in-container.
