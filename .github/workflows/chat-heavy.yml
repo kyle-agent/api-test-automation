@@ -78,6 +78,13 @@ jobs:
       # ADOPT it instead of each self-creating — keeps -n safe under the 5-VPC cap.
       - name: Provision shared VPC + subnet (export for xdist adopt)
         if: steps.req.outputs.action == 'run'
+        env:
+          # shared_infra --provision is a NO-OP without the mutation gate (it then
+          # prints no SCP_SHARED_VPC_ID, every attempt "fails", and pure adopters like
+          # the SKE cluster IB-049-skip). This gate was missing -> provision silently
+          # no-op'd on every run; only self-creating lifecycles still worked.
+          SCP_ALLOW_MUTATIONS: 'true'
+          SCP_ALLOW_DESTRUCTIVE: 'true'
         run: |
           for i in $(seq 1 8); do
             python -m regression.scenarios.shared_infra --provision > shared_ids.txt 2>/dev/null || true
