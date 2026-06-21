@@ -118,6 +118,32 @@ const enc=encodeURIComponent;
 const dispatchUrl=svc=>cpUrl("/testing?suite=full"+(svc?"&service="+enc(svc):""));
 const editUrl=id=>cpUrl("/planning/resources/"+enc(id));
 const newUrl=svc=>cpUrl("/planning/resources/_new"+(svc?"?service="+enc(svc):""));
+
+// ===== EXECUTE (option 1: GitHub-triggered chat-heavy) =====
+// A static page can't push, so "실행" opens a GitHub "new file" form prefilled with a
+// chat-heavy run-request (.github/chat-heavy-request.d/run-<ts>.txt). The user commits
+// it with their own GitHub auth → the chat-heavy workflow runs EXACTLY the selected
+// lifecycles (crud_ids) on a storm-free CI runner. (Later: swap runUrl→ control-plane
+// POST for one-click, option 3 — the selection/mapping below is unchanged.)
+const REPO=(function(){try{const repo=location.pathname.split("/").filter(Boolean)[0];
+  const owner=location.hostname.split(".")[0];
+  if(owner&&repo&&location.hostname.endsWith("github.io"))return owner+"/"+repo;}catch(e){}
+  return "kyle-agent/api-test-automation";})();
+// selected nodes → deduped runnable lifecycle ids (node.lifecycle = source.lifecycle)
+function lifecyclesFor(ids){const s=new Set();(ids||[]).forEach(id=>{const lc=N[id]&&N[id].lifecycle;if(lc)s.add(lc);});return [...s];}
+function runRequestBody(ids){const lcs=lifecyclesFor(ids);
+  const body=["# console run "+new Date().toISOString(),"action=run","mutations=true",
+    "destructive=true","heavy=true","crud_ids="+lcs.join(","),
+    "parallel="+Math.min(6,Math.max(2,lcs.length||2))].join("\n")+"\n";
+  return {lcs,body};}
+function runUrl(ids){const {lcs,body}=runRequestBody(ids);if(!lcs.length)return null;
+  const fn=".github/chat-heavy-request.d/run-"+Date.now()+".txt";
+  return "https://github.com/"+REPO+"/new/main?filename="+enc(fn)+"&value="+enc(body);}
+// anchor HTML for a "실행" button over a set of node ids (disabled when nothing runnable)
+function runBtn(ids,label){const u=runUrl(ids);const lcs=lifecyclesFor(ids);
+  if(!u)return `<button class="btn ghost" disabled title="실행 가능한 lifecycle 없음">${label||"실행"} ▶</button>`;
+  return `<a class="btn" href="${u}" target="_blank" rel="noopener"
+     title="GitHub에서 commit하면 chat-heavy가 실행: ${esc(lcs.join(', '))}">${label||"실행"} ▶</a>`;}
 function setCP(){
   const cur=CP;const v=prompt("컨트롤플레인 base URL (실제 실행/편집이 일어나는 FastAPI 서버):\n예) http://localhost:8000",cur);
   if(v===null)return;
@@ -369,9 +395,8 @@ function planTab(){
     ${branchNodes.length?`<h3>분기 선택</h3>${bx}`:""}
     ${p.shared.size?`<h3>공유 인프라(1회)</h3><p class="small">${[...p.shared].map(s=>`<code>${s}</code>`).join(" ")}</p>`:""}
     <button class="btn" style="margin-top:10px" onclick="go('run')">이 plan을 Run으로 →</button>
-    <a class="btn ghost" href="${dispatchUrl(targets.size?N[[...targets][0]].service:'')}" target="_blank" rel="noopener"
-       title="컨트롤플레인 Run 콘솔에서 실제 dispatch (${esc(CP)})">dispatch(실행 트리거) ↗</a>
-    <p class="cp-note">↗ 컨트롤플레인 Run 콘솔이 대상 서비스로 미리 채워진 채 열립니다. 안전게이트·실행은 서버에서. <a href="#" class="cp-link" onclick="setCP();return false">서버 변경</a></p>`;
+    ${runBtn([...targets], "선택 "+targets.size+"개 실행")}
+    <p class="cp-note">▶ 선택한 ${targets.size}개 노드의 lifecycle을 <b>GitHub에서 commit</b>하면 chat-heavy가 storm-free CI에서 실제 실행합니다(crud_ids 정확매칭). 안전게이트는 워크플로에서.</p>`;
   document.querySelectorAll('#right input[type=radio]').forEach(r=>r.onchange=()=>{choices[r.dataset.key]=r.dataset.b;draw();});
 }
 
@@ -404,9 +429,8 @@ function runTab(){
   drawRun();
   document.getElementById("left").innerHTML=`<h2>실행 (데모)</h2>
     <div class="run-ctl"><button class="btn" id="play">▶ Play</button><button class="btn ghost" id="reset">↻ Reset</button>
-      <a class="btn ghost" href="${dispatchUrl(targets.size?N[[...targets][0]].service:'')}" target="_blank" rel="noopener"
-         title="컨트롤플레인 Run 콘솔에서 실제 dispatch (${esc(CP)})">실제 실행 ↗</a></div>
-    <p class="cp-note">▶ Play는 병렬 스케줄 시뮬레이션. <b>실제 실행 ↗</b> 는 컨트롤플레인(<code>${esc(CP)}</code>)에서 진짜 run을 트리거합니다.</p>
+      ${runBtn([...targets], "실제 실행")}</div>
+    <p class="cp-note">▶ Play는 병렬 스케줄 시뮬레이션. <b>실제 실행 ▶</b> 는 GitHub commit → chat-heavy로 선택 lifecycle을 진짜 실행합니다(crud_ids).</p>
     <div class="note"><b>병렬 모델:</b> depth가 같은(서로 의존 없는) 노드는 <b>동시 실행</b>,
       한 단계가 끝나야 다음 단계 시작(배리어). 예: vpc 뒤의 subnet·igw·public-ip는 병렬.</div>
     <h3>단계(level) 진행</h3><div id="levels"></div>`;
@@ -479,9 +503,8 @@ function reportTab(){
       <tr><th>node</th><th>L</th><th>create</th><th>ready</th><th>verify</th><th>합</th><th>구간</th></tr>${rows}</table></div>
     <div class="run-ctl" style="margin-top:10px">
       <button class="btn ghost" onclick="go('catalog')">↺ Catalog로</button>
-      <a class="btn ghost" href="${dispatchUrl(r?N[selNode].service:(targets.size?N[[...targets][0]].service:''))}" target="_blank" rel="noopener"
-         title="컨트롤플레인에서 이 범위 재실행 (${esc(CP)})">재실행(dispatch) ↗</a></div>
-    <p class="cp-note">수행시간은 시뮬 추정. C3·pass/fail은 실측. <b>재실행 ↗</b> 는 컨트롤플레인에서. <a href="#" class="cp-link" onclick="setCP();return false">서버 변경</a></p>`;
+      ${runBtn([...targets], "재실행")}</div>
+    <p class="cp-note">수행시간은 시뮬 추정. C3·pass/fail은 실측. <b>재실행 ▶</b> 는 GitHub commit → chat-heavy(선택 lifecycle, crud_ids).</p>`;
 }
 
 // ---- tab switch ----

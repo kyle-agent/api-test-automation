@@ -17,7 +17,12 @@ name: Chat heavy (push-triggered, cancellable)
 # (exits before any SCP call or sweep) so adding this workflow never starts a run.
 on:
   push:
-    paths: [".github/chat-heavy-request"]
+    # Two request channels: the single legacy file (CLI/session edits it in place), and
+    # a request DIRECTORY where the platform console drops a NEW uniquely-named file per
+    # execution (GitHub's /new prefill can't overwrite an existing path, so the console
+    # creates a fresh file -> always triggers). The Parse step reads the newest .d/ file
+    # when present, else the single file.
+    paths: [".github/chat-heavy-request", ".github/chat-heavy-request.d/**"]
 
 # Only ONE chat-heavy run at a time; a new push (e.g. action=stop) CANCELS the
 # in-flight one — this is the git-only "stop" lever.
@@ -50,13 +55,18 @@ jobs:
       - name: Parse control file
         id: req
         run: |
+          # newest request from the console's .d/ directory wins; else the legacy file
           F=.github/chat-heavy-request
+          newest=$(ls -t .github/chat-heavy-request.d/* 2>/dev/null | head -1 || true)
+          [ -n "$newest" ] && F="$newest"
+          echo "request file: $F"
           get() { grep -E "^$1=" "$F" | head -1 | cut -d= -f2- | tr -d '"' | xargs || true; }
           echo "action=$(get action)"        >> "$GITHUB_OUTPUT"
           echo "mutations=$(get mutations)"   >> "$GITHUB_OUTPUT"
           echo "destructive=$(get destructive)">> "$GITHUB_OUTPUT"
           echo "heavy=$(get heavy)"           >> "$GITHUB_OUTPUT"
           echo "crud_filter=$(get crud_filter)">> "$GITHUB_OUTPUT"
+          echo "crud_ids=$(get crud_ids)"     >> "$GITHUB_OUTPUT"
           echo "category=$(get category)"     >> "$GITHUB_OUTPUT"
           echo "service=$(get service)"       >> "$GITHUB_OUTPUT"
           echo "parallel=$(get parallel)"     >> "$GITHUB_OUTPUT"
@@ -108,6 +118,9 @@ jobs:
           SCP_RUN_HEAVY: ${{ steps.req.outputs.heavy || 'true' }}
           SCP_CRUD_CATEGORY: ${{ steps.req.outputs.category }}
           SCP_CRUD_SERVICE: ${{ steps.req.outputs.service }}
+          # exact lifecycle-id allowlist from the platform console (node -> source.lifecycle).
+          # tests/crud/conftest.py deselects everything not in this set — precise, no -k.
+          SCP_CRUD_IDS: ${{ steps.req.outputs.crud_ids }}
           SCP_VPC_SHARED_RESERVED: '1'
         run: |
           K="${{ steps.req.outputs.crud_filter }}"

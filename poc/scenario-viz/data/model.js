@@ -35,7 +35,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "aimlops-platform-release-write-coverage"
   },
   "cloudml-image": {
    "id": "cloudml-image",
@@ -55,7 +56,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "cloud-ml-write-coverage"
   },
   "cloud-ml": {
    "id": "cloud-ml",
@@ -102,7 +104,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "cloud-ml-write-coverage"
   },
   "apigw-api": {
    "id": "apigw-api",
@@ -134,7 +137,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "application-apigateway-api-resource"
   },
   "apigw-root-resource": {
    "id": "apigw-root-resource",
@@ -159,7 +163,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "application-apigateway-api-resource"
   },
   "apigw-resource": {
    "id": "apigw-resource",
@@ -197,7 +202,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "application-apigateway-api-resource"
   },
   "apigw-method": {
    "id": "apigw-method",
@@ -264,7 +270,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "apigateway-api-write-coverage"
   },
   "apigw-deployment": {
    "id": "apigw-deployment",
@@ -293,7 +300,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "apigateway-api-write-coverage"
   },
   "apigw-stage": {
    "id": "apigw-stage",
@@ -322,7 +330,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "apigateway-api-write-coverage"
   },
   "apigw-auth": {
    "id": "apigw-auth",
@@ -351,7 +360,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "apigateway-api-write-coverage"
   },
   "apigw-access-control": {
    "id": "apigw-access-control",
@@ -380,7 +390,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "apigateway-api-write-coverage"
   },
   "apigw-usage-plan": {
    "id": "apigw-usage-plan",
@@ -405,7 +416,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "apigateway-api-write-coverage"
   },
   "apigw-api-key": {
    "id": "apigw-api-key",
@@ -434,7 +446,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "apigateway-api-write-coverage"
   },
   "apigw-privatelink-endpoint": {
    "id": "apigw-privatelink-endpoint",
@@ -459,7 +472,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "generated__wave5-appsvc"
   },
   "queue": {
    "id": "queue",
@@ -479,7 +493,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "application-queueservice-queue"
   },
   "queue-fifo": {
    "id": "queue-fifo",
@@ -511,7 +526,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "application-queueservice-queue"
   },
   "baremetal-server": {
    "id": "baremetal-server",
@@ -540,7 +556,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "baremetal-server-coverage"
   },
   "gpu-node-image": {
    "id": "gpu-node-image",
@@ -560,7 +577,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mngc-gpu-node-coverage"
   },
   "gpu-node-product": {
    "id": "gpu-node-product",
@@ -580,7 +598,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mngc-gpu-node-coverage"
   },
   "gpu-node-fabric": {
    "id": "gpu-node-fabric",
@@ -600,7 +619,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mngc-gpu-node-coverage"
   },
   "gpu-node": {
    "id": "gpu-node",
@@ -641,7 +661,8 @@ window.MODEL = {
    ],
    "ready_timeout": 3600,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "mngc-gpu-node-coverage"
   },
   "scf-function": {
    "id": "scf-function",
@@ -661,7 +682,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 10,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-scf-cloud-function-cronjob-trigger"
   },
   "scf-cronjob-trigger": {
    "id": "scf-cronjob-trigger",
@@ -686,7 +708,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-scf-cloud-function-cronjob-trigger"
   },
   "scf-privatelink-endpoint": {
    "id": "scf-privatelink-endpoint",
@@ -715,7 +738,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "generated__wave5-appsvc"
   },
   "scf-apigateway-trigger": {
    "id": "scf-apigateway-trigger",
@@ -748,7 +772,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "generated__wave5-appsvc"
   },
   "keypair": {
    "id": "keypair",
@@ -768,7 +793,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "virtualserver-keypair"
   },
   "server-group": {
    "id": "server-group",
@@ -788,7 +814,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-virtualserver-full"
   },
   "image": {
    "id": "image",
@@ -808,7 +835,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "compute-virtualserver-full"
   },
   "server-type": {
    "id": "server-type",
@@ -828,7 +856,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "compute-virtualserver-full"
   },
   "volume-type": {
    "id": "volume-type",
@@ -848,7 +877,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "vs-volume-transfer-coverage"
   },
   "server": {
    "id": "server",
@@ -889,7 +919,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 600,
    "verify_n": 9,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-virtualserver-full"
   },
   "block-volume": {
    "id": "block-volume",
@@ -926,7 +957,8 @@ window.MODEL = {
    ],
    "ready_timeout": 300,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-virtualserver-volume-snapshot"
   },
   "volume-snapshot": {
    "id": "volume-snapshot",
@@ -951,7 +983,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-virtualserver-volume-snapshot"
   },
   "volume-attachment": {
    "id": "volume-attachment",
@@ -992,7 +1025,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-virtualserver-full"
   },
   "custom-image": {
    "id": "custom-image",
@@ -1017,7 +1051,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-virtualserver-full"
   },
   "image-registration": {
    "id": "image-registration",
@@ -1037,7 +1072,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vs-image-write-coverage"
   },
   "volume-transfer": {
    "id": "volume-transfer",
@@ -1062,7 +1098,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vs-volume-transfer-coverage"
   },
   "launch-configuration": {
    "id": "launch-configuration",
@@ -1095,7 +1132,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vs-autoscaling-coverage"
   },
   "auto-scaling-group": {
    "id": "auto-scaling-group",
@@ -1128,7 +1166,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 5,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vs-autoscaling-coverage"
   },
   "asg-policy": {
    "id": "asg-policy",
@@ -1153,7 +1192,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vs-autoscaling-coverage"
   },
   "asg-schedule": {
    "id": "asg-schedule",
@@ -1178,7 +1218,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vs-autoscaling-coverage"
   },
   "asg-notification": {
    "id": "asg-notification",
@@ -1212,7 +1253,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vs-autoscaling-coverage"
   },
   "server-interface": {
    "id": "server-interface",
@@ -1241,7 +1283,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "compute-virtualserver-full"
   },
   "server-static-nat": {
    "id": "server-static-nat",
@@ -1282,7 +1325,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vs-server-action-coverage"
   },
   "container-registry": {
    "id": "container-registry",
@@ -1302,7 +1346,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 180,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "container-scr-registry"
   },
   "scr-repository": {
    "id": "scr-repository",
@@ -1327,7 +1372,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 8,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "container-scr-registry"
   },
   "scr-image": {
    "id": "scr-image",
@@ -1354,7 +1400,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "scr-image-write-coverage"
   },
   "scr-tag": {
    "id": "scr-tag",
@@ -1379,7 +1426,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "scr-tags-write-coverage"
   },
   "kubernetes-version": {
    "id": "kubernetes-version",
@@ -1399,7 +1447,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "container-ske-cluster-nodepool"
   },
   "ske-cluster": {
    "id": "ske-cluster",
@@ -1453,7 +1502,8 @@ window.MODEL = {
    ],
    "ready_timeout": 1800,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "container-ske-cluster-nodepool"
   },
   "ske-nodepool": {
    "id": "ske-nodepool",
@@ -1495,7 +1545,8 @@ window.MODEL = {
    ],
    "ready_timeout": 1200,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "container-ske-cluster-nodepool"
   },
   "ske-image": {
    "id": "ske-image",
@@ -1515,7 +1566,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "container-ske-cluster-nodepool"
   },
   "ske-cluster-upgrade": {
    "id": "ske-cluster-upgrade",
@@ -1549,7 +1601,8 @@ window.MODEL = {
    ],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "ske-upgrade-write-coverage"
   },
   "ske-nodepool-upgrade": {
    "id": "ske-nodepool-upgrade",
@@ -1578,7 +1631,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "ske-upgrade-write-coverage"
   },
   "data-flow": {
    "id": "data-flow",
@@ -1615,7 +1669,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "data-flow-service-and-flow-guarded"
   },
   "data-flow-service": {
    "id": "data-flow-service",
@@ -1677,7 +1732,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "data-flow-service-and-flow-guarded"
   },
   "data-ops": {
    "id": "data-ops",
@@ -1714,7 +1770,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "data-ops-service-and-ops-guarded"
   },
   "data-ops-service": {
    "id": "data-ops-service",
@@ -1787,7 +1844,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "data-ops-service-and-ops-guarded"
   },
   "eventstreams-cluster": {
    "id": "eventstreams-cluster",
@@ -1851,7 +1909,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "eventstreams-cluster-subops-guarded"
   },
   "quick-query-list": {
    "id": "quick-query-list",
@@ -1871,7 +1930,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "quick-query-image-versions": {
    "id": "quick-query-image-versions",
@@ -1891,7 +1951,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "quick-query": {
    "id": "quick-query",
@@ -2009,7 +2070,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "quick-query-lifecycle-guarded"
   },
   "quick-query-validate": {
    "id": "quick-query-validate",
@@ -2037,8 +2099,9 @@ window.MODEL = {
     }
    ],
    "ready_timeout": null,
-   "verify_n": 0,
-   "has_delete": false
+   "verify_n": 1,
+   "has_delete": false,
+   "lifecycle": "quick-query-lifecycle-guarded"
   },
   "quick-query-update-description": {
    "id": "quick-query-update-description",
@@ -2063,7 +2126,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "quick-query-lifecycle-guarded"
   },
   "searchengine-cluster": {
    "id": "searchengine-cluster",
@@ -2129,7 +2193,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "searchengine-cluster-subops-guarded"
   },
   "vertica-cluster": {
    "id": "vertica-cluster",
@@ -2203,7 +2268,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vertica-cluster-subops-guarded"
   },
   "cachestore-cluster": {
    "id": "cachestore-cluster",
@@ -2245,7 +2311,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-dbaas"
   },
   "epas-engine-version": {
    "id": "epas-engine-version",
@@ -2265,7 +2332,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "heavy-shared-dbaas"
   },
   "epas-engine-version-16": {
    "id": "epas-engine-version-16",
@@ -2285,7 +2353,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "epas-server-type": {
    "id": "epas-server-type",
@@ -2305,7 +2374,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "heavy-shared-dbaas"
   },
   "epas-cluster": {
    "id": "epas-cluster",
@@ -2363,7 +2433,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-dbaas"
   },
   "epas-instance-group": {
    "id": "epas-instance-group",
@@ -2388,7 +2459,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-parameter-group": {
    "id": "epas-parameter-group",
@@ -2408,7 +2480,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "epas-parameter": {
    "id": "epas-parameter",
@@ -2433,7 +2506,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-add-block-storage": {
    "id": "epas-add-block-storage",
@@ -2462,7 +2536,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-resize-block-storage": {
    "id": "epas-resize-block-storage",
@@ -2491,7 +2566,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-resize-server-type": {
    "id": "epas-resize-server-type",
@@ -2533,7 +2609,8 @@ window.MODEL = {
    ],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-log-export-config": {
    "id": "epas-log-export-config",
@@ -2591,7 +2668,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-replica": {
    "id": "epas-replica",
@@ -2629,7 +2707,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-sync-replica-state": {
    "id": "epas-sync-replica-state",
@@ -2658,7 +2737,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-switchover": {
    "id": "epas-switchover",
@@ -2683,7 +2763,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-reset-replica": {
    "id": "epas-reset-replica",
@@ -2712,7 +2793,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-promote": {
    "id": "epas-promote",
@@ -2741,7 +2823,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-restore": {
    "id": "epas-restore",
@@ -2779,7 +2862,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-patch": {
    "id": "epas-patch",
@@ -2813,7 +2897,8 @@ window.MODEL = {
    ],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "epas-kernel-upgrade": {
    "id": "epas-kernel-upgrade",
@@ -2838,7 +2923,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "epas-cluster-subops-guarded"
   },
   "mariadb-engine-version": {
    "id": "mariadb-engine-version",
@@ -2858,7 +2944,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "heavy-shared-dbaas"
   },
   "mariadb-engine-version-10": {
    "id": "mariadb-engine-version-10",
@@ -2878,7 +2965,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "mariadb-server-type": {
    "id": "mariadb-server-type",
@@ -2898,7 +2986,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "heavy-shared-dbaas"
   },
   "mariadb-cluster": {
    "id": "mariadb-cluster",
@@ -2956,7 +3045,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 11,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-dbaas"
   },
   "mariadb-instance-group": {
    "id": "mariadb-instance-group",
@@ -2981,7 +3071,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-parameter-group": {
    "id": "mariadb-parameter-group",
@@ -3001,7 +3092,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "mariadb-parameter": {
    "id": "mariadb-parameter",
@@ -3026,7 +3118,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-add-block-storage": {
    "id": "mariadb-add-block-storage",
@@ -3055,7 +3148,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-resize-block-storage": {
    "id": "mariadb-resize-block-storage",
@@ -3084,7 +3178,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-resize-server-type": {
    "id": "mariadb-resize-server-type",
@@ -3126,7 +3221,8 @@ window.MODEL = {
    ],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-log-export-config": {
    "id": "mariadb-log-export-config",
@@ -3184,7 +3280,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-stop": {
    "id": "mariadb-stop",
@@ -3209,7 +3306,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-start": {
    "id": "mariadb-start",
@@ -3238,7 +3336,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-restart": {
    "id": "mariadb-restart",
@@ -3267,7 +3366,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-replica": {
    "id": "mariadb-replica",
@@ -3305,7 +3405,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-sync-replica-state": {
    "id": "mariadb-sync-replica-state",
@@ -3334,7 +3435,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-switchover": {
    "id": "mariadb-switchover",
@@ -3359,7 +3461,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-reset-replica": {
    "id": "mariadb-reset-replica",
@@ -3388,7 +3491,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-promote": {
    "id": "mariadb-promote",
@@ -3417,7 +3521,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-restore": {
    "id": "mariadb-restore",
@@ -3455,7 +3560,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-patch": {
    "id": "mariadb-patch",
@@ -3489,7 +3595,8 @@ window.MODEL = {
    ],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mariadb-kernel-upgrade": {
    "id": "mariadb-kernel-upgrade",
@@ -3514,7 +3621,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mariadb-cluster-subops-guarded"
   },
   "mysql-engine-version": {
    "id": "mysql-engine-version",
@@ -3534,7 +3642,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-mysql-cluster"
   },
   "mysql-engine-version-8": {
    "id": "mysql-engine-version-8",
@@ -3554,7 +3663,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "mysql-server-type": {
    "id": "mysql-server-type",
@@ -3574,7 +3684,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-mysql-cluster"
   },
   "mysql-cluster": {
    "id": "mysql-cluster",
@@ -3632,7 +3743,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 7,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "database-mysql-cluster"
   },
   "mysql-instance-group": {
    "id": "mysql-instance-group",
@@ -3657,7 +3769,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-parameter-group": {
    "id": "mysql-parameter-group",
@@ -3677,7 +3790,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-mysql-cluster"
   },
   "mysql-parameter": {
    "id": "mysql-parameter",
@@ -3702,7 +3816,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-mysql-cluster"
   },
   "mysql-add-block-storage": {
    "id": "mysql-add-block-storage",
@@ -3731,7 +3846,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-resize-block-storage": {
    "id": "mysql-resize-block-storage",
@@ -3760,7 +3876,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "mysql-resize-server-type": {
    "id": "mysql-resize-server-type",
@@ -3802,7 +3919,8 @@ window.MODEL = {
    ],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "mysql-log-export-config": {
    "id": "mysql-log-export-config",
@@ -3860,7 +3978,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-stop": {
    "id": "mysql-stop",
@@ -3885,7 +4004,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "mysql-start": {
    "id": "mysql-start",
@@ -3914,7 +4034,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "mysql-restart": {
    "id": "mysql-restart",
@@ -3943,7 +4064,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-mysql-cluster"
   },
   "mysql-replica": {
    "id": "mysql-replica",
@@ -3981,7 +4103,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-sync-replica-state": {
    "id": "mysql-sync-replica-state",
@@ -4010,7 +4133,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-switchover": {
    "id": "mysql-switchover",
@@ -4035,7 +4159,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-reset-replica": {
    "id": "mysql-reset-replica",
@@ -4064,7 +4189,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-promote": {
    "id": "mysql-promote",
@@ -4093,7 +4219,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-restore": {
    "id": "mysql-restore",
@@ -4131,7 +4258,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-patch": {
    "id": "mysql-patch",
@@ -4165,7 +4293,8 @@ window.MODEL = {
    ],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "mysql-kernel-upgrade": {
    "id": "mysql-kernel-upgrade",
@@ -4190,7 +4319,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "mysql-cluster-subops-guarded"
   },
   "pg-engine-version": {
    "id": "pg-engine-version",
@@ -4210,7 +4340,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-postgresql-cluster"
   },
   "pg-engine-version-16": {
    "id": "pg-engine-version-16",
@@ -4230,7 +4361,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "pg-server-type": {
    "id": "pg-server-type",
@@ -4250,7 +4382,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-postgresql-cluster"
   },
   "postgresql-cluster": {
    "id": "postgresql-cluster",
@@ -4308,7 +4441,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "database-postgresql-cluster"
   },
   "pg-instance-group": {
    "id": "pg-instance-group",
@@ -4333,7 +4467,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-parameter-group": {
    "id": "pg-parameter-group",
@@ -4353,7 +4488,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-postgresql-cluster"
   },
   "pg-parameter": {
    "id": "pg-parameter",
@@ -4378,7 +4514,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "database-postgresql-cluster"
   },
   "pg-add-block-storage": {
    "id": "pg-add-block-storage",
@@ -4407,7 +4544,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-resize-block-storage": {
    "id": "pg-resize-block-storage",
@@ -4436,7 +4574,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-resize-server-type": {
    "id": "pg-resize-server-type",
@@ -4478,7 +4617,8 @@ window.MODEL = {
    ],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-log-export-config": {
    "id": "pg-log-export-config",
@@ -4536,7 +4676,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-replica": {
    "id": "pg-replica",
@@ -4574,7 +4715,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-sync-replica-state": {
    "id": "pg-sync-replica-state",
@@ -4603,7 +4745,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-switchover": {
    "id": "pg-switchover",
@@ -4628,7 +4771,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-reset-replica": {
    "id": "pg-reset-replica",
@@ -4657,7 +4801,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-promote": {
    "id": "pg-promote",
@@ -4686,7 +4831,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-restore": {
    "id": "pg-restore",
@@ -4724,7 +4870,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-patch": {
    "id": "pg-patch",
@@ -4758,7 +4905,8 @@ window.MODEL = {
    ],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "pg-kernel-upgrade": {
    "id": "pg-kernel-upgrade",
@@ -4783,7 +4931,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "postgresql-cluster-subops-guarded"
   },
   "ss-engine-version": {
    "id": "ss-engine-version",
@@ -4803,7 +4952,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-read-coverage"
   },
   "ss-server-type": {
    "id": "ss-server-type",
@@ -4823,7 +4973,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "ss-parameter-group": {
    "id": "ss-parameter-group",
@@ -4843,7 +4994,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "sqlserver-cluster": {
    "id": "sqlserver-cluster",
@@ -4893,7 +5045,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-instance-group": {
    "id": "ss-instance-group",
@@ -4918,7 +5071,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-parameter": {
    "id": "ss-parameter",
@@ -4943,7 +5097,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-add-block-storage": {
    "id": "ss-add-block-storage",
@@ -4972,7 +5127,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-resize-block-storage": {
    "id": "ss-resize-block-storage",
@@ -5001,7 +5157,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-resize-server-type": {
    "id": "ss-resize-server-type",
@@ -5043,7 +5200,8 @@ window.MODEL = {
    ],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-restart": {
    "id": "ss-restart",
@@ -5068,7 +5226,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-sync-state": {
    "id": "ss-sync-state",
@@ -5093,7 +5252,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-set-audit-log": {
    "id": "ss-set-audit-log",
@@ -5118,7 +5278,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-set-maintenance": {
    "id": "ss-set-maintenance",
@@ -5143,7 +5304,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-set-backup": {
    "id": "ss-set-backup",
@@ -5168,7 +5330,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-restore": {
    "id": "ss-restore",
@@ -5206,7 +5369,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-patch": {
    "id": "ss-patch",
@@ -5240,7 +5404,8 @@ window.MODEL = {
    ],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-switchover": {
    "id": "ss-switchover",
@@ -5265,7 +5430,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-add-secondary": {
    "id": "ss-add-secondary",
@@ -5301,7 +5467,8 @@ window.MODEL = {
    ],
    "ready_timeout": 2400,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "ss-databases": {
    "id": "ss-databases",
@@ -5326,7 +5493,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 1800,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sqlserver-cluster-subops-guarded"
   },
   "devops-service": {
    "id": "devops-service",
@@ -5381,7 +5549,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "devopsservice-write-coverage"
   },
   "planned-compute": {
    "id": "planned-compute",
@@ -5445,7 +5614,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "billingplan-planned-computes-guarded"
   },
   "account-budget": {
    "id": "account-budget",
@@ -5499,7 +5669,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "budget-account-budget"
   },
   "cost-reads": {
    "id": "cost-reads",
@@ -5519,7 +5690,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "pricing-reads": {
    "id": "pricing-reads",
@@ -5539,7 +5711,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "cloudcontrol-landing-zone": {
    "id": "cloudcontrol-landing-zone",
@@ -5564,7 +5737,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "cloudcontrol-landing-zone-guarded"
   },
   "cm-account-resource": {
    "id": "cm-account-resource",
@@ -5593,7 +5767,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "cm-event-policy": {
    "id": "cm-event-policy",
@@ -5646,7 +5821,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "cloudmonitoring-event-policy"
   },
   "cm-event": {
    "id": "cm-event",
@@ -5666,7 +5842,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "cm-addrbook": {
    "id": "cm-addrbook",
@@ -5686,7 +5863,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "iam-identity-center": {
    "id": "iam-identity-center",
@@ -5718,7 +5896,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "idc-instance"
   },
   "idc-user": {
    "id": "idc-user",
@@ -5743,7 +5922,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "idc-user"
   },
   "idc-group": {
    "id": "idc-group",
@@ -5768,7 +5948,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "idc-group"
   },
   "idc-permission-set": {
    "id": "idc-permission-set",
@@ -5793,7 +5974,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "idc-permission-set"
   },
   "idc-account-assignment": {
    "id": "idc-account-assignment",
@@ -5826,7 +6008,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "idc-account-assignment"
   },
   "iam-group": {
    "id": "iam-group",
@@ -5846,7 +6029,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-group"
   },
   "iam-policy": {
    "id": "iam-policy",
@@ -5866,7 +6050,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-policy"
   },
   "iam-role": {
    "id": "iam-role",
@@ -5891,7 +6076,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-role-full"
   },
   "iam-access-key": {
    "id": "iam-access-key",
@@ -5911,7 +6097,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-credentials-heavy"
   },
   "iam-group-policy-binding": {
    "id": "iam-group-policy-binding",
@@ -5940,7 +6127,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-group-bindings"
   },
   "iam-policy-binding-set": {
    "id": "iam-policy-binding-set",
@@ -5969,7 +6157,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-policy-extra-writes"
   },
   "iam-role-policy-binding": {
    "id": "iam-role-policy-binding",
@@ -5998,7 +6187,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-role-full"
   },
   "iam-saml-provider": {
    "id": "iam-saml-provider",
@@ -6018,7 +6208,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-credentials-heavy"
   },
   "iam-group-member": {
    "id": "iam-group-member",
@@ -6052,7 +6243,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-group-bindings"
   },
   "iam-user": {
    "id": "iam-user",
@@ -6081,7 +6273,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 4,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-credentials-heavy"
   },
   "iam-user-policy-binding": {
    "id": "iam-user-policy-binding",
@@ -6115,7 +6308,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-user-policy-bindings"
   },
   "iam-resource-policy": {
    "id": "iam-resource-policy",
@@ -6144,7 +6338,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 4,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "iam-resource-policy"
   },
   "trail": {
    "id": "trail",
@@ -6224,7 +6419,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "loggingaudit-trail"
   },
   "network-logging-storage": {
    "id": "network-logging-storage",
@@ -6265,7 +6461,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "network-logging-storage"
   },
   "organization": {
    "id": "organization",
@@ -6285,7 +6482,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "org-organizations-guarded"
   },
   "organization-unit": {
    "id": "organization-unit",
@@ -6310,7 +6508,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "org-units-guarded"
   },
   "organization-account": {
    "id": "organization-account",
@@ -6335,7 +6534,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "org-accounts-guarded"
   },
   "service-control-policy": {
    "id": "service-control-policy",
@@ -6360,7 +6560,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "org-service-control-policies-guarded"
   },
   "delegation-policy": {
    "id": "delegation-policy",
@@ -6385,7 +6586,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "org-policy-bindings-and-delegation-guarded"
   },
   "org-invitation": {
    "id": "org-invitation",
@@ -6410,7 +6612,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "org-invitations-guarded"
   },
   "account-quota": {
    "id": "account-quota",
@@ -6430,7 +6633,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "quota-reads"
   },
   "quota-request": {
    "id": "quota-request",
@@ -6450,7 +6654,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "quota-reads"
   },
   "resource-group": {
    "id": "resource-group",
@@ -6470,7 +6675,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 11,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "resourcemanager-resource-group"
   },
   "resource-group-bulk": {
    "id": "resource-group-bulk",
@@ -6490,7 +6696,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "resourcemanager-resource-group"
   },
   "log-group": {
    "id": "log-group",
@@ -6510,7 +6717,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "servicewatch-loggroup-logstream"
   },
   "log-stream": {
    "id": "log-stream",
@@ -6535,7 +6743,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "servicewatch-loggroup-logstream"
   },
   "sw-metric-catalog": {
    "id": "sw-metric-catalog",
@@ -6555,7 +6764,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "alert": {
    "id": "alert",
@@ -6593,7 +6803,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 4,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "servicewatch-alert"
   },
   "dashboard": {
    "id": "dashboard",
@@ -6613,7 +6824,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "servicewatch-dashboard"
   },
   "event-rule": {
    "id": "event-rule",
@@ -6633,7 +6845,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "servicewatch-event-rule"
   },
   "sw-custom-metric-meta": {
    "id": "sw-custom-metric-meta",
@@ -6653,7 +6866,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "servicewatch-custom-ingest"
   },
   "sw-custom-log-collect": {
    "id": "sw-custom-log-collect",
@@ -6678,7 +6892,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "servicewatch-custom-ingest"
   },
   "support-inquiry": {
    "id": "support-inquiry",
@@ -6707,7 +6922,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "support-reads"
   },
   "support-service-request": {
    "id": "support-service-request",
@@ -6736,7 +6952,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "support-reads"
   },
   "cdn": {
    "id": "cdn",
@@ -6765,7 +6982,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-cdn-service"
   },
   "direct-connect": {
    "id": "direct-connect",
@@ -6790,7 +7008,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-direct-connect-routing"
   },
   "private-dns": {
    "id": "private-dns",
@@ -6810,7 +7029,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 3600,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-dns-hosted-zone-private"
   },
   "hosted-zone": {
    "id": "hosted-zone",
@@ -6835,7 +7055,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-dns-hosted-zone-private"
   },
   "firewall": {
    "id": "firewall",
@@ -6860,7 +7081,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 600,
    "verify_n": 3,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "networking-firewall-rule"
   },
   "firewall-rule": {
    "id": "firewall-rule",
@@ -6885,7 +7107,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 600,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-firewall-rule"
   },
   "gslb": {
    "id": "gslb",
@@ -6905,7 +7128,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-gslb-service"
   },
   "lb-health-check": {
    "id": "lb-health-check",
@@ -6934,7 +7158,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-networking"
   },
   "load-balancer": {
    "id": "load-balancer",
@@ -6972,7 +7197,8 @@ window.MODEL = {
    ],
    "ready_timeout": 600,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-networking"
   },
   "lb-server-group": {
    "id": "lb-server-group",
@@ -7005,7 +7231,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-networking"
   },
   "lb-listener": {
    "id": "lb-listener",
@@ -7034,7 +7261,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-networking"
   },
   "lb-member": {
    "id": "lb-member",
@@ -7068,7 +7296,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-loadbalancer-members-nat"
   },
   "lb-member-bulk": {
    "id": "lb-member-bulk",
@@ -7102,7 +7331,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-loadbalancer-members-nat"
   },
   "lb-static-nat": {
    "id": "lb-static-nat",
@@ -7135,7 +7365,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-loadbalancer-members-nat"
   },
   "security-group": {
    "id": "security-group",
@@ -7167,7 +7398,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-security-group"
   },
   "security-group-rule": {
    "id": "security-group-rule",
@@ -7192,7 +7424,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-security-group"
   },
   "vpc": {
    "id": "vpc",
@@ -7229,7 +7462,8 @@ window.MODEL = {
    ],
    "ready_timeout": 180,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-vpc-subnet"
   },
   "subnet": {
    "id": "subnet",
@@ -7263,7 +7497,8 @@ window.MODEL = {
    ],
    "ready_timeout": 180,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-vpc-subnet"
   },
   "endpoint-subnet": {
    "id": "endpoint-subnet",
@@ -7297,7 +7532,8 @@ window.MODEL = {
    ],
    "ready_timeout": 180,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "gen-wave5-vpce"
   },
   "port": {
    "id": "port",
@@ -7331,7 +7567,8 @@ window.MODEL = {
    ],
    "ready_timeout": 180,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-vpc-subnet"
   },
   "internet-gateway": {
    "id": "internet-gateway",
@@ -7368,7 +7605,8 @@ window.MODEL = {
    ],
    "ready_timeout": 300,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-vpc-internet-gateway"
   },
   "nat-gateway": {
    "id": "nat-gateway",
@@ -7397,7 +7635,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-networking"
   },
   "public-ip": {
    "id": "public-ip",
@@ -7417,7 +7656,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-vpc-publicip"
   },
   "private-nat": {
    "id": "private-nat",
@@ -7457,7 +7697,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "gen-wave5-privnat"
   },
   "vpc-endpoint": {
    "id": "vpc-endpoint",
@@ -7511,7 +7752,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "gen-wave5-vpce"
   },
   "privatelink-service": {
    "id": "privatelink-service",
@@ -7553,7 +7795,8 @@ window.MODEL = {
    ],
    "ready_timeout": 300,
    "verify_n": 3,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "generated__wave5-appsvc"
   },
   "vpc-peering": {
    "id": "vpc-peering",
@@ -7578,7 +7821,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "vpc-peering"
   },
   "transit-gateway": {
    "id": "transit-gateway",
@@ -7598,7 +7842,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "heavy-shared-networking"
   },
   "tgw-vpc-connection": {
    "id": "tgw-vpc-connection",
@@ -7627,7 +7872,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "gen-wave5-privnat"
   },
   "vpn-gateway": {
    "id": "vpn-gateway",
@@ -7656,7 +7902,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-vpn-gateway-tunnel"
   },
   "vpn-tunnel": {
    "id": "vpn-tunnel",
@@ -7706,7 +7953,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "networking-vpn-gateway-tunnel"
   },
   "product-category": {
    "id": "product-category",
@@ -7726,7 +7974,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "product": {
    "id": "product",
@@ -7746,7 +7995,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": null
   },
   "sts-token": {
    "id": "sts-token",
@@ -7775,7 +8025,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "sts-token-issuance-coverage"
   },
   "certificate": {
    "id": "certificate",
@@ -7795,7 +8046,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "security-certificatemanager-selfsign"
   },
   "certificate-import": {
    "id": "certificate-import",
@@ -7815,7 +8067,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "security-certificatemanager-import"
   },
   "diagnosis": {
    "id": "diagnosis",
@@ -7850,7 +8103,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "security-configinspection-diagnosis"
   },
   "kms-key": {
    "id": "kms-key",
@@ -7882,7 +8136,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "security-kms-key"
   },
   "secret": {
    "id": "secret",
@@ -7916,7 +8171,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "security-secretsmanager-secret"
   },
   "secretvault-vault": {
    "id": "secretvault-vault",
@@ -7955,7 +8211,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "security-secretvault-vault"
   },
   "archive-bucket": {
    "id": "archive-bucket",
@@ -7975,7 +8232,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 11,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "archivestorage-bucket"
   },
   "archiving-policy": {
    "id": "archiving-policy",
@@ -8004,7 +8262,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 5,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "archivestorage-archiving-policy"
   },
   "backup-agent": {
    "id": "backup-agent",
@@ -8038,7 +8297,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "backup-agent"
   },
   "backup-target": {
    "id": "backup-target",
@@ -8063,7 +8323,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "backup-job"
   },
   "backup-policy": {
    "id": "backup-policy",
@@ -8088,7 +8349,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 900,
    "verify_n": 13,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "backup-job"
   },
   "backup-manual": {
    "id": "backup-manual",
@@ -8113,7 +8375,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 3600,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "backup-job"
   },
   "backup-restore-target": {
    "id": "backup-restore-target",
@@ -8142,7 +8405,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "backup-job"
   },
   "backup-restore": {
    "id": "backup-restore",
@@ -8183,7 +8447,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 3600,
    "verify_n": 1,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "backup-job"
   },
   "bm-block-volume": {
    "id": "bm-block-volume",
@@ -8203,7 +8468,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "blockstorage-volume"
   },
   "bm-volume-snapshot": {
    "id": "bm-volume-snapshot",
@@ -8228,7 +8494,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "blockstorage-volume"
   },
   "bm-volume-group": {
    "id": "bm-volume-group",
@@ -8253,7 +8520,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 0,
-   "has_delete": false
+   "has_delete": false,
+   "lifecycle": "blockstorage-volume-group"
   },
   "bm-group-snapshot": {
    "id": "bm-group-snapshot",
@@ -8278,7 +8546,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "blockstorage-volume-group"
   },
   "filestorage-volume": {
    "id": "filestorage-volume",
@@ -8298,7 +8567,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "filestorage-volume"
   },
   "fs-snapshot": {
    "id": "fs-snapshot",
@@ -8323,7 +8593,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 2,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "filestorage-replication-schedule"
   },
   "fs-snapshot-schedule": {
    "id": "fs-snapshot-schedule",
@@ -8348,7 +8619,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "filestorage-replication-schedule"
   },
   "fs-replication": {
    "id": "fs-replication",
@@ -8393,7 +8665,8 @@ window.MODEL = {
    ],
    "ready_timeout": null,
    "verify_n": 0,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "filestorage-replication-schedule"
   },
   "pfs-volume": {
    "id": "pfs-volume",
@@ -8413,7 +8686,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": 300,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "parallel-filestorage-capacity-restore"
   },
   "pfs-snapshot": {
    "id": "pfs-snapshot",
@@ -8438,7 +8712,8 @@ window.MODEL = {
    "options": [],
    "ready_timeout": null,
    "verify_n": 1,
-   "has_delete": true
+   "has_delete": true,
+   "lifecycle": "parallel-filestorage-capacity-restore"
   }
  },
  "groups": {

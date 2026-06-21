@@ -1,19 +1,24 @@
-"""CRUD collection ordering — longest lifecycle FIRST (xdist-friendly).
+"""CRUD collection: exact-id allowlist + longest-lifecycle-FIRST ordering (xdist).
 
-The dag dynamic dispatcher already dispatches longest-job-first so the big
-DB/K8s/VM clusters start at t=0. The pytest path (api-test.yml's xdist run AND
-chat-heavy) had NO such ordering: pytest collects in declaration order, so under
-``-n`` the heavy clusters started late in the distribution while light lifecycles
-churned first (observed live: 10 min into a run, every live resource was light and
-ZERO DB clusters had begun). This hook makes longest-first FUNDAMENTAL for the
-pytest path too, sorting the parametrized lifecycle cases by recorded wall time
-(``data/optimizer/durations.json`` -> ``avg_s``) descending. So whichever engine
-runs — pytest/xdist or the dag dispatcher, local or CI — the heavy clusters lead.
+Two collection-time behaviours, both keyed off the parametrized ``lifecycle`` case:
 
-Only the ``lifecycle``-parametrized items are reordered (in their existing slots);
-any other collected tests keep their position.
+1. ``SCP_CRUD_IDS`` (comma-separated EXACT lifecycle ids) — deselect every lifecycle
+   not in the set. The platform console emits a precise id list (node -> source.lifecycle)
+   so "select services in the UI -> run exactly those" works without a ``-k`` expression
+   (hyphenated ids like ``database-mysql-cluster`` parse as subtraction under ``-k``).
+
+2. Longest-first ordering — the dag dynamic dispatcher dispatches longest-job-first so
+   the big DB/K8s/VM clusters start at t=0. The pytest path (api-test.yml's xdist run AND
+   chat-heavy) had NO such ordering: pytest collects in declaration order, so under ``-n``
+   the heavy clusters started late while light lifecycles churned first. Sorting the
+   lifecycle cases by recorded wall time (``data/optimizer/durations.json`` -> ``avg_s``)
+   descending makes longest-first FUNDAMENTAL for the pytest path too.
+
+Only ``lifecycle``-parametrized items are touched; any other collected tests keep their
+position and are never deselected.
 """
 import json
+import os
 from pathlib import Path
 
 _DUR_PATH = Path(__file__).resolve().parents[2] / "data" / "optimizer" / "durations.json"
@@ -33,7 +38,20 @@ def _lifecycle_id(item) -> str | None:
     return lc.get("id") if isinstance(lc, dict) else None
 
 
-def pytest_collection_modifyitems(items) -> None:
+def pytest_collection_modifyitems(config, items) -> None:
+    # 1) exact-id allowlist — deselect lifecycle cases not in SCP_CRUD_IDS (non-lifecycle
+    #    tests are always kept). Precise selection from the console, no -k parsing.
+    only = {x.strip() for x in os.getenv("SCP_CRUD_IDS", "").split(",") if x.strip()}
+    if only:
+        keep, drop = [], []
+        for it in items:
+            lid = _lifecycle_id(it)
+            (drop if (lid is not None and lid not in only) else keep).append(it)
+        if drop:
+            config.hook.pytest_deselected(items=drop)
+            items[:] = keep
+
+    # 2) longest-first ordering of the surviving lifecycle items (in their slots)
     dur = _durations()
     if not dur:
         return

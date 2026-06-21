@@ -7,9 +7,7 @@ Mirrors regression/scenarios/composer.load_model + _norm_requires keying
 
     python3 poc/scenario-viz/build_data.py
 """
-import glob
 import json
-import os
 from pathlib import Path
 
 import yaml
@@ -98,6 +96,11 @@ def main():
                 "ready_timeout": ready.get("timeout"),
                 "verify_n": len(task.get("verify") or []),
                 "has_delete": bool(task.get("delete")),
+                # the scenario lifecycle that creates+tests this resource (catalog_planner
+                # source.lifecycle). The platform console maps selected nodes -> these ids
+                # -> chat-heavy crud_ids, so "pick a node, run it" works end-to-end.
+                "lifecycle": ((task.get("source") or {}).get("lifecycle")
+                              if isinstance(task.get("source"), dict) else None),
             }
 
     # group meta for the UI (label + category), only groups actually present
