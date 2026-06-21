@@ -139,11 +139,34 @@ function runRequestBody(ids){const lcs=lifecyclesFor(ids);
 function runUrl(ids){const {lcs,body}=runRequestBody(ids);if(!lcs.length)return null;
   const fn=".github/chat-heavy-request.d/run-"+Date.now()+".txt";
   return "https://github.com/"+REPO+"/new/main?filename="+enc(fn)+"&value="+enc(body);}
-// anchor HTML for a "실행" button over a set of node ids (disabled when nothing runnable)
-function runBtn(ids,label){const u=runUrl(ids);const lcs=lifecyclesFor(ids);
-  if(!u)return `<button class="btn ghost" disabled title="실행 가능한 lifecycle 없음">${label||"실행"} ▶</button>`;
-  return `<a class="btn" href="${u}" target="_blank" rel="noopener"
-     title="GitHub에서 commit하면 chat-heavy가 실행: ${esc(lcs.join(', '))}">${label||"실행"} ▶</a>`;}
+// anchor/button for a "실행" over node ids. Served by console_server.py (local, not
+// github.io) → POST /api/run and run locally; on GitHub Pages → prefilled GitHub commit.
+const LOCAL=!location.hostname.endsWith("github.io");
+function runBtn(ids,label){const lcs=lifecyclesFor(ids);label=label||"실행";
+  if(!lcs.length)return `<button class="btn ghost" disabled title="실행 가능한 lifecycle 없음">${label} ▶</button>`;
+  if(LOCAL)return `<button class="btn" onclick='execRun(${esc(JSON.stringify(lcs))})'
+     title="로컬 서버에서 실행: ${esc(lcs.join(', '))}">${label} ▶</button>`;
+  return `<a class="btn" href="${runUrl(ids)}" target="_blank" rel="noopener"
+     title="GitHub commit → chat-heavy 실행: ${esc(lcs.join(', '))}">${label} ▶</a>`;}
+// local execution: POST selected lifecycle ids to console_server.py, poll status
+function execRun(lcs){
+  let box=document.getElementById("runstat");
+  if(!box){box=document.createElement("div");box.id="runstat";
+    box.style.cssText="position:fixed;right:14px;bottom:14px;max-width:400px;background:var(--panel2,#fff);border:1px solid var(--line,#ccc);border-radius:10px;padding:12px;box-shadow:0 8px 28px rgba(0,0,0,.22);z-index:9999;font-size:13px;color:var(--ink,#111)";
+    document.body.appendChild(box);}
+  box.innerHTML=`<b>실행 요청…</b> <code>${esc(lcs.join(', '))}</code>`;
+  fetch("/api/run",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({crud_ids:lcs,parallel:Math.min(6,Math.max(2,lcs.length)),heavy:true})})
+   .then(r=>r.json()).then(j=>{if(j.error){box.innerHTML="❌ "+esc(j.error);return;}poll(j.id);})
+   .catch(e=>{box.innerHTML="❌ 서버 연결 실패 — <code>python tools/console_server.py</code> 실행 중인가요?<br><span class='small'>"+esc(e.message)+"</span>";});
+  function poll(id){fetch("/api/runs/"+id).then(r=>r.json()).then(j=>{
+    const st=j.status==="running"?"⏳ 실행중":j.status==="done"?(j.rc===0?"✅ 완료":"⚠️ 완료 (rc="+j.rc+")"):"❌ "+esc(j.status);
+    box.innerHTML=`<div><b>${st}</b> <button onclick="this.closest('#runstat').remove()" style="float:right;cursor:pointer">×</button></div>
+      <div class="small" style="margin-top:5px"><code>${esc((j.crud_ids||[]).join(', '))}</code></div>
+      <div class="small" style="margin-top:5px;color:#15924f">${esc(j.summary||"")}</div>
+      <div class="small muted" style="margin-top:3px">run ${esc(id)}</div>`;
+    if(j.status==="running")setTimeout(()=>poll(id),3000);}).catch(()=>{});}
+}
 function setCP(){
   const cur=CP;const v=prompt("컨트롤플레인 base URL (실제 실행/편집이 일어나는 FastAPI 서버):\n예) http://localhost:8000",cur);
   if(v===null)return;
