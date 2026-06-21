@@ -39,113 +39,83 @@
 
 <div class="panel">
   <div class="kpath">knowledge/resource-dependencies.md</div>
-  <div class="kbody"><h1>Resource dependency &amp; attach/detach test patterns (confirmed domain knowledge)</h1>
-<blockquote>
-<p>Confirmed creation-order prerequisites and attach/detach lifecycles the CRUD
-scenarios must exercise. Recorded in git so scenarios encode real dependency
-order (a create that omits a prerequisite is a wrong test, not a backend bug).
-Machine-readable prerequisite lists live in
-<code>regression/scenarios/dependencies.json:prerequisites</code>.</p>
-</blockquote>
-<h2>Creation-order DAG (must build prerequisites first)</h2>
-<pre><code>VPC
+  <div class="kbody"><pre class="raw"># Resource dependency &amp; attach/detach test patterns (confirmed domain knowledge)
+
+&gt; Confirmed creation-order prerequisites and attach/detach lifecycles the CRUD
+&gt; scenarios must exercise. Recorded in git so scenarios encode real dependency
+&gt; order (a create that omits a prerequisite is a wrong test, not a backend bug).
+&gt; Machine-readable prerequisite lists live in
+&gt; `regression/scenarios/dependencies.json:prerequisites`.
+
+## Creation-order DAG (must build prerequisites first)
+
+```
+VPC
  └─ subnet            (subnet CIDR ⊂ VPC CIDR — see domain-constraints.md)
      ├─ security-group   (create BEFORE the consumer, then ATTACH)
      ├─ keypair          (create BEFORE virtual server / nodepool)
      ├─ port             (create standalone → map SG → attach to server NIC)
      ├─ block storage / volume   (create standalone → attach → detach → re-attach)
      └─ file / parallel-file storage  (pre-create → attach to K8s cluster)
-</code></pre>
-<ul>
-<li><strong>Virtual server</strong> prereqs: <code>vpc → subnet → security-group → keypair →
-  (image + server-type lookup) → server</code>. The SG is attached at/after create;
-  keypair must exist first.</li>
-<li><strong>Kubernetes (SKE) cluster</strong> prereqs: <code>vpc → subnet → security-group →
+```
+
+- **Virtual server** prereqs: `vpc → subnet → security-group → keypair →
+  (image + server-type lookup) → server`. The SG is attached at/after create;
+  keypair must exist first.
+- **Kubernetes (SKE) cluster** prereqs: `vpc → subnet → security-group →
   keypair → file/parallel storage → cluster (attach storage via volume_id) →
-  nodepool</code>. The storage volume must exist BEFORE the cluster create.</li>
-<li><strong>Nodepool</strong> is VS-like: its nodes need subnet + security-group (+ keypair);
-  exercise SG/linked-resource attach/detach where the API allows.</li>
-</ul>
-<h2>Attach/detach sub-lifecycles (the resource is pre-created, then cycled)</h2>
-<ol>
-<li><strong>Block storage ↔ server</strong>: create volume standalone → <code>attach-volume</code> →
-   use (qos / extend / update) → <code>detach-volume</code> → <strong>re-attach</strong> → detach →
+  nodepool`. The storage volume must exist BEFORE the cluster create.
+- **Nodepool** is VS-like: its nodes need subnet + security-group (+ keypair);
+  exercise SG/linked-resource attach/detach where the API allows.
+
+## Attach/detach sub-lifecycles (the resource is pre-created, then cycled)
+
+1. **Block storage ↔ server**: create volume standalone → `attach-volume` →
+   use (qos / extend / update) → `detach-volume` → **re-attach** → detach →
    delete. The point is the volume OUTLIVES a single attach (create once,
-   attach/detach many).</li>
-<li><strong>Port (NIC) ↔ server</strong>: <code>POST /v1/ports</code> (standalone) → map a
-   security-group onto the port → <code>attach</code> the port to the server as a NIC →
-   <code>detach</code> → delete. The port and its SG mapping exist independently of the
-   server.</li>
-<li><strong>Security-group ↔ server / cluster / port</strong>: create SG first → attach to
-   the consumer → detach → (SG persists, reusable).</li>
-</ol>
-<h2>VS-like resources (apply the same pattern)</h2>
-<p>Any resource that hosts compute and attaches NIC/volume/SG follows the VS
+   attach/detach many).
+2. **Port (NIC) ↔ server**: `POST /v1/ports` (standalone) → map a
+   security-group onto the port → `attach` the port to the server as a NIC →
+   `detach` → delete. The port and its SG mapping exist independently of the
+   server.
+3. **Security-group ↔ server / cluster / port**: create SG first → attach to
+   the consumer → detach → (SG persists, reusable).
+
+## VS-like resources (apply the same pattern)
+
+Any resource that hosts compute and attaches NIC/volume/SG follows the VS
 pattern (pre-create SG/keypair/subnet/storage, attach at create, then
-attach/detach cycles): <strong>virtual server, bare-metal server, auto-scaling
-launch-config/group, SKE nodepool</strong>.</p>
-<h2>Current coverage vs gaps (as of this writing)</h2>
-<table>
-<thead>
-<tr>
-<th>Pattern</th>
-<th>compute-virtualserver-full</th>
-<th>container-ske-cluster-nodepool</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>vpc→subnet→SG→keypair pre-create</td>
-<td>✅ (SG ×2)</td>
-<td>✅</td>
-</tr>
-<tr>
-<td>SG attach + detach</td>
-<td>✅</td>
-<td>✅ (cluster security-groups)</td>
-</tr>
-<tr>
-<td>block volume create→attach→detach→delete</td>
-<td>✅ (single cycle)</td>
-<td>volume pre-created + attached to cluster</td>
-</tr>
-<tr>
-<td>volume <strong>re-attach</strong> cycle</td>
-<td>❌ (only one attach/detach)</td>
-<td>n/a</td>
-</tr>
-<tr>
-<td><strong>standalone PORT → map SG → attach/detach</strong></td>
-<td>❌ <strong>(gap — /v1/ports unused)</strong></td>
-<td>n/a</td>
-</tr>
-<tr>
-<td>file / <strong>parallel-file</strong> storage for cluster</td>
-<td>n/a</td>
-<td>⚠️ uses <code>/v1/volumes</code> NFS, not <code>parallel-filestorage</code></td>
-</tr>
-<tr>
-<td>nodepool SG/subnet attach/detach</td>
-<td>n/a</td>
-<td>⚠️ partial (linked-resources)</td>
-</tr>
-</tbody>
-</table>
-<h2>Proposed scenario work (to close the gaps)</h2>
-<ol>
-<li><strong>NEW <code>compute-port-lifecycle</code></strong> (or extend virtualserver-full): <code>POST /v1/ports</code>
-   → <code>PUT /v1/ports/{id}</code> to map a security-group → attach the port to the
-   server as a secondary NIC → detach → <code>DELETE /v1/ports/{id}</code>. Adopts the
-   shared VPC/subnet; SG pre-created. (Closes the main gap.)</li>
-<li><strong>Volume re-attach cycle</strong> in virtualserver-full: after the first
+attach/detach cycles): **virtual server, bare-metal server, auto-scaling
+launch-config/group, SKE nodepool**.
+
+## Current coverage vs gaps (as of this writing)
+
+| Pattern | compute-virtualserver-full | container-ske-cluster-nodepool |
+|---|---|---|
+| vpc→subnet→SG→keypair pre-create | ✅ (SG ×2) | ✅ |
+| SG attach + detach | ✅ | ✅ (cluster security-groups) |
+| block volume create→attach→detach→delete | ✅ (single cycle) | volume pre-created + attached to cluster |
+| volume **re-attach** cycle | ❌ (only one attach/detach) | n/a |
+| **standalone PORT → map SG → attach/detach** | ❌ **(gap — /v1/ports unused)** | n/a |
+| file / **parallel-file** storage for cluster | n/a | ⚠️ uses `/v1/volumes` NFS, not `parallel-filestorage` |
+| nodepool SG/subnet attach/detach | n/a | ⚠️ partial (linked-resources) |
+
+## Proposed scenario work (to close the gaps)
+
+1. **NEW `compute-port-lifecycle`** (or extend virtualserver-full): `POST /v1/ports`
+   → `PUT /v1/ports/{id}` to map a security-group → attach the port to the
+   server as a secondary NIC → detach → `DELETE /v1/ports/{id}`. Adopts the
+   shared VPC/subnet; SG pre-created. (Closes the main gap.)
+2. **Volume re-attach cycle** in virtualserver-full: after the first
    detach, attach the SAME volume again, then detach + delete — proving the
-   volume is independent of one attachment.</li>
-<li><strong>SKE parallel-filestorage</strong>: pre-create via <code>parallel-filestorage</code> service
-   and attach to the cluster (in addition to / instead of the NFS volume).</li>
-<li><strong>Nodepool</strong> SG/subnet attach-detach where the nodepool API supports it.</li>
-</ol>
-<p>All additions ADOPT the shared VPC+subnet (parallel-safe) and follow the
-optional + grouped + broad-expect_status coverage convention.</p></div>
+   volume is independent of one attachment.
+3. **SKE parallel-filestorage**: pre-create via `parallel-filestorage` service
+   and attach to the cluster (in addition to / instead of the NFS volume).
+4. **Nodepool** SG/subnet attach-detach where the nodepool API supports it.
+
+All additions ADOPT the shared VPC+subnet (parallel-safe) and follow the
+optional + grouped + broad-expect_status coverage convention.
+</pre></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/resource-dependencies.md</code></div>

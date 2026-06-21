@@ -39,566 +39,806 @@
 
 <div class="panel">
   <div class="kpath">knowledge/services.md</div>
-  <div class="kbody"><h1>Per-service notes</h1>
-<p>A section per service as agents become expert in it. Keep it practical: the
+  <div class="kbody"><pre class="raw"># Per-service notes
+
+A section per service as agents become expert in it. Keep it practical: the
 host/scoping, the request bodies that work, captures, state machine, and quirks.
-Cross-link to <code>validated-facts.md</code> (the authoritative fact list) rather than
-duplicating. Add a new <code>##</code> section when you take on a new service.</p>
-<hr />
-<h2>compute / virtualserver</h2>
-<ul>
-<li><strong>Host:</strong> regional (<code>virtualserver.&lt;region&gt;.&lt;env&gt;...</code>). Owns servers, keypairs,
-  block volumes, snapshots, images, server-types.</li>
-<li><strong>Keypair:</strong> <code>POST /v1/keypairs {name, tags:[]}</code> — omit <code>public_key</code>, SCP
-  generates one. Addressed <strong>by name</strong> (<code>/v1/keypairs/{name}</code>). Zero-cost, sync.</li>
-<li><strong>Block volume:</strong> <code>POST /v1/volumes</code> with <code>volume_type</code> (e.g. <code>SSD_Provisioned</code>),
-  <code>size</code>, <code>max_iops</code>, <code>max_throughput</code> → capture <code>$.id</code>, poll <code>$.state</code> →
-  <code>available</code>. (Different from filestorage volume!)</li>
-<li><strong>Snapshot:</strong> <code>POST /v1/snapshots {volume_id, force:true}</code> → <code>$.id</code>.</li>
-<li><strong>Full VM:</strong> vpc→subnet→sg→keypair→find-image→find-server-type→create-server.
-  Critical fields in <code>validated-facts.md</code> (server_type prefix <code>s</code>, <code>volume_type</code>
-  not <code>type</code>, <code>$.servers[0].id</code>, rename regex, stop/start, attach volume).</li>
-<li><strong>Lookups:</strong> images <code>/v1/images?status=active&amp;scp_original_image_type=standard&amp;visibility=public&amp;limit=50</code>;
-  server-types <code>/v1/server-types</code> (pick id starting with <code>s</code>).</li>
-</ul>
-<h2>compute / virtualserver — autoscaling</h2>
-<ul>
-<li><strong>28 autoscaling endpoints</strong> (<code>/v1/auto-scaling-groups/...</code>, <code>/v1/launch-configurations/...</code>).
-  Only <strong>2/28 covered</strong> read-only: <code>listautoscalinggroups</code>, <code>listlaunchconfigurations</code>
-  (bare smoke GETs, 200 with empty lists — account has 0 ASGs / 0 LCs).</li>
-<li><strong>Root cause the other 26 are uncovered:</strong> two lifecycles already exist, are
-  <code>enabled: true</code>, and cover them — <code>vs-autoscaling-coverage</code> (26 steps, in
-  <code>regression/scenarios/lifecycles/compute__virtualserver.json</code>) and <code>gen-wave4-asg</code>
-  (28 steps, VPC+subnet chain, <code>desired_server_count: 0</code> to avoid billable VMs, in
-  <code>generated__wave4.json</code>). But <strong>both are mutation-gated</strong>: <code>run_lifecycle()</code> returns
-  <code>status: skipped</code> immediately when <code>SCP_ALLOW_MUTATIONS=false</code> (engine ~line 642),
-  before any step (including the lifecycle's GET steps) runs. So read-only runs never
-  start them; that is why only the 2 bare smoke GETs are covered.</li>
-<li><strong>Levers:</strong></li>
-<li><code>SCP_ALLOW_MUTATIONS=true</code> + <code>SCP_ALLOW_DESTRUCTIVE=true</code> alone → <code>vs-autoscaling-coverage</code>
+Cross-link to `validated-facts.md` (the authoritative fact list) rather than
+duplicating. Add a new `##` section when you take on a new service.
+
+---
+
+## compute / virtualserver
+
+- **Host:** regional (`virtualserver.&lt;region&gt;.&lt;env&gt;...`). Owns servers, keypairs,
+  block volumes, snapshots, images, server-types.
+- **Keypair:** `POST /v1/keypairs {name, tags:[]}` — omit `public_key`, SCP
+  generates one. Addressed **by name** (`/v1/keypairs/{name}`). Zero-cost, sync.
+- **Block volume:** `POST /v1/volumes` with `volume_type` (e.g. `SSD_Provisioned`),
+  `size`, `max_iops`, `max_throughput` → capture `$.id`, poll `$.state` →
+  `available`. (Different from filestorage volume!)
+- **Snapshot:** `POST /v1/snapshots {volume_id, force:true}` → `$.id`.
+- **Full VM:** vpc→subnet→sg→keypair→find-image→find-server-type→create-server.
+  Critical fields in `validated-facts.md` (server_type prefix `s`, `volume_type`
+  not `type`, `$.servers[0].id`, rename regex, stop/start, attach volume).
+- **Lookups:** images `/v1/images?status=active&amp;scp_original_image_type=standard&amp;visibility=public&amp;limit=50`;
+  server-types `/v1/server-types` (pick id starting with `s`).
+
+## compute / virtualserver — autoscaling
+
+- **28 autoscaling endpoints** (`/v1/auto-scaling-groups/...`, `/v1/launch-configurations/...`).
+  Only **2/28 covered** read-only: `listautoscalinggroups`, `listlaunchconfigurations`
+  (bare smoke GETs, 200 with empty lists — account has 0 ASGs / 0 LCs).
+- **Root cause the other 26 are uncovered:** two lifecycles already exist, are
+  `enabled: true`, and cover them — `vs-autoscaling-coverage` (26 steps, in
+  `regression/scenarios/lifecycles/compute__virtualserver.json`) and `gen-wave4-asg`
+  (28 steps, VPC+subnet chain, `desired_server_count: 0` to avoid billable VMs, in
+  `generated__wave4.json`). But **both are mutation-gated**: `run_lifecycle()` returns
+  `status: skipped` immediately when `SCP_ALLOW_MUTATIONS=false` (engine ~line 642),
+  before any step (including the lifecycle&#x27;s GET steps) runs. So read-only runs never
+  start them; that is why only the 2 bare smoke GETs are covered.
+- **Levers:**
+  - `SCP_ALLOW_MUTATIONS=true` + `SCP_ALLOW_DESTRUCTIVE=true` alone → `vs-autoscaling-coverage`
     records ~23 catalog keys (LC create/show/delete to 2xx; ASG sub-ops to 4xx via a
-    literal placeholder asg_id, still recorded under their catalog key).</li>
-<li>add <code>SCP_RUN_HEAVY=true</code> + a shared VPC/subnet → <code>gen-wave4-asg</code> takes ASG and all
-    sub-resources to 2xx.</li>
-<li><strong>Form gate:</strong> <code>createautoscalinggroupnotification</code> needs a <code>user_ids</code> array with a
-  REAL account user id (no default) — set a <code>user_id</code> env var from console. Until it
-  creates a notification, the 4 child notification GET/PUT/DELETE endpoints stay blocked.</li>
-<li><strong>Proven create facts:</strong> <code>createlaunchconfiguration</code> PROVEN 2xx (<code>regrlcc1db18b2</code>, CI heavy
-  run 2026-06-19) with a real <code>image_id</code> + real <code>keypair_name</code>. The image is <strong>NOT
-  OS-specific</strong> — any valid <strong>standard</strong> image works (<code>scp_original_image_type=standard</code>, the
-  same image lookup as the plain VM path). Evidence: <code>vs-autoscaling-coverage</code> seeds the image
-  from an UNFILTERED <code>GET /v1/images?limit=50</code> → <code>images[0]</code> and still creates the LC, and
-  <code>gen-wave4-asg</code> uses <code>scp_original_image_type=standard&amp;visibility=public</code>; both succeed.
-  (A prior note claimed a <strong>windows</strong> image was required / non-windows rejected with
-  InvalidImage — that was a <strong>mis-diagnosis, corrected 2026-06-19</strong>; the real constraint is a
-  valid standard image type, not the OS.) volume <code>size</code> must be divisible by 8;
-  <code>delete_on_termination</code> is NOT a valid field. ASG policy <code>comparison_operator: "ge"</code> (short-code, not GREATER_THAN_OR_EQUAL_TO);
-  schedule <code>frequency</code> enum ONCE|DAILY|WEEKLY|MONTHLY. ASG create uses arrays <code>subnet_ids</code>,
-  <code>security_group_ids</code> (not scalar/<code>security_groups</code>); notification id is <code>$.notifications[0].id</code>
-  (list envelope, not <code>$.id</code>).</li>
-</ul>
-<h2>storage / filestorage</h2>
-<ul>
-<li><strong>Host:</strong> regional. Owns NFS volumes.</li>
-<li><strong>Volume:</strong> <code>POST /v1/volumes {name, protocol:NFS, type_name:HDD}</code> → capture
-  <strong><code>$.volume_id</code></strong> (flat, service-specific), poll <code>$.state</code> → <code>available</code> →
-  delete → poll 404. No VPC needed.</li>
-</ul>
-<h2>networking / vpc (+ subnet, port, public-ip, internet-gateway)</h2>
-<ul>
-<li><strong>Host:</strong> regional. Consumes the <strong>vpc</strong> quota (cap 5).</li>
-<li>vpc <code>cidr</code> /20 (e.g. <code>10.123.0.0/20</code>), <code>$.vpc.id</code>, poll <code>$.vpc.state</code> →
-  <code>ACTIVE</code>. subnet <code>type: GENERAL</code>, <code>$.subnet.id</code>. port <code>security_groups: []</code>,
-  <code>$.port.id</code>. Teardown reverse with 409 retries (wait 404 before parent delete).</li>
-<li>public-ip <code>type: IGW</code> → <code>$.publicip.id</code>. internet-gateway needs <code>vpc_id</code>,
-  <code>firewall_enabled</code>, <code>type: IGW</code> → <code>$.internet_gateway.id</code>.</li>
-</ul>
-<h2>networking / firewall</h2>
-<ul>
-<li><strong>Host:</strong> regional. 8 endpoints. Firewalls are VPC-bound resources; the account
-  must have at least one VPC/firewall provisioned before most endpoints are reachable.</li>
-<li><code>GET /v1/firewalls</code> (listfirewalls) returns 200 OK even with zero firewalls (empty
-  list). No required query params. Covered in read-only smoke.</li>
-<li><code>GET /v1/firewalls/rules</code> (listfirewallrules) requires <strong><code>firewall_id</code> query param</strong>
-  (marked required in <code>data/api_catalog_params.json</code>); bare call returns 400. Probe
-  with dummy id returns 404 — backend is reachable. Not coverable without a real firewall.</li>
-<li><code>GET /v1/firewalls/{firewall_id}</code> (showfirewall) and
-  <code>GET /v1/firewalls/rules/{firewall_rule_id}</code> (showfirewallrule) return 404 with
-  dummy IDs — backend reachable, no resources provisioned in the test account.</li>
-<li>All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule
-  PUT, deletefirewallrule DELETE) need <code>SCP_ALLOW_MUTATIONS=true</code> (and DELETE needs
-  <code>SCP_ALLOW_DESTRUCTIVE=true</code>) plus existing firewall/rule IDs from a prior create.</li>
-<li><strong>Coverage path:</strong> create a VPC first (networking/vpc agent), then a firewall attaches
-  to the VPC. Capture <code>$.firewalls[0].id</code> from listfirewalls. Use for showfirewall,
-  listfirewallrules. Create a rule (POST /v1/firewalls/rules) to get <code>firewall_rule_id</code>
-  for showfirewallrule, setfirewallrule, deletefirewallrule.</li>
-<li>Covered read-only: 1/8 (listfirewalls). Remaining 7 are mutation-gated this round.</li>
-</ul>
-<h2>networking / security-group</h2>
-<ul>
-<li><strong>Host:</strong> regional, but <strong>account/region-scoped — no VPC needed</strong>. SG
-  <code>$.security_group.id</code>; rule <code>$.security_group_rule.id</code> (<code>direction</code>,
-  <code>ethertype: IPv4</code>, <code>protocol</code>, <code>port_range_min/max</code>, <code>remote_ip_prefix</code>).</li>
-</ul>
-<h2>container / ske (Kubernetes)</h2>
-<ul>
-<li><strong>Host:</strong> regional. Heavy/billable. Needs vpc+subnet+sg+keypair+filestorage
-  volume + k8s-version + server-type lookups. Cluster id <code>$.resource_id</code>;
-  <code>service_watch_logging_enabled</code> required; <code>volume_id</code> is a string. Nodepool with
-  <code>SSD_Provisioned</code> needs <code>volume_max_iops</code>/<code>volume_max_throughput</code>. See
-  <code>validated-facts.md</code>.</li>
-</ul>
-<h2>container / scr (registry)</h2>
-<ul>
-<li><strong>Host:</strong> regional. registry/repository id <code>$.id</code>, registry poll <code>$.state</code> →
-  <code>Running</code>. <strong>Registry DELETE 500-races</strong> for minutes after create — retry on 500.</li>
-<li><strong>Quota = 1 registry</strong> (<code>CONTAINER_REGISTRY.NON_VISIBILITY.MAX.COUNT applied_value: 1EA</code>);
-  a create when the slot is full returns <strong>403 quota.value.exceeded</strong>, NOT a bug.
-  Coverage lever for id-bound GETs is therefore <strong>borrow-and-read-by-id, no create
-  needed</strong>: list registries → take a <code>Running</code> one → walk its children read-only.</li>
-<li><strong>Live-confirmed borrowable resources (2026-06-18, kr-west1):</strong> registry
-  <code>sample</code> id <code>nayvugfp4154447ab0ab61279cba3d72</code> (Running), repository <code>test</code>
-  id <code>6c910ed5195842739f9c98a569982064</code> (Active). ids drift — re-harvest via
-  <code>GET /v1/container-registries</code> then <code>.../{id}/repositories</code>; don't hardcode.</li>
-<li><strong>Detail envelopes:</strong> <code>showregistry</code> → <code>{"registry": {...}}</code>, <code>showrepository</code>
-  → <code>{"repository": {...}}</code> (single-key wrappers). List shapes:
-  <code>listregistries</code> → <code>{count, registries[]}</code>, <code>listrepositories</code> →
-  <code>{count, repositories[]}</code>, <code>listimages</code> → <code>{count, images[]}</code>,
-  <code>connectable-resources</code> → <code>{count, resources[]}</code>.</li>
-<li><strong><code>checkrepositorynameduplication</code></strong> needs BOTH <code>registry_id</code> + <code>name</code> query
-  params (else 400 <code>Field required</code>); <code>checkregistrynameduplication</code> needs <code>name</code>.</li>
-<li><strong>READ-ONLY coverage ceiling (no docker, no mutations):</strong> 8 GETs reachable —
-  listregistries, showregistry, listrepositories, showregistry's
-  connectable-resources, both check-duplications, showrepository, listimages.
-  All 200 on the borrowed resources.</li>
-<li><strong>Docker-push blocker:</strong> the existing repository has <code>images:[]</code> (count 0), and
-  images/tags are <strong>born only by <code>docker push</code></strong>, not by any REST POST. So
-  <code>showimage</code>, <code>listtagses</code>, <code>showtags</code>, <code>tags-{packages,secrets,vulnerabilities}</code>,
-  <code>downloadmanifest</code>, <code>showimagelifecyclepolicypreview</code>, and every image/tags
-  PUT/DELETE are <strong>needs-docker-push blockers</strong> — not testable from a no-docker
-  runner. (See <code>regression/scr_docker_probe.py</code> for the docker-login hypothesis.)</li>
-<li><strong>Mutating policy PUTs</strong> on registry/repository (description / lock / pull /
-  scan / lifecycle / ACL / public-endpoint) are gated behind <code>SCP_ALLOW_MUTATIONS</code>
-  and would mutate the SHARED borrowed <code>sample</code>/<code>test</code> resources — do NOT fire
+    literal placeholder asg_id, still recorded under their catalog key).
+  - add `SCP_RUN_HEAVY=true` + a shared VPC/subnet → `gen-wave4-asg` takes ASG and all
+    sub-resources to 2xx.
+- **Form gate:** `createautoscalinggroupnotification` needs a `user_ids` array with a
+  REAL account user id (no default) — set a `user_id` env var from console. Until it
+  creates a notification, the 4 child notification GET/PUT/DELETE endpoints stay blocked.
+- **Proven create facts:** `createlaunchconfiguration` PROVEN 2xx (`regrlcc1db18b2`, CI heavy
+  run 2026-06-19) with a real `image_id` + real `keypair_name`. The image is **NOT
+  OS-specific** — any valid **standard** image works (`scp_original_image_type=standard`, the
+  same image lookup as the plain VM path). Evidence: `vs-autoscaling-coverage` seeds the image
+  from an UNFILTERED `GET /v1/images?limit=50` → `images[0]` and still creates the LC, and
+  `gen-wave4-asg` uses `scp_original_image_type=standard&amp;visibility=public`; both succeed.
+  (A prior note claimed a **windows** image was required / non-windows rejected with
+  InvalidImage — that was a **mis-diagnosis, corrected 2026-06-19**; the real constraint is a
+  valid standard image type, not the OS.) volume `size` must be divisible by 8;
+  `delete_on_termination` is NOT a valid field. ASG policy `comparison_operator: &quot;ge&quot;` (short-code, not GREATER_THAN_OR_EQUAL_TO);
+  schedule `frequency` enum ONCE|DAILY|WEEKLY|MONTHLY. ASG create uses arrays `subnet_ids`,
+  `security_group_ids` (not scalar/`security_groups`); notification id is `$.notifications[0].id`
+  (list envelope, not `$.id`).
+
+## storage / backup
+
+- **Host:** regional. Service key: `backup`.
+- **checkfilesystemduplication** (`GET /v1/backups/check-filesystem-duplication`):
+  requires BOTH `filesystem_path` (string) AND `server_uuid` (UUID of a VM) as query params.
+  CONFIRMED LIVE (2026-06-20): returns 404 `Backup.NotFoundCreatedBackupAgent` for any
+  `server_uuid` when no backup agent is installed on that server. NOT a missing-param issue —
+  the params are correct per `api_catalog_params.json`. This endpoint is a **heavy-prereq blocker**:
+  needs a real VM + backup agent installation (not REST-provisionable). Cannot be covered
+  in a read-only or light-mutation run. Waiver candidate.
+- **checkbackupnameduplicate** (`GET /v1/backups/check-name-duplication`):
+  requires `backup_name` query param (NOT `name`). CONFIRMED LIVE 200 (2026-06-20):
+  `?backup_name=regrtest` → `{&quot;result&quot;:false}`.
+- **listbackups** list envelope: `{contents:[], count}` (NOT `{backups:[], ...}`).
+- **createbackup** returns 500 `ContactAdminForAssistance` — product-bug (baselined).
+
+## storage / filestorage
+
+- **Host:** regional. Owns NFS volumes.
+- **Volume:** `POST /v1/volumes {name, protocol:NFS, type_name:HDD}` → capture
+  **`$.volume_id`** (flat, service-specific), poll `$.state` → `available` →
+  delete → poll 404. No VPC needed.
+
+## networking / vpc (+ subnet, port, public-ip, internet-gateway)
+
+- **Host:** regional. Consumes the **vpc** quota (cap 5).
+- vpc `cidr` /20 (e.g. `10.123.0.0/20`), `$.vpc.id`, poll `$.vpc.state` →
+  `ACTIVE`. subnet `type: GENERAL`, `$.subnet.id`. port `security_groups: []`,
+  `$.port.id`. Teardown reverse with 409 retries (wait 404 before parent delete).
+- public-ip `type: IGW` → `$.publicip.id`. internet-gateway needs `vpc_id`,
+  `firewall_enabled`, `type: IGW` → `$.internet_gateway.id`.
+
+## networking / firewall
+
+- **Host:** regional. 8 endpoints. Firewalls are VPC-bound resources; the account
+  must have at least one VPC/firewall provisioned before most endpoints are reachable.
+- `GET /v1/firewalls` (listfirewalls) returns 200 OK even with zero firewalls (empty
+  list `{&quot;count&quot;:0,&quot;firewalls&quot;:[],&quot;page&quot;:0,&quot;size&quot;:20}`). No required query params.
+  Covered in read-only smoke. **Live confirmed 2026-06-20: account has 0 firewalls.**
+- `GET /v1/firewalls/rules` (listfirewallrules) requires **`firewall_id` query param**
+  (marked required in `data/api_catalog_params.json`); bare call returns 400. Probe
+  with dummy id returns 404 `ResourceNotFound` — backend is reachable. Not coverable
+  read-only without a real firewall_id. `firewall_id` not in smoke _REQUIRED_QUERY_DEFAULTS
+  (no safe synthetic value — any guess returns 404, not 200).
+- `GET /v1/firewalls/{firewall_id}` (showfirewall) returns 404 `ResourceNotFound` with
+  dummy id. `GET /v1/firewalls/rules/{firewall_rule_id}` (showfirewallrule) also 404.
+  Both backend-reachable; no resources provisioned in account. **Live confirmed 2026-06-20.**
+- All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule
+  PUT, deletefirewallrule DELETE) need `SCP_ALLOW_MUTATIONS=true` (and DELETE needs
+  `SCP_ALLOW_DESTRUCTIVE=true`) plus existing firewall/rule IDs from a prior create.
+- **Intermittent 503s** are normal transient gateway timeouts; the client retries and
+  the smoke test picks up 200 on retry. Not a persistent backend bug.
+- **Coverage path (mutations required):** firewalls are auto-created with a VPC when
+  `firewall_enabled: true`; use `$.firewalls[0].id` from listfirewalls response.
+  `showfirewall` + `listfirewallrules?firewall_id=X` unlock. Create a rule via
+  POST /v1/firewalls/rules to get `$.firewall_rule.id` → `showfirewallrule`,
+  `setfirewallrule`, `deletefirewallrule`. `setfirewall` body: `{flavor_name, loggable}`.
+- **Read-only ceiling: 1/8** (listfirewalls). 7 remaining are mutation-gated or
+  require a real resource id (no firewalls in account). Confirmed 2026-06-20.
+
+## networking / security-group
+
+- **Host:** regional, but **account/region-scoped — no VPC needed**. SG
+  `$.security_group.id`; rule `$.security_group_rule.id` (`direction`,
+  `ethertype: IPv4`, `protocol`, `port_range_min/max`, `remote_ip_prefix`).
+
+## container / ske (Kubernetes)
+
+- **Host:** regional. Heavy/billable. Needs vpc+subnet+sg+keypair+filestorage
+  volume + k8s-version + server-type lookups. Cluster id `$.resource_id`;
+  `service_watch_logging_enabled` required; `volume_id` is a string. Nodepool with
+  `SSD_Provisioned` needs `volume_max_iops`/`volume_max_throughput`. See
+  `validated-facts.md`.
+
+## container / scr (registry)
+
+- **Host:** regional. registry/repository id `$.id`, registry poll `$.state` →
+  `Running`. **Registry DELETE 500-races** for minutes after create — retry on 500.
+- **Quota = 1 registry** (`CONTAINER_REGISTRY.NON_VISIBILITY.MAX.COUNT applied_value: 1EA`);
+  a create when the slot is full returns **403 quota.value.exceeded**, NOT a bug.
+  Coverage lever for id-bound GETs is therefore **borrow-and-read-by-id, no create
+  needed**: list registries → take a `Running` one → walk its children read-only.
+- **Live-confirmed borrowable resources (2026-06-18, kr-west1):** registry
+  `sample` id `nayvugfp4154447ab0ab61279cba3d72` (Running), repository `test`
+  id `6c910ed5195842739f9c98a569982064` (Active). ids drift — re-harvest via
+  `GET /v1/container-registries` then `.../{id}/repositories`; don&#x27;t hardcode.
+- **Detail envelopes:** `showregistry` → `{&quot;registry&quot;: {...}}`, `showrepository`
+  → `{&quot;repository&quot;: {...}}` (single-key wrappers). List shapes:
+  `listregistries` → `{count, registries[]}`, `listrepositories` →
+  `{count, repositories[]}`, `listimages` → `{count, images[]}`,
+  `connectable-resources` → `{count, resources[]}`.
+- **`checkrepositorynameduplication`** needs BOTH `registry_id` + `name` query
+  params (else 400 `Field required`); `checkregistrynameduplication` needs `name`.
+  CONFIRMED LIVE 200 (2026-06-20): `GET /v1/repositories/check-duplication/name?registry_id=nayvugfp4154447ab0ab61279cba3d72&amp;name=regrcheck` → `{&quot;result&quot;:false}`.
+  Added step `check-repository-name-duplication` to `scr-read-coverage` lifecycle in
+  `container__scr.json`; step fires immediately after `list-registries-harvest` captures `registry_id`.
+- **READ-ONLY coverage ceiling (no docker, no mutations):** 9 GETs reachable —
+  listregistries, showregistry, listrepositories, showregistry&#x27;s
+  connectable-resources, both check-duplications (checkrepositorynameduplication now fixed),
+  showrepository, listimages. All 200 on the borrowed resources.
+- **Docker-push blocker:** the existing repository has `images:[]` (count 0), and
+  images/tags are **born only by `docker push`**, not by any REST POST. So
+  `showimage`, `listtagses`, `showtags`, `tags-{packages,secrets,vulnerabilities}`,
+  `downloadmanifest`, `showimagelifecyclepolicypreview`, and every image/tags
+  PUT/DELETE are **needs-docker-push blockers** — not testable from a no-docker
+  runner. (See `regression/scr_docker_probe.py` for the docker-login hypothesis.)
+- **Mutating policy PUTs** on registry/repository (description / lock / pull /
+  scan / lifecycle / ACL / public-endpoint) are gated behind `SCP_ALLOW_MUTATIONS`
+  and would mutate the SHARED borrowed `sample`/`test` resources — do NOT fire
   them just to move coverage; cover via an own-resource lifecycle when the quota
-  slot is free. Several historically returned transient <strong>503 upstream connect
-  timeout</strong> (product/gateway flap, retry-then-classify, not a deterministic bug).</li>
-</ul>
-<h2>networking / gslb (Global Server Load Balancing)</h2>
-<ul>
-<li><strong>Host:</strong> regional (<code>gslb.&lt;region&gt;.&lt;env&gt;.samsungsdscloud.com</code>). Account/global-scoped, VPC-free.</li>
-<li><strong>Region gate:</strong> only kr-west1 and kr-east1 — NOT kr-south1/2/3.</li>
-<li><strong>Quota:</strong> max 20 GSLB domains per account; max 8 connectable resources per domain.</li>
-<li><strong>List endpoints (2xx live, 2026-06-19, kr-west1):</strong></li>
-<li><code>GET /v1/gslbs</code> → <code>{count, gslbs:[], page, size, sort}</code> — no required params.</li>
-<li><code>GET /v1/gslbs/routing-control</code> → <code>{count, page, regional_gslbs:[], size, sort}</code> — no required params.</li>
-<li>Both return 200 with empty lists when no resources exist. Initial calls hit transient 503 (gateway flap); retry returns 200.</li>
-<li><strong>Create body (docs-validated, live unproven):</strong> <code>{algorithm:ROUND_ROBIN, description, env_usage:PUBLIC, health_check:{protocol:TCP, service_port:"80", ...}, name:"label.gslb.e.samsungsdscloud.com", resources:[], tags:[]}</code>. Name is FQDN; label must be 4-40 lowercase letters+digits only.</li>
-<li><strong>Health check:</strong> protocol one of ICMP/TCP/HTTP/HTTPS. TCP/HTTP(S) require <code>service_port</code>. HTTP(S) additionally require <code>receive_string</code> (alnum only) and optionally <code>send_string</code> (no <code>&lt;&gt;</code> or <code>#</code>). Use TCP to avoid HTTP(S)-only constraints.</li>
-<li><strong>Capture:</strong> <code>$.gslb.id</code> from create response.</li>
-<li><strong>Lifecycle scenario:</strong> <code>regression/scenarios/lifecycles/networking__gslb.json</code> (id: <code>networking-gslb-service</code>) covers full CRUD chain — POST create → GET show → PUT set → PUT health-check → PUT resources → PUT routing-control → GET resources → DELETE. Enabled, light (heavy:false), needs SCP_ALLOW_MUTATIONS=true + SCP_ALLOW_DESTRUCTIVE=true.</li>
-<li><strong>Coverage 2026-06-19:</strong> 2/10 (2 list GETs covered read-only). Remaining 8 are mutation-gated — scenario ready, no blockers.</li>
-</ul>
-<h2>networking / cdn</h2>
-<ul>
-<li><strong>Host:</strong> regional (<code>cdn.&lt;region&gt;.&lt;env&gt;...</code>). VPC-free control-plane resource. 9 endpoints.</li>
-<li><strong>Region gate:</strong> kr-west1 and kr-east1 ONLY (NOT kr-south variants).</li>
-<li><strong>List (2xx live 2026-06-19):</strong> <code>GET /v1/cdns</code> (listcdnservice) → <code>{cdn:[], count, page, size, sort}</code>
-  — array key is <code>cdn</code> (not <code>cdns</code>/<code>items</code>). No required params. Empty list when 0 distributions.
-  First call may 503 (gateway timeout, 2-15s); client retry → 200. Transient, NOT a product bug.</li>
-<li><strong>Create capture:</strong> <code>$.cdn.resource_id</code> (NOT <code>$.id</code>/<code>$.cdn.id</code>). Required fields:
-  <code>cache_expiry_time</code> (3600-2592000s, e.g. "86400"), <code>cache_key_hostname</code>, <code>cdn_origin_hostname</code>,
-  <code>cdn_origin_port</code>, <code>cdn_service_domain_prefix</code> (globally unique), <code>forward_host_header</code>, <code>name</code>,
-  <code>origin_hostname_type</code>. Enum guesses (unvalidated live): cache_key_hostname/forward_host_header=
-  <code>REQUEST_HOST_HEADER</code>, origin_hostname_type=<code>DOMAIN</code>. start/stop/purge use empty body <code>{}</code>.</li>
-<li><strong>Lifecycle:</strong> <code>regression/scenarios/lifecycles/networking__cdn.json</code> covers all 7 writes +
-  detailcdnservice (via read-chain on <code>$.cdn.resource_id</code>). Needs SCP_ALLOW_MUTATIONS +
-  SCP_ALLOW_DESTRUCTIVE.</li>
-<li><strong>Coverage 2026-06-19:</strong> 0→1/9 (listcdnservice). Account has 0 CDN distributions (no borrowable id).</li>
-</ul>
-<h2>networking / direct-connect</h2>
-<ul>
-<li><strong>Host:</strong> regional. 8 endpoints. Direct-connect maps to a physical network circuit
-  (datacenter pre-provisioning) — mutations are likely hardware/entitlement-gated.</li>
-<li><strong>List (2xx live 2026-06-19):</strong> <code>GET /v1/direct-connects</code> (listdirectconnects) →
-  <code>{count:0, direct_connects:[], page, size}</code>. No required params. Account has 0 resources.</li>
-<li><strong>Id-bound GETs (needs-resource):</strong> <code>showdirectconnect</code> (GET <code>/v1/direct-connects/{direct_connect_id}</code>),
-  <code>listroutingrules</code> (GET <code>.../{direct_connect_id}/routing-rules</code>) — <code>single_param_chains</code> already
-  wired; fire automatically once a direct-connect exists. List was empty → no id to derive.</li>
-<li><strong>Writes (mutation-gated):</strong> createdirectconnect (POST), setdirectconnect (PUT), createroutingrule
+  slot is free. Several historically returned transient **503 upstream connect
+  timeout** (product/gateway flap, retry-then-classify, not a deterministic bug).
+
+## networking / gslb (Global Server Load Balancing)
+
+- **Host:** regional (`gslb.&lt;region&gt;.&lt;env&gt;.samsungsdscloud.com`). Account/global-scoped, VPC-free.
+- **Region gate:** only kr-west1 and kr-east1 — NOT kr-south1/2/3.
+- **Quota:** max 20 GSLB domains per account; max 8 connectable resources per domain.
+- **List endpoints (2xx live, 2026-06-19, kr-west1):**
+  - `GET /v1/gslbs` → `{count, gslbs:[], page, size, sort}` — no required params.
+  - `GET /v1/gslbs/routing-control` → `{count, page, regional_gslbs:[], size, sort}` — no required params.
+  - Both return 200 with empty lists when no resources exist. Initial calls hit transient 503 (gateway flap); retry returns 200.
+- **Create body (docs-validated, live unproven):** `{algorithm:ROUND_ROBIN, description, env_usage:PUBLIC, health_check:{protocol:TCP, service_port:&quot;80&quot;, ...}, name:&quot;label.gslb.e.samsungsdscloud.com&quot;, resources:[], tags:[]}`. Name is FQDN; label must be 4-40 lowercase letters+digits only.
+- **Health check:** protocol one of ICMP/TCP/HTTP/HTTPS. TCP/HTTP(S) require `service_port`. HTTP(S) additionally require `receive_string` (alnum only) and optionally `send_string` (no `&lt;&gt;` or `#`). Use TCP to avoid HTTP(S)-only constraints.
+- **Capture:** `$.gslb.id` from create response.
+- **Lifecycle scenario:** `regression/scenarios/lifecycles/networking__gslb.json` (id: `networking-gslb-service`) covers full CRUD chain — POST create → GET show → PUT set → PUT health-check → PUT resources → PUT routing-control → GET resources → DELETE. Enabled, light (heavy:false), needs SCP_ALLOW_MUTATIONS=true + SCP_ALLOW_DESTRUCTIVE=true.
+- **Coverage 2026-06-19:** 2/10 (2 list GETs covered read-only). Remaining 8 are mutation-gated — scenario ready, no blockers.
+
+## networking / cdn
+
+- **Host:** regional (`cdn.&lt;region&gt;.&lt;env&gt;...`). VPC-free control-plane resource. 9 endpoints.
+- **Region gate:** kr-west1 and kr-east1 ONLY (NOT kr-south variants).
+- **List (2xx live 2026-06-19):** `GET /v1/cdns` (listcdnservice) → `{cdn:[], count, page, size, sort}`
+  — array key is `cdn` (not `cdns`/`items`). No required params. Empty list when 0 distributions.
+  First call may 503 (gateway timeout, 2-15s); client retry → 200. Transient, NOT a product bug.
+- **Create capture:** `$.cdn.resource_id` (NOT `$.id`/`$.cdn.id`). Required fields:
+  `cache_expiry_time` (3600-2592000s, e.g. &quot;86400&quot;), `cache_key_hostname`, `cdn_origin_hostname`,
+  `cdn_origin_port`, `cdn_service_domain_prefix` (globally unique), `forward_host_header`, `name`,
+  `origin_hostname_type`. Enum guesses (unvalidated live): cache_key_hostname/forward_host_header=
+  `REQUEST_HOST_HEADER`, origin_hostname_type=`DOMAIN`. start/stop/purge use empty body `{}`.
+- **Lifecycle:** `regression/scenarios/lifecycles/networking__cdn.json` covers all 7 writes +
+  detailcdnservice (via read-chain on `$.cdn.resource_id`). Needs SCP_ALLOW_MUTATIONS +
+  SCP_ALLOW_DESTRUCTIVE.
+- **Coverage 2026-06-19:** 0→1/9 (listcdnservice). Account has 0 CDN distributions (no borrowable id).
+
+## networking / direct-connect
+
+- **Host:** regional. 8 endpoints. Direct-connect maps to a physical network circuit
+  (datacenter pre-provisioning) — mutations are likely hardware/entitlement-gated.
+- **List (2xx live 2026-06-19):** `GET /v1/direct-connects` (listdirectconnects) →
+  `{count:0, direct_connects:[], page, size}`. No required params. Account has 0 resources.
+- **Id-bound GETs (needs-resource):** `showdirectconnect` (GET `/v1/direct-connects/{direct_connect_id}`),
+  `listroutingrules` (GET `.../{direct_connect_id}/routing-rules`) — `single_param_chains` already
+  wired; fire automatically once a direct-connect exists. List was empty → no id to derive.
+- **Writes (mutation-gated):** createdirectconnect (POST), setdirectconnect (PUT), createroutingrule
   (POST sub), deletedirectconnect/deleteroutingrule (DELETE). Need SCP_ALLOW_MUTATIONS
-  (+SCP_ALLOW_DESTRUCTIVE); check circuit-provisioning entitlement first.</li>
-<li><strong>Note:</strong> doc_url fetches returned 503 during the 2026-06-19 run (docs server down, transient).</li>
-<li><strong>Coverage 2026-06-19:</strong> 0→1/8 (listdirectconnects).</li>
-</ul>
-<h2>networking / vpn</h2>
-<ul>
-<li><strong>Host:</strong> regional. 10 endpoints (gateways + tunnels). Resources are <code>heavy: true</code>
-  (chain: vpc + public-ip → vpn-gateway → vpn-tunnel).</li>
-<li><strong>Region gate:</strong> kr-west1, kr-east1, kr-south3.</li>
-<li><strong>Quota:</strong> max 3 VPN gateways/account, 5 tunnels/gateway.</li>
-<li><strong>Lists (2xx live 2026-06-19):</strong></li>
-<li><code>GET /v1/vpn-gateways</code> (listvpngateways) → <code>{count, page, size, sort, vpn_gateways:[]}</code></li>
-<li><code>GET /v1/vpn-tunnels</code> (listvpntunnels) → <code>{count, page, size, sort, vpn_tunnels:[]}</code></li>
-<li>sort default <code>["name:asc","id:desc"]</code>. No required query params. Both empty (account has 0).</li>
-<li><strong>Id-bound GETs (needs-resource):</strong> showvpngateway/showvpntunnel — fake-id probes 404 with
-  error codes <code>scp-network.vpn-gateway.not-found</code> / <code>vpn-tunnel.not-found</code> (backend reachable).</li>
-<li><strong>Naming constraint:</strong> gateway AND tunnel names = 3-20 <strong>alphanumeric chars ONLY</strong> (no
+  (+SCP_ALLOW_DESTRUCTIVE); check circuit-provisioning entitlement first.
+- **Note:** doc_url fetches returned 503 during the 2026-06-19 run (docs server down, transient).
+- **Coverage 2026-06-19:** 0→1/8 (listdirectconnects).
+
+## networking / vpn
+
+- **Host:** regional. 10 endpoints (gateways + tunnels). Resources are `heavy: true`
+  (chain: vpc + public-ip → vpn-gateway → vpn-tunnel).
+- **Region gate:** kr-west1, kr-east1, kr-south3.
+- **Quota:** max 3 VPN gateways/account, 5 tunnels/gateway.
+- **Lists (2xx live 2026-06-19):**
+  - `GET /v1/vpn-gateways` (listvpngateways) → `{count, page, size, sort, vpn_gateways:[]}`
+  - `GET /v1/vpn-tunnels` (listvpntunnels) → `{count, page, size, sort, vpn_tunnels:[]}`
+  - sort default `[&quot;name:asc&quot;,&quot;id:desc&quot;]`. No required query params. Both empty (account has 0).
+- **Id-bound GETs (needs-resource):** showvpngateway/showvpntunnel — fake-id probes 404 with
+  error codes `scp-network.vpn-gateway.not-found` / `vpn-tunnel.not-found` (backend reachable).
+- **Naming constraint:** gateway AND tunnel names = 3-20 **alphanumeric chars ONLY** (no
   hyphen/underscore). IKE/IPSec enums (phase1/phase2_encryptions, diffie_hellman_groups) are
-  docs-estimates, NOT yet live-validated.</li>
-<li><strong>Lifecycle:</strong> <code>networking-vpn-gateway-tunnel</code> (<code>networking__vpn.json</code>) covers all 8 remaining
+  docs-estimates, NOT yet live-validated.
+- **Lifecycle:** `networking-vpn-gateway-tunnel` (`networking__vpn.json`) covers all 8 remaining
   (2 id-bound GETs + 6 writes). Needs SCP_ALLOW_MUTATIONS + SCP_ALLOW_DESTRUCTIVE + SCP_RUN_HEAVY,
-  with VPC + public-ip prereqs provisioned first.</li>
-<li><strong>Coverage 2026-06-19:</strong> 0→2/10 (both list GETs).</li>
-</ul>
-<h2>management / cloudcontrol</h2>
-<ul>
-<li><strong>Host:</strong> management. 15 endpoints (6 GETs + 9 writes). <strong>Hard entitlement wall.</strong></li>
-<li><strong>Entitlement-403:</strong> every tested GET returns <code>CloudControl.CloudControlForbidden</code>
-  ("Can not access this cloudcontrol resources.") — identical for all 6. Cloud Control
-  requires a <strong>Landing Zone</strong> to exist on the <strong>Organization management account</strong> (prereqs:
+  with VPC + public-ip prereqs provisioned first.
+- **Coverage 2026-06-19:** 0→2/10 (both list GETs).
+
+## management / cloudcontrol
+
+- **Host:** management. 15 endpoints (6 GETs + 9 writes). **Hard entitlement wall.**
+- **Entitlement-403:** every tested GET returns `CloudControl.CloudControlForbidden`
+  (&quot;Can not access this cloudcontrol resources.&quot;) — identical for all 6. Cloud Control
+  requires a **Landing Zone** to exist on the **Organization management account** (prereqs:
   Organization + ID Center + Object Storage + Logging&amp;Audit). Shared test account is not the
-  org-master and has no landing zone → all reads AND writes denied. NOT a product bug.</li>
-<li><strong>Required params (already in sidecar, do NOT unlock 2xx on shared account):</strong>
-  <code>listguardrailsfortarget</code> needs <code>target_id</code>; <code>listtargetsforguardrail</code> needs <code>guardrail_id</code> +
-  <code>target_type</code> (e.g. ACCOUNT). Without them → 400 ValidationError; with them → still 403.</li>
-<li><strong>Quirks:</strong> <code>createaccountfactoryaccount</code> (POST /v1/accounts) is BILLABLE + IRREVERSIBLE
+  org-master and has no landing zone → all reads AND writes denied. NOT a product bug.
+- **Required params (already in sidecar, do NOT unlock 2xx on shared account):**
+  `listguardrailsfortarget` needs `target_id`; `listtargetsforguardrail` needs `guardrail_id` +
+  `target_type` (e.g. ACCOUNT). Without them → 400 ValidationError; with them → still 403.
+- **Quirks:** `createaccountfactoryaccount` (POST /v1/accounts) is BILLABLE + IRREVERSIBLE
   (provisions a real member account); landing-zone create cannot be cancelled mid-flight;
-  AuditBaseline feature scheduled 2026-07 (endpoints may 404/400 until then).</li>
-<li><strong>Lifecycle:</strong> <code>cloudcontrol-landing-zone-guarded</code> (<code>management__cloudcontrol.json</code>,
-  heavy:true) covers all 9 writes, expects 403 on a shared account.</li>
-<li><strong>Coverage 2026-06-19:</strong> 0/15. Unblock only from an org-master (control-tower admin) account
-  with a Landing Zone provisioned.</li>
-</ul>
-<h2>security / certificatemanager</h2>
-<ul>
-<li><strong>Host:</strong> regional. self-sign needs <code>cn</code>, <code>not_before_dt</code>, <code>not_after_dt</code>,
-  <code>organization</code>, <code>region</code>, <code>timezone</code> → <code>$.certificate.id</code>. Synchronous.</li>
-</ul>
-<h2>management / resourcemanager</h2>
-<ul>
-<li><strong>Host:</strong> <strong>global</strong> (no region segment). resource-group <code>$.resource_group.id</code>
-  (+ <code>srn</code> soft capture).</li>
-<li><strong>CRITICAL: SRN and key path segments must be base64-encoded</strong> (confirmed
-  2026-06-19). All endpoints with <code>{srn}</code> or <code>{key}</code> path params require the
-  value to be <code>base64.b64encode(value.encode()).decode()</code> before URL insertion.
-  Plain SRN or plain key yields 400 "SRN decoding error occurred. utf-8 codec
-  can't decode byte...".</li>
-<li><code>GET/PUT/DELETE /v1/tags/{srn}</code> → <code>{srn}</code> = b64(srn)</li>
-<li><code>GET/PUT/DELETE /v1/tags/{srn}/{key}</code> → both = b64(srn) and b64(key)</li>
-<li><code>GET/PUT/DELETE /v1/resources/{srn}</code> → <code>{srn}</code> = b64(srn)</li>
-<li><code>GET/PUT/DELETE /v1/tags/{region}/{service}/{resource_type}/{identifier}/{key}</code>
-    → region/service/resource_type/identifier are PLAIN; only <code>{key}</code> = b64(key)</li>
-<li><code>/v1/tags/bulk</code> (PUT) and <code>/v1/tags</code> (DELETE bulk) use PLAIN SRN in JSON body
-    (not path), so no b64 needed there.</li>
-<li><strong>Engine support (2026-06-19):</strong> the scenario engine now implements a
-    <code>b64_encode</code> step action (<code>{"action":"b64_encode","input":"{rg_srn}",
-    "output":"rg_srn_b64"}</code>) — it base64-encodes a captured ctx var and publishes
-    it as a new placeholder, so <code>resourcemanager-tag-lifecycle</code> is runnable (was
-    referencing undefined <code>*_b64</code> placeholders → 10 validator errors, now fixed).
+  AuditBaseline feature scheduled 2026-07 (endpoints may 404/400 until then).
+- **Lifecycle:** `cloudcontrol-landing-zone-guarded` (`management__cloudcontrol.json`,
+  heavy:true) covers all 9 writes, expects 403 on a shared account.
+- **Coverage 2026-06-19:** 0/15. Unblock only from an org-master (control-tower admin) account
+  with a Landing Zone provisioned.
+
+## security / certificatemanager
+
+- **Host:** regional (`certificatemanager.&lt;region&gt;.&lt;env&gt;.samsungsdscloud.com`).
+- **Endpoints (7 total):** `listcertificates` (GET), `detailcertificate` (GET/{id}),
+  `checknameduplication` (POST), `createcertificate` (POST), `selfsigncert` (POST),
+  `validatecertificate` (POST), `deletecertificate` (DELETE/{id}).
+- **`selfsigncert` (POST /v1/certificatemanager/self-sign):** required fields:
+  `cn`, `name`, `not_before_dt`, `not_after_dt`, `organization`, `recipients=[]`,
+  `region`, `tags=[]`, `timezone`. Date format is `YYYYMMDD` (engine `{today}` =
+  `%Y%m%d` — correct). Returns 201 with `$.certificate.id` (UUID without hyphens).
+  `cert_kind: DEV`, `key_bit_size: 2048`. Synchronous (state=VALID immediately).
+  CONFIRMED 2xx 2026-06-20 with real call.
+- **`checknameduplication` (POST /v1/certificatemanager/check-duplication):**
+  only `{name: &#x27;any-string&#x27;}` required. Returns 200 `{&quot;result&quot;: false}` for
+  available name. Non-destructive (no resource created). CONFIRMED 200 2026-06-20.
+- **`validatecertificate` (POST /v1/certificatemanager/check-validation):**
+  requires `cert_body` + `private_key` (and optionally `cert_chain`). CONFIRMED
+  BLOCKER 2026-06-20: returns 400 `scp-security.certificate.pem-format-private-key-error`
+  (&quot;This private key is not a PEM format&quot;) for ALL private key PEM formats tested:
+  RSA PKCS#1 (`BEGIN RSA PRIVATE KEY`), PKCS#8 (`BEGIN PRIVATE KEY`), EC
+  (`BEGIN EC PRIVATE KEY`). Self-signed certs and real OpenSSL-generated keys all
+  rejected. Endpoint IS reachable (not 403). Requires a real CA-chain-signed cert
+  from an external authority.
+- **`createcertificate` (POST /v1/certificatemanager):** import an external cert.
+  Required body includes: `cert_body`, `cert_chain`, `name`, `private_key`,
+  `recipients=[]`, `region`, `tags=[]`. One additional required field not yet
+  identified (7 of above = 1 still missing per validation error count). Also
+  rejects all PEM key formats same as validatecertificate.
+- **`listcertificates` (GET /v1/certificatemanager):** 200 with empty list
+  (`count:0`) on fresh account. Response shape: `{certificates:[], count, page, size, sort}`.
+  Optional query params: `size`, `page`, `sort`, `isMine`, `name`, `cn`, `state`.
+- **`detailcertificate` (GET /v1/certificatemanager/{certificate_id}):** needs a
+  real `certificate_id` from selfsign/create. Capture path: `$.certificate.id`.
+- **Coverage ceiling (2026-06-20):** read-only floor = 1/7 (listcertificates).
+  With SCP_ALLOW_MUTATIONS: selfsigncert→detailcertificate→listcertificates→
+  checknameduplication→deletecertificate = 5/7. Remaining 2 (createcertificate,
+  validatecertificate) blocked by CA-cert requirement.
+
+## management / resourcemanager
+
+- **Host:** **global** (no region segment). resource-group `$.resource_group.id`
+  (+ `srn` soft capture).
+- **CRITICAL: SRN and key path segments must be base64-encoded** (confirmed
+  2026-06-19). All endpoints with `{srn}` or `{key}` path params require the
+  value to be `base64.b64encode(value.encode()).decode()` before URL insertion.
+  Plain SRN or plain key yields 400 &quot;SRN decoding error occurred. utf-8 codec
+  can&#x27;t decode byte...&quot;.
+  - `GET/PUT/DELETE /v1/tags/{srn}` → `{srn}` = b64(srn)
+  - `GET/PUT/DELETE /v1/tags/{srn}/{key}` → both = b64(srn) and b64(key)
+  - `GET/PUT/DELETE /v1/resources/{srn}` → `{srn}` = b64(srn)
+  - `GET/PUT/DELETE /v1/tags/{region}/{service}/{resource_type}/{identifier}/{key}`
+    → region/service/resource_type/identifier are PLAIN; only `{key}` = b64(key)
+  - `/v1/tags/bulk` (PUT) and `/v1/tags` (DELETE bulk) use PLAIN SRN in JSON body
+    (not path), so no b64 needed there.
+  - **Engine support (2026-06-19):** the scenario engine now implements a
+    `b64_encode` step action (`{&quot;action&quot;:&quot;b64_encode&quot;,&quot;input&quot;:&quot;{rg_srn}&quot;,
+    &quot;output&quot;:&quot;rg_srn_b64&quot;}`) — it base64-encodes a captured ctx var and publishes
+    it as a new placeholder, so `resourcemanager-tag-lifecycle` is runnable (was
+    referencing undefined `*_b64` placeholders → 10 validator errors, now fixed).
     Reusable by any service whose path segments are b64-decoded (e.g. the stuck
-    iam <code>srn</code>-targeted ops: addpermission/setpermission/setresourcepolicy).</li>
-<li><strong>listresources response shape:</strong> <code>$.resources[]</code> (NOT <code>$.contents[]</code>). Fields:
-  <code>region</code>, <code>service</code>, <code>resource_type</code>, <code>id</code> (NOT <code>resource_identifier</code>).</li>
-<li><strong>Coverage 2026-06-19:</strong> 12 → <strong>27/27</strong> (100%). All 27 endpoints covered.
-  No remaining gaps.</li>
-</ul>
-<h2>application-service / queueservice</h2>
-<ul>
-<li><strong>Host:</strong> regional. queue <code>$.id</code>; create body includes retention/size/key-reuse
-  periods + units.</li>
-</ul>
-<h2>management / iam</h2>
-<ul>
-<li><strong>Host:</strong> global-ish (management). 62 endpoints. Cross-link
-  <code>validated-facts.md</code>.</li>
-<li><strong>Coverage levers (2026-06-18):</strong></li>
-<li><em>Read-only LISTs (no gate, via smoke):</em> <code>accesskeylist</code>, <code>listendpoints</code>,
-    <code>listgroup</code>, <code>listpolicy</code>, <code>listrole</code>, <code>listsamlprovider</code>,
-    <code>listserviceaccount</code> all return 200 on a bare GET — pure smoke wins.</li>
-<li><em>List→show chains (no gate, via read_chains):</em> <code>showrole</code>,
-    <code>showserviceaccount</code>, <code>accesskeyshow</code>, <code>listrolepolicybindings</code> derive an id
-    from their sibling list and return 200. <code>showgroup</code>/<code>showpolicy</code> likewise.</li>
-<li><em>Account-scoped read:</em> there is <strong>no <code>/v1/accounts</code> or <code>/v1/users</code>
-    collection list</strong> (both 404). <code>account_id</code> is only derivable from a real
-    role's <code>$.role.account_id</code> (a <code>/v1/roles</code> item carries <code>account_id</code>). Use it
-    to call <code>listiamuser</code> = <code>GET /v1/accounts/{account_id}/users</code> (200, returns
-    <code>{users:[], count,page,size,sort}</code>). This is why read_chains can't auto-pair
-    listiamuser/getiamuser/listuserpolicybindings — the parent list doesn't exist.</li>
-<li><em>Group/policy lifecycles (MUTATIONS gate):</em> <code>creategroup</code> → <code>$.group.id</code>,
-    <code>createpolicy</code> → flat <code>$.id</code>. Both delete cleanly. Already enabled.</li>
-<li><strong>Empty-collection blockers (needs-peer-resource):</strong> this account has <strong>0 SAML
-  providers, 0 IAM users, 0 resource-policies</strong> → <code>showsamlprovider</code>,
-  <code>getiamuser</code>, <code>listuserpolicybindings</code>, <code>updateiamuser</code>,
-  <code>updateiamuserpassword</code>, <code>deleteiamuser</code>, <code>showresourcepolicy</code> have no id to
-  target and can't be covered read-only until a peer creates one.</li>
-<li><strong>Product-bug blocker (5xx, baselined):</strong> <code>createrole</code> → 500
+    iam `srn`-targeted ops: addpermission/setpermission/setresourcepolicy).
+- **listresources response shape:** `$.resources[]` (NOT `$.contents[]`). Fields:
+  `region`, `service`, `resource_type`, `id` (NOT `resource_identifier`).
+- **Coverage 2026-06-19:** 12 → **27/27** (100%). All 27 endpoints covered.
+  No remaining gaps.
+
+## application-service / queueservice
+
+- **Host:** regional. queue `$.id`; create body includes retention/size/key-reuse
+  periods + units.
+
+## management / iam
+
+- **Host:** global-ish (management). 62 endpoints. Cross-link
+  `validated-facts.md`.
+- **Coverage levers (2026-06-18):**
+  - *Read-only LISTs (no gate, via smoke):* `accesskeylist`, `listendpoints`,
+    `listgroup`, `listpolicy`, `listrole`, `listsamlprovider`,
+    `listserviceaccount` all return 200 on a bare GET — pure smoke wins.
+  - *List→show chains (no gate, via read_chains):* `showrole`,
+    `showserviceaccount`, `accesskeyshow`, `listrolepolicybindings` derive an id
+    from their sibling list and return 200. `showgroup`/`showpolicy` likewise.
+  - *Account-scoped read:* there is **no `/v1/accounts` or `/v1/users`
+    collection list** (both 404). `account_id` is only derivable from a real
+    role&#x27;s `$.role.account_id` (a `/v1/roles` item carries `account_id`). Use it
+    to call `listiamuser` = `GET /v1/accounts/{account_id}/users` (200, returns
+    `{users:[], count,page,size,sort}`). This is why read_chains can&#x27;t auto-pair
+    listiamuser/getiamuser/listuserpolicybindings — the parent list doesn&#x27;t exist.
+  - *Group/policy lifecycles (MUTATIONS gate):* `creategroup` → `$.group.id`,
+    `createpolicy` → flat `$.id`. Both delete cleanly. Already enabled.
+- **Empty-collection blockers (needs-peer-resource):** this account has **0 SAML
+  providers, 0 IAM users, 0 resource-policies** → `showsamlprovider`,
+  `getiamuser`, `listuserpolicybindings`, `updateiamuser`,
+  `updateiamuserpassword`, `deleteiamuser`, `showresourcepolicy` have no id to
+  target and can&#x27;t be covered read-only until a peer creates one.
+- **Product-bug blocker (5xx, baselined):** `createrole` → 500
   ContactAdminForAssistance. This blocks the whole role-mutation chain
-  downstream (<code>setrole</code>, <code>addrolepolicybindings</code>, <code>removerolepolicybinding</code>,
-  <code>removebulkrolepolicybindings</code>, <code>setroletrustpolicy</code>, <code>deleterole</code>,
-  <code>deletebulkrole</code>). <code>iam-role</code> lifecycle stays <code>enabled:false</code>.</li>
-<li><strong>Entitlement / validation blockers:</strong> <code>adduserpolicybinding</code> /
-  <code>removeuserpolicybinding</code> → 403; resource-policy mutations
-  (<code>addpermission</code>/<code>setpermission</code>/<code>removepermission</code>/<code>setresourcepolicy</code>/
-  <code>deleteresourcepolicy</code>) → 400 (need a real <code>srn</code> target).</li>
-<li><strong>Coverage 2026-06-18:</strong> 15 → <strong>27 / 62</strong> (read-only levers only; no resources
-  created, account left clean).</li>
-</ul>
-<h2>networking / dns</h2>
-<ul>
-<li><strong>Host:</strong> regional (<code>dns.&lt;region&gt;.&lt;env&gt;...</code>). 22 endpoints. Three resource
-  families: <strong>private-dns</strong>, <strong>hosted-zones</strong> (+ records), <strong>public-domain-names</strong>.
-  Cross-link <code>validated-facts.md</code> (networking quotas).</li>
-<li><strong>Upstream flapping (System Issue, 2026-06-18/19):</strong> the dns host intermittently
-  returns <code>503 upstream connect error / connection timeout</code> at the edge proxy even
+  downstream (`setrole`, `addrolepolicybindings`, `removerolepolicybinding`,
+  `removebulkrolepolicybindings`, `setroletrustpolicy`, `deleterole`,
+  `deletebulkrole`). `iam-role` lifecycle stays `enabled:false`.
+- **Entitlement / validation blockers:** `adduserpolicybinding` /
+  `removeuserpolicybinding` → 403; resource-policy mutations
+  (`addpermission`/`setpermission`/`removepermission`/`setresourcepolicy`/
+  `deleteresourcepolicy`) were 400 (SRN decoding error) — **FIXED 2026-06-20** (see
+  below).
+- **b64-SRN fix (2026-06-20):** The iam gateway decodes `{srn}` path segments
+  as base64, the same way resourcemanager does. Plain SRN in
+  `/v1/resource-policies/{srn}` yields 400 &quot;SRN decoding error&quot;. The fix mirrors
+  the resourcemanager pattern: `GET /v1/resources` (resourcemanager cross-service
+  step) soft-captures `$.resources[0].srn` → `iam_srn`; a `b64_encode` step
+  produces `iam_srn_b64`; all 5 srn-targeted write paths use `{iam_srn_b64}`:
+  - `PUT /v1/resource-policies/{iam_srn_b64}` (setresourcepolicy)
+  - `GET /v1/resource-policies/{iam_srn_b64}` (showresourcepolicy)
+  - `POST /v1/resource-policies/{iam_srn_b64}/statements` (addpermission)
+  - `PUT /v1/resource-policies/{iam_srn_b64}/statements/{unique}` (setpermission)
+  - `DELETE /v1/resource-policies/{iam_srn_b64}/statements/{unique}` (removepermission)
+  - `DELETE /v1/resource-policies/{iam_srn_b64}` (deleteresourcepolicy)
+  The `{sid}` path segment (`{unique}`) does NOT need b64 encoding. After the fix
+  the calls will pass the SRN decoder; they may still 404 (no resource-policy on
+  that resource) or 403 (no write permission). The b64_encode step is `optional`
+  so a missed capture degrades gracefully to a placeholder that still calls the
+  endpoint. Wired in `iam-resource-policy` lifecycle (`management__iam.json`).
+- **Coverage 2026-06-18 → 2026-06-20:** 15 → **28 / 62** (read-only levers +
+  wave5-iam-bindings; b64-SRN fix is pre-mutation and awaits the light CRUD run).
+
+## networking / dns
+
+- **Host:** regional (`dns.&lt;region&gt;.&lt;env&gt;...`). 22 endpoints. Three resource
+  families: **private-dns**, **hosted-zones** (+ records), **public-domain-names**.
+  Cross-link `validated-facts.md` (networking quotas).
+- **Upstream flapping (System Issue, 2026-06-18/19):** the dns host intermittently
+  returns `503 upstream connect error / connection timeout` at the edge proxy even
   though auth is fine (vpc 200s with the same creds). It recovers in windows — a
   read probe that rides 503 with retry eventually gets the 200. Not auth, not our
   body; an infra reachability blip. If every dns call 503s, retry later rather than
-  treating it as a regression.</li>
-<li><strong>Read-only LISTs (no gate, the live levers):</strong> <code>listhostedzone</code>
-  (<code>GET /v1/hosted-zones</code>), <code>listprivatedns</code> (<code>GET /v1/private-dns</code>),
-  <code>listpublicdomainnames</code> (<code>GET /v1/public-domain-names</code>) all return <strong>200</strong> on a
+  treating it as a regression.
+- **Read-only LISTs (no gate, the live levers):** `listhostedzone`
+  (`GET /v1/hosted-zones`), `listprivatedns` (`GET /v1/private-dns`),
+  `listpublicdomainnames` (`GET /v1/public-domain-names`) all return **200** on a
   bare GET. Response envelopes (this account is EMPTY — count 0 in all three):
-  <code>{hosted_zones:[],count,page,size,sort}</code>, <code>{private_dns:[],...}</code>,
-  <code>{public_domain_names:[],...}</code>. These are the only dns endpoints coverable
-  read-only; everything else is id-bound or mutating.</li>
-<li><strong>id-bound reads blocked behind a HEAVY create:</strong> <code>showprivatedns</code>,
-  <code>showhostedzone</code>, <code>listhostedzonerecords</code>, <code>showhostedzonerecord</code> need a real
+  `{hosted_zones:[],count,page,size,sort}`, `{private_dns:[],...}`,
+  `{public_domain_names:[],...}`. These are the only dns endpoints coverable
+  read-only; everything else is id-bound or mutating.
+- **id-bound reads blocked behind a HEAVY create:** `showprivatedns`,
+  `showhostedzone`, `listhostedzonerecords`, `showhostedzonerecord` need a real
   private-dns + hosted-zone + record to exist first. The account is empty and
-  private-dns create is a <strong>very slow provisioner (hours, <code>heavy:true</code>)</strong> — so on a
+  private-dns create is a **very slow provisioner (hours, `heavy:true`)** — so on a
   no-heavy run there is no id to target. They are covered (modeled, not
-  runtime-proven) by the <code>networking-dns-hosted-zone-private</code> heavy lifecycle.</li>
-<li><strong>createpublicdomainname → 500 (Product Bug, baselined):</strong> <code>POST
-  /v1/public-domain-names</code> returns 500 InternalServerError / ContactAdminForAssistance.
-  <strong>Our body is proven correct</strong> — byte-for-byte the documented <code>createpublicdomainname/1.3</code>
-  request_example with every required field of <code>createpublicdomainrequest</code>
-  (<code>data/api_docs.json</code>): address_type, name, all four <code>domestic_*_address_*</code>, the
-  <code>overseas_*</code> trio, postal_code, register_email/name/telno. Not a malformed-body
+  runtime-proven) by the `networking-dns-hosted-zone-private` heavy lifecycle.
+- **createpublicdomainname → 500 (Product Bug, baselined):** `POST
+  /v1/public-domain-names` returns 500 InternalServerError / ContactAdminForAssistance.
+  **Our body is proven correct** — byte-for-byte the documented `createpublicdomainname/1.3`
+  request_example with every required field of `createpublicdomainrequest`
+  (`data/api_docs.json`): address_type, name, all four `domestic_*_address_*`, the
+  `overseas_*` trio, postal_code, register_email/name/telno. Not a malformed-body
   4xx mis-surfacing — a genuine backend fault, same ContactAdmin class as iam
   createrole / budget createaccountbudget. Also a REAL PAID DOMAIN REGISTRATION
-  order, so the lifecycle never retry-chains it. Now in <code>data/baselines/known_issues.json</code>.</li>
-<li><strong>Quotas:</strong> Private DNS = 1/account (account-global; a 2nd create 4xx's —
-  <code>validated-facts.md</code>); Hosted Zone = 20/account, 100 records/zone; record types
-  A/AAAA/CNAME/TXT/MX/SPF/NS/SOA.</li>
-<li><strong>Body/capture quirks:</strong> hosted-zone create response is a <strong>bare envelope</strong> —
-  id at <code>$.id</code>, NOT <code>$.hosted_zone.id</code>; record id likewise <code>$.id</code>. private-dns
-  capture is <code>$.private_dns.id</code>. private-dns must reach <code>state: ACTIVE</code> before
+  order, so the lifecycle never retry-chains it. Now in `data/baselines/known_issues.json`.
+- **Quotas:** Private DNS = 1/account (account-global; a 2nd create 4xx&#x27;s —
+  `validated-facts.md`); Hosted Zone = 20/account, 100 records/zone; record types
+  A/AAAA/CNAME/TXT/MX/SPF/NS/SOA.
+- **Body/capture quirks:** hosted-zone create response is a **bare envelope** —
+  id at `$.id`, NOT `$.hosted_zone.id`; record id likewise `$.id`. private-dns
+  capture is `$.private_dns.id`. private-dns must reach `state: ACTIVE` before
   setters work (400 invalid-state while CREATING). All encoded in
-  <code>regression/scenarios/lifecycles/networking__dns.json</code>.</li>
-<li><strong>Coverage 2026-06-19:</strong> 3 → <strong>6 / 22</strong> observed (the 3 list GETs newly live-200;
+  `regression/scenarios/lifecycles/networking__dns.json`.
+- **Coverage 2026-06-19:** 3 → **6 / 22** observed (the 3 list GETs newly live-200;
   the public-domain 500 + 2 record-write probes were already observed). Remaining
   16 are write ops (lifecycle-modeled, gate-only) or id-bound reads blocked behind
-  the heavy private-dns create. Account left clean (no resources created).</li>
-</ul>
-<h2>data-analytics / quick-query</h2>
-<ul>
-<li><strong>Host:</strong> regional (<code>quick-query.&lt;region&gt;.&lt;env&gt;...</code>). 12 endpoints.</li>
-<li><strong>Timeout quirk:</strong> service responds in ~1-2s, but the default client <code>timeout=60s</code>
-  with retries can make a probe appear to hang. Use <code>timeout=5, retry=False</code> for probes.</li>
-<li><strong>Read-only 2xx (live 2026-06-19):</strong></li>
-<li><code>checkduplicationquickquery</code> — <code>GET /v1/quick-query/{quick_query_name}/check-duplication</code>
-    works with a SYNTHETIC name in the path (no resource needed) → <code>{"result":false}</code>.</li>
-<li><code>getquickqueryimageversions</code> — <code>GET /v1/quick-query/image-versions</code>. No params. Returns
-    available image versions.</li>
-<li><code>getquickquerylist</code> — <code>GET /v1/quick-query</code> <strong>requires <code>page</code> + <code>size</code> query params</strong>
-    (both <code>required:true</code> in sidecar). Bare call → 400 ValidationError "Field required". With
-    <code>?page=0&amp;size=10</code> → 200 <code>{contents:[], page, size, sort:["created_dt:desc"], total_count}</code>.
-    Smoke now defaults page=0/size=10 (commit bdd0550e).</li>
-<li><strong>Id-bound GET (needs-resource):</strong> <code>getquickquery</code> (GET <code>/v1/quick-query/{quick_query_id}</code>)
-  → fake id 404 "Quick Query Not Found" (PRODUCT-AI-ANALYTICS-USER-0002). 0 resources in account.</li>
-<li><strong>Writes (mutation-gated, heavy-prereq):</strong> createquickquery + 6 PUT updates + deletequickquery</li>
-<li>validatequickqueryresources. <code>create</code> and <code>validate</code> both require a real <strong>k8s <code>cluster_id</code></strong>
-  (billable cluster prereq) in the body.</li>
-<li><strong>Coverage 2026-06-19:</strong> 1→3/12 (+imageversions, +getquickquerylist; checkduplication already counted).</li>
-</ul>
-<h2>data-analytics / data-ops</h2>
-<ul>
-<li><strong>Host:</strong> regional. 17 endpoints. Provisions and manages Apache Airflow
-  (data-ops-service = cluster, data-ops = workflow/DAG service on top).</li>
-<li><strong>COMPOSITE-CREATE (HEAVY/BILLABLE):</strong> <code>POST /v1/data-ops-services</code> creates a
-  billable Airflow cluster. <code>POST /v1/data-ops</code> creates a data-ops instance on
-  top of an existing service. Both are <code>heavy:true</code> in the lifecycle; never fire
-  without <code>SCP_RUN_HEAVY=true</code>.</li>
-<li><strong>ID formats (live-confirmed 2026-06-19):</strong></li>
-<li>data-ops id: must start with <code>DOPS-</code> (e.g. <code>DOPS-&lt;uuid&gt;</code>)</li>
-<li>data-ops-service id: must start with <code>DOPS_SERVICE-</code> (e.g. <code>DOPS_SERVICE-&lt;uuid&gt;</code>)</li>
-<li>cluster_id: 32-hex-char UUID (no hyphens, e.g. uuid4().hex)</li>
-<li><strong>check-duplication endpoints:</strong> both GET endpoints with name path-params
-  (<code>/v1/data-ops/{data_ops_name}/check-duplication</code> and
-  <code>/v1/data-ops-services/{data_ops_service_name}/check-duplication</code>) return <strong>200</strong>
-  <code>{"result":false}</code> for any valid name including probes. No resource needed.
-  <code>params: {}</code> added to scenario steps so engine records under catalog key.</li>
-<li><strong>id-bound GETs (non-2xx, soft, needs heavy-prereq):</strong></li>
-<li><code>getdataopsdetail</code> (<code>/v1/data-ops/{data_ops_id}</code>) → 404 when resource missing</li>
-<li><code>getdataopsservice</code> (<code>/v1/data-ops-services/{data_ops_service_id}</code>) → 404 when missing</li>
-<li><code>getdataopssubversion</code> (<code>/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions</code>) → <strong>400</strong> (NOT 404!) "dataOps is null" when ID valid format but resource missing</li>
-<li><code>getingresscontrollerlistv1</code> (<code>/v1/data-ops/clusters/{cluster_id}/ingress-controllers</code>) → 404 when cluster missing</li>
-<li><strong>validate-resources POSTs:</strong> dry-run preflight the console calls before create/update.
-  Still classified <code>mutating=True</code> (POST). Need real cluster_id/service_id AND
-  <code>SCP_ALLOW_MUTATIONS=true</code>. Heavy-prereq blockers.</li>
-<li><strong>Response envelope:</strong> list endpoints use <code>{contents:[], total_count}</code>. Detail uses
-  flat object or wrapped object (not yet confirmed — no existing resources).</li>
-<li><strong>image-versions:</strong> <code>GET /v1/data-ops/image-versions</code> → <code>{contents:[{image_id, image_name, version}], total_count}</code>. Currently returns 1 version: <code>4.1.1</code>.</li>
-<li><strong>Coverage 2026-06-19:</strong> 3 → <strong>5/17</strong> read-only. Remaining 12 are heavy-prereq
-  blockers (4 id-bound GETs + 8 mutating writes all depend on existing billable cluster).</li>
-</ul>
-<hr />
-<h2>management / organization</h2>
-<ul>
-<li><strong>Host:</strong> global (<code>organization.e.samsungsdscloud.com</code> — no region segment).
+  the heavy private-dns create. Account left clean (no resources created).
+
+## data-analytics / quick-query
+
+- **Host:** regional (`quick-query.&lt;region&gt;.&lt;env&gt;...`). 12 endpoints.
+- **Timeout quirk:** service responds in ~1-2s, but the default client `timeout=60s`
+  with retries can make a probe appear to hang. Use `timeout=5, retry=False` for probes.
+- **Read-only 2xx (live 2026-06-19):**
+  - `checkduplicationquickquery` — `GET /v1/quick-query/{quick_query_name}/check-duplication`
+    works with a SYNTHETIC name in the path (no resource needed) → `{&quot;result&quot;:false}`.
+  - `getquickqueryimageversions` — `GET /v1/quick-query/image-versions`. No params. Returns
+    available image versions.
+  - `getquickquerylist` — `GET /v1/quick-query` **requires `page` + `size` query params**
+    (both `required:true` in sidecar). Bare call → 400 ValidationError &quot;Field required&quot;. With
+    `?page=0&amp;size=10` → 200 `{contents:[], page, size, sort:[&quot;created_dt:desc&quot;], total_count}`.
+    Smoke now defaults page=0/size=10 (commit bdd0550e).
+- **Id-bound GET (needs-resource):** `getquickquery` (GET `/v1/quick-query/{quick_query_id}`)
+  → fake id 404 &quot;Quick Query Not Found&quot; (PRODUCT-AI-ANALYTICS-USER-0002). 0 resources in account.
+- **Writes (mutation-gated, heavy-prereq):** createquickquery + 6 PUT updates + deletequickquery
+  + validatequickqueryresources. `create` and `validate` both require a real **k8s `cluster_id`**
+  (billable cluster prereq) in the body.
+- **Coverage 2026-06-19:** 1→3/12 (+imageversions, +getquickquerylist; checkduplication already counted).
+
+## data-analytics / data-ops
+
+- **Host:** regional. 17 endpoints. Provisions and manages Apache Airflow
+  (data-ops-service = cluster, data-ops = workflow/DAG service on top).
+- **COMPOSITE-CREATE (HEAVY/BILLABLE):** `POST /v1/data-ops-services` creates a
+  billable Airflow cluster. `POST /v1/data-ops` creates a data-ops instance on
+  top of an existing service. Both are `heavy:true` in the lifecycle; never fire
+  without `SCP_RUN_HEAVY=true`.
+- **ID formats (live-confirmed 2026-06-19):**
+  - data-ops id: must start with `DOPS-` (e.g. `DOPS-&lt;uuid&gt;`)
+  - data-ops-service id: must start with `DOPS_SERVICE-` (e.g. `DOPS_SERVICE-&lt;uuid&gt;`)
+  - cluster_id: 32-hex-char UUID (no hyphens, e.g. uuid4().hex)
+- **check-duplication endpoints:** both GET endpoints with name path-params
+  (`/v1/data-ops/{data_ops_name}/check-duplication` and
+  `/v1/data-ops-services/{data_ops_service_name}/check-duplication`) return **200**
+  `{&quot;result&quot;:false}` for any valid name including probes. No resource needed.
+  `params: {}` added to scenario steps so engine records under catalog key.
+- **id-bound GETs (non-2xx, soft, needs heavy-prereq):**
+  - `getdataopsdetail` (`/v1/data-ops/{data_ops_id}`) → 404 when resource missing
+  - `getdataopsservice` (`/v1/data-ops-services/{data_ops_service_id}`) → 404 when missing
+  - `getdataopssubversion` (`/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions`) → **400** (NOT 404!) &quot;dataOps is null&quot; when ID valid format but resource missing
+  - `getingresscontrollerlistv1` (`/v1/data-ops/clusters/{cluster_id}/ingress-controllers`) → 404 when cluster missing
+- **validate-resources POSTs:** dry-run preflight the console calls before create/update.
+  Still classified `mutating=True` (POST). Need real cluster_id/service_id AND
+  `SCP_ALLOW_MUTATIONS=true`. Heavy-prereq blockers.
+- **Response envelope:** list endpoints use `{contents:[], total_count}`. Detail uses
+  flat object or wrapped object (not yet confirmed — no existing resources).
+- **image-versions:** `GET /v1/data-ops/image-versions` → `{contents:[{image_id, image_name, version}], total_count}`. Currently returns 1 version: `4.1.1`.
+- **Coverage 2026-06-20 (this run):** confirmed 3 → **5/17** read-only via direct probes:
+  `checkduplicationcontroller` and `checkduplicationcontrollerv1` both return `200 {&quot;result&quot;:false}`
+  for any probe name (e.g. `apiregr-probe`). Recorded via `core.results.record(Observation(...))` with
+  `source=read_chain`. Remaining 12 are heavy-prereq blockers (4 id-bound GETs + 8 mutating writes).
+- **Entitlement-403 for parent paths:** `/v1/data-ops-services/data-ops` and `/v1/data-ops/clusters`
+  both return 403 `Action definition is not found` — these are IAM-unregistered paths for ROOT user.
+  `getdataopssubversion` and `getingresscontrollerlistv1` are thus doubly-blocked (entitlement-403 on
+  parent listing AND heavy-prereq for the actual resource ids).
+
+---
+
+## management / organization
+
+- **Host:** global (`organization.e.samsungsdscloud.com` — no region segment).
   37 endpoints covering the full org-tree: organizations, org-units (OUs), member
   accounts, service-control-policies (SCPs), policy-bindings, delegation-policies,
-  and invitations.</li>
-<li><strong>Account status (2026-06-19, account ec11538abf8f46d2953539521f745366):</strong> this
-  test account is a <strong>MEMBER</strong> (not master/payer) of an existing org.
-  <code>listorganizations</code> returns <code>{count:0, organizations:[]}</code> — member accounts
-  cannot see the org list (only the master can). <code>createorganization</code> returns 409
-  <code>AccountAlreadyExistInOrganization</code> confirming org membership. Most org management
-  operations return <strong>403 Forbidden</strong> (<code>You do not have permission to List/Read/Create</code>)
-  because the test account lacks org-admin IAM actions.</li>
-<li><strong>Coverable read-only (2xx) without org-master:</strong></li>
-<li><code>GET /v1/organizations</code> → 200 <code>{count:0, organizations:[], page, size, sort}</code> (member sees own org slot — empty for non-master)</li>
-<li><code>GET /v1/account-invitations</code> → 200 <code>{account_invitations:[], count:0}</code> (inbound invitations for this account — currently empty)</li>
-<li><strong>Entitlement-403 blockers (7 GET endpoints):</strong> <code>listaccounts</code>, <code>listorganizationunits</code>,
-  <code>listservicecontrolpolicies</code>, <code>listorganizationinvitations</code>, <code>showdelegationpolicy</code>,
-  <code>listpoliciesfortarget</code>, <code>listtargetsforpolicy</code> — all return 403 Forbidden
-  consistently, regardless of query params. These require org-master/admin privilege.</li>
-<li><strong>Id-bound GET blockers (5 endpoints):</strong> <code>showorganization</code>, <code>showorganizationunit</code>,
-  <code>showaccount</code>, <code>showservicecontrolpolicy</code>, <code>listparents</code> — can't get valid IDs
-  without org-master privilege to list the parent resources. <code>showorganizationunit</code>
-  with a fake ID returns 404; others return 403.</li>
-<li><strong>Mutating endpoint classification (live-proven 2026-06-19):</strong></li>
-<li><code>createorganization</code> → 409 (account already in org) — reachable, not 403</li>
-<li><code>createorganizationunit</code>, <code>createservicecontrolpolicy</code>, <code>attachpolicybindings</code>,
-    <code>removepolicybindings</code>, <code>deleteorganizationunits</code>, <code>deleteservicecontrolpolicies</code>,
-    <code>deletedelegationpolicy</code>, <code>setorganizationunit</code>, <code>setservicecontrolpolicy</code>,
-    <code>leaveorganization</code>, <code>deleteorganization</code>, <code>deleteaccount</code> → 403 entitlement</li>
-<li><code>createaccount</code>, <code>createdelegationpolicy</code>, <code>createinvitation</code>, <code>moveaccount</code>,
-    <code>setorganization</code>, <code>setdelegationpolicy</code>, <code>removeaccounts</code> → 400 ValidationError
-    (body shape incomplete but endpoint is reachable)</li>
-<li><code>cancelinvitations</code>, <code>acceptinvitation</code>, <code>declineinvitation</code> → 404 (no pending
-    invitations) — reachable, not 403</li>
-<li><strong>Proven body fields (2026-06-19):</strong></li>
-<li><code>createorganizationunit</code>: needs <code>name</code> + <code>parent_unit_id</code> (validated: these fields
-    move response from 400 to 403, confirming field names are correct)</li>
-<li><code>moveaccount</code>: needs <code>account_id</code> + <code>parent_unit_id</code> (NOT <code>parent_id</code> — <code>parent_id</code>
-    gives 400 "Extra inputs not permitted")</li>
-<li><code>createinvitation</code>: needs <code>organization_id</code> (validated field) + 1 unknown field
-    (docs JS-rendered, not captured; <code>email</code>, <code>message</code>, <code>login_id</code> are all invalid)</li>
-<li><code>listservicecontrolpolicies</code>: required query param <code>organization_id</code></li>
-<li><code>listorganizationunits</code>: required query param <code>parent_unit_id</code> ('ROOT' for root level)</li>
-<li><strong>Response envelopes (live-proven):</strong></li>
-<li><code>listorganizations</code> → <code>$.organizations[0].id</code></li>
-<li><code>listaccountinvitations</code> → <code>$.account_invitations[0].id</code></li>
-<li>Inferred (403 so not confirmed live): <code>organization_units</code>, <code>service_control_policies</code>,
-    <code>organization_accounts</code>, <code>organization_invitations</code></li>
-<li><strong>Coverage ceiling:</strong> 2/37 without org-master privilege. All 37 endpoints probed
+  and invitations.
+- **Account status (2026-06-19, account ec11538abf8f46d2953539521f745366):** this
+  test account is a **MEMBER** (not master/payer) of an existing org.
+  `listorganizations` returns `{count:0, organizations:[]}` — member accounts
+  cannot see the org list (only the master can). `createorganization` returns 409
+  `AccountAlreadyExistInOrganization` confirming org membership. Most org management
+  operations return **403 Forbidden** (`You do not have permission to List/Read/Create`)
+  because the test account lacks org-admin IAM actions.
+- **Coverable read-only (2xx) without org-master:**
+  - `GET /v1/organizations` → 200 `{count:0, organizations:[], page, size, sort}` (member sees own org slot — empty for non-master)
+  - `GET /v1/account-invitations` → 200 `{account_invitations:[], count:0}` (inbound invitations for this account — currently empty)
+- **Entitlement-403 blockers (7 GET endpoints):** `listaccounts`, `listorganizationunits`,
+  `listservicecontrolpolicies`, `listorganizationinvitations`, `showdelegationpolicy`,
+  `listpoliciesfortarget`, `listtargetsforpolicy` — all return 403 Forbidden
+  consistently, regardless of query params. These require org-master/admin privilege.
+- **Id-bound GET blockers (5 endpoints):** `showorganization`, `showorganizationunit`,
+  `showaccount`, `showservicecontrolpolicy`, `listparents` — can&#x27;t get valid IDs
+  without org-master privilege to list the parent resources. `showorganizationunit`
+  with a fake ID returns 404; others return 403.
+- **Mutating endpoint classification (live-proven 2026-06-19):**
+  - `createorganization` → 409 (account already in org) — reachable, not 403
+  - `createorganizationunit`, `createservicecontrolpolicy`, `attachpolicybindings`,
+    `removepolicybindings`, `deleteorganizationunits`, `deleteservicecontrolpolicies`,
+    `deletedelegationpolicy`, `setorganizationunit`, `setservicecontrolpolicy`,
+    `leaveorganization`, `deleteorganization`, `deleteaccount` → 403 entitlement
+  - `createaccount`, `createdelegationpolicy`, `createinvitation`, `moveaccount`,
+    `setorganization`, `setdelegationpolicy`, `removeaccounts` → 400 ValidationError
+    (body shape incomplete but endpoint is reachable)
+  - `cancelinvitations`, `acceptinvitation`, `declineinvitation` → 404 (no pending
+    invitations) — reachable, not 403
+- **Proven body fields (2026-06-19):**
+  - `createorganizationunit`: needs `name` + `parent_unit_id` (validated: these fields
+    move response from 400 to 403, confirming field names are correct)
+  - `moveaccount`: needs `account_id` + `parent_unit_id` (NOT `parent_id` — `parent_id`
+    gives 400 &quot;Extra inputs not permitted&quot;)
+  - `createinvitation`: needs `organization_id` (validated field) + 1 unknown field
+    (docs JS-rendered, not captured; `email`, `message`, `login_id` are all invalid)
+  - `listservicecontrolpolicies`: required query param `organization_id`
+  - `listorganizationunits`: required query param `parent_unit_id` (&#x27;ROOT&#x27; for root level)
+- **Response envelopes (live-proven):**
+  - `listorganizations` → `$.organizations[0].id`
+  - `listaccountinvitations` → `$.account_invitations[0].id`
+  - Inferred (403 so not confirmed live): `organization_units`, `service_control_policies`,
+    `organization_accounts`, `organization_invitations`
+- **Coverage ceiling:** 2/37 without org-master privilege. All 37 endpoints probed
   and observations recorded. The 35-gap is blocked by entitlement-403 (org-master
   required for most ops). Coverage would rise to potentially 25+ on an org-master
-  account (the read + write ops that return 403 here would return 200/201).</li>
-<li><strong>Coverage 2026-06-19:</strong> 0 → <strong>2 / 37</strong>. All 37 endpoints reached and classified.</li>
-</ul>
-<hr />
-<h2>management / cloudmonitoring</h2>
-<ul>
-<li><strong>Host:</strong> regional (<code>cloudmonitoring.&lt;region&gt;.&lt;env&gt;...</code>). 18 endpoints.
+  account (the read + write ops that return 403 here would return 200/201).
+- **Coverage 2026-06-19:** 0 → **2 / 37**. All 37 endpoints reached and classified.
+
+---
+
+## management / cloudmonitoring
+
+- **Host:** regional (`cloudmonitoring.&lt;region&gt;.&lt;env&gt;...`). 18 endpoints.
   EOL service (sunsets 2026-09 → ServiceWatch). All endpoints coverable as
-  static-reachability probes even without deep validation.</li>
-<li><strong>X-ResourceType header (CONFIRMED REQUIRED for multiple endpoints):</strong>
-  Several endpoints require an <code>X-ResourceType: &lt;productTypeCode&gt;</code> HTTP header
-  (NOT a query param <code>resourceType</code>). Without it: 400 <code>InvalidHeaderValue</code>
-  <code>{name:"resourceType", value:"X-ResourceType"}</code>. Confirmed productTypeCodes
-  from <code>GET /v1/cloudmonitorings/product/v1/product-types</code>: <code>VM</code>, <code>Redis</code>,
-  <code>Bare Metal Server</code>, <code>Kubernetes</code>, <code>KAFKA</code>, <code>Object Storage</code>, etc. (37 total).</li>
-<li><code>getaccountproductlist</code> (<code>GET /v1/cloudmonitorings/product/v2/accounts/products</code>):
-    requires <code>X-ResourceType</code> header. Returns 200 (empty list if no resources of
-    that type). Verified live: <code>X-ResourceType: VM</code> → 200.</li>
-<li><code>getproducteventpolicylist</code> (<code>GET /v1/cloudmonitorings/event/v2/event-policies</code>):
-    requires BOTH <code>X-ResourceType</code> header AND <code>productResourceId</code> query param.
-    <code>productResourceId</code> is the resource name (e.g. <code>apitest-logsink</code> for Object
-    Storage). Verified live: <code>X-ResourceType: Object Storage</code> +
-    <code>productResourceId=apitest-logsink</code> → 200 (empty list).</li>
-<li>Likely required for <code>getproducteventlist</code> too but that endpoint also
-    consistently 400s (see bug below).</li>
-<li><strong>Live resources in test account (2026-06-19, kr-west1):</strong></li>
-<li>Object Storage products: <code>productResourceId=apitest-logsink</code> (state=NE),
-    <code>apitest-oplog-permanent</code> (state=NE). Discovered via
-    <code>GET /v1/cloudmonitorings/product/v2/accounts/products</code> with
-    <code>X-ResourceType: Object Storage</code>.</li>
-<li>Block Storage(VM): 1 product (UUID, state=Running). No VMs, no addrbooks.</li>
-<li>All products have state "NE" (not enrolled in monitoring backend) except
+  static-reachability probes even without deep validation.
+- **X-ResourceType header (CONFIRMED REQUIRED for multiple endpoints):**
+  Several endpoints require an `X-ResourceType: &lt;productTypeCode&gt;` HTTP header
+  (NOT a query param `resourceType`). Without it: 400 `InvalidHeaderValue`
+  `{name:&quot;resourceType&quot;, value:&quot;X-ResourceType&quot;}`. Confirmed productTypeCodes
+  from `GET /v1/cloudmonitorings/product/v1/product-types`: `VM`, `Redis`,
+  `Bare Metal Server`, `Kubernetes`, `KAFKA`, `Object Storage`, etc. (37 total).
+  - `getaccountproductlist` (`GET /v1/cloudmonitorings/product/v2/accounts/products`):
+    requires `X-ResourceType` header. Returns 200 (empty list if no resources of
+    that type). Verified live: `X-ResourceType: VM` → 200.
+  - `getproducteventpolicylist` (`GET /v1/cloudmonitorings/event/v2/event-policies`):
+    requires BOTH `X-ResourceType` header AND `productResourceId` query param.
+    `productResourceId` is the resource name (e.g. `apitest-logsink` for Object
+    Storage). Verified live: `X-ResourceType: Object Storage` +
+    `productResourceId=apitest-logsink` → 200 (empty list).
+  - Likely required for `getproducteventlist` too but that endpoint also
+    consistently 400s (see bug below).
+- **Live resources in test account (2026-06-19, kr-west1):**
+  - Object Storage products: `productResourceId=apitest-logsink` (state=NE),
+    `apitest-oplog-permanent` (state=NE). Discovered via
+    `GET /v1/cloudmonitorings/product/v2/accounts/products` with
+    `X-ResourceType: Object Storage`.
+  - Block Storage(VM): 1 product (UUID, state=Running). No VMs, no addrbooks.
+  - All products have state &quot;NE&quot; (not enrolled in monitoring backend) except
     Block Storage(VM). Even the Running Block Storage product returns 400 for
-    event policy create — the "NE" Object Storage products return "InvalidRequest".</li>
-<li>No addrbooks (totalCount=0). Addrbook steps normalize to placeholder '*' key.</li>
-<li><strong>getaccounteventlist 400 / backend bug (CONFIRMED):</strong>
-  <code>GET /v1/cloudmonitorings/event/v2/accounts/events</code> consistently returns 400
-  <code>InvalidInputValue</code> with <code>{name:"resourceType", value:&lt;queryEndDt-date&gt;}</code> regardless
+    event policy create — the &quot;NE&quot; Object Storage products return &quot;InvalidRequest&quot;.
+  - No addrbooks (totalCount=0). Addrbook steps normalize to placeholder &#x27;*&#x27; key.
+- **getaccounteventlist 400 / backend bug (CONFIRMED):**
+  `GET /v1/cloudmonitorings/event/v2/accounts/events` consistently returns 400
+  `InvalidInputValue` with `{name:&quot;resourceType&quot;, value:&lt;queryEndDt-date&gt;}` regardless
   of what params are provided. The API is erroneously treating the queryEndDt query
-  parameter value as the value of the "resourceType" field. This is a backend parameter
+  parameter value as the value of the &quot;resourceType&quot; field. This is a backend parameter
   binding bug — the correct params (eventState, queryStartDt, queryEndDt, X-ResourceType
-  header) all fail the same way. <strong>Classify: validation-400 / backend-param-binding bug.</strong>
-  Dual-recorded in scenario with <code>params</code> so it counts as reached (soft category).</li>
-<li><strong>getproducteventlist 400 / similar bug:</strong>
-  <code>GET /v1/cloudmonitorings/event/v2/events</code> behaves similarly — after providing
-  <code>productResourceId + eventState + queryStartDt</code>, still errors on queryEndDt date.
-  Tried with <code>X-ResourceType</code> header, with/without all params. Backend issue same class.
-  <strong>Classify: validation-400 / needs-real-event-data or backend bug.</strong></li>
-<li><strong>api_catalog_params.json sidecar gaps vs live behavior:</strong></li>
-<li>Sidecar declares <code>getaccounteventlist</code> requires <code>eventState, queryStartDt, queryEndDt</code>
-    but NOT <code>resourceType</code>. Live API also needs <code>resourceType</code> (as header or query)
-    but the backend bug makes it 400 regardless.</li>
-<li>Sidecar declares <code>getaccountproductlist</code> has NO required params. Live API requires
-    <code>X-ResourceType</code> header — sidecar is missing this (header params are outside the
-    sidecar's query_params scope).</li>
-<li><strong>Confirmed 200 endpoints (bare GETs — smoke-covered):</strong></li>
-<li><code>getaccountmembers</code> — bare GET, 200</li>
-<li><code>getadressbooklist</code> — bare GET, 200 (empty)</li>
-<li><code>getmetriclist</code> — bare GET, 200 (3510 metrics across 37 product types)</li>
-<li><code>getproducttypelist</code> — bare GET, 200 (37 product types)</li>
-<li><strong>Id-bound GETs (5 endpoints, getevent<em>/geteventpolicy</em>/getadressbookmember):</strong>
-  Need event-id or eventPolicyId (no events in this account without SCP_RUN_HEAVY)
-  or addrbookId (no addrbooks). Scenario normalizes to '*' placeholder key when
-  no real ID is captured.</li>
-<li><strong>puteventpolicy body shape (CONFIRMED cascade-revealed 2026-06-19):</strong>
-  Must wrap all fields in <code>eventPolicyRequest</code> key. Required cascade-field order:
-  <code>disableYn</code>, <code>isLogMetric</code>, <code>eventLevel</code>, <code>ftCount</code>, <code>eventThreshold</code>. Once all
-  present the API returns <code>{"code":"InvalidRequest","params":[null]}</code> — backend
+  header) all fail the same way. **Classify: validation-400 / backend-param-binding bug.**
+  Dual-recorded in scenario with `params` so it counts as reached (soft category).
+- **getproducteventlist 400 / similar bug:**
+  `GET /v1/cloudmonitorings/event/v2/events` behaves similarly — after providing
+  `productResourceId + eventState + queryStartDt`, still errors on queryEndDt date.
+  Tried with `X-ResourceType` header, with/without all params. Backend issue same class.
+  **Classify: validation-400 / needs-real-event-data or backend bug.**
+- **api_catalog_params.json sidecar gaps vs live behavior:**
+  - Sidecar declares `getaccounteventlist` requires `eventState, queryStartDt, queryEndDt`
+    but NOT `resourceType`. Live API also needs `resourceType` (as header or query)
+    but the backend bug makes it 400 regardless.
+  - Sidecar declares `getaccountproductlist` has NO required params. Live API requires
+    `X-ResourceType` header — sidecar is missing this (header params are outside the
+    sidecar&#x27;s query_params scope).
+- **Confirmed 200 endpoints (bare GETs — smoke-covered):**
+  - `getaccountmembers` — bare GET, 200
+  - `getadressbooklist` — bare GET, 200 (empty)
+  - `getmetriclist` — bare GET, 200 (3510 metrics across 37 product types)
+  - `getproducttypelist` — bare GET, 200 (37 product types)
+- **Id-bound GETs (6 endpoints: geteventdetail, geteventnotificationstates, geteventpolicydetail, geteventpolicyhistories, geteventpolicynotification, getadressbookmemberlist):**
+  CONFIRMED REACHABLE 2026-06-20 via direct numeric-ID probes: ALL return 404
+  `ResourceNotFound` (not 400/400 resourceType-misparse). Key facts:
+  - eventPolicyId is **NUMERIC** (not UUID). Confirmed: numeric 12345 -&gt; 404 ResourceNotFound.
+    UUID-format -&gt; 400 resourceType-misparse (server treats UUID chars as date-like string).
+  - eventId is also **NUMERIC** per same probe.
+  - addrbookId is also **NUMERIC** per same probe.
+  - geteventpolicyhistories ALSO has the date-misparse bug (400 when queryStartDt/queryEndDt
+    provided in any format). Without dates: 400 Validation failure.
+  - addrbook read_chain in smoke uses WRONG list path (/v2/addrbooks instead of /v2/users/addrbooks)
+    -&gt; 404 path-not-found -&gt; chain skips. This is a catalog/API structural mismatch that
+    the auto-derive cannot handle. The lifecycle uses the CORRECT path (/v2/users/addrbooks).
+  Account has 0 events, 0 event-policies, 0 addrbooks. Scenario uses numeric placeholder,
+  normalizes to catalog &#x27;*&#x27; key.
+- **puteventpolicy body shape (CONFIRMED cascade-revealed 2026-06-19):**
+  Must wrap all fields in `eventPolicyRequest` key. Required cascade-field order:
+  `disableYn`, `isLogMetric`, `eventLevel`, `ftCount`, `eventThreshold`. Once all
+  present the API returns `{&quot;code&quot;:&quot;InvalidRequest&quot;,&quot;params&quot;:[null]}` — backend
   business rule validation fails (products in NE state). Full confirmed body:
-  <code>{"eventPolicyRequest": {"eventPolicyName": "...", "productTypeCode": "Object Storage",
-  "productResourceId": "apitest-logsink", "metricKey": "&lt;key&gt;", "eventLevel": "WARNING",
-  "disableYn": "N", "isLogMetric": false, "eventThreshold": 100.0, "ftCount": 1}}</code>.
-  The <code>InvalidRequest</code> with <code>null</code> params is an account-level blocker (products not
-  enrolled in monitoring). <strong>Classify: account-prereq / entitlement-class blocker.</strong></li>
-<li><strong>getmetricperfdatalist body shape (CONFIRMED cascade-revealed 2026-06-19):</strong>
-  POST <code>/v1/cloudmonitorings/product/v2/metric-data</code>. Required fields:
-  <code>productTypeCode</code>, <code>productResourceId</code>, <code>queryStartDt</code> (ISO 8601 with T/Z suffix),
-  <code>queryEndDt</code> (ISO 8601 with T/Z suffix), <code>metricDataConditions</code> (array of objects).
-  Without T-suffix dates: 400 <code>resourceType=queryStartDt</code> backend bug. With T-suffix
-  dates: 404 <code>productResourceInfos not found</code> — same account-level prereq.
-  Example body: <code>{"productTypeCode":"Object Storage","productResourceId":"apitest-logsink",
-  "queryStartDt":"2026-05-21T00:00:00Z","queryEndDt":"2026-06-19T23:59:59Z",
-  "metricDataConditions":[{"metricKey":"objectstorage.usage.bucketSizeBytes",
-  "statisticType":"AVG","period":3600}]}</code>.
-  <strong>Classify: account-prereq / products not in monitoring backend.</strong></li>
-<li><strong>Mutating endpoints (3):</strong> <code>puteventpolicy</code> (POST create), <code>modifyeventpolicy</code>
-  (PUT), <code>deleteeventpolicy</code> (DELETE). All need <code>SCP_ALLOW_MUTATIONS=true</code> +
-  <code>SCP_ALLOW_DESTRUCTIVE=true</code>. Body shape now confirmed from cascade (see above).
-  Cannot reach 2xx without monitoring-enrolled resources. Blocker: account-prereq.</li>
-<li><strong>Coverage 2026-06-19:</strong> 0 → <strong>6/18</strong> confirmed 200 ok:
-  getaccountmembers, getadressbooklist, getmetriclist, getproducttypelist (smoke),
-  getaccountproductlist, getproducteventpolicylist (X-ResourceType header probes).
-  Remaining 12 blocked by: backend date-parsing bug (getaccounteventlist,
-  getproducteventlist), missing monitoring enrollment (puteventpolicy,
-  modifyeventpolicy, deleteeventpolicy, getmetricperfdatalist), no real resource
-  IDs for id-bound GETs (geteventdetail, geteventnotificationstates,
-  geteventpolicydetail, geteventpolicyhistories, geteventpolicynotification,
-  getadressbookmemberlist).</li>
-</ul>
-<hr />
-<h2>Services not yet deeply explored (stubs — fill in as you go)</h2>
-<p>database (mysql, mariadb), data-analytics, ai-ml, financial-management,
-platform, devops-tools, and the long tail of management/networking/storage.
-These have the most uncovered endpoints — see <code>scenario-catalog.md</code> gap list.</p></div>
+  `{&quot;eventPolicyRequest&quot;: {&quot;eventPolicyName&quot;: &quot;...&quot;, &quot;productTypeCode&quot;: &quot;Object Storage&quot;,
+  &quot;productResourceId&quot;: &quot;apitest-logsink&quot;, &quot;metricKey&quot;: &quot;&lt;key&gt;&quot;, &quot;eventLevel&quot;: &quot;WARNING&quot;,
+  &quot;disableYn&quot;: &quot;N&quot;, &quot;isLogMetric&quot;: false, &quot;eventThreshold&quot;: 100.0, &quot;ftCount&quot;: 1}}`.
+  The `InvalidRequest` with `null` params is an account-level blocker (products not
+  enrolled in monitoring). **Classify: account-prereq / entitlement-class blocker.**
+- **getmetricperfdatalist body shape (CONFIRMED cascade-revealed 2026-06-19):**
+  POST `/v1/cloudmonitorings/product/v2/metric-data`. Required fields:
+  `productTypeCode`, `productResourceId`, `queryStartDt` (ISO 8601 with T/Z suffix),
+  `queryEndDt` (ISO 8601 with T/Z suffix), `metricDataConditions` (array of objects).
+  Without T-suffix dates: 400 `resourceType=queryStartDt` backend bug. With T-suffix
+  dates: 404 `productResourceInfos not found` — same account-level prereq.
+  Example body: `{&quot;productTypeCode&quot;:&quot;Object Storage&quot;,&quot;productResourceId&quot;:&quot;apitest-logsink&quot;,
+  &quot;queryStartDt&quot;:&quot;2026-05-21T00:00:00Z&quot;,&quot;queryEndDt&quot;:&quot;2026-06-19T23:59:59Z&quot;,
+  &quot;metricDataConditions&quot;:[{&quot;metricKey&quot;:&quot;objectstorage.usage.bucketSizeBytes&quot;,
+  &quot;statisticType&quot;:&quot;AVG&quot;,&quot;period&quot;:3600}]}`.
+  **Classify: account-prereq / products not in monitoring backend.**
+- **Mutating endpoints (3):** `puteventpolicy` (POST create), `modifyeventpolicy`
+  (PUT), `deleteeventpolicy` (DELETE). All need `SCP_ALLOW_MUTATIONS=true` +
+  `SCP_ALLOW_DESTRUCTIVE=true`. Body shape now confirmed from cascade (see above).
+  Cannot reach 2xx without monitoring-enrolled resources. Blocker: account-prereq.
+- **Backend date-misparse bug scope (EXPANDED 2026-06-20):**
+  The date-misparse bug (400 `params[name=resourceType, value=&lt;date&gt;]`) affects:
+  getaccounteventlist, getproducteventlist, AND geteventpolicyhistories.
+  Also geteventmetricperfdatalist POST without T-suffix on dates (confirmed prior).
+  All date formats tried for affected endpoints: YYYY-MM-DD, ISO-T-Z
+  (YYYY-MM-DDTHH:MM:SSZ), YYYYMMDD compact, int epoch. ALL fail with same error.
+  The X-ResourceType header IS correctly forwarded (confirmed by debug trace of
+  request headers). This is a server-side routing/validation bug where the query
+  parameter value is mapped to the &#x27;resourceType&#x27; validation field.
+- **CRUD lifecycle engine / read-only lifecycle interaction:**
+  The `regression.scenarios.engine.run_lifecycle()` function requires
+  `SCP_ALLOW_MUTATIONS=true` to run ANY lifecycle (line 691), including read-only
+  ones. This means `cloudmonitoring-readonly-shows` and `cloudmonitoring-event-policy`
+  lifecycles only run during the CRUD pass (not the smoke pass). The smoke test
+  records what it can (bare GETs), and direct probes fill in the rest.
+- **Coverage 2026-06-20:** **6/18** confirmed 2xx ok:
+  getaccountmembers, getadressbooklist, getmetriclist, getproducttypelist (smoke);
+  getaccountproductlist (X-ResourceType: Object Storage -&gt; 200 confirmed + recorded);
+  getproducteventpolicylist (X-ResourceType + productResourceId -&gt; 200 confirmed + recorded).
+  ALL 14 non-mutating endpoints now have observations.jsonl entries.
+  Remaining 12 gap:
+  - backend-bug: getaccounteventlist, getproducteventlist, geteventpolicyhistories
+    (date-misparse, no workaround)
+  - account-prereq: puteventpolicy, modifyeventpolicy, deleteeventpolicy,
+    getmetricperfdatalist (products not enrolled in monitoring backend)
+  - no-real-id: geteventdetail, geteventnotificationstates, geteventpolicydetail,
+    geteventpolicynotification, getadressbookmemberlist (0 events/policies/addrbooks)
+    — all REACHABLE (404 with numeric id), will 2xx when real IDs exist.
+
+---
+
+---
+
+## management/network-logging
+
+- **Host / service key:** `network-logging`
+- **Catalog endpoints (4):** `listnetworkloggingconfigurations` (GET /v1/network-logging/configurations), `listnetworkloggingstorages` (GET /v1/network-logging/storages), `createnetworkloggingstorage` (POST), `deletenetworkloggingstorage` (DELETE).
+- **REQUIRED query param for both GETs:** `resource_type`. Valid enum values (confirmed live 2026-06-20): `FIREWALL`, `SECURITY_GROUP`, `NAT`. The value `VPC_FLOW_LOG` is REJECTED with 400 (&quot;Input should be &#x27;FIREWALL&#x27;, &#x27;SECURITY_GROUP&#x27; or &#x27;NAT&#x27;&quot;).
+- **Backend stability:** Both GET endpoints exhibit transient 503s (no body). In a healthy window they return 200 with empty lists (`count:0`). The client engine retries handle this; scenarios use `expect_status: [200, 403]` so 503 retry path does not red the run.
+- **Scenario file:** `regression/scenarios/lifecycles/management__network-logging.json`; both GET steps now carry `&quot;params&quot;: {&quot;resource_type&quot;: &quot;FIREWALL&quot;}`.
+- **Coverage 2026-06-20:** 2 existing + 2 GET list steps now have correct `resource_type` param fix applied (was missing -&gt; 400 ValidationError; fixed to FIREWALL -&gt; 200 in healthy window).
+
+---
+
+## container/ske
+
+- **Host / service key:** `ske`
+- **listimages (GET /v1/images):** `scp_original_image_type` is REQUIRED. Only confirmed valid value: `k8s`. Without the param: 400 ValidationError &quot;Field required&quot;. With `k8s`: 200, returns `nodepool_images` array (count:15 on 2026-06-20).
+- **Scenario files updated:** `container__ske.json` (added `list-images` step with `params: {scp_original_image_type: k8s}` to `ske-read-coverage` lifecycle); `generated__heavy-ske.json` (converted inline query-string path to `params` dict for `create-ske-image` and `verify-ske-image-images-page` steps).
+- **Coverage 2026-06-20:** `listimages` unblocked — 400→200 confirmed live.
+
+---
+
+## security / kms
+
+- **Host:** regional (`kms.&lt;region&gt;.&lt;env&gt;...`). 20 endpoints (18 user-managed + 2 managed-kms).
+- **Key creation:** `POST /v1/kms/transit` with `key_type: advanced`, `purpose: &lt;spec&gt;`, `auto_rotate: Y`, `rotate_cycle: 7`. Capture `$.key.id`. Response also at `$.key.purpose`, `$.key.state`.
+- **Purpose / key type matrix (PARTIALLY VALIDATED as of 2026-06-20):**
+  - `purpose: rsa-2048` — CONFIRMED live 2xx. Asymmetric. Supports: sign/verify, encrypt/decrypt. Does NOT support hmac/datakey.
+  - `purpose: aes-256` — UNPROVEN (grounded in resource model knowledge/formal/resources/security__kms.yaml). Expected symmetric. Should support: hmac, datakey. Confirm live in first light CRUD run.
+  - `purpose: ecdsa` — UNPROVEN. Sign/verify only (no encrypt).
+  - `purpose: hmac` — UNPROVEN alternate string for HMAC-purpose key (may be the actual API value vs aes-256).
+  - Account had only `rsa-2048` keys as of 2026-06-20 (50 total, all To_Be_Terminated from prior runs).
+- **HMAC/datakey require symmetric key:** `POST /v1/kms/openapi/hmac/{key_id}` and `/datakey/{key_id}` return 400 when fired against an RSA-2048 key. Must route to an aes-256 (or HMAC-type) key. The `security-kms-transit-crypto` lifecycle now creates a separate symmetric key (`create-sym` step) and routes hmac+datakey to `sym_key_id`.
+- **Managed keys:** `GET /v1/managed-kms/transit` (listmanagedkeys) returns `{count, keys[], page, size, sort}`. Account had count=0 as of 2026-06-20. `updatemanagedkeydescription` (`PUT /v1/managed-kms/transit/{key_id}/description`) requires an existing managed key id — the account must have system-managed keys for this to 2xx.
+- **Delete:** Scheduled delete (not immediate); key enters `To_Be_Terminated` state and stays in list for days. Reconciler sees state but key is functionally gone. `DELETE /v1/kms/transit/{key_id}` returns 200/202. Cleanup in lifecycle teardown is safe.
+- **Crypto ops (all require active key):** encrypt → `{ciphertext: &quot;vault:v..&quot;}`; decrypt/rewrap ← ciphertext; sign → `{signature}`; verify ← signature + input; hmac ← `{input: base64}` → `{hmac: &quot;vault:v1/..&quot;}`.
+- **Coverage 2026-06-20:** 15/20. Gaps: hmac (sym key unproven), datakey (sym key unproven), updatemanagedkeydescription (0 managed keys), plus any missed sub-ops. Lifecycle `security-kms-transit-crypto` covers 17 write ops total.
+
+## security / secretsmanager
+
+- **Host:** regional (`secretsmanager.&lt;region&gt;.&lt;env&gt;...`). 15 endpoints total (3 read, 12 write).
+- **Read-only coverage (smoke + read-chains, no mutations needed):**
+  - `listsecretsmanager` (`GET /v1/secrets`) — smoke GET, 200 confirmed 2026-06-20.
+  - `showsecretsmanager` (`GET /v1/secrets/{secret_id}`) — read-chain (list→show), 200 confirmed 2026-06-20.
+  - `listversion` (`GET /v1/secrets/{secret_id}/versions`) — read-chain (list→versions), 200 confirmed 2026-06-20.
+- **All write endpoints require `SCP_ALLOW_MUTATIONS=true`** (lifecycle `security-secretsmanager-writes`).
+- **Create body quirks:** `private_acl_enabled` is STRING `&quot;false&quot;` (not boolean). `secret_value` is a JSON STRING (e.g. `&quot;{\&quot;k\&quot;:\&quot;v\&quot;}&quot;` not an object). `kms_id` required (must be a real transit KMS key id). `acl_cidr` is a comma-separated CIDR string.
+- **version_list response:** `GET /v1/secrets/{secret_id}/versions` returns `{&quot;count&quot;: N, &quot;version_list&quot;: [&quot;&lt;version_id_string&gt;&quot;, ...]}`. Items are bare version_id strings (NOT objects). Capture with `$.version_list[0]` (not `.id` field). Confirmed from response_example in api_docs.json.
+- **setsecretsmanagerlabel body:** `{&quot;label&quot;: &quot;&lt;name&gt;&quot;, &quot;move_to_version_id&quot;: &quot;&lt;version_id&gt;&quot;}`. Using only `move_to_version_id` adds the label; using only `remove_from_version_id` removes it. Both together moves a label from one version to another. Label `CURRENT` is reserved for the active version; use custom label names like `PREVIOUS` for moves.
+- **showsecretsmanagersecretvalue (reveal):** `POST /v1/secrets/{secret_id}/values` with body `{&quot;label&quot;: &quot;CURRENT&quot;}` or `{&quot;version_id&quot;: &quot;&lt;id&gt;&quot;}`. This is distinct from `updatesecretsmanagersecretvalue` (`PUT .../values`).
+- **soft-delete / restore:** `DELETE /v1/secrets/{secret_id}` requires body `{&quot;waiting_time_ndays&quot;: 7}` (NOT a plain DELETE). Soft-deleted secret can be restored via `PUT /v1/secrets/{secret_id}/restore` within the recovery window.
+- **setsecretsmanagerkmskey (`POST /v1/secrets/kms-key`):** Provisions a service-level KMS key for secrets manager. Body `{&quot;service_name&quot;: &quot;&quot;}`. Returns 400/403 if service-level key already exists or permissions missing. Treat as optional (grouped).
+- **Lifecycle coverage:** `security-secretsmanager-writes` covers all 12 write endpoints. 5 endpoints added 2026-06-20: setsecretdescription, setsecretaclcidr, setprivateacl, updatesecretsmanagersecretvalue, setsecretsmanagerlabel (with list-versions capture step). 7 previously existed: createsecretsmanager, createsecretsmanagerkmskey, generaterandompassword, deletesecretsmanager, showsecretsmanagersecretvalue, setkmsid, restoresecretsmanager.
+- **Coverage 2026-06-20 (read-only run):** 3/15 (listsecretsmanager, showsecretsmanager, listversion). 12/15 expected when lifecycle runs with `SCP_ALLOW_MUTATIONS=true`. No entitlement blockers identified.
+
+## management / servicewatch
+
+- **Host:** regional (`servicewatch.&lt;region&gt;.&lt;env&gt;...`). 31 endpoints (alerts, dashboards, event-rules, log-groups/streams, metrics, custom ingest).
+- **Metric catalog lookup:** `POST /v1/metrics` with `{}` body (listmetricinfos) returns `{count, namespaces[{id, name, dimensions[{metrics[{id, name, namespace_id, ...}]}]}]}`. This is a POST-as-read (no mutation, no teardown). Use to get real `namespace_id` = `$.namespaces[0].id` and `metric_id` = `$.namespaces[0].dimensions[0].metrics[0].id`. Required for `createalert` — fake doc-sample IDs cause 400.
+- **Alert create:** `POST /v1/alerts` — response envelope is FLAT: `{created_at, created_by, id}` (NOT `{alert.id}`). Capture `$.id`. AlertCreateRequest required: `level, metric_id, name, namespace_id, operator, period, statistic`. RANGE operator: use `lower_bound`/`upper_bound` NOT `threshold` (live 400 conflict). `recipient_ids: []` (valid empty). `dimensions`/`individual_items` optional (account-specific, drop for portability).
+- **Alert show path:** `GET /v1/alerts/{id}` — the catalog param name is `{id}` (not `{alert_id}`); engine resolves by value so captured `alert_id` variable works.
+- **Event-rule create:** `POST /v1/event-rules` — `event_ids`/`resource_type_id`/`service_id` are PLATFORM-GLOBAL catalog values (VALIDATED: `createeventrule` 2xx in prior runs). `recipient_ids: []` valid. `srn_list: []` valid. Response: `{event_rule: {id, ...}}` — capture `$.event_rule.id`.
+- **Event-rule GET list:** No list-all endpoint for event-rules (GET /v1/event-rules returns 404). Cannot borrow existing event-rule IDs read-only — create must succeed to get an id for showeventrule.
+- **Dashboard capture:** `$.id` (flat, VALIDATED 2026-06-15). Dashboard delete uses field `dashboard_ids` (NOT `ids`) in the bulk DELETE body. All other bulk deletes (alerts, event-rules, log-groups, log-streams) use `ids`.
+- **OTLP custom metrics:** `POST /v1/metrics/custom` — `as_int` integer value (not `as_double`), `time_unix_nano` must be a recent epoch (use 1780272000000000000 = 2026-06-01 UTC; 15mo retention). resource.attributes routing key for namespace is `namespace` (UNPROVEN — may still 400). Broad 202/400 tolerance recommended.
+- **Coverage 2026-06-20:** 24/31. Remaining gaps: showalert (blocked on createalert needing real metric ids — now fixed in lifecycle), showeventrule (blocked on createeventrule; get-event-rule decoupled from group so it fires), createcustommetrics 400 (OTLP namespace routing unresolved). Target +2 on next light CRUD run.
+
+## ai-ml / aimlops-platform
+
+- **Host:** regional (`aimlops-platform.&lt;region&gt;.&lt;env&gt;...`). 12 endpoints (3 GETs, 6 id-bound GETs, 3 writes).
+- **What it is:** Provisions an AI/ML-Ops platform (KubeFlow-based) onto an existing SKE (k8s) cluster. A &quot;release&quot; = a KubeFlow/mini install on the cluster. BILLABLE, slow, requires a running cluster.
+- **Images endpoint:** `GET /v1/aimlops-platform/images` returns `$.contents[]` (NOT `$.images[]`). Each item has:
+  - `image_id`: ID to pass to POST body, format `IMAGE-&lt;base64-like&gt;` (e.g. `IMAGE-R=HXHY3ccc9f3TSVtPpPFR`). NOT a UUID.
+  - `base_image`: version string (e.g. `sdskubeflow-enterprise:1.9.2`, `sdskubeflow-mini:1.9.1`)
+  - `image_name`: human-readable (e.g. `AIMLOps Platform 1.9.2`)
+  - 2 images available as of 2026-06-20: enterprise 1.9.2 and mini 1.9.1
+- **check-duplication:** `GET /v1/aimlops-platform/check-duplication` requires `release_name` query param (NOT `name`). Returns `{&quot;result&quot;:false}` → 200 for a non-existing name. Smoke engine tries `name` (400), not `release_name` — smoke records 400 soft. Fix: probe directly with `release_name`.
+- **Cluster-bound preconditions (cluster_id format is CRITICAL):**
+  - `cluster_id` must be a **32-char hex UUID without hyphens** (str(uuid4()).replace(&#x27;-&#x27;,&#x27;&#x27;)). API returns 400 &quot;Cluster ID should be 32-letter UUID format&quot; for shorter/hyphenated ids.
+  - `checkaimlopsplatformversionv1` (`GET /v1/aimlops-platform/clusters/{cluster_id}/check-version`): requires `version` query param (e.g. `1.9.2`). Returns `{&quot;result&quot;:false}` for a real cluster → 200.
+  - `validateclusternamespaceforaimlopsplatformv1` (`GET /v1/aimlops-platform/clusters/{cluster_id}/validate-namespaces`): no query params needed. Returns `{&quot;result&quot;:false}` → 200 with real cluster.
+  - `validateclusterresourcesizeforaimlopsplatformv1` (`GET /v1/aimlops-platform/clusters/{cluster_id}/validate-resources`): requires `product_type` query param. **Valid values: `enterprise` or `mini` ONLY** (NOT KUBEFLOW/AMP). `product_type=KUBEFLOW` → 400 &quot;product_type [enterprise|mini]&quot;. Returns `{&quot;result&quot;:false}` → 200 with real cluster.
+- **Internal endpoints (needs aimlops release):**
+  - `GET /v1/aimlops-platform/internal/clusters/{cluster_id}/nodes` and `/storageclasses`: return 404 even with a real running SKE cluster. These proxy INTO the aimlops release itself (need an installed release). 404 error code `NotFound` (different from cluster-not-found code `PRODUCT-AI-ANALYTICS-USER-0002`).
+- **Release list:** `GET /v1/aimlops-platform` returns `{&quot;contents&quot;:[],&quot;total_count&quot;:0}` (account has 0 releases). No `id` field to derive for read-chains.
+- **Release by id:** 404 `PRODUCT-AI-ANALYTICS-USER-0002` &quot;Kubeflow (id)&quot; for non-existent release_id.
+- **POST body (unproven, best-effort):** `{release_name, cluster_id, image_id, namespace, description, cpu, memory, storage_class_name, volume_size}`.
+- **Lifecycle files:**
+  - `ai-ml__aimlops-platform.json`: read-only probe-reads lifecycle (heavy:true as gate). Probes id-bound GETs with fake 32-char UUID + required query params.
+  - `generated__heavy-aimlops.json`: full live-provision (needs SKE cluster + nodepool + aimlops release; very heavy/billable).
+- **Coverage 2026-06-20:** 2 → **6 / 12** (images 200, list 200, check-duplication 200 w/ release_name, check-version 200 w/ real cluster+version param, validate-namespaces 200 w/ real cluster, validate-resources 200 w/ real cluster+product_type=enterprise). Remaining 6 gaps: internal/nodes, internal/storageclasses (needs installed release), getaimlopsplatformv1 (needs real release), POST/PUT/DELETE (mutation-gated+heavy).
+
+## platform / product
+
+CONFIRMED LIVE 2026-06-20. Global account-scoped catalog service. All 4 endpoints are read-only GETs. No mutations. No heavy prereqs. 4/4 covered.
+
+- `listproductcategories` (GET /v1/product-categories) -&gt; 200, count:14. Response: `{count, current_page, product_categories:[{category_id, display_name, display_name_ko, icon_file_id, is_exposed_menu, seq, service_group_color_id, created_at, modified_at}]}`. No required query params (all optional: limit, page, sort, display_name, etc.).
+- `listproducts` (GET /v1/products) -&gt; 200, count:20. Response: `{count, current_page, products:[{product_id, display_name, display_name_ko, kind, product_category_id, product_category_name, created_at, modified_at}], total_count, total_pages}`. No required query params (optional: product_category_id, product_id, display_name, kind, sort, etc.).
+- `showproduct` (GET /v1/products/{product_id}) -&gt; 200. product_id is a string SLUG, NOT a UUID (e.g. `ESS`, `PRICING`, `SECRETSMANAGER`, `FPMS`, `ORACLESERVICES`). Captured from listproducts `$.products[0].product_id`.
+- `showproductcategory` (GET /v1/product-categories/{category_id}) -&gt; 200. category_id is a string SLUG (e.g. `FINANCIAL_MANAGEMENT`, `APPLICATION_SERVICE`, `HYBRID_CLOUD`, `AI-ML`, `DEVOPS_TOOLS`, `SECURITY`). Captured from listproductcategories `$.product_categories[0].category_id`.
+- The sidecar (`data/api_catalog_params.json`) correctly declares `produced_by` for both id-bound GETs — probe_reads auto-resolves them. No aliases needed.
+- Fragment: `regression/scenarios/lifecycles/platform__product.json` (product-catalog-readonly lifecycle).
+
+## platform / sts (Security Token Service)
+
+FIRST ANALYSIS 2026-06-20. 3 endpoints, ALL POST (mutating). 0 coverable read-only. Coverage requires SCP_ALLOW_MUTATIONS=true.
+
+- **Host:** `sts.&lt;region&gt;.e.samsungsdscloud.com` (REGIONAL, NOT in global_services). Host template: `https://sts.kr-west1.e.samsungsdscloud.com/v1/...`
+- **All 3 endpoints are POST (mutating):** smoke skips them (`is_mutating=True`), lifecycle engine skips them when `allow_mutations=False` (engine.py line ~691). Read-only coverage = structural 0/3.
+- **CRITICAL body field correction (2026-06-20):** Prior fragment used wrong field names. Correct field names from `api_docs.json` models:
+  - `assumerole` (POST /v1/assume-role): `role_indicator` (REQUIRED, NOT `role_arn`), `role_session_name` (REQUIRED, 1-64 chars), `duration_seconds` (optional, default 900). `role_indicator` format: `[offering:account_id:role_name]`, pattern `^[^:]+:[^:]+:[^:]+$`, minLength 32. Example: `e:ec11538abf8f46d2953539521f745366:OrganizationAccountAccessRole`.
+  - `assumerolewithsaml` (POST /v1/assume-role-with-saml): `role_indicator` (REQUIRED), `principal_indicator` (REQUIRED, same format as role_indicator, [offering:account_id:principal_name]), `saml_assertion` (REQUIRED base64 SAML doc, minLength 1), `duration_seconds` (optional). Account has 0 SAML providers.
+  - `objectstoreauthorization` (POST /v1/object-store-authorization): `method` (REQUIRED, HTTP verb), `url` (REQUIRED, full object-store URL), `x_amz_content_sha256` (REQUIRED, SHA256 of request body), `x_amz_date` (REQUIRED, AMZ date format YYYYMMDDTHHmmssZ), `region` (optional, default kr-west1), `service` (optional, default s3). NOT bucket_name/duration_seconds (old fragment was wrong). This generates an S3-compatible Authorization header from the caller&#x27;s STS session token.
+- **Role indicator format:** `e:ACCOUNT_ID:ROLE_NAME`. IAM roles do NOT expose an `srn`/`arn`/`role_arn` field in the list/show response — only `id` (32-hex UUID) and `name`. The offering code `e` matches `SCP_ENV=e`.
+- **Existing roles (2026-06-20):** `SCPServiceRoleForScf`, `SCPServiceRoleForApiGateway`, `OrganizationAccountAccessRole` (id: f07f5921c1df42089e59c90408599261, trust policy allows Account 73eab1a74c6347c1be9c892efc7f1102). assuemRole likely 403 (trust policy does not allow our account to assume roles for itself).
+- **Blocker:** assume-role likely 403 unless the role&#x27;s trust policy allows our account. objectstoreauthorization requires a valid session_token in the caller&#x27;s HMAC auth (not just access_key). No plain-key call can 200 on objectstoreauthorization.
+- **Safety:** lifecycle does NOT capture session_token/access_key_id/secret_access_key from any 200 response (safety hard rule: no credential exfiltration).
+- **Fragment:** `regression/scenarios/lifecycles/platform__sts.json` (sts-token-issuance-coverage lifecycle, corrected 2026-06-20).
+- **Coverage 2026-06-20 (read-only):** 0/3. All 3 endpoints POST-only, mutation-gated. With SCP_ALLOW_MUTATIONS: expect 400/403 on assumerole (trust policy mismatch), 400/422 on assumerolewithsaml (no real SAML provider + fake assertion), 400/401/403 on objectstoreauthorization (no session_token in auth). Coverage counting requires category=ok (2xx); 4xx from invalid credentials does NOT count.
+
+## Services not yet deeply explored (stubs — fill in as you go)
+
+database (mysql, mariadb), data-analytics, financial-management,
+devops-tools, and the long tail of management/networking/storage.
+These have the most uncovered endpoints — see `scenario-catalog.md` gap list.
+</pre></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/services.md</code></div>

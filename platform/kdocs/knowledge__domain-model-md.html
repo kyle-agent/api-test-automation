@@ -39,133 +39,84 @@
 
 <div class="panel">
   <div class="kpath">knowledge/domain-model.md</div>
-  <div class="kbody"><h1>SCP domain model</h1>
-<p>The shape of the platform the suite tests. Source of truth for counts:
-<code>data/api_catalog.json</code> (re-derive with <code>python -m spec.summary</code>).</p>
-<h2>Scale</h2>
-<ul>
-<li><strong>1,372 endpoints</strong>, all resolved (0 unresolved).</li>
-<li>15 categories per the docs; <strong>13</strong> present in the catalog today.</li>
-<li>Methods: GET 527 · POST 383 · PUT 244 · DELETE 209 · PATCH 9.</li>
-</ul>
-<h2>Categories (catalog, with endpoint counts)</h2>
-<table>
-<thead>
-<tr>
-<th>Category</th>
-<th>Endpoints</th>
-<th>Notable services</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>compute</td>
-<td>181</td>
-<td>virtualserver (VM, keypair, volume, snapshot, image, server-type)</td>
-</tr>
-<tr>
-<td>networking</td>
-<td>205</td>
-<td>vpc, subnet, port, security-group, public-ip, internet-gateway, private-dns</td>
-</tr>
-<tr>
-<td>database</td>
-<td>255</td>
-<td>mysql, mariadb, … (clusters)</td>
-</tr>
-<tr>
-<td>management</td>
-<td>244</td>
-<td>resourcemanager, iam, organization, quota, …</td>
-</tr>
-<tr>
-<td>storage</td>
-<td>129</td>
-<td>filestorage (volumes), object/block storage</td>
-</tr>
-<tr>
-<td>data-analytics</td>
-<td>119</td>
-<td>—</td>
-</tr>
-<tr>
-<td>application-service</td>
-<td>67</td>
-<td>queueservice</td>
-</tr>
-<tr>
-<td>container</td>
-<td>63</td>
-<td>ske (K8s clusters/nodepools), scr (registry/repository)</td>
-</tr>
-<tr>
-<td>security</td>
-<td>54</td>
-<td>certificatemanager</td>
-</tr>
-<tr>
-<td>ai-ml</td>
-<td>21</td>
-<td>—</td>
-</tr>
-<tr>
-<td>financial-management</td>
-<td>21</td>
-<td>billing-related</td>
-</tr>
-<tr>
-<td>platform</td>
-<td>7</td>
-<td>—</td>
-</tr>
-<tr>
-<td>devops-tools</td>
-<td>6</td>
-<td>—</td>
-</tr>
-</tbody>
-</table>
-<p>(Counts drift as the spec evolves — trust <code>spec.summary</code>, not this table.)</p>
-<h2>Per-service hosts (critical)</h2>
-<p>SCP Open API is <strong>per service</strong>, not one gateway. Path roots collide across
-services (<code>/v1/clusters</code> is used by ske, mariadb, mysql, …), so <strong>every call must
-target its own service host</strong>.</p>
-<ul>
-<li><strong>Regional:</strong> <code>https://&lt;service&gt;.&lt;region&gt;.&lt;env&gt;.samsungsdscloud.com</code>
-  e.g. <code>vpc.kr-west1.e.samsungsdscloud.com</code> + path <code>/v1/vpcs</code>.</li>
-<li><strong>Global (account-scoped, no region segment):</strong>
-  <code>https://&lt;service&gt;.&lt;env&gt;.samsungsdscloud.com</code> e.g. <code>product.e...</code>.</li>
-</ul>
-<p>Global services (DNS-verified; override via <code>SCP_GLOBAL_SERVICES</code>):
-<code>billingplan, budget, cloudcontrol, costexplorer, iam, organization, pricing,
-product, quota, resourcemanager, support</code>.</p>
-<p>Resolution order (<code>core/config.py::resolve_base_url</code>):
-1. <code>SCP_SERVICE_HOSTS</code> override map (JSON <code>{service: host-or-url}</code>)
+  <div class="kbody"><pre class="raw"># SCP domain model
+
+The shape of the platform the suite tests. Source of truth for counts:
+`data/api_catalog.json` (re-derive with `python -m spec.summary`).
+
+## Scale
+
+- **1,372 endpoints**, all resolved (0 unresolved).
+- 15 categories per the docs; **13** present in the catalog today.
+- Methods: GET 527 · POST 383 · PUT 244 · DELETE 209 · PATCH 9.
+
+## Categories (catalog, with endpoint counts)
+
+| Category | Endpoints | Notable services |
+|----------|-----------|------------------|
+| compute | 181 | virtualserver (VM, keypair, volume, snapshot, image, server-type) |
+| networking | 205 | vpc, subnet, port, security-group, public-ip, internet-gateway, private-dns |
+| database | 255 | mysql, mariadb, … (clusters) |
+| management | 244 | resourcemanager, iam, organization, quota, … |
+| storage | 129 | filestorage (volumes), object/block storage |
+| data-analytics | 119 | — |
+| application-service | 67 | queueservice |
+| container | 63 | ske (K8s clusters/nodepools), scr (registry/repository) |
+| security | 54 | certificatemanager |
+| ai-ml | 21 | — |
+| financial-management | 21 | billing-related |
+| platform | 7 | — |
+| devops-tools | 6 | — |
+
+(Counts drift as the spec evolves — trust `spec.summary`, not this table.)
+
+## Per-service hosts (critical)
+
+SCP Open API is **per service**, not one gateway. Path roots collide across
+services (`/v1/clusters` is used by ske, mariadb, mysql, …), so **every call must
+target its own service host**.
+
+- **Regional:** `https://&lt;service&gt;.&lt;region&gt;.&lt;env&gt;.samsungsdscloud.com`
+  e.g. `vpc.kr-west1.e.samsungsdscloud.com` + path `/v1/vpcs`.
+- **Global (account-scoped, no region segment):**
+  `https://&lt;service&gt;.&lt;env&gt;.samsungsdscloud.com` e.g. `product.e...`.
+
+Global services (DNS-verified; override via `SCP_GLOBAL_SERVICES`):
+`billingplan, budget, cloudcontrol, costexplorer, iam, organization, pricing,
+product, quota, resourcemanager, support`.
+
+Resolution order (`core/config.py::resolve_base_url`):
+1. `SCP_SERVICE_HOSTS` override map (JSON `{service: host-or-url}`)
 2. global template (if service is global) — no region
-3. regional template + <code>SCP_REGION</code> + <code>SCP_ENV</code>
-4. <code>SCP_BASE_URL</code> single-host fallback</p>
-<p>Set <code>SCP_REGION</code> (+ <code>SCP_ENV</code>, default <code>e</code>). Some services' API subdomain differs
-from the catalog name — pin those via <code>SCP_SERVICE_HOSTS</code>.</p>
-<h2>Authentication (HMAC)</h2>
-<p>SCP signs Open API calls with <strong>Access Key + HMAC-SHA256</strong>:</p>
-<ul>
-<li>Signing string (per the "Common / API 호출하기" guide):
-  <code>method + encodeURI(url) + timestamp + accessKey + clientType</code> → HMAC-SHA256 →
-  Base64.</li>
-<li>Sent in <code>Scp-*</code> headers; <code>clientType</code> value is <code>"Openapi"</code>.
-  Defaults: <code>Scp-Accesskey</code>, <code>Scp-Signature</code>, <code>Scp-Timestamp</code>, <code>Scp-ClientType</code>,
-  <code>Accept-Language: en-US</code>.</li>
-<li>All header names + the signing string are <strong>overridable via env</strong>
-  (<code>SCP_HMAC_*</code>, <code>SCP_AUTH_SCHEME=hmac|bearer|none</code>, <code>SCP_SIGN_FULL_URL</code>) and the
-  one signing method in <code>core/auth.py</code>. On 401/403, adjust there and confirm
-  against a real 200.</li>
-</ul>
-<h2>Resource lifecycle shape (general)</h2>
-<p>Most resources follow: <strong>create (async)</strong> → <strong>poll a state field to ready</strong> →
-read/list → (update) → <strong>delete (async)</strong> → <strong>poll until 404</strong>. The state field
-name and ready values differ per service — see <code>validated-facts.md</code>. Create
-responses often nest the id (<code>$.vpc.id</code>, <code>$.security_group.id</code>) or use a flat id
-(<code>$.id</code>, <code>$.volume_id</code>, <code>$.servers[0].id</code>) — also per service.</p></div>
+3. regional template + `SCP_REGION` + `SCP_ENV`
+4. `SCP_BASE_URL` single-host fallback
+
+Set `SCP_REGION` (+ `SCP_ENV`, default `e`). Some services&#x27; API subdomain differs
+from the catalog name — pin those via `SCP_SERVICE_HOSTS`.
+
+## Authentication (HMAC)
+
+SCP signs Open API calls with **Access Key + HMAC-SHA256**:
+
+- Signing string (per the &quot;Common / API 호출하기&quot; guide):
+  `method + encodeURI(url) + timestamp + accessKey + clientType` → HMAC-SHA256 →
+  Base64.
+- Sent in `Scp-*` headers; `clientType` value is `&quot;Openapi&quot;`.
+  Defaults: `Scp-Accesskey`, `Scp-Signature`, `Scp-Timestamp`, `Scp-ClientType`,
+  `Accept-Language: en-US`.
+- All header names + the signing string are **overridable via env**
+  (`SCP_HMAC_*`, `SCP_AUTH_SCHEME=hmac|bearer|none`, `SCP_SIGN_FULL_URL`) and the
+  one signing method in `core/auth.py`. On 401/403, adjust there and confirm
+  against a real 200.
+
+## Resource lifecycle shape (general)
+
+Most resources follow: **create (async)** → **poll a state field to ready** →
+read/list → (update) → **delete (async)** → **poll until 404**. The state field
+name and ready values differ per service — see `validated-facts.md`. Create
+responses often nest the id (`$.vpc.id`, `$.security_group.id`) or use a flat id
+(`$.id`, `$.volume_id`, `$.servers[0].id`) — also per service.
+</pre></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/domain-model.md</code></div>

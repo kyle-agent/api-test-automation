@@ -39,480 +39,115 @@
 
 <div class="panel">
   <div class="kpath">knowledge/formal/INGESTION.md</div>
-  <div class="kbody"><h1>Userguide ingestion backlog (짬짬이 내부 지식화 추적표)</h1>
-<blockquote>
-<p><strong>최종 목표:</strong> userguide 전체를 읽고 ① 서비스별 테스트 시나리오, ② 여러
-서비스를 엮은 조합 시나리오, ③ 옵션 항목 변형(C4 parameter coverage)까지
-만든다. <strong>당장은</strong> 커버리지 100%(C3)에 필요한 문서부터 — 이 표가 그
-우선순위와 진행 상태의 단일 추적표다. 아무 세션이나 P1부터 집어
-<code>services/&lt;category&gt;__&lt;service&gt;.yaml</code>로 지식화하고 status를 갱신할 것.</p>
-</blockquote>
-<p><strong>How to ingest one service</strong> (any session, ~5 min each):</p>
-<ol>
-<li>WebFetch <code>https://docs.e.samsungsdscloud.com&lt;path&gt;</code> — extract 제약 사항
-   (constraints/limits/naming rules) + 선행 서비스 (prerequisites).</li>
-<li>Write/update <code>knowledge/formal/services/&lt;api-category&gt;__&lt;api-service&gt;.yaml</code>
-   (<code>provenance: docs</code>; schema in <code>FORMAT.md</code>). Prerequisites that add graph
-   edges go to <code>cross-service.yaml</code>.</li>
-<li><code>python knowledge/formal/validate.py</code> → commit → flip status here.</li>
-</ol>
-<blockquote>
-<p><strong>M5 이후의 최종 목적지 (2026-06-12):</strong> 형식화의 종착 레이어는
-<strong><code>knowledge/formal/resources/&lt;category&gt;__&lt;service&gt;.yaml</code>의 자원 task
-모델</strong>이다 (127 노드 — 의존조건·검증된 body 템플릿·옵션; 합성기가 여기서
-lifecycle을 생성한다, <code>docs/RESOURCE-MODEL-PLAN.md</code>). 신규 ingest에서
-생성 전제조건/옵션/한도 같은 <em>자원 단위</em> 지식은 해당 resources 파일의
-<code>requires</code>/<code>options</code>/<code>notes</code>로 넣고, 서비스 전역 제약(네이밍 규칙 등)은
-종전대로 <code>services/</code> Layer-1에 넣는다. 둘 다 같은 validator가 검사한다.</p>
-</blockquote>
-<p>Priorities: <strong>P1</strong> = needed for coverage 100% (an enabled lifecycle's writes
+  <div class="kbody"><pre class="raw"># Userguide ingestion backlog (짬짬이 내부 지식화 추적표)
+
+&gt; **최종 목표:** userguide 전체를 읽고 ① 서비스별 테스트 시나리오, ② 여러
+&gt; 서비스를 엮은 조합 시나리오, ③ 옵션 항목 변형(C4 parameter coverage)까지
+&gt; 만든다. **당장은** 커버리지 100%(C3)에 필요한 문서부터 — 이 표가 그
+&gt; 우선순위와 진행 상태의 단일 추적표다. 아무 세션이나 P1부터 집어
+&gt; `services/&lt;category&gt;__&lt;service&gt;.yaml`로 지식화하고 status를 갱신할 것.
+
+**How to ingest one service** (any session, ~5 min each):
+
+1. WebFetch `https://docs.e.samsungsdscloud.com&lt;path&gt;` — extract 제약 사항
+   (constraints/limits/naming rules) + 선행 서비스 (prerequisites).
+2. Write/update `knowledge/formal/services/&lt;api-category&gt;__&lt;api-service&gt;.yaml`
+   (`provenance: docs`; schema in `FORMAT.md`). Prerequisites that add graph
+   edges go to `cross-service.yaml`.
+3. `python knowledge/formal/validate.py` → commit → flip status here.
+
+&gt; **M5 이후의 최종 목적지 (2026-06-12):** 형식화의 종착 레이어는
+&gt; **`knowledge/formal/resources/&lt;category&gt;__&lt;service&gt;.yaml`의 자원 task
+&gt; 모델**이다 (127 노드 — 의존조건·검증된 body 템플릿·옵션; 합성기가 여기서
+&gt; lifecycle을 생성한다, `docs/RESOURCE-MODEL-PLAN.md`). 신규 ingest에서
+&gt; 생성 전제조건/옵션/한도 같은 *자원 단위* 지식은 해당 resources 파일의
+&gt; `requires`/`options`/`notes`로 넣고, 서비스 전역 제약(네이밍 규칙 등)은
+&gt; 종전대로 `services/` Layer-1에 넣는다. 둘 다 같은 validator가 검사한다.
+
+Priorities: **P1** = needed for coverage 100% (an enabled lifecycle&#x27;s writes
 are pending live validation, or smoke shows 4xx that naming-rule/prereq
-knowledge could fix) · <strong>P2</strong> = has Open APIs, not currently blocking ·
-<strong>P3</strong> = no Open API in the catalog (console-only; context for AI-evaluator).</p>
-<table>
-<thead>
-<tr>
-<th>St</th>
-<th>Pri</th>
-<th>Userguide page</th>
-<th>API service</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/vpc/overview/</td>
-<td>networking/vpc</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/security_group/overview/</td>
-<td>networking/security-group</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/compute/virtual_server/overview/</td>
-<td>compute/virtualserver</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/container/k8s_engine/overview/</td>
-<td>container/ske</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/container/container_registry/overview/</td>
-<td>container/scr</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/storage/file_storage/overview/</td>
-<td>storage/filestorage</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/load_balancer/overview/</td>
-<td>networking/loadbalancer</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/dns/overview/</td>
-<td>networking/dns</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/vpn/overview/</td>
-<td>networking/vpn</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/direct_connect/overview/</td>
-<td>networking/direct-connect</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/firewall/overview/</td>
-<td>networking/firewall</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/gslb/overview/</td>
-<td>networking/gslb</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/networking/global_cdn/overview/</td>
-<td>networking/cdn</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/database/mysql/overview/</td>
-<td>database/mysql</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/database/mariadb/overview/</td>
-<td>database/mariadb</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/database/postgresql/overview/</td>
-<td>database/postgresql</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/database/epas/overview/</td>
-<td>database/epas</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/database/mssql/overview/</td>
-<td>database/sqlserver — Always On Secondary는 SQL Server License Key 필요(owner credential 대기, IB-017)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/database/cachestore/overview/</td>
-<td>database/cachestore</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/compute/baremetal_server/overview/</td>
-<td>compute/baremetal</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/compute/block_storage_vm/overview/</td>
-<td>compute/virtualserver (volumes)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/compute/cloud_functions/overview/</td>
-<td>compute/scf</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/compute/mngc/overview/</td>
-<td>compute/multinodegpucluster (bare-metal GPU; VPC prereq; types g2c96h8_metal/g3c128b8_metal; min 2 +1 scale; cluster-fabric companion-minted; Planned Compute optional; all docs/UNPROVEN)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/storage/archive_storage/overview/</td>
-<td>storage/archivestorage — <strong>대상 영구 제외</strong> (owner 2026-06-11: 전용 인증키 미발급, waiver 25/25; 다시 끌어올리지 말 것)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/storage/backup/overview/</td>
-<td>storage/backup</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/storage/block_storage_bm/overview/</td>
-<td>storage/baremetal-blockstorage</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/storage/parallel_file_storage/overview/</td>
-<td>storage/parallel-filestorage — <strong>reads-only 범위</strong> (owner 2026-06-12: writes는 owner-exclusion waiver, 복구 lifecycle disabled)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/security/kms/overview/</td>
-<td>security/kms</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/security/secrets_manager/overview/</td>
-<td>security/secretsmanager</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/security/secret_vault/overview/</td>
-<td>security/secretvault</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/security/certificate_manager/overview/</td>
-<td>security/certificatemanager</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/security/config_inspection_enterprise/overview/</td>
-<td>security/configinspection</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/iam/overview/</td>
-<td>management/iam</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/id_center/overview/</td>
-<td>management/iam-identity-center (smoke 400s)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/organization/overview/</td>
-<td>management/organization (waiver class)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/cloud_control/overview/</td>
-<td>management/cloudcontrol (smoke 403s)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/cloud_monitoring/overview/</td>
-<td>management/cloudmonitoring (smoke 400s = events/event-policies need productResourceId+eventState+queryStartDt+queryEndDt; X-ResourceType header was invention, removed; discontinued after Sep 2026)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/logging_audit/overview/</td>
-<td>management/loggingaudit (trail needs Object Storage bucket; create body=TrailCreateRequestV1dot1 account_id+bucket_name+bucket_region; capture $.trail.id)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/service_watch/overview/</td>
-<td>management/servicewatch</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/resource_groups/overview/</td>
-<td>management/resourcemanager (tags ≤50/resource; RG name-len/quota undocumented — confirm live)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/management/quota/overview/</td>
-<td>management/quota (verify the VPC 3-vs-5!)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/application/api_gateway/overview/</td>
-<td>application-service/apigateway (ADD-only deepen — PRIVATE endpoint forces JWT; method ANY + integration HTTP/Cloud Function/PrivateLink; PrivateLink desc ≤50 explains set-PUT 400)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/application/queue_service/overview/</td>
-<td>application-service/queueservice (name 3-64/.fifo; size ≤256KB; retention ≤14d; kr-west1/east1)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/analytics/data_flow/overview/</td>
-<td>data-analytics/data-flow — NiFi-on-SKE (ske-cluster+filestorage, ingress 1/cluster; create body UNPROVEN docs-vs-reality, IB-018)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/analytics/data_ops/overview/</td>
-<td>data-analytics/data-ops — Airflow-on-SKE (executor K8s/Celery; create body UNPROVEN docs-vs-reality, IB-018)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/analytics/event_streams/overview/</td>
-<td>data-analytics/eventstreams (smoke 400s)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/analytics/quick_query/overview/</td>
-<td>data-analytics/quick-query (smoke 400 = bare GET /v1/quick-query missing required size+page; fixed; real create gated on DSC domain, IB-018)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/analytics/search_engine/overview/</td>
-<td>data-analytics/searchengine (ES BYOL / OpenSearch; subnet; data nodes 1-10/50; add-instances model)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/analytics/vertica/overview/</td>
-<td>data-analytics/vertica (masterless MPP; 24.2.0-2 only; no add-instances/patch; backup 7-35d)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/ai_ml/ai_ml_ops_platform/overview/</td>
-<td>ai-ml/aimlops-platform (smoke 400s)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/ai_ml/cloud_ml/overview/</td>
-<td>ai-ml/cloud-ml (smoke 404s)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/devopstools/devops_service/overview/</td>
-<td>devops-tools/devopsservice (PF-05 fixed: create body needs members+tenant_code+tenant_name, NOT name/description; capture $.devops_service.id; dup-check by tenant; 1/account)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/financial_management/planned_compute/overview/</td>
-<td>financial-management/billingplan (smoke 500 = GET /v1/planned-computes/server-types backend 500 — Product Bug, baselined since 2026-06-01; create body corrected to PlannedComputeCreateRequest; NOTE lifecycle JSON still carries old invented body — IB-019)</td>
-</tr>
-<tr>
-<td>✅</td>
-<td>P1</td>
-<td>/userguide/financial_management/cost_management/overview/</td>
-<td>financial-management/budget·costexplorer (budget: name≤20, amount+start_month req, currency UNPROVEN, <strong>create 500 = PF-04 baselined product bug</strong>) · (costexplorer: reads-only, 6mo window, smoke 3/3 200)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/compute/gpu_server/overview/</td>
-<td>compute (gpu types)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/compute/auto_scaling/overview/</td>
-<td>compute/auto-scaling</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/compute/virtual_server_dr/overview/</td>
-<td>compute (DR)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/storage/object_storage/overview/</td>
-<td>storage/objectstorage</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/management/notification_manager/overview/</td>
-<td>management/notification</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/management/resource_explorer/overview/</td>
-<td>management (explorer)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/management/support_center/overview/</td>
-<td>management/support</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/management/architecture_diagram/overview/</td>
-<td>management (diagram)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/financial_management/marketplace/overview/</td>
-<td>financial-management (marketplace)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/security/webfirewall/overview/</td>
-<td>security (WAF)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/security/ddosprotection/overview/</td>
-<td>security (DDoS)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P2</td>
-<td>/userguide/platform... (sts 등 catalog 잔여)</td>
-<td>platform/sts</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P3</td>
-<td>/userguide/networking/{sase,private_5g_cloud,cloud_wan,lan_campus_enterprise,lan_datacenter,cloud_last_mile,cloud_virtual_circuit}/overview/</td>
-<td>(console-only)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P3</td>
-<td>/userguide/security/{ess,fpms,ips,log_transmission,secured_firewall,secured_vpn,single_id}/overview/</td>
-<td>(console-only)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P3</td>
-<td>/userguide/hybrid_cloud/{edge_server,oracle_services}/overview/</td>
-<td>(console-only)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P3</td>
-<td>/userguide/developers_tools/mcp_server_enterprise/overview/</td>
-<td>(console-only)</td>
-</tr>
-<tr>
-<td>—</td>
-<td>P3</td>
-<td>/userguide/scp_common/overview/</td>
-<td>(platform common)</td>
-</tr>
-</tbody>
-</table>
-<blockquote>
-<p>표는 userguide TOC(2026-06-09 수집) 기준. 카테고리/서비스 추가 발견 시 행을
-추가. P1 완료 기준: constraints/prereqs가 Layer-1 yaml에 들어가고 validate
-통과. <strong>beyond-overview</strong>(how_to_guides 등 하위 페이지)는 옵션 변형(C4)
-단계에서 서비스별로 내려받는다.</p>
-</blockquote></div>
+knowledge could fix) · **P2** = has Open APIs, not currently blocking ·
+**P3** = no Open API in the catalog (console-only; context for AI-evaluator).
+
+| St | Pri | Userguide page | API service |
+|----|-----|---------------|-------------|
+| ✅ | P1 | /userguide/networking/vpc/overview/ | networking/vpc |
+| ✅ | P1 | /userguide/networking/security_group/overview/ | networking/security-group |
+| ✅ | P1 | /userguide/compute/virtual_server/overview/ | compute/virtualserver |
+| ✅ | P1 | /userguide/container/k8s_engine/overview/ | container/ske |
+| ✅ | P1 | /userguide/container/container_registry/overview/ | container/scr |
+| ✅ | P1 | /userguide/storage/file_storage/overview/ | storage/filestorage |
+| ✅ | P1 | /userguide/networking/load_balancer/overview/ | networking/loadbalancer |
+| ✅ | P1 | /userguide/networking/dns/overview/ | networking/dns |
+| ✅ | P1 | /userguide/networking/vpn/overview/ | networking/vpn |
+| ✅ | P1 | /userguide/networking/direct_connect/overview/ | networking/direct-connect |
+| ✅ | P1 | /userguide/networking/firewall/overview/ | networking/firewall |
+| ✅ | P1 | /userguide/networking/gslb/overview/ | networking/gslb |
+| ✅ | P1 | /userguide/networking/global_cdn/overview/ | networking/cdn |
+| ✅ | P1 | /userguide/database/mysql/overview/ | database/mysql |
+| ✅ | P1 | /userguide/database/mariadb/overview/ | database/mariadb |
+| ✅ | P1 | /userguide/database/postgresql/overview/ | database/postgresql |
+| ✅ | P1 | /userguide/database/epas/overview/ | database/epas |
+| ✅ | P1 | /userguide/database/mssql/overview/ | database/sqlserver — Always On Secondary는 SQL Server License Key 필요(owner credential 대기, IB-017) |
+| ✅ | P1 | /userguide/database/cachestore/overview/ | database/cachestore |
+| ✅ | P1 | /userguide/compute/baremetal_server/overview/ | compute/baremetal |
+| ✅ | P1 | /userguide/compute/block_storage_vm/overview/ | compute/virtualserver (volumes) |
+| ✅ | P1 | /userguide/compute/cloud_functions/overview/ | compute/scf |
+| ✅ | P1 | /userguide/compute/mngc/overview/ | compute/multinodegpucluster (bare-metal GPU; VPC prereq; types g2c96h8_metal/g3c128b8_metal; min 2 +1 scale; cluster-fabric companion-minted; Planned Compute optional; all docs/UNPROVEN) |
+| ✅ | P1 | /userguide/storage/archive_storage/overview/ | storage/archivestorage — **대상 영구 제외** (owner 2026-06-11: 전용 인증키 미발급, waiver 25/25; 다시 끌어올리지 말 것) |
+| ✅ | P1 | /userguide/storage/backup/overview/ | storage/backup |
+| ✅ | P1 | /userguide/storage/block_storage_bm/overview/ | storage/baremetal-blockstorage |
+| ✅ | P1 | /userguide/storage/parallel_file_storage/overview/ | storage/parallel-filestorage — **reads-only 범위** (owner 2026-06-12: writes는 owner-exclusion waiver, 복구 lifecycle disabled) |
+| ✅ | P1 | /userguide/security/kms/overview/ | security/kms |
+| ✅ | P1 | /userguide/security/secrets_manager/overview/ | security/secretsmanager |
+| ✅ | P1 | /userguide/security/secret_vault/overview/ | security/secretvault |
+| ✅ | P1 | /userguide/security/certificate_manager/overview/ | security/certificatemanager |
+| ✅ | P1 | /userguide/security/config_inspection_enterprise/overview/ | security/configinspection |
+| ✅ | P1 | /userguide/management/iam/overview/ | management/iam |
+| ✅ | P1 | /userguide/management/id_center/overview/ | management/iam-identity-center (smoke 400s) |
+| ✅ | P1 | /userguide/management/organization/overview/ | management/organization (waiver class) |
+| ✅ | P1 | /userguide/management/cloud_control/overview/ | management/cloudcontrol (smoke 403s) |
+| ✅ | P1 | /userguide/management/cloud_monitoring/overview/ | management/cloudmonitoring (smoke 400s = events/event-policies need productResourceId+eventState+queryStartDt+queryEndDt; X-ResourceType header was invention, removed; discontinued after Sep 2026) |
+| ✅ | P1 | /userguide/management/logging_audit/overview/ | management/loggingaudit (trail needs Object Storage bucket; create body=TrailCreateRequestV1dot1 account_id+bucket_name+bucket_region; capture $.trail.id) |
+| ✅ | P1 | /userguide/management/service_watch/overview/ | management/servicewatch |
+| ✅ | P1 | /userguide/management/resource_groups/overview/ | management/resourcemanager (tags ≤50/resource; RG name-len/quota undocumented — confirm live) |
+| ✅ | P1 | /userguide/management/quota/overview/ | management/quota (verify the VPC 3-vs-5!) |
+| ✅ | P1 | /userguide/application/api_gateway/overview/ | application-service/apigateway (ADD-only deepen — PRIVATE endpoint forces JWT; method ANY + integration HTTP/Cloud Function/PrivateLink; PrivateLink desc ≤50 explains set-PUT 400) |
+| ✅ | P1 | /userguide/application/queue_service/overview/ | application-service/queueservice (name 3-64/.fifo; size ≤256KB; retention ≤14d; kr-west1/east1) |
+| ✅ | P1 | /userguide/analytics/data_flow/overview/ | data-analytics/data-flow — NiFi-on-SKE (ske-cluster+filestorage, ingress 1/cluster; create body UNPROVEN docs-vs-reality, IB-018) |
+| ✅ | P1 | /userguide/analytics/data_ops/overview/ | data-analytics/data-ops — Airflow-on-SKE (executor K8s/Celery; create body UNPROVEN docs-vs-reality, IB-018) |
+| ✅ | P1 | /userguide/analytics/event_streams/overview/ | data-analytics/eventstreams (smoke 400s) |
+| ✅ | P1 | /userguide/analytics/quick_query/overview/ | data-analytics/quick-query (smoke 400 = bare GET /v1/quick-query missing required size+page; fixed; real create gated on DSC domain, IB-018) |
+| ✅ | P1 | /userguide/analytics/search_engine/overview/ | data-analytics/searchengine (ES BYOL / OpenSearch; subnet; data nodes 1-10/50; add-instances model) |
+| ✅ | P1 | /userguide/analytics/vertica/overview/ | data-analytics/vertica (masterless MPP; 24.2.0-2 only; no add-instances/patch; backup 7-35d) |
+| ✅ | P1 | /userguide/ai_ml/ai_ml_ops_platform/overview/ | ai-ml/aimlops-platform (smoke 400s) |
+| ✅ | P1 | /userguide/ai_ml/cloud_ml/overview/ | ai-ml/cloud-ml (smoke 404s) |
+| ✅ | P1 | /userguide/devopstools/devops_service/overview/ | devops-tools/devopsservice (PF-05 fixed: create body needs members+tenant_code+tenant_name, NOT name/description; capture $.devops_service.id; dup-check by tenant; 1/account) |
+| ✅ | P1 | /userguide/financial_management/planned_compute/overview/ | financial-management/billingplan (smoke 500 = GET /v1/planned-computes/server-types backend 500 — Product Bug, baselined since 2026-06-01; create body corrected to PlannedComputeCreateRequest; NOTE lifecycle JSON still carries old invented body — IB-019) |
+| ✅ | P1 | /userguide/financial_management/cost_management/overview/ | financial-management/budget·costexplorer (budget: name≤20, amount+start_month req, currency UNPROVEN, **create 500 = PF-04 baselined product bug**) · (costexplorer: reads-only, 6mo window, smoke 3/3 200) |
+| — | P2 | /userguide/compute/gpu_server/overview/ | compute (gpu types) |
+| — | P2 | /userguide/compute/auto_scaling/overview/ | compute/auto-scaling |
+| — | P2 | /userguide/compute/virtual_server_dr/overview/ | compute (DR) |
+| — | P2 | /userguide/storage/object_storage/overview/ | storage/objectstorage |
+| — | P2 | /userguide/management/notification_manager/overview/ | management/notification |
+| — | P2 | /userguide/management/resource_explorer/overview/ | management (explorer) |
+| — | P2 | /userguide/management/support_center/overview/ | management/support |
+| — | P2 | /userguide/management/architecture_diagram/overview/ | management (diagram) |
+| — | P2 | /userguide/financial_management/marketplace/overview/ | financial-management (marketplace) |
+| — | P2 | /userguide/security/webfirewall/overview/ | security (WAF) |
+| — | P2 | /userguide/security/ddosprotection/overview/ | security (DDoS) |
+| — | P2 | /userguide/platform... (sts 등 catalog 잔여) | platform/sts |
+| — | P3 | /userguide/networking/{sase,private_5g_cloud,cloud_wan,lan_campus_enterprise,lan_datacenter,cloud_last_mile,cloud_virtual_circuit}/overview/ | (console-only) |
+| — | P3 | /userguide/security/{ess,fpms,ips,log_transmission,secured_firewall,secured_vpn,single_id}/overview/ | (console-only) |
+| — | P3 | /userguide/hybrid_cloud/{edge_server,oracle_services}/overview/ | (console-only) |
+| — | P3 | /userguide/developers_tools/mcp_server_enterprise/overview/ | (console-only) |
+| — | P3 | /userguide/scp_common/overview/ | (platform common) |
+
+&gt; 표는 userguide TOC(2026-06-09 수집) 기준. 카테고리/서비스 추가 발견 시 행을
+&gt; 추가. P1 완료 기준: constraints/prereqs가 Layer-1 yaml에 들어가고 validate
+&gt; 통과. **beyond-overview**(how_to_guides 등 하위 페이지)는 옵션 변형(C4)
+&gt; 단계에서 서비스별로 내려받는다.
+</pre></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/formal/INGESTION.md</code></div>

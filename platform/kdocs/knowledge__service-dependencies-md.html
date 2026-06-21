@@ -39,17 +39,20 @@
 
 <div class="panel">
   <div class="kpath">knowledge/service-dependencies.md</div>
-  <div class="kbody"><h1>Service dependencies &amp; call order</h1>
-<p>What must exist before what. Encoded as data in
-<code>regression/scenarios/dependencies.json</code> (<code>prerequisites</code>) and realized step-by-step
-in <code>scenarios.json</code>. This file is the human-readable view.</p>
-<blockquote>
-<p>Note on "prerequisites": in the scenario engine these are created <strong>inline</strong> by
-the lifecycle's own steps (not external preconditions). The graph below tells
-you the order; the scenario builds the whole chain and tears it down in reverse.</p>
-</blockquote>
-<h2>Dependency graph (create order →)</h2>
-<pre><code>vpc ──► subnet ──► port
+  <div class="kbody"><pre class="raw"># Service dependencies &amp; call order
+
+What must exist before what. Encoded as data in
+`regression/scenarios/dependencies.json` (`prerequisites`) and realized step-by-step
+in `scenarios.json`. This file is the human-readable view.
+
+&gt; Note on &quot;prerequisites&quot;: in the scenario engine these are created **inline** by
+&gt; the lifecycle&#x27;s own steps (not external preconditions). The graph below tells
+&gt; you the order; the scenario builds the whole chain and tears it down in reverse.
+
+## Dependency graph (create order →)
+
+```
+vpc ──► subnet ──► port
   │        │
   │        ├──► (security-group is account/region-scoped — NO vpc needed)
   │        │
@@ -72,35 +75,45 @@ certificatemanager      — standalone (self-sign)
 queueservice queue      — standalone
 resourcemanager rg      — standalone (global service)
 mysql cluster           — needs vpc + subnet
-</code></pre>
-<h2>Canonical orders (from validated scenarios)</h2>
-<p><strong>Networking (vpc + subnet + port)</strong> — <code>networking-vpc-subnet</code>:
-1. create vpc (<code>cidr</code> e.g. <code>10.123.0.0/20</code>) → capture <code>$.vpc.id</code> → poll <code>$.vpc.state == ACTIVE</code>
-2. create subnet (<code>type: GENERAL</code>, <code>vpc_id</code>) → <code>$.subnet.id</code> → poll <code>$.subnet.state == ACTIVE</code>
-3. create port (<code>subnet_id</code>, <code>security_groups: []</code>) → <code>$.port.id</code>
-4. teardown reverse: <strong>port → subnet → vpc</strong>, each with <code>409</code> retry (dependency
-   still releasing). Wait for subnet 404 before deleting vpc.</p>
-<p><strong>Virtual server (full VM)</strong> — <code>compute-virtualserver-full</code> (heavy):
+```
+
+## Canonical orders (from validated scenarios)
+
+**Networking (vpc + subnet + port)** — `networking-vpc-subnet`:
+1. create vpc (`cidr` e.g. `10.123.0.0/20`) → capture `$.vpc.id` → poll `$.vpc.state == ACTIVE`
+2. create subnet (`type: GENERAL`, `vpc_id`) → `$.subnet.id` → poll `$.subnet.state == ACTIVE`
+3. create port (`subnet_id`, `security_groups: []`) → `$.port.id`
+4. teardown reverse: **port → subnet → vpc**, each with `409` retry (dependency
+   still releasing). Wait for subnet 404 before deleting vpc.
+
+**Virtual server (full VM)** — `compute-virtualserver-full` (heavy):
 vpc → subnet → security-group → keypair → find-image → find-server-type →
 create-server → (attach extra volume, rename, stop/start, image-create) →
-teardown reverse. See <code>validated-facts.md</code> for the field-level gotchas.</p>
-<p><strong>Kubernetes (ske cluster + nodepool)</strong> — <code>container-ske-cluster-nodepool</code> (heavy):
+teardown reverse. See `validated-facts.md` for the field-level gotchas.
+
+**Kubernetes (ske cluster + nodepool)** — `container-ske-cluster-nodepool` (heavy):
 vpc → subnet → security-group → keypair → find k8s-version → find server-type →
 filestorage volume → create cluster → create nodepool → (scale, label) →
-teardown reverse (nodepool → cluster → volume → keypair → sg → subnet → vpc).</p>
-<p><strong>Container registry (scr)</strong> — <code>container-scr-registry</code>:
-create registry → poll <code>$.state == Running</code> → create repository (<code>registry_id</code>) →
-teardown: repository → registry (registry DELETE 500-races for minutes — retry).</p>
-<h2>Async polling</h2>
-<p>Every create that returns before the resource is usable is followed by a <code>poll</code>
-on a state field (<code>poll: {field, until, timeout, interval}</code>) or a status code
-(<code>until_status</code>). Ready values vary by service (<code>ACTIVE</code>, <code>Running</code>, <code>available</code>,
-<code>in-use</code>, …) — collected in <code>validated-facts.md</code>. Deletes poll <code>until_status: [404]</code>.</p>
-<h2>Teardown rule</h2>
-<p>Always reverse-order, registry-owned. Deletes that race dependency release retry
-on <code>409</code>/<code>500</code>. A multi-group scenario (<code>group</code> + <code>optional</code>) isolates a failing
+teardown reverse (nodepool → cluster → volume → keypair → sg → subnet → vpc).
+
+**Container registry (scr)** — `container-scr-registry`:
+create registry → poll `$.state == Running` → create repository (`registry_id`) →
+teardown: repository → registry (registry DELETE 500-races for minutes — retry).
+
+## Async polling
+
+Every create that returns before the resource is usable is followed by a `poll`
+on a state field (`poll: {field, until, timeout, interval}`) or a status code
+(`until_status`). Ready values vary by service (`ACTIVE`, `Running`, `available`,
+`in-use`, …) — collected in `validated-facts.md`. Deletes poll `until_status: [404]`.
+
+## Teardown rule
+
+Always reverse-order, registry-owned. Deletes that race dependency release retry
+on `409`/`500`. A multi-group scenario (`group` + `optional`) isolates a failing
 family: it tears down just that group and keeps the rest, so one bad body costs
-one family, not the whole run.</p></div>
+one family, not the whole run.
+</pre></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/service-dependencies.md</code></div>

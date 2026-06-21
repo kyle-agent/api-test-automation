@@ -39,88 +39,61 @@
 
 <div class="panel">
   <div class="kpath">knowledge/README.md</div>
-  <div class="kbody"><h1>SCP Domain Knowledge (knowledge/)</h1>
-<blockquote>
-<p>Accumulated, <strong>human-readable</strong> knowledge about the SCP platform that the test
-agents need. AI agents generate and maintain it; <strong>humans read and adjust it.</strong>
-It is the durable memory that lets any new session start where the last left off.
-(이 디렉토리는 AI가 생성/유지하지만 사람이 읽고 수정하는 SCP 도메인 지식입니다.)</p>
-</blockquote>
-<p>The same facts exist in two forms and must stay in sync:</p>
-<ul>
-<li><strong>Here (<code>knowledge/*.md</code>)</strong> — narrative, reviewable by a human.</li>
-<li><strong>As data (<code>regression/scenarios/scenarios.json</code>, <code>dependencies.json</code>,
-  <code>core/budgets.py</code>, <code>core/config.py</code>)</strong> — consumed by the engines.</li>
-</ul>
-<p>The Domain-Knowledge agent (<code>agents/domain-knowledge-agent.md</code>) owns keeping
-these two in sync. When you learn something, write it here <strong>and</strong> encode it in
-the scenario/budget data, in the same commit.</p>
-<h2>Map</h2>
-<table>
-<thead>
-<tr>
-<th>File</th>
-<th>Contents</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="formal/FORMAT.md"><code>formal/</code></a></td>
-<td><strong>The formalized, human-editable form</strong> (YAML), structured in 3 layers: <code>services/</code> (per-service constraints), <code>cross-service.yaml</code> (dependency graph + cross-service constraints), <code>flows.yaml</code> (scenario-flow rules + call orders), plus <code>combo-scenarios.yaml</code> (combos with per-scenario <code>review:</code> blocks a human approves). Offline validator: <code>python knowledge/formal/validate.py</code>. Edit here first.</td>
-</tr>
-<tr>
-<td><code>formal/resources/</code></td>
-<td><strong>The M5 resource-task model — the formal destination knowledge converges into.</strong> One YAML per service (132 nodes / 53 files, groups in <code>_groups.yaml</code>, codes <code>&lt;cat&gt;-&lt;group&gt;-&lt;resource&gt;</code>): per-resource <code>requires</code> (incl. <code>one_of</code>/<code>count</code>/<code>credential</code>), validated create-body templates, options, capture/ready/delete, <code>provenance</code> + live-run citations in <code>notes</code>. <code>regression/scenarios/composer.py</code> compiles it into engine lifecycles (<code>gen-*</code>/<code>bundle-*</code>) — long-term this layer <strong>generates</strong> the engine data instead of mirroring it. Validated by the same <code>validate.py</code> (R1 checks). See <code>docs/RESOURCE-MODEL-PLAN.md</code>.</td>
-</tr>
-<tr>
-<td><a href="domain-model.md"><code>domain-model.md</code></a></td>
-<td>SCP concepts: categories, services, per-service hosts (regional vs global), region/env, auth (HMAC).</td>
-</tr>
-<tr>
-<td><a href="service-dependencies.md"><code>service-dependencies.md</code></a></td>
-<td>Which resources must exist before which — the dependency graph + canonical create/teardown orders.</td>
-</tr>
-<tr>
-<td><a href="quotas-and-budgets.md"><code>quotas-and-budgets.md</code></a></td>
-<td>Account caps (vpc=5, private-dns=3, …), which scenarios consume them, reserve/skip behavior.</td>
-</tr>
-<tr>
-<td><a href="validated-facts.md"><code>validated-facts.md</code></a></td>
-<td>Runtime-confirmed truths the docs don't tell you (id fields, undocumented required fields, state machines, delete races). The highest-value file.</td>
-</tr>
-<tr>
-<td><a href="scenario-catalog.md"><code>scenario-catalog.md</code></a></td>
-<td>The CRUD lifecycles that exist today, light vs heavy, and the coverage gap list.</td>
-</tr>
-<tr>
-<td><a href="services.md"><code>services.md</code></a></td>
-<td>Per-service notes (request bodies, captures, quirks). Add a section per service as you become expert.</td>
-</tr>
-</tbody>
-</table>
-<h2>Provenance discipline</h2>
-<p>Every non-obvious fact is tagged:</p>
-<ul>
-<li><strong>VALIDATED</strong> — confirmed by a real 2xx at runtime (trust it).</li>
-<li><strong>from docs</strong> — taken from the API Reference, not yet runtime-confirmed
-  (best-effort; verify before relying on it for mutations).</li>
-</ul>
-<p>Never silently promote a "from docs" guess to VALIDATED — only a real success does.</p>
-<h2>Owner scope decisions (do not re-litigate per session)</h2>
-<ul>
-<li><strong>storage/archivestorage — permanently excluded</strong> (owner, 2026-06-11): no
+  <div class="kbody"><pre class="raw"># SCP Domain Knowledge (knowledge/)
+
+&gt; Accumulated, **human-readable** knowledge about the SCP platform that the test
+&gt; agents need. AI agents generate and maintain it; **humans read and adjust it.**
+&gt; It is the durable memory that lets any new session start where the last left off.
+&gt; (이 디렉토리는 AI가 생성/유지하지만 사람이 읽고 수정하는 SCP 도메인 지식입니다.)
+
+The same facts exist in two forms and must stay in sync:
+
+- **Here (`knowledge/*.md`)** — narrative, reviewable by a human.
+- **As data (`regression/scenarios/scenarios.json`, `dependencies.json`,
+  `core/budgets.py`, `core/config.py`)** — consumed by the engines.
+
+The Domain-Knowledge agent (`docs/agent-team.md`) owns keeping
+these two in sync. When you learn something, write it here **and** encode it in
+the scenario/budget data, in the same commit.
+
+## Map
+
+| File | Contents |
+|------|----------|
+| [`formal/`](formal/FORMAT.md) | **The formalized, human-editable form** (YAML), structured in 3 layers: `services/` (per-service constraints), `cross-service.yaml` (dependency graph + cross-service constraints), `flows.yaml` (scenario-flow rules + call orders), plus `combo-scenarios.yaml` (combos with per-scenario `review:` blocks a human approves). Offline validator: `python knowledge/formal/validate.py`. Edit here first. |
+| `formal/resources/` | **The M5 resource-task model — the formal destination knowledge converges into.** One YAML per service (132 nodes / 53 files, groups in `_groups.yaml`, codes `&lt;cat&gt;-&lt;group&gt;-&lt;resource&gt;`): per-resource `requires` (incl. `one_of`/`count`/`credential`), validated create-body templates, options, capture/ready/delete, `provenance` + live-run citations in `notes`. `regression/scenarios/composer.py` compiles it into engine lifecycles (`gen-*`/`bundle-*`) — long-term this layer **generates** the engine data instead of mirroring it. Validated by the same `validate.py` (R1 checks). See `docs/RESOURCE-MODEL-PLAN.md`. |
+| [`domain-model.md`](domain-model.md) | SCP concepts: categories, services, per-service hosts (regional vs global), region/env, auth (HMAC). |
+| [`service-dependencies.md`](service-dependencies.md) | Which resources must exist before which — the dependency graph + canonical create/teardown orders. |
+| [`quotas-and-budgets.md`](quotas-and-budgets.md) | Account caps (vpc=5, private-dns=3, …), which scenarios consume them, reserve/skip behavior. |
+| [`validated-facts.md`](validated-facts.md) | Runtime-confirmed truths the docs don&#x27;t tell you (id fields, undocumented required fields, state machines, delete races). The highest-value file. |
+| [`scenario-catalog.md`](scenario-catalog.md) | The CRUD lifecycles that exist today, light vs heavy, and the coverage gap list. |
+| [`services.md`](services.md) | Per-service notes (request bodies, captures, quirks). Add a section per service as you become expert. |
+
+## Provenance discipline
+
+Every non-obvious fact is tagged:
+
+- **VALIDATED** — confirmed by a real 2xx at runtime (trust it).
+- **from docs** — taken from the API Reference, not yet runtime-confirmed
+  (best-effort; verify before relying on it for mutations).
+
+Never silently promote a &quot;from docs&quot; guess to VALIDATED — only a real success does.
+
+## Owner scope decisions (do not re-litigate per session)
+
+- **storage/archivestorage — permanently excluded** (owner, 2026-06-11): no
   dedicated auth keys will be issued; all 25 endpoints carry approved waivers,
-  lifecycles stay <code>enabled:false</code>. Do not pull this service back in — if the
-  key policy changes, the owner updates the decision first.</li>
-<li><strong>storage/parallel-filestorage — reads-only scope</strong> (owner, 2026-06-12): GET
-  coverage only; writes are coverage-waived (<code>owner-exclusion</code> class) and the
+  lifecycles stay `enabled:false`. Do not pull this service back in — if the
+  key policy changes, the owner updates the decision first.
+- **storage/parallel-filestorage — reads-only scope** (owner, 2026-06-12): GET
+  coverage only; writes are coverage-waived (`owner-exclusion` class) and the
   capacity-restore lifecycle is disabled. Recorded in
-  <code>formal/services/storage__parallel-filestorage.yaml</code>.</li>
-<li><strong>Per-environment baselines</strong> are file-suffixed (<code>known_issues.&lt;profile&gt;.json</code>
-  takes precedence over the default — <code>core/baselines.py</code>); <strong>multi-tenancy</strong>
+  `formal/services/storage__parallel-filestorage.yaml`.
+- **Per-environment baselines** are file-suffixed (`known_issues.&lt;profile&gt;.json`
+  takes precedence over the default — `core/baselines.py`); **multi-tenancy**
   is a confirmed platform requirement (tenant columns exist in the control
-  plane DB).</li>
-</ul></div>
+  plane DB).
+</pre></div>
 </div>
 
 <div class="foot">생성됨: <code>poc/scenario-viz/build_knowledge.py</code> · 원본: <code>knowledge/README.md</code></div>
