@@ -5,8 +5,8 @@ Run this on a machine that has the repo + working SCP creds (.env). It serves th
 console AND executes selected lifecycles locally, so the console's "실행 ▶" button
 actually runs (no GitHub round-trip, no FastAPI).
 
-    python tools/console_server.py                 # http://127.0.0.1:8800/
-    PORT=9000 python tools/console_server.py
+    python tools/console_server.py                 # http://127.0.0.1:9000/
+    PORT=8800 python tools/console_server.py        # override the default port
 
 Flow: open the console -> Plan tab -> pick service(s)/combo -> 실행 ▶ -> the console
 POSTs the selected lifecycle ids to /api/run -> the server runs
@@ -32,7 +32,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "poc" / "scenario-viz"            # console.html + data/ + assets/ + kdocs/
 RUN_DIR = ROOT / "reports" / "console-runs"
-PORT = int(os.environ.get("PORT", "8800"))
+PORT = int(os.environ.get("PORT", "9000"))
 
 _RUNS: dict[str, dict] = {}                    # id -> run record (in-memory)
 _LOCK = threading.Lock()

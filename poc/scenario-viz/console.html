@@ -51,6 +51,16 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:4px}
   border-radius:7px;cursor:pointer;border-bottom:1px dashed var(--line)}
 .reglist .ri:hover{background:var(--panel2)}
 .reglist .ri .pct{font-weight:700;color:#c63434}
+/* live local-execution panel (Report tab, server mode) */
+.livecard{border:1px solid var(--accent,#2563c9);border-radius:10px;padding:10px 12px;margin-bottom:12px;background:var(--panel2)}
+.runrow{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:5px 6px;
+  border-radius:7px;cursor:pointer;border-bottom:1px dashed var(--line)}
+.runrow:hover{background:var(--panel)}
+.runrow .pct{font-weight:700;color:var(--muted)}
+.runrow.on{background:var(--panel)}
+.runlog{background:#0d1117;color:#c9d1d9;font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;
+  padding:9px 11px;border-radius:7px;margin:4px 0 8px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.livedot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
 </style>
 </head><body><div class="wrap">
 <header class="top">
@@ -164,8 +174,50 @@ function execRun(lcs){
     box.innerHTML=`<div><b>${st}</b> <button onclick="this.closest('#runstat').remove()" style="float:right;cursor:pointer">×</button></div>
       <div class="small" style="margin-top:5px"><code>${esc((j.crud_ids||[]).join(', '))}</code></div>
       <div class="small" style="margin-top:5px;color:#15924f">${esc(j.summary||"")}</div>
-      <div class="small muted" style="margin-top:3px">run ${esc(id)}</div>`;
+      <div class="small muted" style="margin-top:3px">run ${esc(id)}</div>
+      <div style="margin-top:7px"><button class="btn ghost" style="font-size:11px;padding:3px 8px"
+        onclick='openRun=${esc(JSON.stringify(id))};go("report")'>Report에서 로그 보기 →</button></div>`;
     if(j.status==="running")setTimeout(()=>poll(id),3000);}).catch(()=>{});}
+}
+
+// ===== LIVE RUNS panel (Report tab, local server only): real execution records + logs =====
+// Plan/Run에서 실행한 결과를 Report에서 실제로 확인하는 화면. /api/runs(목록) + /api/runs/<id>(전체 로그).
+let runsTimer=null, openRun=null;
+function stopRunsPoll(){if(runsTimer){clearTimeout(runsTimer);runsTimer=null;}}
+function liveRunsHtml(runs){
+  if(!runs.length)return '<p class="muted small">아직 실행 기록이 없습니다 — <b>Plan</b>/<b>Run</b> 탭에서 <b>실행 ▶</b> 하면 여기에 나타납니다.</p>';
+  return runs.map(r=>{
+    const icon=r.status==="running"?"⏳":r.status==="done"?(r.rc===0?"✅":"⚠️"):"❌";
+    const dur=(r.ended&&r.started)?Math.round(r.ended-r.started)+"s":(r.status==="running"?"실행중…":"");
+    const on=openRun===r.id;
+    return `<div class="runrow${on?' on':''}" data-id="${esc(r.id)}">
+        <span><b class="small">${icon} ${esc(r.id)}</b>
+          <span class="muted small">${esc((r.crud_ids||[]).join(', '))||'—'}</span></span>
+        <span class="pct small">${esc(r.summary||r.status)} · ${dur}</span></div>`+
+      (on?`<pre class="runlog" id="log-${esc(r.id)}">로그 로딩…</pre>`:"");
+  }).join("");
+}
+function renderLiveRuns(box){
+  fetch("/api/runs").then(r=>r.json()).then(j=>{
+    const runs=j.runs||[];
+    const anyRunning=runs.some(r=>r.status==="running");
+    box.innerHTML=`<h3 style="margin:0 0 7px">실제 실행 기록 <span class="muted small">· 로컬 서버 · ${runs.length}건${anyRunning?' · <span style="color:#2563c9">⏳ 실행중</span>':''}</span>
+        <button class="btn ghost" id="runsRefresh" style="float:right;font-size:11px;padding:3px 8px">↻ 새로고침</button></h3>
+      <div class="scroll" id="runsList" style="max-height:260px">${liveRunsHtml(runs)}</div>
+      <p class="cp-note">행 클릭 = 전체 로그 펼치기/접기. 실행 중이면 3초마다 자동 갱신.</p>`;
+    document.getElementById("runsRefresh").onclick=()=>renderLiveRuns(box);
+    document.querySelectorAll('#runsList .runrow').forEach(el=>el.onclick=()=>{
+      openRun=(openRun===el.dataset.id)?null:el.dataset.id;renderLiveRuns(box);});
+    if(openRun){const pre=document.getElementById("log-"+openRun);
+      if(pre)fetch("/api/runs/"+openRun).then(r=>r.json()).then(d=>{
+        pre.textContent=d.log||"(로그 없음)";pre.scrollTop=pre.scrollHeight;
+      }).catch(()=>{pre.textContent="(로그 로드 실패)";});}
+    stopRunsPoll();
+    if(anyRunning)runsTimer=setTimeout(()=>renderLiveRuns(box),3000);
+  }).catch(()=>{
+    box.innerHTML='<h3 style="margin:0 0 7px">실제 실행 기록</h3>'
+      +'<p class="muted small">로컬 서버에 연결되지 않았습니다 — <code>python tools/console_server.py</code> 가 실행 중인지 확인하세요. (GitHub Pages에서는 실행 기록을 볼 수 없습니다.)</p>';
+  });
 }
 function setCP(){
   const cur=CP;const v=prompt("컨트롤플레인 base URL (실제 실행/편집이 일어나는 FastAPI 서버):\n예) http://localhost:8000",cur);
@@ -528,11 +580,19 @@ function reportTab(){
       <button class="btn ghost" onclick="go('catalog')">↺ Catalog로</button>
       ${runBtn([...targets], "재실행")}</div>
     <p class="cp-note">수행시간은 시뮬 추정. C3·pass/fail은 실측. <b>재실행 ▶</b> 는 GitHub commit → chat-heavy(선택 lifecycle, crud_ids).</p>`;
+  // local server: show the REAL execution records + logs at the top of Report
+  // (Plan→Run→Report 실제 루프). On github.io this panel says "server not connected".
+  if(LOCAL){
+    const left=document.getElementById("left");
+    const card=document.createElement("div");card.className="livecard";
+    left.insertBefore(card,left.firstChild);
+    renderLiveRuns(card);
+  }
 }
 
 // ---- tab switch ----
 function draw(){({catalog:knowledge,plan:planTab,run:runTab,report:reportTab})[tab]();}
-function go(t){stopRun();if(t==="run")clock=0;tab=t;
+function go(t){stopRun();stopRunsPoll();if(t==="run")clock=0;tab=t;
   document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));draw();}
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>go(b.dataset.t));
 // re-select when the hash deep-link changes (e.g. #networking/loadbalancer)
