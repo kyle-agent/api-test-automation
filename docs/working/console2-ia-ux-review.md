@@ -87,10 +87,10 @@ Effort: S ≈ <½d · M ≈ 1–2d · L ≈ multi-day/IA shift.
 ### Bigger IA shifts
 | # | Prio | Problem → Change | Effort | Status |
 |---|------|------------------|--------|--------|
-| B1 | P0 | 4 flat tabs force manual re-correlation → report = master(흐름) + detail(자원·API·로그 scoped) | L | backlog |
-| B2 | P0 | DAG unusable at 222 nodes → collapse-to-service + focus-on-click + minimap/zoom; order/wave as equal views | L | backlog |
+| B1 | P0 | 4 flat tabs force manual re-correlation → report = master(흐름) + detail(자원·API·로그 scoped) | L | **DONE** (f73afadb) |
+| B2 | P0 | DAG unusable at 222 nodes → collapse-to-service + focus-on-click + minimap/zoom; order/wave as equal views | L | **DONE** (6f5ae673) |
 | B3 | P1 | Closure invisible as a set → "닫힘 보기" trimmable drawer with provenance; = "save as suite" | M–L | backlog |
-| B4 | P1 | Suites homeless in UI → Suite ▾ picker (load/save named scope) | M | backlog |
+| B4 | P1 | Suites homeless in UI → Suite ▾ picker (load/save named scope) | M | **DONE** — `Suite ▾` in 구성, backed by `suites/*.yaml` + `core.suites`; saves a CI-ignored `scope:` for console2 fidelity |
 | B5 | P1 | Run history subordinate; no compare; queue undefined → Runs build-list rail (queue = a state) | M–L | backlog |
 | B6 | P0 | API-detail/coverage is the north star → Schema vs Request vs Response + param diff; coverage heatmap on DAG | L | **in build-1 (started)** |
 | B7 | P2 | Plan↔run cut loses order/quota readout → carry compact order/peak-VPC/dedup strip into 실행 | S–M | backlog |

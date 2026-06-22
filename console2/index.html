@@ -37,6 +37,10 @@
       <h2>선택 <span class="muted small">— 카테고리 ▸ 서비스 (행 클릭 = 서비스 선택)</span></h2>
       <div class="svc-controls">
         <input type="search" class="search" id="sel-search" placeholder="서비스 검색…  (예: vpc, queue)">
+        <div class="suitewrap" id="suitewrap">
+          <button class="allbtn" id="suite-btn" title="스윗 = 범위 × 안전게이트 프리셋 (suites/*.yaml · CI 공유). 불러오기/현재 선택 저장">스윗 ▾</button>
+          <div class="suitemenu hidden" id="suite-menu"></div>
+        </div>
         <button class="allbtn" id="sel-all">전체 선택</button>
       </div>
       <div class="selreadout treeread" id="sel-readout"></div>

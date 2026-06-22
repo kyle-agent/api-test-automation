@@ -80,6 +80,7 @@ function init() {
   wireNav();
   wireModal();
   buildAxisCtl();
+  wireSuites();
   go("build");
 }
 
@@ -583,6 +584,112 @@ function buildAxisCtl() {
     ctxBar(); launchSummary();
   });
   $("launch-go").onclick = startRun;
+}
+
+// ================= 스윗 (suites/*.yaml · CI 공유) =================
+// A suite = a named (scope × safety-gates) preset. Loading one applies its
+// gates (→ Axis) and selects its scope (node_ids ▸ services ▸ categories, else
+// the whole catalog); saving POSTs the current selection back to
+// suites/<id>.yaml via /api/suites. The built-in 4 (smoke/full/full-heavy/
+// conformance) are the canonical run shapes; saved ones round-trip console2's
+// exact selection through the CI-ignored `scope:` block.
+let SUITES = [];
+const _gatesEqual = (a, b) =>
+  !!a.mutations === !!b.mutations && !!a.destructive === !!b.destructive && !!a.heavy === !!b.heavy;
+
+async function loadSuites() {
+  try {
+    const r = await fetch("/api/suites");
+    SUITES = (await r.json()).suites || [];
+  } catch (e) { SUITES = []; }
+  drawSuiteMenu();
+}
+function closeSuiteMenu() {
+  const m = $("suite-menu"); if (m) m.classList.add("hidden");
+  const b = $("suite-btn"); if (b) b.classList.remove("on");
+}
+function drawSuiteMenu() {
+  const m = $("suite-menu"); if (!m) return;
+  const rows = SUITES.map(s => {
+    const on = Object.keys(s.gates || {}).filter(k => s.gates[k]);
+    const chips = on.length
+      ? on.map(k => `<span class="sgate g-${esc(k)}">${esc(k)}</span>`).join("")
+      : `<span class="sgate ro">read-only</span>`;
+    const tag = s.builtin ? `<span class="stag b">기본</span>` : `<span class="stag">저장됨</span>`;
+    return `<div class="srow" data-suite="${esc(s.id)}">
+      <div class="sline"><span class="sname">${esc(s.id)}</span>${tag}<span class="sgates">${chips}</span></div>
+      ${s.label ? `<div class="slabel">${esc(s.label)}</div>` : ""}</div>`;
+  }).join("");
+  m.innerHTML = rows +
+    `<div class="srow ssave" id="suite-save">＋ 현재 선택을 스윗으로 저장…</div>`;
+  els("#suite-menu .srow[data-suite]").forEach(r => r.onclick = () => {
+    const s = SUITES.find(x => x.id === r.dataset.suite); if (s) applySuite(s);
+  });
+  const sv = $("suite-save"); if (sv) sv.onclick = saveCurrentAsSuite;
+}
+function applySuite(s) {
+  const g = s.gates || {}, sc = s.scope || {}, req = s.request || {};
+  // gates → an *enabled* Axis with matching gates (else keep the current Axis)
+  const ax = Object.keys(AXES).find(k => AXES[k].enabled && _gatesEqual(AXES[k].gates || {}, g));
+  if (ax) { runAxis = ax; buildAxisCtl(); }
+  // scope → targets (prefer the richest available: nodes ▸ services ▸ categories ▸ all)
+  targets.clear();
+  const addIf = pred => Object.keys(N).forEach(id => { if (N[id].lifecycle && pred(id)) targets.add(id); });
+  if (Array.isArray(sc.node_ids) && sc.node_ids.length) {
+    sc.node_ids.forEach(id => { if (N[id] && N[id].lifecycle) targets.add(id); });
+  } else if ((sc.services && sc.services.length) || req.service) {
+    const set = new Set(sc.services || []);
+    if (req.service) Object.keys(N).forEach(id => { if (shortName(N[id].service) === req.service) set.add(N[id].service); });
+    addIf(id => set.has(N[id].service));
+  } else if ((sc.categories && sc.categories.length) || req.category) {
+    const set = new Set([...(sc.categories || []), ...(req.category ? [req.category] : [])]);
+    addIf(id => set.has(N[id].category));
+  } else {
+    addIf(() => true);                       // whole-catalog suite (smoke/full/…)
+  }
+  closeSuiteMenu();
+  selectionChanged();
+}
+function currentSuitePayload(id, label) {
+  const node_ids = [...targets];
+  const services = [...new Set(node_ids.map(i => N[i].service))];
+  const categories = [...new Set(node_ids.map(i => N[i].category))];
+  const g = (AXES[runAxis] && AXES[runAxis].gates) || {};
+  const request = {};
+  ["mutations", "destructive", "heavy"].forEach(k => { if (k in g) request[k] = !!g[k]; });
+  if (services.length === 1) {               // single service → CI-precise filter (README convention)
+    const sn = shortName(services[0]);
+    request.service = sn; request.crud_filter = sn;
+  }
+  return { id, label, request, scope: { node_ids, services, categories } };
+}
+async function saveCurrentAsSuite() {
+  if (!targets.size) { alert("선택된 리소스가 없습니다 — 먼저 서비스를 선택하세요."); return; }
+  const id = (prompt("스윗 id (소문자·숫자·-_. · 예: net-core):", "") || "").trim().toLowerCase();
+  if (!id) return;
+  const label = (prompt("설명 (label, 선택):", "") || "").trim();
+  try {
+    const res = await fetch("/api/suites", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(currentSuitePayload(id, label))
+    });
+    const j = await res.json();
+    if (!res.ok) { alert("저장 실패: " + (j.error || res.status)); return; }
+    SUITES = j.suites || SUITES; drawSuiteMenu();
+    alert(`스윗 '${id}' 저장됨 → suites/${id}.yaml (CI 공유)`);
+  } catch (e) { alert("저장 실패: " + e); }
+}
+function wireSuites() {
+  const b = $("suite-btn"); if (!b) return;
+  b.onclick = e => {
+    e.stopPropagation();
+    const hidden = $("suite-menu").classList.toggle("hidden");
+    b.classList.toggle("on", !hidden);
+  };
+  document.addEventListener("click", e => {
+    const w = $("suitewrap"); if (w && !w.contains(e.target)) closeSuiteMenu();
+  });
+  loadSuites();
 }
 function launchSummary() {
   const svcs = new Set([...targets].map(id => N[id].service));

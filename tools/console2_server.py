@@ -36,6 +36,14 @@ What it exposes (all JSON unless noted):
   POST /api/owned              -> read-only owned-resource inventory as a STRUCTURED
                                   list (service · path · total) for the run-screen
                                   "남은 자원(잔존)" pre-flight panel. LIST calls only.
+  GET  /api/suites             -> named suites (suites/*.yaml via core.suites) as
+                                  {id,label,request,gates,scope,builtin} — the Suite ▾
+                                  presets (smoke/full/full-heavy/conformance + saved).
+  POST /api/suites {id,label,request,scope?}
+                               -> save the current selection as a suite: writes
+                                  suites/<id>.yaml (validated by core.suites). The
+                                  optional `scope` preserves console2's exact
+                                  selection and is ignored by core.suites / CI.
 
 Safety: identical opt-in to console_server / chat-heavy — mutation/destructive/
 heavy gates are set PER RUN from the request only, never globally. Simulate makes
@@ -785,6 +793,83 @@ def _rec_view(rec: dict, full: bool = False) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# suites (named run shapes) — reuse core.suites (suites/*.yaml, CI-shared)
+# --------------------------------------------------------------------------- #
+# A suite = a named (scope × safety-gates) preset. The canonical store is
+# suites/*.yaml driven by core.suites — the SAME data the CI run-request reads,
+# so a suite saved here is runnable by the workflow with no new concept. The
+# `request:` block holds exactly the run-request options (gates + a single
+# category/service/crud_filter). console2's finer, multi-service / resource-level
+# selection is preserved in an OPTIONAL top-level `scope:` block that core.suites
+# ignores (it validates only `request`), so the file stays CI-valid while still
+# round-tripping faithfully in the console.
+
+_BUILTIN_SUITES = ("smoke", "full", "full-heavy", "conformance")
+_SUITE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,48}$")
+
+
+def _suite_view(data: dict, *, builtin: bool) -> dict:
+    """A core.suites record -> console2 shape (gates + scope split out)."""
+    from core import suites as _s
+    req = dict(data.get("request") or {})
+    gates = {k: bool(req.get(k, False)) for k in _s.BOOL_KEYS}
+    scope = dict(data.get("scope") or {})          # console2 extension (CI-ignored)
+    for k in _s.STR_KEYS:                           # surface the CI-coarse filter too
+        if req.get(k) and k not in scope:
+            scope[k] = req[k]
+    return {"id": data.get("id"), "label": data.get("label", ""),
+            "request": req, "gates": gates, "scope": scope, "builtin": builtin}
+
+
+def _list_suites_view() -> list[dict]:
+    from core import suites as _s
+    return [_suite_view(s, builtin=(s.get("id") in _BUILTIN_SUITES))
+            for s in _s.list_suites()]
+
+
+def _save_suite(body: dict) -> dict:
+    """Validate + write suites/<id>.yaml; return the saved suite view.
+
+    Raises ValueError(msg) on any rejection (bad id, gate inconsistency, builtin
+    overwrite without force) so the route can map it to a 400.
+    """
+    import yaml
+    from core import suites as _s
+
+    sid = str(body.get("id") or "").strip().lower()
+    if not _SUITE_ID_RE.match(sid):
+        raise ValueError("id must be a slug: a-z 0-9 . _ - (1–49 chars), no spaces/paths")
+    if sid in _BUILTIN_SUITES and not body.get("force"):
+        raise ValueError(f"{sid!r} is a built-in suite — choose another id (or pass force=true)")
+    label = str(body.get("label") or sid).strip()
+    req_in = dict(body.get("request") or {})
+    request: dict = {}
+    for k in _s.BOOL_KEYS:                           # gates -> bool
+        if k in req_in:
+            request[k] = bool(req_in[k])
+    for k in _s.STR_KEYS:                            # coarse filter -> str
+        if req_in.get(k):
+            request[k] = str(req_in[k])
+    data: dict = {"id": sid, "label": label, "request": request}
+    scope = body.get("scope")
+    if isinstance(scope, dict):                      # console2 fidelity (CI ignores it)
+        kept = {k: scope[k] for k in ("category", "service", "crud_filter",
+                                      "categories", "services", "node_ids")
+                if scope.get(k)}
+        if kept:
+            data["scope"] = kept
+    path = _s.suite_path(sid)
+    errs = _s.validate_suite(data, path)
+    if errs:
+        raise ValueError("; ".join(errs))
+    header = ("# console2-authored suite (saved selection). `request:` is the CI\n"
+              "# run-request block; the optional `scope:` preserves console2's exact\n"
+              "# selection and is ignored by core.suites / the workflow.\n")
+    path.write_text(header + yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+    return _suite_view(data, builtin=False)
+
+
+# --------------------------------------------------------------------------- #
 # HTTP
 # --------------------------------------------------------------------------- #
 class Handler(BaseHTTPRequestHandler):
@@ -837,6 +922,11 @@ class Handler(BaseHTTPRequestHandler):
                                         "method": (method or "").upper(),
                                         "path": path})
             return self._json(200, hit)
+        if p == "/api/suites":
+            try:
+                return self._json(200, {"suites": _list_suites_view()})
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"suites list failed: {exc}"})
         if p == "/api/runs":
             with _LOCK:
                 rows = [_rec_view(r) for r in sorted(_RUNS.values(),
@@ -899,6 +989,15 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 rec = _start("simulate", _simulate_worker, mode="simulate", lifecycle_ids=ids)
             return self._json(202, _rec_view(rec))
+        if p == "/api/suites":
+            b = self._body()
+            try:
+                view = _save_suite(b)
+            except ValueError as exc:
+                return self._json(400, {"error": str(exc)})
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"suite save failed: {exc}"})
+            return self._json(201, {"suite": view, "suites": _list_suites_view()})
         if p == "/api/cleanup":
             return self._json(202, _rec_view(_start("cleanup", _cleanup_worker)))
         if p == "/api/verify":

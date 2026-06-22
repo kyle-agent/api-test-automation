@@ -529,3 +529,54 @@ def test_plan_all_disabled_selection_is_empty_not_everything():
     assert p["plan"]["leaf_set"] == []
     # 'no selection at all' still falls back to the full enabled set
     assert len(C2._plan([])["plan"]["leaf_set"]) > 50
+
+
+# --------------------------------------------------------------------------- #
+# suites (named run shapes) — /api/suites is backed by core.suites + the
+# console2 `scope:` extension. Pin: the built-in 4 surface with parsed gates,
+# a saved suite is CI-valid (render ignores scope), and the guards reject.
+# --------------------------------------------------------------------------- #
+def test_list_suites_view_surfaces_builtins_with_parsed_gates():
+    view = {s["id"]: s for s in C2._list_suites_view()}
+    for sid in ("smoke", "full", "full-heavy", "conformance"):
+        assert sid in view and view[sid]["builtin"] is True, f"missing builtin {sid}"
+    # gates are parsed out of the request block into a flat map (all BOOL_KEYS)
+    assert all(v is False for v in view["smoke"]["gates"].values())  # read-only
+    assert view["full"]["gates"]["mutations"] and view["full"]["gates"]["destructive"]
+    assert view["full"]["gates"]["heavy"] is False
+    assert view["full-heavy"]["gates"]["heavy"] and view["full-heavy"]["gates"]["conformance"]
+
+
+def test_save_suite_writes_ci_valid_file_and_render_ignores_scope(tmp_path, monkeypatch):
+    """A console2-saved suite must (a) write suites/<id>.yaml, (b) pass core.suites
+    validation, and (c) render to a run-request that carries ONLY the request
+    block — the console2 `scope:` extension stays invisible to CI."""
+    from core import suites as S
+    monkeypatch.setattr(S, "SUITE_DIR", tmp_path)
+    out = C2._save_suite({
+        "id": "net-core", "label": "core networking",
+        "request": {"mutations": True, "destructive": True},
+        "scope": {"node_ids": ["vpc", "subnet"], "services": ["networking/vpc"]},
+    })
+    assert out["id"] == "net-core" and out["builtin"] is False
+    path = tmp_path / "net-core.yaml"
+    assert path.exists(), "suite file not written"
+    data = S.load_suite("net-core")
+    assert S.validate_suite(data, path) == [], "saved suite is not CI-valid"
+    assert data["scope"]["node_ids"] == ["vpc", "subnet"]  # console2 fidelity preserved
+    rendered = S.render(data)
+    assert "mutations=true" in rendered and "destructive=true" in rendered
+    assert "scope" not in rendered and "node_ids" not in rendered  # CI never sees scope
+
+
+def test_save_suite_rejects_bad_id_builtin_overwrite_and_gate_inconsistency(tmp_path, monkeypatch):
+    import pytest
+    from core import suites as S
+    monkeypatch.setattr(S, "SUITE_DIR", tmp_path)
+    with pytest.raises(ValueError):                       # path-traversal / non-slug id
+        C2._save_suite({"id": "../evil", "request": {}})
+    with pytest.raises(ValueError):                       # built-in overwrite without force
+        C2._save_suite({"id": "smoke", "request": {}})
+    with pytest.raises(ValueError):                       # mutations without destructive (core rule)
+        C2._save_suite({"id": "lonely-mut", "request": {"mutations": True}})
+    assert not list(tmp_path.glob("*.yaml")), "no file should be written on rejection"
