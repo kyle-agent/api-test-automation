@@ -20,7 +20,7 @@
  * `scene()` is the productionized B2 mockup (console2/mockups/b2-dag-scale.html):
  * group-by-category & collapse-by-default when large, an OBVIOUS expand⇄collapse
  * TOGGLE (▸/▾ chevron, click group again or 전체 접기/펼치기 to collapse), focus
- * on a resource node (dependency path highlit, rest dimmed), a draggable minimap,
+ * on a resource node (dependency path highlit, rest dimmed),
  * zoom +/−/맞춤/wheel, and drag-to-pan. It renders the SAME graph object the flat
  * renderer does, so 구성(selection) and 흐름(live-run) share one navigable scene;
  * an `overlay` keeps run-state coloring PRIMARY on 흐름. */
@@ -45,12 +45,12 @@
     "financial-management": "#b5740b", "devops-tools": "#1f883d",
   };
   const catColor = c => CAT_COLOR[c] || "#656d76";
-  // Korean-ish short labels + a stable left-to-right (foundation-first) order.
+  // Short English labels + a stable left-to-right (foundation-first) order.
   const CAT_LABEL = {
-    "networking": "네트워킹", "security": "보안", "management": "관리", "storage": "스토리지",
-    "compute": "컴퓨트", "container": "컨테이너", "database": "데이터베이스", "data-analytics": "데이터분석",
-    "ai-ml": "AI/ML", "application-service": "앱서비스", "platform": "플랫폼",
-    "financial-management": "비용관리", "devops-tools": "DevOps",
+    "networking": "Networking", "security": "Security", "management": "Management", "storage": "Storage",
+    "compute": "Compute", "container": "Container", "database": "Database", "data-analytics": "Data Analytics",
+    "ai-ml": "AI/ML", "application-service": "App Service", "platform": "Platform",
+    "financial-management": "Financial Mgmt", "devops-tools": "DevOps Tools",
   };
   const CAT_ORDER = ["networking", "security", "management", "storage", "compute", "container",
     "database", "data-analytics", "ai-ml", "application-service", "platform",
@@ -311,11 +311,8 @@
   function scene(svg, stage, data, opt) {
     opt = opt || {};
     // DOM the scene drives (all optional except svg+stage). The caller wires the
-    // toolbar buttons to controller methods; the scene owns zoom/pan/minimap/focus.
+    // toolbar buttons to controller methods; the scene owns zoom/pan/focus.
     const dom = {
-      minimap: opt.minimap || null,      // .minimap container
-      mmsvg: opt.mmsvg || null,          // svg inside the minimap
-      mmview: opt.mmview || null,        // the draggable viewport rect
       hint: opt.hint || null,            // hint pill
       stat: opt.stat || null,            // stat chip
       granNote: opt.granNote || null,    // granularity note
@@ -485,7 +482,6 @@
       svg.querySelectorAll("g.rg-unit").forEach(g => g.addEventListener("click", ev => {
         ev.stopPropagation(); onUnitClick(g.dataset.key);
       }));
-      renderMinimap();
       updateHint();
       updateStat();
       if (opt.onDraw) opt.onDraw();
@@ -531,7 +527,7 @@
     }
 
     // ---- zoom + pan (transform on the svg; stage clips) ----
-    function applyT() { svg.style.transformOrigin = "0 0"; svg.style.transform = `translate(${T.x}px,${T.y}px) scale(${T.k})`; updateMinimapView(); updateStat(); }
+    function applyT() { svg.style.transformOrigin = "0 0"; svg.style.transform = `translate(${T.x}px,${T.y}px) scale(${T.k})`; updateStat(); }
     const clampK = k => Math.max(0.1, Math.min(2.4, k));
     function zoomAt(cx, cy, factor) {
       const nk = clampK(T.k * factor), r = nk / T.k;
@@ -547,29 +543,6 @@
     }
     function zoomIn() { zoomAt(stage.clientWidth / 2, stage.clientHeight / 2, 1.25); }
     function zoomOut() { zoomAt(stage.clientWidth / 2, stage.clientHeight / 2, 0.8); }
-
-    // ---- minimap ----
-    function renderMinimap() {
-      const mm = dom.mmsvg; if (!mm) return;
-      mm.setAttribute("viewBox", `0 0 ${LAYOUT.w} ${LAYOUT.h}`);
-      let s = "";
-      LAYOUT.units.forEach(u => {
-        const p = LAYOUT.pos[u.key];
-        const fill = u.kind === "res" ? "#cdd5de" : catColor(u.cat);
-        s += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="5" fill="${fill}" opacity="${u.kind === "res" ? 0.55 : 0.85}"/>`;
-      });
-      mm.innerHTML = s;
-      updateMinimapView();
-    }
-    function updateMinimapView() {
-      const mm = dom.mmsvg, view = dom.mmview; if (!mm || !view) return;
-      const sw = stage.clientWidth, sh = stage.clientHeight;
-      const vx = (-T.x) / T.k, vy = (-T.y) / T.k, vw = sw / T.k, vh = sh / T.k;
-      const mmw = mm.clientWidth || 220, mmh = mm.clientHeight || 144;
-      const sx = mmw / LAYOUT.w, sy = mmh / LAYOUT.h;
-      view.style.left = (vx * sx) + "px"; view.style.top = (vy * sy) + "px";
-      view.style.width = Math.max(8, vw * sx) + "px"; view.style.height = Math.max(8, vh * sy) + "px";
-    }
 
     // ---- hint + stat ----
     function updateHint() {
@@ -594,66 +567,46 @@
       if (note) {
         if (GRAN === "category") note.textContent = `카테고리 단위로 접음 (${total} → ${nGroups || nUnits}). 그룹 클릭으로 펼침.`;
         else if (GRAN === "service") note.textContent = `서비스 단위로 접음 (${total}자원).`;
-        else note.textContent = `${total}개 자원 전부 펼침 — 미니맵·focus로 탐색.`;
+        else note.textContent = `${total}개 자원 전부 펼침 — 확대·focus로 탐색.`;
       }
     }
 
-    // ---- pointer handlers (drag-to-pan, wheel-zoom, minimap drag) ----
-    let drag = null, mmDrag = null;
+    // ---- pointer handlers (drag-to-pan, wheel-zoom) ----
+    let drag = null;
     function onWheel(e) {
       e.preventDefault();
       const rect = stage.getBoundingClientRect();
       zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 0.89);
     }
     function onDown(e) {
-      if (dom.minimap && e.target.closest(".minimap")) return;
       if (e.target.closest(".zoomctl")) return;
       drag = { x: e.clientX, y: e.clientY, tx: T.x, ty: T.y, moved: false };
       stage.classList.add("grabbing");
     }
     function onMove(e) {
-      if (mmDrag) {
-        const mm = dom.mmsvg; const mmw = mm.clientWidth || 220, mmh = mm.clientHeight || 144;
-        const sx = mmw / LAYOUT.w, sy = mmh / LAYOUT.h;
-        T.x = mmDrag.tx - (e.clientX - mmDrag.x) / sx * T.k;
-        T.y = mmDrag.ty - (e.clientY - mmDrag.y) / sy * T.k; applyT(); return;
-      }
       if (!drag) return;
       T.x = drag.tx + (e.clientX - drag.x); T.y = drag.ty + (e.clientY - drag.y);
       if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) > 3) drag.moved = true;
       applyT();
     }
     function onUp(e) {
-      mmDrag = null;
       if (drag) {
         // click empty space (no drag, not on a unit) clears focus
         if (!drag.moved && !e.target.closest("g.rg-unit") && !e.target.closest(".rg-selbox") && FOCUS) clearFocus();
         drag = null; stage.classList.remove("grabbing");
       }
     }
-    function onMmDown(e) {
-      if (dom.mmview && e.target === dom.mmview) { e.stopPropagation(); mmDrag = { x: e.clientX, y: e.clientY, tx: T.x, ty: T.y }; return; }
-      // click the minimap body = recenter there
-      const mm = dom.mmsvg; if (!mm) return;
-      const rect = mm.getBoundingClientRect();
-      const sx = mm.clientWidth / LAYOUT.w, sy = mm.clientHeight / LAYOUT.h;
-      const gx = (e.clientX - rect.left) / sx, gy = (e.clientY - rect.top) / sy;
-      T.x = stage.clientWidth / 2 - gx * T.k; T.y = stage.clientHeight / 2 - gy * T.k; applyT();
-      e.stopPropagation();
-    }
 
     stage.addEventListener("wheel", onWheel, { passive: false });
     stage.addEventListener("mousedown", onDown);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-    if (dom.minimap) dom.minimap.addEventListener("mousedown", onMmDown);
 
     function destroy() {
       stage.removeEventListener("wheel", onWheel);
       stage.removeEventListener("mousedown", onDown);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      if (dom.minimap) dom.minimap.removeEventListener("mousedown", onMmDown);
     }
 
     // pick a sensible initial collapse state: collapse-by-category when large,

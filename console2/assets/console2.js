@@ -53,7 +53,7 @@ let scopeAuto = true;       // true until the user explicitly picks a scope (so 
 
 // DAG-at-scale (B2) scene controllers — one for the 구성 composition DAG, one for
 // the 흐름 live-run DAG. Both drive the SAME graph object via ResourceGraph.scene
-// (group/collapse · focus · minimap · zoom). buildView toggles 그림|표 on ①.
+// (group/collapse · focus · zoom). buildView toggles 그림|표 on ①.
 let dagScene = null;        // 구성 (#dag-svg) scene
 let r1Scene = null;         // 흐름 (#r1-svg) scene
 let buildView = "fig";      // 그림 | 표 (구성 DAG mode)
@@ -91,6 +91,10 @@ const hasLifecycle = id => !!(N[id] && N[id].lifecycle);
 const svcNodes = svc => Object.keys(N).filter(id => N[id].service === svc);          // all nodes of a service
 const svcSelectable = svc => svcNodes(svc).filter(hasLifecycle);                       // its lifecycle-bearing nodes
 const shortName = svc => svc.split("/").pop();
+// English category display label (shared with the DAG via ResourceGraph.catLabel);
+// the raw slug stays the data key, only the shown name is localized to English.
+const catName = c => (window.ResourceGraph && window.ResourceGraph.catLabel
+  ? window.ResourceGraph.catLabel(c) : c);
 
 // resource KIND from a delete/create path: the collection segment right after the
 // version (e.g. /v1/vpcs/{id} → vpc, /v1/subnets/... → subnet, /v1/nat-gateways →
@@ -297,7 +301,7 @@ function drawSvcTree() {
       <div class="trow tcat-row ${catCls}" data-cat="${esc(cat)}">
         <span class="tcar">${open ? "▾" : "▸"}</span>
         <span class="tchk cat" data-catchk="${esc(cat)}" title="카테고리 전체 선택/해제">${catAllOn ? "✓" : catPartial ? "◐" : ""}</span>
-        <span class="tname">${esc(cat)}</span>
+        <span class="tname">${esc(catName(cat))}</span>
         <span class="tmeta">${onCount}/${svcs.length}</span>
       </div>`;
     if (open) {
@@ -419,13 +423,12 @@ function renderGraph(g) {
   applyBuildView();
 }
 
-// construct the 구성 DAG scene controller: group/collapse + focus + minimap + zoom.
+// construct the 구성 DAG scene controller: group/collapse + focus + zoom.
 // Interaction decision (least-surprising at scale): click a resource node = FOCUS
 // (dependency path); the small ＋/✓ corner control toggles TARGET selection. Click a
 // collapsed group = expand; click it again (or 전체 접기) collapses it back.
 function makeDagScene(svg, g) {
   return window.ResourceGraph.scene(svg, $("dag-stage"), g, {
-    minimap: $("dag-minimap"), mmsvg: $("dag-mmsvg"), mmview: $("dag-mmview"),
     hint: $("dag-hint"), stat: $("dag-stat"), granNote: $("dag-gran-note"),
     isSelectable: id => hasLifecycle(id),
     onToggleTarget: id => {                // ＋/✓ corner = toggle this target
@@ -1207,14 +1210,12 @@ function reportR1() {
           <svg id="r1-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
           <div class="hint-pill" id="r1-hint"></div>
           <div class="zoomctl"><button id="r1-zin">+</button><button id="r1-zout">−</button><button id="r1-zfit" class="fit">맞춤</button></div>
-          <div class="minimap" id="r1-minimap"><span class="mmlabel">미니맵</span><svg id="r1-mmsvg" xmlns="http://www.w3.org/2000/svg"></svg><div id="r1-mmview"></div></div>
         </div>
       </div>
       <div id="r1-prog" style="margin-top:8px"></div>`;
     $("r1-stage-wrap").dataset.run = String(runId);
     if (g) {
       r1Scene = window.ResourceGraph.scene($("r1-svg"), $("r1-stage"), g, {
-        minimap: $("r1-minimap"), mmsvg: $("r1-mmsvg"), mmview: $("r1-mmview"),
         hint: $("r1-hint"), stat: $("r1-stat"),
         overlay: r1Overlay, groupOverlay: r1GroupOverlay,
         // node focus = DRILL into that lifecycle's detail (master→detail). The focus
