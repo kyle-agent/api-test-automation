@@ -344,7 +344,7 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .lo-warn{color:var(--red);font-weight:700}
 
 /* ============================================================================
- * DAG-at-scale (B2) — group/collapse · focus · minimap · zoom · 그림|표.
+ * DAG-at-scale (B2) — group/collapse · focus · zoom · 그림|표.
  * Ported from console2/mockups/b2-dag-scale.html, recolored to this Primer theme.
  * Used by the 구성 composition DAG (#dag-*) and reused on the 흐름 live DAG (#r1-*).
  * ========================================================================== */
@@ -390,13 +390,6 @@ g.rg-selbox{cursor:pointer}
   box-shadow:0 1px 2px rgba(31,35,40,.12)}
 .zoomctl button:hover{border-color:var(--accent);color:var(--accent)}
 .zoomctl button.fit{font-size:10.5px;font-weight:700}
-.minimap{position:absolute;bottom:10px;right:10px;width:220px;height:144px;border:1px solid var(--line2);
-  border-radius:8px;background:rgba(255,255,255,.92);overflow:hidden;z-index:5;box-shadow:0 2px 6px rgba(31,35,40,.14)}
-.minimap .mmlabel{position:absolute;top:3px;left:6px;font-size:9px;font-weight:700;color:var(--muted);
-  text-transform:uppercase;letter-spacing:.4px;z-index:2;pointer-events:none}
-.minimap svg{position:absolute;top:0;left:0;width:100%;height:100%}
-.minimap .mmview,#dag-mmview,#r1-mmview{position:absolute;border:2px solid var(--accent);
-  background:rgba(37,99,201,.10);cursor:move;z-index:3}
 .hint-pill{position:absolute;top:10px;left:10px;z-index:5;background:rgba(255,255,255,.94);
   border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--muted);
   box-shadow:0 1px 2px rgba(31,35,40,.1);max-width:60%}
