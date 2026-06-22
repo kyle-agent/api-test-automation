@@ -388,11 +388,23 @@ def _run_worker(rec: dict) -> None:
             rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
 
 
+def _sim_resource_type(path: str) -> str:
+    """Coarse resource type from a step path, e.g. ``/v1/queues/{queue_id}`` -> ``queues``.
+    First non-version, non-template segment. Synthetic (simulate-only) labelling."""
+    for seg in (path or "").strip("/").split("/"):
+        if not seg or seg.startswith("{") or (seg.startswith("v") and seg[1:].isdigit()):
+            continue
+        return seg
+    return "resource"
+
+
 def _simulate_worker(rec: dict) -> None:
     """DRY-RUN: replay the plan to the event stream (no cloud, deterministic). Walks
     the dag_planner waves in order and, within each wave, each lifecycle's HTTP steps,
     so the live view shows the real DAG order + the real API call sequence. Used to
-    confirm ordering quickly before a real run."""
+    confirm ordering quickly before a real run. Also emits clearly-synthetic
+    ``resource-tracked``/``resource-deleted`` events (ids prefixed ``sim-``) on
+    create/delete steps so the resource-inventory report renders without any cloud."""
     evp, logp = rec["events"], Path(rec["log"])
     try:
         plan = _plan(rec["lifecycle_ids"])
@@ -420,6 +432,18 @@ def _simulate_worker(rec: dict) -> None:
                     _emit_event(evp, "step-end", lifecycle=lid, step=s["name"],
                                 method=s["method"], path=s["path"],
                                 status=200, category="ok", elapsed_ms=40)
+                    # synthetic resource tracking (simulate-only; ids prefixed sim-)
+                    # so the "리소스 (실자원 id)" report renders without any cloud call.
+                    if s.get("kind") == "create":
+                        rtype = _sim_resource_type(s["path"])
+                        _emit_event(evp, "resource-tracked", lifecycle=lid,
+                                    resource_type=rtype,
+                                    resource_id="sim-" + uuid.uuid4().hex[:8],
+                                    path=s["path"])
+                    elif s.get("kind") == "delete":
+                        _emit_event(evp, "resource-deleted", lifecycle=lid,
+                                    resource_type=_sim_resource_type(s["path"]),
+                                    path=s["path"])
                 _emit_event(evp, "lifecycle-end", lifecycle=lid, status="passed")
         _emit_event(evp, "run-end", status="done")
         with _LOCK:

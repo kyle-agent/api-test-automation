@@ -114,6 +114,24 @@ def test_simulate_worker_emits_dag_ordered_events(tmp_path):
     assert all("wave_kind" in e for e in evs if e["kind"] == "wave-start")
 
 
+def test_simulate_worker_emits_resource_tracked(tmp_path):
+    """Simulate now emits clearly-synthetic resource ids (prefix ``sim-``) on
+    create steps so the resource-inventory report renders with no cloud calls."""
+    rec = C2._new_rec("simulate", mode="simulate",
+                      lifecycle_ids=C2._resolve_lifecycle_ids(
+                          {"services": ["application-service/queueservice"]}))
+    C2._simulate_worker(rec)
+    assert rec["status"] == "done", rec.get("error")
+    evs = C2._read_events(rec["events"])
+    tracked = [e for e in evs if e["kind"] == "resource-tracked"]
+    assert tracked, "simulate must emit resource-tracked on create steps"
+    one = tracked[0]
+    assert one["resource_id"].startswith("sim-")  # clearly synthetic, no cloud id
+    assert one.get("resource_type") and one.get("path") and one.get("lifecycle")
+    # a lifecycle with a delete step also reports the teardown
+    assert any(e["kind"] == "resource-deleted" for e in evs)
+
+
 def test_plan_all_disabled_selection_is_empty_not_everything():
     """A selection that resolves to only DISABLED lifecycles must yield an EMPTY
     plan — never the all-enabled fallback (that fallback is only for 'no selection')."""

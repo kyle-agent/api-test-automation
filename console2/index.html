@@ -3,77 +3,107 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>console2 — SCP API 테스트 실행 콘솔 (backend up)</title>
-<style>
-  :root{--ink:#1d2530;--muted:#6b7480;--line:#d9e2ec;--panel:#fff;--bg:#eef1f5;--accent:#2563c9}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-       font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px}
-  header{padding:18px 24px;background:#16212e;color:#e7eef6}
-  header h1{margin:0;font-size:18px}
-  header .sub{color:#90a4ba;font-size:12.5px;margin-top:4px}
-  .wrap{max-width:1100px;margin:0 auto;padding:20px 24px}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
-         padding:14px 16px;margin-bottom:14px}
-  .kpi{display:flex;gap:10px;flex-wrap:wrap}
-  .kpi .s{background:#f5f7f9;border:1px solid var(--line);border-radius:9px;padding:8px 14px;min-width:96px}
-  .kpi .s b{font-size:20px;display:block}.kpi .s span{font-size:11px;color:var(--muted)}
-  .note{font-size:12.5px;color:var(--muted);line-height:1.55}
-  code{background:#f0f3f6;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
-  .flow{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12.5px;flex-wrap:wrap;margin:6px 0 0}
-  .flow b{color:var(--accent)} .flow .ar{color:var(--line)}
-  .ok{color:#15924f;font-weight:600}.err{color:#c63434;font-weight:600}
-  ul{margin:6px 0;padding-left:20px}li{margin:3px 0;font-size:13px}
-</style>
+<title>console2 — SCP API 테스트 실행 콘솔</title>
+<link rel="stylesheet" href="assets/console2.css">
 </head>
 <body>
-<header>
-  <h1>console2 — SCP API 테스트 실행 콘솔</h1>
-  <div class="sub">browse → plan(real dag_planner) → run(simulate | live) → DAG-순서 라이브 리포트</div>
-</header>
 <div class="wrap">
-  <div class="panel">
-    <b>백엔드 상태</b> <span id="status">확인 중…</span>
-    <div class="flow" style="margin-top:8px">
-      <b>① 선택</b> category/service/resource <span class="ar">→</span>
-      <b>② Plan</b> 의존 폐포·합성·DAG <span class="ar">→</span>
-      <b>③ Run</b> simulate | live <span class="ar">→</span>
-      <b>④ Report</b> api 단위 라이브
+<header class="top">
+  <h1>console2</h1>
+  <span class="crumbs">SCP API 회귀 테스트 실행 콘솔 · 선택 → Plan → 실행 → 라이브 리포트</span>
+  <nav class="nav">
+    <a href="https://127.0.0.1" id="modelLink" onclick="return false" title="모델 출처">resource model</a>
+  </nav>
+</header>
+
+<!-- GLOBAL CONTEXT BAR -->
+<div class="ctxbar" id="ctxbar">
+  <span class="seg">로딩 중…</span>
+</div>
+
+<!-- STAGE TABS -->
+<div class="tabs" id="tabs">
+  <button data-t="select" class="on"><span class="n">1</span>선택</button>
+  <button data-t="plan"><span class="n">2</span>Plan</button>
+  <button data-t="run"><span class="n">3</span>실행</button>
+  <button data-t="report"><span class="n">4</span>리포트</button>
+</div>
+
+<!-- STAGE BODIES (one visible at a time) -->
+
+<!-- ① 선택 -->
+<section id="stage-select" class="stage">
+  <div class="cols sel">
+    <div class="panel" id="sel-left">
+      <h2>자원 선택 <span class="muted small">category → service → resource</span></h2>
+      <input type="search" class="search" id="sel-search" placeholder="검색 (id · service)…">
+      <div class="run-ctl" style="margin:4px 0">
+        <select class="search" id="sel-preset" style="margin:0;flex:1" disabled
+          title="다음 빌드: suite 프리셋(smoke-core 등)">
+          <option>suite 프리셋 (다음 빌드)</option>
+        </select>
+        <button class="btn ghost" id="sel-clear" style="font-size:11px;padding:5px 9px">선택 해제</button>
+      </div>
+      <div class="scroll tree" id="sel-tree"></div>
+    </div>
+    <div class="panel">
+      <h2 id="sel-gtitle">레이어드 DAG <span class="muted small">왼→오 = 생성 순서 · 밴드 = 카테고리</span></h2>
+      <div class="legend" id="sel-legend"></div>
+      <div class="svgbox"><svg id="sel-svg"></svg></div>
+      <p class="muted small" id="sel-ghint" style="margin-top:6px"></p>
+    </div>
+    <div class="panel" id="sel-right"></div>
+  </div>
+</section>
+
+<!-- ② Plan -->
+<section id="stage-plan" class="stage hidden">
+  <div class="cols plan">
+    <div class="panel">
+      <h2 id="plan-gtitle">실행 DAG <span class="muted small">깊이 = 생성 순서</span></h2>
+      <div class="legend" id="plan-legend"></div>
+      <div class="svgbox"><svg id="plan-svg"></svg></div>
+      <h3>dag_planner 웨이브 <span class="muted small">provision → free → adopt → self-create</span></h3>
+      <div id="plan-waves"></div>
+    </div>
+    <div class="panel" id="plan-right"></div>
+  </div>
+</section>
+
+<!-- ③ 실행 -->
+<section id="stage-run" class="stage hidden">
+  <div class="cols run">
+    <div class="panel" id="run-left"></div>
+    <div class="panel" id="run-right">
+      <h2>실행 준비</h2>
+      <p class="muted small">왼쪽에서 Axis와 mode를 고른 뒤 <b>실행</b>을 누르면 여기서 라이브 진행 상황(리포트 ①)이 시작됩니다.</p>
+      <div id="run-live"></div>
     </div>
   </div>
+</section>
 
-  <div class="panel">
-    <b>모델 요약</b> <span class="note">(/api/model — 의존 카탈로그 = resource model)</span>
-    <div class="kpi" id="kpi" style="margin-top:10px"><span class="note">로딩…</span></div>
-    <p class="note" id="catline" style="margin-top:10px"></p>
+<!-- ④ 리포트 -->
+<section id="stage-report" class="stage hidden">
+  <div class="subtabs" id="report-subtabs">
+    <button data-r="r1" class="on">R1 진행</button>
+    <button data-r="r2">R2 리소스</button>
+    <button data-r="r3">R3 API</button>
+    <button data-r="r4">R4 로그</button>
   </div>
+  <div class="cols plan">
+    <div class="panel" id="report-main"></div>
+    <div class="panel" id="report-side"></div>
+  </div>
+</section>
 
-  <div class="panel note">
-    <b>이 화면은 임시 백엔드 상태 페이지입니다.</b> 실제 UI(레이어드 DAG 캔버스에서
-    category/service/resource를 선택 → 폐포 → 합성 → DAG plan → 실행 → api 단위 라이브 리포트)는
-    용어/구조 확정 후 이 자리에 들어옵니다. 백엔드 API는 이미 동작합니다:
-    <ul>
-      <li><code>GET /api/model</code> — 의존 카탈로그(resource model) + 실행 단위 lifecycle + 스텝</li>
-      <li><code>POST /api/plan</code> — 선택 → 실제 dag_planner 스케줄(공유 루트·위상 웨이브·VPC 슬롯)</li>
-      <li><code>POST /api/run</code> — <code>{mode:"simulate"|"live"}</code> 실행 (안전 게이트는 요청별 opt-in)</li>
-      <li><code>GET /api/runs/&lt;id&gt;/events</code> — api 단위 라이브 이벤트 스트림</li>
-    </ul>
-    실행: <code>python tools/console2_server.py</code> → <code>http://127.0.0.1:9100/</code>
-  </div>
+<div class="foot">
+  같은 <code>viz.js</code> 그래프를 4개 스테이지가 공유 · 실행 단위 = lifecycle · 리포트 단위 = api ·
+  Axis는 run 단위 · simulate = 클라우드 호출 없음(합성 id).
 </div>
-<script>
-fetch("/api/model").then(r=>r.json()).then(m=>{
-  document.getElementById("status").innerHTML='<span class="ok">● up</span>';
-  document.getElementById("kpi").innerHTML=[
-    ["categories",m.categories.length],["services",m.services.length],
-    ["resources",m.node_count],["lifecycles",m.lifecycle_count],
-    ["VALIDATED",m.validated]
-  ].map(([k,v])=>`<div class="s"><b>${v}</b><span>${k}</span></div>`).join("");
-  document.getElementById("catline").textContent="categories: "+m.categories.join(" · ");
-}).catch(e=>{
-  document.getElementById("status").innerHTML='<span class="err">● 연결 실패</span> — '+
-    'python tools/console2_server.py 가 실행 중인가요?';
-});
-</script>
+</div>
+
+<!-- console2.js fetches /api/model, sets window.MODEL, THEN injects assets/viz.js
+     (viz.js captures window.MODEL at load — order matters). -->
+<script src="assets/console2.js" defer></script>
 </body>
 </html>
