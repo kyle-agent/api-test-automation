@@ -48,6 +48,10 @@ try:                       # ops-log resource events (best-effort; never breaks 
     from core import oplog as _oplog
 except Exception:          # pragma: no cover
     _oplog = None
+try:                       # console2 local live-event sink (gated by SCP_CONSOLE_EVENTS)
+    from core import console_events as _cev
+except Exception:          # pragma: no cover
+    _cev = None
 try:                       # platform command channel (best-effort; never breaks a run)
     from core import commands as _commands
 except Exception:          # pragma: no cover
@@ -712,6 +716,10 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
     if _oplog:
         _oplog.emit_resource("lifecycle-start", service=service or "",
                              name=lifecycle["id"], lifecycle=lifecycle["id"])
+    if _cev:
+        _cev.emit("lifecycle-start", lifecycle=lifecycle["id"],
+                  service=service or "", heavy=bool(lifecycle.get("heavy")),
+                  n_steps=len(lifecycle.get("steps", [])))
 
     _now = time.gmtime()
     # {unique}/{ualpha} name the resources a lifecycle creates. A bare
@@ -1020,6 +1028,11 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                         f"the account VPC cap")
                 _pending_vpc_tok.append(_tok)   # bound to its id at cleanup reg
 
+            if _cev:
+                _cev.emit("step-start", lifecycle=lifecycle["id"],
+                          step=step.get("name", ""), method=step["method"],
+                          path=step.get("path", path), service=step_service or "",
+                          optional=bool(step.get("optional")))
             try:
                 resp = _run_step(client, step, path, body, step_service, ctx,
                                  lifecycle_id=lifecycle["id"])
@@ -1061,6 +1074,11 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # record the step call itself for coverage/timing
             _cat = categorize(resp.status, resp.raw_text or "")
             _ems = getattr(resp, "elapsed_ms", None)
+            if _cev:
+                _cev.emit("step-end", lifecycle=lifecycle["id"],
+                          step=step.get("name", ""), method=step["method"],
+                          path=step.get("path", path), service=step_service or "",
+                          status=resp.status, category=_cat, elapsed_ms=_ems)
             _note = ""
             if _cat == results.FAIL or (
                     _cat == results.SOFT and step["method"].upper() != "GET"
@@ -1262,6 +1280,9 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                                  name=lifecycle["id"], lifecycle=lifecycle["id"],
                                  status="skipped")
             _oplog.flush_resources()
+        if _cev:
+            _cev.emit("lifecycle-end", lifecycle=lifecycle["id"],
+                      status="skipped", reason=str(exc))
         return {"id": lifecycle["id"], "status": "skipped", "reason": str(exc),
                 "failed_groups": sorted(failed_groups), "created": created_count}
     except Exception as exc:
@@ -1282,6 +1303,9 @@ def _finish(lifecycle, status, failed_groups, group_fail_reason, created, *,
                              name=lifecycle["id"], lifecycle=lifecycle["id"],
                              status=status)
         _oplog.flush_resources()
+    if _cev:
+        _cev.emit("lifecycle-end", lifecycle=lifecycle["id"], status=status,
+                  failed_groups=sorted(failed_groups), reason=reason)
     if failed_groups:
         import warnings
         for g in sorted(failed_groups):

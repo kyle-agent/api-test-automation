@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>console2 — SCP API 테스트 실행 콘솔 (backend up)</title>
+<style>
+  :root{--ink:#1d2530;--muted:#6b7480;--line:#d9e2ec;--panel:#fff;--bg:#eef1f5;--accent:#2563c9}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:14px}
+  header{padding:18px 24px;background:#16212e;color:#e7eef6}
+  header h1{margin:0;font-size:18px}
+  header .sub{color:#90a4ba;font-size:12.5px;margin-top:4px}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px 24px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+         padding:14px 16px;margin-bottom:14px}
+  .kpi{display:flex;gap:10px;flex-wrap:wrap}
+  .kpi .s{background:#f5f7f9;border:1px solid var(--line);border-radius:9px;padding:8px 14px;min-width:96px}
+  .kpi .s b{font-size:20px;display:block}.kpi .s span{font-size:11px;color:var(--muted)}
+  .note{font-size:12.5px;color:var(--muted);line-height:1.55}
+  code{background:#f0f3f6;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
+  .flow{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:12.5px;flex-wrap:wrap;margin:6px 0 0}
+  .flow b{color:var(--accent)} .flow .ar{color:var(--line)}
+  .ok{color:#15924f;font-weight:600}.err{color:#c63434;font-weight:600}
+  ul{margin:6px 0;padding-left:20px}li{margin:3px 0;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>console2 — SCP API 테스트 실행 콘솔</h1>
+  <div class="sub">browse → plan(real dag_planner) → run(simulate | live) → DAG-순서 라이브 리포트</div>
+</header>
+<div class="wrap">
+  <div class="panel">
+    <b>백엔드 상태</b> <span id="status">확인 중…</span>
+    <div class="flow" style="margin-top:8px">
+      <b>① 선택</b> category/service/resource <span class="ar">→</span>
+      <b>② Plan</b> 의존 폐포·합성·DAG <span class="ar">→</span>
+      <b>③ Run</b> simulate | live <span class="ar">→</span>
+      <b>④ Report</b> api 단위 라이브
+    </div>
+  </div>
+
+  <div class="panel">
+    <b>모델 요약</b> <span class="note">(/api/model — 의존 카탈로그 = resource model)</span>
+    <div class="kpi" id="kpi" style="margin-top:10px"><span class="note">로딩…</span></div>
+    <p class="note" id="catline" style="margin-top:10px"></p>
+  </div>
+
+  <div class="panel note">
+    <b>이 화면은 임시 백엔드 상태 페이지입니다.</b> 실제 UI(레이어드 DAG 캔버스에서
+    category/service/resource를 선택 → 폐포 → 합성 → DAG plan → 실행 → api 단위 라이브 리포트)는
+    용어/구조 확정 후 이 자리에 들어옵니다. 백엔드 API는 이미 동작합니다:
+    <ul>
+      <li><code>GET /api/model</code> — 의존 카탈로그(resource model) + 실행 단위 lifecycle + 스텝</li>
+      <li><code>POST /api/plan</code> — 선택 → 실제 dag_planner 스케줄(공유 루트·위상 웨이브·VPC 슬롯)</li>
+      <li><code>POST /api/run</code> — <code>{mode:"simulate"|"live"}</code> 실행 (안전 게이트는 요청별 opt-in)</li>
+      <li><code>GET /api/runs/&lt;id&gt;/events</code> — api 단위 라이브 이벤트 스트림</li>
+    </ul>
+    실행: <code>python tools/console2_server.py</code> → <code>http://127.0.0.1:9100/</code>
+  </div>
+</div>
+<script>
+fetch("/api/model").then(r=>r.json()).then(m=>{
+  document.getElementById("status").innerHTML='<span class="ok">● up</span>';
+  document.getElementById("kpi").innerHTML=[
+    ["categories",m.categories.length],["services",m.services.length],
+    ["resources",m.node_count],["lifecycles",m.lifecycle_count],
+    ["VALIDATED",m.validated]
+  ].map(([k,v])=>`<div class="s"><b>${v}</b><span>${k}</span></div>`).join("");
+  document.getElementById("catline").textContent="categories: "+m.categories.join(" · ");
+}).catch(e=>{
+  document.getElementById("status").innerHTML='<span class="err">● 연결 실패</span> — '+
+    'python tools/console2_server.py 가 실행 중인가요?';
+});
+</script>
+</body>
+</html>
