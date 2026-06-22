@@ -111,3 +111,34 @@ Effort: S ≈ <½d · M ≈ 1–2d · L ≈ multi-day/IA shift.
 - **Coverage is the payoff, on the hero object.** On finish the DAG becomes a **coverage heatmap**:
   nodes whose endpoints' declared params were under-exercised light up, each expandable to the exact
   schema-vs-sent diff — turning "did it pass?" into "what's *not yet tested?*".
+
+## 5. Future — scheduled-regression HISTORY dashboard (status-page style) [later]
+
+> Captured from a user design pointer (2026-06-22): use **https://status.claude.com/** (an
+> Atlassian-Statuspage layout) as the visual reference for a NEW, complementary screen — not the
+> pick→run flow, but the **"is the suite staying green over time?"** view. Explicitly **deferred —
+> 나중에 구현 (implement later).**
+
+**What it answers:** per **service** and per **API/endpoint**, did the *scheduled* regression (the
+cron/CI runs, not ad-hoc console2 runs) **pass / soft-fail / fail / run late (delayed) / skip** — and
+how has that trended over the last N scheduled runs (history).
+
+**Statuspage pattern → SCP mapping:**
+- Overall "All systems operational" banner → **fleet health**: N/M services green on the latest
+  scheduled run (+ axis split: regression vs conformance).
+- One **row per component** → one row per **service** (collapsible to its **endpoints/lifecycles**);
+  right-aligned status pill = latest scheduled result.
+- The **90-day uptime bar** (a cell/day) → a **history strip**: one cell per scheduled run, colored
+  pass(green)/soft(amber)/fail(red)/delayed(grey-stripe)/skip(hollow); hover = run id + date +
+  duration; click = that run's console2 report (deep-link by run id).
+- **Incident timeline** → **regression timeline**: newly-introduced failures / NEW conformance
+  findings vs the baseline (`data/baselines/known_issues.json`), dated, linking the finding.
+- **Uptime %** → **pass-rate %** per service/endpoint over the window (+ "last green" timestamp).
+
+**Data source (already exists):** `reports/results/*.jsonl` (Observations/Findings via `core.results`)
+keyed by service · endpoint · run · ts · status — group by (service, endpoint) × scheduled run for the
+history grid. "Delayed" = a scheduled run that started late / overran its window (needs the schedule +
+run-meta timing). No new engine concepts: a read-only projection over the same results store the
+two-axis dashboard already reads, published to Pages.
+
+**Effort:** L (new screen). **Status:** backlog / later.
