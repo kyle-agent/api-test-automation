@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>console2 — SCP API 테스트 실행 콘솔</title>
+<link rel="stylesheet" href="assets/console2.css">
+</head>
+<body>
+<div id="c2-demo-banner" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1f6feb;color:#fff;font:600 12px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:5px 12px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25)">DEMO · 정적 스냅샷 (백엔드 없이 미리 구운 데이터 · 실행은 모의)</div><style>body{padding-top:30px!important}</style>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>console2</h1>
+    <div class="crumbs">SCP API 회귀 테스트 실행 콘솔 · ① 구성(선택 → 합성 DAG) → ② 실행 &amp; 리포트</div>
+  </div>
+  <div class="seg-ctl" id="screenToggle">
+    <button data-scr="build" class="on"><span class="k">①</span>구성</button>
+    <button data-scr="run"><span class="k">②</span>실행 &amp; 리포트</button>
+  </div>
+  <nav class="nav">
+    <a href="https://127.0.0.1" id="modelLink" onclick="return false" title="모델 출처">resource model</a>
+  </nav>
+</header>
+
+<!-- GLOBAL CONTEXT BAR -->
+<div class="ctxbar" id="ctxbar">
+  <span class="seg">로딩 중…</span>
+</div>
+
+<!-- ======================= ① 구성 ======================= -->
+<section id="screen-build" class="screen">
+  <div class="cols build">
+    <!-- LEFT: compact collapsible category→service MENU-TREE (picker) -->
+    <div class="panel treepanel" id="sel-panel">
+      <h2>선택 <span class="muted small">— 카테고리 ▸ 서비스 (행 클릭 = 서비스 선택)</span></h2>
+      <div class="svc-controls">
+        <input type="search" class="search" id="sel-search" placeholder="서비스 검색…  (예: vpc, queue)">
+        <button class="allbtn" id="sel-all">전체 선택</button>
+      </div>
+      <div class="selreadout treeread" id="sel-readout"></div>
+      <div id="svcWrap" class="svctree"></div>
+    </div>
+
+    <!-- RIGHT (dominant): live composition DAG + readout + 순서표 -->
+    <div class="panel" id="dag-panel">
+      <h2>합성 배포 그림 <span class="muted small">— composer.graph_view · 레벨 = 생성 순서</span></h2>
+      <div class="legend" id="dag-legend"></div>
+      <div class="svgbox big"><svg id="dag-svg"></svg></div>
+      <div class="readout" id="dag-readout"></div>
+      <h3>생성 · 검증 · 삭제 순서표</h3>
+      <div class="scroll"><table class="tbl" id="order-tbl"></table></div>
+    </div>
+  </div>
+
+  <!-- launch bar — carries the selection into ② -->
+  <div class="launchbar">
+    <div class="lbl-grp">
+      <span class="lab">Axis</span>
+      <div class="pill-ctl" id="axisCtl"></div>
+    </div>
+    <div class="lbl-grp">
+      <span class="lab">mode</span>
+      <div class="pill-ctl mode" id="modeCtl">
+        <button data-md="simulate" class="on">simulate</button>
+        <button data-md="live">live</button>
+      </div>
+    </div>
+    <div class="sumtxt" id="launchSum"></div>
+    <div class="right">
+      <button class="btn" id="launch-go">▶ 지금 실행</button>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= ② 실행 & 리포트 ======================= -->
+<section id="screen-run" class="screen hidden">
+  <div class="cols run">
+    <div id="run-left"></div>
+    <div class="panel" id="run-right">
+      <div class="subtabs" id="report-subtabs">
+        <button data-r="r1" class="on">흐름</button>
+        <button data-r="r2">자원</button>
+        <button data-r="r3">API</button>
+        <button data-r="r4">로그</button>
+      </div>
+      <div id="report-main"></div>
+      <h3>실행 기록 <span class="muted small">· /api/runs</span></h3>
+      <div id="report-side"></div>
+    </div>
+  </div>
+</section>
+
+<div class="foot">
+  ① 구성: 서비스 선택(좌 메뉴-트리) → composer.graph_view 합성 DAG(생성 순서·dedup·peak quota) ·
+  ② 실행: simulate = 클라우드 호출 없음(합성 id) · live = pytest + 안전 게이트 ·
+  리포트 = 흐름 · 자원 · API · 로그.
+</div>
+</div>
+
+<!-- resource modal (specific-resource selection per service) -->
+<div class="scrim" id="modal-scrim"></div>
+<div class="modal" id="res-modal">
+  <div class="mh">
+    <h3 id="modal-title">리소스 선택</h3>
+    <span class="msvc" id="modal-svc"></span>
+    <button class="mclose" id="modal-close">×</button>
+  </div>
+  <div class="mbody" id="modal-body"></div>
+  <div class="mfoot">
+    <span class="muted small" id="modal-hint"></span>
+    <button class="btn ghost" id="modal-clear">이 서비스 선택 해제</button>
+    <button class="btn" id="modal-done">완료</button>
+  </div>
+</div>
+
+<!-- console2.js fetches /api/model, sets the model, THEN renders. resource_graph.js
+     (composer.graph_view renderer, light theme) is loaded first so it's ready. -->
+<script src="data/static-data.js"></script>
+<script src="assets/mock-api.js"></script>
+<script src="assets/resource_graph.js" defer></script>
+<script src="assets/console2.js" defer></script>
+</body>
+</html>
