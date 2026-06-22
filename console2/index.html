@@ -9,8 +9,14 @@
 <body>
 <div class="wrap">
 <header class="top">
-  <h1>console2</h1>
-  <span class="crumbs">SCP API 회귀 테스트 실행 콘솔 · 선택 → Plan → 실행 → 라이브 리포트</span>
+  <div>
+    <h1>console2</h1>
+    <div class="crumbs">SCP API 회귀 테스트 실행 콘솔 · ① 구성(선택 → 합성 DAG) → ② 실행 &amp; 리포트</div>
+  </div>
+  <div class="seg-ctl" id="screenToggle">
+    <button data-scr="build" class="on"><span class="k">①</span>구성</button>
+    <button data-scr="run"><span class="k">②</span>실행 &amp; 리포트</button>
+  </div>
   <nav class="nav">
     <a href="https://127.0.0.1" id="modelLink" onclick="return false" title="모델 출처">resource model</a>
   </nav>
@@ -21,89 +27,94 @@
   <span class="seg">로딩 중…</span>
 </div>
 
-<!-- STAGE TABS -->
-<div class="tabs" id="tabs">
-  <button data-t="select" class="on"><span class="n">1</span>선택</button>
-  <button data-t="plan"><span class="n">2</span>Plan</button>
-  <button data-t="run"><span class="n">3</span>실행</button>
-  <button data-t="report"><span class="n">4</span>리포트</button>
-</div>
-
-<!-- STAGE BODIES (one visible at a time) -->
-
-<!-- ① 선택 -->
-<section id="stage-select" class="stage">
-  <div class="cols sel">
-    <div class="panel" id="sel-left">
-      <h2>자원 선택 <span class="muted small">category → service → resource</span></h2>
-      <input type="search" class="search" id="sel-search" placeholder="검색 (id · service)…">
-      <div class="run-ctl" style="margin:4px 0">
-        <select class="search" id="sel-preset" style="margin:0;flex:1" disabled
-          title="다음 빌드: suite 프리셋(smoke-core 등)">
-          <option>suite 프리셋 (다음 빌드)</option>
-        </select>
-        <button class="btn ghost" id="sel-clear" style="font-size:11px;padding:5px 9px">선택 해제</button>
+<!-- ======================= ① 구성 ======================= -->
+<section id="screen-build" class="screen">
+  <div class="cols build">
+    <!-- LEFT/MAIN: category sections + compact service cards (picker) -->
+    <div class="panel" id="sel-panel">
+      <h2>구성 <span class="muted small">— 카테고리 · 서비스 선택 (카드 클릭 = 서비스 전체 선택)</span></h2>
+      <div class="svc-controls">
+        <input type="search" class="search" id="sel-search" placeholder="서비스 검색…  (예: vpc, queue, mysql)">
+        <button class="allbtn" id="sel-all">전체 선택</button>
+        <span class="selreadout" id="sel-readout"></span>
       </div>
-      <div class="scroll tree" id="sel-tree"></div>
+      <div id="svcWrap"></div>
     </div>
-    <div class="panel">
-      <h2 id="sel-gtitle">레이어드 DAG <span class="muted small">왼→오 = 생성 순서 · 밴드 = 카테고리</span></h2>
-      <div class="legend" id="sel-legend"></div>
-      <div class="svgbox"><svg id="sel-svg"></svg></div>
-      <p class="muted small" id="sel-ghint" style="margin-top:6px"></p>
+
+    <!-- RIGHT: live composition DAG + readout + 순서표 -->
+    <div class="panel" id="dag-panel">
+      <h2>합성 배포 그림 <span class="muted small">— composer.graph_view · 레벨 = 생성 순서</span></h2>
+      <div class="legend" id="dag-legend"></div>
+      <div class="svgbox"><svg id="dag-svg"></svg></div>
+      <div class="readout" id="dag-readout"></div>
+      <h3>생성 · 검증 · 삭제 순서표</h3>
+      <div class="scroll"><table class="tbl" id="order-tbl"></table></div>
     </div>
-    <div class="panel" id="sel-right"></div>
+  </div>
+
+  <!-- launch bar — carries the selection into ② -->
+  <div class="launchbar">
+    <div class="lbl-grp">
+      <span class="lab">Axis</span>
+      <div class="pill-ctl" id="axisCtl"></div>
+    </div>
+    <div class="lbl-grp">
+      <span class="lab">mode</span>
+      <div class="pill-ctl mode" id="modeCtl">
+        <button data-md="simulate" class="on">simulate</button>
+        <button data-md="live">live</button>
+      </div>
+    </div>
+    <div class="sumtxt" id="launchSum"></div>
+    <div class="right">
+      <button class="btn" id="launch-go">▶ 지금 실행</button>
+    </div>
   </div>
 </section>
 
-<!-- ② Plan -->
-<section id="stage-plan" class="stage hidden">
-  <div class="cols plan">
-    <div class="panel">
-      <h2 id="plan-gtitle">실행 DAG <span class="muted small">깊이 = 생성 순서</span></h2>
-      <div class="legend" id="plan-legend"></div>
-      <div class="svgbox"><svg id="plan-svg"></svg></div>
-      <h3>dag_planner 웨이브 <span class="muted small">provision → free → adopt → self-create</span></h3>
-      <div id="plan-waves"></div>
-    </div>
-    <div class="panel" id="plan-right"></div>
-  </div>
-</section>
-
-<!-- ③ 실행 -->
-<section id="stage-run" class="stage hidden">
+<!-- ======================= ② 실행 & 리포트 ======================= -->
+<section id="screen-run" class="screen hidden">
   <div class="cols run">
     <div class="panel" id="run-left"></div>
     <div class="panel" id="run-right">
-      <h2>실행 준비</h2>
-      <p class="muted small">왼쪽에서 Axis와 mode를 고른 뒤 <b>실행</b>을 누르면 여기서 라이브 진행 상황(리포트 ①)이 시작됩니다.</p>
-      <div id="run-live"></div>
+      <div class="subtabs" id="report-subtabs">
+        <button data-r="r1" class="on">R1 진행</button>
+        <button data-r="r2">R2 리소스</button>
+        <button data-r="r3">R3 API</button>
+        <button data-r="r4">R4 로그</button>
+      </div>
+      <div id="report-main"></div>
+      <h3>실행 기록 <span class="muted small">· /api/runs</span></h3>
+      <div id="report-side"></div>
     </div>
-  </div>
-</section>
-
-<!-- ④ 리포트 -->
-<section id="stage-report" class="stage hidden">
-  <div class="subtabs" id="report-subtabs">
-    <button data-r="r1" class="on">R1 진행</button>
-    <button data-r="r2">R2 리소스</button>
-    <button data-r="r3">R3 API</button>
-    <button data-r="r4">R4 로그</button>
-  </div>
-  <div class="cols plan">
-    <div class="panel" id="report-main"></div>
-    <div class="panel" id="report-side"></div>
   </div>
 </section>
 
 <div class="foot">
-  같은 <code>viz.js</code> 그래프를 4개 스테이지가 공유 · 실행 단위 = lifecycle · 리포트 단위 = api ·
-  Axis는 run 단위 · simulate = 클라우드 호출 없음(합성 id).
+  ① 구성: 서비스 선택 → composer.graph_view 합성 DAG(생성 순서·dedup·peak quota) ·
+  ② 실행: simulate = 클라우드 호출 없음(합성 id) · live = pytest + 안전 게이트 · 리포트 단위 = api.
 </div>
 </div>
 
-<!-- console2.js fetches /api/model, sets window.MODEL, THEN injects assets/viz.js
-     (viz.js captures window.MODEL at load — order matters). -->
+<!-- resource modal (specific-resource selection per service) -->
+<div class="scrim" id="modal-scrim"></div>
+<div class="modal" id="res-modal">
+  <div class="mh">
+    <h3 id="modal-title">리소스 선택</h3>
+    <span class="msvc" id="modal-svc"></span>
+    <button class="mclose" id="modal-close">×</button>
+  </div>
+  <div class="mbody" id="modal-body"></div>
+  <div class="mfoot">
+    <span class="muted small" id="modal-hint"></span>
+    <button class="btn ghost" id="modal-clear">이 서비스 선택 해제</button>
+    <button class="btn" id="modal-done">완료</button>
+  </div>
+</div>
+
+<!-- console2.js fetches /api/model, sets the model, THEN renders. resource_graph.js
+     (composer.graph_view renderer, light theme) is loaded first so it's ready. -->
+<script src="assets/resource_graph.js" defer></script>
 <script src="assets/console2.js" defer></script>
 </body>
 </html>

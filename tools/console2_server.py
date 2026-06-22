@@ -14,6 +14,11 @@ What it exposes (all JSON unless noted):
   GET  /api/model              -> the resource-task model: categories, services,
                                   resources (+ per-resource deps & API endpoints),
                                   and the runnable lifecycles (+ their step lists).
+  POST /api/graph {selection}  -> the composition DAG (composer.graph_view) for a
+                                  selection: resource nodes with longest-path levels,
+                                  is_target/shared(dedup) flags, edges, create order,
+                                  teardown order, peak quota. Empty selection -> empty
+                                  graph. Read-only projection (no cloud, no schedule).
   POST /api/plan  {selection}  -> the REAL dag_planner schedule for a selection
                                   (shared roots, topological waves, VPC-slot
                                   accounting) + a per-lifecycle step preview.
@@ -222,6 +227,46 @@ def _resolve_lifecycle_ids(sel: dict) -> list[str]:
         if nid in node_ids or n["service"] in svcs or n["category"] in cats:
             want.add(n["lifecycle"])
     return sorted(lid for lid in want if lid in lcs)
+
+
+def _graph_targets(sel: dict) -> list[str]:
+    """A selection (node_ids / services / categories) -> the set of resource-node
+    ids to feed ``composer.graph_view`` as targets. A selected service contributes
+    all of its ``lifecycle != null`` resource nodes; explicit node_ids are taken as
+    given (still filtered to ones that actually have a lifecycle). Only ids that are
+    real model nodes survive (graph_view raises on an unknown target)."""
+    m = _model()
+    nodes = m["nodes"]
+    node_ids = set(sel.get("node_ids") or [])
+    svcs = set(sel.get("services") or [])
+    cats = set(sel.get("categories") or [])
+    out: set[str] = set()
+    for nid, n in nodes.items():
+        if not n.get("lifecycle"):
+            continue  # lookup / dep-only resources are never standalone targets
+        if nid in node_ids or n["service"] in svcs or n["category"] in cats:
+            out.add(nid)
+    # an explicit node id that has a lifecycle but wasn't matched above (defensive)
+    for nid in node_ids:
+        if nid in nodes and nodes[nid].get("lifecycle"):
+            out.add(nid)
+    return sorted(out)
+
+
+def _graph(sel: dict) -> dict:
+    """Composition-DAG projection of a selection, via composer.graph_view — the SAME
+    closure/branch/dedup the real composer uses. Resolve the selection to target
+    resource nodes, then return graph_view's dict as-is:
+        {nodes:[{id,service,provenance,quota,heavy,options,level,is_target,shared}],
+         edges:[{from,to}], levels, shared, peak_quota, order, teardown}
+    An empty selection returns an empty graph (no error) so the UI can render
+    "nothing selected" without special-casing the HTTP status."""
+    targets = _graph_targets(sel)
+    if not targets:
+        return {"nodes": [], "edges": [], "levels": [0], "shared": [],
+                "peak_quota": {}, "order": [], "teardown": []}
+    from regression.scenarios import composer
+    return composer.graph_view(targets, sel.get("choices") or None)
 
 
 def _plan(lifecycle_ids: list[str]) -> dict:
@@ -590,6 +635,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = urlparse(self.path).path
+        if p == "/api/graph":
+            try:
+                return self._json(200, _graph(self._body()))
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"graph failed: {exc}"})
         if p == "/api/plan":
             sel = self._body()
             ids = sel.get("lifecycle_ids") if "lifecycle_ids" in sel and not (

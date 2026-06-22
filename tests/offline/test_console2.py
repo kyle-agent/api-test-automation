@@ -79,6 +79,60 @@ def test_resolve_lifecycle_ids_by_service_and_category():
 
 
 # --------------------------------------------------------------------------- #
+# graph: selection -> composer.graph_view (composition DAG for the console2 ①)
+# --------------------------------------------------------------------------- #
+def test_graph_for_service_has_levels_targets_shared_and_edges():
+    """POST /api/graph (via _graph) for a single service returns the composition
+    DAG: nodes carrying level/is_target/shared, a non-empty edge set, and the
+    dependency closure pulls vpc (subnet's root)."""
+    g = C2._graph({"services": ["networking/vpc"]})
+    assert g["nodes"], "expected resource nodes for networking/vpc"
+    assert g["edges"], "expected a non-empty edge set (subnet→…→vpc etc.)"
+    # every node carries the layout/role fields the light DAG renderer needs
+    for n in g["nodes"]:
+        assert "level" in n and "is_target" in n and "shared" in n
+        assert isinstance(n["level"], int)
+    ids = {n["id"] for n in g["nodes"]}
+    assert "vpc" in ids, "closure must pull vpc"
+    # an edge is {from,to} between two nodes that are present
+    assert all(e["from"] in ids and e["to"] in ids for e in g["edges"])
+    # at least one target (a selected service's lifecycle-bearing resource)
+    assert any(n["is_target"] for n in g["nodes"])
+    # graph_view's accounting fields are passed through as-is
+    assert "order" in g and "teardown" in g and "peak_quota" in g
+
+
+def test_graph_empty_selection_is_empty_graph_not_error():
+    """An empty selection returns an empty graph (no 500) so the UI renders
+    'nothing selected' without special-casing."""
+    g = C2._graph({})
+    assert g["nodes"] == [] and g["edges"] == []
+    assert g["order"] == [] and g["teardown"] == []
+
+
+def test_graph_targets_skips_lookup_resources():
+    """A selected service contributes only its lifecycle-bearing resource nodes;
+    lookup / no-lifecycle resources are never standalone targets."""
+    m = C2._model()
+    # pick any service that has BOTH a lifecycle-bearing node and a no-lifecycle
+    # (lookup / dep-only) node — robust to model drift.
+    by_svc: dict[str, dict] = {}
+    for nid, n in m["nodes"].items():
+        svc = n.get("service")
+        if not svc:
+            continue
+        b = by_svc.setdefault(svc, {"lc": [], "nolc": []})
+        b["lc" if n.get("lifecycle") else "nolc"].append(nid)
+    mixed = next((s for s, b in by_svc.items() if b["lc"] and b["nolc"]), None)
+    assert mixed, "model expected at least one service with a lookup resource"
+    targets = set(C2._graph_targets({"services": [mixed]}))
+    # every resolved target actually has a lifecycle in the model
+    assert targets and all(m["nodes"][t].get("lifecycle") for t in targets)
+    # the service's no-lifecycle resources are excluded as standalone targets
+    assert not (set(by_svc[mixed]["nolc"]) & targets)
+
+
+# --------------------------------------------------------------------------- #
 # plan: selection -> the REAL dag_planner schedule
 # --------------------------------------------------------------------------- #
 def test_plan_returns_real_dag_waves():

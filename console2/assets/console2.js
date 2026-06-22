@@ -1,333 +1,388 @@
-/* console2 — single-page execution console.
- * Loop: ① 선택(layered-DAG canvas) → ② Plan(real dag_planner waves) →
- *       ③ 실행(Axis × mode) → ④ 리포트(R1 진행 / R2 리소스 / R3 API / R4 로그),
- * all driven by /api/model + /api/plan + /api/run + the live event stream.
+/* console2 — single-page execution console (LIGHT theme).
+ * IA (locked): ① 구성 — category sections + COMPACT service cards (click = select
+ * whole service; "리소스…" → modal for specific resources) drive a LIVE composition
+ * DAG (composer.graph_view via /api/graph) + a 생성/검증/삭제 순서표. ② 실행 & 리포트 —
+ * the existing run (simulate | live) + event-driven report (R1 진행 / R2 리소스 /
+ * R3 API / R4 로그), re-themed light, with the ① selection carried into the launch.
  *
  * Vocabulary (locked concept model): category → service → resource → api.
- *   selection (resource) pulls its dependency CLOSURE (auto-ordered) ·
- *   execution unit = lifecycle · reporting unit = api (a lifecycle step) ·
- *   a run = Scope × Axis (axis is per-run, not per-resource). */
+ *   selection (resource/service) pulls its dependency CLOSURE (auto-ordered) ·
+ *   execution unit = lifecycle · reporting unit = api (a lifecycle step). */
 (function () {
 "use strict";
 
 // ---- tiny DOM helpers ----
 const $ = id => document.getElementById(id);
 const esc = s => (s + "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-const el = (q, r) => (r || document).querySelector(q);
 const els = (q, r) => [...(r || document).querySelectorAll(q)];
 
 // ---- global state ----
-let MODEL = null;          // raw /api/model payload
-let V = null;              // VIZ (after viz.js loads with window.MODEL set)
-let N = {};                // VIZ.N (nodes)
-let targets = new Set();   // selected resource ids (targets)
-let stage = "select";
-let lastPlan = null;       // last /api/plan response (selection-driven)
-let openExpand = {};       // selector tree expanded cats/services
+let MODEL = null;           // raw /api/model payload
+let N = {};                 // MODEL.nodes (by id)
+let targets = new Set();    // selected resource node ids (the targets)
+let screen = "build";       // build | run
+let lastGraph = null;       // last /api/graph response (composition DAG)
+let graphTimer = null;      // debounce for /api/graph
+let modalSvc = null;        // service short id whose resource modal is open
 
 // run/report state
-let runId = null;          // current/last run id
+let runId = null;
 let runMode = "simulate";
 let runAxis = "regression-light";
-let runEvents = [];        // accumulated events for the open run
+let runEvents = [];
 let runStatus = "idle";
 let pollTimer = null;
 let reportSub = "r1";
 
-// ---- bootstrap: fetch model, set window.MODEL, THEN load viz.js ----
+// ---- bootstrap: fetch the model, then render ----
 fetch("/api/model").then(r => r.json()).then(m => {
   if (m.error) throw new Error(m.error);
-  MODEL = m;
-  // viz.js reads window.MODEL at load; only nodes+groups are needed.
-  window.MODEL = { nodes: m.nodes, groups: m.groups };
-  const s = document.createElement("script");
-  s.src = "assets/viz.js";
-  s.onload = init;
-  s.onerror = () => fatal("viz.js 로드 실패");
-  document.body.appendChild(s);
+  MODEL = m; N = m.nodes;
+  init();
 }).catch(e => fatal("백엔드 연결 실패 — <code>python tools/console2_server.py</code> 실행 중인가요? (" + esc(e.message) + ")"));
 
 function fatal(html) {
-  $("ctxbar").innerHTML = '<span class="seg" style="color:var(--fail)">● ' + html + "</span>";
+  $("ctxbar").innerHTML = '<span class="seg" style="color:var(--red)">● ' + html + "</span>";
 }
 
 function init() {
-  V = window.VIZ; N = V.N;
-  // default selection: a small, meaningful target so the canvas isn't empty.
-  ["vpc", "subnet"].forEach(id => { if (V.exists(id)) targets.add(id); });
-  if (!targets.size) {  // fallback: first node that has a lifecycle
-    const id = V.allIds().find(i => N[i].lifecycle);
+  // a small, meaningful default so the DAG isn't empty
+  ["vpc", "subnet"].forEach(id => { if (N[id] && N[id].lifecycle) targets.add(id); });
+  if (!targets.size) {
+    const id = Object.keys(N).find(i => N[i].lifecycle);
     if (id) targets.add(id);
   }
-  wireTabs();
-  ctxBar();
-  go("select");
+  wireNav();
+  wireModal();
+  buildAxisCtl();
+  go("build");
 }
 
-// ---- selectability: a resource is standalone-selectable iff it maps to a lifecycle.
-// (~20 lookup/pure-dep resources have lifecycle=null → shown dimmed, non-selectable;
-// they still appear on the canvas when pulled in as a dependency.) ----
+// ---- a resource node is standalone-selectable iff it maps to a lifecycle.
+// (lookup / pure-dep resources have lifecycle=null → never selectable; they
+// still appear on the composition DAG when pulled in as a dependency.) ----
 const hasLifecycle = id => !!(N[id] && N[id].lifecycle);
+const svcNodes = svc => Object.keys(N).filter(id => N[id].service === svc);          // all nodes of a service
+const svcSelectable = svc => svcNodes(svc).filter(hasLifecycle);                       // its lifecycle-bearing nodes
+const shortName = svc => svc.split("/").pop();
+
+// build category → [services] (sorted), services that have ≥1 node
+function categoryMap() {
+  const byCat = {};
+  Object.keys(N).forEach(id => {
+    const n = N[id];
+    if (!n.service) return;
+    (byCat[n.category] = byCat[n.category] || new Set()).add(n.service);
+  });
+  const out = {};
+  Object.keys(byCat).sort().forEach(c => { out[c] = [...byCat[c]].sort(); });
+  return out;
+}
+
+// ================= top nav (① 구성 / ② 실행 & 리포트) =================
+function wireNav() {
+  els("#screenToggle button").forEach(b => b.onclick = () => go(b.dataset.scr));
+  els("#report-subtabs button").forEach(b => b.onclick = () => { reportSub = b.dataset.r; drawReport(); });
+}
+function go(scr) {
+  screen = scr;
+  ["build", "run"].forEach(s => $("screen-" + s).classList.toggle("hidden", s !== scr));
+  els("#screenToggle button").forEach(b => b.classList.toggle("on", b.dataset.scr === scr));
+  ctxBar();
+  if (scr === "build") drawBuild();
+  else drawRunScreen();
+}
+window.go = go;
 
 // ---- global context bar ----
 function ctxBar() {
-  const closure = V.closure([...targets]);
-  const svcs = new Set([...closure].map(id => N[id].service));
-  const heavy = [...closure].some(id => N[id].heavy);
+  const closureK = lastGraph ? lastGraph.nodes.length : "…";
+  const svcs = new Set([...targets].map(id => N[id].service));
+  const heavyTargets = [...targets].some(id => N[id].heavy);
+  const heavyClosure = lastGraph ? lastGraph.nodes.some(n => n.heavy) : heavyTargets;
   const axisLabel = AXES[runAxis] ? AXES[runAxis].label : runAxis;
   const isLive = runMode === "live";
   $("ctxbar").innerHTML =
     `<span class="seg">env <b>local</b></span>
      <span class="seg">· axis <b>${esc(axisLabel)}</b></span>
-     <span class="seg">· mode <b>${runMode}</b></span>
-     <span class="seg">· 대상 <b>${targets.size}</b></span>
-     <span class="seg">· 폐포 <b>${closure.size}</b></span>
+     <span class="seg">· mode <b>${esc(runMode)}</b></span>
+     <span class="seg">· 선택 <b>${targets.size}</b> 리소스</span>
      <span class="seg">· 서비스 <b>${svcs.size}</b></span>
-     <span class="seg">· heavy <b>${heavy ? "🜂 포함" : "없음"}</b></span>
-     <span class="seg">· 모델 <b>${MODEL.node_count}</b>자원 / <b>${MODEL.lifecycle_count}</b>lifecycle</span>
+     <span class="seg">· 폐포 <b>${closureK}</b></span>
+     <span class="seg">· heavy <b>${heavyClosure ? "🜂 포함" : "없음"}</b></span>
+     <span class="seg">· 모델 <b>${MODEL.node_count}</b> 자원 / <b>${MODEL.lifecycle_count}</b> lifecycle</span>
      <span class="badge ${isLive ? "live" : "sim"}">${isLive ? "LIVE" : "SIMULATE"}</span>`;
 }
 
-// ================= stage switching =================
-const STAGES = ["select", "plan", "run", "report"];
-function wireTabs() {
-  els(".tabs button").forEach(b => b.onclick = () => go(b.dataset.t));
-  els("#report-subtabs button").forEach(b => b.onclick = () => { reportSub = b.dataset.r; drawReport(); });
-}
-function go(t) {
-  stage = t;
-  STAGES.forEach(s => $("stage-" + s).classList.toggle("hidden", s !== t));
-  els(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
-  ctxBar();
-  if (t === "select") drawSelect();
-  else if (t === "plan") drawPlan();
-  else if (t === "run") drawRun();
-  else if (t === "report") drawReport();
-}
-window.go = go;
-
-// ================= ① 선택 (Select) =================
-// layered-DAG canvas (emulates 02-layered-dag.html: longest-path depth = creation
-// order left→right, category swimlanes). targets vs pulled-in deps are distinct;
-// lookup/no-lifecycle resources are dimmed + non-selectable.
-function drawSelect() {
-  selectTree();
-  selectCanvas();
-  selectSummary();
-  $("sel-clear").onclick = () => { targets.clear(); ctxBar(); drawSelect(); };
-  $("sel-search").oninput = selectTree;
+// ================= ① 구성 =================
+function drawBuild() {
+  drawSvcGrid();
+  refreshGraph();           // fetch /api/graph for the current selection
+  $("sel-search").oninput = drawSvcGrid;
+  $("sel-all").onclick = toggleAll;
 }
 
-function selectTree() {
+// selection helpers --------------------------------------------------------
+// "service selected" state over its lifecycle-bearing nodes: off | partial | on
+function svcState(svc) {
+  const sel = svcSelectable(svc);
+  if (!sel.length) return "none";
+  const on = sel.filter(id => targets.has(id)).length;
+  return on === 0 ? "off" : on === sel.length ? "on" : "partial";
+}
+function setSvc(svc, want) {
+  svcSelectable(svc).forEach(id => want ? targets.add(id) : targets.delete(id));
+}
+function allSelectableServices() {
+  const out = [];
+  Object.values(categoryMap()).forEach(svcs => svcs.forEach(s => { if (svcSelectable(s).length) out.push(s); }));
+  return out;
+}
+function toggleAll() {
+  const svcs = allSelectableServices();
+  const allOn = svcs.every(s => svcState(s) === "on");
+  svcs.forEach(s => setSvc(s, !allOn));
+  selectionChanged();
+}
+
+// the controls/readout + count (selected services, resources, closure)
+function selReadout() {
+  const svcs = new Set([...targets].map(id => N[id].service));
+  const K = lastGraph ? lastGraph.nodes.length : "…";
+  const heavy = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
+  $("sel-readout").innerHTML =
+    `선택: <b>${svcs.size}</b> 서비스 · <b>${targets.size}</b> 리소스 · 폐포 <b>${K}</b>` +
+    `<span class="${heavy ? "hvflag" : ""}">${heavy ? " · 🜂 heavy" : ""}</span>`;
+  // sync the "전체 선택" toggle state
+  const svcsAll = allSelectableServices();
+  const allOn = svcsAll.length && svcsAll.every(s => svcState(s) === "on");
+  const btn = $("sel-all");
+  if (btn) { btn.classList.toggle("on", !!allOn); btn.textContent = allOn ? "전체 해제" : "전체 선택"; }
+}
+
+// category sections + compact service cards (picker) -----------------------
+function drawSvcGrid() {
   const q = ($("sel-search").value || "").toLowerCase();
-  // category → service → resource
-  const byCat = {};
-  V.allIds().forEach(id => {
-    const n = N[id];
-    if (q && !(id + " " + n.service).toLowerCase().includes(q)) return;
-    ((byCat[n.category] = byCat[n.category] || {})[n.service] =
-      (byCat[n.category][n.service] || [])).push(id);
-  });
-  const cats = Object.keys(byCat).sort();
+  const cats = categoryMap();
   let h = "";
-  cats.forEach(cat => {
-    const open = q ? true : (openExpand["c:" + cat] !== false);  // open by default
-    const svcs = Object.keys(byCat[cat]).sort();
-    const allRes = svcs.flatMap(s => byCat[cat][s]).filter(hasLifecycle);
-    const allSel = allRes.length && allRes.every(id => targets.has(id));
-    h += `<div class="cat"><div class="catrow">
-        <span class="twirl" data-tw="c:${esc(cat)}">${open ? "▾" : "▸"}</span>
-        <span data-tw="c:${esc(cat)}" style="cursor:pointer">${esc(cat)}</span>
-        <span class="cnt">${allRes.length}</span>
-        <button class="allbtn" data-all="cat:${esc(cat)}" ${allRes.length ? "" : "disabled"}>${allSel ? "해제" : "전체"}</button>
-      </div>`;
-    if (open) {
-      h += `<div class="svcwrap">`;
-      svcs.forEach(svc => {
-        const sOpen = q ? true : (openExpand["s:" + svc] !== false);
-        const res = byCat[cat][svc].slice().sort();
-        const selRes = res.filter(hasLifecycle);
-        const sAll = selRes.length && selRes.every(id => targets.has(id));
-        const short = svc.split("/").pop();
-        h += `<div class="svc"><div class="svcrow">
-            <span class="twirl" data-tw="s:${esc(svc)}">${sOpen ? "▾" : "▸"}</span>
-            <span data-tw="s:${esc(svc)}" style="cursor:pointer">${esc(short)}</span>
-            <span class="cnt">${selRes.length}</span>
-            <button class="allbtn" data-all="svc:${esc(svc)}" ${selRes.length ? "" : "disabled"}>${sAll ? "해제" : "전체"}</button>
-          </div>`;
-        if (sOpen) {
-          h += `<div class="reswrap">`;
-          res.forEach(id => {
-            const lc = hasLifecycle(id);
-            const isT = targets.has(id);
-            h += `<div class="resrow ${lc ? "" : "nolc"} ${isT ? "istarget" : ""}">
-              <label>${lc
-                ? `<input type="checkbox" data-res="${esc(id)}" ${isT ? "checked" : ""}>`
-                : `<input type="checkbox" disabled title="lifecycle 없음 — 의존으로만 포함">`}
-                <span class="dot" style="background:${V.provColor(N[id].provenance)}"></span>
-                <b>${esc(id)}</b></label>
-              ${lc ? "" : `<span class="nolctag" title="순수 의존/룩업 — 단독 선택 불가">dep-only</span>`}
-            </div>`;
-          });
-          h += `</div>`;
-        }
-        h += `</div>`;
-      });
-      h += `</div>`;
-    }
-    h += `</div>`;
+  Object.keys(cats).forEach(cat => {
+    const svcs = cats[cat].filter(s => !q || (shortName(s) + " " + s).toLowerCase().includes(q));
+    if (!svcs.length) return;
+    const selectableSvcs = svcs.filter(s => svcSelectable(s).length);
+    const onCount = selectableSvcs.filter(s => svcState(s) !== "off").length;
+    const catAllOn = selectableSvcs.length && selectableSvcs.every(s => svcState(s) === "on");
+    h += `<div class="catsec"><div class="catsec-h">
+        <span class="csn">${esc(cat)}</span>
+        <button class="csbtn ${catAllOn ? "on" : ""}" data-cat="${esc(cat)}" ${selectableSvcs.length ? "" : "disabled"}>${catAllOn ? "✓ 카테고리 선택" : "카테고리 선택"}</button>
+        <span class="cscount">선택 <b>${onCount}</b>/총 ${svcs.length} svc</span>
+      </div><div class="svcgrid">`;
+    svcs.forEach(svc => {
+      const sel = svcSelectable(svc);
+      const all = svcNodes(svc);
+      const st = svcState(svc);
+      const heavy = all.some(id => N[id].heavy);
+      const quota = all.some(id => N[id].quota);
+      const onN = sel.filter(id => targets.has(id)).length;
+      const cls = st === "on" ? "on" : st === "partial" ? "partial" : "";
+      const fracTxt = st === "partial" ? `${onN}/${sel.length} 리소스` : `${sel.length} 리소스`;
+      h += `<div class="svc-cell"><div class="svc ${cls}" data-svc="${esc(svc)}" title="${esc(svc)} — 클릭하면 서비스 전체(생애주기 보유 리소스) 선택">
+          <div class="sh"><span class="sn">${esc(shortName(svc))}</span>
+            <span class="schk">${st === "on" ? "✓" : st === "partial" ? "◐" : ""}</span></div>
+          <div class="sfrac"><span>${esc(fracTxt)}</span>
+            ${heavy ? '<span class="glyph" title="heavy 리소스 포함">🜂</span>' : ""}
+            ${quota ? '<span class="glyph q" title="quota 제약 리소스 포함">⛔</span>' : ""}</div>
+          ${sel.length ? `<button class="resbtn ${st === "partial" ? "pick" : ""}" data-res-svc="${esc(svc)}">리소스…</button>` : '<span class="resbtn dim" style="cursor:default">생애주기 없음</span>'}
+        </div></div>`;
+    });
+    h += `</div></div>`;
   });
-  $("sel-tree").innerHTML = h || '<p class="empty">검색 결과 없음</p>';
-  // wire twirls
-  els("#sel-tree [data-tw]").forEach(e => e.onclick = ev => {
+  $("svcWrap").innerHTML = h || '<p class="empty">검색 결과 없음</p>';
+
+  // card click = toggle whole service
+  els("#svcWrap .svc[data-svc]").forEach(card => card.onclick = ev => {
+    if (ev.target.closest("[data-res-svc]")) return;   // the "리소스…" button has its own handler
+    const svc = card.dataset.svc;
+    if (!svcSelectable(svc).length) return;
+    setSvc(svc, svcState(svc) !== "on");
+    selectionChanged();
+  });
+  // category select toggle
+  els("#svcWrap .csbtn[data-cat]").forEach(b => b.onclick = ev => {
     ev.stopPropagation();
-    const k = e.dataset.tw, kk = (k[0] === "c" ? "c:" : "s:") + k.slice(2);
-    openExpand[kk] = openExpand[kk] === false ? true : false;
-    selectTree();
+    const cat = b.dataset.cat;
+    const svcs = (categoryMap()[cat] || []).filter(s => svcSelectable(s).length);
+    const allOn = svcs.length && svcs.every(s => svcState(s) === "on");
+    svcs.forEach(s => setSvc(s, !allOn));
+    selectionChanged();
   });
-  // wire "전체/해제"
-  els("#sel-tree [data-all]").forEach(b => b.onclick = ev => {
+  // "리소스…" → modal
+  els("#svcWrap [data-res-svc]").forEach(b => b.onclick = ev => {
     ev.stopPropagation();
-    const [kind, key] = b.dataset.all.split(/:(.+)/);
-    let ids;
-    if (kind === "cat") ids = V.allIds().filter(id => N[id].category === key && hasLifecycle(id));
-    else ids = V.allIds().filter(id => N[id].service === key && hasLifecycle(id));
-    const allSel = ids.every(id => targets.has(id));
-    ids.forEach(id => allSel ? targets.delete(id) : targets.add(id));
-    ctxBar(); drawSelect();
+    openModal(b.dataset.resSvc);
   });
-  // wire resource checkboxes
-  els("#sel-tree input[data-res]").forEach(cb => cb.onchange = () => {
-    cb.checked ? targets.add(cb.dataset.res) : targets.delete(cb.dataset.res);
-    ctxBar(); selectCanvas(); selectSummary();
-    els("#sel-tree input[data-res]").forEach(x =>
-      x.closest(".resrow").classList.toggle("istarget", targets.has(x.dataset.res)));
-  });
+  selReadout();
 }
 
-function selectCanvas() {
-  if (!targets.size) {
-    $("sel-svg").innerHTML = "";
-    $("sel-ghint").textContent = "왼쪽 트리에서 자원을 선택하면 의존 폐포가 생성 순서대로 배치됩니다.";
+// any selection change: re-grid (state), readout, and re-fetch the DAG (debounced)
+function selectionChanged() {
+  if (screen === "build") drawSvcGrid();
+  selReadout();
+  ctxBar();
+  refreshGraph();
+  if (screen === "build") launchSummary();
+}
+
+// ---- live composition DAG via /api/graph (debounced) ----
+function refreshGraph() {
+  if (graphTimer) clearTimeout(graphTimer);
+  graphTimer = setTimeout(fetchGraph, 180);
+}
+function fetchGraph() {
+  const body = selectionPayload();
+  fetch("/api/graph", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(r => r.json()).then(g => {
+      if (g.error) { renderGraphError(g.error); return; }
+      lastGraph = g;
+      renderGraph(g);
+      ctxBar(); selReadout(); launchSummary();
+    }).catch(e => renderGraphError(e.message));
+}
+function renderGraphError(msg) {
+  $("dag-svg").innerHTML = `<text x="12" y="24" fill="#cf222e">graph: ${esc(msg)}</text>`;
+}
+function renderGraph(g) {
+  const svg = $("dag-svg");
+  if (!g.nodes.length) {
+    window.ResourceGraph.render(svg, { nodes: [], edges: [] }, {});
+    svg.innerHTML = '<text x="12" y="24" fill="#656d76">서비스를 선택하면 합성 배포 DAG가 생성 순서대로 표시됩니다.</text>';
+    svg.setAttribute("viewBox", "0 0 420 40"); svg.setAttribute("width", 420); svg.setAttribute("height", 40);
+    $("dag-readout").innerHTML = "";
+    $("order-tbl").innerHTML = "";
+    $("dag-legend").innerHTML = "";
     return;
   }
-  const closure = V.closure([...targets]);
-  drawSwimlane($("sel-svg"), closure, {
-    targets,
-    onClick: id => {
-      if (!hasLifecycle(id)) return;            // dep-only resources are not toggleable
+  window.ResourceGraph.render(svg, g, {
+    onClick: id => {                       // click a node on the DAG = toggle that target
+      if (!hasLifecycle(id)) return;       // dep-only nodes are not toggleable
       targets.has(id) ? targets.delete(id) : targets.add(id);
-      if (!targets.size) targets.add(id);       // keep at least the clicked one
-      ctxBar(); drawSelect();
+      selectionChanged();
     }
   });
-  $("sel-legend").innerHTML = legend([
-    ["#3b82f6", "대상(target)"], ["#27384b", "폐포(의존)"], ["#0b121c", "dep-only(흐림)"]
-  ]) + '<span>🜂 heavy · ⛔ quota · 클릭 = 대상 토글</span>';
-  $("sel-ghint").textContent =
-    "깊이(왼→오) = 최장경로 생성 순서 · 가로 밴드 = 카테고리(스윔레인) · 의존은 service/category 경계를 넘을 수 있음.";
+  $("dag-legend").innerHTML = legend([
+    ["#e6effd", "★ 대상"], ["#fffaf0", "■ 공유(dedup)"], ["#f3eefc", "↓ 의존"]
+  ]) + '<span><span style="color:var(--val)">●</span> VALIDATED · <span style="color:var(--docs)">●</span> docs · 🜂 heavy · ⛔ quota</span>';
+  graphReadout(g);
+  orderTable(g);
 }
 
-function selectSummary() {
-  const closure = V.closure([...targets]);
-  const svcs = new Set([...closure].map(id => N[id].service));
-  const cats = new Set([...closure].map(id => N[id].category));
-  const heavy = [...closure].filter(id => N[id].heavy);
-  const lcs = new Set([...closure].map(id => N[id].lifecycle).filter(Boolean));
-  const quota = {};
-  closure.forEach(id => { const qq = N[id].quota; if (qq) quota[qq] = (quota[qq] || 0) + 1; });
-  const depOnly = [...closure].filter(id => !hasLifecycle(id));
-  $("sel-right").innerHTML = `<h2>선택 요약</h2>
-    <div class="kpi">
-      <div class="s"><b>${targets.size}</b><span>대상</span></div>
-      <div class="s"><b>${closure.size}</b><span>폐포</span></div>
-      <div class="s"><b>${lcs.size}</b><span>lifecycle</span></div>
-    </div>
-    <div class="kpi" style="margin-top:7px">
-      <div class="s"><b>${svcs.size}</b><span>서비스</span></div>
-      <div class="s"><b>${cats.size}</b><span>카테고리</span></div>
-      <div class="s"><b style="color:${heavy.length ? "var(--heavy)" : "var(--ink)"}">${heavy.length}</b><span>heavy</span></div>
-    </div>
-    <h3>quota peaks</h3>
-    <div class="chiprow">${Object.entries(quota).map(([k, v]) =>
-      `<span class="chip">⛔ <b>${esc(k)}</b> ×${v}</span>`).join("") || '<span class="muted small">없음</span>'}</div>
-    <h3>대상 (${targets.size})</h3>
-    <div class="chiprow">${[...targets].sort().map(id =>
-      `<span class="chip"><b>${esc(id)}</b><span class="x" data-rm="${esc(id)}">×</span></span>`).join("")
-      || '<span class="muted small">없음</span>'}</div>
-    ${depOnly.length ? `<h3>dep-only 자원 (${depOnly.length})</h3>
-      <p class="muted small">${depOnly.slice(0, 12).map(esc).join(" · ")}${depOnly.length > 12 ? " …" : ""}</p>` : ""}
-    <div class="run-ctl"><button class="btn" id="sel-toplan" ${targets.size ? "" : "disabled"}>Plan으로 →</button></div>`;
-  els("#sel-right [data-rm]").forEach(x => x.onclick = () => {
-    targets.delete(x.dataset.rm); ctxBar(); drawSelect();
-  });
-  if ($("sel-toplan")) $("sel-toplan").onclick = () => go("plan");
+// readout: 생성 순서 · peak quota · 공유(dedup)
+function graphReadout(g) {
+  const order = (g.order || []).map(baseId);
+  const seen = new Set(), uniqOrder = [];
+  order.forEach(b => { if (!seen.has(b)) { seen.add(b); uniqOrder.push(b); } });
+  const pq = Object.entries(g.peak_quota || {}).map(([k, v]) => `${esc(k)} ×${v}`).join(" · ") || "없음";
+  $("dag-readout").innerHTML =
+    `<b>생성 순서:</b> <span class="mono">${uniqOrder.map(esc).join(" → ") || "—"}</span><br>` +
+    `<b>peak quota:</b> ${pq} · <b>공유(dedup):</b> ${(g.shared || []).length}` +
+    `${(g.shared || []).length ? ' <span class="muted">(' + g.shared.map(esc).join(", ") + ')</span>' : ""}`;
 }
 
-// ================= ② Plan =================
-function drawPlan() {
-  $("plan-right").innerHTML = '<p class="empty">plan 요청 중…</p>';
-  $("plan-waves").innerHTML = "";
-  const sel = selectionPayload();
-  fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(sel) })
-    .then(r => r.json()).then(p => {
-      if (p.error) { $("plan-right").innerHTML = '<p class="empty">plan 실패: ' + esc(p.error) + "</p>"; return; }
-      lastPlan = p;
-      renderPlan(p);
-    }).catch(e => { $("plan-right").innerHTML = '<p class="empty">plan 연결 실패: ' + esc(e.message) + "</p>"; });
-}
-
-function renderPlan(p) {
-  const plan = p.plan || {};
-  const waves = plan.waves || [];
-  // (a) resource DAG (closure of the selection), depth = 생성 순서
-  const closure = V.closure([...targets]);
-  drawSwimlane($("plan-svg"), closure, { targets });
-  $("plan-legend").innerHTML = legend([["#3b82f6", "대상"], ["#27384b", "의존"]]) +
-    `<span>shared roots: ${(plan.shared_roots || []).map(r => `<code>${esc(r)}</code>`).join(" ") || "—"}</span>`;
-  $("plan-gtitle").innerHTML = `실행 DAG <span class="muted small">· 폐포 ${closure.size} · leaf ${(plan.leaf_set || []).length}</span>`;
-
-  // (b) dag_planner waves
-  $("plan-waves").innerHTML = waves.length ? waves.map((w, i) => {
-    const kind = (w.kind || "").replace("-", "");
-    return `<div class="wave">
-      <div class="wh"><span>웨이브 ${i}</span>
-        <span class="wk ${esc(kind)}">${esc(w.kind)}</span>
-        <span class="muted small">동시 ${w.lifecycles.length}개${w.vpc_slots ? ` · VPC 슬롯 ${w.vpc_slots}` : ""}</span></div>
-      <div class="ll">${w.lifecycles.map(l => `<span class="chip"><b>${esc(l)}</b></span>`).join("")}</div>
-    </div>`;
-  }).join("") : '<p class="empty">웨이브 없음 (실행 가능한 lifecycle이 선택에 없음)</p>';
-
-  // right: per-lifecycle step preview (which APIs each leaf calls) + counts
-  const preview = p.preview || {};
-  const leaves = Object.keys(preview).sort();
-  const stepRows = leaves.map(lid => {
-    const pv = preview[lid];
-    const steps = (pv.steps || []).filter(s => s.method);  // HTTP steps only
-    return `<tr class="lc-head"><td colspan="2">${esc(lid)} <span class="muted small">${esc(pv.service)}${pv.heavy ? " · 🜂" : ""} · ${steps.length} api</span></td></tr>` +
-      steps.map(s => `<tr><td><span class="mtag ${esc(s.method)}">${esc(s.method)}</span></td>
-        <td><code>${esc(s.path)}</code> <span class="muted small">${esc(s.kind)}</span></td></tr>`).join("");
+// 생성/검증/삭제 순서표: create order (graph.order) · verify count (model.verify_n) · delete order (graph.teardown)
+function orderTable(g) {
+  const createOrder = [], seen = new Set();
+  (g.order || []).forEach(inst => { const b = baseId(inst); if (!seen.has(b)) { seen.add(b); createOrder.push(b); } });
+  // teardown rank by base node (first occurrence)
+  const delRank = {}; let r = 0;
+  (g.teardown || []).forEach(inst => { const b = baseId(inst); if (!(b in delRank)) delRank[b] = ++r; });
+  const nodeById = {}; (g.nodes || []).forEach(n => { nodeById[n.id] = n; });
+  const rows = createOrder.map((id, i) => {
+    const n = nodeById[id] || {};
+    const verifyN = (N[id] && N[id].verify_n != null) ? N[id].verify_n : 0;
+    const tgt = n.is_target ? '<span class="bdg run" style="border:none;background:none;color:var(--accent);padding:0">★</span>' : "";
+    const sh = n.shared ? '<span class="tag amber" title="공유(dedup)">공유</span>' : "";
+    return `<tr>
+      <td class="ordn">${i + 1}</td>
+      <td><b>${esc(id)}</b> ${tgt} ${sh}${n.heavy ? " 🜂" : ""}</td>
+      <td class="muted">${esc(shortName(n.service || (N[id] && N[id].service) || ""))}</td>
+      <td class="ordn">${verifyN}</td>
+      <td class="ordn">${delRank[id] || "—"}</td>
+    </tr>`;
   }).join("");
-  const skipped = p.skipped_disabled || [];
-  $("plan-right").innerHTML = `<h2>Plan 요약</h2>
-    <div class="kpi">
-      <div class="s"><b>${(plan.leaf_set || []).length}</b><span>leaf lifecycle</span></div>
-      <div class="s"><b>${waves.length}</b><span>웨이브</span></div>
-      <div class="s"><b>${p.peak_vpcs != null ? p.peak_vpcs : "—"}</b><span>peak VPCs</span></div>
-    </div>
-    <div class="kv"><span>요청 lifecycle</span><b>${(p.requested || []).length}</b></div>
-    <div class="kv"><span>실행 가능</span><b>${(p.runnable || []).length}</b></div>
-    <div class="kv"><span>공유 루트</span><b>${(plan.shared_roots || []).length}</b></div>
-    ${skipped.length ? `<div class="note small"><b>skipped (disabled):</b> ${skipped.map(esc).join(", ")}</div>` : ""}
-    <h3>lifecycle별 API 미리보기</h3>
-    <div class="scroll" style="max-height:420px"><table class="tbl">${stepRows ||
-      '<tr><td class="empty">미리보기 없음</td></tr>'}</table></div>
-    <div class="run-ctl"><button class="btn" id="plan-torun" ${(plan.leaf_set || []).length ? "" : "disabled"}>실행으로 →</button></div>`;
-  if ($("plan-torun")) $("plan-torun").onclick = () => go("run");
+  $("order-tbl").innerHTML =
+    `<thead><tr><th>생성#</th><th>리소스</th><th>service</th><th>검증(verify)</th><th>삭제#</th></tr></thead>` +
+    `<tbody>${rows || '<tr><td colspan="5" class="empty">없음</td></tr>'}</tbody>`;
 }
 
-// ================= ③ 실행 (Run) =================
+const baseId = inst => (inst + "").split("#")[0];
+
+// ================= resource modal (specific-resource selection) =================
+function wireModal() {
+  const close = () => closeModal();
+  $("modal-close").onclick = close;
+  $("modal-scrim").onclick = close;
+  $("modal-done").onclick = close;
+  $("modal-clear").onclick = () => {
+    if (modalSvc) setSvc(modalSvc, false);
+    drawModalBody();
+    selectionChanged();
+  };
+  document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+}
+function openModal(svc) {
+  modalSvc = svc;
+  $("modal-title").textContent = "리소스 선택 — " + shortName(svc);
+  $("modal-svc").textContent = svc;
+  drawModalBody();
+  $("res-modal").classList.add("open");
+  $("modal-scrim").classList.add("open");
+}
+function closeModal() {
+  $("res-modal").classList.remove("open");
+  $("modal-scrim").classList.remove("open");
+  modalSvc = null;
+}
+function drawModalBody() {
+  const svc = modalSvc; if (!svc) return;
+  // dependency set pulled in by the CURRENT closure (so we can flag "의존으로 포함")
+  const depIds = new Set((lastGraph ? lastGraph.nodes : []).filter(n => !n.is_target).map(n => n.id));
+  const ids = svcNodes(svc).slice().sort();
+  let h = "";
+  ids.forEach(id => {
+    const n = N[id];
+    const lc = hasLifecycle(id);
+    const on = targets.has(id);
+    const pulledDep = !on && depIds.has(id);
+    const prov = n.provenance === "VALIDATED" ? "var(--val)" : "var(--docs)";
+    if (!lc) {
+      // lookup / no-lifecycle resource: dimmed + disabled, never selectable
+      h += `<div class="mres nolc"><label>
+          <span class="cb dash"></span>
+          <span class="nodedot" style="background:${prov}"></span>
+          <span>${esc(id)}</span></label>
+          <span class="meta"><span class="tag dep">의존전용</span></span></div>`;
+    } else {
+      h += `<div class="mres ${pulledDep ? "dep" : ""}" data-mid="${esc(id)}"><label>
+          <span class="cb ${on ? "on" : ""}"></span>
+          <span class="nodedot" style="background:${prov}"></span>
+          <b>${esc(id)}</b>${n.heavy ? " 🜂" : ""}</label>
+          <span class="meta">${n.quota ? '<span class="tag amber">⛔ ' + esc(n.quota) + "</span>" : ""}${pulledDep ? '<span class="tag dep">의존으로 포함</span>' : ""}</span></div>`;
+    }
+  });
+  $("modal-body").innerHTML = h || '<p class="empty">리소스 없음</p>';
+  const sel = svcSelectable(svc);
+  const onN = sel.filter(id => targets.has(id)).length;
+  $("modal-hint").innerHTML = onN
+    ? `이 서비스에서 <b>${onN}</b>개 리소스만 선택됨 (서비스 전체 대신 이것만 합성).`
+    : `아무것도 고르지 않고 닫으면 이 서비스는 선택되지 않습니다.`;
+  els("#modal-body [data-mid]").forEach(row => row.onclick = () => {
+    const id = row.dataset.mid;
+    targets.has(id) ? targets.delete(id) : targets.add(id);
+    drawModalBody();
+    selectionChanged();
+  });
+}
+
+// ================= launch bar (carry selection into ②) =================
 const AXES = {
   "smoke":             { label: "smoke", desc: "읽기 전용 (다음 빌드)", enabled: false, gates: {} },
   "regression-light":  { label: "회귀-light", desc: "CRUD · mutations+destructive", enabled: true,
@@ -336,56 +391,89 @@ const AXES = {
                          gates: { mutations: true, destructive: true, heavy: true } },
   "conformance":       { label: "conformance", desc: "설계 적합성 (다음 빌드)", enabled: false, gates: {} }
 };
+function buildAxisCtl() {
+  $("axisCtl").innerHTML = Object.entries(AXES).map(([k, a]) =>
+    `<button data-ax="${k}" class="${runAxis === k ? "on" : ""}" ${a.enabled ? "" : "disabled"} title="${esc(a.desc)}">${esc(a.label)}</button>`).join("");
+  els("#axisCtl button").forEach(b => b.onclick = () => {
+    if (!AXES[b.dataset.ax].enabled) return;
+    runAxis = b.dataset.ax;
+    els("#axisCtl button").forEach(x => x.classList.toggle("on", x.dataset.ax === runAxis));
+    ctxBar(); launchSummary();
+  });
+  els("#modeCtl button").forEach(b => b.onclick = () => {
+    runMode = b.dataset.md;
+    els("#modeCtl button").forEach(x => x.classList.toggle("on", x.dataset.md === runMode));
+    ctxBar(); launchSummary();
+  });
+  $("launch-go").onclick = startRun;
+}
+function launchSummary() {
+  const svcs = new Set([...targets].map(id => N[id].service));
+  const K = lastGraph ? lastGraph.nodes.length : "…";
+  const heavy = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
+  const pq = lastGraph ? Object.values(lastGraph.peak_quota || {}).reduce((a, b) => a + b, 0) : 0;
+  $("launchSum").innerHTML =
+    `대상 <b>${svcs.size}</b> svc / <b>${targets.size}</b> 리소스 · 폐포 <b>${K}</b> · peak quota <b>${pq}</b> · ` +
+    `🜂heavy <span class="${heavy ? "hv" : ""}">${heavy ? "포함" : "없음"}</span>`;
+  const go = $("launch-go");
+  if (go) {
+    go.disabled = !targets.size;
+    go.className = "btn" + (runMode === "live" ? " warn" : "");
+    go.textContent = runMode === "live" ? "⚠ LIVE 실행 ▶" : "▶ simulate 실행";
+  }
+}
 
-function drawRun() {
-  const closure = V.closure([...targets]);
-  const lcs = new Set([...closure].map(id => N[id].lifecycle).filter(Boolean));
+// ================= ② 실행 & 리포트 =================
+function drawRunScreen() {
+  drawRunSettings();
+  drawReport();
+}
+function drawRunSettings() {
   const ax = AXES[runAxis];
+  const svcs = new Set([...targets].map(id => N[id].service));
   $("run-left").innerHTML = `<h2>실행 설정</h2>
-    <h3>Axis <span class="muted small">(run 단위 — resource별 아님)</span></h3>
+    <h3>Axis <span class="muted small">(run 단위)</span></h3>
     <div class="axisgrid" id="axisgrid">${Object.entries(AXES).map(([k, a]) =>
       `<label class="axisopt ${runAxis === k ? "on" : ""} ${a.enabled ? "" : "disabled"}">
-        <input type="radio" name="axis" value="${k}" ${runAxis === k ? "checked" : ""} ${a.enabled ? "" : "disabled"}>
+        <input type="radio" name="axis2" value="${k}" ${runAxis === k ? "checked" : ""} ${a.enabled ? "" : "disabled"}>
         <span><span class="t">${esc(a.label)}</span><br><span class="d">${esc(a.desc)}</span></span>
       </label>`).join("")}</div>
     <h3>mode</h3>
-    <div class="seg-ctl" id="modeseg">
+    <div class="pill-ctl mode" id="modeseg" style="width:fit-content">
       <button data-m="simulate" class="${runMode === "simulate" ? "on" : ""}">simulate</button>
       <button data-m="live" class="${runMode === "live" ? "on" : ""}">live</button>
     </div>
-    <p class="muted small" style="margin-top:6px">simulate = 플랜을 결정론적으로 재생(클라우드 호출 없음, 합성 id). live = 실제 pytest + 안전 게이트.</p>
+    <p class="muted small" style="margin-top:7px">simulate = 플랜을 결정론적으로 재생(클라우드 호출 없음, 합성 id). live = 실제 pytest + 안전 게이트.</p>
     <h3>적용 게이트</h3>
     <div class="chiprow" id="gatechips"></div>
-    <div class="kv"><span>실행 lifecycle</span><b>${lcs.size}</b></div>
-    <div class="run-ctl"><button class="btn ${runMode === "live" ? "warn" : ""}" id="run-go" ${lcs.size ? "" : "disabled"}>
-      ${runMode === "live" ? "⚠ LIVE 실행 ▶" : "▶ simulate 실행"}</button></div>
-    ${lcs.size ? "" : '<p class="muted small">선택에 실행 가능한 lifecycle이 없습니다 — ① 선택에서 자원을 고르세요.</p>'}`;
+    <div class="kv"><span>선택</span><b>${svcs.size} svc / ${targets.size} 리소스</b></div>
+    <div class="run-ctl">
+      <button class="btn ${runMode === "live" ? "warn" : ""}" id="run-go" ${targets.size ? "" : "disabled"}>
+        ${runMode === "live" ? "⚠ LIVE 실행 ▶" : "▶ simulate 실행"}</button>
+      <button class="btn ghost" id="run-toconf" title="① 구성으로 돌아가 선택 변경">← 구성</button>
+    </div>
+    ${targets.size ? "" : '<p class="muted small">선택이 없습니다 — ① 구성에서 서비스를 고르세요.</p>'}`;
   gateChips();
   els("#axisgrid input").forEach(r => r.onchange = () => {
     if (!AXES[r.value].enabled) return;
-    runAxis = r.value; ctxBar(); drawRun();
+    runAxis = r.value; ctxBar(); drawRunSettings();
   });
-  els("#modeseg button").forEach(b => b.onclick = () => { runMode = b.dataset.m; ctxBar(); drawRun(); });
+  els("#modeseg button").forEach(b => b.onclick = () => { runMode = b.dataset.m; ctxBar(); drawRunSettings(); });
   $("run-go").onclick = startRun;
-  // keep the live area if a run is in flight / done
-  $("run-live").innerHTML = runId ? liveProgressHtml() : "";
+  $("run-toconf").onclick = () => go("build");
 }
-
 function gateChips() {
   const g = AXES[runAxis].gates || {};
-  const chips = [
-    ["mutations", g.mutations], ["destructive", g.destructive], ["heavy", g.heavy]
-  ].map(([k, v]) => `<span class="chip" style="border-color:${v ? "var(--heavy)" : "var(--line)"}">
-    ${v ? "✔" : "✕"} ${k}</span>`).join("");
+  const chips = [["mutations", g.mutations], ["destructive", g.destructive], ["heavy", g.heavy]]
+    .map(([k, v]) => `<span class="chip" style="border-color:${v ? "var(--red)" : "var(--line)"}">${v ? "✔" : "✕"} ${k}</span>`).join("");
   if ($("gatechips")) $("gatechips").innerHTML = runMode === "live"
-    ? chips
-    : '<span class="muted small">simulate — 게이트 무관 (클라우드 호출 없음)</span>';
+    ? chips : '<span class="muted small">simulate — 게이트 무관 (클라우드 호출 없음)</span>';
 }
 
 function startRun() {
+  if (!targets.size) return;
   const ax = AXES[runAxis];
-  const sel = selectionPayload();
-  const body = Object.assign({ mode: runMode }, sel);
+  const body = Object.assign({ mode: runMode }, selectionPayload());
   if (runMode === "live") {
     Object.assign(body, ax.gates || {});
     const g = ax.gates || {};
@@ -396,21 +484,15 @@ function startRun() {
       `heavy(billable lifecycle): ${g.heavy ? "ON" : "off"}\n\n진행할까요?`;
     if (!confirm(msg)) return;
   }
-  $("run-go").disabled = true;
-  $("run-live").innerHTML = '<p class="muted small">실행 요청 중…</p>';
-  fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body) })
+  if (screen !== "run") go("run");
+  $("report-main").innerHTML = '<p class="muted small">실행 요청 중…</p>';
+  fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).then(j => {
-      if (j.error) { $("run-live").innerHTML = '<p class="empty">실행 실패: ' + esc(j.error) + "</p>"; $("run-go").disabled = false; return; }
-      runId = j.id; runEvents = []; runStatus = "running";
+      if (j.error) { $("report-main").innerHTML = '<p class="empty">실행 실패: ' + esc(j.error) + "</p>"; return; }
+      runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r1";
+      drawReport();
       pollEvents();
-      go("report");
-    }).catch(e => { $("run-live").innerHTML = '<p class="empty">실행 연결 실패: ' + esc(e.message) + "</p>"; $("run-go").disabled = false; });
-}
-
-function liveProgressHtml() {
-  return `<div class="note small">run <code>${esc(runId)}</code> · ${esc(runStatus)} —
-    <a href="#" onclick="go('report');return false">리포트에서 보기 →</a></div>`;
+    }).catch(e => { $("report-main").innerHTML = '<p class="empty">실행 연결 실패: ' + esc(e.message) + "</p>"; });
 }
 
 // ---- poll the live event stream until run-end / status done ----
@@ -421,19 +503,17 @@ function pollEvents() {
     runEvents = j.events || [];
     runStatus = j.status || runStatus;
     const ended = runEvents.some(e => e.kind === "run-end") || (runStatus !== "running");
-    if (stage === "report") drawReport();
-    if (stage === "run") $("run-live").innerHTML = liveProgressHtml();
+    if (screen === "run") drawReport();
     if (!ended) pollTimer = setTimeout(pollEvents, 1500);
-    else { runStatus = runStatus === "running" ? "done" : runStatus; if (stage === "report") drawReport(); }
+    else { runStatus = runStatus === "running" ? "done" : runStatus; if (screen === "run") drawReport(); }
   }).catch(() => { pollTimer = setTimeout(pollEvents, 2000); });
 }
 
-// ================= ④ 리포트 (Report) =================
+// ================= ④ 리포트 (R1/R2/R3/R4) — kept functional, light theme =================
 function drawReport() {
   els("#report-subtabs button").forEach(b => b.classList.toggle("on", b.dataset.r === reportSub));
   if (!runId) {
-    $("report-main").innerHTML = '<p class="empty">아직 실행이 없습니다 — ③ 실행에서 <b>실행 ▶</b>을 누르세요.</p>';
-    $("report-side").innerHTML = runRecordsPlaceholder();
+    $("report-main").innerHTML = '<p class="empty">아직 실행이 없습니다 — 위에서 <b>실행 ▶</b>을 누르세요.</p>';
     loadRunRecords();
     return;
   }
@@ -441,16 +521,15 @@ function drawReport() {
   else if (reportSub === "r2") reportR2();
   else if (reportSub === "r3") reportR3();
   else reportR4();
-  $("report-side").innerHTML = runRecordsPlaceholder();
   loadRunRecords();
 }
 
-// derive live lifecycle state from events: queued/running/done/fail
+// derive live lifecycle state from events: queued/running/done/fail/skip
 function lifecycleStates() {
   const st = {};
-  (lastPlan && lastPlan.plan && lastPlan.plan.leaf_set || []).forEach(l => st[l] = "queued");
   runEvents.forEach(e => {
     if (e.kind === "run-meta") (e.runnable || []).forEach(l => { if (!st[l]) st[l] = "queued"; });
+    if (e.kind === "wave-start") (e.lifecycles || []).forEach(l => { if (!st[l]) st[l] = "queued"; });
     if (e.kind === "lifecycle-start") st[e.lifecycle] = "running";
     if (e.kind === "lifecycle-end") st[e.lifecycle] =
       e.status === "passed" ? "done" : e.status === "skipped" ? "skip" : "fail";
@@ -458,68 +537,62 @@ function lifecycleStates() {
   return st;
 }
 
-// R1 진행 — DAG/wave graph colored by live lifecycle state + wave progress
+// R1 진행 — composition DAG colored by live lifecycle state + wave progress.
+// Re-uses ResourceGraph with an overlay mapping each node's source lifecycle state.
 function reportR1() {
   const st = lifecycleStates();
-  const waves = (lastPlan && lastPlan.plan && lastPlan.plan.waves) || [];
-  // map lifecycle state onto its source resource node(s) for the swimlane color
-  const lcOfNode = {};
-  V.allIds().forEach(id => { if (N[id].lifecycle) (lcOfNode[N[id].lifecycle] = lcOfNode[N[id].lifecycle] || []).push(id); });
-  const nodeState = id => {
-    const lc = N[id] && N[id].lifecycle;
-    return lc && st[lc] ? st[lc] : null;
-  };
-  const closure = V.closure([...targets]);
-  const COL = { queued: "#1c2a3a", running: "#0f2033", done: "#0f2419", fail: "#2a1311", skip: "#1c2a3a" };
-  const STK = { queued: "#5b7088", running: "#3b82f6", done: "#2fb673", fail: "#e0574c", skip: "#6b8099" };
+  const FILL = { queued: "#ffffff", running: "#e8f0fd", done: "#eaf7ee", fail: "#fdeaea", skip: "#f6f8fa" };
+  const STK = { queued: "#8a93a0", running: "#2563c9", done: "#2da44e", fail: "#cf222e", skip: "#8a93a0" };
   const BDG = { queued: "", running: "⏳", done: "✓", fail: "✕", skip: "–" };
-  drawSwimlane($("report-main-svg-host") || makeR1Host(), closure, {
-    targets,
-    colorOf: id => COL[nodeState(id)] || null,
-    strokeOf: id => STK[nodeState(id)] || null,
-    badgeOf: id => BDG[nodeState(id)] || ""
-  });
+  const nodeState = id => { const lc = N[id] && N[id].lifecycle; return lc && st[lc] ? st[lc] : null; };
+  $("report-main").innerHTML = `<h2>R1 진행 <span class="muted small">· DAG 노드 = lifecycle 라이브 상태</span></h2>
+    <div class="legend">${legend([["#ffffff", "queued"], ["#e8f0fd", "running"], ["#eaf7ee", "done"], ["#fdeaea", "fail"]])}</div>
+    <div class="svgbox"><svg id="r1-svg"></svg></div>
+    <div id="r1-prog" style="margin-top:8px"></div>`;
+  const g = lastGraph && lastGraph.nodes.length ? lastGraph : null;
+  if (g) {
+    window.ResourceGraph.render($("r1-svg"), g, {
+      overlay: id => {
+        const s = nodeState(id);
+        if (!s) return null;
+        return { fill: FILL[s], stroke: STK[s], badge: BDG[s] };
+      }
+    });
+  } else {
+    $("r1-svg").innerHTML = '<text x="12" y="22" fill="#656d76">합성 그래프 없음</text>';
+  }
   // wave progress under the canvas
+  const waves = {};
+  runEvents.forEach(e => { if (e.kind === "wave-start") waves[e.wave] = { kind: e.wave_kind, lcs: e.lifecycles || [] }; });
   const counts = k => Object.values(st).filter(v => v === k).length;
-  const total = Object.keys(st).length;
-  const waveLines = waves.map((w, i) => {
-    const lcs = w.lifecycles;
-    const done = lcs.filter(l => st[l] === "done").length;
-    const running = lcs.some(l => st[l] === "running");
-    const pct = lcs.length ? Math.round(100 * done / lcs.length) : 0;
-    return `<div class="kv"><span>${running ? "⏳" : done === lcs.length && lcs.length ? "✓" : "·"}
-      웨이브 ${i} <span class="muted small">${esc(w.kind)} · ${lcs.length}개</span></span>
-      <b>${done}/${lcs.length}</b></div>
-      <div class="pbar"><i style="width:${pct}%"></i></div>`;
+  const total = Object.keys(st).length || (g ? g.nodes.filter(n => n.is_target).length : 0);
+  const waveLines = Object.keys(waves).sort((a, b) => a - b).map(i => {
+    const w = waves[i];
+    const done = w.lcs.filter(l => st[l] === "done").length;
+    const running = w.lcs.some(l => st[l] === "running");
+    const pct = w.lcs.length ? Math.round(100 * done / w.lcs.length) : 0;
+    return `<div class="kv"><span>${running ? "⏳" : done === w.lcs.length && w.lcs.length ? "✓" : "·"}
+      웨이브 ${i} <span class="muted small">${esc(w.kind || "")} · ${w.lcs.length}개</span></span><b>${done}/${w.lcs.length}</b></div>
+      <div class="pbar ${done === w.lcs.length && w.lcs.length ? "done" : ""}"><i style="width:${pct}%"></i></div>`;
   }).join("");
-  $("report-main-prog").innerHTML = `
-    <div class="kpi">
+  $("r1-prog").innerHTML = `<div class="kpi">
       <div class="s"><b>${counts("done")}/${total}</b><span>완료</span></div>
       <div class="s"><b style="color:var(--run)">${counts("running")}</b><span>실행중</span></div>
       <div class="s"><b style="color:var(--fail)">${counts("fail")}</b><span>fail</span></div>
       <div class="s"><b>${esc(runStatus)}</b><span>상태</span></div>
     </div>
-    <h3>웨이브 진행 (계획 순서)</h3>${waveLines || '<p class="muted small">웨이브 정보 없음</p>'}`;
-}
-function makeR1Host() {
-  $("report-main").innerHTML = `<h2>R1 진행 <span class="muted small">· DAG 노드 = lifecycle 라이브 상태</span></h2>
-    <div class="legend">${legend([["#5b7088", "queued"], ["#3b82f6", "running"], ["#2fb673", "done"], ["#e0574c", "fail"]])}</div>
-    <div class="svgbox"><svg id="report-main-svg-host"></svg></div>
-    <div id="report-main-prog" style="margin-top:8px"></div>`;
-  return $("report-main-svg-host");
+    <h3>웨이브 진행 (실행 순서)</h3>${waveLines || '<p class="muted small">웨이브 이벤트 대기 중…</p>'}`;
 }
 
 // R2 리소스 — per-resource rows from resource-tracked / resource-deleted
 function reportR2() {
-  const rows = {};  // resource_id → {type, lifecycle, created, deleted}
-  // per-lifecycle: did its verify (read) steps pass? (api-level ok)
+  const rows = {};
   const lcVerifyOk = {};
   runEvents.forEach(e => {
     if (e.kind === "resource-tracked")
       rows[e.resource_id] = { id: e.resource_id, type: e.resource_type, lifecycle: e.lifecycle,
         path: e.path, created: true, deleted: false, tested: false };
     if (e.kind === "resource-deleted") {
-      // mark the most recent same-type+lifecycle row deleted (synthetic teardown)
       const cand = Object.values(rows).filter(r => r.lifecycle === e.lifecycle && r.type === e.resource_type && !r.deleted);
       if (cand.length) cand[cand.length - 1].deleted = true;
     }
@@ -540,19 +613,18 @@ function reportR2() {
   $("report-main").innerHTML = `<h2>R2 리소스${simLabel}</h2>
     <p class="muted small">create/delete 스텝마다 추적된 실자원 — resource_type · resource_id · 생성/테스트/삭제.</p>
     <table class="tbl">
-      <tr><th>type</th><th>resource_id</th><th>lifecycle</th><th>생성</th><th>테스트</th><th>삭제</th></tr>
-      ${body}</table>`;
+      <thead><tr><th>type</th><th>resource_id</th><th>lifecycle</th><th>생성</th><th>테스트</th><th>삭제</th></tr></thead>
+      <tbody>${body}</tbody></table>`;
 }
 
 // R3 API — api-first table of step-start/step-end (method+path, 결과, 응답시간)
 function reportR3() {
-  const calls = [];  // {lifecycle, step, method, path, status, category, ms}
+  const calls = [];
   const open = {};
   runEvents.forEach(e => {
     if (e.kind === "step-start") {
       const k = e.lifecycle + "|" + e.step;
-      open[k] = { lifecycle: e.lifecycle, step: e.step, method: e.method, path: e.path,
-        status: null, category: "run", ms: null };
+      open[k] = { lifecycle: e.lifecycle, step: e.step, method: e.method, path: e.path, status: null, category: "run", ms: null };
       calls.push(open[k]);
     }
     if (e.kind === "step-end") {
@@ -562,21 +634,19 @@ function reportR3() {
       if (!open[k]) calls.push(c);
     }
   });
-  // group by lifecycle but api-first within
   const byLc = {};
   calls.forEach(c => (byLc[c.lifecycle] = byLc[c.lifecycle] || []).push(c));
   const okN = calls.filter(c => c.category === "ok").length;
   const softN = calls.filter(c => c.category === "soft").length;
   const failN = calls.filter(c => c.category === "fail").length;
-  const body = Object.keys(byLc).sort().map(lc => {
-    return `<tr class="lc-head"><td colspan="4">${esc(lc)} <span class="muted small">${byLc[lc].length} api</span></td></tr>` +
-      byLc[lc].map(c => `<tr>
+  const body = Object.keys(byLc).sort().map(lc =>
+    `<tr class="lc-head"><td colspan="4">${esc(lc)} <span class="muted small">${byLc[lc].length} api</span></td></tr>` +
+    byLc[lc].map(c => `<tr>
         <td><span class="mtag ${esc(c.method || "")}">${esc(c.method || "")}</span> <code>${esc(c.path || "")}</code></td>
         <td>${badge(c.category)}</td>
         <td class="muted">${c.status != null ? esc(c.status) : "—"}</td>
         <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run" ? "⏳" : "—")}</td>
-      </tr>`).join("");
-  }).join("");
+      </tr>`).join("")).join("");
   $("report-main").innerHTML = `<h2>R3 API <span class="muted small">· api 단위 (대상 · 결과 · 응답시간)</span></h2>
     <div class="kpi">
       <div class="s"><b>${calls.length}</b><span>api 호출</span></div>
@@ -585,17 +655,17 @@ function reportR3() {
       <div class="s"><b style="color:var(--fail)">${failN}</b><span>fail</span></div>
     </div>
     <div class="scroll" style="max-height:520px;margin-top:8px"><table class="tbl">
-      <tr><th>method · path (대상)</th><th>결과</th><th>status</th><th>응답시간</th></tr>
-      ${body || '<tr><td colspan="4" class="empty">api 이벤트 없음</td></tr>'}</table></div>`;
+      <thead><tr><th>method · path (대상)</th><th>결과</th><th>status</th><th>응답시간</th></tr></thead>
+      <tbody>${body || '<tr><td colspan="4" class="empty">api 이벤트 없음</td></tr>'}</tbody></table></div>`;
 }
 
 // R4 로그 — raw run log + cleanup/verify controls
 function reportR4() {
   $("report-main").innerHTML = `<h2>R4 로그 <span class="muted small">· 원시 실행 로그</span></h2>
     <div class="run-ctl">
-      <button class="btn warn" id="btn-cleanup" title="우리(owner)가 만든 자원을 강제 삭제 (reconciler, TTL 무시).">🧹 강제 클린업</button>
-      <button class="btn ghost" id="btn-verify" title="삭제 없이 남은 우리 자원 수 확인 (read-only).">🔍 클린업 확인</button>
-      <button class="btn ghost" id="btn-reflog" style="font-size:11px">↻ 로그 새로고침</button>
+      <button class="minibtn red" id="btn-cleanup" title="우리(owner)가 만든 자원을 강제 삭제 (reconciler, TTL 무시).">🧹 강제 클린업</button>
+      <button class="minibtn" id="btn-verify" title="삭제 없이 남은 우리 자원 수 확인 (read-only).">🔍 클린업 확인</button>
+      <button class="minibtn" id="btn-reflog">↻ 로그 새로고침</button>
     </div>
     <pre class="runlog" id="r4-log">로그 로딩…</pre>`;
   loadLog();
@@ -622,25 +692,20 @@ function loadLog() {
     pre.scrollTop = pre.scrollHeight;
   }).catch(() => { const pre = $("r4-log"); if (pre) pre.textContent = "(로그 로드 실패)"; });
 }
-// cleanup/verify runs have no event stream — poll the record's log/status instead
 function pollLogRun() {
   if (!runId) return;
   fetch("/api/runs/" + runId).then(r => r.json()).then(j => {
     runStatus = j.status || runStatus;
-    if (stage === "report") { if (reportSub === "r4") loadLog(); loadRunRecords(); }
+    if (screen === "run") { if (reportSub === "r4") loadLog(); loadRunRecords(); }
     if (j.status === "running") setTimeout(pollLogRun, 1500);
   }).catch(() => setTimeout(pollLogRun, 2000));
 }
 
-// ---- run records list (right side of report) ----
-function runRecordsPlaceholder() {
-  return `<h2>실행 기록 <span class="muted small">· /api/runs</span></h2>
-    <div id="runs-list"><p class="muted small">로딩…</p></div>`;
-}
+// ---- run records list ----
 function loadRunRecords() {
   fetch("/api/runs").then(r => r.json()).then(j => {
     const runs = j.runs || [];
-    const host = $("runs-list"); if (!host) return;
+    const host = $("report-side"); if (!host) return;
     if (!runs.length) { host.innerHTML = '<p class="muted small">아직 실행 기록이 없습니다.</p>'; return; }
     const KIND = { simulate: "▶sim", lifecycle: "▶live", cleanup: "🧹", verify: "🔍" };
     host.innerHTML = runs.map(r => {
@@ -653,89 +718,21 @@ function loadRunRecords() {
           <span class="muted small">${esc((r.lifecycle_ids || []).slice(0, 2).join(", "))}${(r.lifecycle_ids || []).length > 2 ? " …" : ""}</span></span>
         <span class="muted small">${esc(r.summary || r.status)} · ${dur}</span></div>`;
     }).join("");
-    els("#runs-list .runrow").forEach(row => row.onclick = () => {
+    els("#report-side .runrow").forEach(row => row.onclick = () => {
       runId = row.dataset.id; runEvents = []; runStatus = "running";
-      // reopen: pull events (simulate/live) and log
       fetch("/api/runs/" + runId + "/events").then(r => r.json()).then(j2 => {
         runEvents = j2.events || []; runStatus = j2.status || "done";
-        const running = runStatus === "running";
-        if (running) pollEvents();
+        if (runStatus === "running") pollEvents();
         drawReport();
       }).catch(() => drawReport());
     });
-  }).catch(() => { const host = $("runs-list"); if (host) host.innerHTML = '<p class="muted small">서버 연결 실패</p>'; });
+  }).catch(() => { const host = $("report-side"); if (host) host.innerHTML = '<p class="muted small">서버 연결 실패</p>'; });
 }
 
-// ================= shared: selection payload + canvas + helpers =================
-// the server resolves node_ids → source lifecycles; we send the TARGET resources
-// (it pulls the closure server-side via dag_planner). Sending node_ids keeps the
-// "selection = resources" contract; services/categories are equivalent shortcuts.
+// ================= shared helpers =================
+// the server resolves node_ids → graph_view targets (and → source lifecycles for a
+// run). Sending node_ids keeps the "selection = resources" contract.
 function selectionPayload() { return { node_ids: [...targets] }; }
-
-// layered swimlane DAG (depth = creation order, band = category). A self-contained
-// renderer (viz.js layout() gives x/y/depth; we re-shelf into category bands and
-// add the colorOf/strokeOf/badgeOf overlay hooks the report stages need).
-function drawSwimlane(svg, setIds, opt) {
-  opt = opt || {};
-  if (!setIds.size) { svg.innerHTML = ""; return; }
-  const dep = V.depths(setIds, opt.choices);
-  const bands = [...new Set([...setIds].map(id => N[id].category))]
-    .sort((a, b) => (opt.targets && [...setIds].some(id => opt.targets.has(id) && N[id].category === a) ? 0 : 1)
-      - (opt.targets && [...setIds].some(id => opt.targets.has(id) && N[id].category === b) ? 0 : 1)
-      || (a < b ? -1 : 1));
-  const colGap = 196, rowGap = 56, bw = 162, bh = 42, padX = 116, padY = 16, bandPad = 18;
-  const byId = {}; let y = padY, maxCol = 0;
-  bands.forEach(cat => {
-    const cols = {};
-    [...setIds].filter(id => N[id].category === cat).forEach(id => { (cols[dep[id]] = cols[dep[id]] || []).push(id); });
-    const rows = Math.max(1, ...Object.values(cols).map(a => a.length));
-    const bandTop = y, bandH = rows * rowGap + bandPad;
-    Object.keys(cols).map(Number).forEach(c => {
-      maxCol = Math.max(maxCol, c);
-      cols[c].sort().forEach((id, i) => {
-        byId[id] = { id, x: padX + c * colGap, y: bandTop + bandPad / 2 + i * rowGap, w: bw, h: bh, band: cat, bandTop, bandH };
-      });
-    });
-    y += bandH + 10;
-  });
-  const W = padX + maxCol * colGap + bw + 40, H = y + 10;
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("width", W); svg.setAttribute("height", H);
-  let s = `<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-    <path d="M0,0 L8,3 L0,6 z" fill="#5b7088"/></marker></defs>`;
-  // band backgrounds + labels
-  const drawn = new Set();
-  Object.values(byId).forEach(p => {
-    if (drawn.has(p.band)) return; drawn.add(p.band);
-    s += `<rect x="2" y="${p.bandTop}" width="${W - 4}" height="${p.bandH}" rx="9" fill="#11202f" stroke="#27384b"/>`;
-    s += `<text x="11" y="${p.bandTop + 17}" font-size="11.5" font-weight="700" fill="#6b8099">${esc(p.band)}</text>`;
-  });
-  // edges
-  [...setIds].forEach(id => V.depRefs(id, opt.choices).forEach(r => {
-    const a = byId[r], b = byId[id]; if (!a || !b) return;
-    const x1 = a.x + a.w, y1 = a.y + a.h / 2, x2 = b.x, y2 = b.y + b.h / 2;
-    s += `<path d="M${x1},${y1} C${x1 + 50},${y1} ${x2 - 50},${y2} ${x2},${y2}" fill="none" stroke="#33485e" stroke-width="1.3" marker-end="url(#ar)"/>`;
-  }));
-  // nodes
-  Object.values(byId).forEach(p => {
-    const n = N[p.id];
-    const isT = opt.targets && opt.targets.has(p.id);
-    const lc = hasLifecycle(p.id);
-    const fill = (opt.colorOf && opt.colorOf(p.id)) || (isT ? "#13314f" : lc ? "#1c2a3a" : "#0b121c");
-    const stroke = (opt.strokeOf && opt.strokeOf(p.id)) || (isT ? "#3b82f6" : lc ? V.provColor(n.provenance) : "#33485e");
-    const badge = opt.badgeOf ? opt.badgeOf(p.id) : "";
-    const sw = isT ? 2.4 : 1.4;
-    const op = lc ? 1 : 0.5;
-    s += `<g style="cursor:${opt.onClick && lc ? "pointer" : "default"}" data-id="${esc(p.id)}" opacity="${op}">
-      <title>${esc(p.id)} — ${esc(n.service)}\nprovenance ${esc(n.provenance)}\ndepth ${dep[p.id]}${lc ? "\nlifecycle: " + esc(n.lifecycle) : "\n(dep-only — lifecycle 없음)"}</title>
-      <rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
-      <text x="${p.x + 9}" y="${p.y + 17}" font-size="12" font-weight="600" fill="#e7eef6">${n.heavy ? "🜂 " : ""}${esc(p.id)}</text>
-      <text x="${p.x + 9}" y="${p.y + 32}" font-size="10" fill="#90a4ba">${esc(n.service.split("/").pop())}${n.quota ? " ⛔" + esc(n.quota) : ""}</text>
-      ${badge ? `<text x="${p.x + p.w - 9}" y="${p.y + 16}" font-size="12" text-anchor="end">${esc(badge)}</text>` : ""}
-    </g>`;
-  });
-  svg.innerHTML = s;
-  if (opt.onClick) els("g[data-id]", svg).forEach(g => g.onclick = () => opt.onClick(g.dataset.id));
-}
 
 function legend(items) {
   return items.map(i => `<span><i style="background:${i[0]}"></i>${esc(i[1])}</span>`).join("");
