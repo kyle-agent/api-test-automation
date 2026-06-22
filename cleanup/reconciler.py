@@ -185,6 +185,19 @@ def _converge_enabled() -> bool:
     return os.environ.get("SCP_SWEEP_NO_CONVERGE", "").lower() != "true"
 
 
+def _reset_campaign_state() -> None:
+    """Clear all per-campaign convergence caches so a fresh sweep starts clean.
+    Called at the top of ``main()``; also useful for hermetic tests that exercise
+    multiple independent sweeps in one process (the module-level sets otherwise
+    persist across calls)."""
+    _CONVERGED.clear()
+    _DELETED_THIS_SWEEP.clear()
+    _DELETE_ISSUED.clear()
+    _STUCK.clear()
+    _REGION_CLIENTS.clear()
+    _PROGRESS_THIS_ROUND[0] = 0
+
+
 def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
             match_token: bool = False, force_unnamed: bool = False):
     """List a collection and return only deletable items.
@@ -235,6 +248,29 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
         reason = ("live-ttl" if has_tag
                   else "unnamed" if not name else "name-mismatch")
         skipped.append(f"{name or '<unnamed>'}({reason})")
+    # Persistent-after-delete ("stuck") filtering — convergence fix. Drop any
+    # owned item we ALREADY issued a delete for in a prior round but that is
+    # STILL listed (same id): it is un-deletable with this credential/shape
+    # (filestorage replication source 400; IAM-gated SKE log-group 200-but-stays),
+    # so re-attempting it cannot progress and would re-arm the round loop. Mark
+    # it stuck (report once) and exclude it from this pass. SAFETY: only items
+    # that already passed the is_owned/is_expired gate above reach here, so this
+    # never deletes/keeps anything based on a weakened ownership rule — it only
+    # SUPPRESSES a known-futile retry of an owned item.
+    if _converge_enabled():
+        still: list = []
+        for it in picked:
+            iid = _item_id(it)
+            if iid and iid in _STUCK:
+                continue  # already known-stuck this campaign — silent skip
+            if iid and iid in _DELETE_ISSUED:
+                _STUCK[iid] = "persists after delete (un-deletable: dependency "
+                _STUCK[iid] += "or IAM-gated child)"
+                print(f"  stuck: {iid} ({_name_of(it) or path}) — "
+                      f"deleted in a prior round but still listed; not retrying")
+                continue
+            still.append(it)
+        picked = still
     if listed:
         print(f"  {path}: {len(listed)} listed / {len(picked)} deletable")
         if skipped:
@@ -256,6 +292,80 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
 # already 2xx-deleted this sweep is not progress, or the round loop never
 # reaches its fixed point and burns ~10 minutes re-deleting the same 40.
 _DELETED_THIS_SWEEP: set = set()
+
+
+# ---------------------------------------------------------------------------
+# Persistent-after-delete ("stuck") tracking — convergence fix (8-round loop)
+# ---------------------------------------------------------------------------
+# Field 2026-06-22: a multi-round sweep ran to its MAX rounds every time because
+# some owned items report a truthy DELETE status yet RE-LIST every round:
+#   * filestorage replication source volumes — DELETE 400 "volume.purpose"
+#     ("replication is in use"); the old code counted any truthy status as
+#     "deleted" (logged deleted, nothing gone) → re-listed → looped.
+#   * the IAM-blocked SKE log-group ``/scp/ske/regr*`` — bulk DELETE returns 200
+#     but the group persists because a child log-stream sits behind a 403 IAM
+#     gate this credential lacks → re-listed → looped.
+# These items are un-deletable WITH THIS CREDENTIAL/SHAPE; re-attempting them
+# every round can never make progress. So: remember the id of every owned item
+# we ISSUED a delete for; if the SAME id is still listed in a LATER round, mark
+# it STUCK and stop re-attempting it (report it once). Per-id, additive to the
+# per-collection ``_CONVERGED`` cache — never widens ownership (selection still
+# goes through is_owned/is_expired first); it only suppresses a known-futile
+# retry so the sweep CONVERGES instead of looping.
+_DELETE_ISSUED: set = set()   # ids we have issued a DELETE for this campaign
+_STUCK: dict = {}             # id -> reason, for items still listed after delete
+_PROGRESS_THIS_ROUND = [0]    # genuinely-gone deletions in the current round
+                              # (boxed so run_sweep can reset/read it per round)
+
+
+def _item_id(it: dict):
+    """Stable id for stuck-tracking — covers the id-field variants the API uses
+    across collections (id / volume_id / image_id / replication_id / name)."""
+    for k in ("id", "volume_id", "image_id", "replication_id"):
+        v = it.get(k)
+        if v:
+            return str(v)
+    return _name_of(it) or None
+
+
+def _is_2xx_or_gone(st) -> bool:
+    """A DELETE outcome that represents real teardown: a 2xx (accepted) or 404
+    (already gone). A 4xx (other than 404) / 409 / 5xx is NOT teardown — the
+    item is still there. Centralised so no pass mistakes a rejection for success.
+    """
+    return bool(st) and ((200 <= st < 300) or st == 404)
+
+
+def _mark_issued(it: dict) -> None:
+    """Record that a delete for this owned item did NOT achieve teardown (its
+    status was not 2xx/404), so if the SAME id is still listed next round we can
+    mark it stuck and stop retrying. We mark on FAILURE only — a clean 2xx/404 is
+    not recorded, so a legitimately-async delete (VPC/snapshot/dbaas; gone by the
+    next round via _wait_gone or the round pause) is never falsely called stuck.
+    """
+    iid = _item_id(it)
+    if iid:
+        _DELETE_ISSUED.add(iid)
+
+
+def _note_progress(st, it: dict | None = None) -> bool:
+    """Decide whether a DELETE "counted" as real teardown, with stuck-tracking.
+
+    Returns True (and counts one unit of genuine progress for the round's
+    no-progress stop) iff ``st`` is a 2xx/404. A 4xx delete is NEVER tallied as
+    deleted (Bug 2a). For stuck-tracking (Bug 3) we record the id ONLY for HARD,
+    non-retryable rejections so a later re-list marks it stuck — but NOT for a
+    ``409``: a 409 means "a child/dependency is still present", which the sweep
+    is actively clearing in dependency order, so it must keep retrying across
+    rounds (e.g. a volume that 409s while its snapshot/image is reaped this round
+    deletes cleanly next round). Recording a 409 as stuck would strand a resource
+    that is merely waiting on an in-flight dependency."""
+    if _is_2xx_or_gone(st):
+        _PROGRESS_THIS_ROUND[0] += 1
+        return True
+    if it is not None and st != 409:
+        _mark_issued(it)
+    return False
 
 
 # PF-09: KMS keys and secrets enter a SCHEDULED ("pending deletion") state and
@@ -416,6 +526,185 @@ def _purge_vpc_children(client, vid):
 
 
 # ---------------------------------------------------------------------------
+# filestorage replication teardown (Bug 2b) — pause + delete from the REPLICA
+# ---------------------------------------------------------------------------
+# A filestorage volume that participates in cross-region replication CANNOT be
+# deleted while the replication is live: DELETE /v1/volumes/{id} -> 400
+# filestorage.BadRequest.Invalid.volume.purpose ("Check the volume purpose";
+# replication is in use). The replication must be PAUSED then DELETED, and that
+# is only accepted from the REPLICA side (the source side always 400s "Check the
+# volume purpose"). Proven call sequence (field 2026-06-22), all against the
+# REPLICA volume's region/host:
+#   PUT    /v1/replications/{rid}?volume_id={replica_id}
+#          body {"replication_update_type":"policy","replication_policy":"paused"} -> 202
+#   DELETE /v1/replications/{rid}?volume_id={replica_id}                            -> 202
+#   then DELETE the source + replica volumes (retry after the async replication
+#   delete finishes; an immediate volume delete still 400s on the race).
+#
+# NOTE ON DIRECTIONALITY: listvolumereplications (GET /v1/replications?volume_id=)
+# returns the pair for EITHER endpoint, but the destructive PUT/DELETE only take
+# from the replica. This helper is therefore called for the volume the sweep is
+# CURRENTLY looking at; when that volume is the replica it tears the pair down,
+# when it is the source the replica-side calls 400 harmlessly and the pair is
+# reaped on the kr-east1 (replica-region) pass instead. Owned-only: the caller
+# only invokes this for a volume already selected as ours by _select.
+#
+# TODO(verify-live, 2026-06-22): the account was clean when this was written, so
+# this teardown is built from the hand-resolved live evidence above but NOT
+# re-run end-to-end here. The two things to confirm on the next live filestorage
+# replication leak: (1) the REPLICA-id field name on a listvolumereplications
+# record — _replica_id_of tries several (replica_volume_id / destination_… /
+# target_… / dst_… / secondary_…); if none match it falls back to addressing the
+# volume the sweep is looking at, which still works because the kr-east1 pass
+# hits the replica directly. (2) That a single pause+delete clears it (the source
+# side should keep 400ing "Check the volume purpose"). The calls themselves are
+# proven: PUT/DELETE /v1/replications/{rid}?volume_id={replica_id} (pause body
+# {"replication_update_type":"policy","replication_policy":"paused"}), then the
+# volume deletes. Best-effort + owned-only, so a wrong-side call just 4xxs
+# harmlessly — safe to ship un-re-verified.
+
+def _replica_id_of(rep: dict):
+    """Best-effort: the REPLICA (destination) volume id in a replication record.
+    Field shapes vary; try the documented/observed keys, newest-first."""
+    for k in ("replica_volume_id", "destination_volume_id", "target_volume_id",
+              "dst_volume_id", "secondary_volume_id"):
+        v = rep.get(k)
+        if v:
+            return str(v)
+    return None
+
+
+def _teardown_filestorage_replication(client, volume_id: str) -> bool:
+    """Pause + delete any replication this filestorage volume participates in,
+    from the REPLICA side, so the underlying volumes become deletable. Returns
+    True if a replication delete was ISSUED (caller should retry the volume
+    delete after the async replication delete settles). Best-effort and
+    idempotent: a wrong-side / already-gone call 4xxs harmlessly.
+
+    Owned-neutral: invoked only for a volume the sweep already scoped as ours."""
+    try:
+        reps = _items(client.get(f"/v1/replications?volume_id={volume_id}",
+                                 service="filestorage").body)
+    except Exception as exc:
+        print(f"  list replications for {volume_id} error: {exc}")
+        return False
+    issued = False
+    for rep in reps:
+        if not isinstance(rep, dict):
+            continue
+        rid = (rep.get("replication_id") or rep.get("id"))
+        if not rid:
+            continue
+        # the destructive calls only succeed from the replica side; pick the
+        # replica id when the record exposes it, else address this volume.
+        side = _replica_id_of(rep) or volume_id
+        base = f"/v1/replications/{rid}?volume_id={side}"
+        try:  # PAUSE the replication policy (replica side) — 202 on success
+            client.put(base, service="filestorage",
+                       json={"replication_update_type": "policy",
+                             "replication_policy": "paused"})
+        except core.MutationBlocked as exc:
+            print(f"  blocked: {exc}")
+            return False
+        except Exception as exc:
+            print(f"  pause replication {rid} -> {exc}")
+        # DELETE the replication. The replica-scoping ``?volume_id=`` must ride
+        # on the path, so issue through the client directly (it still honours the
+        # destructive safety gate via client._guard) rather than via _delete,
+        # which keys its dedup cache on (service, path, json).
+        st = None
+        try:
+            r = client.delete(base, service="filestorage")
+            st = r.status
+        except core.MutationBlocked as exc:
+            print(f"  blocked: {exc}")
+            return False
+        except Exception as exc:
+            print(f"  delete replication {rid} -> {exc}")
+            st = None
+        if _is_2xx_or_gone(st):
+            issued = True
+            print(f"  replication {rid} (replica {side}) pause+delete -> {st}")
+        else:
+            print(f"  replication {rid} (replica {side}) delete -> {st}")
+    return issued
+
+
+def _sweep_filestorage_volumes(client) -> int:
+    """Reap owned (regrfs*) filestorage volumes, replication-aware. For each
+    owned volume: tear down its replication FROM THE REPLICA SIDE first (pause +
+    delete), then DELETE the volume — counting ONLY a genuine 2xx/404 as deleted
+    (a 400 'volume.purpose' / replication-in-use is NOT progress and feeds the
+    stuck detector). The async replication delete races the volume delete, so a
+    same-round volume delete may still 400; the round loop retries next pass once
+    the replication delete has settled. Returns this collection's deletion count.
+    """
+    deleted = 0
+    for it in _select(client, "filestorage", "/v1/volumes",
+                      name_prefixes=("regrfs",)):
+        vid = it.get("volume_id") or it.get("id")
+        if not vid:
+            continue
+        # Pause + delete any replication this volume is in (replica-side); makes
+        # the volume deletable. Best-effort; safe (owned volume only).
+        _teardown_filestorage_replication(client, str(vid))
+        st = _delete(client, "filestorage", f"/v1/volumes/{vid}")
+        if _note_progress(st, it):
+            deleted += 1
+        else:
+            print(f"  filestorage volume {_name_of(it)} ({vid}) delete -> {st}")
+    return deleted
+
+
+# Cache the per-region clients so a multi-round sweep doesn't rebuild them.
+_REGION_CLIENTS: dict = {}
+
+
+def _sweep_regions() -> tuple[str, ...]:
+    """SCP_SWEEP_REGIONS — comma-separated EXTRA regions to also sweep for
+    region-scoped leaks the primary-region sweep can't see. The motivating case
+    (field 2026-06-22): filestorage cross-region replication leaves a REPLICA
+    volume in kr-east1 while the source lives in kr-west1; the sweep historically
+    only visited the primary region, so the kr-east1 replica leaked (billable)
+    forever. Set e.g. SCP_SWEEP_REGIONS=kr-east1 for an explicit account-wide
+    cleanup. Empty by default — no behaviour change unless opted in.
+    """
+    raw = os.environ.get("SCP_SWEEP_REGIONS", "")
+    return tuple(r.strip() for r in raw.split(",") if r.strip())
+
+
+def _extra_region_clients(primary) -> list:
+    """Build (and cache) an ApiClient per SCP_SWEEP_REGIONS entry that differs
+    from the primary client's region, reusing the primary's credentials/config
+    with only the region overridden. Returns [] when none are configured (the
+    default), so the standard single-region sweep is unchanged. A client that
+    can't be built (no usable region/host config) is skipped, never fatal.
+    """
+    import dataclasses
+    cfg = getattr(primary, "cfg", None)
+    if cfg is None:
+        return []
+    primary_region = getattr(cfg, "region", "")
+    out = []
+    for region in _sweep_regions():
+        if not region or region == primary_region:
+            continue
+        if region in _REGION_CLIENTS:
+            out.append(_REGION_CLIENTS[region])
+            continue
+        try:
+            sub_cfg = dataclasses.replace(cfg, region=region)
+            sub = core.ApiClient(sub_cfg)
+        except Exception as exc:
+            print(f"  extra-region client {region} skipped: {exc}")
+            continue
+        _REGION_CLIENTS[region] = sub
+        out.append(sub)
+        print(f"  also sweeping region {region} for filestorage replicas")
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Main sweep
 # ---------------------------------------------------------------------------
 
@@ -449,12 +738,33 @@ def run_sweep(client) -> int:
         if it.get("id") and _delete(c, "vpc", f"/v1/ports/{it['id']}"):
             deleted += 1
 
+    # 2c-0. virtualserver CUSTOM IMAGES (regrimg*) — MUST go before the volume
+    # pass. A custom image created from a VM volume PINS its source volume:
+    #   DELETE /v1/volumes/{id} -> 400 Snapshot.InvalidSnapshotDeleteRequest
+    #     "Volume linked to the Server Custom Image cannot be deleted."
+    # so a leaked regrimg* image makes its source volume un-reapable forever
+    # (8-round loop, field 2026-06-22). Dependency order is image -> snapshot ->
+    # volume, so reap the image first; DELETE /v1/images/{id} -> 204 clears it.
+    # Owned-only (regrimg prefix / owner tag) — never touches platform base
+    # images (those carry no regr* name and no owner tag).
+    for it in _select(c, "virtualserver", "/v1/images",
+                      name_prefixes=("regrimg",), match_token=True):
+        iid = it.get("id") or it.get("image_id")
+        if not iid:
+            continue
+        st = _delete(c, "virtualserver", f"/v1/images/{iid}")
+        if _note_progress(st, it):
+            deleted += 1
+            _wait_gone(c, "virtualserver", f"/v1/images/{iid}", 300, 15)
+        else:
+            print(f"  image {_name_of(it)} ({iid}) delete -> {st}")
+
     # 2c. volume snapshots (regrsnap) then their block volumes (regrvol) —
     # snapshot first so the volume delete isn't blocked.
     for it in _select(c, "virtualserver", "/v1/snapshots",
                       name_prefixes=("regr",), match_token=True):
-        if it.get("id") and _delete(
-                c, "virtualserver", f"/v1/snapshots/{it['id']}"):
+        if it.get("id") and _note_progress(
+                _delete(c, "virtualserver", f"/v1/snapshots/{it['id']}"), it):
             deleted += 1
             _wait_gone(c, "virtualserver",
                        f"/v1/snapshots/{it['id']}", 300, 15)
@@ -470,7 +780,7 @@ def run_sweep(client) -> int:
         if not vid:
             continue
         st = _delete(c, "virtualserver", f"/v1/volumes/{vid}")
-        if st and (200 <= st < 300 or st == 404):
+        if _note_progress(st, it):
             deleted += 1
         else:
             print(f"  volume {_name_of(it)} ({vid}) delete -> {st}")
@@ -632,12 +942,12 @@ def run_sweep(client) -> int:
                 continue
             break
 
-    # 7. filestorage volumes
-    for it in _select(c, "filestorage", "/v1/volumes",
-                      name_prefixes=("regrfs",)):
-        vid = it.get("volume_id") or it.get("id")
-        if vid and _delete(c, "filestorage", f"/v1/volumes/{vid}"):
-            deleted += 1
+    # 7. filestorage volumes (replication-aware; primary region + any extra
+    # SCP_SWEEP_REGIONS). Tears down a volume's replication from the replica side
+    # before deleting it, and NEVER counts a 4xx delete as success (Bug 2).
+    deleted += _sweep_filestorage_volumes(c)
+    for extra in _extra_region_clients(c):
+        deleted += _sweep_filestorage_volumes(extra)
 
     # 8. ske clusters (regrske) — delete their nodepools first, then cluster
     for it in _select(c, "ske", "/v1/clusters",
@@ -803,6 +1113,16 @@ def run_sweep(client) -> int:
         return name.startswith("regrlg") or any(
             seg.startswith("regr") for seg in name.split("/") if seg)
 
+    # This pass does NOT go through _select (it has a bespoke path-segment owner
+    # rule, _regr_log_group), so apply the same persistent-after-delete (stuck)
+    # convergence guard here by hand. The motivating leak (field 2026-06-22): the
+    # IAM-blocked SKE log-group `/scp/ske/regr*` — its bulk DELETE returns 200 but
+    # the group PERSISTS because a child log-stream sits behind a 403 IAM gate
+    # this credential lacks. The 200 looks like success, so the old code counted
+    # it deleted, it re-listed next round, and the sweep ran to its max rounds.
+    # Fix: a group we already issued a delete for and that is STILL listed is
+    # stuck → report once, skip. Un-deletable (IAM-gated) items are reported, not
+    # forced. Ownership is untouched (_is_deletable/_regr_log_group still gate).
     _lg_listed = _list_all(c, "servicewatch", "/v1/log-groups")
     _lg_picked = [it for it in _lg_listed
                   if _is_deletable(it, name_prefixes=("regrlg",))
@@ -813,6 +1133,15 @@ def run_sweep(client) -> int:
     for it in _lg_picked:
         gid = it.get("id")
         if not gid:
+            continue
+        if _converge_enabled() and str(gid) in _STUCK:
+            continue  # known-stuck (e.g. IAM-gated stream) — don't retry
+        if _converge_enabled() and str(gid) in _DELETE_ISSUED:
+            # we deleted it a prior round yet it persists → IAM-gated / un-reapable
+            _STUCK[str(gid)] = "log-group persists after delete (IAM-gated child "
+            _STUCK[str(gid)] += "log-stream: needs the log-stream IAM action)"
+            print(f"  stuck: {gid} ({_name_of(it)}) — log-group still listed "
+                  f"after delete (IAM-gated child stream); not retrying")
             continue
         try:
             streams = _items(c.get(
@@ -826,11 +1155,16 @@ def run_sweep(client) -> int:
             st = _delete(c, "servicewatch",
                          f"/v1/log-groups/{gid}/log-streams",
                          json={"ids": s_ids})
-            if not (st and (200 <= st < 300 or st == 404)):
+            if not _is_2xx_or_gone(st):
                 print(f"  log-streams of {gid} delete -> {st}")
         st = _delete(c, "servicewatch", "/v1/log-groups",
                      json={"ids": [gid]})
-        if st and (200 <= st < 300 or st == 404):
+        # Record the issued delete for stuck-detection regardless of status: the
+        # bulk endpoint returns a deceptive 200 even when the group persists, so
+        # persistence (re-listing next round) — not the status — is the signal.
+        if _converge_enabled():
+            _DELETE_ISSUED.add(str(gid))
+        if _note_progress(st, it):
             deleted += 1
         else:
             print(f"  log-group {gid} delete -> {st}")
@@ -856,6 +1190,7 @@ def main() -> int:
 
     core.settings.require_credentials()
     client = core.ApiClient(core.settings)
+    _reset_campaign_state()   # fresh convergence/stuck caches for this campaign
     # Run to a FIXED POINT (bounded): list endpoints may paginate, so one pass
     # can only reap the first page's worth — repeat until a full pass deletes
     # nothing (or 5 rounds).
@@ -864,13 +1199,34 @@ def main() -> int:
     round_sleep = int(os.environ.get("SCP_SWEEP_ROUND_SLEEP_S", "12"))
     for rnd in range(1, rounds + 1):
         print(f"--- sweep round {rnd} ---", flush=True)
-        if run_sweep(client) == 0:
+        _PROGRESS_THIS_ROUND[0] = 0          # reset genuine-teardown counter
+        reported = run_sweep(client)
+        genuine = _PROGRESS_THIS_ROUND[0]
+        # Convergence stop (Bug 3): end the sweep as soon as a round makes no
+        # REAL progress — i.e. nothing genuinely-gone (2xx/404) was reaped. This
+        # is stricter than the legacy ``reported == 0`` because ``reported`` can
+        # be inflated by passes that still tally a deceptive status; ``genuine``
+        # counts only items that actually went away. Items that re-list after a
+        # delete are now marked stuck (logged once) and not retried, so a sweep
+        # with only stuck/un-deletable owned items left converges here instead of
+        # looping to max rounds. Fall back to ``reported`` for any pass that
+        # hasn't been routed through _note_progress yet (still ends on a 0-round).
+        if genuine == 0 and reported == 0:
+            break
+        if genuine == 0:
+            print(f"no genuinely-removed resource this round "
+                  f"(reported={reported}); converged — stopping.")
             break
         # In FAST (no-wait) mode rounds fire back-to-back; pause briefly so
         # async deletes issued this round actually disappear before the next
         # pass retries their now-unblocked dependents.
         if nowait and rnd < rounds:
             time.sleep(round_sleep)
+    if _STUCK:
+        print(f"--- {len(_STUCK)} owned item(s) could not be deleted "
+              f"(reported, not forced) ---")
+        for iid, reason in _STUCK.items():
+            print(f"  stuck: {iid} ({reason})")
     return 0
 
 

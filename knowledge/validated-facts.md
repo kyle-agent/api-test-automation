@@ -1213,3 +1213,74 @@ depending on which engine ran. FIX = move them into shared code so EVERY path in
 Engine is also unified: chat-heavy uses the SAME pytest-xdist path as api-test.yml (no
 divergent driver). RULE going forward: if an optimization helps, put it where ALL paths
 see it (core/* or conftest), and unify engines — do NOT improve one driver in isolation.
+
+## Cleanup-reconciler teardown gotchas (tag-scoped sweep) — billable leaks + the 8-round loop (2026-06-22)
+
+> conf: 0.85 · seen: 2026-06-22 · obs: 1
+
+Found during a live cleanup that had to resolve these BY HAND after the reconciler
+sweep looped 8 rounds (its max) without converging and left billable resources behind.
+All four facts are dependency/directionality quirks the spec does not state; the fixes
+live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconciler_convergence.py`).
+
+- **virtualserver custom image PINS its source volume — sweep `/v1/images` FIRST.** A
+  custom image created from a VM volume (`regrimg*`, `POST /v1/images`, key
+  `compute/virtualserver/createimage`) holds its source block volume open:
+  `DELETE /v1/volumes/{id}` → `400 Snapshot.InvalidSnapshotDeleteRequest` —
+  *"Volume linked to the Server Custom Image cannot be deleted."* So a leaked custom
+  image makes its source volume un-reapable forever. Dependency order is
+  **image → snapshot → volume**: reap the image first. `DELETE /v1/images/{image_id}`
+  (key `compute/virtualserver/deleteimage`) → 204 clears it; the volume then deletes
+  normally. The reconciler historically had NO `/v1/images` pass at all → permanent
+  image+volume leak. (Owned-only: match `regrimg*`/owner-tag; platform base images
+  carry neither and must never be touched.)
+
+- **filestorage replication: pause + delete from the REPLICA (kr-east1) side; the
+  SOURCE side always 400s.** A replicated filestorage volume cannot be deleted while
+  the replication is live: `DELETE /v1/volumes/{id}` →
+  `400 filestorage.BadRequest.Invalid.volume.purpose` (*"Check the volume purpose"* /
+  replication in use). The replication must be torn down, and the destructive calls
+  are accepted **only from the replica volume's side** (the source side 400s
+  "Check the volume purpose"). Proven sequence, all addressed to the REPLICA with its
+  id in the query string:
+  - `PUT /v1/replications/{rid}?volume_id={replica_id}` body
+    `{"replication_update_type":"policy","replication_policy":"paused"}` → 202
+    (key `storage/filestorage/setvolumereplication`)
+  - `DELETE /v1/replications/{rid}?volume_id={replica_id}` → 202
+    (key `storage/filestorage/deletevolumereplication`)
+  - THEN `DELETE` the source + replica volumes. The replication delete is async, so an
+    immediate volume delete still 400s on the race — retry the volume delete after the
+    replication delete settles (the reconciler's round loop does this). List the pair
+    with `GET /v1/replications?volume_id={id}` (the `volume_id` query is REQUIRED).
+
+- **the reconciler historically counted a 4xx delete as "deleted" AND only swept the
+  primary region → SILENT billable replica leak + non-convergence.** Two compounding
+  bugs: (1) the filestorage volume pass did `if vid and _delete(...)` and `_delete`
+  returns the raw HTTP status, so a `400` ("replication in use") was truthy and tallied
+  as deleted — it logged "deleted" while nothing went away, so the item re-listed every
+  round (this is what made the "10 listed / 10 deletable that delete every round but
+  reappear" loop). (2) The sweep only visited the primary region (`kr-west1`), so the
+  replication's **replica volume in `kr-east1`** was never even listed → leaked
+  (billable) forever. Fixes: never count a non-2xx/404 delete as progress
+  (`_is_2xx_or_gone`/`_note_progress`); pause+delete the replication (replica-side)
+  before the volume; sweep extra regions via `SCP_SWEEP_REGIONS=kr-east1` (a
+  `dataclasses.replace(cfg, region=...)` clone of the client — `core.config.Settings`
+  resolves the host from `region`, so the same creds reach `kr-east1`).
+
+- **IAM-gated SKE log-group `/scp/ske/regr*` cannot be deleted with this credential —
+  it makes the sweep loop.** Its bulk `DELETE /v1/log-groups {ids:[…]}` returns **200**
+  but the group PERSISTS, because deleting it requires removing a child log-stream that
+  sits behind a **403 IAM gate this credential lacks** (needs the log-stream delete IAM
+  action). The deceptive 200 looked like success, so the old code counted it deleted and
+  it re-listed every round → ran to max rounds. There is no force path with this
+  credential; it must be **reported, not forced**.
+
+- **convergence rule (the actual loop fix): persistent-after-delete = stuck.** Items
+  that report a truthy/2xx delete yet RE-LIST (same id) a later round are un-deletable
+  with this credential/shape (the two cases above). The reconciler now records the id of
+  every owned item whose delete did NOT achieve teardown; if that id is still listed in a
+  later round it is marked **stuck** (logged once: `stuck: <id> (<reason>)`) and not
+  retried, and a round that removes nothing genuinely-gone ends the sweep. This is
+  per-id, layered on the existing per-collection `_CONVERGED` cache, and **never widens
+  ownership** — selection still goes through `is_owned`/`is_expired`; stuck-tracking only
+  suppresses a known-futile retry so the sweep CONVERGES instead of looping to its cap.
