@@ -68,3 +68,29 @@ shared graph engine (`assets/viz.js`), and renders.
 - **live** runs `pytest tests/crud` with the per-run safety gates from the chosen Axis
   (mutations / destructive / heavy). The gates are explicit opt-ins, never set to "make
   a test pass".
+
+## Static demo snapshot (backend-free, for GitHub Pages)
+
+`build_static.py` assembles a **self-contained snapshot of the REAL app** so the
+actual UI (not the design mockups) can be viewed on Pages with **no backend**:
+
+```bash
+python console2/build_static.py        # writes reports/console2-static/ (gitignored)
+```
+
+It imports the pure builder functions from `tools/console2_server.py` (no running
+server, no creds, no cloud) and **bakes** the data: the full `/api/model`, a
+`composer.graph_view` DAG per single service (+ a few multi-service / node-id
+examples), and one hermetic SIMULATE run (record + events + log) so all four report
+tabs are populated. It then copies `index.html` + `assets/*` **verbatim** and adds
+two small files — `data/static-data.js` (`window.__C2_STATIC__`) and
+`assets/mock-api.js` (a `window.fetch` monkeypatch that answers `/api/*` from the
+bake **before** `console2.js` loads). The production front-end therefore runs
+**completely unchanged**; only the injected copy of `index.html` carries the shim
+`<script>`s + a DEMO banner. In the snapshot, simulate AND live both surface the
+same pre-baked run (there is no real execution).
+
+Published to the Pages branch (`dashboard-data:/console2/app/`):
+**https://kyle-agent.github.io/api-test-automation/console2/app/**
+
+The real app (`index.html`, `assets/*`) is never modified by the build.
