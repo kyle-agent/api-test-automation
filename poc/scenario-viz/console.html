@@ -61,6 +61,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .runlog{background:#0d1117;color:#c9d1d9;font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;
   padding:9px 11px;border-radius:7px;margin:4px 0 8px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word}
 .livedot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
+.kindtag{display:inline-block;font-size:10px;font-weight:700;color:var(--muted);border:1px solid var(--line);
+  border-radius:6px;padding:0 5px;margin-right:3px;vertical-align:middle}
 </style>
 </head><body><div class="wrap">
 <header class="top">
@@ -184,15 +186,18 @@ function execRun(lcs){
 // Plan/Run에서 실행한 결과를 Report에서 실제로 확인하는 화면. /api/runs(목록) + /api/runs/<id>(전체 로그).
 let runsTimer=null, openRun=null;
 function stopRunsPoll(){if(runsTimer){clearTimeout(runsTimer);runsTimer=null;}}
+const KIND_TAG={lifecycle:"실행",cleanup:"🧹클린업",verify:"🔍확인"};
 function liveRunsHtml(runs){
-  if(!runs.length)return '<p class="muted small">아직 실행 기록이 없습니다 — <b>Plan</b>/<b>Run</b> 탭에서 <b>실행 ▶</b> 하면 여기에 나타납니다.</p>';
+  if(!runs.length)return '<p class="muted small">아직 실행 기록이 없습니다 — <b>Plan</b>/<b>Run</b> 탭에서 <b>실행 ▶</b>, 또는 아래 <b>강제 클린업</b>/<b>클린업 확인</b>을 누르면 여기에 나타납니다.</p>';
   return runs.map(r=>{
     const icon=r.status==="running"?"⏳":r.status==="done"?(r.rc===0?"✅":"⚠️"):"❌";
     const dur=(r.ended&&r.started)?Math.round(r.ended-r.started)+"s":(r.status==="running"?"실행중…":"");
     const on=openRun===r.id;
+    const tag=KIND_TAG[r.kind||"lifecycle"]||esc(r.kind||"");
+    const detail=(r.kind==="cleanup"||r.kind==="verify")?"":(esc((r.crud_ids||[]).join(', '))||'—');
     return `<div class="runrow${on?' on':''}" data-id="${esc(r.id)}">
-        <span><b class="small">${icon} ${esc(r.id)}</b>
-          <span class="muted small">${esc((r.crud_ids||[]).join(', '))||'—'}</span></span>
+        <span><span class="kindtag">${tag}</span> <b class="small">${icon} ${esc(r.id)}</b>
+          <span class="muted small">${detail}</span></span>
         <span class="pct small">${esc(r.summary||r.status)} · ${dur}</span></div>`+
       (on?`<pre class="runlog" id="log-${esc(r.id)}">로그 로딩…</pre>`:"");
   }).join("");
@@ -203,9 +208,19 @@ function renderLiveRuns(box){
     const anyRunning=runs.some(r=>r.status==="running");
     box.innerHTML=`<h3 style="margin:0 0 7px">실제 실행 기록 <span class="muted small">· 로컬 서버 · ${runs.length}건${anyRunning?' · <span style="color:#2563c9">⏳ 실행중</span>':''}</span>
         <button class="btn ghost" id="runsRefresh" style="float:right;font-size:11px;padding:3px 8px">↻ 새로고침</button></h3>
+      <div class="run-ctl" style="margin:0 0 8px">
+        <button class="btn" id="btnCleanup" title="생성된 우리(owner=apitest) 자원을 강제로 삭제 (reconciler, TTL 무시). 실행이 중간에 깨졌을 때 쓰세요.">🧹 강제 클린업</button>
+        <button class="btn ghost" id="btnVerify" title="삭제 없이 남아있는 우리 자원 수를 확인 (read-only). 클린업이 실제로 됐는지 검증.">🔍 클린업 확인</button></div>
       <div class="scroll" id="runsList" style="max-height:260px">${liveRunsHtml(runs)}</div>
-      <p class="cp-note">행 클릭 = 전체 로그 펼치기/접기. 실행 중이면 3초마다 자동 갱신.</p>`;
+      <p class="cp-note">행 클릭 = 전체 로그 펼치기/접기. 실행 중이면 3초마다 자동 갱신. <b>강제 클린업</b>=우리가 만든 자원 전부 삭제, <b>클린업 확인</b>=남은 자원 0인지 검증.</p>`;
     document.getElementById("runsRefresh").onclick=()=>renderLiveRuns(box);
+    document.getElementById("btnCleanup").onclick=()=>{
+      if(!confirm("강제 클린업: 이 계정에서 우리(owner=apitest)가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?"))return;
+      fetch("/api/cleanup",{method:"POST"}).then(r=>r.json()).then(j=>{if(j.error){alert(j.error);return;}openRun=j.id;renderLiveRuns(box);})
+        .catch(()=>alert("서버 연결 실패 — console_server.py 실행 중인지 확인"));};
+    document.getElementById("btnVerify").onclick=()=>{
+      fetch("/api/verify",{method:"POST"}).then(r=>r.json()).then(j=>{if(j.error){alert(j.error);return;}openRun=j.id;renderLiveRuns(box);})
+        .catch(()=>alert("서버 연결 실패 — console_server.py 실행 중인지 확인"));};
     document.querySelectorAll('#runsList .runrow').forEach(el=>el.onclick=()=>{
       openRun=(openRun===el.dataset.id)?null:el.dataset.id;renderLiveRuns(box);});
     if(openRun){const pre=document.getElementById("log-"+openRun);

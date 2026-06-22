@@ -125,16 +125,68 @@ def _run_worker(rec: dict) -> None:
             rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
 
 
-def _start_run(crud_ids: list[str], parallel: int, heavy: bool) -> dict:
+def _cleanup_worker(rec: dict) -> None:
+    """FORCE cleanup: reconciler sweep with SCP_SWEEP_IGNORE_TTL=true, so it deletes
+    EVERY owned (owner=apitest) resource regardless of TTL — for "a run broke midway,
+    just delete everything we made". Same tag-scoped ownership guard as always (never
+    touches resources we don't own); only the not-yet-expired guard is overridden."""
+    logp = Path(rec["log"])
+    env = {**os.environ, "PYTHONPATH": str(ROOT),
+           "SCP_ALLOW_MUTATIONS": "true", "SCP_ALLOW_DESTRUCTIVE": "true",
+           "SCP_SWEEP_IGNORE_TTL": "true", "SCP_SWEEP_NOWAIT": "true"}
+    try:
+        with open(logp, "w", encoding="utf-8") as f:
+            f.write(f"# console FORCE cleanup {rec['id']}\n\n"
+                    "=== reconciler sweep (FORCE: delete ALL owned, ignore TTL) ===\n")
+            f.flush()
+            rc = subprocess.run([sys.executable, "-m", "cleanup.reconciler"],
+                                cwd=str(ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+        with _LOCK:
+            rec["status"], rec["rc"], rec["ended"] = "done", rc, time.time()
+    except Exception as exc:  # noqa: BLE001
+        with _LOCK:
+            rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
+
+
+def _verify_worker(rec: dict) -> None:
+    """READ-ONLY verification: cleanup.verify_clean lists (never deletes) and reports how
+    many owned resources still survive per service — proof the cleanup actually worked."""
+    logp = Path(rec["log"])
+    env = {**os.environ, "PYTHONPATH": str(ROOT), "SCP_ALLOW_DESTRUCTIVE": "false"}
+    try:
+        with open(logp, "w", encoding="utf-8") as f:
+            f.write(f"# console cleanup VERIFY {rec['id']} (read-only owned-resource inventory)\n\n"
+                    "=== verify_clean (no deletes; counts surviving owned resources) ===\n")
+            f.flush()
+            rc = subprocess.run([sys.executable, "-m", "cleanup.verify_clean"],
+                                cwd=str(ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+        with _LOCK:
+            rec["status"], rec["rc"], rec["ended"] = "done", rc, time.time()
+    except Exception as exc:  # noqa: BLE001
+        with _LOCK:
+            rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
+
+
+def _new_rec(kind: str, **extra) -> dict:
     rid = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:4]
     RUN_DIR.mkdir(parents=True, exist_ok=True)
-    rec = {"id": rid, "status": "running", "crud_ids": crud_ids, "parallel": parallel,
-           "heavy": heavy, "started": time.time(), "ended": None, "rc": None,
-           "log": str(RUN_DIR / f"{rid}.log")}
+    rec = {"id": rid, "kind": kind, "status": "running",
+           "crud_ids": extra.get("crud_ids", []), "parallel": extra.get("parallel", 2),
+           "heavy": extra.get("heavy", False), "started": time.time(),
+           "ended": None, "rc": None, "log": str(RUN_DIR / f"{rid}.log")}
     with _LOCK:
         _RUNS[rid] = rec
-    threading.Thread(target=_run_worker, args=(rec,), daemon=True).start()
     return rec
+
+
+def _start(kind: str, worker, **extra) -> dict:
+    rec = _new_rec(kind, **extra)
+    threading.Thread(target=worker, args=(rec,), daemon=True).start()
+    return rec
+
+
+def _start_run(crud_ids: list[str], parallel: int, heavy: bool) -> dict:
+    return _start("lifecycle", _run_worker, crud_ids=crud_ids, parallel=parallel, heavy=heavy)
 
 
 def _tail(path: str, n: int = 80) -> str:
@@ -144,9 +196,20 @@ def _tail(path: str, n: int = 80) -> str:
         return ""
 
 
-def _summary(log: str) -> str:
+def _summarize(kind: str, log: str) -> str:
+    """One-line headline per run kind, shown on the run row in the console."""
     import re
-    m = re.findall(r"\d+ (?:passed|failed|skipped|error)[^\n]*", log)
+    if kind == "verify":
+        if "NONE — every swept collection is empty" in log:
+            return "✅ clean — owned survivors: 0"
+        m = re.search(r"TOTAL owned survivors across all collections:\s*(\d+)", log)
+        if m:
+            return "✅ clean — owned survivors: 0" if m.group(1) == "0" else f"⚠️ {m.group(1)} owned survivors"
+        return ""
+    if kind == "cleanup":
+        m = re.findall(r"sweep done:\s*(\d+) resource\(s\) deleted", log)
+        return f"🧹 {sum(int(x) for x in m)} resource(s) deleted" if m else ""
+    m = re.findall(r"\d+ (?:passed|failed|skipped|error)[^\n]*", log)  # lifecycle: pytest summary
     return m[-1] if m else ""
 
 
@@ -186,6 +249,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         p = urlparse(self.path).path
+        # FORCE cleanup (delete all owned) + read-only verify — no request body needed.
+        if p == "/api/cleanup":
+            return self._json(202, self._rec_view(_start("cleanup", _cleanup_worker)))
+        if p == "/api/verify":
+            return self._json(202, self._rec_view(_start("verify", _verify_worker)))
         if p != "/api/run":
             return self._json(404, {"error": "not found"})
         try:
@@ -200,11 +268,12 @@ class Handler(BaseHTTPRequestHandler):
         self._json(202, self._rec_view(rec))
 
     def _rec_view(self, rec: dict, full: bool = False) -> dict:
-        v = {k: rec[k] for k in ("id", "status", "crud_ids", "parallel", "heavy", "rc", "started", "ended")}
-        log = _tail(rec["log"], 200 if full else 1)
-        v["summary"] = _summary(open(rec["log"], encoding="utf-8").read()) if Path(rec["log"]).exists() else ""
+        v = {k: rec.get(k) for k in
+             ("id", "kind", "status", "crud_ids", "parallel", "heavy", "rc", "started", "ended")}
+        full_log = open(rec["log"], encoding="utf-8").read() if Path(rec["log"]).exists() else ""
+        v["summary"] = _summarize(rec.get("kind", "lifecycle"), full_log)
         if full:
-            v["log"] = log
+            v["log"] = _tail(rec["log"], 200)
         return v
 
     def _file(self, path: Path) -> None:
