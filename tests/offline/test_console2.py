@@ -399,6 +399,125 @@ def test_owned_worker_records_structured_list(monkeypatch):
     assert view["owned_total"] == 1 and view["owned"][0]["service"] == "networking/vpc"
 
 
+# --------------------------------------------------------------------------- #
+# B1 report master→detail: event → lifecycle grouping (per-lifecycle 자원/API/로그)
+# --------------------------------------------------------------------------- #
+def _group_events_by_lifecycle(events):
+    """Python mirror of console2.js ``groupEventsByLifecycle`` — the pure core of the
+    B1 drill-down. Buckets the event stream BY LIFECYCLE so the detail pane can scope
+    자원 (resource-tracked/-deleted) · API (step-start/-end) · status to ONE lifecycle
+    or aggregate across all. Kept in lock-step with the JS so a server event-shape
+    change that would break the drill-down fails HERE (offline) — see the assertions
+    in test_simulate_events_group_into_per_lifecycle_detail."""
+    lcs, order = {}, []
+
+    def ensure(lid):
+        if lid not in lcs:
+            lcs[lid] = {"id": lid, "status": "queued", "service": "", "heavy": False,
+                        "resources": [], "api": [], "_api_by_step": {},
+                        "softN": 0, "failN": 0, "createN": 0}
+            order.append(lid)
+        return lcs[lid]
+
+    for e in events:
+        kind, lid = e.get("kind"), e.get("lifecycle")
+        if kind == "run-meta":
+            for runnable_id in e.get("runnable", []):
+                ensure(runnable_id)
+        elif kind == "wave-start":
+            for wave_id in e.get("lifecycles", []):
+                ensure(wave_id)
+        elif kind == "lifecycle-start":
+            b = ensure(lid)
+            b["status"] = "running"
+            if e.get("service"):
+                b["service"] = e["service"]
+            if e.get("heavy"):
+                b["heavy"] = True
+        elif kind == "lifecycle-end":
+            b = ensure(lid)
+            b["status"] = ("done" if e.get("status") == "passed"
+                           else "skip" if e.get("status") == "skipped" else "fail")
+        elif kind == "step-start":
+            b = ensure(lid)
+            step = e.get("step")
+            c = {"step": step, "lifecycle": lid, "method": e.get("method"),
+                 "path": e.get("path"), "status": None, "category": "run", "ms": None}
+            b["_api_by_step"][step] = c
+            b["api"].append(c)
+        elif kind == "step-end":
+            b = ensure(lid)
+            step = e.get("step")
+            c = b["_api_by_step"].get(step)
+            if c is None:
+                c = {"step": step, "lifecycle": lid, "method": e.get("method"),
+                     "path": e.get("path")}
+                b["_api_by_step"][step] = c
+                b["api"].append(c)
+            c["status"] = e.get("status")
+            c["category"] = e.get("category")
+            c["ms"] = e.get("elapsed_ms")
+            if e.get("category") == "soft":
+                b["softN"] += 1
+            elif e.get("category") == "fail":
+                b["failN"] += 1
+        elif kind == "resource-tracked":
+            b = ensure(lid)
+            b["resources"].append({"id": e.get("resource_id"), "type": e.get("resource_type"),
+                                   "lifecycle": lid, "path": e.get("path"),
+                                   "created": True, "deleted": False})
+            b["createN"] += 1
+        elif kind == "resource-deleted":
+            b = ensure(lid)
+            cand = [r for r in b["resources"] if r["type"] == e.get("resource_type") and not r["deleted"]]
+            if cand:
+                cand[-1]["deleted"] = True
+    return {"lcs": lcs, "order": order}
+
+
+def test_simulate_events_group_into_per_lifecycle_detail():
+    """A MULTI-lifecycle simulate (the whole networking/vpc closure) produces events
+    that group cleanly into per-lifecycle 자원/API buckets — the data the B1 detail
+    pane scopes to one lifecycle. Pins: (1) >1 lifecycle (so there IS a master→detail
+    drill, not a single-row run); (2) each bucket carries ordered api calls with
+    method/path/status + tracked resources flipped created→deleted by teardown; (3)
+    the aggregate (sum of buckets) equals the flat event totals (the 전체 escape hatch
+    is loss-less)."""
+    rec = C2._new_rec("simulate", mode="simulate",
+                      lifecycle_ids=C2._resolve_lifecycle_ids({"services": ["networking/vpc"]}))
+    C2._simulate_worker(rec)
+    assert rec["status"] == "done", rec.get("error")
+    evs = C2._read_events(rec["events"])
+    grouped = _group_events_by_lifecycle(evs)
+    order, lcs = grouped["order"], grouped["lcs"]
+    # (1) the closure spans MORE THAN ONE lifecycle → a real master→detail drill
+    assert len(order) > 1, f"expected a multi-lifecycle run, got {order}"
+    assert "networking-vpc-subnet" in order
+    # (2) every lifecycle that ran reaches a terminal state + has API calls with detail
+    ran = [lid for lid in order if lcs[lid]["status"] != "queued"]
+    assert ran, "at least one lifecycle should have started"
+    for lid in ran:
+        b = lcs[lid]
+        assert b["status"] in {"running", "done", "fail", "skip"}
+        for c in b["api"]:
+            assert c["method"] and c["path"]            # the API tab row needs these
+        # a lifecycle with a create step tracked a resource (자원 tab populates)
+        if b["createN"]:
+            assert b["resources"] and b["resources"][0]["id"]
+    # the vpc lifecycle created then deleted its resources (생성→삭제 in the 자원 tab)
+    vpc = lcs["networking-vpc-subnet"]
+    assert vpc["resources"], "vpc lifecycle must track resources"
+    assert any(r["deleted"] for r in vpc["resources"]), "teardown should flip created→deleted"
+    # (3) aggregate over buckets == flat event totals (전체 view is loss-less)
+    flat_tracked = sum(1 for e in evs if e["kind"] == "resource-tracked")
+    flat_steps = len({(e["lifecycle"], e["step"]) for e in evs
+                      if e["kind"] in ("step-start", "step-end")})
+    agg_res = sum(len(lcs[lid]["resources"]) for lid in order)
+    agg_api = sum(len(lcs[lid]["api"]) for lid in order)
+    assert agg_res == flat_tracked
+    assert agg_api == flat_steps
+
+
 def test_plan_all_disabled_selection_is_empty_not_everything():
     """A selection that resolves to only DISABLED lifecycles must yield an EMPTY
     plan — never the all-enabled fallback (that fallback is only for 'no selection')."""

@@ -35,10 +35,21 @@ let runAxis = "regression-light";
 let runEvents = [];
 let runStatus = "idle";
 let pollTimer = null;
-let reportSub = "r1";
 let lastLogText = null;     // last log text written to the 로그 <pre> (in-place diff → no flicker)
-let r4LogTimer = null;      // dedicated slow (2s) log poller while on the 로그 tab during a run
-let expandedApi = null;     // key of the currently-expanded API row (API tab detail)
+let r4LogTimer = null;      // dedicated slow (2s) log poller while running (detail 로그 tab)
+let expandedApi = null;     // key of the currently-expanded API row (detail API tab)
+
+// ---- B1 master→detail report state ----------------------------------------
+// 흐름 is the persistent MASTER (the B2 scene). The DETAIL pane is scoped to ONE
+// lifecycle (detailScope = its id) or to the cross-run aggregate (detailScope="*").
+// Node-click on the master = B2 focus + open that lifecycle's detail (reconciled:
+// the focus gesture IS the drill). The detail sub-tabs (자원·API·로그) mean
+// "…for this scope". State persists across polls so a live refresh never loses the
+// user's selected lifecycle / open API row / sub-tab.
+let detailScope = "*";      // "*" = 전체 (aggregate) · else a lifecycle id
+let detailTab = "res";      // res | api | log
+let scopeAuto = true;       // true until the user explicitly picks a scope (so a
+                            //   single-lifecycle run can auto-select without fighting them)
 
 // DAG-at-scale (B2) scene controllers — one for the 구성 composition DAG, one for
 // the 흐름 live-run DAG. Both drive the SAME graph object via ResourceGraph.scene
@@ -119,10 +130,19 @@ function categoryMap() {
 // ================= top nav (① 구성 / ② 실행 & 리포트) =================
 function wireNav() {
   els("#screenToggle button").forEach(b => b.onclick = () => go(b.dataset.scr));
-  els("#report-subtabs button").forEach(b => b.onclick = () => { reportSub = b.dataset.r; drawReport(); });
+  // detail sub-tabs (자원·API·로그) — switch the DETAIL pane's tab; the master 흐름
+  // scene is persistent and untouched by a tab switch.
+  els("#detail-subtabs button").forEach(b => b.onclick = () => { setDetailTab(b.dataset.d); });
 }
 function go(scr) {
   screen = scr;
+  // leaving the run screen: tear down the 흐름 master scene (its window listeners must
+  // not dangle on a hidden stage) and stop the log poller. Rebuilt cleanly on return
+  // (the scene shell is keyed by runId → a fresh build re-attaches everything).
+  if (scr !== "run") {
+    if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
+    stopR4Poll();
+  }
   ["build", "run"].forEach(s => $("screen-" + s).classList.toggle("hidden", s !== scr));
   els("#screenToggle button").forEach(b => b.classList.toggle("on", b.dataset.scr === scr));
   ctxBar();
@@ -643,7 +663,7 @@ function drawLeftover() {
     if (!confirm("강제 클린업: owner=apitest 가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?")) return;
     fetch("/api/cleanup", { method: "POST" }).then(r => r.json()).then(j => {
       if (j.error) { alert(j.error); return; }
-      runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r4";
+      runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
       drawReport(); startR4Poll();
       // after a force cleanup, auto re-scan so the panel reflects the new state
       setTimeout(scanOwned, 1200);
@@ -729,7 +749,8 @@ function startRun() {
   fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).then(j => {
       if (j.error) { $("report-main").innerHTML = '<p class="empty">실행 실패: ' + esc(j.error) + "</p>"; return; }
-      runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r1";
+      runId = j.id; runEvents = []; runStatus = "running";
+      detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;   // fresh run → reconcile auto-selects
       drawReport();
       pollEvents();
     }).catch(e => { $("report-main").innerHTML = '<p class="empty">실행 연결 실패: ' + esc(e.message) + "</p>"; });
@@ -752,25 +773,213 @@ function pollEvents() {
   }).catch(() => { pollTimer = setTimeout(pollEvents, 1000); });
 }
 
-// ================= 리포트 (흐름 · 자원 · API · 로그) — light theme =================
+// ================= 리포트 — master(흐름) → detail(자원·API·로그) + 전체 ===========
+// The report is a master→detail drill-down: 흐름 is the PERSISTENT master (the B2
+// live scene + a compact lifecycle list); the DETAIL pane (자원·API·로그) is scoped
+// to the currently-selected lifecycle, or to the cross-run aggregate (전체). Both
+// the master and the open detail refresh in place on every poll — no flicker, and
+// the user's selected lifecycle / sub-tab / open API row survive.
 function drawReport() {
-  els("#report-subtabs button").forEach(b => b.classList.toggle("on", b.dataset.r === reportSub));
-  // leaving the 로그 tab: stop its dedicated poller so it can't fight another tab
-  if (reportSub !== "r4") stopR4Poll();
-  // leaving the 흐름 tab: tear down its scene so its window listeners don't dangle on
-  // the about-to-be-replaced #r1-stage (reportR2/3/4 overwrite report-main). Rebuilt
-  // cleanly on return to 흐름 (data-run mismatch → fresh shell). Mirrors stopR4Poll.
-  if (reportSub !== "r1" && r1Scene) { r1Scene.destroy(); r1Scene = null; }
   if (!runId) {
+    if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
     $("report-main").innerHTML = '<p class="empty">아직 실행이 없습니다 — 위에서 <b>실행 ▶</b>을 누르세요.</p>';
+    $("lc-picker").innerHTML = "";
+    $("md-report") && $("md-report").classList.remove("has-detail");
+    $("scopebar").innerHTML = "";
+    $("detail-body").innerHTML = '<p class="empty">실행이 시작되면 라이프사이클을 선택해 상세를 봅니다.</p>';
+    stopR4Poll();
     loadRunRecords();
     return;
   }
-  if (reportSub === "r1") reportR1();
-  else if (reportSub === "r2") reportR2();
-  else if (reportSub === "r3") reportR3();
-  else reportR4();
+  reconcileScope();        // auto-select for a single-lifecycle run; validate scope
+  reportR1();              // MASTER: the 흐름 scene (B2) — persistent, refresh in place
+  renderLcPicker();        // MASTER: compact lifecycle list (collapsed-group / dense escape)
+  renderDetail();          // DETAIL: scope bar + 자원/API/로그 for the current scope
   loadRunRecords();
+}
+
+// ---- event → lifecycle grouping (the pure core of the drill-down) -----------
+// Walk the event stream once and bucket everything BY LIFECYCLE so the detail pane
+// can scope 자원/API/로그 to one lifecycle (or aggregate across all). Each bucket
+// carries: status, ordered resources (from resource-tracked/-deleted), ordered api
+// calls (from step-start/-end, enriched), and counts. Pure (events in → object out)
+// so it is unit-testable offline; the UI just renders the buckets.
+function groupEventsByLifecycle(events) {
+  const lcs = {};       // id -> bucket
+  const order = [];     // lifecycle ids in first-seen order
+  const ensure = id => {
+    if (!lcs[id]) { lcs[id] = { id, status: "queued", service: "", heavy: false,
+      resources: [], _resByKey: {}, api: [], _apiByKey: {}, softN: 0, failN: 0, createN: 0 }; order.push(id); }
+    return lcs[id];
+  };
+  (events || []).forEach(e => {
+    const id = e.lifecycle;
+    if (e.kind === "run-meta") (e.runnable || []).forEach(ensure);
+    else if (e.kind === "wave-start") (e.lifecycles || []).forEach(ensure);
+    else if (e.kind === "lifecycle-start") { const b = ensure(id); b.status = "running";
+      if (e.service) b.service = e.service; if (e.heavy) b.heavy = true; }
+    else if (e.kind === "lifecycle-end") { const b = ensure(id);
+      b.status = e.status === "passed" ? "done" : e.status === "skipped" ? "skip" : "fail"; }
+    else if (e.kind === "step-start") { const b = ensure(id); const k = e.step;
+      const c = { key: k, lifecycle: id, step: k, method: e.method, path: e.path,
+        status: null, category: "run", ms: null, params: null, req_body: null, resp_snippet: null };
+      b._apiByKey[k] = c; b.api.push(c); }
+    else if (e.kind === "step-end") { const b = ensure(id); const k = e.step;
+      let c = b._apiByKey[k];
+      if (!c) { c = { key: k, lifecycle: id, step: k, method: e.method, path: e.path }; b._apiByKey[k] = c; b.api.push(c); }
+      c.status = e.status; c.category = e.category; c.ms = e.elapsed_ms;
+      if (e.params != null) c.params = e.params;
+      if (e.req_body != null) c.req_body = e.req_body;
+      if (e.resp_snippet != null) c.resp_snippet = e.resp_snippet;
+      if (e.category === "soft") b.softN++; else if (e.category === "fail") b.failN++;
+    }
+    else if (e.kind === "resource-tracked") { const b = ensure(id);
+      const r = { id: e.resource_id, type: e.resource_type, lifecycle: id, path: e.path,
+        created: true, deleted: false }; b.resources.push(r); b.createN++; }
+    else if (e.kind === "resource-deleted") { const b = ensure(id);
+      const cand = b.resources.filter(r => r.type === e.resource_type && !r.deleted);
+      if (cand.length) cand[cand.length - 1].deleted = true; }
+  });
+  return { lcs, order };
+}
+
+// the current scope's grouped buckets (recomputed each call from the live stream).
+function groupedRun() { return groupEventsByLifecycle(runEvents); }
+const isAggScope = () => detailScope === "*";
+
+// auto-select the scope for a single-lifecycle run (so the detail shows without an
+// extra click), and drop a stale scope (e.g. a lifecycle that vanished). Honours an
+// explicit user pick (scopeAuto=false) — we never yank them off their chosen scope.
+function reconcileScope() {
+  const { order } = groupedRun();
+  if (scopeAuto) {
+    if (order.length === 1) detailScope = order[0];        // single lifecycle → drill in
+    else detailScope = "*";                                 // multi → aggregate by default
+  } else if (detailScope !== "*" && !order.includes(detailScope)) {
+    detailScope = "*"; scopeAuto = true;                    // chosen lifecycle gone → aggregate
+  }
+}
+
+// set the detail scope to a lifecycle id (or "*"); record it as an explicit pick so
+// reconcileScope won't override it, then re-render the master list highlight + detail.
+// `fromScene` marks a selection that ORIGINATED from a master node focus (so we don't
+// fight the scene). A selection from the compact list sets scope only — the master
+// scene's focus stays where the user left it (resource_graph.js exposes no
+// focus-by-id, and it's frozen; the list is the escape hatch for a dense graph).
+function selectScope(id, opts) {  // eslint-disable-line no-unused-vars
+  detailScope = id;
+  scopeAuto = false;
+  renderLcPicker();
+  renderDetail();
+}
+function setDetailTab(tab) {
+  detailTab = tab;
+  els("#detail-subtabs button").forEach(b => b.classList.toggle("on", b.dataset.d === tab));
+  renderDetailBody();
+}
+
+// ---- lifecycle status presentation (shared by the picker + scope bar) -------
+function lcStatusClass(s) { return s === "done" ? "done" : s === "running" ? "run" : s === "fail" ? "fail" : s === "skip" ? "skip" : "queued"; }
+function lcStatusGlyph(s) { return s === "done" ? "✓" : s === "running" ? "⏳" : s === "fail" ? "✕" : s === "skip" ? "–" : "·"; }
+function lcStatusLabel(s) { return s === "done" ? "완료" : s === "running" ? "진행 중" : s === "fail" ? "실패" : s === "skip" ? "건너뜀" : "대기"; }
+
+// ---- MASTER: compact lifecycle list + 전체(aggregate) toggle ----------------
+// The escape hatch for a dense / collapsed graph: a one-row-per-lifecycle list
+// (status · service · API/자원 counts) where a click drills into that lifecycle's
+// detail, plus a clearly-labeled 전체 pill that switches the detail to the cross-run
+// aggregate (the CURRENT flat behavior). Highlights the current scope.
+function renderLcPicker() {
+  const host = $("lc-picker"); if (!host) return;
+  const { lcs, order } = groupedRun();
+  const agg = aggregateBucket(lcs, order);
+  const rows = order.map(id => {
+    const b = lcs[id];
+    const cls = lcStatusClass(b.status);
+    return `<button class="lcitem ${detailScope === id ? "sel" : ""}" data-lc="${esc(id)}" title="${esc(id)} — 상세 열기">
+      <span class="lctop"><span class="st ${cls}">${lcStatusGlyph(b.status)}</span>
+        <span class="lcname">${b.heavy ? "🜂 " : ""}${esc(id)}</span></span>
+      <span class="lcmeta">${b.service ? `<span class="lcsvc">${esc(b.service)}</span>` : ""}
+        <span class="pill l">${b.api.length} API</span>
+        <span class="pill">${b.resources.length} 자원</span>
+        ${b.softN ? `<span class="pill soft">${b.softN} soft</span>` : ""}
+        ${b.failN ? `<span class="pill fail">${b.failN} fail</span>` : ""}</span>
+    </button>`;
+  }).join("");
+  host.innerHTML =
+    `<div class="lcp-h">라이프사이클 <span class="muted small">· 클릭 = 상세 (밀집/접힌 그래프용)</span></div>
+     <div class="lclist">${rows || '<p class="muted small">라이프사이클 대기 중…</p>'}</div>
+     <button class="aggitem ${isAggScope() ? "sel" : ""}" id="agg-toggle" title="크로스-런 집계 — 평면 탭의 기존 동작">
+       <span class="ico">🗂️</span><span class="aggtxt"><b>전체 (집계)</b>
+         <span class="muted small">런 전체 자원/API/로그 합산</span></span>
+       <span class="sub">${agg.resources.length} 자원 · ${agg.api.length} API</span>
+     </button>`;
+  els("#lc-picker .lcitem[data-lc]").forEach(b => b.onclick = () => selectScope(b.dataset.lc));
+  $("agg-toggle").onclick = () => selectScope("*");
+}
+
+// aggregate bucket across all lifecycles (the 전체 scope) — concatenates resources +
+// api in lifecycle order, tagging each item with its source lifecycle (_lc) so the
+// aggregate views can show which lifecycle each row came from.
+function aggregateBucket(lcs, order) {
+  const resources = [], api = [];
+  order.forEach(id => {
+    lcs[id].resources.forEach(r => resources.push(Object.assign({ _lc: id }, r)));
+    lcs[id].api.forEach(c => api.push(Object.assign({}, c, { _lc: id })));
+  });
+  return { resources, api };
+}
+
+// the buckets for the CURRENT scope: one lifecycle's, or the aggregate.
+function scopeData() {
+  const { lcs, order } = groupedRun();
+  if (isAggScope()) {
+    const agg = aggregateBucket(lcs, order);
+    return { agg: true, resources: agg.resources, api: agg.api, lcCount: order.length, order, lcs };
+  }
+  const b = lcs[detailScope] || { resources: [], api: [], status: "queued", service: "", heavy: false };
+  return { agg: false, id: detailScope, resources: b.resources, api: b.api,
+    status: b.status, service: b.service, heavy: b.heavy, lcs, order };
+}
+
+// ---- DETAIL: sticky scope bar + sub-tab counts + tab body -------------------
+function renderDetail() {
+  $("md-report") && $("md-report").classList.add("has-detail");
+  renderScopeBar();
+  renderDetailCounts();
+  els("#detail-subtabs button").forEach(b => b.classList.toggle("on", b.dataset.d === detailTab));
+  renderDetailBody();
+}
+
+// the sticky scope bar — PINS which lifecycle the detail is showing (the thing flat
+// tabs lose). e.g.  스코프 ▸ networking-vpc-subnet · networking/vpc · 진행 중 · 14 API · 3 자원
+function renderScopeBar() {
+  const bar = $("scopebar"); if (!bar) return;
+  const d = scopeData();
+  if (d.agg) {
+    bar.innerHTML = `<span class="lbl">스코프</span>
+      <span class="cur agg">🗂️ 전체 (집계)</span>
+      <span class="crumb">— ${d.lcCount} lifecycle 합산 · ${d.resources.length} 자원 · ${d.api.length} API</span>`;
+    return;
+  }
+  bar.innerHTML = `<span class="lbl">스코프</span>
+    <span class="cur"><span class="st ${lcStatusClass(d.status)}">${lcStatusGlyph(d.status)}</span> ${d.heavy ? "🜂 " : ""}${esc(d.id)}</span>
+    <span class="crumb">— ${d.service ? esc(d.service) + " · " : ""}${lcStatusLabel(d.status)} · ${d.api.length} API · ${d.resources.length} 자원</span>
+    <button class="clear" id="scope-clear" title="전체 집계로">전체 집계로 ↺</button>`;
+  $("scope-clear") && ($("scope-clear").onclick = () => selectScope("*"));
+}
+
+function renderDetailCounts() {
+  const d = scopeData();
+  $("d-nres").textContent = d.resources.length;
+  $("d-napi").textContent = d.api.length;
+}
+
+// route the detail body to the scoped 자원 / API / 로그 view.
+function renderDetailBody() {
+  if (!runId) return;
+  if (detailTab === "res") reportR2();
+  else if (detailTab === "api") reportR3();
+  else reportR4();
 }
 
 // derive live lifecycle state from events: queued/running/done/fail/skip
@@ -877,10 +1086,9 @@ function reportR1() {
   const fresh = !shell || shell.dataset.run !== String(runId);
   if (fresh) {
     if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
-    $("report-main").innerHTML = `<h2>흐름 <span class="muted small">· DAG 진행 순서 — 노드 = lifecycle 라이브 상태 (run-state 우선, 접기·focus·미니맵 가능)</span></h2>
-      <div id="r1-banner">${banner}</div>
+    $("report-main").innerHTML = `<div id="r1-banner">${banner}</div>
       <div class="legend">${legend([["#ffffff", "대기"], ["#e8f0fd", "진행 중"], ["#eaf7ee", "완료"], ["#fdeaea", "실패"]])}
-        <span>접힌 그룹 = done/total · 그룹 클릭=펼치기 · 노드 클릭=focus</span></div>
+        <span>접힌 그룹 = done/total · 그룹 클릭=펼치기 · <b>노드 클릭 = focus + 그 라이프사이클 상세 열기</b></span></div>
       <div class="dag-toolbar">
         <div class="tgroup" id="r1-gran"><button data-gran="category" class="on">카테고리</button><button data-gran="service">서비스</button><button data-gran="resource">전체 펼침</button></div>
         <button class="minibtn" id="r1-collapse">⊟ 전체 접기</button>
@@ -902,6 +1110,20 @@ function reportR1() {
         minimap: $("r1-minimap"), mmsvg: $("r1-mmsvg"), mmview: $("r1-mmview"),
         hint: $("r1-hint"), stat: $("r1-stat"),
         overlay: r1Overlay, groupOverlay: r1GroupOverlay,
+        // node focus = DRILL into that lifecycle's detail (master→detail). The focus
+        // gesture IS the drill, reconciling cleanly with B2: focusing a node both
+        // highlights its dependency path AND opens its detail. We only DRILL IN here
+        // (focus set); clearing focus does NOT reset the scope (the user changes scope
+        // via the 전체 pill or another lifecycle) — so a granularity/collapse change,
+        // which fires onFocus(null), never wipes the user's selected detail.
+        onFocus: info => {
+          if (!info) return;
+          const lc = N[info.label] && N[info.label].lifecycle;
+          if (lc) selectScope(lc, { fromScene: true });
+        },
+        // the report is READ-ONLY: no target selection here, so we DON'T wire
+        // onToggleTarget/isSelectable — the scene then renders a static provenance dot
+        // in the node corner instead of the ＋/✓ selection box. Node-click = focus+drill.
       });
       r1Scene.start();
       els("#r1-gran button").forEach(b => b.onclick = () => {
@@ -966,36 +1188,30 @@ function reportR1() {
       : '<p class="muted small">실행 시작을 기다리는 중…</p>')}`;
 }
 
-// 자원 — per-resource rows (생성·테스트·삭제 + id) from resource-tracked/-deleted.
-// While running, the most-recent resource shows a live phase (생성→테스트→삭제) so
-// the user watches each resource step through its lifecycle, not just a final state.
+// 자원 (DETAIL · scoped) — per-resource rows (생성·테스트·삭제 + id) for the current
+// scope (one lifecycle, or the 전체 aggregate). Resources come from groupEventsBy
+// Lifecycle (resource-tracked/-deleted, ordered). "tested" = the lifecycle saw a GET
+// 2xx. While running, the most-recent resource in the active lifecycle shows a live
+// phase (생성→테스트→삭제) so the user watches each resource step through its cycle.
 function reportR2() {
-  const rows = {};
+  const d = scopeData();
+  // per-lifecycle verify flag (a GET-ok step-end) — used to mark resources "tested".
   const lcVerifyOk = {};
-  const order = [];
   runEvents.forEach(e => {
-    if (e.kind === "resource-tracked") {
-      rows[e.resource_id] = { id: e.resource_id, type: e.resource_type, lifecycle: e.lifecycle,
-        path: e.path, created: true, deleted: false, tested: false };
-      order.push(e.resource_id);
-    }
-    if (e.kind === "resource-deleted") {
-      const cand = Object.values(rows).filter(r => r.lifecycle === e.lifecycle && r.type === e.resource_type && !r.deleted);
-      if (cand.length) cand[cand.length - 1].deleted = true;
-    }
     if (e.kind === "step-end" && (e.method || "").toUpperCase() === "GET" && e.category === "ok")
       lcVerifyOk[e.lifecycle] = true;
   });
-  Object.values(rows).forEach(r => { r.tested = !!lcVerifyOk[r.lifecycle]; });
+  const list = d.resources;            // already scope-filtered + ordered
+  list.forEach(r => { r.tested = !!lcVerifyOk[r.lifecycle || d.id]; });
   const prog = liveProgress();
-  // the live "cursor" resource = newest tracked-not-deleted in the active lifecycle
+  // the live cursor = newest tracked-not-deleted in the active lifecycle, but only
+  // when that lifecycle is IN this scope (aggregate, or the active one is selected).
   let cursorId = null;
-  if (prog.running) {
-    const live = order.map(id => rows[id]).filter(r => r && !r.deleted
-      && (!prog.activeLifecycle || r.lifecycle === prog.activeLifecycle));
+  if (prog.running && (d.agg || prog.activeLifecycle === d.id)) {
+    const live = list.filter(r => !r.deleted
+      && (!prog.activeLifecycle || (r.lifecycle || d.id) === prog.activeLifecycle));
     cursorId = live.length ? live[live.length - 1].id : null;
   }
-  // per-row live phase chip
   const phaseChip = r => {
     if (r.deleted) return '<span class="phch del">삭제됨</span>';
     if (prog.running && r.id === cursorId) {
@@ -1008,78 +1224,74 @@ function reportR2() {
     if (r.created) return '<span class="phch created">생성됨</span>';
     return "";
   };
-  const list = order.map(id => rows[id]).filter(Boolean);
   const simLabel = runMode === "simulate" ? ' <span class="muted small">(simulate: 합성 id)</span>' : "";
   // TYPE = the resource KIND derived from the create/delete PATH (vpc/subnet/port),
-  // NOT the service name — the path is the source of truth for what was actually
-  // created. Fall back to the service short-name only when the path can't be parsed.
+  // NOT the service name — the path is the source of truth for what was created.
   const rowKind = r => kindFromPath(r.path) || shortName(r.type || "") || "?";
+  // the lifecycle column only matters in the aggregate view (single-lc scope already
+  // names the lifecycle in the scope bar).
+  const lcCol = d.agg ? "<th>lifecycle</th>" : "";
+  const ncol = d.agg ? 7 : 6;
   const body = list.length ? list.map(r => `<tr class="${r.id === cursorId ? "rowact" : ""}">
       <td>${esc(rowKind(r))}</td>
       <td><code>${esc(r.id)}</code></td>
-      <td>${esc(r.lifecycle)}</td>
+      ${d.agg ? `<td>${esc(r._lc || r.lifecycle || "")}</td>` : ""}
       <td class="${r.created ? "tick" : "tickno"}">${r.created ? "✓" : "—"}</td>
       <td class="${r.tested ? "tick" : "tickno"}">${r.tested ? "✓" : "—"}</td>
       <td class="${r.deleted ? "tick" : "tickno"}">${r.deleted ? "✓" : "—"}</td>
       <td>${phaseChip(r)}</td>
-    </tr>`).join("") : '<tr><td colspan="7" class="empty">자원 이벤트 없음 (실행 중이거나 create 스텝 없음)</td></tr>';
+    </tr>`).join("")
+    : `<tr><td colspan="${ncol}" class="empty">${d.agg ? "추적된 자원 없음"
+        : (d.status === "running" ? "이 라이프사이클은 아직 자원을 만들지 않았습니다 (진행 중)…"
+           : "이 라이프사이클에는 추적된 자원이 없습니다.")}</td></tr>`;
   const nowLine = prog.running && cursorId
     ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
         <b>${esc(prog.phaseLabel)}</b> · <code>${esc(cursorId)}</code></div>` : "";
-  $("report-main").innerHTML = `<h2>자원${simLabel} <span class="muted small">· 생성 · 테스트 · 삭제 + id</span></h2>
-    <p class="muted small">create/delete 스텝마다 추적된 실자원 — type · resource_id · 생성/테스트/삭제(+ 현재 단계).</p>
+  $("detail-body").innerHTML = `<h3 class="detail-h">자원${simLabel} <span class="muted small">· ${d.agg ? "런 전체" : "이 라이프사이클"} — 생성 · 테스트 · 삭제 + id</span></h3>
     ${nowLine}
     <table class="tbl">
-      <thead><tr><th>type</th><th>resource_id</th><th>lifecycle</th><th>생성</th><th>테스트</th><th>삭제</th><th>단계</th></tr></thead>
+      <thead><tr><th>type</th><th>resource_id</th>${lcCol}<th>생성</th><th>테스트</th><th>삭제</th><th>단계</th></tr></thead>
       <tbody>${body}</tbody></table>`;
 }
 
-// API — api-first table of step-start/step-end (method+path, 결과, 응답시간). Rows
-// are CLICKABLE: an inline detail panel shows the actual 요청 params/body + 응답
-// status/snippet (from the enriched step-end event) AND the endpoint's parameter
-// SCHEMA (from /api/model endpoint_params) marking which params were actually sent
-// — a coverage hint ("what COULD be tested" vs "what WAS").
+// API (DETAIL · scoped) — api-first table of this scope's calls (method+path, 결과,
+// 응답시간). Rows are CLICKABLE: an inline detail panel shows the actual 요청
+// params/body + 응답 status/snippet (from the enriched step-end event) AND the
+// endpoint's parameter SCHEMA (from /api/model endpoint_params) marking which params
+// were actually sent — a coverage hint ("what COULD be tested" vs "what WAS"). Works
+// inside a per-lifecycle scope (flat list) AND the 전체 view (grouped by lifecycle).
 function reportR3() {
-  const calls = [];
-  const open = {};
-  runEvents.forEach(e => {
-    if (e.kind === "step-start") {
-      const k = e.lifecycle + "|" + e.step;
-      open[k] = { key: k, lifecycle: e.lifecycle, step: e.step, method: e.method, path: e.path,
-                  status: null, category: "run", ms: null, params: null, req_body: null, resp_snippet: null };
-      calls.push(open[k]);
-    }
-    if (e.kind === "step-end") {
-      const k = e.lifecycle + "|" + e.step;
-      const c = open[k] || { key: k, lifecycle: e.lifecycle, step: e.step, method: e.method, path: e.path };
-      c.status = e.status; c.category = e.category; c.ms = e.elapsed_ms;
-      // enriched detail (additive; present only for live runs with the new engine)
-      if (e.params != null) c.params = e.params;
-      if (e.req_body != null) c.req_body = e.req_body;
-      if (e.resp_snippet != null) c.resp_snippet = e.resp_snippet;
-      if (!open[k]) calls.push(c);
-    }
-  });
-  const byLc = {};
-  calls.forEach(c => (byLc[c.lifecycle] = byLc[c.lifecycle] || []).push(c));
+  const d = scopeData();
+  const calls = d.api;                  // already scope-filtered + ordered
+  // a globally-unique row key (lifecycle|step) so the open-row state is stable in the
+  // aggregate view where two lifecycles can share a step name.
+  const rowKey = c => (c._lc || c.lifecycle || detailScope) + "|" + c.step;
   const okN = calls.filter(c => c.category === "ok").length;
   const softN = calls.filter(c => c.category === "soft").length;
   const failN = calls.filter(c => c.category === "fail").length;
-  const body = Object.keys(byLc).sort().map(lc =>
-    `<tr class="lc-head"><td colspan="4">${esc(lc)} <span class="muted small">${byLc[lc].length} api</span></td></tr>` +
-    byLc[lc].map(c => {
-      const isOpen = expandedApi === c.key;
-      const row = `<tr class="apirow ${isOpen ? "open" : ""}" data-apik="${esc(c.key)}">
-        <td><span class="caret">${isOpen ? "▾" : "▸"}</span> <span class="mtag ${esc(c.method || "")}">${esc(c.method || "")}</span> <code>${esc(c.path || "")}</code></td>
-        <td>${badge(c.category)}</td>
-        <td class="muted">${c.status != null ? esc(c.status) : "—"}</td>
-        <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run" ? "⏳" : "—")}</td>
-      </tr>`;
-      const detail = isOpen
-        ? `<tr class="apidetail"><td colspan="4">${apiDetailHtml(c)}</td></tr>` : "";
-      return row + detail;
-    }).join("")).join("");
-  $("report-main").innerHTML = `<h2>API <span class="muted small">· 호출 결과 (행 클릭 → 요청·응답·파라미터 스키마)</span></h2>
+  const apiRow = c => {
+    const k = rowKey(c);
+    const isOpen = expandedApi === k;
+    const row = `<tr class="apirow ${isOpen ? "open" : ""}" data-apik="${esc(k)}">
+      <td><span class="caret">${isOpen ? "▾" : "▸"}</span> <span class="mtag ${esc(c.method || "")}">${esc(c.method || "")}</span> <code>${esc(c.path || "")}</code></td>
+      <td>${badge(c.category)}</td>
+      <td class="muted">${c.status != null ? esc(c.status) : "—"}</td>
+      <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run" ? "⏳" : "—")}</td>
+    </tr>`;
+    const detail = isOpen ? `<tr class="apidetail"><td colspan="4">${apiDetailHtml(c)}</td></tr>` : "";
+    return row + detail;
+  };
+  let body;
+  if (d.agg) {
+    const byLc = {};
+    calls.forEach(c => (byLc[c._lc || c.lifecycle] = byLc[c._lc || c.lifecycle] || []).push(c));
+    body = Object.keys(byLc).sort().map(lc =>
+      `<tr class="lc-head"><td colspan="4">${esc(lc)} <span class="muted small">${byLc[lc].length} api</span></td></tr>` +
+      byLc[lc].map(apiRow).join("")).join("");
+  } else {
+    body = calls.map(apiRow).join("");
+  }
+  $("detail-body").innerHTML = `<h3 class="detail-h">API <span class="muted small">· ${d.agg ? "런 전체" : "이 라이프사이클"} — 행 클릭 → 요청·응답·파라미터 스키마</span></h3>
     <div class="kpi">
       <div class="s"><b>${calls.length}</b><span>api 호출</span></div>
       <div class="s"><b style="color:var(--ok)">${okN}</b><span>ok</span></div>
@@ -1088,9 +1300,9 @@ function reportR3() {
     </div>
     <div class="scroll" style="max-height:560px;margin-top:8px"><table class="tbl apitbl">
       <thead><tr><th>method · path (대상)</th><th>결과</th><th>status</th><th>응답시간</th></tr></thead>
-      <tbody>${body || '<tr><td colspan="4" class="empty">api 이벤트 없음</td></tr>'}</tbody></table></div>`;
+      <tbody>${body || `<tr><td colspan="4" class="empty">${d.status === "running" ? "API 호출 대기 중 (진행 중)…" : "이 스코프에 API 호출이 없습니다."}</td></tr>`}</tbody></table></div>`;
   // row click → toggle the inline detail (collapse if it was already open)
-  els("#report-main .apirow[data-apik]").forEach(row => row.onclick = () => {
+  els("#detail-body .apirow[data-apik]").forEach(row => row.onclick = () => {
     const k = row.dataset.apik;
     expandedApi = expandedApi === k ? null : k;
     reportR3();
@@ -1196,29 +1408,34 @@ function normPathClient(p) {
 // never rebuilds this panel. Scroll position is preserved unless the user is at
 // the bottom — so they can read mid-log without being yanked down.
 function reportR4() {
-  const fresh = !$("r4-log");
-  if (fresh) {                   // build the shell ONCE; repeated draws are no-ops
+  const d = scopeData();
+  if (!d.agg) { reportR4Scoped(d); stopR4Poll(); return; }   // per-lifecycle structured log
+  // ---- 전체 (aggregate) scope: the raw run log + cleanup/verify controls ----
+  // shell keyed by run+scope so switching INTO 전체 (from a scoped log) rebuilds it.
+  const key = "agg:" + runId;
+  const fresh = !$("r4-log") || $("r4-log").dataset.logkey !== key;
+  if (fresh) {                   // build the shell ONCE per run/scope; redraws are no-ops
     lastLogText = null;          // force the first paint after a (re)build
-    $("report-main").innerHTML = `<h2>로그 <span class="muted small">· 실행 로그</span></h2>
+    $("detail-body").innerHTML = `<h3 class="detail-h">로그 <span class="muted small">· 런 전체 실행 로그</span></h3>
       <div class="run-ctl">
         <button class="minibtn red" id="btn-cleanup" title="우리(owner)가 만든 자원을 강제 삭제 (reconciler, TTL 무시).">🧹 강제 클린업</button>
         <button class="minibtn" id="btn-verify" title="삭제 없이 남은 우리 자원 수 확인 (read-only).">🔍 클린업 확인</button>
         <button class="minibtn" id="btn-reflog">↻ 로그 새로고침</button>
       </div>
-      <pre class="runlog" id="r4-log">로그 로딩…</pre>`;
+      <pre class="runlog" id="r4-log" data-logkey="${esc(key)}">로그 로딩…</pre>`;
     $("btn-reflog").onclick = () => loadLog(true);   // manual refresh → snap to bottom
     $("btn-cleanup").onclick = () => {
       if (!confirm("강제 클린업: owner=apitest 가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?")) return;
       fetch("/api/cleanup", { method: "POST" }).then(r => r.json()).then(j => {
         if (j.error) { alert(j.error); return; }
-        runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r4";
+        runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
         drawReport(); startR4Poll();
       }).catch(() => alert("서버 연결 실패"));
     };
     $("btn-verify").onclick = () => {
       fetch("/api/verify", { method: "POST" }).then(r => r.json()).then(j => {
         if (j.error) { alert(j.error); return; }
-        runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r4";
+        runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
         drawReport(); startR4Poll();
       }).catch(() => alert("서버 연결 실패"));
     };
@@ -1229,6 +1446,30 @@ function reportR4() {
   // log, keeping the panel quiet (no flicker, no scroll fights).
   if (fresh || runStatus !== "running") loadLog();
   if (runStatus === "running") startR4Poll(); else stopR4Poll();
+}
+
+// 로그 (DETAIL · single lifecycle) — a STRUCTURED per-lifecycle log built from this
+// lifecycle's events (api calls + status), filtered to the scope (the raw server log
+// is whole-run and not cleanly splittable). Rebuilt in place each draw; cheap + no
+// flicker (the content is derived, not fetched), and a failed lifecycle surfaces its
+// fail line. The 전체 view still owns the raw run log + cleanup controls.
+function reportR4Scoped(d) {
+  const b = (groupedRun().lcs[d.id]) || { api: [], status: "queued" };
+  const lines = b.api.map(c => {
+    const cls = c.category === "fail" ? "err" : c.category === "soft" ? "warn" : c.category === "run" ? "dim" : "ok";
+    const tag = c.category === "fail" ? "FAIL" : c.category === "soft" ? "SOFT" : c.category === "run" ? "…" : "ok";
+    const code = c.status != null ? c.status : "";
+    return `<span class="meth">${esc(c.method || "")}</span> ${esc(c.path || "")} `
+      + `<span class="dim">(${esc(c.step || "")})</span> → <span class="${cls}">${esc(code)} ${tag}</span>`
+      + (c.ms != null ? ` <span class="dim">${c.ms}ms</span>` : "");
+  });
+  if (d.status === "fail") lines.push('<span class="err">✕ 이 라이프사이클 실패 — 위 fail 스텝 + 잔존 자원 확인 (전체 로그/클린업은 전체 탭).</span>');
+  else if (d.status === "done") lines.push('<span class="ok">✓ 라이프사이클 통과 — 자원 생성→삭제 완료.</span>');
+  else if (d.status === "running") lines.push('<span class="dim">⏳ 진행 중…</span>');
+  const logHtml = lines.length ? lines.join("\n") : "(이 라이프사이클의 API 이벤트 없음)";
+  $("detail-body").innerHTML = `<h3 class="detail-h">로그 <span class="muted small">· 이 라이프사이클(${esc(d.id)})로 필터됨</span></h3>
+    <pre class="runlog logbox">${logHtml}</pre>
+    <p class="muted small">이 스코프의 API 호출 로그 — 런 전체 원시 로그 + 강제 클린업은 <b>전체</b> 보기에서.</p>`;
 }
 
 // near-bottom test: within ~24px of the bottom counts as "following the tail".
@@ -1253,7 +1494,8 @@ function startR4Poll() {
   if (r4LogTimer) return;        // single in-flight poller
   const tick = () => {
     r4LogTimer = null;
-    if (screen !== "run" || reportSub !== "r4") return;     // only while visible
+    // only while the aggregate (전체) raw-log view is actually visible
+    if (screen !== "run" || detailTab !== "log" || !isAggScope() || !$("r4-log")) return;
     fetch("/api/runs/" + runId).then(r => r.json()).then(j => {
       runStatus = j.status || runStatus;
       loadLog();
@@ -1286,6 +1528,7 @@ function loadRunRecords() {
     }).join("");
     els("#report-side .runrow").forEach(row => row.onclick = () => {
       runId = row.dataset.id; runEvents = []; runStatus = "running";
+      detailScope = "*"; scopeAuto = true; expandedApi = null;   // new run → reconcile re-selects
       fetch("/api/runs/" + runId + "/events").then(r => r.json()).then(j2 => {
         runEvents = j2.events || []; runStatus = j2.status || "done";
         if (runStatus === "running") pollEvents();

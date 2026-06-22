@@ -408,5 +408,86 @@ g.rg-selbox{cursor:pointer}
 .tab-scope{font-size:11.5px;color:var(--muted);margin:2px 0 6px}
 .tab-scope b{color:var(--ink)}
 
+/* ============================================================================
+ * B1 — report master→detail drill-down. 흐름(master) is the persistent B2 scene +
+ * a compact lifecycle list; the DETAIL pane (자원·API·로그) is scoped to one
+ * lifecycle (sticky scope bar pins which) or the 전체 aggregate. Ported from
+ * console2/mockups/b1-report-drilldown.html, recolored to this Primer theme.
+ * ========================================================================== */
+.md-report{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;margin-bottom:8px}
+/* once a detail is shown, split master | detail side-by-side on wide viewports */
+.md-report.has-detail{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
+@media(max-width:1280px){.md-report.has-detail{grid-template-columns:1fr}}
+.md-master,.md-detail{min-width:0}
+.md-master>h2,.md-detail .detail-h{margin-top:0}
+
+/* MASTER: compact lifecycle list + 전체 toggle (escape hatch for a dense graph) */
+.lc-picker{margin-top:12px}
+.lcp-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px}
+.lclist{display:flex;flex-direction:column;gap:6px}
+.lcitem{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+  border-radius:8px;padding:7px 10px;cursor:pointer}
+.lcitem:hover{border-color:var(--accent)}
+.lcitem.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
+.lcitem .lctop{display:flex;align-items:center;gap:8px}
+.lcitem .st{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:#fff;flex:0 0 auto}
+.lcitem .st.done{background:var(--green)}.lcitem .st.run{background:var(--accent)}
+.lcitem .st.fail{background:var(--red)}.lcitem .st.skip{background:var(--line2)}
+.lcitem .st.queued{background:#fff;border:1.5px solid var(--line2);color:var(--muted)}
+.lcitem .lcname{font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lcitem .lcmeta{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.lcitem .lcsvc{color:var(--muted);font-size:11px}
+.lcitem .pill{border:1px solid var(--line2);border-radius:10px;padding:0 7px;font-size:10px;font-weight:700;
+  color:#3a424b;white-space:nowrap}
+.lcitem .pill.l{background:var(--accent);color:#fff;border-color:var(--accent)}
+.lcitem .pill.soft{border-color:var(--amber);color:var(--amber)}
+.lcitem .pill.fail{border-color:var(--red);color:var(--red)}
+
+.aggitem{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#fff;
+  border:1px dashed var(--line2);border-radius:8px;padding:8px 11px;margin-top:9px;cursor:pointer}
+.aggitem:hover{border-color:var(--accent)}
+.aggitem.sel{border-style:solid;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
+.aggitem .ico{font-size:15px}
+.aggitem .aggtxt b{font-size:12.5px;display:block}
+.aggitem .sub{color:var(--muted);font-size:11px;margin-left:auto;white-space:nowrap}
+
+/* DETAIL: sticky scope bar pins WHICH lifecycle (the thing flat tabs lose) */
+.md-detail{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 1px 2px rgba(31,35,40,.05);overflow:hidden}
+.scopebar{display:flex;align-items:center;gap:9px;padding:9px 13px;background:#f7faff;
+  border-bottom:1px solid var(--line);font-size:12.5px;position:sticky;top:0;z-index:3;flex-wrap:wrap}
+.scopebar .lbl{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
+.scopebar .cur{font-weight:800;color:#0f3d8a;display:inline-flex;align-items:center;gap:7px}
+.scopebar .cur.agg{color:var(--ink)}
+.scopebar .cur .st{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.scopebar .cur .st.done{background:var(--green)}.scopebar .cur .st.run{background:var(--accent)}
+.scopebar .cur .st.fail{background:var(--red)}.scopebar .cur .st.skip{background:var(--line2)}
+.scopebar .cur .st.queued{background:#fff;border:1.5px solid var(--line2);color:var(--muted)}
+.scopebar .crumb{color:var(--muted);font-size:11.5px}
+.scopebar .clear{margin-left:auto;font-size:11px;color:var(--accent);cursor:pointer;border:1px solid var(--line);
+  background:#fff;border-radius:6px;padding:3px 9px;font-weight:600;white-space:nowrap}
+.scopebar .clear:hover{background:var(--panel2)}
+
+/* detail sub-tabs (자원·API·로그) with a per-tab count chip */
+.detailtabs{gap:2px;padding:8px 12px 0;margin:0;background:var(--panel);border-bottom:1px solid var(--line)}
+.detailtabs button{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);
+  padding:7px 12px;border-radius:6px 6px 0 0}
+.detailtabs button:hover{color:var(--ink);background:#fff}
+.detailtabs button.on{color:var(--accent);border-bottom-color:var(--accent);background:#fff}
+.detailtabs button .n{font-size:10px;background:var(--panel2);border-radius:9px;padding:0 6px;margin-left:5px;
+  color:var(--muted);font-weight:700}
+.detailtabs button.on .n{background:#dbeafe;color:#0f3d8a}
+#detail-body{padding:12px 14px}
+#detail-body .detail-h{font-size:12.5px;margin:0 0 9px;text-transform:none;letter-spacing:0;color:var(--ink)}
+#detail-body .empty{color:var(--muted);font-size:12.5px;padding:22px 8px;text-align:center}
+
+/* the dark structured per-lifecycle log box (scoped 로그) */
+.runlog.logbox{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;line-height:1.6}
+.runlog.logbox .ts{color:#6e7681}
+.runlog.logbox .ok{color:#3fb950}.runlog.logbox .warn{color:#d29922}.runlog.logbox .err{color:#f85149}
+.runlog.logbox .meth{color:#79c0ff}.runlog.logbox .dim{color:#8b949e}
+
 .foot{margin-top:32px;color:var(--muted);font-size:11.5px;border-top:1px solid var(--line);padding-top:13px}
 .hidden{display:none}
