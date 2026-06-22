@@ -447,6 +447,151 @@ def _start(kind: str, worker, **extra) -> dict:
     return rec
 
 
+# --------------------------------------------------------------------------- #
+# cross-run VPC admission + wait queue
+# --------------------------------------------------------------------------- #
+# Several runs can be in flight at once (one user, multiple runs). Each run needs
+# up to ``peak_vpcs`` VPC slots (dag_planner); the account caps total VPCs
+# (core.budgets, =5 VALIDATED). A run is ADMITTED when it fits under the cap and
+# otherwise QUEUED (FIFO, head-of-line), admitted later when an in-flight run
+# finishes and frees slots. ``_BASELINE`` = account VPCs NOT from our in-flight
+# runs (resynced from a live LIST whenever nothing is in flight), so
+# effective_used = baseline + Σ(reserved peaks), headroom = cap − that.
+# Reservations gate BOTH simulate and live runs (simulate reserves the same slots
+# so the queue can be exercised with zero billing).
+_ADMIT = threading.Lock()
+_RESERVED: dict[str, int] = {}     # run_id -> reserved VPC slots (in flight)
+_QUEUE: list[str] = []             # run_ids waiting, FIFO
+_PENDING: dict[str, object] = {}   # run_id -> worker fn (for queued runs)
+_BASELINE = 0                      # account VPCs not attributable to our runs
+_VPCCNT = {"n": 0, "ts": 0.0}      # cached live account VPC count
+
+
+def _vpc_cap() -> int:
+    from core import budgets
+    return int(budgets.Budget().limits.get("vpc", 5))
+
+
+def _account_vpc_count(ttl: float = 12.0) -> int:
+    """Live account VPC count via a read-only LIST (cached; best-effort)."""
+    now = time.time()
+    if now - _VPCCNT["ts"] < ttl:
+        return _VPCCNT["n"]
+    try:
+        from core.config import Settings
+        from core.http_client import ApiClient
+        r = ApiClient(Settings()).get("/v1/vpcs", params={"size": 1}, service="vpc",
+                                      timeout=10, retry=False)
+        if getattr(r, "ok", False):
+            body = r.body if isinstance(r.body, dict) else {}
+            n = body.get("totalCount")
+            if n is None:
+                items = body.get("contents") or body.get("vpcs") or []
+                n = len(items) if isinstance(items, list) else 0
+            _VPCCNT.update(n=int(n), ts=now)
+    except Exception:  # noqa: BLE001 — budget view is best-effort, never crash a run
+        pass
+    return _VPCCNT["n"]
+
+
+def _selection_is_heavy(ids: list[str]) -> bool:
+    """True iff any selected lifecycle is heavy/billable (auto-derives the gate)."""
+    lcs = _model().get("lifecycles", {})
+    return any(lcs.get(i, {}).get("heavy") for i in ids)
+
+
+def _run_peak_vpcs(ids: list[str]) -> int:
+    try:
+        return int(_plan(ids).get("peak_vpcs", 0) or 0)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _capacity_view() -> dict:
+    global _BASELINE
+    cap = _vpc_cap()
+    acct = _account_vpc_count()
+    with _ADMIT:
+        if not _RESERVED:
+            _BASELINE = acct
+        base, reserved = _BASELINE, sum(_RESERVED.values())
+        running, queued = list(_RESERVED.keys()), list(_QUEUE)
+
+    def _v(rid: str) -> dict:
+        r = _RUNS.get(rid)
+        return _rec_view(r) if r else {"id": rid}
+    return {"cap": cap, "baseline": base, "reserved": reserved, "account_live": acct,
+            "headroom": max(0, cap - base - reserved),
+            "running": [_v(r) for r in running], "queued": [_v(r) for r in queued]}
+
+
+def _spawn_run(rec: dict, worker) -> None:
+    def _run():
+        try:
+            worker(rec)
+        finally:
+            _on_run_finish(rec["id"])
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _admit_or_queue(rec: dict, worker) -> dict:
+    """Reserve VPC slots and start the run if it fits the cap, else enqueue it."""
+    global _BASELINE
+    peak = int(rec.get("peak_vpcs", 0) or 0)
+    base_now = _account_vpc_count()
+    spawn = False
+    with _ADMIT:
+        if not _RESERVED:
+            _BASELINE = base_now
+        head = max(0, _vpc_cap() - _BASELINE - sum(_RESERVED.values()))
+        if head >= peak:
+            _RESERVED[rec["id"]] = peak
+            rec["status"], rec["queued"] = "running", False
+            spawn = True
+        else:
+            rec["status"], rec["queued"] = "queued", True
+            _PENDING[rec["id"]] = worker
+            _QUEUE.append(rec["id"])
+    if spawn:
+        _spawn_run(rec, worker)
+    return rec
+
+
+def _try_admit_queue() -> None:
+    """Admit queued runs (FIFO, head-of-line) that now fit under the cap."""
+    global _BASELINE
+    base_now = _account_vpc_count()
+    ready = []
+    with _ADMIT:
+        if not _RESERVED:
+            _BASELINE = base_now
+        while _QUEUE:
+            rid = _QUEUE[0]
+            rec = _RUNS.get(rid)
+            if not rec:
+                _QUEUE.pop(0)
+                _PENDING.pop(rid, None)
+                continue
+            peak = int(rec.get("peak_vpcs", 0) or 0)
+            head = max(0, _vpc_cap() - _BASELINE - sum(_RESERVED.values()))
+            if head >= peak:
+                _QUEUE.pop(0)
+                worker = _PENDING.pop(rid)
+                _RESERVED[rid] = peak
+                rec["status"], rec["queued"] = "running", False
+                ready.append((rec, worker))
+            else:
+                break  # head-of-line: don't skip ahead of a waiting bigger run
+    for rec, worker in ready:
+        _spawn_run(rec, worker)
+
+
+def _on_run_finish(rid: str) -> None:
+    with _ADMIT:
+        _RESERVED.pop(rid, None)
+    _try_admit_queue()
+
+
 def _provision_shared(env: dict, f) -> dict:
     """Provision ONE session-shared VPC+subnet so adopter lifecycles don't skip under
     -n (identical to console_server / chat-heavy). Best-effort: on failure adopters
@@ -776,7 +921,7 @@ def _summarize(rec: dict, log: str) -> str:
 def _rec_view(rec: dict, full: bool = False) -> dict:
     v = {k: rec.get(k) for k in ("id", "kind", "mode", "status", "lifecycle_ids",
                                  "heavy", "mutations", "destructive", "rc", "started",
-                                 "ended", "error", "runner_missing")}
+                                 "ended", "error", "runner_missing", "peak_vpcs", "queued")}
     if rec.get("kind") == "owned":   # expose the structured owned-resource inventory
         v["owned"] = rec.get("owned", [])
         v["owned_total"] = rec.get("owned_total")
@@ -927,6 +1072,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, {"suites": _list_suites_view()})
             except Exception as exc:  # noqa: BLE001
                 return self._json(500, {"error": f"suites list failed: {exc}"})
+        if p == "/api/capacity":
+            # VPC budget + admission state: cap, baseline, reserved, headroom,
+            # running[], queued[] — drives the 실행 screen capacity bar.
+            try:
+                return self._json(200, _capacity_view())
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"capacity failed: {exc}"})
         if p == "/api/runs":
             with _LOCK:
                 rows = [_rec_view(r) for r in sorted(_RUNS.values(),
@@ -977,17 +1129,26 @@ class Handler(BaseHTTPRequestHandler):
                 ids = _resolve_lifecycle_ids(b)
             if not ids:
                 return self._json(400, {"error": "no lifecycles selected"})
-            mode = b.get("mode", "simulate")
+            mode = b.get("mode", "live")
+            heavy = _selection_is_heavy(ids)
+            peak = _run_peak_vpcs(ids)
             if mode == "live":
-                # safety gates are explicit per-run opt-ins (Hard Rule 1): default
-                # OFF so a bare live POST never mutates/deletes by omission — the
-                # client must set each gate true.
-                rec = _start("lifecycle", _run_worker, mode="live", lifecycle_ids=ids,
-                             heavy=bool(b.get("heavy", False)),
-                             mutations=bool(b.get("mutations", False)),
-                             destructive=bool(b.get("destructive", False)))
+                # Gates are DERIVED from the selection (no UI axis): CRUD lifecycles
+                # need mutations+destructive; heavy auto-enables iff the selected
+                # closure contains a heavy (billable) lifecycle. The deliberate
+                # opt-in (Hard Rule 1) is the selection itself + the client's
+                # pre-flight confirm — not a separate toggle.
+                rec = _new_rec("lifecycle", mode="live", lifecycle_ids=ids,
+                               heavy=heavy, mutations=True, destructive=True)
+                worker = _run_worker
             else:
-                rec = _start("simulate", _simulate_worker, mode="simulate", lifecycle_ids=ids)
+                # simulate stays a server capability (no UI toggle): no cloud calls,
+                # used to exercise the admission queue with zero billing.
+                rec = _new_rec("simulate", mode="simulate", lifecycle_ids=ids, heavy=heavy)
+                worker = _simulate_worker
+            rec["peak_vpcs"], rec["queued"] = peak, False
+            # admit now (reserve VPC slots) or enqueue if it would exceed the cap
+            _admit_or_queue(rec, worker)
             return self._json(202, _rec_view(rec))
         if p == "/api/suites":
             b = self._body()
@@ -999,6 +1160,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(500, {"error": f"suite save failed: {exc}"})
             return self._json(201, {"suite": view, "suites": _list_suites_view()})
         if p == "/api/cleanup":
+            # account-wide reconciler reaps by owner-tag (NOT per run) — running it
+            # while other runs are in flight would delete their resources too. Block
+            # it until nothing is running/queued (per-run teardown still cleans each
+            # finished run; this button is only for account-wide leftovers).
+            with _ADMIT:
+                busy = bool(_RESERVED or _QUEUE)
+            if busy:
+                return self._json(409, {"error":
+                    "진행 중(또는 대기 중) 실행이 있어 계정 전체 강제 클린업을 막았습니다 — "
+                    "reconciler 는 owner-tag 로 전체를 reap 하므로 다른 실행이 만든 자원까지 "
+                    "삭제됩니다. 모든 실행이 끝난 뒤 다시 시도하세요."})
             return self._json(202, _rec_view(_start("cleanup", _cleanup_worker)))
         if p == "/api/verify":
             return self._json(202, _rec_view(_start("verify", _verify_worker)))

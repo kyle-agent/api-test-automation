@@ -580,3 +580,72 @@ def test_save_suite_rejects_bad_id_builtin_overwrite_and_gate_inconsistency(tmp_
     with pytest.raises(ValueError):                       # mutations without destructive (core rule)
         C2._save_suite({"id": "lonely-mut", "request": {"mutations": True}})
     assert not list(tmp_path.glob("*.yaml")), "no file should be written on rejection"
+
+
+# --------------------------------------------------------------------------- #
+# cross-run VPC admission + wait queue — the concurrent-execution model:
+# several runs in flight, each reserving peak_vpcs slots against the account cap;
+# a run that would exceed the cap QUEUES (FIFO) and is admitted when a slot frees.
+# Hermetic + synchronous: the account VPC count + cap are monkeypatched (no
+# network) and ``_spawn_run`` is stubbed so NO worker thread runs — completion is
+# driven explicitly via ``_on_run_finish``. (The real threaded path is covered by
+# the live integration run.) This isolates the admission DECISION logic with zero
+# timing flakiness.
+# --------------------------------------------------------------------------- #
+def _reset_admission(monkeypatch, spawned):
+    monkeypatch.setattr(C2, "_account_vpc_count", lambda ttl=0.0: 0)   # baseline 0, no LIST
+    monkeypatch.setattr(C2, "_vpc_cap", lambda: 5)                     # cap 5 regardless of env
+    monkeypatch.setattr(C2, "_spawn_run", lambda rec, worker: spawned.append(rec["id"]))
+    C2._RESERVED.clear()
+    C2._QUEUE.clear()
+    C2._PENDING.clear()
+    monkeypatch.setattr(C2, "_BASELINE", 0, raising=False)
+
+
+def test_admission_reserves_queues_and_auto_dequeues(monkeypatch):
+    spawned: list = []
+    _reset_admission(monkeypatch, spawned)
+
+    def launch(peak):
+        rec = C2._new_rec("simulate", mode="simulate", lifecycle_ids=["x"])
+        rec["peak_vpcs"], rec["queued"] = peak, False
+        C2._admit_or_queue(rec, lambda r: None)
+        return rec
+
+    a, b, c, d = launch(1), launch(1), launch(2), launch(2)   # 1+1+2=4 fit; +2 > cap 5
+    assert a["status"] == b["status"] == c["status"] == "running"
+    assert d["status"] == "queued"
+    cap = C2._capacity_view()
+    assert cap["reserved"] == 4 and cap["headroom"] == 1
+    assert [q["id"] for q in cap["queued"]] == [d["id"]]
+    assert spawned == [a["id"], b["id"], c["id"]]            # only admitted runs spawn
+
+    # A finishes -> a slot frees -> D is admitted (FIFO head-of-line)
+    C2._on_run_finish(a["id"])
+    assert C2._RUNS[d["id"]]["status"] == "running"
+    assert C2._RUNS[d["id"]]["queued"] is False
+    assert d["id"] in spawned and a["id"] not in C2._RESERVED
+    cap2 = C2._capacity_view()
+    assert cap2["reserved"] == 5 and cap2["headroom"] == 0   # b(1)+c(2)+d(2) now hold the cap
+
+    # finish the rest -> drains to empty
+    for rid in (b["id"], c["id"], d["id"]):
+        C2._on_run_finish(rid)
+    assert not C2._RESERVED and not C2._QUEUE
+
+
+def test_peak_zero_run_never_queues(monkeypatch):
+    """A run that needs no VPC (peak 0 — e.g. a light service) is always admitted,
+    even when the cap is fully reserved by others."""
+    spawned: list = []
+    _reset_admission(monkeypatch, spawned)
+    C2._RESERVED["other"] = 5                                  # cap fully reserved
+    try:
+        rec = C2._new_rec("simulate", mode="simulate", lifecycle_ids=["x"])
+        rec["peak_vpcs"], rec["queued"] = 0, False
+        C2._admit_or_queue(rec, lambda r: None)
+        assert rec["status"] == "running", "peak-0 run must not queue"
+        assert rec["id"] in spawned
+    finally:
+        C2._RESERVED.pop("other", None)
+        C2._RESERVED.pop(rec["id"], None)
