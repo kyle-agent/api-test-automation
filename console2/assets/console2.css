@@ -343,5 +343,70 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .lo-ok{color:var(--green);font-weight:700}
 .lo-warn{color:var(--red);font-weight:700}
 
+/* ============================================================================
+ * DAG-at-scale (B2) — group/collapse · focus · minimap · zoom · 그림|표.
+ * Ported from console2/mockups/b2-dag-scale.html, recolored to this Primer theme.
+ * Used by the 구성 composition DAG (#dag-*) and reused on the 흐름 live DAG (#r1-*).
+ * ========================================================================== */
+/* a small inline 그림|표 segmented toggle that sits in the panel <h2> */
+.seg-ctl.mini{margin-left:10px;vertical-align:middle;border-radius:7px}
+.seg-ctl.mini button{padding:4px 11px;font-size:11.5px;font-weight:700}
+
+/* toolbar above the stage: granularity + 전체 접기/펼치기 + note + stat */
+.dag-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0 6px}
+.tgroup{display:flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+.tgroup button{background:#fff;border:none;border-left:1px solid var(--line);color:var(--muted);
+  padding:5px 11px;cursor:pointer;font-size:11.5px;font-weight:700}
+.tgroup button:first-child{border-left:none}
+.tgroup button.on{background:var(--panel2);color:var(--ink)}
+.gran-note{font-size:11px;color:var(--muted)}
+.statchip{margin-left:auto;font-size:11px;color:var(--muted);background:var(--panel);
+  border:1px solid var(--line);border-radius:13px;padding:3px 11px;font-variant-numeric:tabular-nums}
+.statchip b{color:var(--ink)}
+
+/* the stage = the clipped, pannable canvas (replaces a plain .svgbox for the DAG) */
+.stage-wrap{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.stage-wrap.hide{display:none}
+.stage{position:relative;width:100%;height:min(74vh,560px);min-height:440px;overflow:hidden;cursor:grab;
+  background:radial-gradient(circle,#eef1f4 1px,transparent 1px);background-size:26px 26px}
+.stage.grabbing{cursor:grabbing}
+#dag-svg,#r1-svg.scene-svg{position:absolute;top:0;left:0;transform-origin:0 0}
+.stage svg text{fill:var(--ink)}
+
+/* scene node/group/edge states */
+g.rg-unit{cursor:pointer}
+g.rg-unit .nrect{transition:opacity .12s}
+g.rg-unit.dimmed{opacity:.13}
+g.rg-unit .nrect.grp{filter:drop-shadow(0 1px 1px rgba(31,35,40,.06))}
+g.rg-selbox{cursor:pointer}
+.rg-edge{stroke:var(--dep);stroke-width:1.3;fill:none}
+.rg-edge.hot{stroke:var(--accent);stroke-width:2.2}
+.rg-edge.dim{opacity:.08}
+
+/* floating overlays inside the stage */
+.zoomctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:5px;z-index:5}
+.zoomctl button{width:30px;height:30px;border:1px solid var(--line);background:#fff;border-radius:7px;
+  cursor:pointer;font-size:15px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 2px rgba(31,35,40,.12)}
+.zoomctl button:hover{border-color:var(--accent);color:var(--accent)}
+.zoomctl button.fit{font-size:10.5px;font-weight:700}
+.minimap{position:absolute;bottom:10px;right:10px;width:220px;height:144px;border:1px solid var(--line2);
+  border-radius:8px;background:rgba(255,255,255,.92);overflow:hidden;z-index:5;box-shadow:0 2px 6px rgba(31,35,40,.14)}
+.minimap .mmlabel{position:absolute;top:3px;left:6px;font-size:9px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.4px;z-index:2;pointer-events:none}
+.minimap svg{position:absolute;top:0;left:0;width:100%;height:100%}
+.minimap .mmview,#dag-mmview,#r1-mmview{position:absolute;border:2px solid var(--accent);
+  background:rgba(37,99,201,.10);cursor:move;z-index:3}
+.hint-pill{position:absolute;top:10px;left:10px;z-index:5;background:rgba(255,255,255,.94);
+  border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--muted);
+  box-shadow:0 1px 2px rgba(31,35,40,.1);max-width:60%}
+.hint-pill b{color:var(--ink)}
+.hint-pill .focusinfo{color:var(--accent);font-weight:600}
+
+/* 표 mode: hide the stage, the order table becomes the primary view */
+#dag-tableview.tab-primary{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:4px;background:#fff}
+.tab-scope{font-size:11.5px;color:var(--muted);margin:2px 0 6px}
+.tab-scope b{color:var(--ink)}
+
 .foot{margin-top:32px;color:var(--muted);font-size:11.5px;border-top:1px solid var(--line);padding-top:13px}
 .hidden{display:none}

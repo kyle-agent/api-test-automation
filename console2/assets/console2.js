@@ -40,6 +40,14 @@ let lastLogText = null;     // last log text written to the 로그 <pre> (in-pla
 let r4LogTimer = null;      // dedicated slow (2s) log poller while on the 로그 tab during a run
 let expandedApi = null;     // key of the currently-expanded API row (API tab detail)
 
+// DAG-at-scale (B2) scene controllers — one for the 구성 composition DAG, one for
+// the 흐름 live-run DAG. Both drive the SAME graph object via ResourceGraph.scene
+// (group/collapse · focus · minimap · zoom). buildView toggles 그림|표 on ①.
+let dagScene = null;        // 구성 (#dag-svg) scene
+let r1Scene = null;         // 흐름 (#r1-svg) scene
+let buildView = "fig";      // 그림 | 표 (구성 DAG mode)
+let dagFocus = null;        // current focus info on the 구성 DAG (for 표 scoping)
+
 // ---- bootstrap: fetch the model, then render ----
 fetch("/api/model").then(r => r.json()).then(m => {
   if (m.error) throw new Error(m.error);
@@ -147,9 +155,53 @@ function ctxBar() {
 function drawBuild() {
   initCollapse();
   drawSvcTree();
+  wireDagControls();        // granularity / 전체 접기·펼치기 / 그림|표 (idempotent)
   refreshGraph();           // fetch /api/graph for the current selection
   $("sel-search").oninput = drawSvcTree;
   $("sel-all").onclick = toggleAll;
+}
+
+// wire the DAG-at-scale toolbar once (granularity, 전체 접기/펼치기 = the re-collapse
+// fix, 그림|표 mode, zoom controls). Buttons call into the scene controller.
+let _dagWired = false;
+function wireDagControls() {
+  if (_dagWired) return; _dagWired = true;
+  // granularity 카테고리 / 서비스 / 전체 펼침
+  els("#dag-gran button").forEach(b => b.onclick = () => {
+    els("#dag-gran button").forEach(x => x.classList.toggle("on", x === b));
+    if (dagScene) dagScene.setGranularity(b.dataset.gran);
+  });
+  // 전체 접기 / 전체 펼치기 — the OBVIOUS collapse affordance the user asked for
+  $("dag-collapse").onclick = () => { syncGranBtn("category"); if (dagScene) { dagScene.setGranularity("category"); } };
+  $("dag-expand").onclick = () => { syncGranBtn("resource"); if (dagScene) dagScene.expandAll(); };
+  // zoom + / − / 맞춤
+  $("dag-zin").onclick = () => dagScene && dagScene.zoomIn();
+  $("dag-zout").onclick = () => dagScene && dagScene.zoomOut();
+  $("dag-zfit").onclick = () => dagScene && dagScene.zoomToFit();
+  // 그림 | 표 mode toggle
+  els("#dag-mode button").forEach(b => b.onclick = () => {
+    buildView = b.dataset.mode;
+    els("#dag-mode button").forEach(x => x.classList.toggle("on", x === b));
+    applyBuildView();
+  });
+}
+function syncGranBtn(gran) {
+  els("#dag-gran button").forEach(x => x.classList.toggle("on", x.dataset.gran === gran));
+}
+// reflect the scene's current granularity onto the toolbar (after a reset/auto-collapse)
+function syncGranFromScene() {
+  if (dagScene) syncGranBtn(dagScene.gran);
+}
+
+// 그림|표: show the stage OR the order table as the primary view. The 표 is scoped
+// to the focus path when the DAG is focused (same selection, linear order).
+function applyBuildView() {
+  const fig = buildView === "fig";
+  $("dag-stage-wrap").classList.toggle("hide", !fig);
+  $("dag-readout").style.display = fig ? "" : "none";
+  $("dag-tableview").classList.toggle("tab-primary", !fig);
+  if (fig) { if (dagScene) dagScene.zoomToFit(); }
+  else if (lastGraph) orderTable(lastGraph, dagFocus);   // re-render table scoped to focus
 }
 
 // categories start COLLAPSED except ones that already carry a selection. Computed
@@ -316,26 +368,55 @@ function renderGraphError(msg) {
 function renderGraph(g) {
   const svg = $("dag-svg");
   if (!g.nodes.length) {
-    window.ResourceGraph.render(svg, { nodes: [], edges: [] }, {});
+    if (dagScene) { dagScene.destroy(); dagScene = null; }
+    dagFocus = null;
+    svg.removeAttribute("style");
     svg.innerHTML = '<text x="12" y="24" fill="#656d76">서비스를 선택하면 합성 배포 DAG가 생성 순서대로 표시됩니다.</text>';
     svg.setAttribute("viewBox", "0 0 420 40"); svg.setAttribute("width", 420); svg.setAttribute("height", 40);
     $("dag-readout").innerHTML = "";
     $("order-tbl").innerHTML = "";
     $("dag-legend").innerHTML = "";
+    $("dag-hint").innerHTML = "";
+    $("dag-stat").innerHTML = "";
+    $("dag-gran-note").textContent = "";
     return;
   }
-  window.ResourceGraph.render(svg, g, {
-    onClick: id => {                       // click a node on the DAG = toggle that target
-      if (!hasLifecycle(id)) return;       // dep-only nodes are not toggleable
-      targets.has(id) ? targets.delete(id) : targets.add(id);
-      selectionChanged();
-    }
-  });
   $("dag-legend").innerHTML = legend([
     ["#e6effd", "★ 대상"], ["#fffaf0", "■ 공유(dedup)"], ["#f3eefc", "↓ 의존"]
-  ]) + '<span><span style="color:var(--val)">●</span> VALIDATED · <span style="color:var(--docs)">●</span> docs · 🜂 heavy · ⛔ quota</span>';
+  ]) + '<span>그룹 = <b>접힘</b>(클릭=펼치기) · <span style="color:var(--val)">●</span> VALIDATED · <span style="color:var(--docs)">●</span> docs · 🜂 heavy · ⛔ quota</span>';
+  // (re)build or update the interactive scene. The node SET drives whether the
+  // scene re-chooses its collapse state (new selection) or refreshes in place.
+  if (!dagScene) {
+    dagScene = makeDagScene(svg, g);
+    dagScene.start();
+  } else {
+    dagScene.update(g);
+  }
+  syncGranFromScene();
   graphReadout(g);
-  orderTable(g);
+  orderTable(g, dagFocus);
+  applyBuildView();
+}
+
+// construct the 구성 DAG scene controller: group/collapse + focus + minimap + zoom.
+// Interaction decision (least-surprising at scale): click a resource node = FOCUS
+// (dependency path); the small ＋/✓ corner control toggles TARGET selection. Click a
+// collapsed group = expand; click it again (or 전체 접기) collapses it back.
+function makeDagScene(svg, g) {
+  return window.ResourceGraph.scene(svg, $("dag-stage"), g, {
+    minimap: $("dag-minimap"), mmsvg: $("dag-mmsvg"), mmview: $("dag-mmview"),
+    hint: $("dag-hint"), stat: $("dag-stat"), granNote: $("dag-gran-note"),
+    isSelectable: id => hasLifecycle(id),
+    onToggleTarget: id => {                // ＋/✓ corner = toggle this target
+      if (!hasLifecycle(id)) return;
+      targets.has(id) ? targets.delete(id) : targets.add(id);
+      selectionChanged();
+    },
+    onFocus: info => {                     // focus changed → keep the 표 in sync if shown
+      dagFocus = info;
+      if (buildView === "tab" && lastGraph) orderTable(lastGraph, dagFocus);
+    },
+  });
 }
 
 // readout: 생성 순서 · peak quota · 공유(dedup)
@@ -350,14 +431,27 @@ function graphReadout(g) {
     `${(g.shared || []).length ? ' <span class="muted">(' + g.shared.map(esc).join(", ") + ')</span>' : ""}`;
 }
 
-// 생성/검증/삭제 순서표: create order (graph.order) · verify count (model.verify_n) · delete order (graph.teardown)
-function orderTable(g) {
+// 생성/검증/삭제 순서표: create order (graph.order) · verify count (model.verify_n) · delete order (graph.teardown).
+// When `focus` is given (그림|표 with a focused node), the table is SCOPED to the
+// focus dependency path — the same selection shown linearly. A scope note above the
+// table tells the user what they're looking at.
+function orderTable(g, focus) {
+  const scopeSet = focus && focus.resourceIds ? new Set(focus.resourceIds) : null;
+  const inScope = id => !scopeSet || scopeSet.has(id);
   const createOrder = [], seen = new Set();
-  (g.order || []).forEach(inst => { const b = baseId(inst); if (!seen.has(b)) { seen.add(b); createOrder.push(b); } });
+  (g.order || []).forEach(inst => { const b = baseId(inst); if (!seen.has(b) && inScope(b)) { seen.add(b); createOrder.push(b); } });
   // teardown rank by base node (first occurrence)
   const delRank = {}; let r = 0;
-  (g.teardown || []).forEach(inst => { const b = baseId(inst); if (!(b in delRank)) delRank[b] = ++r; });
+  (g.teardown || []).forEach(inst => { const b = baseId(inst); if (!(b in delRank) && inScope(b)) delRank[b] = ++r; });
   const nodeById = {}; (g.nodes || []).forEach(n => { nodeById[n.id] = n; });
+  // scope note (shown in 표 mode; harmless in 그림 mode where the table is hidden)
+  const titleEl = $("dag-table-title");
+  if (titleEl) {
+    const note = scopeSet
+      ? `<div class="tab-scope">focus: <b>${esc(focus.label)}</b> 경로 · <b>${createOrder.length}</b> 자원 (전체 ${g.nodes.length})</div>`
+      : `<div class="tab-scope">전체 선택 · <b>${createOrder.length}</b> 자원</div>`;
+    titleEl.innerHTML = `생성 · 검증 · 삭제 순서표${note}`;
+  }
   const rows = createOrder.map((id, i) => {
     const n = nodeById[id] || {};
     const verifyN = (N[id] && N[id].verify_n != null) ? N[id].verify_n : 0;
@@ -663,6 +757,10 @@ function drawReport() {
   els("#report-subtabs button").forEach(b => b.classList.toggle("on", b.dataset.r === reportSub));
   // leaving the 로그 tab: stop its dedicated poller so it can't fight another tab
   if (reportSub !== "r4") stopR4Poll();
+  // leaving the 흐름 tab: tear down its scene so its window listeners don't dangle on
+  // the about-to-be-replaced #r1-stage (reportR2/3/4 overwrite report-main). Rebuilt
+  // cleanly on return to 흐름 (data-run mismatch → fresh shell). Mirrors stopR4Poll.
+  if (reportSub !== "r1" && r1Scene) { r1Scene.destroy(); r1Scene = null; }
   if (!runId) {
     $("report-main").innerHTML = '<p class="empty">아직 실행이 없습니다 — 위에서 <b>실행 ▶</b>을 누르세요.</p>';
     loadRunRecords();
@@ -720,46 +818,110 @@ function liveProgress() {
            lastTrack, lastDelete };
 }
 
+// run-state palettes (shared by the node overlay + the collapsed-group summary).
+const R1_FILL = { queued: "#ffffff", running: "#e8f0fd", done: "#eaf7ee", fail: "#fdeaea", skip: "#f6f8fa" };
+const R1_STK = { queued: "#8a93a0", running: "#2563c9", done: "#2da44e", fail: "#cf222e", skip: "#8a93a0" };
+const R1_BDG = { queued: "", running: "⏳", done: "✓", fail: "✕", skip: "–" };
+
+// the live run-state of a resource node id (via its lifecycle), recomputed fresh on
+// each call so the scene's overlay reflects the latest event stream.
+function r1NodeState(id) {
+  const st = lifecycleStates();
+  const lc = N[id] && N[id].lifecycle;
+  return lc && st[lc] ? st[lc] : null;
+}
+// per-node overlay — run-state PRIMARY; the ACTIVE lifecycle pulses blue + phase glyph.
+function r1Overlay(id) {
+  const prog = liveProgress();
+  const lc = N[id] && N[id].lifecycle;
+  if (prog.running && lc && lc === prog.activeLifecycle) {
+    const glyph = prog.phase === "create" ? "⊕" : prog.phase === "delete" ? "⊖" : "⏳";
+    return { fill: "#dbe8fd", stroke: "#1a56c4", badge: glyph, pulse: true };
+  }
+  const s = r1NodeState(id);
+  if (!s) return null;
+  return { fill: R1_FILL[s], stroke: R1_STK[s], badge: R1_BDG[s] };
+}
+// collapsed-group overlay — so a LARGE run is navigable while still showing progress:
+// the group card tints by its members' aggregate state + a "done/total" chip.
+function r1GroupOverlay(unit) {
+  const st = lifecycleStates();
+  const states = unit.members.map(id => { const lc = N[id] && N[id].lifecycle; return lc ? st[lc] : null; }).filter(Boolean);
+  if (!states.length) return null;
+  const total = states.length;
+  const done = states.filter(s => s === "done").length;
+  const anyFail = states.some(s => s === "fail");
+  const anyRun = states.some(s => s === "running");
+  const key = anyFail ? "fail" : anyRun ? "running" : done === total ? "done" : "queued";
+  return { fill: R1_FILL[key], stroke: R1_STK[key], badge: `${done}/${total}`,
+    chipFill: R1_STK[key] + "22", chipStroke: R1_STK[key], chipText: R1_STK[key],
+    title: `진행 ${done}/${total}${anyFail ? " · 실패 포함" : anyRun ? " · 진행 중" : ""}` };
+}
+
 // 흐름 — composition DAG colored by live lifecycle state + the ACTIVE node pulsed,
 // so the user watches the order advance (생성→테스트→삭제). + wave progress below.
+// FLICKER FIX (mirrors 로그): the shell (legend + scene stage) is built ONCE per run;
+// the fast poll only refreshes the banner/progress text + the scene overlay in place
+// (r1Scene.refresh()), so zoom / focus / collapse survive every poll.
 function reportR1() {
-  const st = lifecycleStates();
   const prog = liveProgress();
-  const FILL = { queued: "#ffffff", running: "#e8f0fd", done: "#eaf7ee", fail: "#fdeaea", skip: "#f6f8fa" };
-  const STK = { queued: "#8a93a0", running: "#2563c9", done: "#2da44e", fail: "#cf222e", skip: "#8a93a0" };
-  const BDG = { queued: "", running: "⏳", done: "✓", fail: "✕", skip: "–" };
-  const nodeState = id => { const lc = N[id] && N[id].lifecycle; return lc && st[lc] ? st[lc] : null; };
   const activeLc = prog.activeLifecycle;
-  // banner: 현재 무엇을 하고 있는지 (생성 중 / 테스트 중 / 삭제 중 / 완료)
+  const g = lastGraph && lastGraph.nodes.length ? lastGraph : null;
   const banner = prog.running
     ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
         <b>${esc(prog.phaseLabel)}</b> · <span class="mono">${esc(activeLc || "")}</span>
         ${prog.active ? `<span class="muted small">${esc((prog.active.method || "") + " " + (prog.active.path || ""))}</span>` : ""}</div>`
     : `<div class="nowbar done"><span class="dot"></span><b>완료</b> · 상태 ${esc(runStatus)}</div>`;
-  $("report-main").innerHTML = `<h2>흐름 <span class="muted small">· DAG 진행 순서 — 노드 = lifecycle 라이브 상태</span></h2>
-    ${banner}
-    <div class="legend">${legend([["#ffffff", "대기"], ["#e8f0fd", "진행 중"], ["#eaf7ee", "완료"], ["#fdeaea", "실패"]])}</div>
-    <div class="svgbox big"><svg id="r1-svg"></svg></div>
-    <div id="r1-prog" style="margin-top:8px"></div>`;
-  const g = lastGraph && lastGraph.nodes.length ? lastGraph : null;
-  if (g) {
-    window.ResourceGraph.render($("r1-svg"), g, {
-      overlay: id => {
-        const lc = N[id] && N[id].lifecycle;
-        const s = nodeState(id);
-        // the ACTIVE lifecycle's nodes pulse blue + carry the phase glyph so the
-        // eye tracks the advancing step even before the lifecycle flips to done.
-        if (prog.running && lc && lc === activeLc) {
-          const glyph = prog.phase === "create" ? "⊕" : prog.phase === "delete" ? "⊖" : "⏳";
-          return { fill: "#dbe8fd", stroke: "#1a56c4", badge: glyph, pulse: true };
-        }
-        if (!s) return null;
-        return { fill: FILL[s], stroke: STK[s], badge: BDG[s] };
-      }
-    });
+  // (re)build the shell only when missing or the run changed (keeps the scene alive).
+  const shell = $("r1-stage-wrap");
+  const fresh = !shell || shell.dataset.run !== String(runId);
+  if (fresh) {
+    if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
+    $("report-main").innerHTML = `<h2>흐름 <span class="muted small">· DAG 진행 순서 — 노드 = lifecycle 라이브 상태 (run-state 우선, 접기·focus·미니맵 가능)</span></h2>
+      <div id="r1-banner">${banner}</div>
+      <div class="legend">${legend([["#ffffff", "대기"], ["#e8f0fd", "진행 중"], ["#eaf7ee", "완료"], ["#fdeaea", "실패"]])}
+        <span>접힌 그룹 = done/total · 그룹 클릭=펼치기 · 노드 클릭=focus</span></div>
+      <div class="dag-toolbar">
+        <div class="tgroup" id="r1-gran"><button data-gran="category" class="on">카테고리</button><button data-gran="service">서비스</button><button data-gran="resource">전체 펼침</button></div>
+        <button class="minibtn" id="r1-collapse">⊟ 전체 접기</button>
+        <button class="minibtn" id="r1-expand">⊞ 전체 펼치기</button>
+        <span class="statchip" id="r1-stat"></span>
+      </div>
+      <div class="stage-wrap" id="r1-stage-wrap">
+        <div class="stage" id="r1-stage">
+          <svg id="r1-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="hint-pill" id="r1-hint"></div>
+          <div class="zoomctl"><button id="r1-zin">+</button><button id="r1-zout">−</button><button id="r1-zfit" class="fit">맞춤</button></div>
+          <div class="minimap" id="r1-minimap"><span class="mmlabel">미니맵</span><svg id="r1-mmsvg" xmlns="http://www.w3.org/2000/svg"></svg><div id="r1-mmview"></div></div>
+        </div>
+      </div>
+      <div id="r1-prog" style="margin-top:8px"></div>`;
+    $("r1-stage-wrap").dataset.run = String(runId);
+    if (g) {
+      r1Scene = window.ResourceGraph.scene($("r1-svg"), $("r1-stage"), g, {
+        minimap: $("r1-minimap"), mmsvg: $("r1-mmsvg"), mmview: $("r1-mmview"),
+        hint: $("r1-hint"), stat: $("r1-stat"),
+        overlay: r1Overlay, groupOverlay: r1GroupOverlay,
+      });
+      r1Scene.start();
+      els("#r1-gran button").forEach(b => b.onclick = () => {
+        els("#r1-gran button").forEach(x => x.classList.toggle("on", x === b));
+        r1Scene.setGranularity(b.dataset.gran);
+      });
+      $("r1-collapse").onclick = () => { els("#r1-gran button").forEach(x => x.classList.toggle("on", x.dataset.gran === "category")); r1Scene.setGranularity("category"); };
+      $("r1-expand").onclick = () => { els("#r1-gran button").forEach(x => x.classList.toggle("on", x.dataset.gran === "resource")); r1Scene.expandAll(); };
+      $("r1-zin").onclick = () => r1Scene.zoomIn();
+      $("r1-zout").onclick = () => r1Scene.zoomOut();
+      $("r1-zfit").onclick = () => r1Scene.zoomToFit();
+    } else {
+      $("r1-svg").innerHTML = '<text x="12" y="22" fill="#656d76">합성 그래프 없음</text>';
+    }
   } else {
-    $("r1-svg").innerHTML = '<text x="12" y="22" fill="#656d76">합성 그래프 없음</text>';
+    // same run, subsequent poll: refresh the banner + overlay in place (no rebuild)
+    $("r1-banner").innerHTML = banner;
+    if (r1Scene) r1Scene.refresh();
   }
+  const st = lifecycleStates();
   // wave progress under the canvas. SIMULATE emits explicit wave-start events; a
   // LIVE run does NOT (it emits lifecycle-start/-end only) — so when there are no
   // wave-start events we DERIVE the structure from the lifecycles that actually

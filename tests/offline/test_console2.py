@@ -244,6 +244,39 @@ def test_graph_empty_selection_is_empty_graph_not_error():
     assert g["order"] == [] and g["teardown"] == []
 
 
+def test_graph_nodes_carry_fields_the_dag_at_scale_scene_groups_by():
+    """The DAG-at-scale (B2) scene in resource_graph.js groups the composition DAG
+    by CATEGORY derived from ``service.split('/')[0]`` and ranks/colors collapsed
+    groups from each node's level/heavy/quota/provenance. Pin that every /api/graph
+    node still carries those exact fields and that the category derivation is
+    well-formed for the whole selection, so a server-side shape change that would
+    silently break collapse-by-category fails HERE (offline, no DOM) instead of in
+    the browser.
+
+    A LARGE selection (everything runnable) must also span MANY categories — this is
+    the 'gen 1마일' case the scene collapses by default (>~25 nodes)."""
+    m = C2._model()
+    runnable = [nid for nid, n in m["nodes"].items() if n.get("lifecycle")]
+    g = C2._graph({"node_ids": runnable})
+    assert len(g["nodes"]) > 25, "select-all is the large graph the scene collapses"
+    cats = set()
+    for n in g["nodes"]:
+        # the precise field set the scene reads per node (resource_graph.js groupNodes
+        # + the unit renderer). A missing field would break grouping/coloring.
+        for f in ("id", "service", "provenance", "quota", "heavy", "level",
+                  "is_target", "shared"):
+            assert f in n, f"graph node missing {f!r} the B2 scene needs"
+        assert isinstance(n["level"], int)
+        # category = the segment before the first '/' — must be non-empty for grouping
+        cat = (n["service"] or "").split("/")[0]
+        assert cat, f"node {n['id']} has no derivable category from {n['service']!r}"
+        cats.add(cat)
+    # the at-scale selection genuinely spans many categories (collapse buys a lot)
+    assert len(cats) >= 8, f"expected a broad category spread, got {sorted(cats)}"
+    # group/category info is ALSO available richer on /api/model for the scene's labels
+    assert "groups" in m and m["groups"], "model exposes per-group metadata for labels"
+
+
 def test_graph_targets_skips_lookup_resources():
     """A selected service contributes only its lifecycle-bearing resource nodes;
     lookup / no-lifecycle resources are never standalone targets."""

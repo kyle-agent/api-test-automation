@@ -43,12 +43,48 @@
 
     <!-- RIGHT (dominant): live composition DAG + readout + 순서표 -->
     <div class="panel" id="dag-panel">
-      <h2>합성 배포 그림 <span class="muted small">— composer.graph_view · 레벨 = 생성 순서</span></h2>
+      <h2>합성 배포 그림 <span class="muted small">— composer.graph_view · 레벨 = 생성 순서</span>
+        <span class="seg-ctl mini" id="dag-mode">
+          <button data-mode="fig" class="on">▦ 그림</button>
+          <button data-mode="tab">≣ 표</button>
+        </span>
+      </h2>
+      <!-- DAG-at-scale toolbar: granularity + 전체 접기/펼치기 (the re-collapse fix) -->
+      <div class="dag-toolbar" id="dag-toolbar">
+        <div class="tgroup" id="dag-gran" title="펼침 단위">
+          <button data-gran="category" class="on">카테고리</button>
+          <button data-gran="service">서비스</button>
+          <button data-gran="resource">전체 펼침</button>
+        </div>
+        <button class="minibtn" id="dag-collapse">⊟ 전체 접기</button>
+        <button class="minibtn" id="dag-expand">⊞ 전체 펼치기</button>
+        <span class="gran-note" id="dag-gran-note"></span>
+        <span class="statchip" id="dag-stat"></span>
+      </div>
       <div class="legend" id="dag-legend"></div>
-      <div class="svgbox big"><svg id="dag-svg"></svg></div>
+      <!-- figure: the interactive scene stage (collapse/focus/minimap/zoom) -->
+      <div class="stage-wrap" id="dag-stage-wrap">
+        <div class="stage" id="dag-stage">
+          <svg id="dag-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+          <div class="hint-pill" id="dag-hint"></div>
+          <div class="zoomctl">
+            <button id="dag-zin" title="확대">+</button>
+            <button id="dag-zout" title="축소">−</button>
+            <button id="dag-zfit" class="fit" title="전체 보기">맞춤</button>
+          </div>
+          <div class="minimap" id="dag-minimap">
+            <span class="mmlabel">미니맵</span>
+            <svg id="dag-mmsvg" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div id="dag-mmview"></div>
+          </div>
+        </div>
+      </div>
       <div class="readout" id="dag-readout"></div>
-      <h3>생성 · 검증 · 삭제 순서표</h3>
-      <div class="scroll"><table class="tbl" id="order-tbl"></table></div>
+      <!-- table: 생성·검증·삭제 순서표 (first-class equal to 그림, scoped to focus) -->
+      <div id="dag-tableview">
+        <h3 id="dag-table-title">생성 · 검증 · 삭제 순서표</h3>
+        <div class="scroll"><table class="tbl" id="order-tbl"></table></div>
+      </div>
     </div>
   </div>
 
