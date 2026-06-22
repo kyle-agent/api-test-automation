@@ -46,9 +46,55 @@ def _pytest_cmd(crud_ids: list[str], parallel: int) -> list[str]:
             "-n", n, "-o", "addopts=", "-q"]
 
 
+def _provision_shared(env: dict, f) -> dict:
+    """Mirror chat-heavy.yml's 'Provision shared VPC' step. Under ``-n`` the tests/crud
+    ``shared_vpc`` fixture yields ``{}`` for xdist workers WITHOUT ``SCP_SHARED_VPC_ID``
+    (conftest.py — never provision per-worker), so pure ADOPTERS (SKE/MySQL clusters)
+    IB-049-skip. We provision ONE shared VPC+subnet up front and pass its ids in, so
+    adopters adopt it instead of skipping. Best-effort: on failure adopters still skip
+    (self-creating lifecycles run regardless), exactly as before this step existed.
+
+    Returns the SCP_SHARED_* env to merge into the pytest run (empty if provision failed)."""
+    f.write("\n=== provision shared VPC (adopters need this under -n) ===\n")
+    f.flush()
+    out = subprocess.run(
+        [sys.executable, "-m", "regression.scenarios.shared_infra", "--provision"],
+        cwd=str(ROOT), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    f.write(out.stdout or "")
+    shared = {}
+    for line in (out.stdout or "").splitlines():
+        if line.startswith("SCP_SHARED_") and "=" in line:
+            k, _, v = line.partition("=")
+            if v.strip():
+                shared[k.strip()] = v.strip()
+    if shared.get("SCP_SHARED_VPC_ID"):
+        shared["SCP_VPC_SHARED_RESERVED"] = "1"
+        f.write(f"\n[provision] shared VPC ready: {shared['SCP_SHARED_VPC_ID']}\n")
+    else:
+        f.write("\n[provision] no shared VPC id — adopter lifecycles will skip "
+                "(self-creating lifecycles still run)\n")
+    f.flush()
+    return shared
+
+
+def _teardown_shared(env: dict, shared: dict, f) -> None:
+    """Delete EXACTLY the shared VPC+subnet we provisioned (by id), symmetric to
+    _provision_shared. Precise (targets our own ids), so it's safe regardless of TTL
+    and never touches a concurrent run — unlike the tag-scoped reconciler sweep, which
+    skips not-yet-expired owned resources and so would leak this just-made VPC."""
+    if not shared.get("SCP_SHARED_VPC_ID"):
+        return
+    f.write("\n=== teardown shared VPC (precise, by id) ===\n")
+    f.flush()
+    subprocess.run(
+        [sys.executable, "-m", "regression.scenarios.shared_infra", "--teardown"],
+        cwd=str(ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT)
+
+
 def _run_worker(rec: dict) -> None:
-    """Provision is handled by the tests/crud shared_vpc fixture; we run the selected
-    lifecycles then a tag-scoped reconciler sweep. Output streams to the run's log."""
+    """Provision a shared VPC (so adopters don't skip under -n), run the selected
+    lifecycles, tear that VPC down by id, then a tag-scoped reconciler sweep as the
+    catch-all safety net. Output streams to the run's log."""
     logp = Path(rec["log"])
     env = {**os.environ, "PYTHONPATH": str(ROOT),
            "SCP_CRUD_IDS": ",".join(rec["crud_ids"]),
@@ -57,10 +103,16 @@ def _run_worker(rec: dict) -> None:
     try:
         with open(logp, "w", encoding="utf-8") as f:
             f.write(f"# console run {rec['id']}  crud_ids={rec['crud_ids']}  "
-                    f"parallel={rec['parallel']} heavy={rec['heavy']}\n\n=== pytest ===\n")
+                    f"parallel={rec['parallel']} heavy={rec['heavy']}\n")
+            f.flush()
+            # adopters (SKE/MySQL) need a shared VPC under -n; self-creators don't care.
+            shared = _provision_shared(env, f) if rec["heavy"] else {}
+            f.write("\n=== pytest ===\n")
             f.flush()
             rc = subprocess.run(_pytest_cmd(rec["crud_ids"], rec["parallel"]),
-                                cwd=str(ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+                                cwd=str(ROOT), env={**env, **shared},
+                                stdout=f, stderr=subprocess.STDOUT).returncode
+            _teardown_shared(env, shared, f)
             f.write("\n=== reconciler sweep (cleanup) ===\n")
             f.flush()
             sweep_env = {**env, "SCP_SWEEP_NOWAIT": "true"}
