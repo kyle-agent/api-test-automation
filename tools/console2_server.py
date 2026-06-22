@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -53,7 +54,7 @@ import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -64,6 +65,10 @@ PORT = int(os.environ.get("PORT", "9100"))
 _RUNS: dict[str, dict] = {}
 _LOCK = threading.Lock()
 _MODEL: dict | None = None
+# lazy-built map "METHOD norm(path)" -> endpoint parameter schema (built once from
+# data/api_catalog.json + data/api_catalog_params.json on first /api/model or
+# /api/endpoint-params request). None until built.
+_EP_PARAMS: dict | None = None
 # simulate pacing — make the dry-run VISIBLY step through 생성→테스트→삭제 in DAG
 # order (not flash by in ~1s). Per-HTTP-step delay + a short beat around a
 # resource create/delete. Env-overridable so tests can run them at 0 (hermetic +
@@ -216,6 +221,69 @@ def _model() -> dict:
     if _MODEL is None:
         _MODEL = _build_model()
     return _MODEL
+
+
+# --------------------------------------------------------------------------- #
+# endpoint parameter SCHEMA (per-endpoint param defs for the API-tab coverage hint)
+# --------------------------------------------------------------------------- #
+def _ep_norm_path(p: str) -> str:
+    """Collapse templated id segments to '*' and drop the leading slash + query —
+    MUST mirror regression.scenarios.engine._norm_path so a lifecycle step's
+    templated path (e.g. ``/v1/subnets/{subnet_id}``) maps to the catalog's
+    ``/v1/subnets/{subnet_id}`` regardless of the concrete id used."""
+    p = (p or "").split("?")[0].strip("/")
+    return "/".join("*" if "{" in s else s for s in p.split("/"))
+
+
+def _ep_key(method: str, path: str) -> str:
+    return (method or "").upper() + " " + _ep_norm_path(path)
+
+
+def _build_endpoint_params() -> dict:
+    """Join data/api_catalog.json (METHOD + http_path + catalog key) with
+    data/api_catalog_params.json (per-key path_params/query_params) into a map
+    keyed by ``"METHOD norm(path)"``. This lets the console map an observed api
+    call ``(method, templated path)`` to that endpoint's available parameters, so
+    the API tab can show "what params COULD be tested" next to what was actually
+    sent. Pure offline read; first-occurrence wins on a key collision."""
+    cat_path = ROOT / "data" / "api_catalog.json"
+    par_path = ROOT / "data" / "api_catalog_params.json"
+    out: dict[str, dict] = {}
+    if not cat_path.exists():
+        return out
+    catalog = json.loads(cat_path.read_text(encoding="utf-8"))
+    params = json.loads(par_path.read_text(encoding="utf-8")) if par_path.exists() else {}
+    for e in catalog:
+        hp = e.get("http_path")
+        if not hp:
+            continue
+        k = _ep_key(e.get("method"), hp)
+        if k in out:
+            continue  # first occurrence wins (stable, deterministic)
+        pinfo = params.get(e.get("key")) or {}
+        out[k] = {
+            "key": e.get("key"),
+            "method": (e.get("method") or "").upper(),
+            "path": hp,
+            "category": e.get("category"),
+            "service": e.get("service"),
+            "path_params": pinfo.get("path_params") or [],
+            "query_params": pinfo.get("query_params") or [],
+        }
+    return out
+
+
+def _endpoint_params() -> dict:
+    global _EP_PARAMS
+    if _EP_PARAMS is None:
+        _EP_PARAMS = _build_endpoint_params()
+    return _EP_PARAMS
+
+
+def _lookup_endpoint_params(method: str, path: str) -> dict | None:
+    """Map an api call's ``(method, templated path)`` to its endpoint parameter
+    schema, or None when the endpoint isn't in the catalog."""
+    return _endpoint_params().get(_ep_key(method, path))
 
 
 # --------------------------------------------------------------------------- #
@@ -405,10 +473,34 @@ def _teardown_shared(env: dict, shared: dict, f) -> None:
                    cwd=str(ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT)
 
 
+def _pytest_did_not_run(rc: int, pytest_out: str) -> bool:
+    """True when the pytest *runner itself* never executed (so there are no test
+    results to trust) — most commonly because pytest isn't installed in the
+    interpreter that launched the run. ``python -m pytest`` with no pytest prints
+    ``No module named pytest`` and exits rc=1; we also treat the conventional
+    "usage error / internal error" exit codes (4 = usage, 3 = internal) as
+    didn't-run when no test outcome line is present."""
+    low = (pytest_out or "").lower()
+    if "no module named pytest" in low or "no module named 'pytest'" in low:
+        return True
+    # rc 4 (usage) / 3 (internal) with no per-test outcome summary => runner bailed
+    has_outcome = bool(re.search(r"\d+\s+(passed|failed|skipped|error|xfailed|deselected)",
+                                 pytest_out or ""))
+    return rc in (3, 4) and not has_outcome
+
+
 def _run_worker(rec: dict) -> None:
     """REAL run: provision shared VPC (heavy) -> pytest tests/crud with SCP_CRUD_IDS +
-    the per-run safety gates + SCP_CONSOLE_EVENTS -> teardown shared -> reconciler sweep.
-    The engine appends step-level events to rec['events'] (core.console_events)."""
+    the per-run safety gates + SCP_CONSOLE_EVENTS -> teardown shared.
+
+    Per-run cleanup is **teardown-scoped** (Hard Rule 3 + the run-owner rule): the
+    lifecycle's OWN teardown already deletes exactly what this run created, and the
+    account-wide ``cleanup.reconciler`` does NOT support scoping a sweep to a single
+    run (it only filters by the static ``owner=apitest`` tag, reaping unrelated OLD
+    leftovers from other runs). So we do NOT auto-run the reconciler here — the
+    precise shared-VPC teardown handles the heavy session resource, and account-wide
+    reaping stays the explicit 강제 클린업 button (POST /api/cleanup). The engine
+    appends step-level events to rec['events'] (core.console_events)."""
     logp = Path(rec["log"])
     env = {**os.environ, "PYTHONPATH": str(ROOT),
            "SCP_CRUD_IDS": ",".join(rec["lifecycle_ids"]),
@@ -426,17 +518,44 @@ def _run_worker(rec: dict) -> None:
             shared = _provision_shared(env, f) if rec["heavy"] else {}
             f.write("\n=== pytest ===\n")
             f.flush()
+            pos = f.tell()      # remember where the pytest output begins
             rc = subprocess.run(
                 [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
                  "-n", n, "-o", "addopts=", "-q"],
                 cwd=str(ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT).returncode
-            _teardown_shared(env, shared, f)
-            f.write("\n=== reconciler sweep (cleanup) ===\n")
             f.flush()
-            subprocess.run([sys.executable, "-m", "cleanup.reconciler"], cwd=str(ROOT),
-                           env={**env, "SCP_SWEEP_NOWAIT": "true"}, stdout=f, stderr=subprocess.STDOUT)
+            # Read back just the pytest output to detect "the runner never ran"
+            # (e.g. pytest not installed in this venv). When it didn't run there are
+            # no results to trust AND nothing was created — so skip cleanup entirely.
+            try:
+                with open(logp, encoding="utf-8") as rf:
+                    rf.seek(pos)
+                    pytest_out = rf.read()
+            except Exception:  # noqa: BLE001
+                pytest_out = ""
+            runner_missing = _pytest_did_not_run(rc, pytest_out)
+            if runner_missing:
+                f.write("\n⚠ 테스트 러너 없음 — pytest 가 실행되지 않았습니다 "
+                        "(pip install -r requirements.txt; venv 활성화).\n"
+                        "  생성된 자원이 없으므로 teardown/sweep 을 건너뜁니다.\n")
+                f.flush()
+            else:
+                _teardown_shared(env, shared, f)
+                # Per-run cleanup is teardown-scoped: the lifecycle teardown above
+                # already deleted what THIS run created. We deliberately do NOT run
+                # the account-wide reconciler sweep here (it can't be scoped to one
+                # run and would reap unrelated OLD leftovers, flooding this run's
+                # log). Account-wide reaping = the manual 강제 클린업 button
+                # (POST /api/cleanup).
+                f.write("\n=== per-run cleanup: teardown-scoped ===\n"
+                        "  이 실행이 만든 자원은 라이프사이클 teardown 으로 이미 삭제됨.\n"
+                        "  계정 전체 reconciler 청소는 자동 실행하지 않음 — '강제 클린업'(POST "
+                        "/api/cleanup) 버튼으로 수동 실행하세요 (run-scoped 청소를 reconciler 가 "
+                        "지원하지 않기 때문).\n")
+                f.flush()
         with _LOCK:
             rec["status"], rec["rc"], rec["ended"] = "done", rc, time.time()
+            rec["runner_missing"] = runner_missing
     except Exception as exc:  # noqa: BLE001 — surface to the UI, never crash the server
         with _LOCK:
             rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
@@ -450,6 +569,27 @@ def _sim_resource_type(path: str) -> str:
             continue
         return seg
     return "resource"
+
+
+def _resource_kind_from_path(path: str) -> str | None:
+    """Resource KIND (singular) from a create/delete path: the collection segment
+    right after the version, singularized — ``/v1/vpcs/{id}`` -> ``vpc``,
+    ``/v1/subnets/{subnet_id}`` -> ``subnet``, ``/v1/nat-gateways`` -> ``nat-gateway``.
+    Returns None when no collection segment exists (caller falls back to the service
+    name). This is the canonical derivation; console2.js ``kindFromPath`` mirrors it
+    so the 자원 tab shows the resource kind, not the service name."""
+    coll = None
+    for seg in (path or "").split("?")[0].strip("/").split("/"):
+        if not seg or re.match(r"^v\d", seg):   # skip version (v1, v2, v1.1, v2025-…)
+            continue
+        coll = seg
+        break
+    if not coll:
+        return None
+    # singularize: strip a trailing 's' (but not 'ss'); leave singular names alone.
+    if len(coll) > 1 and coll.endswith("s") and not coll.endswith("ss"):
+        coll = coll[:-1]
+    return coll
 
 
 def _simulate_worker(rec: dict) -> None:
@@ -593,8 +733,12 @@ def _owned_worker(rec: dict) -> None:
 
 
 def _summarize(rec: dict, log: str) -> str:
-    import re
     kind = rec.get("kind")
+    # A live run whose pytest runner never ran (e.g. pytest not installed) gets a
+    # clear, actionable summary instead of a bare "0 passed" — surfaced from the
+    # flag _run_worker set when it detected the runner was missing.
+    if rec.get("runner_missing"):
+        return "⚠ 테스트 러너 없음 — pip install -r requirements.txt (venv)"
     if kind == "owned":
         if rec.get("status") == "error":
             return f"⚠️ 스캔 실패: {str(rec.get('error'))[:60]}"
@@ -624,7 +768,7 @@ def _summarize(rec: dict, log: str) -> str:
 def _rec_view(rec: dict, full: bool = False) -> dict:
     v = {k: rec.get(k) for k in ("id", "kind", "mode", "status", "lifecycle_ids",
                                  "heavy", "mutations", "destructive", "rc", "started",
-                                 "ended", "error")}
+                                 "ended", "error", "runner_missing")}
     if rec.get("kind") == "owned":   # expose the structured owned-resource inventory
         v["owned"] = rec.get("owned", [])
         v["owned_total"] = rec.get("owned_total")
@@ -668,9 +812,31 @@ class Handler(BaseHTTPRequestHandler):
             return self._file(WEB / "index.html")
         if p == "/api/model":
             try:
-                return self._json(200, _model())
+                # ship the per-endpoint parameter SCHEMA alongside the model so the
+                # API tab can map an observed call (method, path) -> its available
+                # params (coverage hint) with no extra round-trip. Keyed by
+                # "METHOD norm(path)"; lazily built + cached.
+                m = dict(_model())
+                m["endpoint_params"] = _endpoint_params()
+                return self._json(200, m)
             except Exception as exc:  # noqa: BLE001
                 return self._json(500, {"error": f"model build failed: {exc}"})
+        if p == "/api/endpoint-params":
+            # on-demand single lookup: /api/endpoint-params?method=GET&path=/v1/vpcs
+            q = parse_qs(urlparse(self.path).query)
+            method = (q.get("method") or [""])[0]
+            path = (q.get("path") or [""])[0]
+            if not path:
+                return self._json(400, {"error": "path query param required"})
+            try:
+                hit = _lookup_endpoint_params(method, path)
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"endpoint-params failed: {exc}"})
+            if not hit:
+                return self._json(404, {"error": "endpoint not in catalog",
+                                        "method": (method or "").upper(),
+                                        "path": path})
+            return self._json(200, hit)
         if p == "/api/runs":
             with _LOCK:
                 rows = [_rec_view(r) for r in sorted(_RUNS.values(),

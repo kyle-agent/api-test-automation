@@ -273,6 +273,24 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .mtag.DELETE{color:var(--red);border-color:#e5a3a3}
 .mtag.PUT,.mtag.PATCH{color:var(--amber);border-color:#e7c98f}
 
+/* ===== API tab: clickable rows + inline request/response/param-schema detail ===== */
+.apitbl tr.apirow{cursor:pointer}
+.apitbl tr.apirow:hover td{background:#f4f8ff}
+.apitbl tr.apirow.open td{background:#e8f0fd}
+.apitbl tr.apirow .caret{color:var(--muted);font-size:10px;margin-right:2px}
+.apitbl tr.apidetail td{background:#fbfcfe;padding:0;border-bottom:2px solid var(--line)}
+.apidet{padding:11px 13px}
+.apidet-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+@media(max-width:760px){.apidet-grid{grid-template-columns:1fr}}
+.apidet-h{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin-bottom:3px}
+.apidet code{font-size:11px;background:#fff;border:1px solid var(--line);border-radius:4px;padding:0 4px;display:inline-block;margin:1px 2px 1px 0;word-break:break-all}
+.apipre{background:#fff;border:1px solid var(--line);border-radius:6px;padding:7px 9px;margin:2px 0 0;
+  font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;max-height:160px;overflow:auto;color:#3a424b}
+.schematbl{margin-top:3px}
+.schematbl th{font-size:9.5px}
+.schematbl td{padding:3px 9px}
+.schematbl code{background:none;border:none;padding:0}
+
 /* live log */
 .runlog{background:var(--panel);color:var(--ink);font:11px/1.5 ui-monospace,Menlo,Consolas,monospace;
   padding:11px 13px;border-radius:8px;margin:6px 0;max-height:440px;overflow:auto;white-space:pre-wrap;word-break:break-word;

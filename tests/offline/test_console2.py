@@ -81,6 +81,110 @@ def test_console_events_writes_jsonl_when_enabled(tmp_path, monkeypatch):
     assert json.loads(lines[1])["status"] == 202
 
 
+def test_step_end_event_carries_request_response_detail(tmp_path, monkeypatch):
+    """The engine enriches step-end with params/req_body/resp_snippet (console2 API
+    -tab detail). This pins the event SHAPE the enriched emit relies on — additive
+    fields that round-trip through the sink for the UI's request/response panel."""
+    from core import console_events as cev
+    sink = tmp_path / "ev.jsonl"
+    monkeypatch.setenv(cev.ENV, str(sink))
+    # exactly the enriched call the engine makes at its step-end site
+    cev.emit("step-end", lifecycle="networking-vpc-subnet", step="create-vpc",
+             method="POST", path="/v1/vpcs", service="networking/vpc",
+             status=202, category="ok", elapsed_ms=812,
+             params={"size": 50}, req_body='{"name":"regr-vpc","cidr":"10.0.0.0/16"}',
+             resp_snippet='{"resource_id":"vpc-abc123","state":"CREATING"}')
+    rec = json.loads(sink.read_text(encoding="utf-8").strip())
+    assert rec["kind"] == "step-end"
+    assert rec["params"] == {"size": 50}
+    assert rec["req_body"].startswith('{"name":"regr-vpc"')
+    assert "vpc-abc123" in rec["resp_snippet"]
+
+
+def test_engine_step_end_emit_includes_enrichment_kwargs():
+    """Guard the engine's enriched step-end emit at the source: the call must pass
+    params, req_body and resp_snippet (so a refactor that drops them — losing the
+    API-tab detail — fails here). Also confirms it's gated by _cev.enabled()."""
+    src = (ROOT / "regression" / "scenarios" / "engine.py").read_text(encoding="utf-8")
+    assert "_cev and _cev.enabled()" in src, "step-end enrichment must be env-gated"
+    # the enriched emit passes all three new fields
+    assert "params=_cev_params" in src
+    assert "req_body=_cev_req" in src
+    assert "resp_snippet=_cev_resp" in src
+    # truncation keeps the event small (no unbounded bodies / responses)
+    assert "[:400]" in src
+
+
+# --------------------------------------------------------------------------- #
+# endpoint parameter SCHEMA — (method, path) -> the catalog's param definitions
+# --------------------------------------------------------------------------- #
+def test_endpoint_params_lookup_returns_schema_for_known_endpoint():
+    """``_lookup_endpoint_params`` maps (METHOD, templated path) to the catalog
+    endpoint's parameter schema (path_params + query_params), so the API tab can
+    show 'what params COULD be tested'. GET /v1/vpcs (listvpcs) carries query
+    params; the id-addressed DELETE carries a path param."""
+    hit = C2._lookup_endpoint_params("GET", "/v1/vpcs")
+    assert hit is not None, "GET /v1/vpcs must resolve to a catalog endpoint"
+    assert hit["key"] == "networking/vpc/listvpcs"
+    assert hit["method"] == "GET" and hit["path"] == "/v1/vpcs"
+    qnames = {p["name"] for p in hit["query_params"]}
+    assert qnames, "listvpcs should expose filter query params"
+    # a templated path normalizes ({subnet_id} -> *) and resolves to its path param
+    d = C2._lookup_endpoint_params("DELETE", "/v1/subnets/{subnet_id}")
+    assert d and {p["name"] for p in d["path_params"]} == {"subnet_id"}
+    # an unknown endpoint is a clean miss (None), not an error
+    assert C2._lookup_endpoint_params("GET", "/v1/definitely-not-a-real-collection") is None
+
+
+def test_model_payload_includes_endpoint_params_map():
+    """The /api/model handler ships endpoint_params keyed 'METHOD norm(path)' so the
+    client maps an observed call to its schema with no extra round-trip."""
+    m = C2._endpoint_params()
+    assert isinstance(m, dict) and m, "expected a non-empty endpoint-params map"
+    assert "GET v1/vpcs" in m   # key form = METHOD + normalized (slash-stripped) path
+    assert m["GET v1/vpcs"]["key"] == "networking/vpc/listvpcs"
+
+
+# --------------------------------------------------------------------------- #
+# resource KIND from a create/delete path (자원 tab TYPE column)
+# --------------------------------------------------------------------------- #
+def test_resource_kind_from_path_singularizes_collection():
+    """The 자원 tab shows the resource KIND (vpc/subnet/port) derived from the
+    create/delete path — not the service name. ``_resource_kind_from_path`` is the
+    canonical derivation that console2.js kindFromPath mirrors."""
+    assert C2._resource_kind_from_path("/v1/subnets/{subnet_id}") == "subnet"
+    assert C2._resource_kind_from_path("/v1/vpcs/vpc-abc123") == "vpc"
+    assert C2._resource_kind_from_path("/v1/ports") == "port"
+    assert C2._resource_kind_from_path("/v1/nat-gateways/{id}") == "nat-gateway"
+    # version segment is skipped; an unparseable path falls back to None
+    assert C2._resource_kind_from_path("/v1/vpcs") == "vpc"
+    assert C2._resource_kind_from_path("") is None
+
+
+# --------------------------------------------------------------------------- #
+# live run: pytest-runner-missing detection (clear status + skip sweep)
+# --------------------------------------------------------------------------- #
+def test_pytest_did_not_run_detects_missing_runner():
+    """When pytest isn't installed the live worker must recognise the runner never
+    ran (so it shows a clear message + skips cleanup) rather than reporting a bogus
+    '0 passed'. Detected via the 'No module named pytest' marker or a usage/internal
+    exit code with no test-outcome line."""
+    assert C2._pytest_did_not_run(1, "/usr/bin/python: No module named pytest\n")
+    assert C2._pytest_did_not_run(4, "ERROR: usage: pytest ...\n")        # usage error, no outcome
+    # a real run with outcomes is NOT flagged, even on a non-zero rc (tests failed)
+    assert not C2._pytest_did_not_run(1, "= 2 failed, 3 passed in 4.2s =\n")
+    assert not C2._pytest_did_not_run(0, "= 5 passed in 1.0s =\n")
+
+
+def test_runner_missing_summary_is_actionable():
+    """A run record flagged runner_missing summarises with the install hint."""
+    rec = C2._new_rec("lifecycle", mode="live", lifecycle_ids=["networking-vpc-subnet"])
+    rec["runner_missing"] = True
+    rec["status"], rec["rc"] = "done", 1
+    assert "테스트 러너 없음" in C2._summarize(rec, "")
+    assert C2._rec_view(rec)["runner_missing"] is True
+
+
 # --------------------------------------------------------------------------- #
 # model: categories -> services -> resources (+ deps & endpoints) + lifecycles
 # --------------------------------------------------------------------------- #

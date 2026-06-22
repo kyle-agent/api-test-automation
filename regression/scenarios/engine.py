@@ -1074,11 +1074,30 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # record the step call itself for coverage/timing
             _cat = categorize(resp.status, resp.raw_text or "")
             _ems = getattr(resp, "elapsed_ms", None)
-            if _cev:
+            if _cev and _cev.enabled():
+                # console2 API-tab detail (coverage analysis): enrich step-end with
+                # the resolved query params, the request body, and a response
+                # snippet so a clicked API row can show what was actually sent vs
+                # received. Additive + env-gated — `_cev.enabled()` is the same
+                # SCP_CONSOLE_EVENTS check emit() makes, so none of this payload is
+                # even built (and nothing is written) unless the console sink is
+                # configured: zero cost + zero behaviour change when unset. All
+                # values are TRUNCATED so the event stream stays small; these are
+                # test-resource bodies (owner-tagged synthetic ids), not secrets.
+                _cev_params = _fill_obj(step.get("params"), ctx) or None
+                _cev_req = None
+                if body is not None:
+                    try:
+                        _cev_req = json.dumps(body, ensure_ascii=False, default=str)[:400]
+                    except Exception:  # noqa: BLE001 — never let detail break a run
+                        _cev_req = str(body)[:400]
+                _cev_resp = (resp.raw_text or "")[:400] or None
                 _cev.emit("step-end", lifecycle=lifecycle["id"],
                           step=step.get("name", ""), method=step["method"],
                           path=step.get("path", path), service=step_service or "",
-                          status=resp.status, category=_cat, elapsed_ms=_ems)
+                          status=resp.status, category=_cat, elapsed_ms=_ems,
+                          params=_cev_params, req_body=_cev_req,
+                          resp_snippet=_cev_resp)
             _note = ""
             if _cat == results.FAIL or (
                     _cat == results.SOFT and step["method"].upper() != "GET"

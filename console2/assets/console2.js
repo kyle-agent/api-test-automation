@@ -36,6 +36,9 @@ let runEvents = [];
 let runStatus = "idle";
 let pollTimer = null;
 let reportSub = "r1";
+let lastLogText = null;     // last log text written to the 로그 <pre> (in-place diff → no flicker)
+let r4LogTimer = null;      // dedicated slow (2s) log poller while on the 로그 tab during a run
+let expandedApi = null;     // key of the currently-expanded API row (API tab detail)
 
 // ---- bootstrap: fetch the model, then render ----
 fetch("/api/model").then(r => r.json()).then(m => {
@@ -68,6 +71,29 @@ const hasLifecycle = id => !!(N[id] && N[id].lifecycle);
 const svcNodes = svc => Object.keys(N).filter(id => N[id].service === svc);          // all nodes of a service
 const svcSelectable = svc => svcNodes(svc).filter(hasLifecycle);                       // its lifecycle-bearing nodes
 const shortName = svc => svc.split("/").pop();
+
+// resource KIND from a delete/create path: the collection segment right after the
+// version (e.g. /v1/vpcs/{id} → vpc, /v1/subnets/... → subnet, /v1/nat-gateways →
+// nat-gateway), singularized by dropping a trailing 's' (kept for words ending in
+// a non-pluralizing 's'-pair is overkill here — collection names are simple). The
+// version segment (v1, v2025-…) and any {template}/concrete-id segments are
+// skipped. Returns null when no collection segment can be found (caller falls back
+// to the service name).
+function kindFromPath(path) {
+  const segs = (path || "").split("?")[0].split("/").filter(Boolean);
+  // first segment that is NOT a version (v1, v2, v1.1, v2025-01-01) → the collection
+  const isVer = s => /^v\d/.test(s);
+  let coll = null;
+  for (const s of segs) {
+    if (isVer(s)) continue;
+    coll = s; break;                 // the collection comes right after the version
+  }
+  if (!coll) return null;
+  // singularize: vpcs→vpc, subnets→subnet, ports→port, nat-gateways→nat-gateway.
+  // only strip a trailing 's' (not 'ss'); leave already-singular names alone.
+  if (coll.length > 1 && coll.endsWith("s") && !coll.endsWith("ss")) coll = coll.slice(0, -1);
+  return coll;
+}
 
 // build category → [services] (sorted), services that have ≥1 node
 function categoryMap() {
@@ -524,7 +550,7 @@ function drawLeftover() {
     fetch("/api/cleanup", { method: "POST" }).then(r => r.json()).then(j => {
       if (j.error) { alert(j.error); return; }
       runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r4";
-      pollLogRun(); drawReport();
+      drawReport(); startR4Poll();
       // after a force cleanup, auto re-scan so the panel reflects the new state
       setTimeout(scanOwned, 1200);
     }).catch(() => alert("서버 연결 실패"));
@@ -635,6 +661,8 @@ function pollEvents() {
 // ================= 리포트 (흐름 · 자원 · API · 로그) — light theme =================
 function drawReport() {
   els("#report-subtabs button").forEach(b => b.classList.toggle("on", b.dataset.r === reportSub));
+  // leaving the 로그 tab: stop its dedicated poller so it can't fight another tab
+  if (reportSub !== "r4") stopR4Poll();
   if (!runId) {
     $("report-main").innerHTML = '<p class="empty">아직 실행이 없습니다 — 위에서 <b>실행 ▶</b>을 누르세요.</p>';
     loadRunRecords();
@@ -732,27 +760,48 @@ function reportR1() {
   } else {
     $("r1-svg").innerHTML = '<text x="12" y="22" fill="#656d76">합성 그래프 없음</text>';
   }
-  // wave progress under the canvas
+  // wave progress under the canvas. SIMULATE emits explicit wave-start events; a
+  // LIVE run does NOT (it emits lifecycle-start/-end only) — so when there are no
+  // wave-start events we DERIVE the structure from the lifecycles that actually
+  // started, one row per lifecycle, in start order. Either way the section reflects
+  // live progress and never sits on "대기 중…" once the run has events.
   const waves = {};
+  let derived = false;
   runEvents.forEach(e => { if (e.kind === "wave-start") waves[e.wave] = { kind: e.wave_kind, lcs: e.lifecycles || [] }; });
+  if (!Object.keys(waves).length) {
+    // derive from lifecycle-start (live). Group each started lifecycle as its own
+    // row so a single-lifecycle run shows that one lifecycle with its live state.
+    derived = true;
+    const seen = [];
+    runEvents.forEach(e => { if (e.kind === "lifecycle-start" && !seen.includes(e.lifecycle)) seen.push(e.lifecycle); });
+    // fall back to the known lifecycle set if a wave shows before any start arrives
+    const lcs = seen.length ? seen : Object.keys(st);
+    lcs.forEach((lc, i) => { waves[i] = { kind: (N[lc] && N[lc].lifecycle) || "lifecycle", lcs: [lc], single: true }; });
+  }
   const counts = k => Object.values(st).filter(v => v === k).length;
   const total = Object.keys(st).length || (g ? g.nodes.filter(n => n.is_target).length : 0);
   const waveLines = Object.keys(waves).sort((a, b) => a - b).map(i => {
     const w = waves[i];
     const done = w.lcs.filter(l => st[l] === "done").length;
     const running = w.lcs.some(l => st[l] === "running");
+    const failed = w.lcs.some(l => st[l] === "fail");
     const pct = w.lcs.length ? Math.round(100 * done / w.lcs.length) : 0;
-    return `<div class="kv"><span>${running ? "⏳" : done === w.lcs.length && w.lcs.length ? "✓" : "·"}
-      웨이브 ${i} <span class="muted small">${esc(w.kind || "")} · ${w.lcs.length}개</span></span><b>${done}/${w.lcs.length}</b></div>
+    // for a derived single-lifecycle row, label it with the lifecycle id itself.
+    const label = w.single ? esc(w.lcs[0]) : `웨이브 ${i} <span class="muted small">${esc(w.kind || "")} · ${w.lcs.length}개</span>`;
+    const mark = running ? "⏳" : failed ? "✕" : (done === w.lcs.length && w.lcs.length) ? "✓" : "·";
+    return `<div class="kv"><span>${mark} ${label}</span><b>${done}/${w.lcs.length}</b></div>
       <div class="pbar ${done === w.lcs.length && w.lcs.length ? "done" : ""}"><i style="width:${pct}%"></i></div>`;
   }).join("");
+  const waveHdr = derived ? "라이프사이클 진행 (실행 순서)" : "웨이브 진행 (실행 순서)";
   $("r1-prog").innerHTML = `<div class="kpi">
       <div class="s"><b>${counts("done")}/${total}</b><span>완료</span></div>
       <div class="s"><b style="color:var(--run)">${counts("running")}</b><span>실행중</span></div>
       <div class="s"><b style="color:var(--fail)">${counts("fail")}</b><span>fail</span></div>
       <div class="s"><b>${esc(runStatus)}</b><span>상태</span></div>
     </div>
-    <h3>웨이브 진행 (실행 순서)</h3>${waveLines || '<p class="muted small">웨이브 이벤트 대기 중…</p>'}`;
+    <h3>${waveHdr}</h3>${waveLines || (runEvents.length
+      ? '<p class="muted small">진행 정보 집계 중…</p>'
+      : '<p class="muted small">실행 시작을 기다리는 중…</p>')}`;
 }
 
 // 자원 — per-resource rows (생성·테스트·삭제 + id) from resource-tracked/-deleted.
@@ -799,8 +848,12 @@ function reportR2() {
   };
   const list = order.map(id => rows[id]).filter(Boolean);
   const simLabel = runMode === "simulate" ? ' <span class="muted small">(simulate: 합성 id)</span>' : "";
+  // TYPE = the resource KIND derived from the create/delete PATH (vpc/subnet/port),
+  // NOT the service name — the path is the source of truth for what was actually
+  // created. Fall back to the service short-name only when the path can't be parsed.
+  const rowKind = r => kindFromPath(r.path) || shortName(r.type || "") || "?";
   const body = list.length ? list.map(r => `<tr class="${r.id === cursorId ? "rowact" : ""}">
-      <td>${esc(shortName(r.type || ""))}</td>
+      <td>${esc(rowKind(r))}</td>
       <td><code>${esc(r.id)}</code></td>
       <td>${esc(r.lifecycle)}</td>
       <td class="${r.created ? "tick" : "tickno"}">${r.created ? "✓" : "—"}</td>
@@ -819,20 +872,29 @@ function reportR2() {
       <tbody>${body}</tbody></table>`;
 }
 
-// API — api-first table of step-start/step-end (method+path, 결과, 응답시간)
+// API — api-first table of step-start/step-end (method+path, 결과, 응답시간). Rows
+// are CLICKABLE: an inline detail panel shows the actual 요청 params/body + 응답
+// status/snippet (from the enriched step-end event) AND the endpoint's parameter
+// SCHEMA (from /api/model endpoint_params) marking which params were actually sent
+// — a coverage hint ("what COULD be tested" vs "what WAS").
 function reportR3() {
   const calls = [];
   const open = {};
   runEvents.forEach(e => {
     if (e.kind === "step-start") {
       const k = e.lifecycle + "|" + e.step;
-      open[k] = { lifecycle: e.lifecycle, step: e.step, method: e.method, path: e.path, status: null, category: "run", ms: null };
+      open[k] = { key: k, lifecycle: e.lifecycle, step: e.step, method: e.method, path: e.path,
+                  status: null, category: "run", ms: null, params: null, req_body: null, resp_snippet: null };
       calls.push(open[k]);
     }
     if (e.kind === "step-end") {
       const k = e.lifecycle + "|" + e.step;
-      const c = open[k] || { lifecycle: e.lifecycle, step: e.step, method: e.method, path: e.path };
+      const c = open[k] || { key: k, lifecycle: e.lifecycle, step: e.step, method: e.method, path: e.path };
       c.status = e.status; c.category = e.category; c.ms = e.elapsed_ms;
+      // enriched detail (additive; present only for live runs with the new engine)
+      if (e.params != null) c.params = e.params;
+      if (e.req_body != null) c.req_body = e.req_body;
+      if (e.resp_snippet != null) c.resp_snippet = e.resp_snippet;
       if (!open[k]) calls.push(c);
     }
   });
@@ -843,64 +905,204 @@ function reportR3() {
   const failN = calls.filter(c => c.category === "fail").length;
   const body = Object.keys(byLc).sort().map(lc =>
     `<tr class="lc-head"><td colspan="4">${esc(lc)} <span class="muted small">${byLc[lc].length} api</span></td></tr>` +
-    byLc[lc].map(c => `<tr>
-        <td><span class="mtag ${esc(c.method || "")}">${esc(c.method || "")}</span> <code>${esc(c.path || "")}</code></td>
+    byLc[lc].map(c => {
+      const isOpen = expandedApi === c.key;
+      const row = `<tr class="apirow ${isOpen ? "open" : ""}" data-apik="${esc(c.key)}">
+        <td><span class="caret">${isOpen ? "▾" : "▸"}</span> <span class="mtag ${esc(c.method || "")}">${esc(c.method || "")}</span> <code>${esc(c.path || "")}</code></td>
         <td>${badge(c.category)}</td>
         <td class="muted">${c.status != null ? esc(c.status) : "—"}</td>
         <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run" ? "⏳" : "—")}</td>
-      </tr>`).join("")).join("");
-  $("report-main").innerHTML = `<h2>API <span class="muted small">· 호출 결과 (대상 · 결과 · 응답시간)</span></h2>
+      </tr>`;
+      const detail = isOpen
+        ? `<tr class="apidetail"><td colspan="4">${apiDetailHtml(c)}</td></tr>` : "";
+      return row + detail;
+    }).join("")).join("");
+  $("report-main").innerHTML = `<h2>API <span class="muted small">· 호출 결과 (행 클릭 → 요청·응답·파라미터 스키마)</span></h2>
     <div class="kpi">
       <div class="s"><b>${calls.length}</b><span>api 호출</span></div>
       <div class="s"><b style="color:var(--ok)">${okN}</b><span>ok</span></div>
       <div class="s"><b style="color:var(--soft)">${softN}</b><span>soft</span></div>
       <div class="s"><b style="color:var(--fail)">${failN}</b><span>fail</span></div>
     </div>
-    <div class="scroll" style="max-height:520px;margin-top:8px"><table class="tbl">
+    <div class="scroll" style="max-height:560px;margin-top:8px"><table class="tbl apitbl">
       <thead><tr><th>method · path (대상)</th><th>결과</th><th>status</th><th>응답시간</th></tr></thead>
       <tbody>${body || '<tr><td colspan="4" class="empty">api 이벤트 없음</td></tr>'}</tbody></table></div>`;
+  // row click → toggle the inline detail (collapse if it was already open)
+  els("#report-main .apirow[data-apik]").forEach(row => row.onclick = () => {
+    const k = row.dataset.apik;
+    expandedApi = expandedApi === k ? null : k;
+    reportR3();
+  });
 }
 
-// 로그 — raw run log + cleanup/verify controls
-function reportR4() {
-  $("report-main").innerHTML = `<h2>로그 <span class="muted small">· 실행 로그</span></h2>
-    <div class="run-ctl">
-      <button class="minibtn red" id="btn-cleanup" title="우리(owner)가 만든 자원을 강제 삭제 (reconciler, TTL 무시).">🧹 강제 클린업</button>
-      <button class="minibtn" id="btn-verify" title="삭제 없이 남은 우리 자원 수 확인 (read-only).">🔍 클린업 확인</button>
-      <button class="minibtn" id="btn-reflog">↻ 로그 새로고침</button>
-    </div>
-    <pre class="runlog" id="r4-log">로그 로딩…</pre>`;
-  loadLog();
-  $("btn-reflog").onclick = loadLog;
-  $("btn-cleanup").onclick = () => {
-    if (!confirm("강제 클린업: owner=apitest 가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?")) return;
-    fetch("/api/cleanup", { method: "POST" }).then(r => r.json()).then(j => {
-      if (j.error) { alert(j.error); return; }
-      runId = j.id; runEvents = []; runStatus = "running"; pollLogRun(); drawReport();
-    }).catch(() => alert("서버 연결 실패"));
-  };
-  $("btn-verify").onclick = () => {
-    fetch("/api/verify", { method: "POST" }).then(r => r.json()).then(j => {
-      if (j.error) { alert(j.error); return; }
-      runId = j.id; runEvents = []; runStatus = "running"; pollLogRun(); drawReport();
-    }).catch(() => alert("서버 연결 실패"));
-  };
+// the set of param NAMES this call actually SENT — query params (object keys) +
+// any name that literally appears in the request-body snippet. Used to mark schema
+// params as sent ∈ vs not, so the panel reads as a coverage hint.
+function sentParamNames(c) {
+  const sent = new Set();
+  if (c.params && typeof c.params === "object") Object.keys(c.params).forEach(k => sent.add(k));
+  const body = c.req_body || "";
+  return { has: name => sent.has(name) || (name && body.indexOf('"' + name + '"') >= 0), querySet: sent };
 }
-function loadLog() {
+
+// build the inline detail panel for one api call: actual request/response (event)
+// + the endpoint parameter schema (catalog), marking sent vs not.
+function apiDetailHtml(c) {
+  const sent = sentParamNames(c);
+  // (a) actual request params + body
+  let reqParams = "<span class='muted small'>없음</span>";
+  if (c.params && typeof c.params === "object" && Object.keys(c.params).length) {
+    reqParams = Object.entries(c.params).map(([k, v]) =>
+      `<code>${esc(k)}=${esc(typeof v === "object" ? JSON.stringify(v) : v)}</code>`).join(" ");
+  }
+  const reqBody = c.req_body
+    ? `<pre class="apipre">${esc(c.req_body)}</pre>`
+    : "<span class='muted small'>본문 없음 (GET 또는 빈 바디)</span>";
+  // (b) response status + snippet
+  const respSnip = c.resp_snippet
+    ? `<pre class="apipre">${esc(c.resp_snippet)}</pre>`
+    : "<span class='muted small'>응답 본문 스니펫 없음</span>";
+  const statusLine = c.status != null
+    ? `${badge(c.category)} <b>${esc(c.status)}</b>${c.ms != null ? ` · ${c.ms} ms` : ""}`
+    : `${badge(c.category)} <span class="muted">진행 중…</span>`;
+  // (c) endpoint parameter SCHEMA from the catalog (coverage hint)
+  const schema = endpointParamsFor(c.method, c.path);
+  let schemaHtml;
+  if (!schema) {
+    schemaHtml = "<span class='muted small'>카탈로그에 이 엔드포인트의 파라미터 정의 없음 "
+      + "(또는 simulate 경로 — live 실행에서 채워집니다).</span>";
+  } else {
+    const rows = [];
+    (schema.path_params || []).forEach(p => rows.push(schemaRow(p, "path", sent)));
+    (schema.query_params || []).forEach(p => rows.push(schemaRow(p, "query", sent)));
+    const sentN = rows.filter(r => r.sent).length;
+    const tbody = rows.length
+      ? rows.map(r => r.html).join("")
+      : '<tr><td colspan="4" class="muted small">정의된 path/query 파라미터 없음 (본문 전용 엔드포인트일 수 있음)</td></tr>';
+    schemaHtml = `<div class="muted small" style="margin-bottom:4px">카탈로그 키 <code>${esc(schema.key || "")}</code> · 보낸 파라미터 <b>${sentN}/${rows.length}</b></div>
+      <table class="tbl schematbl"><thead><tr><th>param</th><th>위치</th><th>required</th><th>보냄?</th></tr></thead>
+      <tbody>${tbody}</tbody></table>`;
+  }
+  return `<div class="apidet">
+    <div class="apidet-grid">
+      <div><div class="apidet-h">요청 — params</div>${reqParams}</div>
+      <div><div class="apidet-h">요청 — body</div>${reqBody}</div>
+      <div><div class="apidet-h">응답 — status</div><div>${statusLine}</div></div>
+      <div><div class="apidet-h">응답 — 본문 snippet</div>${respSnip}</div>
+    </div>
+    <div class="apidet-h" style="margin-top:9px">파라미터 스키마 <span class="muted small">· 이 엔드포인트가 받을 수 있는 파라미터 (coverage hint)</span></div>
+    ${schemaHtml}
+  </div>`;
+}
+
+// one schema-param row + whether it was sent (for the sentN tally)
+function schemaRow(p, loc, sent) {
+  const name = p.name || "?";
+  const wasSent = loc === "path" ? true : sent.has(name);    // path params are always supplied
+  const req = p.required ? '<span class="phch created">required</span>' : '<span class="muted small">optional</span>';
+  const mark = wasSent ? '<span class="tick">✓ 보냄</span>' : '<span class="tickno">—</span>';
+  const type = p.type ? ` <span class="muted small">${esc(p.type)}</span>` : "";
+  return { sent: wasSent, html: `<tr>
+    <td><code>${esc(name)}</code>${type}</td>
+    <td class="muted small">${loc}</td>
+    <td>${req}</td>
+    <td>${mark}</td></tr>` };
+}
+
+// endpoint parameter schema lookup: prefer the map shipped with /api/model
+// (endpoint_params, keyed "METHOD norm(path)"); the server also exposes
+// GET /api/endpoint-params for the same data.
+function endpointParamsFor(method, path) {
+  const map = (MODEL && MODEL.endpoint_params) || null;
+  if (!map) return null;
+  const key = (method || "").toUpperCase() + " " + normPathClient(path);
+  return map[key] || null;
+}
+
+// MUST mirror the server's _ep_norm_path / engine._norm_path: strip leading slash
+// + query, collapse {template} segments to '*'.
+function normPathClient(p) {
+  p = (p || "").split("?")[0].replace(/^\/+|\/+$/g, "");
+  return p.split("/").map(s => s.indexOf("{") >= 0 ? "*" : s).join("/");
+}
+
+// 로그 — raw run log + cleanup/verify controls.
+// FLICKER FIX: the panel SHELL is built once (idempotent — only when #r4-log is
+// absent), never on every poll, and the log text is updated IN PLACE only when it
+// actually changed (loadLog diffs against lastLogText). A dedicated SLOW (2s)
+// poller refreshes the log while the run is running so the fast 0.7s event poll
+// never rebuilds this panel. Scroll position is preserved unless the user is at
+// the bottom — so they can read mid-log without being yanked down.
+function reportR4() {
+  const fresh = !$("r4-log");
+  if (fresh) {                   // build the shell ONCE; repeated draws are no-ops
+    lastLogText = null;          // force the first paint after a (re)build
+    $("report-main").innerHTML = `<h2>로그 <span class="muted small">· 실행 로그</span></h2>
+      <div class="run-ctl">
+        <button class="minibtn red" id="btn-cleanup" title="우리(owner)가 만든 자원을 강제 삭제 (reconciler, TTL 무시).">🧹 강제 클린업</button>
+        <button class="minibtn" id="btn-verify" title="삭제 없이 남은 우리 자원 수 확인 (read-only).">🔍 클린업 확인</button>
+        <button class="minibtn" id="btn-reflog">↻ 로그 새로고침</button>
+      </div>
+      <pre class="runlog" id="r4-log">로그 로딩…</pre>`;
+    $("btn-reflog").onclick = () => loadLog(true);   // manual refresh → snap to bottom
+    $("btn-cleanup").onclick = () => {
+      if (!confirm("강제 클린업: owner=apitest 가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?")) return;
+      fetch("/api/cleanup", { method: "POST" }).then(r => r.json()).then(j => {
+        if (j.error) { alert(j.error); return; }
+        runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r4";
+        drawReport(); startR4Poll();
+      }).catch(() => alert("서버 연결 실패"));
+    };
+    $("btn-verify").onclick = () => {
+      fetch("/api/verify", { method: "POST" }).then(r => r.json()).then(j => {
+        if (j.error) { alert(j.error); return; }
+        runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r4";
+        drawReport(); startR4Poll();
+      }).catch(() => alert("서버 연결 실패"));
+    };
+  }
+  // refresh the log only on the initial build or when the run is NOT running
+  // (a finished run needs one load). While running, the dedicated 2s poller owns
+  // refresh — so the 0.7s event poll calling drawReport() does NOT also fetch the
+  // log, keeping the panel quiet (no flicker, no scroll fights).
+  if (fresh || runStatus !== "running") loadLog();
+  if (runStatus === "running") startR4Poll(); else stopR4Poll();
+}
+
+// near-bottom test: within ~24px of the bottom counts as "following the tail".
+function _nearBottom(el) { return el.scrollHeight - el.scrollTop - el.clientHeight < 24; }
+
+// fetch the log and write it IN PLACE only if changed; keep scroll unless the user
+// was at the bottom (or `force` after a manual refresh / fresh build).
+function loadLog(force) {
   if (!runId) return;
   fetch("/api/runs/" + runId).then(r => r.json()).then(j => {
     const pre = $("r4-log"); if (!pre) return;
-    pre.textContent = j.log || "(로그 없음)";
-    pre.scrollTop = pre.scrollHeight;
-  }).catch(() => { const pre = $("r4-log"); if (pre) pre.textContent = "(로그 로드 실패)"; });
+    const txt = j.log || "(로그 없음)";
+    if (txt === lastLogText) return;            // unchanged → don't touch the DOM
+    const follow = force || lastLogText === null || _nearBottom(pre);
+    const keepTop = pre.scrollTop;
+    lastLogText = txt;
+    pre.textContent = txt;
+    pre.scrollTop = follow ? pre.scrollHeight : keepTop;   // stay put unless following
+  }).catch(() => { /* keep last good log on a transient fetch error (no flicker) */ });
 }
-function pollLogRun() {
-  if (!runId) return;
-  fetch("/api/runs/" + runId).then(r => r.json()).then(j => {
-    runStatus = j.status || runStatus;
-    if (screen === "run") { if (reportSub === "r4") loadLog(); loadRunRecords(); }
-    if (j.status === "running") setTimeout(pollLogRun, 1500);
-  }).catch(() => setTimeout(pollLogRun, 2000));
+function startR4Poll() {
+  if (r4LogTimer) return;        // single in-flight poller
+  const tick = () => {
+    r4LogTimer = null;
+    if (screen !== "run" || reportSub !== "r4") return;     // only while visible
+    fetch("/api/runs/" + runId).then(r => r.json()).then(j => {
+      runStatus = j.status || runStatus;
+      loadLog();
+      loadRunRecords();
+      if (runStatus === "running") r4LogTimer = setTimeout(tick, 2000);
+    }).catch(() => { r4LogTimer = setTimeout(tick, 2500); });
+  };
+  r4LogTimer = setTimeout(tick, 2000);
+}
+function stopR4Poll() {
+  if (r4LogTimer) { clearTimeout(r4LogTimer); r4LogTimer = null; }
 }
 
 // ---- run records list ----
