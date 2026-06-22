@@ -11,6 +11,7 @@
   var RUN = DATA.run || {};
   var REC = RUN.record || {};
   var RUN_ID = REC.id || "demo-run";
+  var SUITES = (DATA.suites || []).slice();   // named run-shape presets (Suite ▾)
   var realFetch = window.fetch ? window.fetch.bind(window) : null;
 
   function jsonResponse(obj, status) {
@@ -85,6 +86,20 @@
 
     // ---- GET /api/model ----
     if (path === "/api/model" && method === "GET") return jsonResponse(MODEL);
+
+    // ---- GET /api/suites -> baked presets; POST -> in-memory add (no persistence) ----
+    if (path === "/api/suites" && method === "GET") return jsonResponse({ suites: SUITES });
+    if (path === "/api/suites" && method === "POST") {
+      var sb = {};
+      try { sb = init && init.body ? JSON.parse(init.body) : {}; } catch (e) {}
+      var req = sb.request || {}, gates = {};
+      ["mutations", "destructive", "heavy", "sweep_force", "conformance"]
+        .forEach(function (k) { gates[k] = !!req[k]; });
+      var view = { id: sb.id || "demo", label: sb.label || "", request: req,
+                   gates: gates, scope: sb.scope || {}, builtin: false, _demo: true };
+      SUITES = SUITES.filter(function (s) { return s.id !== view.id; }).concat([view]);
+      return jsonResponse({ suite: view, suites: SUITES }, 201);
+    }
 
     // ---- GET /api/endpoint-params?method=&path= ----
     if (path === "/api/endpoint-params" && method === "GET") {

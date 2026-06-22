@@ -343,5 +343,175 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .lo-ok{color:var(--green);font-weight:700}
 .lo-warn{color:var(--red);font-weight:700}
 
+/* ============================================================================
+ * DAG-at-scale (B2) — group/collapse · focus · minimap · zoom · 그림|표.
+ * Ported from console2/mockups/b2-dag-scale.html, recolored to this Primer theme.
+ * Used by the 구성 composition DAG (#dag-*) and reused on the 흐름 live DAG (#r1-*).
+ * ========================================================================== */
+/* a small inline 그림|표 segmented toggle that sits in the panel <h2> */
+.seg-ctl.mini{margin-left:10px;vertical-align:middle;border-radius:7px}
+.seg-ctl.mini button{padding:4px 11px;font-size:11.5px;font-weight:700}
+
+/* toolbar above the stage: granularity + 전체 접기/펼치기 + note + stat */
+.dag-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:8px 0 6px}
+.tgroup{display:flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+.tgroup button{background:#fff;border:none;border-left:1px solid var(--line);color:var(--muted);
+  padding:5px 11px;cursor:pointer;font-size:11.5px;font-weight:700}
+.tgroup button:first-child{border-left:none}
+.tgroup button.on{background:var(--panel2);color:var(--ink)}
+.gran-note{font-size:11px;color:var(--muted)}
+.statchip{margin-left:auto;font-size:11px;color:var(--muted);background:var(--panel);
+  border:1px solid var(--line);border-radius:13px;padding:3px 11px;font-variant-numeric:tabular-nums}
+.statchip b{color:var(--ink)}
+
+/* the stage = the clipped, pannable canvas (replaces a plain .svgbox for the DAG) */
+.stage-wrap{position:relative;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.stage-wrap.hide{display:none}
+.stage{position:relative;width:100%;height:min(74vh,560px);min-height:440px;overflow:hidden;cursor:grab;
+  background:radial-gradient(circle,#eef1f4 1px,transparent 1px);background-size:26px 26px}
+.stage.grabbing{cursor:grabbing}
+#dag-svg,#r1-svg.scene-svg{position:absolute;top:0;left:0;transform-origin:0 0}
+.stage svg text{fill:var(--ink)}
+
+/* scene node/group/edge states */
+g.rg-unit{cursor:pointer}
+g.rg-unit .nrect{transition:opacity .12s}
+g.rg-unit.dimmed{opacity:.13}
+g.rg-unit .nrect.grp{filter:drop-shadow(0 1px 1px rgba(31,35,40,.06))}
+g.rg-selbox{cursor:pointer}
+.rg-edge{stroke:var(--dep);stroke-width:1.3;fill:none}
+.rg-edge.hot{stroke:var(--accent);stroke-width:2.2}
+.rg-edge.dim{opacity:.08}
+
+/* floating overlays inside the stage */
+.zoomctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:5px;z-index:5}
+.zoomctl button{width:30px;height:30px;border:1px solid var(--line);background:#fff;border-radius:7px;
+  cursor:pointer;font-size:15px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 2px rgba(31,35,40,.12)}
+.zoomctl button:hover{border-color:var(--accent);color:var(--accent)}
+.zoomctl button.fit{font-size:10.5px;font-weight:700}
+.minimap{position:absolute;bottom:10px;right:10px;width:220px;height:144px;border:1px solid var(--line2);
+  border-radius:8px;background:rgba(255,255,255,.92);overflow:hidden;z-index:5;box-shadow:0 2px 6px rgba(31,35,40,.14)}
+.minimap .mmlabel{position:absolute;top:3px;left:6px;font-size:9px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.4px;z-index:2;pointer-events:none}
+.minimap svg{position:absolute;top:0;left:0;width:100%;height:100%}
+.minimap .mmview,#dag-mmview,#r1-mmview{position:absolute;border:2px solid var(--accent);
+  background:rgba(37,99,201,.10);cursor:move;z-index:3}
+.hint-pill{position:absolute;top:10px;left:10px;z-index:5;background:rgba(255,255,255,.94);
+  border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:11px;color:var(--muted);
+  box-shadow:0 1px 2px rgba(31,35,40,.1);max-width:60%}
+.hint-pill b{color:var(--ink)}
+.hint-pill .focusinfo{color:var(--accent);font-weight:600}
+
+/* 표 mode: hide the stage, the order table becomes the primary view */
+#dag-tableview.tab-primary{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:4px;background:#fff}
+.tab-scope{font-size:11.5px;color:var(--muted);margin:2px 0 6px}
+.tab-scope b{color:var(--ink)}
+
+/* ============================================================================
+ * B1 — report master→detail drill-down. 흐름(master) is the persistent B2 scene +
+ * a compact lifecycle list; the DETAIL pane (자원·API·로그) is scoped to one
+ * lifecycle (sticky scope bar pins which) or the 전체 aggregate. Ported from
+ * console2/mockups/b1-report-drilldown.html, recolored to this Primer theme.
+ * ========================================================================== */
+.md-report{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;margin-bottom:8px}
+/* once a detail is shown, split master | detail side-by-side on wide viewports */
+.md-report.has-detail{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
+@media(max-width:1280px){.md-report.has-detail{grid-template-columns:1fr}}
+.md-master,.md-detail{min-width:0}
+.md-master>h2,.md-detail .detail-h{margin-top:0}
+
+/* MASTER: compact lifecycle list + 전체 toggle (escape hatch for a dense graph) */
+.lc-picker{margin-top:12px}
+.lcp-h{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 6px}
+.lclist{display:flex;flex-direction:column;gap:6px}
+.lcitem{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+  border-radius:8px;padding:7px 10px;cursor:pointer}
+.lcitem:hover{border-color:var(--accent)}
+.lcitem.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
+.lcitem .lctop{display:flex;align-items:center;gap:8px}
+.lcitem .st{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:#fff;flex:0 0 auto}
+.lcitem .st.done{background:var(--green)}.lcitem .st.run{background:var(--accent)}
+.lcitem .st.fail{background:var(--red)}.lcitem .st.skip{background:var(--line2)}
+.lcitem .st.queued{background:#fff;border:1.5px solid var(--line2);color:var(--muted)}
+.lcitem .lcname{font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lcitem .lcmeta{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.lcitem .lcsvc{color:var(--muted);font-size:11px}
+.lcitem .pill{border:1px solid var(--line2);border-radius:10px;padding:0 7px;font-size:10px;font-weight:700;
+  color:#3a424b;white-space:nowrap}
+.lcitem .pill.l{background:var(--accent);color:#fff;border-color:var(--accent)}
+.lcitem .pill.soft{border-color:var(--amber);color:var(--amber)}
+.lcitem .pill.fail{border-color:var(--red);color:var(--red)}
+
+.aggitem{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:#fff;
+  border:1px dashed var(--line2);border-radius:8px;padding:8px 11px;margin-top:9px;cursor:pointer}
+.aggitem:hover{border-color:var(--accent)}
+.aggitem.sel{border-style:solid;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
+.aggitem .ico{font-size:15px}
+.aggitem .aggtxt b{font-size:12.5px;display:block}
+.aggitem .sub{color:var(--muted);font-size:11px;margin-left:auto;white-space:nowrap}
+
+/* DETAIL: sticky scope bar pins WHICH lifecycle (the thing flat tabs lose) */
+.md-detail{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 1px 2px rgba(31,35,40,.05);overflow:hidden}
+.scopebar{display:flex;align-items:center;gap:9px;padding:9px 13px;background:#f7faff;
+  border-bottom:1px solid var(--line);font-size:12.5px;position:sticky;top:0;z-index:3;flex-wrap:wrap}
+.scopebar .lbl{color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px}
+.scopebar .cur{font-weight:800;color:#0f3d8a;display:inline-flex;align-items:center;gap:7px}
+.scopebar .cur.agg{color:var(--ink)}
+.scopebar .cur .st{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.scopebar .cur .st.done{background:var(--green)}.scopebar .cur .st.run{background:var(--accent)}
+.scopebar .cur .st.fail{background:var(--red)}.scopebar .cur .st.skip{background:var(--line2)}
+.scopebar .cur .st.queued{background:#fff;border:1.5px solid var(--line2);color:var(--muted)}
+.scopebar .crumb{color:var(--muted);font-size:11.5px}
+.scopebar .clear{margin-left:auto;font-size:11px;color:var(--accent);cursor:pointer;border:1px solid var(--line);
+  background:#fff;border-radius:6px;padding:3px 9px;font-weight:600;white-space:nowrap}
+.scopebar .clear:hover{background:var(--panel2)}
+
+/* detail sub-tabs (자원·API·로그) with a per-tab count chip */
+.detailtabs{gap:2px;padding:8px 12px 0;margin:0;background:var(--panel);border-bottom:1px solid var(--line)}
+.detailtabs button{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);
+  padding:7px 12px;border-radius:6px 6px 0 0}
+.detailtabs button:hover{color:var(--ink);background:#fff}
+.detailtabs button.on{color:var(--accent);border-bottom-color:var(--accent);background:#fff}
+.detailtabs button .n{font-size:10px;background:var(--panel2);border-radius:9px;padding:0 6px;margin-left:5px;
+  color:var(--muted);font-weight:700}
+.detailtabs button.on .n{background:#dbeafe;color:#0f3d8a}
+#detail-body{padding:12px 14px}
+#detail-body .detail-h{font-size:12.5px;margin:0 0 9px;text-transform:none;letter-spacing:0;color:var(--ink)}
+#detail-body .empty{color:var(--muted);font-size:12.5px;padding:22px 8px;text-align:center}
+
+/* the dark structured per-lifecycle log box (scoped 로그) */
+.runlog.logbox{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;line-height:1.6}
+.runlog.logbox .ts{color:#6e7681}
+.runlog.logbox .ok{color:#3fb950}.runlog.logbox .warn{color:#d29922}.runlog.logbox .err{color:#f85149}
+.runlog.logbox .meth{color:#79c0ff}.runlog.logbox .dim{color:#8b949e}
+
 .foot{margin-top:32px;color:var(--muted);font-size:11.5px;border-top:1px solid var(--line);padding-top:13px}
 .hidden{display:none}
+
+/* ===== 스윗 picker (suites/*.yaml · CI 공유) — dropdown in .svc-controls ===== */
+.suitewrap{position:relative}
+#suite-btn.on{border-color:var(--accent);color:var(--accent)}
+.suitemenu{position:absolute;top:calc(100% + 5px);left:0;z-index:40;min-width:268px;max-width:340px;
+  max-height:60vh;overflow:auto;background:#fff;border:1px solid var(--line2);border-radius:8px;
+  box-shadow:0 6px 22px rgba(31,35,40,.16);padding:5px}
+.suitemenu .srow{padding:7px 9px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.suitemenu .srow:hover{background:var(--panel);border-color:var(--line)}
+.suitemenu .sline{display:flex;align-items:center;gap:6px}
+.suitemenu .sname{font-weight:600;font-size:12px;color:var(--ink)}
+.suitemenu .slabel{font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.stag{font-size:9px;padding:1px 5px;border-radius:9px;background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.stag.b{background:rgba(37,99,201,.1);color:var(--accent);border-color:rgba(37,99,201,.3)}
+.sgates{margin-left:auto;display:flex;gap:3px;flex-wrap:wrap}
+.sgate{font-size:9px;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--muted);background:#fff}
+.sgate.g-mutations{color:var(--accent);border-color:rgba(37,99,201,.35)}
+.sgate.g-destructive{color:var(--red);border-color:rgba(207,34,46,.35)}
+.sgate.g-heavy{color:var(--amber);border-color:rgba(181,116,11,.35)}
+.sgate.g-conformance{color:var(--purple);border-color:rgba(130,80,223,.35)}
+.sgate.ro{color:var(--green);border-color:rgba(45,164,78,.35)}
+.suitemenu .ssave{margin-top:4px;border-top:1px solid var(--line);border-radius:0 0 6px 6px;
+  font-size:11px;font-weight:600;color:var(--accent);text-align:center}
+.suitemenu .ssave:hover{background:rgba(37,99,201,.07);border-color:var(--line)}
