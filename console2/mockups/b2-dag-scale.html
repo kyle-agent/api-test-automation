@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B2 — DAG at scale (접기·focus·미니맵) — console2 mockup</title>
+<style>
+/* ===== Light theme (GitHub Primer) — design mockup, throwaway artifact ===== */
+:root{
+  --page:#ffffff; --panel:#f6f8fa; --panel2:#eaeef2; --ink:#1f2328; --muted:#656d76;
+  --line:#d0d7de; --line2:#afb8c1;
+  --accent:#2563c9; --green:#2da44e; --red:#cf222e; --amber:#b5740b; --purple:#8250df;
+  --val:#2da44e; --docs:#b5740b;
+  /* graph fills (mirror resource_graph.js C{}) */
+  --fillPlain:#ffffff; --fillTarget:#e6effd; --fillDep:#f3eefc; --fillShared:#fffaf0;
+  --edge:#8a93a0; --band:#2563c91a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);
+  font:13.5px/1.5 system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace}
+.wrap{max-width:1640px;margin:0 auto;padding:0 18px 50px}
+
+header.top{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding:16px 4px 13px}
+header.top h1{font-size:18px;margin:0}
+header.top .sub{color:var(--muted);font-size:12.5px;max-width:880px;margin-top:3px}
+header.top .sub b{color:var(--ink)}
+.spacer{flex:1}
+.seg-ctl{display:flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;box-shadow:0 1px 2px rgba(31,35,40,.06)}
+.seg-ctl button{background:#fff;border:none;color:var(--muted);padding:8px 15px;cursor:pointer;
+  font-size:12.5px;font-weight:600;border-left:1px solid var(--line)}
+.seg-ctl button:first-child{border-left:none}
+.seg-ctl button.on{background:var(--accent);color:#fff}
+.seg-ctl button .k{font-weight:800;margin-right:5px;opacity:.85}
+
+/* problem banner */
+.prob{margin-top:13px;background:#fff8e6;border:1px solid #f0d9a8;border-left:3px solid var(--amber);
+  border-radius:6px;padding:9px 13px;color:#6b4e0f;font-size:12.5px}
+.prob b{color:#5a3d00}
+.prob .big{font-variant-numeric:tabular-nums;font-weight:700}
+
+/* toolbar */
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:13px}
+.btn{background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:7px;
+  padding:6px 12px;cursor:pointer;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.prim{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.prim:hover{filter:brightness(1.06);color:#fff}
+.tgroup{display:flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+.tgroup button{background:#fff;border:none;border-left:1px solid var(--line);color:var(--muted);
+  padding:6px 11px;cursor:pointer;font-size:12px;font-weight:600}
+.tgroup button:first-child{border-left:none}
+.tgroup button.on{background:var(--panel2);color:var(--ink)}
+.gran-note{font-size:11.5px;color:var(--muted)}
+.search{background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:7px;
+  padding:6px 10px;font-size:12.5px;width:230px}
+.search:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.15)}
+.statchip{margin-left:auto;font-size:11.5px;color:var(--muted);background:var(--panel);
+  border:1px solid var(--line);border-radius:13px;padding:3px 11px;font-variant-numeric:tabular-nums}
+.statchip b{color:var(--ink)}
+
+/* stage */
+.stage-wrap{position:relative;margin-top:12px;border:1px solid var(--line);border-radius:10px;
+  overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(31,35,40,.05)}
+.stage{position:relative;width:100%;height:620px;overflow:hidden;cursor:grab;
+  background:
+    linear-gradient(90deg,transparent 0,transparent calc(100% - 1px),#f1f3f5 100%),
+    radial-gradient(circle, #eef1f4 1px, transparent 1px);
+  background-size:auto, 26px 26px;}
+.stage.grabbing{cursor:grabbing}
+#svg{position:absolute;top:0;left:0;transform-origin:0 0}
+
+/* svg node styles applied inline; helper classes for state */
+g.gnode{cursor:pointer}
+g.gnode .nrect{transition:opacity .12s}
+.dimmed{opacity:.12}
+.edge{stroke:var(--edge);stroke-width:1.3;fill:none}
+.edge.hot{stroke:var(--accent);stroke-width:2.2}
+.edge.dim{opacity:.07}
+
+/* floating overlays inside stage */
+.zoomctl{position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:5px;z-index:5}
+.zoomctl button{width:32px;height:32px;border:1px solid var(--line);background:#fff;border-radius:7px;
+  cursor:pointer;font-size:16px;font-weight:700;color:var(--ink);display:flex;align-items:center;justify-content:center;
+  box-shadow:0 1px 2px rgba(31,35,40,.12)}
+.zoomctl button:hover{border-color:var(--accent);color:var(--accent)}
+.zoomctl button.fit{font-size:11px;font-weight:700}
+
+.minimap{position:absolute;bottom:12px;right:12px;width:230px;height:150px;border:1px solid var(--line2);
+  border-radius:8px;background:rgba(255,255,255,.92);overflow:hidden;z-index:5;box-shadow:0 2px 6px rgba(31,35,40,.14)}
+.minimap .mmlabel{position:absolute;top:3px;left:6px;font-size:9px;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.4px;z-index:2;pointer-events:none}
+#mmsvg{position:absolute;top:0;left:0;width:100%;height:100%}
+#mmview{position:absolute;border:2px solid var(--accent);background:rgba(37,99,201,.10);
+  cursor:move;z-index:3}
+
+.hint-pill{position:absolute;top:12px;left:12px;z-index:5;background:rgba(255,255,255,.94);
+  border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:11.5px;color:var(--muted);
+  box-shadow:0 1px 2px rgba(31,35,40,.1);max-width:330px}
+.hint-pill b{color:var(--ink)}
+.hint-pill .focusinfo{color:var(--accent);font-weight:600}
+
+/* table view */
+.tableview{margin-top:12px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;
+  display:none}
+.tableview.show{display:block}
+.stage-wrap.hide{display:none}
+.tvhdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--panel);
+  border-bottom:1px solid var(--line);font-size:12.5px;font-weight:600}
+.tvhdr .muted{font-weight:400}
+.tvscroll{max-height:600px;overflow:auto}
+table.ord{width:100%;border-collapse:collapse;font-size:12.5px}
+table.ord th{position:sticky;top:0;background:var(--panel);text-align:left;padding:7px 12px;
+  font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);border-bottom:1px solid var(--line);z-index:2}
+table.ord td{padding:6px 12px;border-bottom:1px solid #eef1f4;vertical-align:middle}
+table.ord tr:hover td{background:var(--panel)}
+table.ord .ord-n{font-variant-numeric:tabular-nums;color:var(--muted);width:46px}
+table.ord .lvl{font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:9px;padding:1px 7px}
+.nodedot{width:8px;height:8px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.12);vertical-align:0px;margin-right:6px}
+.catpill{font-size:10.5px;font-weight:600;border:1px solid var(--line2);border-radius:11px;padding:1px 8px;color:#3a424b;white-space:nowrap}
+.svcsub{color:var(--muted);font-size:11.5px}
+.depcell{color:var(--muted);font-size:11px}
+
+/* legend */
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);
+  padding:10px 14px;border-top:1px solid var(--line);background:var(--panel)}
+.legend i{display:inline-block;width:22px;height:13px;border-radius:4px;vertical-align:-2px;margin-right:5px;border:1px solid rgba(0,0,0,.12)}
+.legend .b{display:inline-block;width:0;height:13px;border-left:3px solid;vertical-align:-2px;margin-right:5px}
+
+.foot{margin-top:26px;color:var(--muted);font-size:11.5px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>B2 · DAG at scale — 접기 · focus · 미니맵</h1>
+      <div class="sub">console2 리포트의 흐름 DAG 스케일 전략 목업 (실제 앱 아님 · 정적 데이터). 실제 모델 전체
+        (<b id="hdrRes">275</b> 자원 / <b id="hdrSvc">59</b> 서비스 / <b id="hdrCat">13</b> 카테고리)를
+        내장해 스케일이 진짜로 느껴지게 했습니다.</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="seg-ctl" id="modeToggle">
+      <button data-mode="fig" class="on"><span class="k">▦</span>그림 (DAG)</button>
+      <button data-mode="tab"><span class="k">≣</span>표 (생성 순서)</button>
+    </div>
+  </header>
+
+  <div class="prob">
+    <b>문제:</b> 실제 흐름 DAG는 약 <span class="big">222</span> 라이프사이클 / <span class="big">275</span> 자원을
+    longest-path로 전부 그리면 <b>가로 1마일</b> = 읽기 불가. <b>해결:</b> 기본은 카테고리 단위로 <b>접고</b>,
+    노드를 클릭하면 의존 경로만 남기는 <b>focus</b>, 그리고 <b>미니맵 + zoom-to-fit</b>으로 다룹니다.
+    표 보기는 222노드보다 <b>생성 순서 표</b>가 더 읽기 쉽다는 점을 보여줍니다.
+  </div>
+
+  <div class="toolbar">
+    <div class="tgroup" id="granToggle" title="펼침 단위">
+      <button data-gran="category" class="on">카테고리</button>
+      <button data-gran="service">서비스</button>
+      <button data-gran="resource">전체 펼침</button>
+    </div>
+    <button class="btn" id="collapseAll">⊟ 모두 접기</button>
+    <span class="gran-note" id="granNote"></span>
+    <input class="search" id="search" placeholder="노드 검색 → 하이라이트 (예: mysql, ske, vpc)">
+    <span class="statchip" id="statChip"></span>
+  </div>
+
+  <!-- GRAPH (figure) -->
+  <div class="stage-wrap" id="stageWrap">
+    <div class="stage" id="stage">
+      <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="hint-pill" id="hintPill">
+        <b>접힌 그래프</b> — 그룹 클릭 = 펼치기 · 노드 클릭 = focus(의존 경로만) · 빈 곳 클릭 = 해제 · 드래그 = 이동
+      </div>
+      <div class="zoomctl">
+        <button id="zin" title="확대">+</button>
+        <button id="zout" title="축소">−</button>
+        <button id="zfit" class="fit" title="전체 보기">맞춤</button>
+      </div>
+      <div class="minimap" id="minimap">
+        <span class="mmlabel">미니맵</span>
+        <svg id="mmsvg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div id="mmview"></div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--fillTarget);border-color:var(--accent)"></i>대상(target) ★</span>
+      <span><i style="background:var(--fillDep)"></i>의존(dependent) ↓</span>
+      <span><i style="background:var(--fillShared);border-color:var(--amber)"></i>공유(dedup)</span>
+      <span><span class="b" style="border-color:var(--val)"></span>VALIDATED</span>
+      <span><span class="b" style="border-color:var(--docs)"></span>docs</span>
+      <span>🜂 heavy · ⛔ quota</span>
+      <span>그룹 노드 = <b style="color:var(--ink)">접힘</b> (count badge)</span>
+    </div>
+  </div>
+
+  <!-- TABLE (생성 순서) -->
+  <div class="tableview" id="tableView">
+    <div class="tvhdr">생성 순서 (위상 정렬 · longest-path level)
+      <span class="muted">— 현재 선택: <b id="tvScope">전체 (275 자원)</b></span>
+      <span class="muted" style="margin-left:auto">동일 선택을 그래프 대신 선형 표로. 222노드보다 읽기 쉬움.</span>
+    </div>
+    <div class="tvscroll">
+      <table class="ord">
+        <thead><tr><th>#</th><th>L</th><th>자원</th><th>카테고리 · 서비스</th><th>의존 (생성 선행)</th></tr></thead>
+        <tbody id="ordBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="foot">design mockup · console2/mockups/b2-dag-scale.html · 실제 SCP 모델 전체 내장 · 정적, 실행 없음</div>
+</div>
+
+<script id="model-data" type="application/json">
+[["account-budget","financial-management/budget","financial-management","fm-budget",[],0,null,0,"budget-account-budget"],["account-quota","management/quota","management","mg-quota",[],0,null,1,"quota-reads"],["aimlops-platform","ai-ml/aimlops-platform","ai-ml","ai-ml",["ske-cluster"],1,null,0,"aimlops-platform-release-write-coverage"],["alert","management/servicewatch","management","mg-sw",["sw-metric-catalog"],0,null,0,"servicewatch-alert"],["apigw-access-control","application-service/apigateway","application-service","ap-apigw",["apigw-api","apigw-deployment"],0,null,1,"apigateway-api-write-coverage"],["apigw-api","application-service/apigateway","application-service","ap-apigw",[],0,null,1,"application-apigateway-api-resource"],["apigw-api-key","application-service/apigateway","application-service","ap-apigw",["apigw-api","apigw-usage-plan"],0,null,1,"apigateway-api-write-coverage"],["apigw-auth","application-service/apigateway","application-service","ap-apigw",["apigw-api","apigw-deployment"],0,null,1,"apigateway-api-write-coverage"],["apigw-deployment","application-service/apigateway","application-service","ap-apigw",["apigw-api","apigw-method"],0,null,1,"apigateway-api-write-coverage"],["apigw-method","application-service/apigateway","application-service","ap-apigw",["apigw-api","apigw-resource"],0,null,1,"apigateway-api-write-coverage"],["apigw-privatelink-endpoint","application-service/apigateway","application-service","ap-apigw",["privatelink-service"],0,null,0,"generated__wave5-appsvc"],["apigw-resource","application-service/apigateway","application-service","ap-apigw",["apigw-api","apigw-root-resource"],0,null,1,"application-apigateway-api-resource"],["apigw-root-resource","application-service/apigateway","application-service","ap-apigw",["apigw-api"],0,null,1,"application-apigateway-api-resource"],["apigw-stage","application-service/apigateway","application-service","ap-apigw",["apigw-api","apigw-deployment"],0,null,1,"apigateway-api-write-coverage"],["apigw-usage-plan","application-service/apigateway","application-service","ap-apigw",["apigw-api"],0,null,1,"apigateway-api-write-coverage"],["archive-bucket","storage/archivestorage","storage","st-as",[],0,null,0,"archivestorage-bucket"],["archiving-policy","storage/archivestorage","storage","st-as",[],0,null,0,"archivestorage-archiving-policy"],["asg-notification","compute/virtualserver","compute","cp-vs",["auto-scaling-group"],0,null,0,"vs-autoscaling-coverage"],["asg-policy","compute/virtualserver","compute","cp-vs",["auto-scaling-group"],0,null,0,"vs-autoscaling-coverage"],["asg-schedule","compute/virtualserver","compute","cp-vs",["auto-scaling-group"],0,null,0,"vs-autoscaling-coverage"],["auto-scaling-group","compute/virtualserver","compute","cp-vs",["launch-configuration","security-group","subnet"],0,null,0,"vs-autoscaling-coverage"],["backup-agent","storage/backup","storage","st-backup",["subnet"],1,null,0,"backup-agent"],["backup-manual","storage/backup","storage","st-backup",["backup-policy"],1,null,0,"backup-job"],["backup-policy","storage/backup","storage","st-backup",["backup-target"],1,null,0,"backup-job"],["backup-restore","storage/backup","storage","st-backup",["backup-policy","backup-restore-target","security-group","server-type","subnet"],1,null,0,"backup-job"],["backup-restore-target","storage/backup","storage","st-backup",["backup-manual","backup-policy"],1,null,0,"backup-job"],["backup-target","storage/backup","storage","st-backup",["server"],1,null,0,"backup-job"],["baremetal-server","compute/baremetal","compute","cp-bm",["subnet","vpc"],1,null,0,"baremetal-server-coverage"],["block-volume","compute/virtualserver","compute","cp-vs",[],0,null,1,"compute-virtualserver-volume-snapshot"],["bm-block-volume","storage/baremetal-blockstorage","storage","st-bs",[],1,null,0,"blockstorage-volume"],["bm-group-snapshot","storage/baremetal-blockstorage","storage","st-bs",["bm-volume-group"],0,null,0,"blockstorage-volume-group"],["bm-volume-group","storage/baremetal-blockstorage","storage","st-bs",["bm-block-volume"],1,null,0,"blockstorage-volume-group"],["bm-volume-snapshot","storage/baremetal-blockstorage","storage","st-bs",["bm-block-volume"],0,null,0,"blockstorage-volume"],["cachestore-cluster","database/cachestore","database","db-cache",["subnet"],1,null,1,"heavy-shared-dbaas"],["cdn","networking/cdn","networking","nw-cdn",[],0,null,0,"networking-cdn-service"],["certificate","security/certificatemanager","security","sec-cert",[],0,null,1,"security-certificatemanager-selfsign"],["certificate-import","security/certificatemanager","security","sec-cert",[],0,null,0,"security-certificatemanager-import"],["cloud-ml","ai-ml/cloud-ml","ai-ml","ai-ml",["cloudml-image","container-registry","ske-cluster"],1,null,0,"cloud-ml-write-coverage"],["cloudcontrol-landing-zone","management/cloudcontrol","management","mg-cc",["iam-identity-center"],1,null,0,"cloudcontrol-landing-zone-guarded"],["cloudml-image","ai-ml/cloud-ml","ai-ml","ai-ml",[],0,null,0,"cloud-ml-write-coverage"],["cm-account-resource","management/cloudmonitoring","management","mg-cm",[],0,null,0,null],["cm-addrbook","management/cloudmonitoring","management","mg-cm",[],0,null,0,null],["cm-event","management/cloudmonitoring","management","mg-cm",[],0,null,0,null],["cm-event-policy","management/cloudmonitoring","management","mg-cm",["cm-account-resource"],0,null,0,"cloudmonitoring-event-policy"],["container-registry","container/scr","container","ct-scr",[],0,null,1,"container-scr-registry"],["cost-reads","financial-management/costexplorer","financial-management","fm-cost",[],0,null,1,null],["custom-image","compute/virtualserver","compute","cp-vs",["server"],1,null,1,"compute-virtualserver-full"],["dashboard","management/servicewatch","management","mg-sw",[],0,null,1,"servicewatch-dashboard"],["data-flow","data-analytics/data-flow","data-analytics","da-df",[],1,null,0,"data-flow-service-and-flow-guarded"],["data-flow-service","data-analytics/data-flow","data-analytics","da-df",["data-flow","ske-cluster"],1,null,0,"data-flow-service-and-flow-guarded"],["data-ops","data-analytics/data-ops","data-analytics","da-do",[],1,null,0,"data-ops-service-and-ops-guarded"],["data-ops-service","data-analytics/data-ops","data-analytics","da-do",["data-ops","ske-cluster"],1,null,0,"data-ops-service-and-ops-guarded"],["delegation-policy","management/organization","management","mg-org",["organization"],1,null,0,"org-policy-bindings-and-delegation-guarded"],["devops-service","devops-tools/devopsservice","devops-tools","dt-devops",[],0,null,0,"devopsservice-write-coverage"],["diagnosis","security/configinspection","security","sec-ci",[],0,null,0,"security-configinspection-diagnosis"],["direct-connect","networking/direct-connect","networking","nw-dc",["vpc"],0,null,0,"networking-direct-connect-routing"],["endpoint-subnet","networking/vpc","networking","nw-vpc",["vpc"],0,null,1,"gen-wave5-vpce"],["epas-add-block-storage","database/epas","database","db-epas",["epas-cluster","epas-instance-group"],1,null,0,"epas-cluster-subops-guarded"],["epas-cluster","database/epas","database","db-epas",["epas-engine-version","epas-server-type","subnet"],1,null,1,"heavy-shared-dbaas"],["epas-engine-version","database/epas","database","db-epas",[],0,null,1,"heavy-shared-dbaas"],["epas-engine-version-16","database/epas","database","db-epas",[],0,null,1,null],["epas-instance-group","database/epas","database","db-epas",["epas-cluster"],0,null,0,"epas-cluster-subops-guarded"],["epas-kernel-upgrade","database/epas","database","db-epas",["epas-cluster"],1,null,0,"epas-cluster-subops-guarded"],["epas-log-export-config","database/epas","database","db-epas",["epas-cluster"],0,null,0,"epas-cluster-subops-guarded"],["epas-parameter","database/epas","database","db-epas",["epas-cluster"],0,null,0,"epas-cluster-subops-guarded"],["epas-parameter-group","database/epas","database","db-epas",[],0,null,1,null],["epas-patch","database/epas","database","db-epas",["epas-cluster"],1,null,0,"epas-cluster-subops-guarded"],["epas-promote","database/epas","database","db-epas",["epas-replica","epas-reset-replica"],1,null,1,"epas-cluster-subops-guarded"],["epas-replica","database/epas","database","db-epas",["epas-cluster","epas-server-type"],1,null,1,"epas-cluster-subops-guarded"],["epas-reset-replica","database/epas","database","db-epas",["epas-replica","epas-sync-replica-state"],1,null,1,"epas-cluster-subops-guarded"],["epas-resize-block-storage","database/epas","database","db-epas",["epas-cluster","epas-instance-group"],1,null,0,"epas-cluster-subops-guarded"],["epas-resize-server-type","database/epas","database","db-epas",["epas-cluster","epas-instance-group","epas-server-type"],1,null,0,"epas-cluster-subops-guarded"],["epas-restore","database/epas","database","db-epas",["epas-cluster","epas-server-type"],1,null,0,"epas-cluster-subops-guarded"],["epas-server-type","database/epas","database","db-epas",[],0,null,1,"heavy-shared-dbaas"],["epas-switchover","database/epas","database","db-epas",["epas-cluster"],1,null,0,"epas-cluster-subops-guarded"],["epas-sync-replica-state","database/epas","database","db-epas",["epas-cluster","epas-replica"],1,null,1,"epas-cluster-subops-guarded"],["event-rule","management/servicewatch","management","mg-sw",[],0,null,1,"servicewatch-event-rule"],["eventstreams-cluster","data-analytics/eventstreams","data-analytics","da-es",["subnet"],1,null,0,"eventstreams-cluster-subops-guarded"],["filestorage-volume","storage/filestorage","storage","st-fs",[],0,null,1,"filestorage-volume"],["firewall","networking/firewall","networking","nw-vpc",["internet-gateway"],0,null,1,"networking-firewall-rule"],["firewall-rule","networking/firewall","networking","nw-vpc",["firewall"],0,null,1,"networking-firewall-rule"],["fs-replication","storage/filestorage","storage","st-fs",["filestorage-volume"],0,null,0,"filestorage-replication-schedule"],["fs-snapshot","storage/filestorage","storage","st-fs",["filestorage-volume"],0,null,1,"filestorage-replication-schedule"],["fs-snapshot-schedule","storage/filestorage","storage","st-fs",["filestorage-volume"],0,null,1,"filestorage-replication-schedule"],["gpu-node","compute/multinodegpucluster","compute","cp-gpu",["subnet","vpc"],1,null,0,"mngc-gpu-node-coverage"],["gpu-node-fabric","compute/multinodegpucluster","compute","cp-gpu",[],0,null,1,"mngc-gpu-node-coverage"],["gpu-node-image","compute/multinodegpucluster","compute","cp-gpu",[],0,null,0,"mngc-gpu-node-coverage"],["gpu-node-product","compute/multinodegpucluster","compute","cp-gpu",[],0,null,1,"mngc-gpu-node-coverage"],["gslb","networking/gslb","networking","nw-gslb",[],0,null,0,"networking-gslb-service"],["hosted-zone","networking/dns","networking","nw-dns",["private-dns"],0,null,1,"networking-dns-hosted-zone-private"],["iam-access-key","management/iam","management","mg-iam",[],1,null,0,"iam-credentials-heavy"],["iam-group","management/iam","management","mg-iam",[],0,null,1,"iam-group"],["iam-group-member","management/iam","management","mg-iam",["iam-group"],0,null,0,"iam-group-bindings"],["iam-group-policy-binding","management/iam","management","mg-iam",["iam-group","iam-policy"],0,null,1,"iam-group-bindings"],["iam-identity-center","management/iam-identity-center","management","mg-idc",[],1,null,0,"idc-instance"],["iam-policy","management/iam","management","mg-iam",[],0,null,1,"iam-policy"],["iam-policy-binding-set","management/iam","management","mg-iam",["iam-group","iam-policy"],0,null,1,"iam-policy-extra-writes"],["iam-resource-policy","management/iam","management","mg-iam",[],0,null,0,"iam-resource-policy"],["iam-role","management/iam","management","mg-iam",["iam-policy"],0,null,0,"iam-role-full"],["iam-role-policy-binding","management/iam","management","mg-iam",["iam-policy","iam-role"],0,null,0,"iam-role-full"],["iam-saml-provider","management/iam","management","mg-iam",[],0,null,0,"iam-credentials-heavy"],["iam-user","management/iam","management","mg-iam",[],0,null,0,"iam-credentials-heavy"],["iam-user-policy-binding","management/iam","management","mg-iam",["iam-policy"],0,null,0,"iam-user-policy-bindings"],["idc-account-assignment","management/iam-identity-center","management","mg-idc",["iam-identity-center","idc-permission-set","idc-user"],1,null,0,"idc-account-assignment"],["idc-group","management/iam-identity-center","management","mg-idc",["iam-identity-center"],1,null,0,"idc-group"],["idc-permission-set","management/iam-identity-center","management","mg-idc",["iam-identity-center"],1,null,0,"idc-permission-set"],["idc-user","management/iam-identity-center","management","mg-idc",["iam-identity-center"],1,null,0,"idc-user"],["image","compute/virtualserver","compute","cp-vs",[],0,null,1,"compute-virtualserver-full"],["image-registration","compute/virtualserver","compute","cp-vs",[],0,null,0,"vs-image-write-coverage"],["internet-gateway","networking/vpc","networking","nw-vpc",["vpc"],0,null,1,"networking-vpc-internet-gateway"],["keypair","compute/virtualserver","compute","cp-vs",[],0,null,1,"virtualserver-keypair"],["kms-key","security/kms","security","sec-kms",[],0,null,1,"security-kms-key"],["kubernetes-version","container/ske","container","ct-ske",[],0,null,1,"container-ske-cluster-nodepool"],["launch-configuration","compute/virtualserver","compute","cp-vs",["image","keypair","server-type"],0,null,1,"vs-autoscaling-coverage"],["lb-health-check","networking/loadbalancer","networking","nw-lb",["subnet","vpc"],0,null,1,"heavy-shared-networking"],["lb-listener","networking/loadbalancer","networking","nw-lb",["lb-server-group","load-balancer"],0,null,1,"heavy-shared-networking"],["lb-member","networking/loadbalancer","networking","nw-lb",["lb-server-group"],0,null,0,"networking-loadbalancer-members-nat"],["lb-member-bulk","networking/loadbalancer","networking","nw-lb",["lb-server-group"],0,null,0,"networking-loadbalancer-members-nat"],["lb-server-group","networking/loadbalancer","networking","nw-lb",["lb-health-check","subnet","vpc"],0,null,1,"heavy-shared-networking"],["lb-static-nat","networking/loadbalancer","networking","nw-lb",["internet-gateway","load-balancer","public-ip"],0,null,0,"networking-loadbalancer-members-nat"],["load-balancer","networking/loadbalancer","networking","nw-lb",["subnet","vpc"],1,null,1,"heavy-shared-networking"],["log-group","management/servicewatch","management","mg-sw",[],0,null,1,"servicewatch-loggroup-logstream"],["log-stream","management/servicewatch","management","mg-sw",["log-group"],0,null,1,"servicewatch-loggroup-logstream"],["mariadb-add-block-storage","database/mariadb","database","db-mariadb",["mariadb-cluster","mariadb-instance-group"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-cluster","database/mariadb","database","db-mariadb",["mariadb-engine-version","mariadb-server-type","subnet"],1,null,1,"heavy-shared-dbaas"],["mariadb-engine-version","database/mariadb","database","db-mariadb",[],0,null,1,"heavy-shared-dbaas"],["mariadb-engine-version-10","database/mariadb","database","db-mariadb",[],0,null,1,null],["mariadb-instance-group","database/mariadb","database","db-mariadb",["mariadb-cluster"],0,null,1,"mariadb-cluster-subops-guarded"],["mariadb-kernel-upgrade","database/mariadb","database","db-mariadb",["mariadb-cluster"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-log-export-config","database/mariadb","database","db-mariadb",["mariadb-cluster"],0,null,0,"mariadb-cluster-subops-guarded"],["mariadb-parameter","database/mariadb","database","db-mariadb",["mariadb-cluster"],0,null,1,"mariadb-cluster-subops-guarded"],["mariadb-parameter-group","database/mariadb","database","db-mariadb",[],0,null,1,null],["mariadb-patch","database/mariadb","database","db-mariadb",["mariadb-cluster"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-promote","database/mariadb","database","db-mariadb",["mariadb-replica","mariadb-reset-replica"],1,null,1,"mariadb-cluster-subops-guarded"],["mariadb-replica","database/mariadb","database","db-mariadb",["mariadb-cluster","mariadb-server-type"],1,null,1,"mariadb-cluster-subops-guarded"],["mariadb-reset-replica","database/mariadb","database","db-mariadb",["mariadb-replica","mariadb-sync-replica-state"],1,null,1,"mariadb-cluster-subops-guarded"],["mariadb-resize-block-storage","database/mariadb","database","db-mariadb",["mariadb-cluster","mariadb-instance-group"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-resize-server-type","database/mariadb","database","db-mariadb",["mariadb-cluster","mariadb-instance-group","mariadb-server-type"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-restart","database/mariadb","database","db-mariadb",["mariadb-cluster","mariadb-start"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-restore","database/mariadb","database","db-mariadb",["mariadb-cluster","mariadb-server-type"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-server-type","database/mariadb","database","db-mariadb",[],0,null,1,"heavy-shared-dbaas"],["mariadb-start","database/mariadb","database","db-mariadb",["mariadb-cluster","mariadb-stop"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-stop","database/mariadb","database","db-mariadb",["mariadb-cluster"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-switchover","database/mariadb","database","db-mariadb",["mariadb-cluster"],1,null,0,"mariadb-cluster-subops-guarded"],["mariadb-sync-replica-state","database/mariadb","database","db-mariadb",["mariadb-cluster","mariadb-replica"],1,null,1,"mariadb-cluster-subops-guarded"],["mysql-add-block-storage","database/mysql","database","db-mysql",["mysql-cluster","mysql-instance-group"],1,null,0,"mysql-cluster-subops-guarded"],["mysql-cluster","database/mysql","database","db-mysql",["mysql-engine-version","mysql-server-type","subnet"],1,null,1,"database-mysql-cluster"],["mysql-engine-version","database/mysql","database","db-mysql",[],0,null,1,"database-mysql-cluster"],["mysql-engine-version-8","database/mysql","database","db-mysql",[],0,null,1,null],["mysql-instance-group","database/mysql","database","db-mysql",["mysql-cluster"],0,null,1,"mysql-cluster-subops-guarded"],["mysql-kernel-upgrade","database/mysql","database","db-mysql",["mysql-cluster"],1,null,0,"mysql-cluster-subops-guarded"],["mysql-log-export-config","database/mysql","database","db-mysql",["mysql-cluster"],0,null,0,"mysql-cluster-subops-guarded"],["mysql-parameter","database/mysql","database","db-mysql",["mysql-cluster"],0,null,1,"database-mysql-cluster"],["mysql-parameter-group","database/mysql","database","db-mysql",[],0,null,1,"database-mysql-cluster"],["mysql-patch","database/mysql","database","db-mysql",["mysql-cluster"],1,null,0,"mysql-cluster-subops-guarded"],["mysql-promote","database/mysql","database","db-mysql",["mysql-replica","mysql-reset-replica"],1,null,1,"mysql-cluster-subops-guarded"],["mysql-replica","database/mysql","database","db-mysql",["mysql-cluster","mysql-server-type"],1,null,1,"mysql-cluster-subops-guarded"],["mysql-reset-replica","database/mysql","database","db-mysql",["mysql-replica","mysql-sync-replica-state"],1,null,1,"mysql-cluster-subops-guarded"],["mysql-resize-block-storage","database/mysql","database","db-mysql",["mysql-cluster","mysql-instance-group"],1,null,0,"postgresql-cluster-subops-guarded"],["mysql-resize-server-type","database/mysql","database","db-mysql",["mysql-cluster","mysql-instance-group","mysql-server-type"],1,null,0,"postgresql-cluster-subops-guarded"],["mysql-restart","database/mysql","database","db-mysql",["mysql-cluster","mysql-start"],1,null,0,"database-mysql-cluster"],["mysql-restore","database/mysql","database","db-mysql",["mysql-cluster","mysql-server-type"],1,null,0,"mysql-cluster-subops-guarded"],["mysql-server-type","database/mysql","database","db-mysql",[],0,null,1,"database-mysql-cluster"],["mysql-start","database/mysql","database","db-mysql",["mysql-cluster","mysql-stop"],1,null,0,null],["mysql-stop","database/mysql","database","db-mysql",["mysql-cluster"],1,null,0,null],["mysql-switchover","database/mysql","database","db-mysql",["mysql-cluster"],1,null,0,"mysql-cluster-subops-guarded"],["mysql-sync-replica-state","database/mysql","database","db-mysql",["mysql-cluster","mysql-replica"],1,null,1,"mysql-cluster-subops-guarded"],["nat-gateway","networking/vpc","networking","nw-vpc",["public-ip","subnet"],0,null,1,"heavy-shared-networking"],["network-logging-storage","management/network-logging","management","mg-nl",[],0,null,1,"network-logging-storage"],["org-invitation","management/organization","management","mg-org",["organization"],1,null,0,"org-invitations-guarded"],["organization","management/organization","management","mg-org",[],1,null,0,"org-organizations-guarded"],["organization-account","management/organization","management","mg-org",["organization"],1,null,0,"org-accounts-guarded"],["organization-unit","management/organization","management","mg-org",["organization"],1,null,0,"org-units-guarded"],["pfs-snapshot","storage/parallel-filestorage","storage","st-pfs",["pfs-volume"],0,null,0,"parallel-filestorage-capacity-restore"],["pfs-volume","storage/parallel-filestorage","storage","st-pfs",[],1,null,0,"parallel-filestorage-capacity-restore"],["pg-add-block-storage","database/postgresql","database","db-postgresql",["pg-instance-group","postgresql-cluster"],1,null,0,"postgresql-cluster-subops-guarded"],["pg-engine-version","database/postgresql","database","db-postgresql",[],0,null,1,"database-postgresql-cluster"],["pg-engine-version-16","database/postgresql","database","db-postgresql",[],0,null,1,null],["pg-instance-group","database/postgresql","database","db-postgresql",["postgresql-cluster"],0,null,1,"postgresql-cluster-subops-guarded"],["pg-kernel-upgrade","database/postgresql","database","db-postgresql",["postgresql-cluster"],1,null,0,"postgresql-cluster-subops-guarded"],["pg-log-export-config","database/postgresql","database","db-postgresql",["postgresql-cluster"],0,null,0,"postgresql-cluster-subops-guarded"],["pg-parameter","database/postgresql","database","db-postgresql",["postgresql-cluster"],0,null,0,"database-postgresql-cluster"],["pg-parameter-group","database/postgresql","database","db-postgresql",[],0,null,1,"database-postgresql-cluster"],["pg-patch","database/postgresql","database","db-postgresql",["postgresql-cluster"],1,null,0,"postgresql-cluster-subops-guarded"],["pg-promote","database/postgresql","database","db-postgresql",["pg-replica","pg-reset-replica"],1,null,1,"postgresql-cluster-subops-guarded"],["pg-replica","database/postgresql","database","db-postgresql",["pg-server-type","postgresql-cluster"],1,null,1,"postgresql-cluster-subops-guarded"],["pg-reset-replica","database/postgresql","database","db-postgresql",["pg-replica","pg-sync-replica-state"],1,null,1,"postgresql-cluster-subops-guarded"],["pg-resize-block-storage","database/postgresql","database","db-postgresql",["pg-instance-group","postgresql-cluster"],1,null,0,"postgresql-cluster-subops-guarded"],["pg-resize-server-type","database/postgresql","database","db-postgresql",["pg-instance-group","pg-server-type","postgresql-cluster"],1,null,0,"postgresql-cluster-subops-guarded"],["pg-restore","database/postgresql","database","db-postgresql",["pg-server-type","postgresql-cluster"],1,null,0,"postgresql-cluster-subops-guarded"],["pg-server-type","database/postgresql","database","db-postgresql",[],0,null,1,"database-postgresql-cluster"],["pg-switchover","database/postgresql","database","db-postgresql",["postgresql-cluster"],1,null,0,"postgresql-cluster-subops-guarded"],["pg-sync-replica-state","database/postgresql","database","db-postgresql",["pg-replica","postgresql-cluster"],1,null,1,"postgresql-cluster-subops-guarded"],["planned-compute","financial-management/billingplan","financial-management","fm-billing",[],1,null,0,"billingplan-planned-computes-guarded"],["port","networking/vpc","networking","nw-vpc",["subnet"],0,null,1,"networking-vpc-subnet"],["postgresql-cluster","database/postgresql","database","db-postgresql",["pg-engine-version","pg-server-type","subnet"],1,null,1,"database-postgresql-cluster"],["pricing-reads","financial-management/pricing","financial-management","fm-pricing",[],0,null,1,null],["private-dns","networking/dns","networking","nw-dns",[],1,"private-dns",1,"networking-dns-hosted-zone-private"],["private-nat","networking/vpc","networking","nw-vpc",["direct-connect","tgw-vpc-connection"],0,null,0,"gen-wave5-privnat"],["privatelink-service","networking/vpc","networking","nw-vpc",["subnet"],0,null,0,"generated__wave5-appsvc"],["product","platform/product","platform","pf-product",[],0,null,1,null],["product-category","platform/product","platform","pf-product",[],0,null,1,null],["public-ip","networking/vpc","networking","nw-vpc",[],0,null,1,"networking-vpc-publicip"],["queue","application-service/queueservice","application-service","ap-queue",[],0,null,1,"application-queueservice-queue"],["queue-fifo","application-service/queueservice","application-service","ap-queue",[],0,null,1,"application-queueservice-queue"],["quick-query","data-analytics/quick-query","data-analytics","da-qq",["filestorage-volume","security-group","subnet","vpc"],1,null,0,"quick-query-lifecycle-guarded"],["quick-query-image-versions","data-analytics/quick-query","data-analytics","da-qq",[],0,null,1,null],["quick-query-list","data-analytics/quick-query","data-analytics","da-qq",[],0,null,1,null],["quick-query-update-description","data-analytics/quick-query","data-analytics","da-qq",["quick-query"],0,null,0,"quick-query-lifecycle-guarded"],["quick-query-validate","data-analytics/quick-query","data-analytics","da-qq",[],0,null,0,"quick-query-lifecycle-guarded"],["quota-request","management/quota","management","mg-quota",[],0,null,1,"quota-reads"],["resource-group","management/resourcemanager","management","mg-rm",[],0,null,1,"resourcemanager-resource-group"],["resource-group-bulk","management/resourcemanager","management","mg-rm",[],0,null,1,"resourcemanager-resource-group"],["scf-apigateway-trigger","compute/scf","compute","cp-scf",["apigw-api","apigw-deployment","scf-function"],0,null,1,"generated__wave5-appsvc"],["scf-cronjob-trigger","compute/scf","compute","cp-scf",["scf-function"],0,null,1,"compute-scf-cloud-function-cronjob-trigger"],["scf-function","compute/scf","compute","cp-scf",[],0,null,1,"compute-scf-cloud-function-cronjob-trigger"],["scf-privatelink-endpoint","compute/scf","compute","cp-scf",["privatelink-service","scf-function"],0,null,0,"generated__wave5-appsvc"],["scr-image","container/scr","container","ct-scr",["scr-repository"],0,null,0,"scr-image-write-coverage"],["scr-repository","container/scr","container","ct-scr",["container-registry"],0,null,1,"container-scr-registry"],["scr-tag","container/scr","container","ct-scr",["scr-image"],0,null,0,"scr-tags-write-coverage"],["searchengine-cluster","data-analytics/searchengine","data-analytics","da-se",["subnet"],1,null,0,"searchengine-cluster-subops-guarded"],["secret","security/secretsmanager","security","sec-sm",["kms-key"],0,null,1,"security-secretsmanager-secret"],["secretvault-vault","security/secretvault","security","sec-sv",[],0,null,0,"security-secretvault-vault"],["security-group","networking/security-group","networking","nw-sg",[],0,null,1,"networking-security-group"],["security-group-rule","networking/security-group","networking","nw-sg",["security-group"],0,null,1,"networking-security-group"],["server","compute/virtualserver","compute","cp-vs",["image","keypair","security-group","server-type","subnet"],1,null,1,"compute-virtualserver-full"],["server-group","compute/virtualserver","compute","cp-vs",[],0,null,1,"compute-virtualserver-full"],["server-interface","compute/virtualserver","compute","cp-vs",["port","server"],0,null,1,"compute-virtualserver-full"],["server-static-nat","compute/virtualserver","compute","cp-vs",["internet-gateway","port","public-ip","server","server-interface"],0,null,1,"vs-server-action-coverage"],["server-type","compute/virtualserver","compute","cp-vs",[],0,null,1,"compute-virtualserver-full"],["service-control-policy","management/organization","management","mg-org",["organization"],1,null,0,"org-service-control-policies-guarded"],["ske-cluster","container/ske","container","ct-ske",["filestorage-volume","keypair","kubernetes-version","security-group","subnet","vpc"],1,null,1,"container-ske-cluster-nodepool"],["ske-cluster-upgrade","container/ske","container","ct-ske",["ske-cluster"],1,null,1,"ske-upgrade-write-coverage"],["ske-image","container/ske","container","ct-ske",[],0,null,1,"container-ske-cluster-nodepool"],["ske-nodepool","container/ske","container","ct-ske",["kubernetes-version","server-type","ske-cluster"],1,null,1,"container-ske-cluster-nodepool"],["ske-nodepool-upgrade","container/ske","container","ct-ske",["ske-cluster-upgrade","ske-nodepool"],1,null,1,"ske-upgrade-write-coverage"],["sqlserver-cluster","database/sqlserver","database","db-sqlserver",["ss-engine-version","ss-server-type","subnet"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-add-block-storage","database/sqlserver","database","db-sqlserver",["sqlserver-cluster","ss-instance-group"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-add-secondary","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-databases","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-engine-version","database/sqlserver","database","db-sqlserver",[],0,null,1,"sqlserver-read-coverage"],["ss-instance-group","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],0,null,0,"sqlserver-cluster-subops-guarded"],["ss-parameter","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],0,null,0,"sqlserver-cluster-subops-guarded"],["ss-parameter-group","database/sqlserver","database","db-sqlserver",[],0,null,1,null],["ss-patch","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-resize-block-storage","database/sqlserver","database","db-sqlserver",["sqlserver-cluster","ss-instance-group"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-resize-server-type","database/sqlserver","database","db-sqlserver",["sqlserver-cluster","ss-instance-group","ss-server-type"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-restart","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-restore","database/sqlserver","database","db-sqlserver",["sqlserver-cluster","ss-server-type"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-server-type","database/sqlserver","database","db-sqlserver",[],0,null,1,null],["ss-set-audit-log","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-set-backup","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-set-maintenance","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-switchover","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["ss-sync-state","database/sqlserver","database","db-sqlserver",["sqlserver-cluster"],1,null,0,"sqlserver-cluster-subops-guarded"],["sts-token","platform/sts","platform","pf-sts",[],0,null,0,"sts-token-issuance-coverage"],["subnet","networking/vpc","networking","nw-vpc",["vpc"],0,null,1,"networking-vpc-subnet"],["support-inquiry","management/support","management","mg-support",[],0,null,1,"support-reads"],["support-service-request","management/support","management","mg-support",[],0,null,1,"support-reads"],["sw-custom-log-collect","management/servicewatch","management","mg-sw",["log-stream"],0,null,1,"servicewatch-custom-ingest"],["sw-custom-metric-meta","management/servicewatch","management","mg-sw",[],0,null,1,"servicewatch-custom-ingest"],["sw-metric-catalog","management/servicewatch","management","mg-sw",[],0,null,1,null],["tgw-vpc-connection","networking/vpc","networking","nw-vpc",["transit-gateway","vpc"],0,null,0,"gen-wave5-privnat"],["trail","management/loggingaudit","management","mg-la",[],0,null,0,"loggingaudit-trail"],["transit-gateway","networking/vpc","networking","nw-vpc",[],0,null,1,"heavy-shared-networking"],["vertica-cluster","data-analytics/vertica","data-analytics","da-vt",["subnet"],1,null,0,"vertica-cluster-subops-guarded"],["volume-attachment","compute/virtualserver","compute","cp-vs",["block-volume","server"],1,null,0,"compute-virtualserver-full"],["volume-snapshot","compute/virtualserver","compute","cp-vs",["block-volume"],0,null,1,"compute-virtualserver-volume-snapshot"],["volume-transfer","compute/virtualserver","compute","cp-vs",["block-volume"],0,null,1,"vs-volume-transfer-coverage"],["volume-type","compute/virtualserver","compute","cp-vs",[],0,null,0,"vs-volume-transfer-coverage"],["vpc","networking/vpc","networking","nw-vpc",[],0,"vpc",1,"networking-vpc-subnet"],["vpc-endpoint","networking/vpc","networking","nw-vpc",["endpoint-subnet","filestorage-volume","vpc"],0,null,0,"gen-wave5-vpce"],["vpc-peering","networking/vpc","networking","nw-vpc",["vpc"],0,null,1,"vpc-peering"],["vpn-gateway","networking/vpn","networking","nw-vpn",["public-ip","vpc"],1,null,0,"networking-vpn-gateway-tunnel"],["vpn-tunnel","networking/vpn","networking","nw-vpn",["vpn-gateway"],1,null,0,"networking-vpn-gateway-tunnel"]]
+</script>
+<script>
+/* ============================================================
+   B2 — DAG-at-scale interactive mockup
+   Real model embedded (275 resources / 59 services / 13 categories).
+   Node row = [id, service, category, group, [deps], heavy, quota, prov(1=VALIDATED), lifecycle]
+   ============================================================ */
+"use strict";
+var RAW = JSON.parse(document.getElementById("model-data").textContent);
+var NODES = {};                 // id -> node obj
+var IDS = [];
+RAW.forEach(function(r){
+  var n = {id:r[0], service:r[1], category:r[2], group:r[3], deps:r[4]||[],
+           heavy:!!r[5], quota:r[6]||null, prov:r[7]?"val":"docs", lc:r[8]||null};
+  NODES[n.id]=n; IDS.push(n.id);
+});
+// keep only deps that exist (defensive; data already filtered)
+IDS.forEach(function(id){ NODES[id].deps = NODES[id].deps.filter(function(d){return NODES[d];}); });
+
+/* ----- palette (mirror resource_graph.js) ----- */
+var C = {fillPlain:"#ffffff", fillTarget:"#e6effd", fillDep:"#f3eefc", fillShared:"#fffaf0",
+  text:"#1f2328", sub:"#656d76", target:"#2563c9", shared:"#b5740b", dependent:"#8250df",
+  val:"#2da44e", docs:"#b5740b", edge:"#8a93a0", band:"#2563c91a"};
+function provColor(p){ return p==="val"?C.val:C.docs; }
+
+/* category metadata: stable display order + Korean-ish short labels.
+   Order roughly = a sensible left-to-right creation grouping (foundation first). */
+var CAT_ORDER = ["networking","security","management","storage","compute","container",
+  "database","data-analytics","ai-ml","application-service","platform","financial-management","devops-tools"];
+var CAT_LABEL = {
+  "networking":"네트워킹","security":"보안","management":"관리","storage":"스토리지","compute":"컴퓨트",
+  "container":"컨테이너","database":"데이터베이스","data-analytics":"데이터분석","ai-ml":"AI/ML",
+  "application-service":"앱서비스","platform":"플랫폼","financial-management":"비용관리","devops-tools":"DevOps"};
+
+/* ----- derived: per-category services + resource counts ----- */
+var CAT = {};   // cat -> {svcs:Set, res:[ids], group? }
+CAT_ORDER.forEach(function(c){ CAT[c]={svcs:{}, res:[]}; });
+IDS.forEach(function(id){
+  var n=NODES[id];
+  if(!CAT[n.category]) CAT[n.category]={svcs:{},res:[]};
+  CAT[n.category].svcs[n.service]=true;
+  CAT[n.category].res.push(id);
+});
+// services that actually exist, grouped by category, sorted
+var SVC = {};   // service -> [ids]
+IDS.forEach(function(id){ var n=NODES[id]; (SVC[n.service]=SVC[n.service]||[]).push(id); });
+
+/* ============================================================
+   Longest-path level for any node (over the FULL resource graph).
+   Used for both the resource layout and to position collapsed groups.
+   ============================================================ */
+var _depthMemo={};
+function depth(id){
+  if(_depthMemo[id]!=null) return _depthMemo[id];
+  _depthMemo[id]=0; // cycle guard
+  var m=0; (NODES[id].deps||[]).forEach(function(d){ if(NODES[d]) m=Math.max(m, depth(d)+1); });
+  return _depthMemo[id]=m;
+}
+IDS.forEach(depth);
+var MAXDEPTH = Math.max.apply(null, IDS.map(depth));
+
+/* ancestors / descendants over the full resource graph (for focus + table scope) */
+function ancestors(id, acc){ acc=acc||{}; (NODES[id].deps||[]).forEach(function(d){ if(NODES[d]&&!acc[d]){acc[d]=true; ancestors(d,acc);} }); return acc; }
+var _childIndex=null;
+function childIndex(){
+  if(_childIndex) return _childIndex;
+  _childIndex={}; IDS.forEach(function(id){ (NODES[id].deps||[]).forEach(function(d){ (_childIndex[d]=_childIndex[d]||[]).push(id); }); });
+  return _childIndex;
+}
+function descendants(id, acc){ acc=acc||{}; (childIndex()[id]||[]).forEach(function(c){ if(!acc[c]){acc[c]=true; descendants(c,acc);} }); return acc; }
+
+/* ============================================================
+   VIEW MODEL: a set of "render units" depending on granularity +
+   which groups are expanded. A unit is either a collapsed group
+   (category or service) or an individual resource node.
+   ============================================================ */
+var GRAN = "category";          // category | service | resource
+var EXPANDED = {};              // unitKey -> true  (groups the user expanded)
+
+function groupKeyForCat(cat){ return "cat:"+cat; }
+function groupKeyForSvc(svc){ return "svc:"+svc; }
+
+/* Build the list of visible units given GRAN + EXPANDED.
+   - category gran: one unit per category, unless expanded -> its services
+       (and an expanded service -> its resources).
+   - service gran:  one unit per service, unless expanded -> its resources.
+   - resource gran: every resource is its own unit. */
+function buildUnits(){
+  var units=[];          // {key,kind:'cat'|'svc'|'res', id|cat|svc, members:[ids], level}
+  var byId={};
+  function addRes(id){
+    var u={key:"res:"+id, kind:"res", res:id, members:[id], level:depth(id), node:NODES[id]};
+    units.push(u); byId[u.key]=u;
+  }
+  function addSvc(svc){
+    if(EXPANDED[groupKeyForSvc(svc)]){ SVC[svc].slice().sort().forEach(addRes); return; }
+    var mem=SVC[svc].slice();
+    var lv=Math.min.apply(null,mem.map(depth));
+    var u={key:groupKeyForSvc(svc), kind:"svc", svc:svc, members:mem,
+           level:lv, cat:NODES[mem[0]].category};
+    units.push(u); byId[u.key]=u;
+  }
+  if(GRAN==="resource"){
+    IDS.slice().sort(function(a,b){return depth(a)-depth(b)||a.localeCompare(b);}).forEach(addRes);
+  } else if(GRAN==="service"){
+    Object.keys(SVC).sort().forEach(function(svc){
+      if(EXPANDED[groupKeyForSvc(svc)]) SVC[svc].slice().sort().forEach(addRes);
+      else addSvc(svc);
+    });
+  } else { // category
+    CAT_ORDER.forEach(function(cat){
+      if(!CAT[cat]||!CAT[cat].res.length) return;
+      if(EXPANDED[groupKeyForCat(cat)]){
+        // expand category -> its services (each may itself be expanded -> resources)
+        Object.keys(CAT[cat].svcs).sort().forEach(addSvc);
+      } else {
+        var mem=CAT[cat].res.slice();
+        var lv=Math.min.apply(null,mem.map(depth));
+        var u={key:groupKeyForCat(cat), kind:"cat", cat:cat, members:mem, level:lv};
+        units.push(u); byId[u.key]=u;
+      }
+    });
+  }
+  return {units:units, byId:byId};
+}
+
+/* A unit's level = min member depth, but to keep edges left->right we also
+   rank groups so a group sits to the LEFT of any group that depends on it.
+   We compute a unit-level by longest-path over the unit dependency graph. */
+function unitGraph(units){
+  // map resource id -> unit key
+  var ofRes={};
+  units.forEach(function(u){ u.members.forEach(function(id){ ofRes[id]=u.key; }); });
+  // edges between units (resource dep crossing unit boundary), dedup
+  var eset={}, edges=[];
+  units.forEach(function(u){
+    u.members.forEach(function(id){
+      (NODES[id].deps||[]).forEach(function(d){
+        var from=ofRes[d], to=u.key;
+        if(from && to && from!==to){
+          var k=from+">"+to; if(!eset[k]){eset[k]=1; edges.push({from:from,to:to});}
+        }
+      });
+    });
+  });
+  // longest-path level over unit graph
+  var succ={}, pred={};
+  edges.forEach(function(e){ (succ[e.from]=succ[e.from]||[]).push(e.to); (pred[e.to]=pred[e.to]||[]).push(e.from); });
+  var memo={};
+  function ulvl(k){
+    if(memo[k]!=null) return memo[k];
+    memo[k]=0;
+    (pred[k]||[]).forEach(function(p){ memo[k]=Math.max(memo[k], ulvl(p)+1); });
+    return memo[k];
+  }
+  units.forEach(function(u){ u.ulevel=ulvl(u.key); });
+  return {edges:edges, ofRes:ofRes};
+}
+
+/* transitive reduction of the unit edge set (clean edges, like resource_graph.js) */
+function transitiveReduction(edges){
+  var succ={};
+  edges.forEach(function(e){ (succ[e.from]=succ[e.from]||[]).push(e.to); });
+  function reach(u,t,sf,st){
+    var stack=[u],seen={}; seen[u]=1;
+    while(stack.length){ var x=stack.pop();
+      var ys=succ[x]||[];
+      for(var i=0;i<ys.length;i++){ var y=ys[i];
+        if(x===sf&&y===st) continue;
+        if(y===t) return true;
+        if(!seen[y]){seen[y]=1; stack.push(y);}
+      }
+    } return false;
+  }
+  var seen={},uniq=[];
+  edges.forEach(function(e){ var k=e.from+" "+e.to; if(!seen[k]){seen[k]=1; uniq.push(e);} });
+  return uniq.filter(function(e){ return e.from===e.to || !reach(e.from,e.to,e.from,e.to); });
+}
+
+/* ============================================================
+   LAYOUT — column per ulevel, rows within a column.
+   Group nodes are taller; resource nodes the standard 168x44.
+   ============================================================ */
+var LAYOUT={pos:{}, w:0, h:0, edges:[]};
+function computeLayout(){
+  var b=buildUnits();
+  var ug=unitGraph(b.units);
+  var edges=transitiveReduction(ug.edges);
+  var colGap=212, rowGap=58, padX=34, padY=30;
+  var byLvl={};
+  b.units.forEach(function(u){ (byLvl[u.ulevel]=byLvl[u.ulevel]||[]).push(u); });
+  var maxL=Math.max.apply(null,b.units.map(function(u){return u.ulevel;}));
+  var pos={}, maxRows=0;
+  for(var l=0;l<=maxL;l++){
+    var col=(byLvl[l]||[]).sort(function(a,b){
+      var ca=(a.cat||a.cat||""), cb=(b.cat||"");
+      // sort within column by category order then key for stability
+      var oa=CAT_ORDER.indexOf(catOf(a)), ob=CAT_ORDER.indexOf(catOf(b));
+      return (oa-ob) || (a.key<b.key?-1:1);
+    });
+    maxRows=Math.max(maxRows,col.length);
+    col.forEach(function(u,i){
+      var w = (u.kind==="res")?168:182;
+      var h = (u.kind==="res")?44:52;
+      pos[u.key]={u:u, x:padX+l*colGap, y:padY+i*rowGap, w:w, h:h};
+    });
+  }
+  var w=padX*2+maxL*colGap+186;
+  var h=padY*2+Math.max(1,maxRows)*rowGap;
+  LAYOUT={pos:pos, w:w, h:h, edges:edges, units:b.units, byId:b.byId, ofRes:ug.ofRes};
+}
+function catOf(u){ return u.cat || (u.res?NODES[u.res].category:"") || ""; }
+
+/* ============================================================
+   RENDER SVG
+   ============================================================ */
+var SVG=document.getElementById("svg");
+var FOCUS=null;          // focused unit key (or null)
+var FOCUSSET=null;       // {unitKey:true} of in-path units when focused
+var SEARCHQ="";
+
+function esc(s){ return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
+function unitFill(u){
+  if(u.kind==="res"){
+    var n=u.node;
+    if(n.id===TARGET_ROOT) return C.fillTarget;
+    return C.fillPlain;
+  }
+  return C.fillPlain;
+}
+function unitStroke(u){
+  if(u.kind==="res"){
+    var n=u.node;
+    if(n.id===TARGET_ROOT) return C.target;
+    return provColor(n.prov);
+  }
+  // group node stroke uses category accent (neutral but distinct)
+  return "#3a424b";
+}
+/* a pretend "target root" just so ★ styling shows on the graph (the resource the
+   user is conceptually inspecting). Purely visual. */
+var TARGET_ROOT="server";
+
+/* compute which units are "in focus path" when a unit is focused.
+   For a resource unit: ancestors+descendants (resource graph) mapped to their units.
+   For a group unit: union over its members. */
+function computeFocusSet(key){
+  var u=LAYOUT.byId[key]; if(!u) return null;
+  var resSet={};
+  u.members.forEach(function(id){
+    resSet[id]=true;
+    var a=ancestors(id); Object.keys(a).forEach(function(x){resSet[x]=true;});
+    var d=descendants(id); Object.keys(d).forEach(function(x){resSet[x]=true;});
+  });
+  // map resource ids -> visible unit keys
+  var set={}; set[key]=true;
+  LAYOUT.units.forEach(function(v){
+    if(v.members.some(function(id){return resSet[id];})) set[v.key]=true;
+  });
+  return set;
+}
+
+function render(){
+  computeLayout();
+  SVG.setAttribute("viewBox","0 0 "+LAYOUT.w+" "+LAYOUT.h);
+  SVG.setAttribute("width",LAYOUT.w); SVG.setAttribute("height",LAYOUT.h);
+  var pos=LAYOUT.pos;
+  var s='<defs><marker id="rg-ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="'+C.edge+'"/></marker>'+
+        '<marker id="rg-ar-hot" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L8,3 L0,6 z" fill="'+C.target+'"/></marker></defs>';
+
+  // level bands
+  var lvls={}; LAYOUT.units.forEach(function(u){ lvls[u.ulevel]=true; });
+  Object.keys(lvls).map(Number).sort(function(a,b){return a-b;}).forEach(function(l){
+    var any=LAYOUT.units.find(function(u){return u.ulevel===l;});
+    if(!any) return;
+    var x=pos[any.key].x-15;
+    s+='<rect x="'+x+'" y="0" width="200" height="'+LAYOUT.h+'" fill="'+C.band+'"/>'+
+       '<text x="'+(x+7)+'" y="15" font-size="10" font-weight="700" fill="'+C.sub+'">L'+l+'</text>';
+  });
+
+  var inFocus = FOCUSSET;
+  // edges
+  LAYOUT.edges.forEach(function(e){
+    var a=pos[e.from], b=pos[e.to]; if(!a||!b) return;
+    var x1=a.x+a.w, y1=a.y+a.h/2, x2=b.x, y2=b.y+b.h/2;
+    var cls="edge";
+    if(inFocus){
+      if(inFocus[e.from]&&inFocus[e.to]) cls="edge hot";
+      else cls="edge dim";
+    }
+    var mk = (cls==="edge hot")?"url(#rg-ar-hot)":"url(#rg-ar)";
+    s+='<path class="'+cls+'" d="M'+x1+','+y1+' C'+(x1+48)+','+y1+' '+(x2-48)+','+y2+' '+x2+','+y2+'" marker-end="'+mk+'"/>';
+  });
+
+  // nodes
+  LAYOUT.units.forEach(function(u){
+    var p=pos[u.key];
+    var dim = inFocus && !inFocus[u.key];
+    var hit = SEARCHQ && unitMatches(u,SEARCHQ);
+    var fill=unitFill(u), stroke=unitStroke(u);
+    var sw = (u.kind==="res") ? (u.node.id===TARGET_ROOT?2.6:1.6) : 2.0;
+    var g='<g class="gnode'+(dim?" dimmed":"")+'" data-key="'+esc(u.key)+'" style="cursor:pointer">';
+    if(u.kind==="res"){
+      var n=u.node;
+      g+='<rect class="nrect" x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="'+p.h+'" rx="8" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"'+(hit?' stroke="'+C.amber+'"':'')+'/>';
+      if(hit) g+='<rect x="'+(p.x-2)+'" y="'+(p.y-2)+'" width="'+(p.w+4)+'" height="'+(p.h+4)+'" rx="9" fill="none" stroke="'+C.amber+'" stroke-width="2.4"/>';
+      g+='<text x="'+(p.x+9)+'" y="'+(p.y+18)+'" font-size="12.5" font-weight="700" fill="'+C.text+'">'+(n.heavy?"🜂 ":"")+esc(n.id)+'</text>';
+      g+='<text x="'+(p.x+9)+'" y="'+(p.y+34)+'" font-size="10" fill="'+C.sub+'">'+esc(n.service.split("/").pop())+(n.quota?" ⛔":"")+'</text>';
+      if(n.id===TARGET_ROOT) g+='<text x="'+(p.x+p.w-8)+'" y="'+(p.y+17)+'" font-size="12" text-anchor="end" fill="'+stroke+'">★</text>';
+    } else {
+      // collapsed group: count badge "<label> · N svc / M res"
+      var nm = (u.kind==="cat") ? (CAT_LABEL[u.cat]||u.cat) : u.svc.split("/").pop();
+      var nsvc = (u.kind==="cat") ? Object.keys(CAT[u.cat].svcs).length : 1;
+      var nres = u.members.length;
+      var heavyN = u.members.filter(function(id){return NODES[id].heavy;}).length;
+      var catAccent = catColor(u.cat||catOf(u));
+      g+='<rect class="nrect" x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="'+p.h+'" rx="9" fill="#fbfcfd" stroke="'+stroke+'" stroke-width="'+sw+'"/>';
+      // left category color stripe
+      g+='<rect x="'+p.x+'" y="'+p.y+'" width="5" height="'+p.h+'" rx="2" fill="'+catAccent+'"/>';
+      if(hit) g+='<rect x="'+(p.x-2)+'" y="'+(p.y-2)+'" width="'+(p.w+4)+'" height="'+(p.h+4)+'" rx="10" fill="none" stroke="'+C.amber+'" stroke-width="2.4"/>';
+      g+='<text x="'+(p.x+12)+'" y="'+(p.y+20)+'" font-size="12.5" font-weight="800" fill="'+C.text+'">'+(u.kind==="cat"?"▸ ":"▸ ")+esc(nm)+'</text>';
+      var badge = (u.kind==="cat") ? (nsvc+" svc / "+nres+" res") : (nres+" res");
+      g+='<text x="'+(p.x+12)+'" y="'+(p.y+37)+'" font-size="10" fill="'+C.sub+'">'+esc(badge)+(heavyN?"  · 🜂"+heavyN:"")+'</text>';
+      // count chip on the right
+      g+='<rect x="'+(p.x+p.w-34)+'" y="'+(p.y+8)+'" width="26" height="17" rx="8.5" fill="'+catAccent+'22" stroke="'+catAccent+'" stroke-width="1"/>';
+      g+='<text x="'+(p.x+p.w-21)+'" y="'+(p.y+20)+'" font-size="10" font-weight="700" text-anchor="middle" fill="'+catAccent+'">'+nres+'</text>';
+    }
+    g+='</g>';
+    s+=g;
+  });
+  SVG.innerHTML=s;
+  SVG.querySelectorAll("g.gnode").forEach(function(g){
+    g.addEventListener("click", function(ev){ ev.stopPropagation(); onUnitClick(g.dataset.key); });
+  });
+  renderMinimap();
+  updateHint();
+  updateStat();
+}
+
+/* category accent colors (distinct, muted) for group stripes/chips */
+var CAT_COLOR={
+  "networking":"#2563c9","security":"#cf222e","management":"#8250df","storage":"#0a7ea3",
+  "compute":"#1a7f37","container":"#9a6700","database":"#bc4c00","data-analytics":"#6e40c9",
+  "ai-ml":"#bf3989","application-service":"#0969da","platform":"#656d76","financial-management":"#b5740b","devops-tools":"#1f883d"};
+function catColor(c){ return CAT_COLOR[c]||"#656d76"; }
+
+function unitMatches(u,q){
+  q=q.toLowerCase();
+  if(u.kind==="res") return u.res.toLowerCase().indexOf(q)>=0 || (u.node.service||"").toLowerCase().indexOf(q)>=0;
+  if(u.kind==="svc") return u.svc.toLowerCase().indexOf(q)>=0 || u.members.some(function(id){return id.toLowerCase().indexOf(q)>=0;});
+  return (u.cat.toLowerCase().indexOf(q)>=0) || (CAT_LABEL[u.cat]||"").indexOf(q)>=0 || u.members.some(function(id){return id.toLowerCase().indexOf(q)>=0;});
+}
+
+/* ----- interaction: click a unit ----- */
+function onUnitClick(key){
+  var u=LAYOUT.byId[key]; if(!u) return;
+  // While focused, clicking a node OUTSIDE the path = clear focus (intuitive "escape").
+  if(FOCUS && FOCUSSET && !FOCUSSET[key]){ FOCUS=null; FOCUSSET=null; render(); return; }
+  if(u.kind==="cat"){
+    // expand the category
+    EXPANDED[key]=true; FOCUS=null; FOCUSSET=null; render(); zoomToFit(true); return;
+  }
+  if(u.kind==="svc"){
+    EXPANDED[key]=true; FOCUS=null; FOCUSSET=null; render(); zoomToFit(true); return;
+  }
+  // resource node -> toggle focus (fade non-path)
+  if(FOCUS===key){ FOCUS=null; FOCUSSET=null; }
+  else { FOCUS=key; FOCUSSET=computeFocusSet(key); }
+  render();
+}
+
+/* collapse everything back to current granularity baseline */
+function collapseAll(){ EXPANDED={}; FOCUS=null; FOCUSSET=null; render(); zoomToFit(true); }
+
+/* ============================================================
+   ZOOM + PAN  (transform on #svg; stage clips)
+   ============================================================ */
+var stage=document.getElementById("stage");
+var T={x:0,y:0,k:1};
+function applyT(){ SVG.style.transform="translate("+T.x+"px,"+T.y+"px) scale("+T.k+")"; updateMinimapView(); }
+function clampK(k){ return Math.max(0.12, Math.min(2.4,k)); }
+function zoomAt(cx,cy,factor){
+  var nk=clampK(T.k*factor);
+  var r=nk/T.k;
+  T.x = cx - (cx-T.x)*r;
+  T.y = cy - (cy-T.y)*r;
+  T.k = nk; applyT();
+}
+function zoomToFit(animate){
+  var sw=stage.clientWidth, sh=stage.clientHeight;
+  var pad=36;
+  var k=Math.min((sw-pad*2)/LAYOUT.w,(sh-pad*2)/LAYOUT.h);
+  k=clampK(k);
+  T.k=k;
+  T.x=(sw-LAYOUT.w*k)/2;
+  T.y=(sh-LAYOUT.h*k)/2;
+  if(T.y<pad) T.y=pad;
+  applyT();
+}
+document.getElementById("zin").onclick=function(){ zoomAt(stage.clientWidth/2,stage.clientHeight/2,1.25); };
+document.getElementById("zout").onclick=function(){ zoomAt(stage.clientWidth/2,stage.clientHeight/2,0.8); };
+document.getElementById("zfit").onclick=function(){ zoomToFit(true); };
+
+stage.addEventListener("wheel", function(e){
+  e.preventDefault();
+  var rect=stage.getBoundingClientRect();
+  zoomAt(e.clientX-rect.left, e.clientY-rect.top, e.deltaY<0?1.12:0.89);
+}, {passive:false});
+
+var drag=null;
+stage.addEventListener("mousedown", function(e){
+  if(e.target.closest(".minimap")||e.target.closest(".zoomctl")) return;
+  drag={x:e.clientX,y:e.clientY,tx:T.x,ty:T.y,moved:false};
+  stage.classList.add("grabbing");
+});
+window.addEventListener("mousemove", function(e){
+  if(!drag) return;
+  T.x=drag.tx+(e.clientX-drag.x); T.y=drag.ty+(e.clientY-drag.y);
+  if(Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>3) drag.moved=true;
+  applyT();
+});
+window.addEventListener("mouseup", function(e){
+  if(drag){
+    if(!drag.moved && !e.target.closest("g.gnode")){ // click empty space clears focus
+      if(FOCUS){ FOCUS=null; FOCUSSET=null; render(); }
+    }
+    drag=null; stage.classList.remove("grabbing");
+  }
+});
+
+/* ============================================================
+   MINIMAP — re-render the whole graph small; show viewport rect.
+   ============================================================ */
+var MM=document.getElementById("mmsvg");
+var MMVIEW=document.getElementById("mmview");
+function renderMinimap(){
+  MM.setAttribute("viewBox","0 0 "+LAYOUT.w+" "+LAYOUT.h);
+  var s="";
+  LAYOUT.units.forEach(function(u){
+    var p=LAYOUT.pos[u.key];
+    var col = (u.kind==="res") ? (u.node.id===TARGET_ROOT?C.target:provColor(u.node.prov)) : catColor(u.cat||catOf(u));
+    var fill = (u.kind==="res") ? "#cdd5de" : catColor(u.cat||catOf(u));
+    s+='<rect x="'+p.x+'" y="'+p.y+'" width="'+p.w+'" height="'+p.h+'" rx="5" fill="'+fill+'" opacity="'+(u.kind==="res"?0.55:0.85)+'"/>';
+  });
+  MM.innerHTML=s;
+  updateMinimapView();
+}
+function updateMinimapView(){
+  // viewport in graph coords: stage rect mapped through inverse transform
+  var sw=stage.clientWidth, sh=stage.clientHeight;
+  var vx=(-T.x)/T.k, vy=(-T.y)/T.k, vw=sw/T.k, vh=sh/T.k;
+  // minimap pixel scale
+  var mmw=MM.clientWidth||230, mmh=MM.clientHeight||150;
+  var sx=mmw/LAYOUT.w, sy=mmh/LAYOUT.h;
+  MMVIEW.style.left=(vx*sx)+"px";
+  MMVIEW.style.top=(vy*sy)+"px";
+  MMVIEW.style.width=Math.max(8,vw*sx)+"px";
+  MMVIEW.style.height=Math.max(8,vh*sy)+"px";
+}
+/* drag the minimap viewport to pan */
+var mmDrag=null;
+MMVIEW.addEventListener("mousedown", function(e){ e.stopPropagation(); mmDrag={x:e.clientX,y:e.clientY,tx:T.x,ty:T.y}; });
+document.getElementById("minimap").addEventListener("mousedown", function(e){
+  if(e.target===MMVIEW) return;
+  // click on minimap = recenter
+  var rect=MM.getBoundingClientRect();
+  var sx=(MM.clientWidth)/LAYOUT.w, sy=(MM.clientHeight)/LAYOUT.h;
+  var gx=(e.clientX-rect.left)/sx, gy=(e.clientY-rect.top)/sy;
+  T.x = stage.clientWidth/2 - gx*T.k;
+  T.y = stage.clientHeight/2 - gy*T.k;
+  applyT();
+  e.stopPropagation();
+});
+window.addEventListener("mousemove", function(e){
+  if(!mmDrag) return;
+  var mmw=MM.clientWidth||230;
+  var sx=mmw/LAYOUT.w, sy=(MM.clientHeight||150)/LAYOUT.h;
+  var dx=(e.clientX-mmDrag.x)/sx, dy=(e.clientY-mmDrag.y)/sy;
+  T.x=mmDrag.tx-dx*T.k; T.y=mmDrag.ty-dy*T.k; applyT();
+});
+window.addEventListener("mouseup", function(){ mmDrag=null; });
+
+/* ============================================================
+   HINT + STAT + granularity controls
+   ============================================================ */
+function updateHint(){
+  var hp=document.getElementById("hintPill");
+  if(FOCUS){
+    var u=LAYOUT.byId[FOCUS];
+    var nm = u? (u.kind==="res"?u.res:(u.kind==="cat"?(CAT_LABEL[u.cat]||u.cat):u.svc.split("/").pop())) : "";
+    var nPath=FOCUSSET?Object.keys(FOCUSSET).length:0;
+    hp.innerHTML='<span class="focusinfo">focus: '+esc(nm)+'</span> — 의존 경로 '+nPath+' 단위만 강조 · 빈 곳 클릭 = 해제';
+  } else {
+    var nExp=Object.keys(EXPANDED).length;
+    hp.innerHTML='<b>'+(nExp?nExp+'개 그룹 펼침':'접힌 그래프')+'</b> — 그룹 클릭 = 펼치기 · 노드 클릭 = focus · 빈 곳 = 해제 · 드래그 = 이동';
+  }
+}
+function updateStat(){
+  var nUnits=LAYOUT.units.length;
+  var nGroups=LAYOUT.units.filter(function(u){return u.kind!=="res";}).length;
+  var nRes=LAYOUT.units.filter(function(u){return u.kind==="res";}).length;
+  document.getElementById("statChip").innerHTML=
+    '표시 단위 <b>'+nUnits+'</b> (그룹 '+nGroups+' · 자원 '+nRes+') / 전체 275 자원 · L0–L'+
+    Math.max.apply(null,LAYOUT.units.map(function(u){return u.ulevel;}))+
+    ' · 줌 <b>'+Math.round(T.k*100)+'%</b>';
+  // granularity note
+  var note=document.getElementById("granNote");
+  if(GRAN==="category") note.textContent="기본: 13개 카테고리 노드로 접음 (275 → 13). 그룹 클릭으로 펼침.";
+  else if(GRAN==="service") note.textContent="59개 서비스 노드로 접음 (275 → 59).";
+  else note.textContent="275개 자원 전부 = 실제 \"가로 1마일\". 미니맵·focus 없이는 읽기 어려움.";
+}
+document.getElementById("granToggle").addEventListener("click", function(e){
+  var b=e.target.closest("button"); if(!b) return;
+  GRAN=b.getAttribute("data-gran");
+  Array.prototype.forEach.call(this.children,function(x){x.classList.toggle("on",x===b);});
+  EXPANDED={}; FOCUS=null; FOCUSSET=null;
+  render(); zoomToFit(true);
+});
+document.getElementById("collapseAll").onclick=collapseAll;
+document.getElementById("search").addEventListener("input", function(e){
+  SEARCHQ=e.target.value.trim(); render();
+  // pan to first hit
+  if(SEARCHQ){
+    var hit=LAYOUT.units.find(function(u){return unitMatches(u,SEARCHQ);});
+    if(hit){ var p=LAYOUT.pos[hit.key];
+      T.x=stage.clientWidth/2-(p.x+p.w/2)*T.k; T.y=stage.clientHeight/2-(p.y+p.h/2)*T.k; applyT(); }
+  }
+});
+
+/* ============================================================
+   TABLE VIEW (생성 순서) — same selection, linear order.
+   Scope = the focused unit's closure if focused, else everything visible.
+   ============================================================ */
+function renderTable(){
+  // which resources are in scope?
+  var scopeIds, scopeLabel;
+  if(FOCUS && FOCUSSET){
+    var idset={};
+    LAYOUT.units.forEach(function(u){ if(FOCUSSET[u.key]) u.members.forEach(function(id){idset[id]=true;}); });
+    scopeIds=Object.keys(idset);
+    var fu=LAYOUT.byId[FOCUS];
+    scopeLabel="focus: "+(fu.kind==="res"?fu.res:(fu.kind==="cat"?(CAT_LABEL[fu.cat]||fu.cat):fu.svc))+" 경로 ("+scopeIds.length+" 자원)";
+  } else {
+    scopeIds=IDS.slice();
+    scopeLabel="전체 ("+scopeIds.length+" 자원)";
+  }
+  scopeIds.sort(function(a,b){return depth(a)-depth(b)||NODES[a].category.localeCompare(NODES[b].category)||a.localeCompare(b);});
+  document.getElementById("tvScope").textContent=scopeLabel;
+  var rows=scopeIds.map(function(id,i){
+    var n=NODES[id];
+    var deps=(n.deps||[]).slice(0,6).join(", ")+((n.deps||[]).length>6?" …":"");
+    return '<tr>'+
+      '<td class="ord-n">'+(i+1)+'</td>'+
+      '<td><span class="lvl">L'+depth(id)+'</span></td>'+
+      '<td><span class="nodedot" style="background:'+provColor(n.prov)+'"></span><b>'+(n.heavy?"🜂 ":"")+esc(id)+'</b>'+(n.quota?' <span class="catpill" style="border-color:var(--amber);color:var(--amber)">⛔ '+esc(n.quota)+'</span>':'')+'</td>'+
+      '<td><span class="catpill" style="border-color:'+catColor(n.category)+';color:'+catColor(n.category)+'">'+esc(CAT_LABEL[n.category]||n.category)+'</span> <span class="svcsub">'+esc(n.service.split("/").pop())+'</span></td>'+
+      '<td class="depcell">'+(deps||"—")+'</td>'+
+    '</tr>';
+  }).join("");
+  document.getElementById("ordBody").innerHTML=rows;
+}
+
+/* ============================================================
+   FIG | TAB mode toggle
+   ============================================================ */
+var VIEWMODE="fig";
+document.getElementById("modeToggle").addEventListener("click", function(e){
+  var b=e.target.closest("button"); if(!b) return;
+  VIEWMODE=b.getAttribute("data-mode");
+  Array.prototype.forEach.call(this.children,function(x){x.classList.toggle("on",x===b);});
+  var fig=VIEWMODE==="fig";
+  document.getElementById("stageWrap").classList.toggle("hide",!fig);
+  document.getElementById("tableView").classList.toggle("show",!fig);
+  if(!fig) renderTable();
+  else { zoomToFit(true); }
+});
+
+/* ============================================================
+   INIT
+   ============================================================ */
+document.getElementById("hdrRes").textContent=IDS.length;
+document.getElementById("hdrSvc").textContent=Object.keys(SVC).length;
+document.getElementById("hdrCat").textContent=CAT_ORDER.filter(function(c){return CAT[c]&&CAT[c].res.length;}).length;
+render();
+zoomToFit(false);
+window.addEventListener("resize", function(){ updateMinimapView(); });
+</script>
+</body>
+</html>
