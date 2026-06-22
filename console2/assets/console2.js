@@ -1,9 +1,10 @@
 /* console2 — single-page execution console (LIGHT theme).
- * IA (locked): ① 구성 — category sections + COMPACT service cards (click = select
- * whole service; "리소스…" → modal for specific resources) drive a LIVE composition
- * DAG (composer.graph_view via /api/graph) + a 생성/검증/삭제 순서표. ② 실행 & 리포트 —
- * the existing run (simulate | live) + event-driven report (R1 진행 / R2 리소스 /
- * R3 API / R4 로그), re-themed light, with the ① selection carried into the launch.
+ * IA (locked): ① 구성 — a COMPACT collapsible category→service MENU-TREE on the
+ * LEFT (click a service row = select whole service; "리소스…" → modal for specific
+ * resources) driving a LARGE LIVE composition DAG on the RIGHT (composer.graph_view
+ * via /api/graph) + a 생성/검증/삭제 순서표. ② 실행 & 리포트 — the run (simulate | live)
+ * + event-driven report (흐름 진행 / 자원 / API / 로그); the run screen leads with a
+ * 남은 자원(잔존) pre-flight panel. The ① selection is carried into the launch.
  *
  * Vocabulary (locked concept model): category → service → resource → api.
  *   selection (resource/service) pulls its dependency CLOSURE (auto-ordered) ·
@@ -24,6 +25,8 @@ let screen = "build";       // build | run
 let lastGraph = null;       // last /api/graph response (composition DAG)
 let graphTimer = null;      // debounce for /api/graph
 let modalSvc = null;        // service short id whose resource modal is open
+let collapsed = null;       // Set of collapsed category names (menu-tree). null = not yet initialised
+let ownedScan = null;       // last /api/owned result {status, owned, owned_total} for the run-screen panel
 
 // run/report state
 let runId = null;
@@ -116,10 +119,23 @@ function ctxBar() {
 
 // ================= ① 구성 =================
 function drawBuild() {
-  drawSvcGrid();
+  initCollapse();
+  drawSvcTree();
   refreshGraph();           // fetch /api/graph for the current selection
-  $("sel-search").oninput = drawSvcGrid;
+  $("sel-search").oninput = drawSvcTree;
   $("sel-all").onclick = toggleAll;
+}
+
+// categories start COLLAPSED except ones that already carry a selection. Computed
+// once per session (first build render) so the user's manual toggles stick after.
+function initCollapse() {
+  if (collapsed) return;
+  collapsed = new Set();
+  const cats = categoryMap();
+  Object.keys(cats).forEach(cat => {
+    const hasSel = cats[cat].some(s => svcState(s) !== "off" && svcState(s) !== "none");
+    if (!hasSel) collapsed.add(cat);
+  });
 }
 
 // selection helpers --------------------------------------------------------
@@ -145,7 +161,7 @@ function toggleAll() {
   selectionChanged();
 }
 
-// the controls/readout + count (selected services, resources, closure)
+// the selection readout: 선택: N 서비스 · M 리소스 · 폐포 K (+ heavy flag)
 function selReadout() {
   const svcs = new Set([...targets].map(id => N[id].service));
   const K = lastGraph ? lastGraph.nodes.length : "…";
@@ -160,8 +176,11 @@ function selReadout() {
   if (btn) { btn.classList.toggle("on", !!allOn); btn.textContent = allOn ? "전체 해제" : "전체 선택"; }
 }
 
-// category sections + compact service cards (picker) -----------------------
-function drawSvcGrid() {
+// COMPACT collapsible category→service MENU-TREE (picker). One fixed-height row
+// per category (▸/▾ + 카테고리 전체 토글 + count) and, when expanded, one fixed-
+// height row per service (click = toggle whole service; "리소스…" → modal). Menu
+// density — NOT cards. A search filter auto-expands matching categories.
+function drawSvcTree() {
   const q = ($("sel-search").value || "").toLowerCase();
   const cats = categoryMap();
   let h = "";
@@ -171,48 +190,66 @@ function drawSvcGrid() {
     const selectableSvcs = svcs.filter(s => svcSelectable(s).length);
     const onCount = selectableSvcs.filter(s => svcState(s) !== "off").length;
     const catAllOn = selectableSvcs.length && selectableSvcs.every(s => svcState(s) === "on");
-    h += `<div class="catsec"><div class="catsec-h">
-        <span class="csn">${esc(cat)}</span>
-        <button class="csbtn ${catAllOn ? "on" : ""}" data-cat="${esc(cat)}" ${selectableSvcs.length ? "" : "disabled"}>${catAllOn ? "✓ 카테고리 선택" : "카테고리 선택"}</button>
-        <span class="cscount">선택 <b>${onCount}</b>/총 ${svcs.length} svc</span>
-      </div><div class="svcgrid">`;
-    svcs.forEach(svc => {
-      const sel = svcSelectable(svc);
-      const all = svcNodes(svc);
-      const st = svcState(svc);
-      const heavy = all.some(id => N[id].heavy);
-      const quota = all.some(id => N[id].quota);
-      const onN = sel.filter(id => targets.has(id)).length;
-      const cls = st === "on" ? "on" : st === "partial" ? "partial" : "";
-      const fracTxt = st === "partial" ? `${onN}/${sel.length} 리소스` : `${sel.length} 리소스`;
-      h += `<div class="svc-cell"><div class="svc ${cls}" data-svc="${esc(svc)}" title="${esc(svc)} — 클릭하면 서비스 전체(생애주기 보유 리소스) 선택">
-          <div class="sh"><span class="sn">${esc(shortName(svc))}</span>
-            <span class="schk">${st === "on" ? "✓" : st === "partial" ? "◐" : ""}</span></div>
-          <div class="sfrac"><span>${esc(fracTxt)}</span>
-            ${heavy ? '<span class="glyph" title="heavy 리소스 포함">🜂</span>' : ""}
-            ${quota ? '<span class="glyph q" title="quota 제약 리소스 포함">⛔</span>' : ""}</div>
-          ${sel.length ? `<button class="resbtn ${st === "partial" ? "pick" : ""}" data-res-svc="${esc(svc)}">리소스…</button>` : '<span class="resbtn dim" style="cursor:default">생애주기 없음</span>'}
-        </div></div>`;
-    });
-    h += `</div></div>`;
+    const catPartial = !catAllOn && onCount > 0;
+    // a search query forces every matching category open; otherwise honour state.
+    const open = q ? true : !collapsed.has(cat);
+    const catCls = catAllOn ? "on" : catPartial ? "partial" : "";
+    h += `<div class="tcat ${open ? "open" : ""}">
+      <div class="trow tcat-row ${catCls}" data-cat="${esc(cat)}">
+        <span class="tcar">${open ? "▾" : "▸"}</span>
+        <span class="tchk cat" data-catchk="${esc(cat)}" title="카테고리 전체 선택/해제">${catAllOn ? "✓" : catPartial ? "◐" : ""}</span>
+        <span class="tname">${esc(cat)}</span>
+        <span class="tmeta">${onCount}/${svcs.length}</span>
+      </div>`;
+    if (open) {
+      h += `<div class="tsvcs">`;
+      svcs.forEach(svc => {
+        const sel = svcSelectable(svc);
+        const all = svcNodes(svc);
+        const st = svcState(svc);
+        const heavy = all.some(id => N[id].heavy);
+        const quota = all.some(id => N[id].quota);
+        const onN = sel.filter(id => targets.has(id)).length;
+        const cls = st === "on" ? "on" : st === "partial" ? "partial" : "";
+        const noLc = !sel.length;
+        const fracTxt = !sel.length ? "—" : st === "partial" ? `${onN}/${sel.length}` : `${sel.length}`;
+        h += `<div class="trow tsvc-row ${cls} ${noLc ? "nolc" : ""}" data-svc="${esc(svc)}" title="${esc(svc)}${noLc ? " — 생애주기 없음(의존전용)" : " — 클릭하면 서비스 전체 선택"}">
+            <span class="tchk svc">${st === "on" ? "✓" : st === "partial" ? "◐" : ""}</span>
+            <span class="tname">${esc(shortName(svc))}${heavy ? ' <span class="glyph" title="heavy 포함">🜂</span>' : ""}${quota ? ' <span class="glyph q" title="quota 제약">⛔</span>' : ""}</span>
+            <span class="tcount">${fracTxt}</span>
+            ${noLc
+              ? '<span class="tdep" title="생애주기 없음 — 의존전용">의존전용</span>'
+              : `<button class="tres ${st === "partial" ? "pick" : ""}" data-res-svc="${esc(svc)}" title="특정 리소스만 선택">리소스…</button>`}
+          </div>`;
+      });
+      h += `</div>`;
+    }
+    h += `</div>`;
   });
   $("svcWrap").innerHTML = h || '<p class="empty">검색 결과 없음</p>';
 
-  // card click = toggle whole service
-  els("#svcWrap .svc[data-svc]").forEach(card => card.onclick = ev => {
-    if (ev.target.closest("[data-res-svc]")) return;   // the "리소스…" button has its own handler
-    const svc = card.dataset.svc;
-    if (!svcSelectable(svc).length) return;
-    setSvc(svc, svcState(svc) !== "on");
-    selectionChanged();
+  // category caret/name click = collapse/expand
+  els("#svcWrap .tcat-row[data-cat]").forEach(row => row.onclick = ev => {
+    if (ev.target.closest("[data-catchk]")) return;    // the cat checkbox toggles selection
+    const cat = row.dataset.cat;
+    collapsed.has(cat) ? collapsed.delete(cat) : collapsed.add(cat);
+    drawSvcTree();
   });
-  // category select toggle
-  els("#svcWrap .csbtn[data-cat]").forEach(b => b.onclick = ev => {
+  // category checkbox = 카테고리 전체 선택/해제
+  els("#svcWrap [data-catchk]").forEach(chk => chk.onclick = ev => {
     ev.stopPropagation();
-    const cat = b.dataset.cat;
+    const cat = chk.dataset.catchk;
     const svcs = (categoryMap()[cat] || []).filter(s => svcSelectable(s).length);
     const allOn = svcs.length && svcs.every(s => svcState(s) === "on");
     svcs.forEach(s => setSvc(s, !allOn));
+    selectionChanged();
+  });
+  // service row click = toggle whole service
+  els("#svcWrap .tsvc-row[data-svc]").forEach(row => row.onclick = ev => {
+    if (ev.target.closest("[data-res-svc]")) return;   // the "리소스…" button has its own handler
+    const svc = row.dataset.svc;
+    if (!svcSelectable(svc).length) return;             // 의존전용 row — not selectable
+    setSvc(svc, svcState(svc) !== "on");
     selectionChanged();
   });
   // "리소스…" → modal
@@ -223,9 +260,9 @@ function drawSvcGrid() {
   selReadout();
 }
 
-// any selection change: re-grid (state), readout, and re-fetch the DAG (debounced)
+// any selection change: re-render the tree (state), readout, and re-fetch the DAG
 function selectionChanged() {
-  if (screen === "build") drawSvcGrid();
+  if (screen === "build") drawSvcTree();
   selReadout();
   ctxBar();
   refreshGraph();
@@ -425,13 +462,96 @@ function launchSummary() {
 
 // ================= ② 실행 & 리포트 =================
 function drawRunScreen() {
+  // pre-flight 남은 자원(잔존) panel at the TOP, then the run settings below it.
+  $("run-left").innerHTML = '<div id="leftover-panel"></div><div id="run-settings"></div>';
+  drawLeftover();
   drawRunSettings();
   drawReport();
 }
+
+// 남은 자원(잔존) — pre-flight panel: list owned (leftover) resources + force cleanup.
+// "🔍 남은 자원 확인" → POST /api/owned, renders the returned list (service · path ·
+// count) with a 없음 ✅ / N건 ⚠️ headline; 🧹 강제 클린업 → POST /api/cleanup; re-check.
+function drawLeftover() {
+  const host = $("leftover-panel");
+  if (!host) return;
+  const s = ownedScan;
+  let head, list = "";
+  if (!s) {
+    head = '<span class="muted small">아직 확인하지 않음 — 실행 전 남은 자원을 점검하세요.</span>';
+  } else if (s.status === "running") {
+    head = '<span class="muted small">⏳ 스캔 중… (read-only LIST)</span>';
+  } else if (s.status === "error") {
+    head = `<span class="lo-warn">스캔 실패: ${esc(s.error || "")}</span>`;
+  } else {
+    const n = s.owned_total != null ? s.owned_total : (s.owned || []).length;
+    head = n === 0
+      ? '<span class="lo-ok">없음 ✅ — 남은 자원 0건</span>'
+      : `<span class="lo-warn">⚠️ ${n}건 — 실행 전 정리 권장</span>`;
+    if (n > 0) {
+      // group by service for a service · path · count rollup
+      const bySvc = {};
+      (s.owned || []).forEach(o => {
+        const k = o.service || "?";
+        (bySvc[k] = bySvc[k] || {}).__n = (bySvc[k].__n || 0) + 1;
+        bySvc[k][o.path] = (bySvc[k][o.path] || 0) + 1;
+      });
+      const rows = Object.keys(bySvc).sort().map(svc => {
+        const paths = Object.keys(bySvc[svc]).filter(k => k !== "__n");
+        return `<tr><td><b>${esc(svc)}</b></td>
+          <td class="muted">${paths.map(p => esc(p) + (bySvc[svc][p] > 1 ? " ×" + bySvc[svc][p] : "")).join("<br>")}</td>
+          <td class="ordn">${bySvc[svc].__n}</td></tr>`;
+      }).join("");
+      list = `<div class="scroll" style="max-height:200px;margin-top:7px"><table class="tbl">
+        <thead><tr><th>service</th><th>path</th><th>count</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`;
+    }
+  }
+  host.innerHTML = `<div class="panel lo-panel">
+    <h2>남은 자원(잔존) <span class="muted small">· 실행 전 점검 (read-only) + 강제 클린업</span></h2>
+    <div class="lo-head">${head}</div>
+    ${list}
+    <div class="run-ctl">
+      <button class="btn ghost" id="lo-scan">🔍 남은 자원 확인</button>
+      <button class="minibtn red" id="lo-cleanup" title="owner=apitest 자원을 TTL 무시하고 삭제">🧹 강제 클린업</button>
+      ${s && s.owned_total != null ? '<button class="minibtn" id="lo-recheck">↻ 다시 확인</button>' : ""}
+    </div>
+  </div>`;
+  $("lo-scan").onclick = scanOwned;
+  if ($("lo-recheck")) $("lo-recheck").onclick = scanOwned;
+  $("lo-cleanup").onclick = () => {
+    if (!confirm("강제 클린업: owner=apitest 가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?")) return;
+    fetch("/api/cleanup", { method: "POST" }).then(r => r.json()).then(j => {
+      if (j.error) { alert(j.error); return; }
+      runId = j.id; runEvents = []; runStatus = "running"; reportSub = "r4";
+      pollLogRun(); drawReport();
+      // after a force cleanup, auto re-scan so the panel reflects the new state
+      setTimeout(scanOwned, 1200);
+    }).catch(() => alert("서버 연결 실패"));
+  };
+}
+
+// trigger the owned-resource scan (POST /api/owned) and poll its record for the list
+function scanOwned() {
+  ownedScan = { status: "running" };
+  drawLeftover();
+  fetch("/api/owned", { method: "POST" }).then(r => r.json()).then(j => {
+    if (j.error) { ownedScan = { status: "error", error: j.error }; drawLeftover(); return; }
+    pollOwned(j.id);
+  }).catch(e => { ownedScan = { status: "error", error: e.message }; drawLeftover(); });
+}
+function pollOwned(id) {
+  fetch("/api/runs/" + id).then(r => r.json()).then(j => {
+    ownedScan = { status: j.status, owned: j.owned || [], owned_total: j.owned_total, error: j.error };
+    if (screen === "run") drawLeftover();
+    if (j.status === "running") setTimeout(() => pollOwned(id), 800);
+  }).catch(() => { ownedScan = { status: "error", error: "연결 실패" }; if (screen === "run") drawLeftover(); });
+}
+
 function drawRunSettings() {
   const ax = AXES[runAxis];
   const svcs = new Set([...targets].map(id => N[id].service));
-  $("run-left").innerHTML = `<h2>실행 설정</h2>
+  $("run-settings").innerHTML = `<div class="panel" style="margin-top:14px"><h2>실행 설정</h2>
     <h3>Axis <span class="muted small">(run 단위)</span></h3>
     <div class="axisgrid" id="axisgrid">${Object.entries(AXES).map(([k, a]) =>
       `<label class="axisopt ${runAxis === k ? "on" : ""} ${a.enabled ? "" : "disabled"}">
@@ -452,7 +572,7 @@ function drawRunSettings() {
         ${runMode === "live" ? "⚠ LIVE 실행 ▶" : "▶ simulate 실행"}</button>
       <button class="btn ghost" id="run-toconf" title="① 구성으로 돌아가 선택 변경">← 구성</button>
     </div>
-    ${targets.size ? "" : '<p class="muted small">선택이 없습니다 — ① 구성에서 서비스를 고르세요.</p>'}`;
+    ${targets.size ? "" : '<p class="muted small">선택이 없습니다 — ① 구성에서 서비스를 고르세요.</p>'}</div>`;
   gateChips();
   els("#axisgrid input").forEach(r => r.onchange = () => {
     if (!AXES[r.value].enabled) return;
@@ -496,6 +616,9 @@ function startRun() {
 }
 
 // ---- poll the live event stream until run-end / status done ----
+// While running we poll FAST (~0.7s) so the user can SEE the order happen — the
+// 흐름 DAG highlights the active node advancing 생성→테스트→삭제 and 자원 steps each
+// resource through create→test→delete, rather than jumping to a final state.
 function pollEvents() {
   if (!runId) return;
   if (pollTimer) clearTimeout(pollTimer);
@@ -504,12 +627,12 @@ function pollEvents() {
     runStatus = j.status || runStatus;
     const ended = runEvents.some(e => e.kind === "run-end") || (runStatus !== "running");
     if (screen === "run") drawReport();
-    if (!ended) pollTimer = setTimeout(pollEvents, 1500);
+    if (!ended) pollTimer = setTimeout(pollEvents, 700);
     else { runStatus = runStatus === "running" ? "done" : runStatus; if (screen === "run") drawReport(); }
-  }).catch(() => { pollTimer = setTimeout(pollEvents, 2000); });
+  }).catch(() => { pollTimer = setTimeout(pollEvents, 1000); });
 }
 
-// ================= ④ 리포트 (R1/R2/R3/R4) — kept functional, light theme =================
+// ================= 리포트 (흐름 · 자원 · API · 로그) — light theme =================
 function drawReport() {
   els("#report-subtabs button").forEach(b => b.classList.toggle("on", b.dataset.r === reportSub));
   if (!runId) {
@@ -537,23 +660,71 @@ function lifecycleStates() {
   return st;
 }
 
-// R1 진행 — composition DAG colored by live lifecycle state + wave progress.
-// Re-uses ResourceGraph with an overlay mapping each node's source lifecycle state.
+// derive the CURRENT in-progress activity from the event stream so the report can
+// show "생성 중 → 테스트 중 → 삭제 중 → 완료" as it advances. The active step is the
+// last step-start with no matching step-end; we phase it by method/kind. Also the
+// most-recently-tracked (not-yet-deleted) resource id, for the 자원 view's cursor.
+function liveProgress() {
+  const running = runStatus === "running" && !runEvents.some(e => e.kind === "run-end");
+  const openSteps = {};        // key -> step event still open
+  let lastStart = null, lastTrack = null, lastDelete = null;
+  runEvents.forEach(e => {
+    if (e.kind === "step-start") { openSteps[e.lifecycle + "|" + e.step] = e; lastStart = e; }
+    if (e.kind === "step-end") delete openSteps[e.lifecycle + "|" + e.step];
+    if (e.kind === "resource-tracked") lastTrack = e;
+    if (e.kind === "resource-deleted") lastDelete = e;
+  });
+  // the active step = the most recent still-open step-start (fallback: lastStart)
+  const openList = Object.values(openSteps);
+  const active = running ? (openList[openList.length - 1] || lastStart) : null;
+  let phase = null, phaseLabel = "";
+  if (active) {
+    const m = (active.method || "").toUpperCase();
+    if (m === "POST") { phase = "create"; phaseLabel = "생성 중"; }
+    else if (m === "DELETE") { phase = "delete"; phaseLabel = "삭제 중"; }
+    else if (m === "PUT" || m === "PATCH") { phase = "update"; phaseLabel = "설정 중"; }
+    else { phase = "test"; phaseLabel = "테스트 중"; }
+  } else if (!running) {
+    phaseLabel = "완료";
+  }
+  return { running, active, phase, phaseLabel,
+           activeLifecycle: active ? active.lifecycle : null,
+           lastTrack, lastDelete };
+}
+
+// 흐름 — composition DAG colored by live lifecycle state + the ACTIVE node pulsed,
+// so the user watches the order advance (생성→테스트→삭제). + wave progress below.
 function reportR1() {
   const st = lifecycleStates();
+  const prog = liveProgress();
   const FILL = { queued: "#ffffff", running: "#e8f0fd", done: "#eaf7ee", fail: "#fdeaea", skip: "#f6f8fa" };
   const STK = { queued: "#8a93a0", running: "#2563c9", done: "#2da44e", fail: "#cf222e", skip: "#8a93a0" };
   const BDG = { queued: "", running: "⏳", done: "✓", fail: "✕", skip: "–" };
   const nodeState = id => { const lc = N[id] && N[id].lifecycle; return lc && st[lc] ? st[lc] : null; };
-  $("report-main").innerHTML = `<h2>R1 진행 <span class="muted small">· DAG 노드 = lifecycle 라이브 상태</span></h2>
-    <div class="legend">${legend([["#ffffff", "queued"], ["#e8f0fd", "running"], ["#eaf7ee", "done"], ["#fdeaea", "fail"]])}</div>
-    <div class="svgbox"><svg id="r1-svg"></svg></div>
+  const activeLc = prog.activeLifecycle;
+  // banner: 현재 무엇을 하고 있는지 (생성 중 / 테스트 중 / 삭제 중 / 완료)
+  const banner = prog.running
+    ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
+        <b>${esc(prog.phaseLabel)}</b> · <span class="mono">${esc(activeLc || "")}</span>
+        ${prog.active ? `<span class="muted small">${esc((prog.active.method || "") + " " + (prog.active.path || ""))}</span>` : ""}</div>`
+    : `<div class="nowbar done"><span class="dot"></span><b>완료</b> · 상태 ${esc(runStatus)}</div>`;
+  $("report-main").innerHTML = `<h2>흐름 <span class="muted small">· DAG 진행 순서 — 노드 = lifecycle 라이브 상태</span></h2>
+    ${banner}
+    <div class="legend">${legend([["#ffffff", "대기"], ["#e8f0fd", "진행 중"], ["#eaf7ee", "완료"], ["#fdeaea", "실패"]])}</div>
+    <div class="svgbox big"><svg id="r1-svg"></svg></div>
     <div id="r1-prog" style="margin-top:8px"></div>`;
   const g = lastGraph && lastGraph.nodes.length ? lastGraph : null;
   if (g) {
     window.ResourceGraph.render($("r1-svg"), g, {
       overlay: id => {
+        const lc = N[id] && N[id].lifecycle;
         const s = nodeState(id);
+        // the ACTIVE lifecycle's nodes pulse blue + carry the phase glyph so the
+        // eye tracks the advancing step even before the lifecycle flips to done.
+        if (prog.running && lc && lc === activeLc) {
+          const glyph = prog.phase === "create" ? "⊕" : prog.phase === "delete" ? "⊖" : "⏳";
+          return { fill: "#dbe8fd", stroke: "#1a56c4", badge: glyph, pulse: true };
+        }
         if (!s) return null;
         return { fill: FILL[s], stroke: STK[s], badge: BDG[s] };
       }
@@ -584,14 +755,19 @@ function reportR1() {
     <h3>웨이브 진행 (실행 순서)</h3>${waveLines || '<p class="muted small">웨이브 이벤트 대기 중…</p>'}`;
 }
 
-// R2 리소스 — per-resource rows from resource-tracked / resource-deleted
+// 자원 — per-resource rows (생성·테스트·삭제 + id) from resource-tracked/-deleted.
+// While running, the most-recent resource shows a live phase (생성→테스트→삭제) so
+// the user watches each resource step through its lifecycle, not just a final state.
 function reportR2() {
   const rows = {};
   const lcVerifyOk = {};
+  const order = [];
   runEvents.forEach(e => {
-    if (e.kind === "resource-tracked")
+    if (e.kind === "resource-tracked") {
       rows[e.resource_id] = { id: e.resource_id, type: e.resource_type, lifecycle: e.lifecycle,
         path: e.path, created: true, deleted: false, tested: false };
+      order.push(e.resource_id);
+    }
     if (e.kind === "resource-deleted") {
       const cand = Object.values(rows).filter(r => r.lifecycle === e.lifecycle && r.type === e.resource_type && !r.deleted);
       if (cand.length) cand[cand.length - 1].deleted = true;
@@ -600,24 +776,50 @@ function reportR2() {
       lcVerifyOk[e.lifecycle] = true;
   });
   Object.values(rows).forEach(r => { r.tested = !!lcVerifyOk[r.lifecycle]; });
-  const list = Object.values(rows);
+  const prog = liveProgress();
+  // the live "cursor" resource = newest tracked-not-deleted in the active lifecycle
+  let cursorId = null;
+  if (prog.running) {
+    const live = order.map(id => rows[id]).filter(r => r && !r.deleted
+      && (!prog.activeLifecycle || r.lifecycle === prog.activeLifecycle));
+    cursorId = live.length ? live[live.length - 1].id : null;
+  }
+  // per-row live phase chip
+  const phaseChip = r => {
+    if (r.deleted) return '<span class="phch del">삭제됨</span>';
+    if (prog.running && r.id === cursorId) {
+      if (prog.phase === "create") return '<span class="phch act create">생성 중</span>';
+      if (prog.phase === "delete") return '<span class="phch act delete">삭제 중</span>';
+      if (prog.phase === "update") return '<span class="phch act test">설정 중</span>';
+      return '<span class="phch act test">테스트 중</span>';
+    }
+    if (r.tested) return '<span class="phch ok">테스트됨</span>';
+    if (r.created) return '<span class="phch created">생성됨</span>';
+    return "";
+  };
+  const list = order.map(id => rows[id]).filter(Boolean);
   const simLabel = runMode === "simulate" ? ' <span class="muted small">(simulate: 합성 id)</span>' : "";
-  const body = list.length ? list.map(r => `<tr>
-      <td>${esc(r.type)}</td>
+  const body = list.length ? list.map(r => `<tr class="${r.id === cursorId ? "rowact" : ""}">
+      <td>${esc(shortName(r.type || ""))}</td>
       <td><code>${esc(r.id)}</code></td>
       <td>${esc(r.lifecycle)}</td>
       <td class="${r.created ? "tick" : "tickno"}">${r.created ? "✓" : "—"}</td>
       <td class="${r.tested ? "tick" : "tickno"}">${r.tested ? "✓" : "—"}</td>
       <td class="${r.deleted ? "tick" : "tickno"}">${r.deleted ? "✓" : "—"}</td>
-    </tr>`).join("") : '<tr><td colspan="6" class="empty">리소스 이벤트 없음 (실행 중이거나 create 스텝 없음)</td></tr>';
-  $("report-main").innerHTML = `<h2>R2 리소스${simLabel}</h2>
-    <p class="muted small">create/delete 스텝마다 추적된 실자원 — resource_type · resource_id · 생성/테스트/삭제.</p>
+      <td>${phaseChip(r)}</td>
+    </tr>`).join("") : '<tr><td colspan="7" class="empty">자원 이벤트 없음 (실행 중이거나 create 스텝 없음)</td></tr>';
+  const nowLine = prog.running && cursorId
+    ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
+        <b>${esc(prog.phaseLabel)}</b> · <code>${esc(cursorId)}</code></div>` : "";
+  $("report-main").innerHTML = `<h2>자원${simLabel} <span class="muted small">· 생성 · 테스트 · 삭제 + id</span></h2>
+    <p class="muted small">create/delete 스텝마다 추적된 실자원 — type · resource_id · 생성/테스트/삭제(+ 현재 단계).</p>
+    ${nowLine}
     <table class="tbl">
-      <thead><tr><th>type</th><th>resource_id</th><th>lifecycle</th><th>생성</th><th>테스트</th><th>삭제</th></tr></thead>
+      <thead><tr><th>type</th><th>resource_id</th><th>lifecycle</th><th>생성</th><th>테스트</th><th>삭제</th><th>단계</th></tr></thead>
       <tbody>${body}</tbody></table>`;
 }
 
-// R3 API — api-first table of step-start/step-end (method+path, 결과, 응답시간)
+// API — api-first table of step-start/step-end (method+path, 결과, 응답시간)
 function reportR3() {
   const calls = [];
   const open = {};
@@ -647,7 +849,7 @@ function reportR3() {
         <td class="muted">${c.status != null ? esc(c.status) : "—"}</td>
         <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run" ? "⏳" : "—")}</td>
       </tr>`).join("")).join("");
-  $("report-main").innerHTML = `<h2>R3 API <span class="muted small">· api 단위 (대상 · 결과 · 응답시간)</span></h2>
+  $("report-main").innerHTML = `<h2>API <span class="muted small">· 호출 결과 (대상 · 결과 · 응답시간)</span></h2>
     <div class="kpi">
       <div class="s"><b>${calls.length}</b><span>api 호출</span></div>
       <div class="s"><b style="color:var(--ok)">${okN}</b><span>ok</span></div>
@@ -659,9 +861,9 @@ function reportR3() {
       <tbody>${body || '<tr><td colspan="4" class="empty">api 이벤트 없음</td></tr>'}</tbody></table></div>`;
 }
 
-// R4 로그 — raw run log + cleanup/verify controls
+// 로그 — raw run log + cleanup/verify controls
 function reportR4() {
-  $("report-main").innerHTML = `<h2>R4 로그 <span class="muted small">· 원시 실행 로그</span></h2>
+  $("report-main").innerHTML = `<h2>로그 <span class="muted small">· 실행 로그</span></h2>
     <div class="run-ctl">
       <button class="minibtn red" id="btn-cleanup" title="우리(owner)가 만든 자원을 강제 삭제 (reconciler, TTL 무시).">🧹 강제 클린업</button>
       <button class="minibtn" id="btn-verify" title="삭제 없이 남은 우리 자원 수 확인 (read-only).">🔍 클린업 확인</button>

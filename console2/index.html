@@ -30,22 +30,22 @@
 <!-- ======================= ① 구성 ======================= -->
 <section id="screen-build" class="screen">
   <div class="cols build">
-    <!-- LEFT/MAIN: category sections + compact service cards (picker) -->
-    <div class="panel" id="sel-panel">
-      <h2>구성 <span class="muted small">— 카테고리 · 서비스 선택 (카드 클릭 = 서비스 전체 선택)</span></h2>
+    <!-- LEFT: compact collapsible category→service MENU-TREE (picker) -->
+    <div class="panel treepanel" id="sel-panel">
+      <h2>선택 <span class="muted small">— 카테고리 ▸ 서비스 (행 클릭 = 서비스 선택)</span></h2>
       <div class="svc-controls">
-        <input type="search" class="search" id="sel-search" placeholder="서비스 검색…  (예: vpc, queue, mysql)">
+        <input type="search" class="search" id="sel-search" placeholder="서비스 검색…  (예: vpc, queue)">
         <button class="allbtn" id="sel-all">전체 선택</button>
-        <span class="selreadout" id="sel-readout"></span>
       </div>
-      <div id="svcWrap"></div>
+      <div class="selreadout treeread" id="sel-readout"></div>
+      <div id="svcWrap" class="svctree"></div>
     </div>
 
-    <!-- RIGHT: live composition DAG + readout + 순서표 -->
+    <!-- RIGHT (dominant): live composition DAG + readout + 순서표 -->
     <div class="panel" id="dag-panel">
       <h2>합성 배포 그림 <span class="muted small">— composer.graph_view · 레벨 = 생성 순서</span></h2>
       <div class="legend" id="dag-legend"></div>
-      <div class="svgbox"><svg id="dag-svg"></svg></div>
+      <div class="svgbox big"><svg id="dag-svg"></svg></div>
       <div class="readout" id="dag-readout"></div>
       <h3>생성 · 검증 · 삭제 순서표</h3>
       <div class="scroll"><table class="tbl" id="order-tbl"></table></div>
@@ -75,13 +75,13 @@
 <!-- ======================= ② 실행 & 리포트 ======================= -->
 <section id="screen-run" class="screen hidden">
   <div class="cols run">
-    <div class="panel" id="run-left"></div>
+    <div id="run-left"></div>
     <div class="panel" id="run-right">
       <div class="subtabs" id="report-subtabs">
-        <button data-r="r1" class="on">R1 진행</button>
-        <button data-r="r2">R2 리소스</button>
-        <button data-r="r3">R3 API</button>
-        <button data-r="r4">R4 로그</button>
+        <button data-r="r1" class="on">흐름</button>
+        <button data-r="r2">자원</button>
+        <button data-r="r3">API</button>
+        <button data-r="r4">로그</button>
       </div>
       <div id="report-main"></div>
       <h3>실행 기록 <span class="muted small">· /api/runs</span></h3>
@@ -91,8 +91,9 @@
 </section>
 
 <div class="foot">
-  ① 구성: 서비스 선택 → composer.graph_view 합성 DAG(생성 순서·dedup·peak quota) ·
-  ② 실행: simulate = 클라우드 호출 없음(합성 id) · live = pytest + 안전 게이트 · 리포트 단위 = api.
+  ① 구성: 서비스 선택(좌 메뉴-트리) → composer.graph_view 합성 DAG(생성 순서·dedup·peak quota) ·
+  ② 실행: simulate = 클라우드 호출 없음(합성 id) · live = pytest + 안전 게이트 ·
+  리포트 = 흐름 · 자원 · API · 로그.
 </div>
 </div>
 

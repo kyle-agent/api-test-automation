@@ -33,6 +33,9 @@ What it exposes (all JSON unless noted):
   GET  /api/runs/<id>/events   -> the structured live-event stream (JSONL parsed)
   POST /api/cleanup            -> FORCE reconciler sweep (delete all owned, ignore TTL)
   POST /api/verify             -> read-only owned-resource inventory (proof of clean)
+  POST /api/owned              -> read-only owned-resource inventory as a STRUCTURED
+                                  list (service · path · total) for the run-screen
+                                  "남은 자원(잔존)" pre-flight panel. LIST calls only.
 
 Safety: identical opt-in to console_server / chat-heavy — mutation/destructive/
 heavy gates are set PER RUN from the request only, never globally. Simulate makes
@@ -61,6 +64,12 @@ PORT = int(os.environ.get("PORT", "9100"))
 _RUNS: dict[str, dict] = {}
 _LOCK = threading.Lock()
 _MODEL: dict | None = None
+# simulate pacing — make the dry-run VISIBLY step through 생성→테스트→삭제 in DAG
+# order (not flash by in ~1s). Per-HTTP-step delay + a short beat around a
+# resource create/delete. Env-overridable so tests can run them at 0 (hermetic +
+# fast); the UI default is a watchable ~0.35s/step. read at call time.
+_SIM_STEP_DELAY = float(os.environ.get("SCP_SIM_STEP_DELAY", "0.35"))
+_SIM_BEAT = float(os.environ.get("SCP_SIM_BEAT", "0.18"))
 _CT = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
        ".css": "text/css; charset=utf-8", ".json": "application/json",
        ".svg": "image/svg+xml", ".ico": "image/x-icon"}
@@ -473,22 +482,31 @@ def _simulate_worker(rec: dict) -> None:
                 for s in steps:
                     _emit_event(evp, "step-start", lifecycle=lid, step=s["name"],
                                 method=s["method"], path=s["path"])
-                    time.sleep(0.04)
+                    # Pace each HTTP step so the live view is WATCHABLE — the user
+                    # can see 생성 중 → 테스트 중 → 삭제 중 advance through DAG order
+                    # rather than the whole run flashing by in ~1s. Tunable via
+                    # SCP_SIM_STEP_DELAY (seconds); default 0.35s per step.
+                    time.sleep(_SIM_STEP_DELAY)
                     _emit_event(evp, "step-end", lifecycle=lid, step=s["name"],
                                 method=s["method"], path=s["path"],
-                                status=200, category="ok", elapsed_ms=40)
+                                status=200, category="ok",
+                                elapsed_ms=int(_SIM_STEP_DELAY * 1000))
                     # synthetic resource tracking (simulate-only; ids prefixed sim-)
-                    # so the "리소스 (실자원 id)" report renders without any cloud call.
+                    # so the "자원 (실자원 id)" report renders without any cloud call.
+                    # A short extra beat around create/delete so the resource view
+                    # visibly steps create → test → delete (not all at once).
                     if s.get("kind") == "create":
                         rtype = _sim_resource_type(s["path"])
                         _emit_event(evp, "resource-tracked", lifecycle=lid,
                                     resource_type=rtype,
                                     resource_id="sim-" + uuid.uuid4().hex[:8],
                                     path=s["path"])
+                        time.sleep(_SIM_BEAT)
                     elif s.get("kind") == "delete":
                         _emit_event(evp, "resource-deleted", lifecycle=lid,
                                     resource_type=_sim_resource_type(s["path"]),
                                     path=s["path"])
+                        time.sleep(_SIM_BEAT)
                 _emit_event(evp, "lifecycle-end", lifecycle=lid, status="passed")
         _emit_event(evp, "run-end", status="done")
         with _LOCK:
@@ -538,9 +556,52 @@ def _verify_worker(rec: dict) -> None:
             rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
 
 
+def _owned_worker(rec: dict) -> None:
+    """Read-only owned-resource inventory via cleanup.verify_clean.scan_owned — runs
+    in-process (no subprocess) and stores the structured list on the record so the
+    run-screen pre-flight panel can show service · path · count. Makes only LIST
+    calls (no mutations); never deletes. On any error the record carries it but the
+    server stays up."""
+    logp = Path(rec["log"])
+    try:
+        # read-only-ness is GUARANTEED by scan_owned stubbing the reconciler's
+        # _delete/_wait_gone (so no DELETE can fire); this default is just a hint.
+        os.environ.setdefault("SCP_ALLOW_DESTRUCTIVE", "false")
+        from cleanup.verify_clean import scan_owned
+        owned = scan_owned()
+        from collections import Counter
+        by_svc = Counter(o["service"] for o in owned)
+        with open(logp, "w", encoding="utf-8") as f:
+            f.write(f"# console2 owned-resource scan {rec['id']} (read-only LIST inventory)\n\n")
+            if not owned:
+                f.write("NONE — every swept collection is empty of owned resources ✅\n")
+            for svc, n in by_svc.most_common():
+                f.write(f"  {svc:18} {n:3}\n")
+            f.write(f"\nTOTAL owned survivors across all collections: {len(owned)}\n")
+        with _LOCK:
+            rec["owned"] = owned
+            rec["owned_total"] = len(owned)
+            rec["status"], rec["rc"], rec["ended"] = "done", 0, time.time()
+    except Exception as exc:  # noqa: BLE001 — surface to the UI, never crash the server
+        try:
+            with open(logp, "a", encoding="utf-8") as f:
+                f.write(f"\nERROR: {exc}\n")
+        except Exception:
+            pass
+        with _LOCK:
+            rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
+
+
 def _summarize(rec: dict, log: str) -> str:
     import re
     kind = rec.get("kind")
+    if kind == "owned":
+        if rec.get("status") == "error":
+            return f"⚠️ 스캔 실패: {str(rec.get('error'))[:60]}"
+        n = rec.get("owned_total")
+        if n is None:
+            return ""
+        return "없음 ✅ — 남은 자원 0건" if n == 0 else f"⚠️ 남은 자원 {n}건"
     if kind == "simulate":
         evs = _read_events(rec["events"])
         nl = sum(1 for e in evs if e.get("kind") == "lifecycle-end")
@@ -564,6 +625,9 @@ def _rec_view(rec: dict, full: bool = False) -> dict:
     v = {k: rec.get(k) for k in ("id", "kind", "mode", "status", "lifecycle_ids",
                                  "heavy", "mutations", "destructive", "rc", "started",
                                  "ended", "error")}
+    if rec.get("kind") == "owned":   # expose the structured owned-resource inventory
+        v["owned"] = rec.get("owned", [])
+        v["owned_total"] = rec.get("owned_total")
     log = ""
     if Path(rec["log"]).exists():
         try:
@@ -673,6 +737,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(202, _rec_view(_start("cleanup", _cleanup_worker)))
         if p == "/api/verify":
             return self._json(202, _rec_view(_start("verify", _verify_worker)))
+        if p == "/api/owned":
+            # read-only owned-resource inventory (LIST calls only) -> list + total
+            return self._json(202, _rec_view(_start("owned", _owned_worker)))
         self._json(404, {"error": "not found"})
 
     def _file(self, path: Path) -> None:

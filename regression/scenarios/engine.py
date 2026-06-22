@@ -1106,6 +1106,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 _oplog.emit_resource("deleted", path=path,
                                      service=step_service or "",
                                      lifecycle=lifecycle["id"])
+            # console2 local live view: mark the resource deleted on a successful
+            # DELETE step so 자원 advances create→test→delete for live runs too.
+            # Env-gated via _cev (no-op when SCP_CONSOLE_EVENTS unset).
+            if (_cev and step["method"].upper() == "DELETE"
+                    and 200 <= resp.status < 300):
+                _cev.emit("resource-deleted", lifecycle=lifecycle["id"],
+                          resource_type=(step_service or ""),
+                          service=(step_service or ""), path=path)
 
             expected = _as_status_list(step.get("expect_status")) or [200]
             _txt = resp.raw_text or ""
@@ -1259,6 +1267,14 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 reg.track(ResourceRecord(
                     service=cu_svc or "", delete_path=cu_path, resource_id=rid,
                     kind=bkind or step["name"], parent=grp))
+                # console2 local live view: surface the REAL tracked resource id
+                # (same shape simulate emits synthetically). Env-gated via _cev —
+                # a single os.environ.get + return when SCP_CONSOLE_EVENTS unset,
+                # so this is a no-op (zero behaviour change) outside console2.
+                if _cev:
+                    _cev.emit("resource-tracked", lifecycle=lifecycle["id"],
+                              resource_id=rid, resource_type=(cu_svc or ""),
+                              service=(cu_svc or ""), path=cu_path)
                 if _oplog:
                     _parent = ""
                     if isinstance(body, dict):

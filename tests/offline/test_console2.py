@@ -24,6 +24,11 @@ def _load_server():
 
 
 C2 = _load_server()
+# Keep simulate fast + hermetic in tests: the UI pacing (~0.35s/step) would make
+# each simulate test take seconds. The worker reads these module globals at call
+# time, so zeroing them here drops the sleeps without changing the event shape.
+C2._SIM_STEP_DELAY = 0.0
+C2._SIM_BEAT = 0.0
 
 
 # --------------------------------------------------------------------------- #
@@ -34,6 +39,31 @@ def test_console_events_noop_when_disabled(monkeypatch):
     monkeypatch.delenv(cev.ENV, raising=False)
     assert cev.enabled() is False
     cev.emit("step-start", lifecycle="x", step="y")  # must not raise / write
+
+
+def test_console_events_resource_tracked_emit(tmp_path, monkeypatch):
+    """The engine hook emits ``resource-tracked`` with the REAL resource id +
+    service/path so the console2 자원 view populates for LIVE runs exactly like
+    simulate's synthetic ids. This pins the event SHAPE the engine emit relies on
+    (no engine import / no cloud — just the additive sink contract)."""
+    from core import console_events as cev
+    sink = tmp_path / "ev.jsonl"
+    monkeypatch.setenv(cev.ENV, str(sink))
+    # the exact call the engine makes right after reg.track(ResourceRecord(...))
+    cev.emit("resource-tracked", lifecycle="networking-vpc-subnet",
+             resource_id="vpc-abc123", resource_type="networking/vpc",
+             service="networking/vpc", path="/v1/vpcs/vpc-abc123")
+    cev.emit("resource-deleted", lifecycle="networking-vpc-subnet",
+             resource_type="networking/vpc", service="networking/vpc",
+             path="/v1/vpcs/vpc-abc123")
+    lines = sink.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 2
+    tracked = json.loads(lines[0])
+    assert tracked["kind"] == "resource-tracked"
+    assert tracked["resource_id"] == "vpc-abc123"
+    assert tracked["resource_type"] == "networking/vpc"
+    assert tracked["path"] == "/v1/vpcs/vpc-abc123" and "ts" in tracked
+    assert json.loads(lines[1])["kind"] == "resource-deleted"
 
 
 def test_console_events_writes_jsonl_when_enabled(tmp_path, monkeypatch):
@@ -184,6 +214,52 @@ def test_simulate_worker_emits_resource_tracked(tmp_path):
     assert one.get("resource_type") and one.get("path") and one.get("lifecycle")
     # a lifecycle with a delete step also reports the teardown
     assert any(e["kind"] == "resource-deleted" for e in evs)
+
+
+# --------------------------------------------------------------------------- #
+# scan_owned: structured owned-resource inventory (read-only LIST sweep)
+# --------------------------------------------------------------------------- #
+def test_scan_owned_returns_a_list(monkeypatch):
+    """``cleanup.verify_clean.scan_owned`` returns ``[{"service","path"}, ...]``.
+    Hermetic: monkeypatch the reconciler sweep so NO cloud/LIST call is made — we
+    only assert the structured-list contract (shape + per-entry keys), tolerating
+    an empty inventory. A passed-in client is honoured (never builds an ApiClient)."""
+    import cleanup.verify_clean as vc
+    import cleanup.reconciler as recon
+
+    # stub the sweep to "find" two owned resources via the patched _delete the
+    # scanner installs — i.e. exercise scan_owned's collection of (service, path)
+    # without touching the network. scan_owned swaps recon._delete for its own
+    # collector, then calls run_sweep(client); our fake run_sweep invokes that
+    # collector exactly like the real sweep would for two owned resources.
+    def fake_run_sweep(client):
+        recon._delete(client, "networking/vpc", "/v1/vpcs/vpc-1")
+        recon._delete(client, "networking/subnet", "/v1/subnets/sn-1")
+
+    monkeypatch.setattr(recon, "run_sweep", fake_run_sweep)
+    owned = vc.scan_owned(client=object())  # passed-in client => no ApiClient build
+    assert isinstance(owned, list)
+    assert all(isinstance(o, dict) and "service" in o and "path" in o for o in owned)
+    services = {o["service"] for o in owned}
+    assert services == {"networking/vpc", "networking/subnet"}
+    # restoring _delete after the call: a second scan with an empty sweep yields []
+    monkeypatch.setattr(recon, "run_sweep", lambda client: None)
+    assert vc.scan_owned(client=object()) == []
+
+
+def test_owned_worker_records_structured_list(monkeypatch):
+    """``_owned_worker`` stores the scan_owned list + total on the run record and
+    marks it done (no cloud — scan_owned is monkeypatched)."""
+    monkeypatch.setattr(
+        "cleanup.verify_clean.scan_owned",
+        lambda client=None: [{"service": "networking/vpc", "path": "/v1/vpcs/vpc-1"}])
+    rec = C2._new_rec("owned")
+    C2._owned_worker(rec)
+    assert rec["status"] == "done", rec.get("error")
+    assert rec["owned_total"] == 1
+    assert rec["owned"] == [{"service": "networking/vpc", "path": "/v1/vpcs/vpc-1"}]
+    view = C2._rec_view(rec)
+    assert view["owned_total"] == 1 and view["owned"][0]["service"] == "networking/vpc"
 
 
 def test_plan_all_disabled_selection_is_empty_not_everything():

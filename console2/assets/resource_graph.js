@@ -123,11 +123,17 @@
         : n.is_dependent ? C.fillDep : n.shared ? C.fillShared : C.fillPlain);
       const stroke = (ov && ov.stroke) || (n.shared ? C.shared
         : n.is_target ? C.target : n.is_dependent ? C.dependent : PROV(n.provenance));
-      const sw = n.is_target ? 2.6 : (n.shared ? 2.2 : 1.6);
+      const pulse = ov && ov.pulse;
+      const sw = pulse ? 3 : (n.is_target ? 2.6 : (n.shared ? 2.2 : 1.6));
       const badge = (ov && ov.badge) || (n.is_target ? "★" : n.is_dependent ? "↓" : "");
-      s += `<g class="rg-node" data-id="${esc(n.id)}" style="cursor:${opt.onClick ? "pointer" : "default"}">
+      // active-node pulse: an animated stroke-width so the eye tracks the step
+      // that is running right now (흐름 view). Pure SVG SMIL — no CSS dependency.
+      const pulseAnim = pulse
+        ? `<animate attributeName="stroke-width" values="3;5;3" dur="1.1s" repeatCount="indefinite"/>`
+        : "";
+      s += `<g class="rg-node${pulse ? " rg-active" : ""}" data-id="${esc(n.id)}" style="cursor:${opt.onClick ? "pointer" : "default"}">
         <title>${esc(n.id)} — ${esc(n.service)}\nprovenance ${esc(n.provenance)}${n.quota ? "\nquota " + esc(n.quota) : ""}${n.shared ? "\nshared (dedup)" : ""}${(n.options || []).length ? "\noptions: " + esc((n.options || []).join(", ")) : ""}</title>
-        <rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
+        <rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="${sw}">${pulseAnim}</rect>
         <text x="${p.x + 9}" y="${p.y + 18}" font-size="12.5" font-weight="700" fill="${C.text}">${n.heavy ? "🜂 " : ""}${esc(n.id)}</text>
         <text x="${p.x + 9}" y="${p.y + 33}" font-size="10" fill="${C.sub}">${esc((n.service || "").split("/").pop())}${n.quota ? " ⛔" + esc(n.quota) : ""}</text>
         ${badge ? `<text x="${p.x + p.w - 8}" y="${p.y + 17}" font-size="12" text-anchor="end" fill="${stroke}">${badge}</text>` : ""}
