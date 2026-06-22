@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B1 — 리포트 드릴다운 (흐름 ▸ 자원·API·로그) — console2 mockup</title>
+<style>
+/* ===== Light theme (GitHub Primer) — design mockup, throwaway artifact ===== */
+:root{
+  --page:#ffffff; --panel:#f6f8fa; --panel2:#eaeef2; --ink:#1f2328; --muted:#656d76;
+  --line:#d0d7de; --line2:#afb8c1;
+  --accent:#2563c9; --green:#2da44e; --red:#cf222e; --amber:#b5740b; --purple:#8250df;
+  --val:#2da44e; --docs:#b5740b;
+  --fillTarget:#e6effd; --fillDep:#f3eefc; --fillShared:#fffaf0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--page);color:var(--ink);
+  font:13.5px/1.5 system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR",sans-serif}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace}
+.wrap{max-width:1640px;margin:0 auto;padding:0 18px 50px}
+
+header.top{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;
+  border-bottom:1px solid var(--line);padding:16px 4px 13px}
+header.top h1{font-size:18px;margin:0}
+header.top .sub{color:var(--muted);font-size:12.5px;max-width:920px;margin-top:3px}
+header.top .sub b{color:var(--ink)}
+.spacer{flex:1}
+.runbadge{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);
+  background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:5px 13px}
+.runbadge .dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
+.runbadge b{color:var(--ink)}
+
+/* the IA-change explainer */
+.explain{margin-top:13px;background:#eef4ff;border:1px solid #cfe0ff;border-left:3px solid var(--accent);
+  border-radius:6px;padding:9px 13px;color:#1c3d6e;font-size:12.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.explain b{color:#0f3d8a}
+.flowchain{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}
+.flowchain .step{background:#fff;border:1px solid #bcd2f5;border-radius:6px;padding:2px 9px;font-weight:600;font-size:11.5px}
+.flowchain .step.master{border-color:var(--accent);color:#0f3d8a}
+.flowchain .step.detail{border-color:var(--purple);color:#5a2ca0}
+.flowchain .ar{color:var(--accent);font-weight:700}
+
+/* master|detail layout */
+.md{display:grid;grid-template-columns:420px 1fr;gap:14px;align-items:start;margin-top:14px}
+@media(max-width:1100px){.md{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+  box-shadow:0 1px 2px rgba(31,35,40,.05)}
+.panel .ph{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);font-weight:600;font-size:13px}
+.panel .ph .sub{font-weight:400;color:var(--muted);font-size:11.5px;margin-left:auto}
+.panel .pb{padding:12px 14px}
+
+/* ===== MASTER: lifecycle list / mini DAG ===== */
+.lcitem{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);
+  border-radius:8px;padding:9px 11px;margin-bottom:9px;cursor:pointer;position:relative}
+.lcitem:hover{border-color:var(--accent)}
+.lcitem.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
+.lcitem .lctop{display:flex;align-items:center;gap:8px}
+.lcitem .st{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;color:#fff;flex:0 0 auto}
+.st.done{background:var(--green)} .st.run{background:var(--amber)} .st.fail{background:var(--red)}
+.st.soft{background:#fff;border:2px solid var(--amber);color:var(--amber);font-size:10px}
+.lcitem .lcname{font-weight:700;font-size:13px}
+.lcitem .lcsvc{color:var(--muted);font-size:11px}
+.lcitem .lcmeta{display:flex;gap:9px;flex-wrap:wrap;margin-top:7px;font-size:11px;color:var(--muted);align-items:center}
+.lcitem .pill{border:1px solid var(--line2);border-radius:10px;padding:0 7px;font-size:10.5px;font-weight:600;color:#3a424b;white-space:nowrap}
+.lcitem .pill.heavy{border-color:var(--amber);color:var(--amber)}
+.lcitem .pill.l{background:var(--accent);color:#fff;border-color:var(--accent)}
+.lcitem .wave{position:absolute;top:9px;right:11px;font-size:10px;color:var(--muted)}
+.lcitem .bar{height:4px;border-radius:3px;background:var(--panel2);margin-top:8px;overflow:hidden}
+.lcitem .bar > i{display:block;height:100%;border-radius:3px}
+.depnote{font-size:10.5px;color:var(--muted);margin:2px 0 8px 6px;display:flex;align-items:center;gap:5px}
+.depnote .ar{color:var(--line2)}
+
+.aggitem{display:flex;align-items:center;gap:9px;background:#fff;border:1px dashed var(--line2);border-radius:8px;
+  padding:9px 11px;margin-bottom:4px;cursor:pointer}
+.aggitem:hover{border-color:var(--accent)}
+.aggitem.sel{border-style:solid;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,201,.13);background:#f7faff}
+.aggitem .ico{font-size:15px}
+.aggitem b{font-size:13px}
+.aggitem .sub{color:var(--muted);font-size:11px;margin-left:auto}
+
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);
+  padding:10px 14px;border-top:1px solid var(--line)}
+.legend .st{width:16px;height:16px;font-size:10px}
+
+/* ===== DETAIL ===== */
+.detail .ph{background:var(--panel)}
+.scopebar{display:flex;align-items:center;gap:9px;padding:9px 14px;background:#f7faff;
+  border-bottom:1px solid var(--line);font-size:12.5px;position:sticky;top:0;z-index:3}
+.scopebar .lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+.scopebar .cur{font-weight:800;color:#0f3d8a;display:inline-flex;align-items:center;gap:7px}
+.scopebar .cur .st{width:16px;height:16px;font-size:10px}
+.scopebar .crumb{color:var(--muted)}
+.scopebar .clear{margin-left:auto;font-size:11.5px;color:var(--accent);cursor:pointer;border:1px solid var(--line);
+  background:#fff;border-radius:6px;padding:3px 9px;font-weight:600}
+.scopebar .clear:hover{background:var(--panel2)}
+
+.subtabs{display:flex;gap:2px;padding:9px 14px 0;background:var(--panel);border-bottom:1px solid var(--line)}
+.subtab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);
+  padding:7px 13px;cursor:pointer;font-size:12.5px;font-weight:600;border-radius:6px 6px 0 0}
+.subtab:hover{color:var(--ink);background:#fff}
+.subtab.on{color:var(--accent);border-bottom-color:var(--accent);background:#fff}
+.subtab .n{font-size:10px;background:var(--panel2);border-radius:9px;padding:0 6px;margin-left:5px;color:var(--muted);font-weight:700}
+.subtab.on .n{background:#dbeafe;color:#0f3d8a}
+
+.tabbody{padding:14px}
+.empty{color:var(--muted);font-size:12.5px;padding:30px 10px;text-align:center}
+
+/* 자원 tab */
+.restable{width:100%;border-collapse:collapse;font-size:12.5px}
+.restable th{text-align:left;padding:6px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;
+  color:var(--muted);border-bottom:1px solid var(--line)}
+.restable td{padding:7px 10px;border-bottom:1px solid #eef1f4;vertical-align:middle}
+.restable tr:hover td{background:#fff}
+.nodedot{width:8px;height:8px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.12);margin-right:6px;vertical-align:0}
+.idmono{font-family:ui-monospace,monospace;font-size:11.5px;color:#3a424b;background:var(--panel2);border-radius:5px;padding:1px 6px}
+.rstate{font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 8px;white-space:nowrap}
+.rstate.created{background:#ddf4e4;color:#1a7f37;border:1px solid #aee0bd}
+.rstate.deleted{background:#eaeef2;color:var(--muted);border:1px solid var(--line)}
+.rstate.kept{background:#fff8e6;color:#6b4e0f;border:1px solid #f0d9a8}
+
+/* API tab */
+.apilist{display:flex;flex-direction:column;gap:0}
+.apirow{border:1px solid var(--line);border-radius:0;border-bottom:none;background:#fff;cursor:pointer}
+.apirow:first-child{border-radius:8px 8px 0 0}
+.apirow:last-child{border-radius:0 0 8px 8px;border-bottom:1px solid var(--line)}
+.apirow .rh{display:flex;align-items:center;gap:9px;padding:8px 11px}
+.apirow:hover{background:var(--panel)}
+.apirow.open{background:#f7faff}
+.method{font-size:10.5px;font-weight:800;border-radius:5px;padding:1px 7px;color:#fff;min-width:54px;text-align:center}
+.method.GET{background:#1f6feb} .method.POST{background:var(--green)} .method.PUT{background:var(--amber)}
+.method.PATCH{background:var(--amber)} .method.DELETE{background:var(--red)}
+.apirow .path{font-family:ui-monospace,monospace;font-size:12px;color:var(--ink)}
+.apirow .stepname{color:var(--muted);font-size:11px}
+.apirow .status{margin-left:auto;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:8px}
+.status .code.s2{color:var(--green)} .status .code.s4{color:var(--red)} .status .code.soft{color:var(--amber)}
+.status .ms{color:var(--muted);font-weight:400;font-size:11px;min-width:64px;text-align:right}
+.apirow .twirl{color:var(--muted);font-size:10px;transition:transform .15s;width:11px}
+.apirow.open .twirl{transform:rotate(90deg)}
+.softtag{font-size:9.5px;font-weight:700;border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:0 5px}
+
+.apidetail{display:none;padding:0 12px 12px 32px;background:#f7faff}
+.apirow.open .apidetail{display:block}
+.kvgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+@media(max-width:760px){.kvgrid{grid-template-columns:1fr}}
+.kvbox{background:#fff;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.kvbox .kbh{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);
+  padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+.kvbox pre{margin:0;padding:9px 11px;font-family:ui-monospace,monospace;font-size:11.5px;
+  color:#1f2328;white-space:pre-wrap;word-break:break-word;line-height:1.5;max-height:230px;overflow:auto}
+.respline{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--line);font-size:11.5px}
+
+/* 파라미터 스키마 (coverage hint = B6) */
+.schema{margin-top:12px}
+.schema .sh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);
+  margin-bottom:6px;display:flex;align-items:center;gap:9px}
+.cov{font-size:10.5px;font-weight:700;border-radius:10px;padding:1px 9px}
+.cov.hi{background:#ddf4e4;color:#1a7f37;border:1px solid #aee0bd}
+.cov.mid{background:#fff8e6;color:#6b4e0f;border:1px solid #f0d9a8}
+.schtable{width:100%;border-collapse:collapse;font-size:11.5px;background:#fff;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.schtable th{text-align:left;padding:5px 9px;font-size:10px;text-transform:uppercase;letter-spacing:.3px;
+  color:var(--muted);background:var(--panel);border-bottom:1px solid var(--line)}
+.schtable td{padding:5px 9px;border-bottom:1px solid #eef1f4}
+.schtable tr:last-child td{border-bottom:none}
+.pname{font-family:ui-monospace,monospace;font-weight:600}
+.preq{font-size:9.5px;border-radius:4px;padding:0 5px;font-weight:700}
+.preq.req{background:#ffe3e3;color:#b42318;border:1px solid #ffc9c9}
+.preq.opt{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.sent{font-weight:700}
+.sent.yes{color:var(--green)} .sent.no{color:var(--muted)}
+.sentbadge{font-size:9.5px;border-radius:9px;padding:0 7px;font-weight:700}
+.sentbadge.yes{background:#ddf4e4;color:#1a7f37}
+.sentbadge.no{background:#fff;color:var(--muted);border:1px dashed var(--line2)}
+.covnote{font-size:11px;color:#6b4e0f;background:#fff8e6;border:1px solid #f0d9a8;border-radius:6px;
+  padding:6px 10px;margin-top:8px}
+
+/* 로그 tab */
+.logbox{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:11px 13px;
+  font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.6;color:#c9d1d9;max-height:460px;overflow:auto}
+.logbox .ts{color:#6e7681}
+.logbox .ok{color:#3fb950} .logbox .warn{color:#d29922} .logbox .err{color:#f85149}
+.logbox .meth{color:#79c0ff} .logbox .dim{color:#8b949e}
+
+.foot{margin-top:26px;color:var(--muted);font-size:11.5px;border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>B1 · 리포트 드릴다운 — 흐름(master) ▸ 노드 클릭 ▸ 자원·API·로그(detail)</h1>
+      <div class="sub">console2 리포트 IA 개편 목업 (실제 앱 아님 · 정적 샘플 런). 평면 4탭 대신 <b>master→detail
+        드릴다운</b>. 자원·API·로그 탭은 이제 "<b>이 라이프사이클의</b>" 자원·API·로그를 의미합니다.</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="runbadge"><span class="dot"></span>run <b>20260622-141233</b> · simulate · <b id="rbScope">3 lifecycle</b> · 진행 <b>100%</b></div>
+  </header>
+
+  <div class="explain">
+    <b>변경:</b>
+    <span class="flowchain">
+      <span class="step">평면 4탭 (흐름 · 자원 · API · 로그)</span>
+      <span class="ar">→</span>
+      <span class="step master">흐름 = master</span>
+      <span class="ar">▸</span>
+      <span class="step">노드 클릭</span>
+      <span class="ar">▸</span>
+      <span class="step detail">자원 · API · 로그 = 그 라이프사이클로 스코프된 detail</span>
+    </span>
+    <span style="color:var(--muted)">— 평면 탭이 잃어버리던 "어느 라이프사이클인가"를 detail 헤더에 항상 표시.</span>
+  </div>
+
+  <div class="md">
+    <!-- ============ MASTER ============ -->
+    <section class="panel master">
+      <div class="ph">흐름 (master) — 이 런의 라이프사이클 <span class="sub">DAG 생성 순서 · 클릭 = detail 열기</span></div>
+      <div class="pb">
+        <div id="lcList"></div>
+        <div class="depnote"><span class="ar">↳</span> server는 vpc·subnet·security-group·keypair 완료 후 생성 (DAG 의존)</div>
+        <div style="margin:14px 0 7px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">크로스-런 집계</div>
+        <button class="aggitem" data-agg="1">
+          <span class="ico">🗂️</span>
+          <span><b>전체 (集計)</b><div class="lcsub" style="font-size:11px;color:var(--muted)">평면 탭의 기존 동작 — 런 전체 자원/API/로그 합산</div></span>
+          <span class="sub" id="aggSub"></span>
+        </button>
+      </div>
+      <div class="legend">
+        <span><span class="st done">✓</span>완료</span>
+        <span><span class="st run">⏳</span>진행</span>
+        <span><span class="st soft">!</span>soft (예상된 4xx)</span>
+        <span><span class="st fail">✕</span>실패</span>
+        <span>🜂 heavy</span>
+      </div>
+    </section>
+
+    <!-- ============ DETAIL ============ -->
+    <section class="panel detail">
+      <div class="scopebar">
+        <span class="lbl">스코프</span>
+        <span class="cur" id="scopeCur"></span>
+        <span class="crumb" id="scopeCrumb"></span>
+        <button class="clear" id="scopeClear">전체 집계로 ↺</button>
+      </div>
+      <div class="subtabs" id="subtabs">
+        <button class="subtab on" data-tab="res">자원 <span class="n" id="nRes">0</span></button>
+        <button class="subtab" data-tab="api">API <span class="n" id="nApi">0</span></button>
+        <button class="subtab" data-tab="log">로그</button>
+      </div>
+      <div class="tabbody" id="tabbody"></div>
+    </section>
+  </div>
+
+  <div class="foot">design mockup · console2/mockups/b1-report-drilldown.html · 실제 networking-vpc-subnet 14-step 라이프사이클 기반 정적 샘플 · 실행 없음</div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   B1 — report drill-down. Hand-crafted but real-ish sample run.
+   3 lifecycles; networking-vpc-subnet carries its real 14 steps
+   (vpc/subnet/port) incl. a soft 404 (wait-gone). One lifecycle fails.
+   ============================================================ */
+
+/* ---- per-API-call sample records (METHOD/path/status/ms + req/resp + schema) ---- */
+function ok(code){ return code>=200&&code<300; }
+
+var RUN = {
+  id:"20260622-141233",
+  lifecycles:[
+    {
+      id:"networking-vpc-subnet", service:"networking/vpc", status:"done",
+      heavy:false, level:0, wave:0,
+      resources:[
+        {kind:"vpc", id:"vpc-7f3a91c2e4", state:"deleted", svc:"networking/vpc", prov:"val"},
+        {kind:"subnet", id:"subnet-1b8e02da7c", state:"deleted", svc:"networking/vpc", prov:"val"},
+        {kind:"port", id:"port-9c4d61fa30", state:"deleted", svc:"networking/vpc", prov:"val"}
+      ],
+      api:[
+        {m:"POST",p:"/v1/vpcs",name:"create-vpc",code:201,ms:3538,
+          req:{body:{name:"apitest-vpc-7f3a",cidr:"10.0.0.0/16",description:"console2 sample"}},
+          resp:{id:"vpc-7f3a91c2e4",state:"CREATING",cidr:"10.0.0.0/16",account_id:"a1b2c3"},
+          schema:{required:["name","cidr"],params:[
+            {n:"name",t:"string",req:true,sent:true},
+            {n:"cidr",t:"string",req:true,sent:true},
+            {n:"description",t:"string",req:false,sent:true},
+            {n:"tags",t:"object",req:false,sent:false}]}},
+        {m:"GET",p:"/v1/vpcs/{vpc_id}",name:"get-vpc-active",code:200,ms:212,
+          req:{path:{vpc_id:"vpc-7f3a91c2e4"}},
+          resp:{id:"vpc-7f3a91c2e4",state:"ACTIVE",cidr:"10.0.0.0/16"},
+          schema:{required:["vpc_id"],params:[{n:"vpc_id",t:"path",req:true,sent:true}]}},
+        {m:"GET",p:"/v1/vpcs",name:"list-vpcs",code:200,ms:184,
+          req:{query:{size:50,state:"ACTIVE"}},
+          resp:{total_count:7,contents:"[ … 7 vpcs … ]"},
+          schema:{required:[],params:[
+            {n:"size",t:"int",req:false,sent:true},
+            {n:"page",t:"int",req:false,sent:false},
+            {n:"sort",t:"string",req:false,sent:false},
+            {n:"id",t:"string",req:false,sent:false},
+            {n:"name",t:"string",req:false,sent:false},
+            {n:"state",t:"string",req:false,sent:true},
+            {n:"cidr",t:"string",req:false,sent:false}]}},
+        {m:"PUT",p:"/v1/vpcs/{vpc_id}",name:"set-vpc",code:200,ms:402,
+          req:{path:{vpc_id:"vpc-7f3a91c2e4"},body:{description:"updated by set-vpc"}},
+          resp:{id:"vpc-7f3a91c2e4",description:"updated by set-vpc"},
+          schema:{required:["vpc_id"],params:[
+            {n:"vpc_id",t:"path",req:true,sent:true},
+            {n:"description",t:"string",req:false,sent:true},
+            {n:"name",t:"string",req:false,sent:false}]}},
+        {m:"POST",p:"/v1/vpcs/{vpc_id}/cidrs",name:"add-cidr",code:201,ms:489,
+          req:{path:{vpc_id:"vpc-7f3a91c2e4"},body:{cidr:"10.1.0.0/16"}},
+          resp:{cidr:"10.1.0.0/16",state:"ATTACHED"},
+          schema:{required:["vpc_id","cidr"],params:[
+            {n:"vpc_id",t:"path",req:true,sent:true},
+            {n:"cidr",t:"string",req:true,sent:true}]}},
+        {m:"POST",p:"/v1/subnets",name:"create-subnet",code:202,ms:1271,
+          req:{body:{vpc_id:"vpc-7f3a91c2e4",name:"apitest-sn-1b8e",cidr:"10.0.1.0/24",type:"GENERAL"}},
+          resp:{id:"subnet-1b8e02da7c",state:"CREATING"},
+          schema:{required:["vpc_id","name","cidr","type"],params:[
+            {n:"vpc_id",t:"string",req:true,sent:true},
+            {n:"name",t:"string",req:true,sent:true},
+            {n:"cidr",t:"string",req:true,sent:true},
+            {n:"type",t:"enum",req:true,sent:true},
+            {n:"zone",t:"string",req:false,sent:false},
+            {n:"description",t:"string",req:false,sent:false}]}},
+        {m:"GET",p:"/v1/subnets/{subnet_id}",name:"get-subnet-active",code:200,ms:198,
+          req:{path:{subnet_id:"subnet-1b8e02da7c"}},
+          resp:{id:"subnet-1b8e02da7c",state:"ACTIVE",cidr:"10.0.1.0/24"},
+          schema:{required:["subnet_id"],params:[{n:"subnet_id",t:"path",req:true,sent:true}]}},
+        {m:"POST",p:"/v1/ports",name:"create-port",code:201,ms:864,
+          req:{body:{subnet_id:"subnet-1b8e02da7c",name:"apitest-port-9c4d",fixed_ip_address:"10.0.1.10"}},
+          resp:{id:"port-9c4d61fa30",state:"ACTIVE",fixed_ip_address:"10.0.1.10"},
+          schema:{required:["subnet_id","name"],params:[
+            {n:"subnet_id",t:"string",req:true,sent:true},
+            {n:"name",t:"string",req:true,sent:true},
+            {n:"fixed_ip_address",t:"string",req:false,sent:true},
+            {n:"security_groups",t:"array",req:false,sent:false}]}},
+        {m:"PUT",p:"/v1/ports/{port_id}",name:"setport",code:200,ms:331,
+          req:{path:{port_id:"port-9c4d61fa30"},body:{name:"apitest-port-9c4d-renamed"}},
+          resp:{id:"port-9c4d61fa30",name:"apitest-port-9c4d-renamed"},
+          schema:{required:["port_id"],params:[
+            {n:"port_id",t:"path",req:true,sent:true},
+            {n:"name",t:"string",req:false,sent:true}]}},
+        {m:"PUT",p:"/v1/subnets/{subnet_id}",name:"setsubnet",code:200,ms:357,
+          req:{path:{subnet_id:"subnet-1b8e02da7c"},body:{description:"updated"}},
+          resp:{id:"subnet-1b8e02da7c",description:"updated"},
+          schema:{required:["subnet_id"],params:[
+            {n:"subnet_id",t:"path",req:true,sent:true},
+            {n:"description",t:"string",req:false,sent:true}]}},
+        {m:"DELETE",p:"/v1/ports/{port_id}",name:"delete-port",code:204,ms:421,
+          req:{path:{port_id:"port-9c4d61fa30"}},
+          resp:{__note:"204 No Content"},
+          schema:{required:["port_id"],params:[{n:"port_id",t:"path",req:true,sent:true}]}},
+        {m:"DELETE",p:"/v1/subnets/{subnet_id}",name:"delete-subnet",code:202,ms:512,
+          req:{path:{subnet_id:"subnet-1b8e02da7c"}},
+          resp:{state:"DELETING"},
+          schema:{required:["subnet_id"],params:[{n:"subnet_id",t:"path",req:true,sent:true}]}},
+        {m:"GET",p:"/v1/subnets/{subnet_id}",name:"wait-subnet-gone",code:404,ms:177,soft:true,
+          req:{path:{subnet_id:"subnet-1b8e02da7c"}},
+          resp:{code:"SUBNET_NOT_FOUND",message:"subnet has been deleted (expected — wait-gone)"},
+          schema:{required:["subnet_id"],params:[{n:"subnet_id",t:"path",req:true,sent:true}]}},
+        {m:"DELETE",p:"/v1/vpcs/{vpc_id}",name:"delete-vpc",code:204,ms:603,
+          req:{path:{vpc_id:"vpc-7f3a91c2e4"}},
+          resp:{__note:"204 No Content"},
+          schema:{required:["vpc_id"],params:[{n:"vpc_id",t:"path",req:true,sent:true}]}}
+      ]
+    },
+    {
+      id:"networking-security-group", service:"networking/security-group", status:"soft",
+      heavy:false, level:0, wave:0,
+      resources:[
+        {kind:"security-group", id:"sg-3da7e91044", state:"deleted", svc:"networking/security-group", prov:"val"},
+        {kind:"security-group-rule", id:"sgr-88fa0c12", state:"deleted", svc:"networking/security-group", prov:"val"}
+      ],
+      api:[
+        {m:"POST",p:"/v1/security-groups",name:"create-sg",code:201,ms:742,
+          req:{body:{name:"apitest-sg-3da7",description:"sample sg"}},
+          resp:{id:"sg-3da7e91044",state:"ACTIVE"},
+          schema:{required:["name"],params:[
+            {n:"name",t:"string",req:true,sent:true},
+            {n:"description",t:"string",req:false,sent:true},
+            {n:"vpc_id",t:"string",req:false,sent:false}]}},
+        {m:"POST",p:"/v1/security-groups/{sg_id}/rules",name:"create-rule",code:201,ms:388,
+          req:{path:{sg_id:"sg-3da7e91044"},body:{direction:"INGRESS",protocol:"TCP",port_min:443,port_max:443,remote_ip_prefix:"0.0.0.0/0"}},
+          resp:{id:"sgr-88fa0c12",direction:"INGRESS"},
+          schema:{required:["direction","protocol"],params:[
+            {n:"direction",t:"enum",req:true,sent:true},
+            {n:"protocol",t:"enum",req:true,sent:true},
+            {n:"port_min",t:"int",req:false,sent:true},
+            {n:"port_max",t:"int",req:false,sent:true},
+            {n:"remote_ip_prefix",t:"string",req:false,sent:true},
+            {n:"remote_group_id",t:"string",req:false,sent:false},
+            {n:"description",t:"string",req:false,sent:false}]}},
+        {m:"PUT",p:"/v1/security-groups/{sg_id}/rules/{rule_id}",name:"update-rule",code:409,ms:233,soft:true,
+          req:{path:{sg_id:"sg-3da7e91044",rule_id:"sgr-88fa0c12"},body:{port_max:8443}},
+          resp:{code:"RULE_IMMUTABLE",message:"rule update conflicts with existing (known 409 — baseline)"},
+          schema:{required:["sg_id","rule_id"],params:[
+            {n:"sg_id",t:"path",req:true,sent:true},
+            {n:"rule_id",t:"path",req:true,sent:true},
+            {n:"port_max",t:"int",req:false,sent:true}]}},
+        {m:"DELETE",p:"/v1/security-groups/{sg_id}/rules/{rule_id}",name:"delete-rule",code:204,ms:301,
+          req:{path:{sg_id:"sg-3da7e91044",rule_id:"sgr-88fa0c12"}},
+          resp:{__note:"204 No Content"},
+          schema:{required:["sg_id","rule_id"],params:[
+            {n:"sg_id",t:"path",req:true,sent:true},{n:"rule_id",t:"path",req:true,sent:true}]}},
+        {m:"DELETE",p:"/v1/security-groups/{sg_id}",name:"delete-sg",code:204,ms:355,
+          req:{path:{sg_id:"sg-3da7e91044"}},
+          resp:{__note:"204 No Content"},
+          schema:{required:["sg_id"],params:[{n:"sg_id",t:"path",req:true,sent:true}]}}
+      ]
+    },
+    {
+      id:"database-mysql-cluster", service:"database/mysql", status:"fail",
+      heavy:true, level:2, wave:1,
+      resources:[
+        {kind:"mysql-cluster", id:"mysql-c-04ab9931", state:"kept", svc:"database/mysql", prov:"val"}
+      ],
+      api:[
+        {m:"GET",p:"/v1/mysql/engine-versions",name:"list-engine-versions",code:200,ms:264,
+          req:{query:{}},
+          resp:{contents:"[ 8.0.34, 8.0.28 ]"},
+          schema:{required:[],params:[{n:"page",t:"int",req:false,sent:false},{n:"size",t:"int",req:false,sent:false}]}},
+        {m:"GET",p:"/v1/mysql/server-types",name:"list-server-types",code:200,ms:241,
+          req:{query:{}},
+          resp:{contents:"[ db1v2m4, db2v4m8 ]"},
+          schema:{required:[],params:[{n:"page",t:"int",req:false,sent:false}]}},
+        {m:"POST",p:"/v1/mysql/clusters",name:"create-cluster",code:500,ms:8842,fail:true,
+          req:{body:{name:"apitest-mysql-04ab",engine_version:"8.0.34",server_type:"db1v2m4",subnet_id:"subnet-shared-xyz",nat_enabled:true}},
+          resp:{code:"INTERNAL_ERROR",message:"backend allocation failed (provisioning timeout)"},
+          schema:{required:["name","engine_version","server_type","subnet_id"],params:[
+            {n:"name",t:"string",req:true,sent:true},
+            {n:"engine_version",t:"string",req:true,sent:true},
+            {n:"server_type",t:"string",req:true,sent:true},
+            {n:"subnet_id",t:"string",req:true,sent:true},
+            {n:"nat_enabled",t:"bool",req:false,sent:true},
+            {n:"init_config_option",t:"object",req:false,sent:false},
+            {n:"backup_option",t:"object",req:false,sent:false},
+            {n:"timezone",t:"string",req:false,sent:false}]}}
+      ]
+    }
+  ]
+};
+
+/* ============================================================
+   helpers
+   ============================================================ */
+function esc(s){ return (s+"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function provColor(p){ return p==="val"?"var(--val)":"var(--docs)"; }
+function statusClass(s){ return s==="done"?"done":s==="run"?"run":s==="fail"?"fail":"soft"; }
+function statusGlyph(s){ return s==="done"?"✓":s==="run"?"⏳":s==="fail"?"✕":"!"; }
+function statusLabel(s){ return s==="done"?"완료":s==="run"?"진행 중":s==="fail"?"실패":"soft (예상된 4xx)"; }
+
+/* aggregate counts across the run (the "전체" scope) */
+function aggResources(){ var a=[]; RUN.lifecycles.forEach(function(lc){ lc.resources.forEach(function(r){ a.push(Object.assign({_lc:lc.id},r)); }); }); return a; }
+function aggApi(){ var a=[]; RUN.lifecycles.forEach(function(lc){ lc.api.forEach(function(c){ a.push(Object.assign({_lc:lc.id},c)); }); }); return a; }
+
+/* ============================================================
+   MASTER render
+   ============================================================ */
+function renderMaster(){
+  var box=document.getElementById("lcList");
+  box.innerHTML=RUN.lifecycles.map(function(lc){
+    var nCreate=lc.api.filter(function(c){return c.m==="POST"&&ok(c.code);}).length;
+    var nSoft=lc.api.filter(function(c){return c.soft;}).length;
+    var nFail=lc.api.filter(function(c){return c.fail;}).length;
+    var progColor = lc.status==="fail"?"var(--red)":lc.status==="soft"?"var(--amber)":"var(--green)";
+    var progW = lc.status==="fail"?"62%":"100%";
+    return '<button class="lcitem" data-lc="'+lc.id+'">'+
+      '<span class="wave">wave '+lc.wave+' · L'+lc.level+'</span>'+
+      '<div class="lctop">'+
+        '<span class="st '+statusClass(lc.status)+'">'+statusGlyph(lc.status)+'</span>'+
+        '<span><span class="lcname">'+(lc.heavy?"🜂 ":"")+esc(lc.id)+'</span>'+
+        '<div class="lcsvc">'+esc(lc.service)+'</div></span>'+
+      '</div>'+
+      '<div class="lcmeta">'+
+        '<span class="pill l">'+lc.api.length+' API</span>'+
+        '<span class="pill">'+lc.resources.length+' 자원</span>'+
+        '<span class="pill">'+nCreate+' created</span>'+
+        (nSoft?'<span class="pill" style="border-color:var(--amber);color:var(--amber)">'+nSoft+' soft</span>':'')+
+        (nFail?'<span class="pill" style="border-color:var(--red);color:var(--red)">'+nFail+' fail</span>':'')+
+        (lc.heavy?'<span class="pill heavy">🜂 heavy</span>':'')+
+      '</div>'+
+      '<div class="bar"><i style="width:'+progW+';background:'+progColor+'"></i></div>'+
+    '</button>';
+  }).join("");
+  // aggregate sub
+  document.getElementById("aggSub").textContent=aggResources().length+" 자원 · "+aggApi().length+" API";
+}
+
+/* ============================================================
+   DETAIL — scope = a lifecycle id, or "*" for aggregate
+   ============================================================ */
+var SCOPE="networking-vpc-subnet";   // current scope
+var TAB="res";
+var OPEN={};                          // open api rows: key "lc#idx"
+
+function scopeLifecycle(){ return RUN.lifecycles.find(function(l){return l.id===SCOPE;}); }
+function isAgg(){ return SCOPE==="*"; }
+
+function renderScopeBar(){
+  var cur=document.getElementById("scopeCur");
+  var crumb=document.getElementById("scopeCrumb");
+  var clear=document.getElementById("scopeClear");
+  if(isAgg()){
+    cur.innerHTML='🗂️ 전체 (크로스-런 집계)';
+    crumb.textContent='— '+RUN.lifecycles.length+' lifecycle 합산 (평면 탭과 동일)';
+    clear.style.display="none";
+  } else {
+    var lc=scopeLifecycle();
+    cur.innerHTML='<span class="st '+statusClass(lc.status)+'">'+statusGlyph(lc.status)+'</span> '+(lc.heavy?"🜂 ":"")+esc(lc.id);
+    crumb.textContent='— '+esc(lc.service)+' · '+statusLabel(lc.status)+' · wave '+lc.wave;
+    clear.style.display="";
+  }
+}
+
+function renderSubtabCounts(){
+  var res = isAgg()?aggResources():scopeLifecycle().resources;
+  var api = isAgg()?aggApi():scopeLifecycle().api;
+  document.getElementById("nRes").textContent=res.length;
+  document.getElementById("nApi").textContent=api.length;
+}
+
+function codeClass(c){ return c.soft?"soft":ok(c.code)?"s2":"s4"; }
+
+/* --- 자원 tab --- */
+function renderResTab(){
+  var list = isAgg()?aggResources():scopeLifecycle().resources;
+  if(!list.length) return '<div class="empty">이 라이프사이클에는 추적된 자원이 없습니다.</div>';
+  var rows=list.map(function(r){
+    var stcls = r.state==="created"?"created":r.state==="kept"?"kept":"deleted";
+    var stlbl = r.state==="created"?"생성됨 (유지)":r.state==="kept"?"유지 (실패 후 잔존)":"생성→삭제 완료";
+    return '<tr>'+
+      '<td><span class="nodedot" style="background:'+provColor(r.prov)+'"></span><b>'+esc(r.kind)+'</b></td>'+
+      '<td><span class="idmono">'+esc(r.id)+'</span></td>'+
+      '<td><span class="svcsub" style="color:var(--muted);font-size:11.5px">'+esc(r.svc)+'</span></td>'+
+      (isAgg()?'<td><span class="svcsub" style="color:var(--muted);font-size:11px">'+esc(r._lc)+'</span></td>':'')+
+      '<td style="text-align:right"><span class="rstate '+stcls+'">'+stlbl+'</span></td>'+
+    '</tr>';
+  }).join("");
+  return '<table class="restable"><thead><tr>'+
+    '<th>리소스 종류</th><th>실자원 id</th><th>서비스</th>'+(isAgg()?'<th>라이프사이클</th>':'')+'<th style="text-align:right">상태</th>'+
+    '</tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<div style="margin-top:10px;font-size:11.5px;color:var(--muted)">자원 상태는 owner-tag 스코프 — 이 런이 만든 자원만. teardown으로 삭제 완료 = "생성→삭제".</div>';
+}
+
+/* --- API tab (rows expand to req/resp + 파라미터 스키마) --- */
+function paramCoverage(call){
+  var ps=call.schema.params;
+  var sent=ps.filter(function(p){return p.sent;}).length;
+  return {sent:sent, total:ps.length};
+}
+function renderApiTab(){
+  var list = isAgg()?aggApi():scopeLifecycle().api;
+  if(!list.length) return '<div class="empty">이 라이프사이클에는 API 호출이 없습니다.</div>';
+  var html='<div class="apilist">';
+  list.forEach(function(c,i){
+    var key=(c._lc||SCOPE)+"#"+i;
+    var cov=paramCoverage(c);
+    var open=OPEN[key];
+    html+='<div class="apirow'+(open?' open':'')+'" data-api="'+key+'">'+
+      '<div class="rh">'+
+        '<span class="twirl">▸</span>'+
+        '<span class="method '+c.m+'">'+c.m+'</span>'+
+        '<span class="path">'+esc(c.p)+'</span>'+
+        '<span class="stepname">'+esc(c.name)+(isAgg()?' · <span style="color:#8250df">'+esc(c._lc)+'</span>':'')+'</span>'+
+        '<span class="status">'+
+          (c.soft?'<span class="softtag">soft</span>':'')+
+          '<span class="code '+codeClass(c)+'">'+c.code+'</span>'+
+          '<span class="ms">'+c.ms+'ms</span>'+
+        '</span>'+
+      '</div>'+
+      '<div class="apidetail">'+renderApiDetail(c,cov)+'</div>'+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
+}
+function fmtJSON(o){ return esc(JSON.stringify(o,null,2)); }
+function renderApiDetail(c,cov){
+  var reqParts=[];
+  if(c.req.path) reqParts.push('// path\n'+fmtJSON(c.req.path));
+  if(c.req.query) reqParts.push('// query\n'+fmtJSON(c.req.query));
+  if(c.req.body) reqParts.push('// body\n'+fmtJSON(c.req.body));
+  var reqStr=reqParts.join('\n\n')||'(파라미터 없음)';
+  var covPct = cov.total?Math.round(cov.sent/cov.total*100):100;
+  var covCls = covPct>=80?"hi":"mid";
+  var schemaRows=c.schema.params.map(function(p){
+    return '<tr>'+
+      '<td><span class="pname">'+esc(p.n)+'</span></td>'+
+      '<td><span class="svcsub" style="color:var(--muted)">'+esc(p.t)+'</span></td>'+
+      '<td><span class="preq '+(p.req?'req':'opt')+'">'+(p.req?'required':'optional')+'</span></td>'+
+      '<td><span class="sentbadge '+(p.sent?'yes':'no')+'">'+(p.sent?'보냄 ✓':'미전송')+'</span></td>'+
+    '</tr>';
+  }).join("");
+  var notSent=c.schema.params.filter(function(p){return !p.sent;}).map(function(p){return p.n;});
+  return '<div class="kvgrid">'+
+      '<div class="kvbox"><div class="kbh">요청 (sent)</div><pre>'+reqStr+'</pre></div>'+
+      '<div class="kvbox"><div class="kbh">응답 ('+c.code+(c.soft?' · soft':'')+')</div>'+
+        '<div class="respline">status <b class="code '+codeClass(c)+'">'+c.code+'</b> · '+c.ms+'ms'+(c.soft?' · <span style="color:var(--amber);font-weight:700">예상된 결과(baseline)</span>':'')+'</div>'+
+        '<pre>'+fmtJSON(c.resp)+'</pre></div>'+
+    '</div>'+
+    '<div class="schema">'+
+      '<div class="sh">파라미터 스키마 (declared) vs 전송(sent) — 커버리지 힌트'+
+        '<span class="cov '+covCls+'">'+cov.sent+'/'+cov.total+' 전송 · '+covPct+'%</span></div>'+
+      '<table class="schtable"><thead><tr><th>파라미터</th><th>타입</th><th>필수</th><th>이번 호출</th></tr></thead>'+
+        '<tbody>'+schemaRows+'</tbody></table>'+
+      (notSent.length?'<div class="covnote">미전송 파라미터 '+notSent.length+'개: <b>'+esc(notSent.join(", "))+'</b> — 이 엔드포인트에서 아직 테스트되지 않은 입력. (B6: 노드별로 굴려 DAG 커버리지 히트맵)</div>':'<div class="covnote" style="background:#ddf4e4;border-color:#aee0bd;color:#1a7f37">선언된 모든 파라미터가 이 호출에서 전송됨 ✓</div>')+
+    '</div>';
+}
+
+/* --- 로그 tab --- */
+function renderLogTab(){
+  var lcs = isAgg()?RUN.lifecycles:[scopeLifecycle()];
+  var lines=[];
+  lcs.forEach(function(lc){
+    lines.push('<span class="dim">── lifecycle '+esc(lc.id)+' ('+esc(lc.service)+') ──</span>');
+    lc.api.forEach(function(c){
+      var cls=c.fail?"err":c.soft?"warn":"ok";
+      var tag=c.fail?"FAIL":c.soft?"SOFT":"ok";
+      lines.push('<span class="ts">'+nextTs()+'</span> <span class="meth">'+c.m+'</span> '+esc(c.p)+
+        ' <span class="dim">('+esc(c.name)+')</span> → <span class="'+cls+'">'+c.code+' '+tag+'</span> <span class="dim">'+c.ms+'ms</span>');
+    });
+    if(lc.status==="fail") lines.push('<span class="err">✕ lifecycle FAILED — create-cluster 500; 자원 잔존 (mysql-c-04ab9931) → 강제 클린업 필요</span>');
+    else if(lc.status==="soft") lines.push('<span class="warn">! lifecycle done with soft 4xx (baseline-muted) — teardown 완료</span>');
+    else lines.push('<span class="ok">✓ lifecycle passed — 자원 생성→삭제 완료</span>');
+    lines.push('');
+  });
+  return '<div class="logbox">'+lines.join("\n")+'</div>'+
+    '<div style="margin-top:8px;font-size:11.5px;color:var(--muted)">로그는 이 스코프로 필터됨 — '+
+    (isAgg()?'런 전체':'이 라이프사이클만')+'. (append-only; 평면 탭의 flicker 없음 — Q1)</div>';
+}
+/* monotonic wall-clock-ish timestamp for the log lines (14:12:33.xxx onward).
+   Cosmetic only; advances ~0.4–1.6s per call. */
+var _tsSec=14*3600 + 12*60 + 33;   // 14:12:33
+var _tsMs=120;
+function nextTs(){
+  _tsMs += 400 + Math.floor(Math.random()*1200);
+  while(_tsMs>=1000){ _tsMs-=1000; _tsSec+=1; }
+  var hh=Math.floor(_tsSec/3600)%24, mm=Math.floor(_tsSec/60)%60, ss=_tsSec%60;
+  var p2=function(x){return ("0"+x).slice(-2);};
+  return p2(hh)+":"+p2(mm)+":"+p2(ss)+"."+("00"+_tsMs).slice(-3);
+}
+
+function renderTabBody(){
+  var body=document.getElementById("tabbody");
+  if(TAB==="res") body.innerHTML=renderResTab();
+  else if(TAB==="api") body.innerHTML=renderApiTab();
+  else body.innerHTML=renderLogTab();
+  // wire api row expand
+  if(TAB==="api"){
+    body.querySelectorAll(".apirow").forEach(function(row){
+      row.addEventListener("click", function(e){
+        var key=row.getAttribute("data-api");
+        OPEN[key]=!OPEN[key];
+        row.classList.toggle("open",OPEN[key]);
+      });
+    });
+  }
+}
+
+function renderDetail(){
+  renderScopeBar();
+  renderSubtabCounts();
+  renderTabBody();
+  // reflect tab active state
+  document.querySelectorAll("#subtabs .subtab").forEach(function(b){ b.classList.toggle("on",b.getAttribute("data-tab")===TAB); });
+  // master selection highlight
+  document.querySelectorAll(".lcitem").forEach(function(b){ b.classList.toggle("sel",b.getAttribute("data-lc")===SCOPE); });
+  document.querySelector(".aggitem").classList.toggle("sel",isAgg());
+}
+
+/* ============================================================
+   events
+   ============================================================ */
+document.getElementById("lcList").addEventListener("click", function(e){
+  var it=e.target.closest("[data-lc]"); if(!it) return;
+  SCOPE=it.getAttribute("data-lc"); OPEN={}; renderDetail();
+});
+document.querySelector(".aggitem").addEventListener("click", function(){
+  SCOPE="*"; OPEN={}; renderDetail();
+});
+document.getElementById("scopeClear").addEventListener("click", function(){
+  SCOPE="*"; OPEN={}; renderDetail();
+});
+document.getElementById("subtabs").addEventListener("click", function(e){
+  var b=e.target.closest(".subtab"); if(!b) return;
+  TAB=b.getAttribute("data-tab"); renderTabBody();
+  document.querySelectorAll("#subtabs .subtab").forEach(function(x){ x.classList.toggle("on",x===b); });
+});
+
+/* ============================================================
+   init
+   ============================================================ */
+renderMaster();
+renderDetail();
+</script>
+</body>
+</html>
