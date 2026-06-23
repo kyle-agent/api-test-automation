@@ -26,7 +26,7 @@ a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--blue-bg);color:var(--blue)}
 .gauge{display:flex;align-items:center;gap:14px}
 .ring{width:62px;height:62px;border-radius:50%;flex:none;
-  background:conic-gradient(var(--red) calc(18*1%),var(--grey-bg) 0);
+  background:conic-gradient(var(--amber) calc(29*1%),var(--grey-bg) 0);
   display:grid;place-items:center;position:relative}
 .ring::after{content:"";position:absolute;inset:7px;background:var(--surface);border-radius:50%}
 .ring span{position:relative;font-weight:700;font-size:15px}
@@ -144,12 +144,12 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div class="hero">
   <div class="gauge">
-    <div class="ring"><span>18%</span></div>
-    <div class="lbl">검증(2xx) 커버<br><b>3 / 17</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 0</span></div>
+    <div class="ring"><span>29%</span></div>
+    <div class="lbl">검증(2xx) 커버<br><b>5 / 17</b> ops · <span style="color:var(--amber)">◑ 도달·미검증 0</span></div>
   </div>
   <h1>data-flow <span class="tag">data-analytics</span></h1>
   <div class="split">
-    <div><div class="k">읽기 GET</div><div class="v" style="color:var(--amber)">33% <span class="sub">3/9</span></div></div>
+    <div><div class="k">읽기 GET</div><div class="v" style="color:var(--green)">56% <span class="sub">5/9</span></div></div>
     <div><div class="k">쓰기 (POST/PUT/DELETE)</div><div class="v" style="color:var(--red)">0% <span class="sub">0/8</span></div></div>
     <div><div class="k">설계/동작 결함</div><div class="v">0 <span class="sub">개선 · 결함 0</span></div></div>
   </div>
@@ -200,11 +200,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 
 <div id="out"></div>
 
-<div class="foot">생성 2026-06-20 14:16 KST · branch <code>claude/ecstatic-ride-m3vv7z</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
+<div class="foot">생성 2026-06-23 11:32 KST · branch <code>main</code> · 커버 기준: GET=실제 호출(smoke/CRUD probe), 쓰기=CRUD 스텝이 해당 method+path 실행 · @prev = 이번 런 미호출, 이전 런의 마지막 관측값</div>
 </div>
 
 <script>
-var R=[{"m": "DELETE", "p": "/v1/data-flow-services/{data_flow_service_id}", "api": "deletedataflowserviceconsole", "c": "n", "s": 400, "t": 0.9, "src": "58379cb", "d": []}, {"m": "DELETE", "p": "/v1/data-flows/{data_flow_id}", "api": "deletedataflow", "c": "n", "s": 400, "t": 0.8, "src": "58379cb", "d": []}, {"m": "GET", "p": "/v1/data-flow-services", "api": "getdataflowservicelistconsole", "c": "y", "s": 200, "t": 1.3, "src": "58379cb", "d": []}, {"m": "GET", "p": "/v1/data-flow-services/{data_flow_service_id}", "api": "getdataflowserviceconsole", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flow-services/{data_flow_service_name}/check-duplication", "api": "getdataflowservicecheckduplication", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flow-services/data-flows/{data_flow_id}/sub-versions", "api": "getdataflowservicesubversions", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows", "api": "getdataflowlistconsole", "c": "y", "s": 200, "t": 1.8, "src": "58379cb", "d": []}, {"m": "GET", "p": "/v1/data-flows/{data_flow_id}", "api": "getdataflow", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows/{data_flow_name}/check-duplication", "api": "getdataflowcheckduplication", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows/clusters/{cluster_id}/ingress-controllers", "api": "ingresscluster", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows/image-versions", "api": "getdataflowimages", "c": "y", "s": 200, "t": 1.2, "src": "58379cb", "d": []}, {"m": "POST", "p": "/v1/data-flow-services", "api": "createdataflowserviceconsole", "c": "n", "s": 400, "t": 1.1, "src": "58379cb", "d": []}, {"m": "POST", "p": "/v1/data-flow-services/{data_flow_service_id}/validate-resources", "api": "dataflowservicevalidateresourcesupdate", "c": "n", "s": 400, "t": 0.8, "src": "58379cb", "d": []}, {"m": "POST", "p": "/v1/data-flow-services/clusters/{cluster_id}/validate-resources", "api": "dataflowservicevalidateresourcescreation", "c": "n", "s": 400, "t": 1.3, "src": "58379cb", "d": []}, {"m": "POST", "p": "/v1/data-flows", "api": "createdataflow", "c": "n", "s": 400, "t": 0.9, "src": "58379cb", "d": []}, {"m": "PUT", "p": "/v1/data-flow-services/{data_flow_service_id}", "api": "updatedataflowserviceconsole", "c": "n", "s": 400, "t": 0.9, "src": "58379cb", "d": []}, {"m": "PUT", "p": "/v1/data-flows/{data_flow_id}", "api": "updatedataflow", "c": "n", "s": 400, "t": 0.8, "src": "58379cb", "d": []}];
+var R=[{"m": "DELETE", "p": "/v1/data-flow-services/{data_flow_service_id}", "api": "deletedataflowserviceconsole", "c": "n", "s": 400, "t": 0.9, "src": "58379cb", "d": []}, {"m": "DELETE", "p": "/v1/data-flows/{data_flow_id}", "api": "deletedataflow", "c": "n", "s": 400, "t": 0.8, "src": "58379cb", "d": []}, {"m": "GET", "p": "/v1/data-flow-services", "api": "getdataflowservicelistconsole", "c": "y", "s": 200, "t": 1.4, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flow-services/{data_flow_service_id}", "api": "getdataflowserviceconsole", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flow-services/{data_flow_service_name}/check-duplication", "api": "getdataflowservicecheckduplication", "c": "y", "s": 200, "t": 1.7, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flow-services/data-flows/{data_flow_id}/sub-versions", "api": "getdataflowservicesubversions", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows", "api": "getdataflowlistconsole", "c": "y", "s": 200, "t": 1.3, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows/{data_flow_id}", "api": "getdataflow", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows/{data_flow_name}/check-duplication", "api": "getdataflowcheckduplication", "c": "y", "s": 200, "t": 2.7, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows/clusters/{cluster_id}/ingress-controllers", "api": "ingresscluster", "c": "n", "s": null, "t": null, "src": "", "d": []}, {"m": "GET", "p": "/v1/data-flows/image-versions", "api": "getdataflowimages", "c": "y", "s": 200, "t": 2.8, "src": "", "d": []}, {"m": "POST", "p": "/v1/data-flow-services", "api": "createdataflowserviceconsole", "c": "n", "s": 400, "t": 1.1, "src": "58379cb", "d": []}, {"m": "POST", "p": "/v1/data-flow-services/{data_flow_service_id}/validate-resources", "api": "dataflowservicevalidateresourcesupdate", "c": "n", "s": 400, "t": 0.8, "src": "58379cb", "d": []}, {"m": "POST", "p": "/v1/data-flow-services/clusters/{cluster_id}/validate-resources", "api": "dataflowservicevalidateresourcescreation", "c": "n", "s": 400, "t": 1.3, "src": "58379cb", "d": []}, {"m": "POST", "p": "/v1/data-flows", "api": "createdataflow", "c": "n", "s": 400, "t": 0.9, "src": "58379cb", "d": []}, {"m": "PUT", "p": "/v1/data-flow-services/{data_flow_service_id}", "api": "updatedataflowserviceconsole", "c": "n", "s": 400, "t": 0.9, "src": "58379cb", "d": []}, {"m": "PUT", "p": "/v1/data-flows/{data_flow_id}", "api": "updatedataflow", "c": "n", "s": 400, "t": 0.8, "src": "58379cb", "d": []}];
 R.forEach(function(r){r.res=r.p.split('/')[2]||'기타';});
 var state={methods:new Set(),cov:'',st:'',def:false,slow:false,q:'',group:true};
 var out=document.getElementById('out');
