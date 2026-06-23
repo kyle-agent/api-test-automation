@@ -37,6 +37,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -196,6 +197,18 @@ def bake() -> dict:
             continue
         graphs[_sig("nodes", present)] = g
         node_baked.append({"node_ids": present, "n_nodes": len(g["nodes"])})
+
+    # the WHOLE-PLATFORM graph (전체 선택): the demo would otherwise fall back to the
+    # tiny default graph for this unbaked selection. Bake the real composition of
+    # ALL selectable nodes, keyed by BOTH the node-id signature (what the app POSTs
+    # for 전체 선택) and the all-services signature, so 전체 선택 shows the true graph.
+    all_nodes = sorted(nid for nid, n in model["nodes"].items() if n.get("lifecycle"))
+    if all_nodes:
+        g_all = _bake_graph(server, {"node_ids": all_nodes})
+        if g_all.get("nodes"):
+            graphs[_sig("nodes", all_nodes)] = g_all
+            all_services = sorted({model["nodes"][n]["service"] for n in all_nodes})
+            graphs[_sig("svc", all_services)] = g_all
 
     # the default graph (so the demo never shows an empty DAG even on a miss)
     default_graph = graphs[_sig("svc", [DEFAULT_SERVICE])]
@@ -526,9 +539,17 @@ def assemble(baked: dict) -> None:
     # the fetch-mock shim
     (OUT / "assets" / "mock-api.js").write_text(MOCK_API_JS, encoding="utf-8")
 
-    # the COPY of index.html with the banner + shim scripts injected
-    src_html = (SRC / "index.html").read_text(encoding="utf-8")
-    (OUT / "index.html").write_text(_inject_index(src_html), encoding="utf-8")
+    # the COPY of index.html with the banner + shim scripts injected, then
+    # CACHE-BUSTED: append ?v=<build> to every local asset/data URL so a republish
+    # never serves a stale cached file next to a new one (GitHub Pages caches
+    # per-file, which otherwise races console2.js against mock-api.js -> the
+    # "백엔드 연결 실패" / null-innerHTML mismatch).
+    ver = str(int(time.time()))
+    html = _inject_index((SRC / "index.html").read_text(encoding="utf-8"))
+    for ref in ("assets/console2.css", "assets/resource_graph.js", "assets/console2.js",
+                "data/static-data.js", "assets/mock-api.js"):
+        html = html.replace(f'"{ref}"', f'"{ref}?v={ver}"')
+    (OUT / "index.html").write_text(html, encoding="utf-8")
 
     # a short README note in the bundle (what this is / how it was built)
     readme = (
