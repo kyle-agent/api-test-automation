@@ -231,28 +231,32 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .minibtn:hover{border-color:var(--accent)}
 .minibtn.red{color:var(--red);border-color:#e5a3a3}
 
-/* launch bar (carry selection into the run) */
+/* launch bar (carry selection into the run — always LIVE now) */
 .launchbar{position:sticky;bottom:0;margin-top:16px;background:#fff;border:1px solid var(--line);
-  border-top:2px solid var(--accent);border-radius:8px;padding:11px 15px;display:flex;align-items:center;gap:16px;
+  border-top:2px solid var(--red);border-radius:8px;padding:11px 15px;display:flex;align-items:center;gap:16px;
   flex-wrap:wrap;box-shadow:0 -2px 8px rgba(31,35,40,.06);z-index:5}
-.lbl-grp{display:flex;align-items:center;gap:8px}
-.lbl-grp .lab{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
-.pill-ctl{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden}
-.pill-ctl button{background:#fff;border:none;color:var(--muted);padding:6px 11px;font-size:12px;cursor:pointer;font-weight:600;border-left:1px solid var(--line)}
-.pill-ctl button:first-child{border-left:none}
-.pill-ctl button.on{background:var(--accent);color:#fff}
-.pill-ctl button:disabled{opacity:.4;cursor:not-allowed}
-.pill-ctl.mode button.on{background:var(--red)}
 .sumtxt{font-size:12px;color:var(--muted)}.sumtxt b{color:var(--ink)}.sumtxt .hv{color:var(--red);font-weight:700}
 .launchbar .right{margin-left:auto;display:flex;gap:9px;align-items:center}
 
-/* axis grid (run settings) */
-.axisgrid{display:grid;grid-template-columns:1fr;gap:6px;margin:6px 0}
-.axisopt{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;cursor:pointer;background:#fff}
-.axisopt.on{border-color:var(--accent);background:#e6effd}
-.axisopt.disabled{opacity:.5;cursor:not-allowed}
-.axisopt input{accent-color:var(--accent)}
-.axisopt .t{font-weight:600}.axisopt .d{font-size:11px;color:var(--muted)}
+/* capacity bar (실행 screen — VPC budget + 진행중/대기 큐) */
+.cap-panel{margin-bottom:14px;border-top:2px solid var(--accent)}
+.cap-head{font-size:13px;margin:2px 0 6px}.cap-head b{font-variant-numeric:tabular-nums}
+.cap-meter{display:flex;gap:3px;margin:4px 0 9px}
+.cap-meter i{flex:1 1 auto;height:10px;border-radius:3px;background:#fff;border:1px solid var(--line2)}
+.cap-meter i.on{background:var(--accent);border-color:var(--accent)}
+.cap-grp{display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-top:1px dashed var(--line)}
+.cap-lbl{font-size:11px;font-weight:700;color:var(--muted);min-width:78px;flex:0 0 auto;padding-top:3px}
+.cap-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.capchip{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--ink);
+  background:#fff;border:1px solid var(--line);border-radius:13px;padding:2px 9px;cursor:default}
+.capchip .kindtag{margin-right:2px}
+.capchip.run{border-color:var(--accent);background:#e6effd;cursor:pointer}
+.capchip.run:hover{filter:brightness(.98);border-color:var(--accent)}
+.capchip.que{border-color:#e7c98f;background:#fdf6e7;color:var(--amber)}
+
+/* inline error region (강제 클린업 409 / failure — no alert/crash) */
+.lo-err{margin-top:7px;font-size:12px;color:var(--red);background:#fdeded;border:1px solid #e5a3a3;
+  border-radius:6px;padding:7px 10px}
 
 /* status badges (report) */
 .bdg{display:inline-block;font-size:9.5px;font-weight:700;border-radius:11px;padding:1px 8px;border:1px solid}
