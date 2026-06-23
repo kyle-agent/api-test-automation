@@ -25,7 +25,7 @@
           "json": {
             "amount": 1000000,
             "name": "regr-budget-{unique}",
-            "start_month": "2026-01",
+            "start_month": "2026-06",
             "unit": "MONTHLY",
             "notifications": {
               "is_use_notification": true,
@@ -40,7 +40,7 @@
           },
           "optional": true,
           "group": "budget-create",
-          "_note": "Body CONFIRMED from api_docs.json BudgetCreateRequest: amount(int,req), name(str,req), start_month('YYYY-MM',req), unit('MONTHLY'|'OVERALL',req), notifications(optional). Old body used wrong field names (budget_amount/currency/period_type) causing 500. Expected 409 if a budget already exists on shared account. Capture $.budget.id confirmed from response_example."
+          "_note": "Body CONFIRMED from api_docs.json BudgetCreateRequest: amount(int,req), name(str,req), start_month('YYYY-MM',req), unit('MONTHLY'|'OVERALL',req), notifications(optional). Old body used wrong field names (budget_amount/currency/period_type) causing 500; 2026-06-12 known_issues.json entry. start_month MUST be >= current month (400 if in the past) -> hardcoded to 2026-06 (current). Capture $.budget.id confirmed from response_example. Account allows only 1 budget at a time (409 if one exists). VALIDATED 2026-06-23: 201 live."
         },
         {
           "name": "probe-budget-reads",
@@ -58,7 +58,7 @@
           "json": {
             "amount": 1500000,
             "name": "regr-budget-{unique}",
-            "start_month": "2026-01",
+            "start_month": "2026-06",
             "unit": "MONTHLY",
             "notifications": {
               "is_use_notification": true,

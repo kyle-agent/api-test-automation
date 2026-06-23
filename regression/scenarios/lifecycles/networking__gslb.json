@@ -18,8 +18,8 @@
             "description": "API regression suite",
             "env_usage": "PUBLIC",
             "health_check": {
-              "health_check_interval": "30",
-              "health_check_probe_timeout": "10",
+              "health_check_interval": "5",
+              "health_check_probe_timeout": "5",
               "health_check_user_id": "",
               "health_check_user_password": "",
               "protocol": "TCP",
@@ -29,7 +29,14 @@
               "timeout": "10"
             },
             "name": "regr{ualpha}.gslb.e.samsungsdscloud.com",
-            "resources": [],
+            "resources": [
+              {
+                "description": "API regression suite resource",
+                "destination": "192.0.2.10",
+                "region": "{region}",
+                "weight": 0
+              }
+            ],
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
@@ -67,8 +74,8 @@
           "group": "gslb",
           "optional": true,
           "json": {
-            "health_check_interval": "30",
-            "health_check_probe_timeout": "10",
+            "health_check_interval": "5",
+            "health_check_probe_timeout": "3",
             "health_check_user_id": "",
             "health_check_user_password": "",
             "protocol": "TCP",
