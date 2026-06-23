@@ -894,7 +894,7 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 </style></head><body><div class="wrap">
 
 <div class="crumb"><a href="../index.html">← 대시보드</a> / @@CAT@@ / <b>@@SVC@@</b>
-  <a class="catlink" href="../platform/console.html?service=@@CAT@@/@@SVC@@" title="이 서비스를 플랫폼 카탈로그에서 열어 자원 선택 → 합성 → plan으로 커버리지 채우기">🗂 카탈로그에서 보기 / 커버리지 채우기 →</a></div>
+  <a class="catlink" href="../console2/app/?service=@@CAT@@/@@SVC@@" title="이 서비스를 console2 실행 콘솔에서 열어 선택 → 합성 DAG → LIVE 실행으로 커버리지 채우기">🧩 console2에서 실행 / 커버리지 채우기 →</a></div>
 
 <div class="hero">
   <div class="gauge">
@@ -1378,9 +1378,10 @@ h2 .hint{font-size:11.5px;font-weight:400;color:var(--muted)}
   <span class="meta">branch <code>@@BRANCH@@</code> · 최근 실행 @@WHEN@@ · @@RUNTYPE@@</span>
   <div class="links" style="margin-top:7px;font-size:13px">
     플랫폼:
-    <a href="platform/console.html" title="자원 모델 콘솔 — Catalog·Plan·Run·Report (자원 선택·합성·plan으로 커버리지 채우기)">🧩 콘솔(Catalog·Plan·Run·Report)</a> ·
+    <a href="console2/app/" title="console2 — SCP API 테스트 실행 콘솔 (서비스 선택 → 합성 DAG → LIVE 실행 · VPC 동시 한도/대기 큐). 이 대시보드가 그 실행 결과입니다.">🧩 console2 실행 콘솔 →</a> ·
     <a href="platform/knowledge.html">📚 Knowledge</a>
-    &nbsp;|&nbsp; <a href="ops.html">Ops</a>
+    &nbsp;|&nbsp; <a href="ops.html">Ops</a> ·
+    <a href="platform/console.html" title="legacy 자원 모델 콘솔 (Catalog·Plan·Run·Report)">🗂 legacy 콘솔</a>
   </div>
 </div>
 
@@ -1454,11 +1455,11 @@ SVCS.forEach(function(s){
 });
 Object.keys(catMeta).forEach(function(c){var m=catMeta[c];m.pct=m.tot?Math.round(m.cov/m.tot*100):0;});
 function catLink(s){
-  // DOWN into this service's catalog on the console (자원 선택 →
-  // 합성 → plan). Deep-links the console Catalog tab via ?service=<cat>/<svc>.
-  return '<a class="svc-cat-link" href="platform/console.html?service='+s.c+'/'+s.n+'"'
-    +' title="플랫폼 카탈로그에서 '+s.n+' 자원 선택 → 합성 → plan으로 커버리지 채우기">'
-    +'🗂 카탈로그 →</a>';
+  // DOWN into this service on console2 (선택 → 합성 DAG → LIVE 실행).
+  // Deep-links console2 to pre-select this service via ?service=<cat>/<svc>.
+  return '<a class="svc-cat-link" href="console2/app/?service='+s.c+'/'+s.n+'"'
+    +' title="console2 실행 콘솔에서 '+s.n+' 선택 → 합성 → LIVE 실행으로 커버리지 채우기">'
+    +'🧩 console2 →</a>';
 }
 function svcCard(s){
   if(s.unt){

@@ -84,11 +84,33 @@ function init() {
     const id = Object.keys(N).find(i => N[i].lifecycle);
     if (id) targets.add(id);
   }
+  // a ?service=<cat>/<svc> deep-link (the dashboard's per-service "console2 →"
+  // links) overrides the default and pre-selects that service.
+  deepLinkService();
   wireNav();
   wireModal();
   wireLaunch();
   wireSuites();
   go("build");
+}
+
+// ---- ?service=<cat>/<svc> deep-link (from the dashboard's per-service links) ----
+// If present and resolvable to a selectable service, REPLACE the default selection
+// with that whole service so the dashboard "console2 →" links land here focused on
+// it. Accepts the full slug ("networking/vpc") or a bare short name ("vpc"); a miss
+// is silent (keeps the default). Returns true iff it changed the selection.
+function deepLinkService() {
+  let q;
+  try { q = new URLSearchParams(location.search).get("service"); } catch (e) { return false; }
+  if (!q) return false;
+  q = q.trim().toLowerCase();
+  const slugs = [...new Set(Object.values(N).map(n => n.service).filter(Boolean))];
+  const svc = slugs.find(s => s.toLowerCase() === q)
+           || slugs.find(s => s.toLowerCase().split("/").pop() === q.split("/").pop());
+  if (!svc || !svcSelectable(svc).length) return false;
+  targets.clear();
+  setSvc(svc, true);
+  return true;
 }
 
 // ---- a resource node is standalone-selectable iff it maps to a lifecycle.
