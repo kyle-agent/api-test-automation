@@ -51,6 +51,22 @@
           }
         },
         {
+          "name": "show-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "group": "vpc-cidr",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "params": {},
+          "_note": "id-bound read (showvpc). params:{} forces catalog-key recording. Runs against the adopted or self-created vpc_id. ADDED 2026-06-23 to cover networking/vpc/showvpc."
+        },
+        {
           "name": "create-vpc-cidr",
           "service": "vpc",
           "method": "POST",
@@ -174,7 +190,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a private-nat). Closes the private_nat_id getid GET /v1/private-nats/{private_nat_id}. Keys off the create-private-nat-captured private_nat_id; tolerant [200,400,403,404] because create references a {unique} service_resource_id (a Direct Connect / TGW we do not own) and 4xx's, leaving private_nat_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
+          "_note": "id-bound read (show a private-nat). Closes the private_nat_id getid GET /v1/private-nats/{private_nat_id}. Keys off the create-private-nat-captured private_nat_id; tolerant [200,400,403,404] because create references a {unique} service_resource_id (a Direct Connect / TGW we do not own) and 4xx's, leaving private_nat_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "get-private-nat-ips",
@@ -189,7 +206,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (list a private-nat's IPs). Closes the private_nat_id getid GET /v1/private-nats/{private_nat_id}/private-nat-ips. Same create-captured private_nat_id + tolerant rationale as show-private-nat."
+          "_note": "id-bound read (list a private-nat's IPs). Closes the private_nat_id getid GET /v1/private-nats/{private_nat_id}/private-nat-ips. Same create-captured private_nat_id + tolerant rationale as show-private-nat. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "create-private-nat-ip",
@@ -441,7 +459,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (list a privatelink-service's connected endpoints). Closes the privatelink_service_id getid GET /v1/privatelink-services/{privatelink_service_id}/connected-endpoints. Keys off the create-privatelink-service-captured privatelink_service_id; tolerant [200,400,403,404] because create uses a {unique} connected_resource_id (a load balancer we do not own) and 4xx's, leaving privatelink_service_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
+          "_note": "id-bound read (list a privatelink-service's connected endpoints). Closes the privatelink_service_id getid GET /v1/privatelink-services/{privatelink_service_id}/connected-endpoints. Keys off the create-privatelink-service-captured privatelink_service_id; tolerant [200,400,403,404] because create uses a {unique} connected_resource_id (a load balancer we do not own) and 4xx's, leaving privatelink_service_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "set-privatelink-service",
@@ -477,7 +496,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a privatelink-service). Closes showprivatelinkservice. Keys off create-captured privatelink_service_id; tolerant [200,400,403,404] because create uses a {unique} connected_resource_id and may 4xx, leaving the id a placeholder that normalizes to the catalog key."
+          "_note": "id-bound read (show a privatelink-service). Closes showprivatelinkservice. Keys off create-captured privatelink_service_id; tolerant [200,400,403,404] because create uses a {unique} connected_resource_id and may 4xx, leaving the id a placeholder that normalizes to the catalog key. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "delete-privatelink-service",
@@ -750,7 +770,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a vpc-endpoint). Closes the vpc_endpoint_id getid GET /v1/vpc-endpoints/{vpc_endpoint_id}. Keys off the create-vpc-endpoint-captured vpc_endpoint_id; tolerant [200,400,403,404] because create uses a {unique}/synthetic resource_key (the target service) and 4xx's, leaving vpc_endpoint_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
+          "_note": "id-bound read (show a vpc-endpoint). Closes the vpc_endpoint_id getid GET /v1/vpc-endpoints/{vpc_endpoint_id}. Keys off the create-vpc-endpoint-captured vpc_endpoint_id; tolerant [200,400,403,404] because create uses a {unique}/synthetic resource_key (the target service) and 4xx's, leaving vpc_endpoint_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "set-vpc-endpoint",
@@ -1073,7 +1094,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (list a vpc-peering's routing rules). Closes the vpc_peering_id getid GET /v1/vpc-peerings/{vpc_peering_id}/routing-rules. Keys off the create-vpc-peering-captured vpc_peering_id; tolerant [200,400,403,404] because the peering may be in CREATING (sub-ops 400) or the create may have 4xx'd, leaving vpc_peering_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
+          "_note": "id-bound read (list a vpc-peering's routing rules). Closes the vpc_peering_id getid GET /v1/vpc-peerings/{vpc_peering_id}/routing-rules. Keys off the create-vpc-peering-captured vpc_peering_id; tolerant [200,400,403,404] because the peering may be in CREATING (sub-ops 400) or the create may have 4xx'd, leaving vpc_peering_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "set-vpc-peering",
@@ -1315,7 +1337,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (list a transit-gateway's routing rules). Closes the transit_gateway_id getid GET /v1/transit-gateways/{transit_gateway_id}/routing-rules. Keys off the create-transit-gateway-captured transit_gateway_id; tolerant [200,400,403,404] because create may 4xx (still records coverage), leaving transit_gateway_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable."
+          "_note": "id-bound read (list a transit-gateway's routing rules). Closes the transit_gateway_id getid GET /v1/transit-gateways/{transit_gateway_id}/routing-rules. Keys off the create-transit-gateway-captured transit_gateway_id; tolerant [200,400,403,404] because create may 4xx (still records coverage), leaving transit_gateway_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "get-tgw-vpc-connections",
@@ -1330,7 +1353,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (list a transit-gateway's VPC connections). Closes the transit_gateway_id getid GET /v1/transit-gateways/{transit_gateway_id}/vpc-connections. Same create-captured transit_gateway_id + tolerant rationale as get-tgw-routing-rules."
+          "_note": "id-bound read (list a transit-gateway's VPC connections). Closes the transit_gateway_id getid GET /v1/transit-gateways/{transit_gateway_id}/vpc-connections. Same create-captured transit_gateway_id + tolerant rationale as get-tgw-routing-rules. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "show-transit-gateway",
@@ -1345,7 +1369,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a transit-gateway). Closes showtransitgateway. Keys off create-captured transit_gateway_id; tolerant [200,400,403,404] because create may 4xx (still records coverage via placeholder normalization)."
+          "_note": "id-bound read (show a transit-gateway). Closes showtransitgateway. Keys off create-captured transit_gateway_id; tolerant [200,400,403,404] because create may 4xx (still records coverage via placeholder normalization). params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "create-tgw-firewall",
@@ -1670,6 +1695,20 @@
           }
         },
         {
+          "name": "show-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "params": {},
+          "_note": "id-bound read (showvpc). params:{} forces catalog-key recording (engine records GET catalog key only when params present). ADDED 2026-06-23 to cover networking/vpc/showvpc."
+        },
+        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -1695,8 +1734,7 @@
             "path": "/v1/subnets/{subnet_id}",
             "service": "vpc"
           },
-          "probe_reads": {},
-          "_note": "Auto-probes listsapsecondarysubnets (/v1/subnets/{subnet_id}/sap-secondary-subnets) and listsubnetvips (/v1/subnets/{subnet_id}/vips) using the captured subnet_id. Adds 2 id-bound GET coverage records without extra lifecycle steps."
+          "_note": "Creates the subnet for VIP/NAT child resources. FIXED 2026-06-23: removed probe_reads from this step (probe_reads replaces the step's own HTTP call, preventing the subnet from being created). Probes moved to a separate step after wait-subnet."
         },
         {
           "name": "wait-subnet",
@@ -1714,6 +1752,28 @@
             "timeout": 180,
             "interval": 10
           }
+        },
+        {
+          "name": "show-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "params": {},
+          "_note": "id-bound read (showsubnet). params:{} forces catalog-key recording. ADDED 2026-06-23 to cover networking/vpc/showsubnet."
+        },
+        {
+          "name": "probe-subnet-children",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "probe_reads": {},
+          "_note": "Auto-probes id-bound child GETs using the captured subnet_id: listsapsecondarysubnets (/v1/subnets/{subnet_id}/sap-secondary-subnets) and listsubnetvips (/v1/subnets/{subnet_id}/vips). Moved from create-subnet (probe_reads on a create step replaces the create call). ADDED 2026-06-23."
         },
         {
           "name": "create-subnet-vip",
@@ -1765,7 +1825,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a subnet VIP). Closes the vip_id getid GET /v1/subnets/{subnet_id}/vips/{vip_id} (the LIST .../vips is already covered). Keys off the create-subnet-vip-captured vip_id ($.subnet_vip.id, live-validated 201 run 27306490231); tolerant [200,400,403,404] so a create miss still records coverage with vip_id normalizing to the catalog '*' key. Makes the endpoint statically reachable."
+          "_note": "id-bound read (show a subnet VIP). Closes the vip_id getid GET /v1/subnets/{subnet_id}/vips/{vip_id} (the LIST .../vips is already covered). Keys off the create-subnet-vip-captured vip_id ($.subnet_vip.id, live-validated 201 run 27306490231); tolerant [200,400,403,404] so a create miss still records coverage with vip_id normalizing to the catalog '*' key. Makes the endpoint statically reachable. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "set-subnet-vip",
@@ -2026,7 +2087,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a public IP). Closes showpublicip. Keys off create-captured publicip_id ($.publicip.id from docs); tolerant [200,400,403,404] because create may 4xx (quota), leaving publicip_id a placeholder that normalizes to catalog key."
+          "_note": "id-bound read (show a public IP). Closes showpublicip. Keys off create-captured publicip_id ($.publicip.id from docs); tolerant [200,400,403,404] because create may 4xx (quota), leaving publicip_id a placeholder that normalizes to catalog key. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "set-publicip",
@@ -2161,7 +2223,7 @@
           }
         },
         {
-          "name": "show-internet-gateway",
+          "name": "wait-igw-active",
           "service": "vpc",
           "method": "GET",
           "path": "/v1/internet-gateways/{internet_gateway_id}",
@@ -2170,10 +2232,33 @@
           "expect_status": [
             200,
             400,
+            404
+          ],
+          "poll": {
+            "field": "$.internet_gateway.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 180,
+            "interval": 10
+          },
+          "_note": "Wait for IGW to reach ACTIVE before setinternetgateway; PUT on a CREATING IGW returns 400 scp-network.internet-gateway.invalid-state1. CONFIRMED 2026-06-23."
+        },
+        {
+          "name": "show-internet-gateway",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/internet-gateways/{internet_gateway_id}",
+          "group": "igw",
+          "optional": true,
+          "params": {},
+          "expect_status": [
+            200,
+            400,
             403,
             404
           ],
-          "_note": "id-bound read (show an internet-gateway). Closes showinternetgateway. Keys off create-captured internet_gateway_id ($.internet_gateway.id from docs); tolerant [200,400,403,404] because create may 4xx."
+          "_note": "id-bound read (show an internet-gateway). Closes showinternetgateway. params:{} forces catalog-key recording (engine only records GET catalog key when params present). Keys off create-captured internet_gateway_id; tolerant [200,400,403,404] because create may 4xx. CONFIRMED 200 live 2026-06-23."
         },
         {
           "name": "set-internet-gateway",
@@ -2184,7 +2269,7 @@
           "optional": true,
           "json": {
             "description": "updated by API regression suite",
-            "loggable": ""
+            "loggable": false
           },
           "expect_status": [
             200,
@@ -2196,7 +2281,7 @@
             409,
             422
           ],
-          "_note": "Closes setinternetgateway (PUT /v1/internet-gateways/{id})."
+          "_note": "Closes setinternetgateway (PUT /v1/internet-gateways/{id}). loggable MUST be boolean (not empty string) \u2014 CONFIRMED 200 live 2026-06-23."
         },
         {
           "name": "delete-internet-gateway",
@@ -2216,11 +2301,12 @@
           ],
           "destructive": true,
           "retry_on_status": [
+            400,
             409
           ],
-          "retries": 4,
+          "retries": 8,
           "retry_interval": 15,
-          "_note": "Closes deleteinternetgateway (DELETE /v1/internet-gateways/{id})."
+          "_note": "Closes deleteinternetgateway (DELETE /v1/internet-gateways/{id}). IGW transitions through UPDATING state after setinternetgateway, returning 400 scp-network.internet-gateway.not-deletable-state; retry 400 to ride out the transition. CONFIRMED 202 live 2026-06-23."
         },
         {
           "name": "delete-vpc",
@@ -2233,6 +2319,11 @@
             204
           ],
           "destructive": true,
+          "retry_on_status": [
+            409
+          ],
+          "retries": 8,
+          "retry_interval": 15,
           "adopt": "vpc"
         }
       ]
@@ -2242,7 +2333,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes ports: POST /v1/ports, GET /v1/ports/{port_id}, PUT /v1/ports/{port_id}, DELETE /v1/ports/{port_id}. Body from docs: {description, fixed_ip_address, name, security_groups, subnet_id, tags}. Creates own VPC+subnet (cidr 10.134.0.0/20) for the required subnet_id. Adopts shared VPC when available. capture envelope $.port.id (from docs response_example). heavy:true. All port steps optional+grouped+broad expect_status.",
+      "_note": "Closes ports: POST /v1/ports, GET /v1/ports/{port_id}, PUT /v1/ports/{port_id}, DELETE /v1/ports/{port_id}. Body from docs: {description, name, security_groups, subnet_id, tags}. fixed_ip_address OMITTED — if provided it must be a valid IP; empty string causes scp-network.port.fixed_ip.format-error 400 (CONFIRMED 2026-06-23). Creates own VPC+subnet (cidr 10.134.0.0/20) for the required subnet_id. Adopts shared VPC when available. capture envelope $.port.id (from docs response_example). heavy:true. All port steps optional+grouped+broad expect_status.",
       "steps": [
         {
           "name": "create-vpc",
@@ -2341,7 +2432,6 @@
           "optional": true,
           "json": {
             "description": "API regression port",
-            "fixed_ip_address": "",
             "name": "regrport{unique}",
             "security_groups": [],
             "subnet_id": "{subnet_id}",
@@ -2379,7 +2469,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a port). Closes showport. Keys off create-captured port_id ($.port.id from docs); tolerant [200,400,403,404] because create may 4xx (subnet too new / not ACTIVE yet)."
+          "_note": "id-bound read (show a port). Closes showport. Keys off create-captured port_id ($.port.id from docs); tolerant [200,400,403,404] because create may 4xx (subnet too new / not ACTIVE yet). params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "set-port",
@@ -2622,7 +2713,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a privatelink-endpoint). Closes showprivatelinkendpoint. Keys off create-captured privatelink_endpoint_id; tolerant because create uses a {unique} service_id and 4xx, leaving id as placeholder normalizing to catalog key."
+          "_note": "id-bound read (show a privatelink-endpoint). Closes showprivatelinkendpoint. Keys off create-captured privatelink_endpoint_id; tolerant because create uses a {unique} service_id and 4xx, leaving id as placeholder normalizing to catalog key. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
+          "params": {}
         },
         {
           "name": "request-privatelink-endpoint",
@@ -2834,6 +2926,20 @@
           }
         },
         {
+          "name": "show-vpc",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/vpcs/{vpc_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "params": {},
+          "_note": "id-bound read (showvpc). params:{} forces catalog-key recording. ADDED 2026-06-23."
+        },
+        {
           "name": "create-subnet",
           "service": "vpc",
           "method": "POST",
@@ -2879,6 +2985,51 @@
           }
         },
         {
+          "name": "show-subnet",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/subnets/{subnet_id}",
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "params": {},
+          "_note": "id-bound read (showsubnet). params:{} forces catalog-key recording. ADDED 2026-06-23."
+        },
+        {
+          "name": "create-publicip-for-nat",
+          "service": "vpc",
+          "method": "POST",
+          "path": "/v1/publicips",
+          "group": "natgw",
+          "optional": true,
+          "json": {
+            "description": "API regression public IP for NAT gateway",
+            "tags": []
+          },
+          "expect_status": [
+            200,
+            201,
+            202,
+            400,
+            403,
+            404,
+            409,
+            422
+          ],
+          "capture": {
+            "publicip_id": "$.publicip.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/publicips/{publicip_id}",
+            "service": "vpc"
+          },
+          "_note": "Creates a public IP to supply a real publicip_id for the NAT gateway. Without a valid publicip_id, createnatgateway fails 4xx and nat_gateway_id remains unresolved, cascading all show/set/delete to 4xx. ADDED 2026-06-23."
+        },
+        {
           "name": "create-nat-gateway",
           "service": "vpc",
           "method": "POST",
@@ -2887,7 +3038,7 @@
           "optional": true,
           "json": {
             "description": "API regression NAT gateway",
-            "publicip_id": "{unique}",
+            "publicip_id": "{publicip_id}",
             "subnet_id": "{subnet_id}",
             "tags": []
           },
@@ -2911,6 +3062,28 @@
           }
         },
         {
+          "name": "wait-nat-gateway-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/nat-gateways/{nat_gateway_id}",
+          "group": "natgw",
+          "optional": true,
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "poll": {
+            "field": "$.nat_gateway.state",
+            "until": [
+              "ACTIVE"
+            ],
+            "timeout": 300,
+            "interval": 15
+          },
+          "_note": "Wait for NAT gateway to reach ACTIVE before set/delete. NAT gateways can take several minutes to provision. ADDED 2026-06-23."
+        },
+        {
           "name": "show-nat-gateway",
           "service": "vpc",
           "method": "GET",
@@ -2923,7 +3096,8 @@
             403,
             404
           ],
-          "_note": "id-bound read (show a nat-gateway). Closes shownatgateway. Keys off create-captured nat_gateway_id ($.nat_gateway.id); tolerant because create uses {unique} publicip_id and 4xx, leaving id as placeholder normalizing to catalog key."
+          "_note": "id-bound read (show a nat-gateway). Closes shownatgateway. params:{} forces catalog-key recording (engine only records GET catalog key when params present). UPDATED 2026-06-23: added publicip create step so create can succeed and nat_gateway_id is real.",
+          "params": {}
         },
         {
           "name": "set-nat-gateway",

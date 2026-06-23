@@ -90,6 +90,27 @@ duplicating. Add a new `##` section when you take on a new service.
   `$.port.id`. Teardown reverse with 409 retries (wait 404 before parent delete).
 - public-ip `type: IGW` → `$.publicip.id`. internet-gateway needs `vpc_id`,
   `firewall_enabled`, `type: IGW` → `$.internet_gateway.id`.
+- **Coverage session 2026-06-23 findings:**
+  - Engine fix: `step.get("params")` evaluated `{}` as falsy; changed to `"params" in step`
+    so `params: {}` on id-bound GET steps correctly triggers catalog-key recording.
+  - `setinternetgateway` body: `loggable` MUST be boolean (`false`), NOT empty string `""`.
+    Empty string causes 400 `ValidationError: unable to interpret input` (CONFIRMED).
+  - IGW state machine: after `createinternetgateway`, poll `$.internet_gateway.state` →
+    `ACTIVE` BEFORE calling `setinternetgateway`. PUT on CREATING IGW → 400
+    `scp-network.internet-gateway.invalid-state1` (CONFIRMED).
+  - `deleteinternetgateway`: after `setinternetgateway` PUT, IGW enters UPDATING state.
+    Retry on 400 `scp-network.internet-gateway.not-deletable-state` (retries: 8).
+  - Port: `fixed_ip_address: ""` (empty string) → 400 `scp-network.port.fixed_ip.format-error`.
+    OMIT the field; it's optional. When provided, must be valid IP in subnet CIDR.
+  - NAT gateway: requires valid `publicip_id` (not a placeholder); create a publicip first
+    then pass its id. NAT gateway takes minutes to provision; poll state → ACTIVE.
+  - `probe_reads: {}` on a CREATE step REPLACES the HTTP call (engine `continue`s
+    after probe_reads). Probes must be a SEPARATE step AFTER the create step.
+  - Session provisioner creates a shared VPC per pytest session; multiple serial pytest
+    invocations stack shared VPCs if teardown doesn't run. Cleanup manually after each run.
+  - VPC budget `core.budgets` live count can be wrong (API eventually-consistent).
+    Always `GET /v1/vpcs` to confirm actual live count before running VPC-consuming lifecycles.
+  - **29/95 covered** as of 2026-06-23 (up from 13 at start of session).
 
 ## networking / firewall
 

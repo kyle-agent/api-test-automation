@@ -1115,7 +1115,7 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
             # under its catalog key: such reads (e.g. queueservice getqueueattributes,
             # which REQUIRES attributes+name) are unreachable by the bare probe, so
             # this explicit step is the ONLY place that exercises the endpoint.
-            if step["method"].upper() != "GET" or step.get("params"):
+            if step["method"].upper() != "GET" or "params" in step:
                 _ck = _catalog_key_for(step["method"], step.get("path", ""), step_service)
                 if _ck:
                     _record_smoke(resp.status, _cat, _ck, step["method"],
