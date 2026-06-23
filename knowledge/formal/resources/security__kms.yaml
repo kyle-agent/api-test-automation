@@ -19,9 +19,9 @@ resources:
              key_type: advanced, name: "regrkms{unique}",
              purpose: "{opt.purpose}", rotate_cycle: 7, tags: []}
       options:
-        purpose: {type: enum, values: [rsa-2048, aes-256], required: true,
+        purpose: {type: enum, values: [rsa-2048, aes256-gcm96, hmac, ecdsa-p256, aria], required: true,
                   default: rsa-2048, vary: true,
-                  note: "키 spec. rsa-2048만 라이브 검증(VALIDATED 기본값). 문서상 AES-256/ECDSA/HMAC/ARIA spec도 존재하나 API purpose 코드 매핑은 R3 라이브 검증 과제 — aes-256은 UNPROVEN 추정값. Secrets Manager가 쓰려면 encrypt-capable spec(AES-256/RSA-2048/ARIA)이어야 한다 (services/security__secretsmanager.yaml kms-key-required)"}
+                  note: "CONFIRMED LIVE 2026-06-23: valid purpose enum strings from API 400 ValidationError: aes256-gcm96, ecdsa-p256, rsa-2048, aria, hmac. IMPORTANT: 'aes-256' is WRONG (400 ValidationError). Operation routing: rsa-2048->encrypt/decrypt/rewrap/sign/verify; aes256-gcm96->datakey (NOT hmac); hmac->hmac (NOT datakey). aria: KR SOUTH gov only. Secrets Manager needs encrypt-capable key (rsa-2048 or aes256-gcm96 recommended)."}
     capture: {key_id: "$.key.id"}
     verify:
       - {name: read-users, endpoint: "GET /v1/kms/transit/{key_id}/users",
