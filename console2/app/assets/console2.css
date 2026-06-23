@@ -105,6 +105,12 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 
 /* the left panel is a narrow, scrollable menu column */
 .treepanel{position:sticky;top:8px;max-height:86vh;display:flex;flex-direction:column}
+/* STACKED (≤1180px = single column): the menu-tree must NOT stay sticky — an 86vh
+   sticky panel covers the DAG panel that now sits BELOW it, hiding the DAG and its
+   카테고리/서비스 granularity buttons and intercepting clicks ('겹쳐져서 안보임').
+   Placed AFTER the base rule so it wins on source order (media queries add no
+   specificity, so an earlier @media would lose to this base rule). */
+@media(max-width:1180px){.treepanel{position:static;max-height:none}}
 .svctree{overflow:auto;border:1px solid var(--line);border-radius:7px;background:#fff;flex:1;min-height:220px}
 .glyph{font-size:10.5px}
 .glyph.q{color:var(--red)}
@@ -241,9 +247,17 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 /* capacity bar (실행 screen — VPC budget + 진행중/대기 큐) */
 .cap-panel{margin-bottom:14px;border-top:2px solid var(--accent)}
 .cap-head{font-size:13px;margin:2px 0 6px}.cap-head b{font-variant-numeric:tabular-nums}
-.cap-meter{display:flex;gap:3px;margin:4px 0 9px}
+.cap-meter{display:flex;gap:3px;margin:4px 0 6px}
 .cap-meter i{flex:1 1 auto;height:10px;border-radius:3px;background:#fff;border:1px solid var(--line2)}
-.cap-meter i.on{background:var(--accent);border-color:var(--accent)}
+.cap-meter i.on,.cap-meter i.live{background:var(--accent);border-color:var(--accent)}  /* 떠 있음(실측) */
+.cap-meter i.resv{background:#fdf6e7;border-color:#e7c98f}                                /* 내 예약(미생성) */
+/* sub-line: 기존·내 예약·여유 breakdown + a tiny legend (현재 계정 실측 vs admission) */
+.cap-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 9px}
+.cap-sub b{color:var(--ink);font-variant-numeric:tabular-nums}
+.cap-key{margin-left:auto;display:inline-flex;align-items:center;gap:4px;color:var(--faint);font-size:10.5px}
+.cap-key i{width:9px;height:9px;border-radius:2px;background:#fff;border:1px solid var(--line2);display:inline-block}
+.cap-key i.live{background:var(--accent);border-color:var(--accent)}
+.cap-key i.resv{background:#fdf6e7;border-color:#e7c98f}
 .cap-grp{display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-top:1px dashed var(--line)}
 .cap-lbl{font-size:11px;font-weight:700;color:var(--muted);min-width:78px;flex:0 0 auto;padding-top:3px}
 .cap-chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
@@ -272,6 +286,10 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .staged-act{display:flex;gap:7px;margin-top:8px}
 .minibtn.go{color:#fff;background:var(--accent);border-color:var(--accent);font-weight:700}
 .minibtn.go:hover{filter:brightness(1.06)}
+/* 대기열 미리보기 header — VPC 여유 + [▶ 실행] on the right, next to the DAG (그림→실행) */
+.sp-head .sp-act{margin-left:auto;display:inline-flex;align-items:center;gap:8px;flex:0 0 auto}
+.sp-head .minibtn.go{font-size:12px;padding:5px 13px}
+.sp-over{font-size:11px;color:var(--amber);background:#fdf6e7;border:1px solid #e7c98f;border-radius:6px;padding:2px 8px;font-weight:600}
 
 /* 구성 ▶ STAGES (enqueues) — a primary action distinct from the destructive LIVE run.
    class is .stagebtn (NOT .stage — that's the tall DAG-scene container; the shared
