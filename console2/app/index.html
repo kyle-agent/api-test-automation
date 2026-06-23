@@ -90,22 +90,11 @@
     </div>
   </div>
 
-  <!-- launch bar — carries the selection into ② -->
+  <!-- launch bar — carries the selection into ② (항상 LIVE · 사전 확인) -->
   <div class="launchbar">
-    <div class="lbl-grp">
-      <span class="lab">Axis</span>
-      <div class="pill-ctl" id="axisCtl"></div>
-    </div>
-    <div class="lbl-grp">
-      <span class="lab">mode</span>
-      <div class="pill-ctl mode" id="modeCtl">
-        <button data-md="simulate" class="on">simulate</button>
-        <button data-md="live">live</button>
-      </div>
-    </div>
     <div class="sumtxt" id="launchSum"></div>
     <div class="right">
-      <button class="btn" id="launch-go">▶ 지금 실행</button>
+      <button class="btn warn" id="launch-go">▶ 지금 실행</button>
     </div>
   </div>
 </section>
@@ -144,7 +133,7 @@
 
 <div class="foot">
   ① 구성: 서비스 선택(좌 메뉴-트리) → composer.graph_view 합성 DAG(생성 순서·dedup·peak quota) ·
-  ② 실행: simulate = 클라우드 호출 없음(합성 id) · live = pytest + 안전 게이트 ·
+  ② 실행: 실제 클라우드(LIVE) — pytest + 선택에서 파생된 안전 게이트 · VPC 동시 실행 한도(cap) 아래 ADMIT/대기 큐 ·
   리포트 = 흐름(master) ▸ 라이프사이클 클릭 ▸ 자원·API·로그(detail) · 전체 = 집계.
 </div>
 </div>

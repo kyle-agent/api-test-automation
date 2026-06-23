@@ -30,8 +30,6 @@ let ownedScan = null;       // last /api/owned result {status, owned, owned_tota
 
 // run/report state
 let runId = null;
-let runMode = "simulate";
-let runAxis = "regression-light";
 let runEvents = [];
 let runStatus = "idle";
 let pollTimer = null;
@@ -79,7 +77,7 @@ function init() {
   }
   wireNav();
   wireModal();
-  buildAxisCtl();
+  wireLaunch();
   wireSuites();
   go("build");
 }
@@ -147,6 +145,7 @@ function go(scr) {
   if (scr !== "run") {
     if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
     stopR4Poll();
+    stopCapPoll();           // leaving the run screen → stop the capacity poll
   }
   ["build", "run"].forEach(s => $("screen-" + s).classList.toggle("hidden", s !== scr));
   els("#screenToggle button").forEach(b => b.classList.toggle("on", b.dataset.scr === scr));
@@ -162,18 +161,14 @@ function ctxBar() {
   const svcs = new Set([...targets].map(id => N[id].service));
   const heavyTargets = [...targets].some(id => N[id].heavy);
   const heavyClosure = lastGraph ? lastGraph.nodes.some(n => n.heavy) : heavyTargets;
-  const axisLabel = AXES[runAxis] ? AXES[runAxis].label : runAxis;
-  const isLive = runMode === "live";
   $("ctxbar").innerHTML =
     `<span class="seg">env <b>local</b></span>
-     <span class="seg">· axis <b>${esc(axisLabel)}</b></span>
-     <span class="seg">· mode <b>${esc(runMode)}</b></span>
      <span class="seg">· 선택 <b>${targets.size}</b> 리소스</span>
      <span class="seg">· 서비스 <b>${svcs.size}</b></span>
      <span class="seg">· 폐포 <b>${closureK}</b></span>
      <span class="seg">· heavy <b>${heavyClosure ? "🜂 포함" : "없음"}</b></span>
      <span class="seg">· 모델 <b>${MODEL.node_count}</b> 자원 / <b>${MODEL.lifecycle_count}</b> lifecycle</span>
-     <span class="badge ${isLive ? "live" : "sim"}">${isLive ? "LIVE" : "SIMULATE"}</span>`;
+     <span class="badge live">LIVE</span>`;
 }
 
 // ================= ① 구성 =================
@@ -564,41 +559,22 @@ function drawModalBody() {
 }
 
 // ================= launch bar (carry selection into ②) =================
-const AXES = {
-  "smoke":             { label: "smoke", desc: "읽기 전용 (다음 빌드)", enabled: false, gates: {} },
-  "regression-light":  { label: "회귀-light", desc: "CRUD · mutations+destructive", enabled: true,
-                         gates: { mutations: true, destructive: true, heavy: false } },
-  "regression-heavy":  { label: "회귀-heavy", desc: "CRUD+billable · heavy 포함", enabled: true,
-                         gates: { mutations: true, destructive: true, heavy: true } },
-  "conformance":       { label: "conformance", desc: "설계 적합성 (다음 빌드)", enabled: false, gates: {} }
-};
-function buildAxisCtl() {
-  $("axisCtl").innerHTML = Object.entries(AXES).map(([k, a]) =>
-    `<button data-ax="${k}" class="${runAxis === k ? "on" : ""}" ${a.enabled ? "" : "disabled"} title="${esc(a.desc)}">${esc(a.label)}</button>`).join("");
-  els("#axisCtl button").forEach(b => b.onclick = () => {
-    if (!AXES[b.dataset.ax].enabled) return;
-    runAxis = b.dataset.ax;
-    els("#axisCtl button").forEach(x => x.classList.toggle("on", x.dataset.ax === runAxis));
-    ctxBar(); launchSummary();
-  });
-  els("#modeCtl button").forEach(b => b.onclick = () => {
-    runMode = b.dataset.md;
-    els("#modeCtl button").forEach(x => x.classList.toggle("on", x.dataset.md === runMode));
-    ctxBar(); launchSummary();
-  });
-  $("launch-go").onclick = startRun;
+// Runs are ALWAYS live now (the server derives gates from the selection); there is
+// no axis/mode toggle. The launch wiring just binds the run buttons to startRun.
+function wireLaunch() {
+  const lg = $("launch-go"); if (lg) lg.onclick = startRun;
+  const rg = $("run-go"); if (rg) rg.onclick = startRun;   // drawRunSettings rebuilds + rebinds this too
 }
 
 // ================= 스윗 (suites/*.yaml · CI 공유) =================
-// A suite = a named (scope × safety-gates) preset. Loading one applies its
-// gates (→ Axis) and selects its scope (node_ids ▸ services ▸ categories, else
-// the whole catalog); saving POSTs the current selection back to
-// suites/<id>.yaml via /api/suites. The built-in 4 (smoke/full/full-heavy/
-// conformance) are the canonical run shapes; saved ones round-trip console2's
-// exact selection through the CI-ignored `scope:` block.
+// A suite = a named (scope × safety-gates) preset. Loading one applies its SCOPE
+// (node_ids ▸ services ▸ categories, else the whole catalog) to the selection;
+// saving POSTs the current selection back to suites/<id>.yaml via /api/suites. The
+// built-in 4 (smoke/full/full-heavy/conformance) are the canonical run shapes;
+// saved ones round-trip console2's exact selection through the CI-ignored `scope:`
+// block. There is no axis anymore — the run derives its gates from the selection,
+// so a loaded suite only restores WHAT is selected.
 let SUITES = [];
-const _gatesEqual = (a, b) =>
-  !!a.mutations === !!b.mutations && !!a.destructive === !!b.destructive && !!a.heavy === !!b.heavy;
 
 async function loadSuites() {
   try {
@@ -631,11 +607,9 @@ function drawSuiteMenu() {
   const sv = $("suite-save"); if (sv) sv.onclick = saveCurrentAsSuite;
 }
 function applySuite(s) {
-  const g = s.gates || {}, sc = s.scope || {}, req = s.request || {};
-  // gates → an *enabled* Axis with matching gates (else keep the current Axis)
-  const ax = Object.keys(AXES).find(k => AXES[k].enabled && _gatesEqual(AXES[k].gates || {}, g));
-  if (ax) { runAxis = ax; buildAxisCtl(); }
-  // scope → targets (prefer the richest available: nodes ▸ services ▸ categories ▸ all)
+  const sc = s.scope || {}, req = s.request || {};
+  // scope → targets (prefer the richest available: nodes ▸ services ▸ categories ▸ all).
+  // No axis mapping — the run derives its gates from the resulting SELECTION.
   targets.clear();
   const addIf = pred => Object.keys(N).forEach(id => { if (N[id].lifecycle && pred(id)) targets.add(id); });
   if (Array.isArray(sc.node_ids) && sc.node_ids.length) {
@@ -657,9 +631,12 @@ function currentSuitePayload(id, label) {
   const node_ids = [...targets];
   const services = [...new Set(node_ids.map(i => N[i].service))];
   const categories = [...new Set(node_ids.map(i => N[i].category))];
-  const g = (AXES[runAxis] && AXES[runAxis].gates) || {};
-  const request = {};
-  ["mutations", "destructive", "heavy"].forEach(k => { if (k in g) request[k] = !!g[k]; });
+  // gates are DERIVED from the selection (no axis): a CRUD run always needs
+  // mutations+destructive; heavy iff the selection pulls in a heavy lifecycle.
+  const request = {
+    mutations: true, destructive: true,
+    heavy: [...targets].some(id => N[id] && N[id].heavy),
+  };
   if (services.length === 1) {               // single service → CI-precise filter (README convention)
     const sn = shortName(services[0]);
     request.service = sn; request.crud_filter = sn;
@@ -705,18 +682,90 @@ function launchSummary() {
   const go = $("launch-go");
   if (go) {
     go.disabled = !targets.size;
-    go.className = "btn" + (runMode === "live" ? " warn" : "");
-    go.textContent = runMode === "live" ? "⚠ LIVE 실행 ▶" : "▶ simulate 실행";
+    go.className = "btn warn";              // runs are always LIVE now
+    go.textContent = "⚠ LIVE 실행 ▶";
   }
 }
 
 // ================= ② 실행 & 리포트 =================
 function drawRunScreen() {
-  // pre-flight 남은 자원(잔존) panel at the TOP, then the run settings below it.
-  $("run-left").innerHTML = '<div id="leftover-panel"></div><div id="run-settings"></div>';
+  // capacity bar (VPC budget + 진행중/대기 큐) at the TOP — the hero of concurrent
+  // execution — then the pre-flight 남은 자원(잔존) panel, then the run settings.
+  $("run-left").innerHTML =
+    '<div id="cap-bar"></div><div id="leftover-panel"></div><div id="run-settings"></div>';
+  drawCapBar();
+  startCapPoll();           // poll /api/capacity every ~2s while on the run screen
   drawLeftover();
   drawRunSettings();
   drawReport();
+}
+
+// ---- capacity bar (GET /api/capacity, polled ~2s while on the 실행 screen) ------
+// The visible surface of the cross-run admission model: VPC budget (used/cap +
+// headroom) + a 진행중 chip per running run and a 대기 chip per queued run. Clicking
+// a running chip loads that run into the report. Light theme, compact; reuses the
+// chip/kindtag styles. The poll timer is cleared in go() when leaving the screen.
+let capTimer = null;
+let lastCapacity = null;    // last /api/capacity payload (for the 강제 클린업 disable)
+function startCapPoll() {
+  stopCapPoll();
+  const tick = () => {
+    if (screen !== "run") { capTimer = null; return; }
+    fetch("/api/capacity").then(r => r.json()).then(c => {
+      if (c.error) return;
+      lastCapacity = c;
+      if (screen === "run") { drawCapBar(); drawLeftover(); }
+    }).catch(() => { /* transient — keep last good capacity */ })
+      .finally(() => { if (screen === "run") capTimer = setTimeout(tick, 2000); });
+  };
+  capTimer = setTimeout(tick, 2000);
+}
+function stopCapPoll() { if (capTimer) { clearTimeout(capTimer); capTimer = null; } }
+
+function drawCapBar() {
+  const host = $("cap-bar"); if (!host) return;
+  const c = lastCapacity;
+  if (!c) {
+    host.innerHTML = `<div class="panel cap-panel"><h2>실행 용량 <span class="muted small">· /api/capacity — VPC 동시 실행 한도</span></h2>
+      <div class="muted small">용량 확인 중…</div></div>`;
+    return;
+  }
+  const cap = c.cap || 0;
+  const used = (c.baseline || 0) + (c.reserved || 0);
+  const headroom = c.headroom != null ? c.headroom : Math.max(0, cap - used);
+  const running = c.running || [], queued = c.queued || [];
+  const idTail = id => (id || "").slice(-6);
+  // a cap-cell meter: one cell per VPC slot, filled = used (baseline + reserved).
+  const cells = [];
+  for (let i = 0; i < cap; i++) cells.push(`<i class="${i < used ? "on" : ""}"></i>`);
+  const runChips = running.length
+    ? running.map(r => `<button class="capchip run" data-runid="${esc(r.id)}" title="${esc(r.id)} — 리포트 열기">
+        <span class="kindtag">${esc(idTail(r.id))}</span> ${r.peak_vpcs || 0} VPC${r.heavy ? " 🜂" : ""}</button>`).join("")
+    : '<span class="muted small">없음</span>';
+  const queChips = queued.length
+    ? queued.map(r => `<span class="capchip que" title="${esc(r.id)} — 여유가 생기면 자동 실행">
+        <span class="kindtag">${esc(idTail(r.id))}</span> ${r.peak_vpcs || 0} VPC 필요 · 여유 ${headroom}</span>`).join("")
+    : '<span class="muted small">없음</span>';
+  host.innerHTML = `<div class="panel cap-panel">
+    <h2>실행 용량 <span class="muted small">· VPC 동시 실행 한도 (cap) — ADMIT/대기 큐</span></h2>
+    <div class="cap-head"><b>VPC ${used}/${cap}</b> <span class="muted">· 여유 ${headroom}</span></div>
+    <div class="cap-meter">${cells.join("")}</div>
+    <div class="cap-grp"><span class="cap-lbl">진행중 (${running.length})</span><span class="cap-chips">${runChips}</span></div>
+    <div class="cap-grp"><span class="cap-lbl">대기 (${queued.length})</span><span class="cap-chips">${queChips}</span></div>
+  </div>`;
+  els("#cap-bar .capchip[data-runid]").forEach(b => b.onclick = () => loadRunIntoReport(b.dataset.runid));
+}
+
+// load a run (by id) into the master→detail report — shared by the cap-bar chips
+// and the run-records list. Fetches the run's events, resets scope, and draws.
+function loadRunIntoReport(id) {
+  runId = id; runEvents = []; runStatus = "running";
+  detailScope = "*"; scopeAuto = true; expandedApi = null;
+  fetch("/api/runs/" + id + "/events").then(r => r.json()).then(j => {
+    runEvents = j.events || []; runStatus = j.status || "done";
+    if (runStatus === "running" || runStatus === "queued") pollEvents();
+    drawReport();
+  }).catch(() => drawReport());
 }
 
 // 남은 자원(잔존) — pre-flight panel: list owned (leftover) resources + force cleanup.
@@ -757,27 +806,39 @@ function drawLeftover() {
         <tbody>${rows}</tbody></table></div>`;
     }
   }
+  // 강제 클린업 is account-wide (reaps by owner-tag) so the server BLOCKS it (409)
+  // while any run is running/queued — grey it out with a tooltip while busy, and
+  // surface any non-OK {error} inline (no alert/crash).
+  const busy = !!(lastCapacity && ((lastCapacity.running || []).length || (lastCapacity.queued || []).length));
   host.innerHTML = `<div class="panel lo-panel">
     <h2>남은 자원(잔존) <span class="muted small">· 실행 전 점검 (read-only) + 강제 클린업</span></h2>
     <div class="lo-head">${head}</div>
     ${list}
     <div class="run-ctl">
       <button class="btn ghost" id="lo-scan">🔍 남은 자원 확인</button>
-      <button class="minibtn red" id="lo-cleanup" title="owner=apitest 자원을 TTL 무시하고 삭제">🧹 강제 클린업</button>
+      <button class="minibtn red" id="lo-cleanup" ${busy ? "disabled" : ""}
+        title="${busy ? "진행 중 실행이 있어 비활성화" : "owner=apitest 자원을 TTL 무시하고 삭제"}">🧹 강제 클린업</button>
       ${s && s.owned_total != null ? '<button class="minibtn" id="lo-recheck">↻ 다시 확인</button>' : ""}
     </div>
+    <div class="lo-err" id="lo-err" style="display:none"></div>
   </div>`;
   $("lo-scan").onclick = scanOwned;
   if ($("lo-recheck")) $("lo-recheck").onclick = scanOwned;
   $("lo-cleanup").onclick = () => {
+    if (busy) return;
+    const errEl = $("lo-err"); if (errEl) errEl.style.display = "none";
     if (!confirm("강제 클린업: owner=apitest 가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?")) return;
-    fetch("/api/cleanup", { method: "POST" }).then(r => r.json()).then(j => {
-      if (j.error) { alert(j.error); return; }
+    fetch("/api/cleanup", { method: "POST" }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+      if (!ok || j.error) {                 // 409 (busy) or any error → show inline, no crash
+        const el = $("lo-err");
+        if (el) { el.textContent = j.error || "강제 클린업 실패"; el.style.display = ""; }
+        return;
+      }
       runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
       drawReport(); startR4Poll();
       // after a force cleanup, auto re-scan so the panel reflects the new state
       setTimeout(scanOwned, 1200);
-    }).catch(() => alert("서버 연결 실패"));
+    }).catch(() => { const el = $("lo-err"); if (el) { el.textContent = "서버 연결 실패"; el.style.display = ""; } });
   };
 }
 
@@ -799,70 +860,85 @@ function pollOwned(id) {
 }
 
 function drawRunSettings() {
-  const ax = AXES[runAxis];
   const svcs = new Set([...targets].map(id => N[id].service));
-  $("run-settings").innerHTML = `<div class="panel" style="margin-top:14px"><h2>실행 설정</h2>
-    <h3>Axis <span class="muted small">(run 단위)</span></h3>
-    <div class="axisgrid" id="axisgrid">${Object.entries(AXES).map(([k, a]) =>
-      `<label class="axisopt ${runAxis === k ? "on" : ""} ${a.enabled ? "" : "disabled"}">
-        <input type="radio" name="axis2" value="${k}" ${runAxis === k ? "checked" : ""} ${a.enabled ? "" : "disabled"}>
-        <span><span class="t">${esc(a.label)}</span><br><span class="d">${esc(a.desc)}</span></span>
-      </label>`).join("")}</div>
-    <h3>mode</h3>
-    <div class="pill-ctl mode" id="modeseg" style="width:fit-content">
-      <button data-m="simulate" class="${runMode === "simulate" ? "on" : ""}">simulate</button>
-      <button data-m="live" class="${runMode === "live" ? "on" : ""}">live</button>
+  const heavy = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
+  // Gates are DERIVED from the selection now (no axis/mode UI): a LIVE run always
+  // sends mutations+destructive; heavy auto iff the selection pulls a heavy
+  // lifecycle. The panel just SHOWS what will be applied + the LIVE run button.
+  $("run-settings").innerHTML = `<div class="panel" style="margin-top:14px"><h2>실행 설정 <span class="muted small">· 항상 LIVE — 게이트는 선택에서 파생</span></h2>
+    <p class="muted small">실제 클라우드 자원을 만들고 삭제합니다. 게이트는 선택(폐포)에서 자동으로 결정됩니다 — 별도 토글 없음. VPC 동시 실행 한도(cap) 아래에서 ADMIT 되거나 대기 큐에 들어갑니다.</p>
+    <h3>적용 게이트 <span class="muted small">(선택에서 파생)</span></h3>
+    <div class="chiprow">
+      <span class="chip" style="border-color:var(--red)">✔ mutations</span>
+      <span class="chip" style="border-color:var(--red)">✔ destructive</span>
+      <span class="chip" style="border-color:${heavy ? "var(--red)" : "var(--line)"}">${heavy ? "✔" : "✕"} heavy</span>
     </div>
-    <p class="muted small" style="margin-top:7px">simulate = 플랜을 결정론적으로 재생(클라우드 호출 없음, 합성 id). live = 실제 pytest + 안전 게이트.</p>
-    <h3>적용 게이트</h3>
-    <div class="chiprow" id="gatechips"></div>
     <div class="kv"><span>선택</span><b>${svcs.size} svc / ${targets.size} 리소스</b></div>
     <div class="run-ctl">
-      <button class="btn ${runMode === "live" ? "warn" : ""}" id="run-go" ${targets.size ? "" : "disabled"}>
-        ${runMode === "live" ? "⚠ LIVE 실행 ▶" : "▶ simulate 실행"}</button>
+      <button class="btn warn" id="run-go" ${targets.size ? "" : "disabled"}>⚠ LIVE 실행 ▶</button>
       <button class="btn ghost" id="run-toconf" title="① 구성으로 돌아가 선택 변경">← 구성</button>
     </div>
     ${targets.size ? "" : '<p class="muted small">선택이 없습니다 — ① 구성에서 서비스를 고르세요.</p>'}</div>`;
-  gateChips();
-  els("#axisgrid input").forEach(r => r.onchange = () => {
-    if (!AXES[r.value].enabled) return;
-    runAxis = r.value; ctxBar(); drawRunSettings();
-  });
-  els("#modeseg button").forEach(b => b.onclick = () => { runMode = b.dataset.m; ctxBar(); drawRunSettings(); });
   $("run-go").onclick = startRun;
   $("run-toconf").onclick = () => go("build");
 }
-function gateChips() {
-  const g = AXES[runAxis].gates || {};
-  const chips = [["mutations", g.mutations], ["destructive", g.destructive], ["heavy", g.heavy]]
-    .map(([k, v]) => `<span class="chip" style="border-color:${v ? "var(--red)" : "var(--line)"}">${v ? "✔" : "✕"} ${k}</span>`).join("");
-  if ($("gatechips")) $("gatechips").innerHTML = runMode === "live"
-    ? chips : '<span class="muted small">simulate — 게이트 무관 (클라우드 호출 없음)</span>';
-}
 
+// Runs are always LIVE. Before posting, fetch the plan + capacity (parallel) and
+// show a pre-flight confirm spelling out lifecycles, heavy count, VPC peak vs the
+// current headroom, and whether it will QUEUE. On confirm, POST /api/run (mode
+// live; the server derives the gates) and drive the existing report flow.
 function startRun() {
   if (!targets.size) return;
-  const ax = AXES[runAxis];
-  const body = Object.assign({ mode: runMode }, selectionPayload());
-  if (runMode === "live") {
-    Object.assign(body, ax.gates || {});
-    const g = ax.gates || {};
-    const msg = `LIVE 실행 — 실제 pytest 가 클라우드 자원을 만들고 삭제합니다.\n\n` +
-      `axis: ${ax.label}\n` +
-      `mutations(POST/PUT/PATCH): ${g.mutations ? "ON" : "off"}\n` +
-      `destructive(DELETE): ${g.destructive ? "ON" : "off"}\n` +
-      `heavy(billable lifecycle): ${g.heavy ? "ON" : "off"}\n\n진행할까요?`;
-    if (!confirm(msg)) return;
-  }
+  const sel = selectionPayload();
+  Promise.all([
+    fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sel) }).then(r => r.json()),
+    fetch("/api/capacity").then(r => r.json()),
+  ]).then(([plan, capacity]) => {
+    plan = plan || {}; capacity = capacity || {};
+    const N_lc = plan.runnable ? plan.runnable.length : (plan.lifecycle_ids ? plan.lifecycle_ids.length : 0);
+    const peak = plan.peak_vpcs || 0;
+    const headroom = capacity.headroom != null ? capacity.headroom : 0;
+    const heavyM = Object.values(plan.preview || {}).filter(p => p && p.heavy).length;
+    const heavy = heavyM > 0;
+    const lines = [
+      "실행 — 실제 클라우드 자원을 만들고 삭제합니다.",
+      "",
+      `라이프사이클: ${N_lc}개`,
+      heavy ? `⚠️ heavy(billable): ${heavyM}개` : "heavy: 없음",
+      `VPC 소모(peak): ${peak} · 현재 여유: ${headroom}`,
+    ];
+    if (peak > headroom) lines.push("→ 여유보다 커서 대기 큐에 들어갑니다.");
+    lines.push("진행할까요?");
+    if (confirm(lines.join("\n"))) postRun(sel);
+  }).catch(e => {
+    // plan/capacity pre-flight failed → still allow the run, but tell the user.
+    if (confirm("사전 점검(plan/capacity) 실패: " + e.message + "\n그래도 LIVE 실행할까요?")) postRun(sel);
+  });
+}
+
+// POST /api/run (always mode live) and drive the existing report flow. Tolerates a
+// "queued" status (pollEvents shows the wait banner until it flips to running).
+function postRun(sel) {
+  const body = Object.assign({ mode: "live" }, sel);
   if (screen !== "run") go("run");
   $("report-main").innerHTML = '<p class="muted small">실행 요청 중…</p>';
   fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).then(j => {
       if (j.error) { $("report-main").innerHTML = '<p class="empty">실행 실패: ' + esc(j.error) + "</p>"; return; }
-      runId = j.id; runEvents = []; runStatus = "running";
+      runId = j.id; runEvents = []; runStatus = j.status || "running";
       detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;   // fresh run → reconcile auto-selects
-      drawReport();
+      // A QUEUED run has no events / no live scene yet: show the wait banner and let
+      // pollEvents own the report until it flips to running (drawReport here would
+      // build+discard the r1 scene and momentarily show a misleading "완료" banner).
+      if (runStatus === "queued") {
+        $("report-main").innerHTML =
+          '<div class="nowbar"><span class="dot"></span><b>대기 큐에서 대기 중</b> — 여유가 생기면 자동 실행</div>';
+        $("lc-picker").innerHTML = "";
+      } else {
+        drawReport();
+      }
       pollEvents();
+      drawCapBar();   // reflect the new run in the capacity bar (refreshes on next poll)
     }).catch(e => { $("report-main").innerHTML = '<p class="empty">실행 연결 실패: ' + esc(e.message) + "</p>"; });
 }
 
@@ -876,7 +952,21 @@ function pollEvents() {
   fetch("/api/runs/" + runId + "/events").then(r => r.json()).then(j => {
     runEvents = j.events || [];
     runStatus = j.status || runStatus;
-    const ended = runEvents.some(e => e.kind === "run-end") || (runStatus !== "running");
+    // A run admitted under the cap is "running"; one that exceeded the cap is
+    // "queued" — no events yet. Show a waiting banner and keep polling the record
+    // (cheap, robust) until it flips to running, then the normal event flow takes
+    // over. Either state is "in flight" (not ended).
+    if (runStatus === "queued") {
+      if (screen === "run") {
+        $("report-main").innerHTML =
+          '<div class="nowbar"><span class="dot"></span><b>대기 큐에서 대기 중</b> — 여유가 생기면 자동 실행</div>';
+        renderLcPicker();
+      }
+      pollTimer = setTimeout(pollEvents, 1500);
+      return;
+    }
+    const ended = runEvents.some(e => e.kind === "run-end")
+      || (runStatus !== "running" && runStatus !== "queued");
     if (screen === "run") drawReport();
     if (!ended) pollTimer = setTimeout(pollEvents, 700);
     else { runStatus = runStatus === "running" ? "done" : runStatus; if (screen === "run") drawReport(); }
@@ -1332,7 +1422,6 @@ function reportR2() {
     if (r.created) return '<span class="phch created">생성됨</span>';
     return "";
   };
-  const simLabel = runMode === "simulate" ? ' <span class="muted small">(simulate: 합성 id)</span>' : "";
   // TYPE = the resource KIND derived from the create/delete PATH (vpc/subnet/port),
   // NOT the service name — the path is the source of truth for what was created.
   const rowKind = r => kindFromPath(r.path) || shortName(r.type || "") || "?";
@@ -1355,7 +1444,7 @@ function reportR2() {
   const nowLine = prog.running && cursorId
     ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
         <b>${esc(prog.phaseLabel)}</b> · <code>${esc(cursorId)}</code></div>` : "";
-  $("detail-body").innerHTML = `<h3 class="detail-h">자원${simLabel} <span class="muted small">· ${d.agg ? "런 전체" : "이 라이프사이클"} — 생성 · 테스트 · 삭제 + id</span></h3>
+  $("detail-body").innerHTML = `<h3 class="detail-h">자원 <span class="muted small">· ${d.agg ? "런 전체" : "이 라이프사이클"} — 생성 · 테스트 · 삭제 + id</span></h3>
     ${nowLine}
     <table class="tbl">
       <thead><tr><th>type</th><th>resource_id</th>${lcCol}<th>생성</th><th>테스트</th><th>삭제</th><th>단계</th></tr></thead>
@@ -1625,8 +1714,10 @@ function loadRunRecords() {
     if (!runs.length) { host.innerHTML = '<p class="muted small">아직 실행 기록이 없습니다.</p>'; return; }
     const KIND = { simulate: "▶sim", lifecycle: "▶live", cleanup: "🧹", verify: "🔍" };
     host.innerHTML = runs.map(r => {
-      const icon = r.status === "running" ? "⏳" : r.status === "done" ? (r.rc === 0 ? "✅" : "⚠️") : "❌";
-      const dur = (r.ended && r.started) ? Math.round(r.ended - r.started) + "s" : (r.status === "running" ? "실행중…" : "");
+      const icon = r.status === "queued" ? "⌛" : r.status === "running" ? "⏳"
+        : r.status === "done" ? (r.rc === 0 ? "✅" : "⚠️") : "❌";
+      const dur = (r.ended && r.started) ? Math.round(r.ended - r.started) + "s"
+        : (r.status === "running" ? "실행중…" : r.status === "queued" ? "대기 중…" : "");
       const on = runId === r.id;
       const tag = KIND[r.kind] || esc(r.kind || "");
       return `<div class="runrow ${on ? "on" : ""}" data-id="${esc(r.id)}">
@@ -1634,15 +1725,7 @@ function loadRunRecords() {
           <span class="muted small">${esc((r.lifecycle_ids || []).slice(0, 2).join(", "))}${(r.lifecycle_ids || []).length > 2 ? " …" : ""}</span></span>
         <span class="muted small">${esc(r.summary || r.status)} · ${dur}</span></div>`;
     }).join("");
-    els("#report-side .runrow").forEach(row => row.onclick = () => {
-      runId = row.dataset.id; runEvents = []; runStatus = "running";
-      detailScope = "*"; scopeAuto = true; expandedApi = null;   // new run → reconcile re-selects
-      fetch("/api/runs/" + runId + "/events").then(r => r.json()).then(j2 => {
-        runEvents = j2.events || []; runStatus = j2.status || "done";
-        if (runStatus === "running") pollEvents();
-        drawReport();
-      }).catch(() => drawReport());
-    });
+    els("#report-side .runrow").forEach(row => row.onclick = () => loadRunIntoReport(row.dataset.id));
   }).catch(() => { const host = $("report-side"); if (host) host.innerHTML = '<p class="muted small">서버 연결 실패</p>'; });
 }
 
