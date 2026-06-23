@@ -388,14 +388,10 @@
           "_note": "setresourcepolicy — PUT /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23: kms:* action is valid for a KMS SRN. Creates a resource policy (group 'rp-real'; cleanup deletes it). Action changed from iam:* (400 UnSupportedActionInPolicy) to kms:* (200). Expect_status narrowed to [200,201,202]: we now have confirmed 2xx."
         },
         {
-          "name": "show-resource-policy",
-          "method": "GET",
-          "path": "/v1/resource-policies/{iam_srn_b64}",
+          "name": "probe-resource-policy-reads",
           "group": "rp-real",
-          "params": {"page": 1},
-          "optional": true,
-          "expect_status": [200, 400, 403, 404],
-          "_note": "showresourcepolicy — GET /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23 (after setresourcepolicy creates the policy). Group 'rp-real' gates this on setresourcepolicy success. params:{page:1} is a harmless/ignored param that makes the engine record this GET under its catalog key management/iam/showresourcepolicy (engine only catalog-records GET steps with non-empty params). Tolerant [200,400,403,404]."
+          "probe_reads": {"srn": "{iam_srn_b64}"},
+          "_note": "showresourcepolicy — probe GET /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23. Explicitly maps catalog param 'srn' to the b64-encoded SRN value (iam_srn_b64). Without this explicit mapping, probe_reads can't resolve {srn} (ctx has 'iam_srn_b64', not 'srn'; _PARAM_ALIASES only has 'rg_srn' for srn). The probe fires GET /v1/resource-policies/{iam_srn_b64} after setresourcepolicy created the policy -> 200. Records under catalog key management/iam/showresourcepolicy. Group rp-real gates this on setresourcepolicy success."
         },
         {
           "name": "add-resource-policy-statement",
