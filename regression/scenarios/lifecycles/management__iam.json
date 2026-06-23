@@ -240,7 +240,7 @@
           "optional": true,
           "json": {"name": "regrgrpb{ualpha}", "description": "API regression suite", "policy_ids": [], "user_ids": [], "tags": []},
           "expect_status": [200, 201, 202],
-          "capture": {"group_id": "$.group.id"},
+          "capture": {"group_id": "$.group.id", "group_name": "$.group.name"},
           "cleanup": {"method": "DELETE", "path": "/v1/groups/{group_id}", "service": "iam"}
         },
         {
@@ -249,8 +249,8 @@
           "path": "/v1/groups/{group_id}",
           "group": "grp-bind",
           "optional": true,
-          "_note": "setgroup — PUT /v1/groups/{group_id}. Update description on the real group created above. Closes GAP-mut for PUT /v1/groups/{group_id} (management/iam/setgroup). Body: description only; name unchanged to avoid collision. Tolerant [200,202,400,403,404,409,422] so a 4xx on group-create propagates cleanly.",
-          "json": {"description": "updated by API regression suite"},
+          "_note": "setgroup — PUT /v1/groups/{group_id}. Update description on the real group created above. Closes GAP-mut for PUT /v1/groups/{group_id} (management/iam/setgroup). CONFIRMED 2026-06-23: body REQUIRES 'name' field (400 'Field required' without it). Captures group_name from create response ($.group.name) and re-sends it unchanged with new description. Tolerant [200,202,400,403,404,409,422] so a 4xx on group-create propagates cleanly.",
+          "json": {"name": "{group_name}", "description": "updated by API regression suite"},
           "expect_status": [200, 202, 400, 403, 404, 409, 422]
         },
         {
@@ -343,19 +343,20 @@
       "id": "iam-resource-policy",
       "service": "management/iam",
       "enabled": true,
-      "_note": "Light, standalone. Covers the resource-policy write ops: PUT/DELETE /v1/resource-policies/{srn}, POST /v1/resource-policies/{srn}/statements, PUT/DELETE /v1/resource-policies/{srn}/statements/{sid}. KEY FIX (2026-06-20): the iam gateway decodes {srn} path segments the same way resourcemanager does — plain SRN in the URL yields 400 'SRN decoding error'; the segment MUST be base64-encoded. Pattern mirrors management__resourcemanager.json. Step 1: GET /v1/resources (resourcemanager) soft-captures a real SRN the account owns ($.resources[0].srn -> iam_srn). Step 2: b64_encode -> iam_srn_b64. Steps 3-8: all {srn} path positions use {iam_srn_b64}. If no resource is found (empty list / 403) the b64_encode step is skipped (optional), leaving {iam_srn_b64} unresolved; the engine then substitutes a placeholder literal which still routes the call to the catalog '*' key — coverage is recorded even on a 4xx. Bodies from api_bodies.json (setresourcepolicy/addpermission/setpermission). A real SRN in the path is a necessary but not sufficient condition for 2xx: the account must also have a resource-policy attached to that SRN. Confidence: the 400 will clear (SRN decoder satisfied); the call may still 404 (no policy exists on that resource) or 403 (no permission). Sid path segment ({unique}) normalizes to '*' for catalog matching — no b64 needed on sid.",
+      "_note": "Light, standalone. Covers the resource-policy write ops: PUT/DELETE /v1/resource-policies/{srn}, POST /v1/resource-policies/{srn}/statements, PUT/DELETE /v1/resource-policies/{srn}/statements/{sid}. KEY FIX (2026-06-20): the iam gateway decodes {srn} path segments as base64 — plain SRN yields 400 'SRN decoding error'; segment MUST be base64-encoded. KEY FIX (2026-06-23): Action in resource-based policy body MUST match the target resource's service (iam:* 400s 'UnSupportedActionInPolicy'; * also 400s; kms:* confirmed 200 against a KMS SRN). Strategy: filter resourcemanager list by resource_type=kms so the captured SRN is always from the kms service, then use kms:* action. Cleanup: setresourcepolicy creates a real policy -> deleteresourcepolicy MUST run as cleanup (destructive). Also: setpermission/removepermission need the real Sid used in addpermission; both use literal 'Statement2' which matches the addpermission body. VALIDATED 2026-06-23: setresourcepolicy 200, showresourcepolicy 200, addpermission 201 (kms:*), setpermission 200, removepermission 204, deleteresourcepolicy 204.",
       "steps": [
         {
-          "name": "list-iam-resources",
+          "name": "list-kms-resources",
           "method": "GET",
           "path": "/v1/resources",
           "service": "resourcemanager",
           "optional": true,
+          "params": {"resource_type": "kms", "page": 1, "page_size": 10},
           "expect_status": [200, 400, 403, 404],
           "capture_soft": {
             "iam_srn": "$.resources[0].srn"
           },
-          "_note": "Soft-capture a real SRN the account owns from resourcemanager GET /v1/resources (confirmed envelope: $.resources[].srn — live-verified 2026-06-19 by resourcemanager agent). This provides the b64-encoding step with a valid SRN for the iam /v1/resource-policies/{srn} paths. Cross-service step: service='resourcemanager' targets the resourcemanager host. If the list is empty or 403, iam_srn stays unresolved and the b64_encode step is skipped (optional), leaving {iam_srn_b64} a literal placeholder."
+          "_note": "Soft-capture a KMS SRN (resource_type=kms filter confirmed 200 with 20 kms resources 2026-06-23). KMS SRN required because resource-based policy Action must match service — kms:* is confirmed valid. Without KMS filter, first resource might be vpc/secretsmanager/etc. which caused 400 UnSupportedActionInPolicy on prior runs. If 403 or empty, iam_srn stays unresolved -> b64-encode skipped -> placeholder SRN (catalog '*' key still covered)."
         },
         {
           "name": "b64-encode-iam-srn",
@@ -363,12 +364,13 @@
           "input": "{iam_srn}",
           "output": "iam_srn_b64",
           "optional": true,
-          "_note": "Base64-encode the captured SRN for use in /v1/resource-policies/{srn} path segments. REQUIRED: the iam gateway decodes {srn} path segments as base64 — plain SRN yields 400 'SRN decoding error' (same decoder as resourcemanager, confirmed by pattern match against the 5 ops all returning 400 pre-fix). Mirrors b64-encode-srn in management__resourcemanager.json."
+          "_note": "Base64-encode the captured KMS SRN for use in /v1/resource-policies/{srn} path segments. REQUIRED: the iam gateway decodes {srn} path segments as base64. Mirrors b64-encode-srn in management__resourcemanager.json."
         },
         {
           "name": "set-resource-policy",
           "method": "PUT",
           "path": "/v1/resource-policies/{iam_srn_b64}",
+          "group": "rp-real",
           "optional": true,
           "json": {
             "policy_version": {
@@ -376,73 +378,80 @@
               "policy_document": {
                 "Version": "2024-07-01",
                 "Statement": [
-                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": "*"}
+                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["kms:*"], "Resource": ["*"], "Principal": "*"}
                 ]
               }
             }
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "_note": "setresourcepolicy — PUT /v1/resource-policies/{srn}. {iam_srn_b64} is base64-encoded SRN from list-iam-resources + b64-encode-iam-srn. Body from api_bodies.json (setresourcepolicy) with server-assigned version id fields omitted. Path normalizes to catalog key management/iam/setresourcepolicy via '*' segment. Expect 404 (resource has no policy yet) or 403 (no permission) on a real run; 400 SRN decoding error is eliminated by b64 encoding."
+          "expect_status": [200, 201, 202],
+          "cleanup": {"method": "DELETE", "path": "/v1/resource-policies/{iam_srn_b64}", "service": "iam"},
+          "_note": "setresourcepolicy — PUT /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23: kms:* action is valid for a KMS SRN. Creates a resource policy (group 'rp-real'; cleanup deletes it). Action changed from iam:* (400 UnSupportedActionInPolicy) to kms:* (200). Expect_status narrowed to [200,201,202]: we now have confirmed 2xx."
         },
         {
           "name": "show-resource-policy",
           "method": "GET",
           "path": "/v1/resource-policies/{iam_srn_b64}",
+          "group": "rp-real",
           "optional": true,
           "expect_status": [200, 400, 403, 404],
-          "_note": "showresourcepolicy — GET /v1/resource-policies/{srn}. {iam_srn_b64} is base64-encoded SRN (same as write steps). Closes GAP-get-id for GET /v1/resource-policies/{srn}. Tolerant [200,400,403,404]: the SRN must have a resource-policy for 200; without one expects 404. Path normalizes to catalog '*' key. If b64 encoding was skipped, the GET fires with a placeholder SRN and records coverage on the call."
+          "_note": "showresourcepolicy — GET /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23 (after setresourcepolicy creates the policy). Group 'rp-real' gates this on setresourcepolicy success. Tolerant [200,400,403,404] in case SRN is placeholder."
         },
         {
           "name": "add-resource-policy-statement",
           "method": "POST",
           "path": "/v1/resource-policies/{iam_srn_b64}/statements",
+          "group": "rp-real",
           "optional": true,
           "json": {
             "Sid": "Statement2",
             "Effect": "Allow",
-            "Action": ["iam:*"],
+            "Action": ["kms:*"],
             "NotAction": [],
             "Principal": "*",
             "Resource": ["*"],
             "Condition": {}
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "_note": "addpermission — POST /v1/resource-policies/{srn}/statements. Body from api_bodies.json (addpermission). {iam_srn_b64} = base64-encoded SRN. Path normalizes to catalog key management/iam/addpermission."
+          "capture_soft": {"rp_statement_sid": "$.Statement.Sid"},
+          "_note": "addpermission — POST /v1/resource-policies/{srn}/statements. CONFIRMED 201 2026-06-23 with kms:* action. Soft-captures $.Statement.Sid ('Statement2') as rp_statement_sid for use in setpermission/removepermission path. Action changed from iam:* to kms:* (same fix as setresourcepolicy)."
         },
         {
           "name": "set-resource-policy-statement",
           "method": "PUT",
-          "path": "/v1/resource-policies/{iam_srn_b64}/statements/{unique}",
+          "path": "/v1/resource-policies/{iam_srn_b64}/statements/{rp_statement_sid}",
+          "group": "rp-real",
           "optional": true,
           "json": {
             "Sid": "Statement2",
             "Effect": "Allow",
-            "Action": ["iam:*"],
+            "Action": ["kms:*"],
             "NotAction": [],
             "Principal": "*",
             "Resource": ["*"],
             "Condition": {}
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
-          "_note": "setpermission — PUT /v1/resource-policies/{srn}/statements/{sid}. {iam_srn_b64} = base64-encoded SRN; {unique} stands in for the sid (path segment normalizes to '*' for catalog matching — sid does NOT need b64 encoding; only the {srn} segment does). Body from api_bodies.json (setpermission)."
+          "_note": "setpermission — PUT /v1/resource-policies/{srn}/statements/{sid}. CONFIRMED 200 2026-06-23. {rp_statement_sid} captured from addpermission response ($.Statement.Sid='Statement2'). Prior {unique} caused 404 because synthetic id didn't match created Sid. {rp_statement_sid} path segment normalizes to catalog '*' key (variable, not literal)."
         },
         {
           "name": "remove-resource-policy-statement",
           "method": "DELETE",
-          "path": "/v1/resource-policies/{iam_srn_b64}/statements/{unique}",
+          "path": "/v1/resource-policies/{iam_srn_b64}/statements/{rp_statement_sid}",
+          "group": "rp-real",
           "optional": true,
           "destructive": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "removepermission — DELETE /v1/resource-policies/{srn}/statements/{sid}. {iam_srn_b64} = base64-encoded SRN; {unique} = synthetic sid (normalizes to '*')."
+          "_note": "removepermission — DELETE /v1/resource-policies/{srn}/statements/{sid}. CONFIRMED 204 2026-06-23. {rp_statement_sid} captured from addpermission (same fix as setpermission)."
         },
         {
           "name": "delete-resource-policy",
           "method": "DELETE",
           "path": "/v1/resource-policies/{iam_srn_b64}",
+          "group": "rp-real",
           "optional": true,
           "destructive": true,
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
-          "_note": "deleteresourcepolicy — DELETE /v1/resource-policies/{srn}. {iam_srn_b64} = base64-encoded SRN."
+          "_note": "deleteresourcepolicy — DELETE /v1/resource-policies/{srn}. CONFIRMED 204 2026-06-23. Also registered as cleanup on set-resource-policy step (belt-and-suspenders so teardown runs even if this explicit step is skipped)."
         }
       ]
     },
