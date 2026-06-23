@@ -19,7 +19,7 @@
         "SCP_ALLOW_MUTATIONS+DESTRUCTIVE+SCP_RUN_HEAVY + shared VPC: gen-wave4-asg covers all 26 to 2xx (except notification, which needs user_ids)"
       ],
       "notes": "Autoscaling 2/28 covered (root cause: both autoscale lifecycles are mutation-gated, skip on read-only). createlaunchconfiguration PROVEN 2xx 2026-06-18 (real windows image + keypair; volume size div by 8, no delete_on_termination field). policy comparison_operator=ge, schedule frequency=ONCE|DAILY|WEEKLY|MONTHLY. See knowledge/services.md compute/virtualserver autoscaling note.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "vpc",
@@ -30,7 +30,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "apigateway",
@@ -48,26 +48,7 @@
         "entitlement: grant privatelink IAM actions -> 7 PL endpoints coverable"
       ],
       "notes": "read-only floor 2/55 (listapis+listprivatelinkendpoints only directly-testable). mutation ceiling 44/55 (stale 47 was pre-PF-19). setapidescription step added (body {description}). NEW entitlement-403: showprivatelinkendpoint, listconnectedprivatelinkendpoints.",
-      "updated": "2026-06-23T02:15:56Z"
-    },
-    {
-      "service": "iam",
-      "covered": 15,
-      "total": 62,
-      "gap": 47,
-      "heavy": false,
-      "blockers": [
-        "product-bug-5xx: createrole 500 ContactAdminForAssistance (blocks role mutation chain).",
-        "entitlement-403: adduserpolicybinding/removeuserpolicybinding (POST/DELETE) - GET listuserpolicybindings is 200.",
-        "engine-multipart-blocked: saml-providers need multipart/form-data.",
-        "needs-resource: 6 resource-policy ops need an existing policy (b64-SRN fix confirmed: shows 404 not 400); heavy-prereq: accesskey/iam-user ops (SCP_RUN_HEAVY)."
-      ],
-      "next_levers": [
-        "MUTATIONS run: iam-group-bindings (new set-group step) + iam-policy-extra-writes (new query-policy, confirmed 200) -> +10 2xx",
-        "MUTATIONS: iam-resource-policy b64-SRN fix - setresourcepolicy may 403 but now targets correctly"
-      ],
-      "notes": "28->30/62 read-only. NEW: listiamuser 200 (real account_id from access-keys envelope $.access_keys[0].account_id); listuserpolicybindings returns 200 for ANY user_id (gateway does not 404 unknown users). account_id=ec11538abf8f46d2953539521f745366. Fragment: +set-group, +query-policy, note fixes.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "postgresql",
@@ -82,7 +63,7 @@
         "postgresql sub-op id-GETs blocked until createcluster 500 is fixed upstream"
       ],
       "notes": "postgresql createcluster 500s (PF, baselined); the 4 other engines covered their sub-ops this run.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "mysql",
@@ -93,7 +74,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "mysql: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "epas",
@@ -104,7 +85,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "epas: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "mariadb",
@@ -115,7 +96,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "mariadb: heavy DBaaS run 2026-06-19 covered showcluster + sub-op id-GETs (backuphistories/parametervalues/etc.) via real cluster create+adopt shared VPC.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "baremetal-blockstorage",
@@ -126,7 +107,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "sqlserver",
@@ -137,7 +118,26 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
+    },
+    {
+      "service": "iam",
+      "covered": 25,
+      "total": 62,
+      "gap": 37,
+      "heavy": false,
+      "blockers": [
+        "product-bug-5xx: createrole 500 ContactAdminForAssistance (blocks role mutation chain).",
+        "entitlement-403: adduserpolicybinding/removeuserpolicybinding (POST/DELETE) - GET listuserpolicybindings is 200.",
+        "engine-multipart-blocked: saml-providers need multipart/form-data.",
+        "needs-resource: 6 resource-policy ops need an existing policy (b64-SRN fix confirmed: shows 404 not 400); heavy-prereq: accesskey/iam-user ops (SCP_RUN_HEAVY)."
+      ],
+      "next_levers": [
+        "MUTATIONS run: iam-group-bindings (new set-group step) + iam-policy-extra-writes (new query-policy, confirmed 200) -> +10 2xx",
+        "MUTATIONS: iam-resource-policy b64-SRN fix - setresourcepolicy may 403 but now targets correctly"
+      ],
+      "notes": "28->30/62 read-only. NEW: listiamuser 200 (real account_id from access-keys envelope $.access_keys[0].account_id); listuserpolicybindings returns 200 for ANY user_id (gateway does not 404 unknown users). account_id=ec11538abf8f46d2953539521f745366. Fragment: +set-group, +query-policy, note fixes.",
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "organization",
@@ -155,7 +155,7 @@
         "createinvitation 2nd required field still unknown (email/message/login_id rejected)"
       ],
       "notes": "2/37 (effective 2/14 non-waived). Hard org-master entitlement wall confirmed live 2026-06-20 across 5 smoke runs. No fragment change needed.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "iam-identity-center",
@@ -173,7 +173,7 @@
         "Add instance_id to smoke _REQUIRED_QUERY_DEFAULTS (shared, orchestrator) to fix 4 list 400->404"
       ],
       "notes": "FIRST ANALYSIS 2026-06-20: 0->1/32 (listinstances 200 empty). Fragment: 4 list steps fixed with instance_id param + new non-heavy idc-read-coverage lifecycle. Response id paths UNPROVEN.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "scr",
@@ -191,7 +191,7 @@
         "docker-push 1 image -> unblocks up to 31 endpoints"
       ],
       "notes": "8/39 (prior 9 overcounted - checkrepositorynameduplication was 400-soft). NEW: showrepository+listimages 200 via chain. Live ids: registry nayvugfp4154447ab0ab61279cba3d72, repo test 6c910ed5195842739f9c98a569982064. /v1/repositories|images|tagses flat lists 403; checkrepositorynameduplication needs registry_id+name.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "loadbalancer",
@@ -208,7 +208,7 @@
         "Pre-provision LB cert for showloadbalancercertificate; private-static-nat needs vpc/nat ids"
       ],
       "notes": "0->6/34. 5 smoke GETs + showlbhealthcheck (5 real system HC ids). HC before SG (LbHealthCheckNotFound). Listener routing_action enum LB_SERVER_GROUP|URL_REDIRECT. Added listener create/delete + listener_id to probe_reads (GET verify steps don't credit catalog keys; only probe_reads). Account 0 LBs/listeners/SGs/members/certs.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "resourcemanager",
@@ -219,7 +219,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "12->27/27 (100%). Key finding: {srn} and {key} path segments MUST be base64-encoded. listresources response uses $.resources[] not $.contents[]. All 27 endpoints confirmed 2xx via direct probes.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "cachestore",
@@ -236,7 +236,7 @@
         "HEAVY+MUTATIONS: cachestore-cluster-subops-guarded -> ~27/32 (remove-backup-histories has known 401-with-valid-HMAC quirk)"
       ],
       "notes": "4->6/32. NEW: listengineversionproperties (read_chain) + listparameters (dbaas_parameter_group_id from /v1/parameter-groups). /v1/parameters needs dbaas_parameter_group_id (not parameter_group_id). 2 param groups (Redis 7, Valkey 8). cluster sub-GETs 404 with placeholder (routed OK). Added dbaas_parameter_group_id to probe_reads.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "servicewatch",
@@ -254,7 +254,7 @@
         "Ceiling with mutations 29/31 if create alert+eventrule 2xx else 27/31"
       ],
       "notes": "read-only floor 5/31; mutation-ceiling 24 retained. NEW servicewatch-log-group lifecycle (6 endpoints) + list-metric-data step. Dashboard fixes: capture_soft, $.id (flat, not $.dashboard.id), delete body dashboard_ids (not ids).",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "archivestorage",
@@ -270,7 +270,7 @@
         "Investigate transient 503s on 4/6 direct GETs"
       ],
       "notes": "0/25. Gateway entitlement-401 wall (scp-archivestorage_hmac not in service-account catalog). reachability-only owner override. Fragment now models all 25/25 endpoints. 6 direct GETs 401 soft; 6 id-GETs skip (parent 401); 13 mutating gated+401.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "backup",
@@ -289,7 +289,7 @@
         "smoke.py: change getbackuptargetlist policy_type default VM_IMAGE->FILESYSTEM (shared file)"
       ],
       "notes": "7->8/31. getbackuptargetlist 200 via FILESYSTEM (VM_IMAGE 500 baselined in known_issues.json). 8 bare GETs covered. showinstallfilepath returns NetBackup 10.4.0.1 installer URL. listbackupregionrelationship 4 region pairs. create-backup-target steps switched to FILESYSTEM.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "scf",
@@ -308,7 +308,7 @@
         "Add 'time' to read_chains shared query values to fix logs/metrics read-only"
       ],
       "notes": "13/36 read-only (prior 26 was a mutation-run number). 9 id-bound GETs 200 via read-chain (cloud_function_id from /v1/cloud-functions). SCF intermittently 503. PL-service enable=true strands fn in Creating -> only enable=false safe.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "searchengine",
@@ -319,7 +319,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "ske",
@@ -333,7 +333,7 @@
         "Remaining 21 gaps need SCP_ALLOW_MUTATIONS + SCP_RUN_HEAVY (cluster+nodepool lifecycle)"
       ],
       "notes": "listimages (GET /v1/images): scp_original_image_type=k8s is REQUIRED (400 without; 200 with, count:15). Fixed in container__ske.json (new list-images step) and generated__heavy-ske.json (inline params -> params dict). Confirmed 200 live 2026-06-20.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "vertica",
@@ -344,7 +344,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "dns",
@@ -362,7 +362,7 @@
         "knowledge correction: known_issues.json has 0 DNS entries; the 500 baseline claim was inaccurate"
       ],
       "notes": "3/22. 3 bare-list GETs 200 (account empty). Fragment: added probe-public-domain-reads probe_reads step. KEY: plain GET steps record under lifecycle:step not catalog key -> need probe_reads for id-GET credit.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "eventstreams",
@@ -373,7 +373,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "cloudcontrol",
@@ -391,7 +391,7 @@
         "target_type enum confirmed ACCOUNT|OU (ROOT->400); params now in fragment"
       ],
       "notes": "0/15. Structural entitlement wall re-verified live 2026-06-20. Fragment now carries listguardrailsfortarget+listtargetsforguardrail with proven params.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "baremetal",
@@ -402,7 +402,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "filestorage",
@@ -418,7 +418,7 @@
         "snapshot_schedule_id from $.snapshot_schedule[0].id (list); replication_id from $.replications[0].replication_id"
       ],
       "notes": "4->8/21. NEW 4 2xx via real volume_id (account has 7 live volumes + live kr-west1->kr-east1 replication): listsnapshots+listsnapshotschedule+listvolumereplications+showvolumereplication. These 3 lists REQUIRE volume_id query. Added capture_soft fallbacks for schedule/replication ids.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "cloudmonitoring",
@@ -437,7 +437,7 @@
         "Enroll a product in monitoring to unlock puteventpolicy/perf-data"
       ],
       "notes": "4->6/18. NEW: getaccountproductlist + getproducteventpolicylist 200 (X-ResourceType header REQUIRED). IDs are NUMERIC not UUID. addrbook read_chain uses wrong path (/v2/addrbooks vs /v2/users/addrbooks).",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "data-flow",
@@ -455,7 +455,7 @@
         "HEAVY+MUTATIONS: data-flow-service-and-flow-guarded provisions NiFi -> +6-8 2xx"
       ],
       "notes": "3->5/12. NEW: 2 check-duplication GETs 200 (accept any name) via direct probe. ID formats: DFLOW-<uuid>, DFLOW_SERVICE-<uuid>, cluster_id 32-char UUID. Both resource lists empty.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "data-ops",
@@ -472,7 +472,7 @@
         "Borrow-read: if another team creates a resource, list to harvest ids"
       ],
       "notes": "5/17 confirmed (2 check-duplication 200 for any name). ID formats DOPS-<uuid>, DOPS_SERVICE-<uuid>, 32-hex cluster_id. getdataopssubversion 400 (not 404) for fake id. Only image version 4.1.1.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "multinodegpucluster",
@@ -483,7 +483,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "billingplan",
@@ -494,7 +494,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "parallel-filestorage",
@@ -511,7 +511,7 @@
         "setaccessrule body shape unknown"
       ],
       "notes": "0->1/11 (listvolumes 200; list field is parallel_filestorages not volumes). Added list-snapshots step (volume_id required, probe_reads can't supply query params). deletesnapshot ALSO needs ?volume_id. capture $.snapshot.id. heavy:true (billable).",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "queueservice",
@@ -524,7 +524,7 @@
         "fifo-only dedup ops need a .fifo queue (optional groups already isolate)"
       ],
       "notes": "12/12 \u2014 getqueueattributes needs attributes=All (case-sensitive) + name=<queue>. Fixed 41858cb.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "quick-query",
@@ -541,7 +541,7 @@
         "Add page+size to read_chains list params -> getquickquery+checkduplication read-only-coverable"
       ],
       "notes": "2/12 (prior 3 stale - checkduplicationquickquery never 2xx). Fixed body bugs: update-engine {cpu,memory,replica}; update-host-alias {host_alias_list:[]}. List items carry quick_query_id+quick_query_name.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "cloud-ml",
@@ -559,24 +559,7 @@
         "HEAVY+MUTATIONS + 5 env secrets (SCP_SCR_*, SCP_CLOUDML_PRODUCT_GROUP_ID): gen-cloudml-chain covers all 9 (~60min)"
       ],
       "notes": "FIRST ANALYSIS 0/9. Product-routing 404 when not subscribed (NOT 403). cloud_ml attaches to existing SKE cluster. Scenarios already model lifecycle.",
-      "updated": "2026-06-23T02:15:56Z"
-    },
-    {
-      "service": "gslb",
-      "covered": 2,
-      "total": 10,
-      "gap": 8,
-      "heavy": false,
-      "blockers": [
-        "needs-resource: showgslb+listgslbresources need gslb_id from list (account has 0 GSLBs).",
-        "mutation-gated: 6 create/set/delete - PURELY mutation-gated, NO entitlement/heavy walls."
-      ],
-      "next_levers": [
-        "MUTATIONS+DESTRUCTIVE: networking-gslb-service covers all 10 (2/10->10/10 expected)",
-        "create body resources:[] may 400 - try [{destination,region}]"
-      ],
-      "notes": "0->2/10 (2 list GETs 200, empty). All 8 gaps pure mutation-gated. Schema: algorithm=RATIO|ROUND_ROBIN, env_usage=PUBLIC|PRIVATE, setgslb 200 others 202, name must be FQDN.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "vpn",
@@ -593,7 +576,7 @@
         "IKE/IPSec enum values (phase1/phase2) still docs-estimates"
       ],
       "notes": "2/10 read-only ceiling. listvpngateways+listvpntunnels 200 empty. id-GETs 404 not-found (no entitlement). createvpngateway needs name/ip_id/ip_type/vpc_id/description; createvpntunnel needs name/vpn_gateway_id/phase1/phase2. Region kr-west1/east1/south3.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "cdn",
@@ -609,7 +592,7 @@
         "purge body needs custom_url+target_content+target_url (not {})"
       ],
       "notes": "1->2/9 (detailcdnservice via read-chain; account has 2 ACTIVE CDNs regrcampkpfc/regriknbddbg). listcdnservice items use id (not resource_id). purge body fixed. Region gate kr-west1/kr-east1. createcdnservice captures $.cdn.resource_id.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "direct-connect",
@@ -626,7 +609,7 @@
         "Verify circuit-provisioning entitlement (control-plane create may succeed independently)"
       ],
       "notes": "1/8 (listdirectconnects 200, empty). CONFIRMED: id-GETs 404 ResourceNotFound (not 403). 503s transient. mutation ceiling 8/8.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "firewall",
@@ -643,7 +626,7 @@
         "firewall_id has no safe synthetic default for smoke"
       ],
       "notes": "1/8 (listfirewalls 200, empty). No standalone POST /v1/firewalls (firewall auto-attaches to VPC). setfirewall body {flavor_name:EXSMALL,loggable}. createfirewallrule captures $.firewall_rule.id. 503s transient.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "loggingaudit",
@@ -660,7 +643,7 @@
         "Fix api_catalog_params.json showlog capture path $.contents[0].id -> $.logs[0].id (spec-intel)"
       ],
       "notes": "0->3/10. NEW: listtrails+listlogs+showlog 200. listlogs REQUIRES start_at+end_at (70k logs). showlog envelope {log:..}, id $.logs[0].id (sidecar path was wrong). downloadlogs body corrected {start_at,end_at,file_type,time_zone_info}.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "aimlops-platform",
@@ -678,7 +661,7 @@
         "product_type enum=enterprise|mini; image_id format IMAGE-...; cluster_id 32-hex no hyphens"
       ],
       "notes": "2->6/12. NEW 4 2xx (check-duplication[release_name], check-version[ver=1.9.2], validate-namespaces, validate-resources[product_type=enterprise]) via borrowed RUNNING SKE cluster 941a4f37... read-only. Fragment: image_id field fix, 32-hex UUIDs, required params.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "configinspection",
@@ -697,7 +680,24 @@
         "Foreign CSP: diagnosisrequest can target AWS/Azure with real creds"
       ],
       "notes": "FIRST ANALYSIS 0->2/7. configinspectionlist+getdiagnosisresultlist 200 (empty). getdiagnosisresultdetail needs diagnosis_id+diagnosis_request_sequence (both REQUIRED). diagnosis_id format DIA-<32hex>. Added configinspection-read-coverage lifecycle. Service transiently 503s.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
+    },
+    {
+      "service": "gslb",
+      "covered": 5,
+      "total": 10,
+      "gap": 5,
+      "heavy": false,
+      "blockers": [
+        "needs-resource: showgslb+listgslbresources need gslb_id from list (account has 0 GSLBs).",
+        "mutation-gated: 6 create/set/delete - PURELY mutation-gated, NO entitlement/heavy walls."
+      ],
+      "next_levers": [
+        "MUTATIONS+DESTRUCTIVE: networking-gslb-service covers all 10 (2/10->10/10 expected)",
+        "create body resources:[] may 400 - try [{destination,region}]"
+      ],
+      "notes": "0->2/10 (2 list GETs 200, empty). All 8 gaps pure mutation-gated. Schema: algorithm=RATIO|ROUND_ROBIN, env_usage=PUBLIC|PRIVATE, setgslb 200 others 202, name must be FQDN.",
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "security-group",
@@ -713,7 +713,7 @@
         "listsecuritygrouprules needs security_group_id REQUIRED query (smoke can't auto-supply dynamic id) -> fragment list-rules step covers it"
       ],
       "notes": "read-only 4/9 (ledger 7 stale). listsecuritygroups+showsecuritygroup (smoke/read-chain) + listsecuritygrouprules+showsecuritygrouprule (live via real SKE-managed SG cf5d390a, 14 rules). setsecuritygroup body {description,loggable} only (name invalid). Added list-rules + probe-sg-reads steps.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "devopsservice",
@@ -730,13 +730,13 @@
         "smoke.py: add devopsservice /check-duplication case ({tenant_code}) to fix soft/400"
       ],
       "notes": "FIRST ANALYSIS 0->2/6. listdevopsservices 200 + checkduplicationdevopsservice 200 (needs EXACTLY ONE of tenant_code OR tenant_name). Fixed check-name-duplication step (tenant_code only). PF-05 root cause CONFIRMED: body DevOpsServiceCreateRequest{tenant_name,tenant_code,members} not {name,description}. Account quota 1/account.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "secretsmanager",
-      "covered": 11,
+      "covered": 12,
       "total": 15,
-      "gap": 4,
+      "gap": 3,
       "heavy": false,
       "blockers": [
         "mutation-gated: 12 write endpoints; lifecycle security-secretsmanager-writes models all 12 but engine ~691 skips when allow_mutations=false. No entitlement/product-bug walls."
@@ -746,25 +746,7 @@
         "version_list items are bare version_id strings -> capture $.version_list[0]"
       ],
       "notes": "read-only 3/15 (ledger 12 stale, from prior mutation run). 3 read GETs (list/show/listversion). Added 5 MISSING write steps: setdescription, setaclcidr, setprivateacl, updatevalue, setlabel. private_acl_enabled is STRING; secret_value is JSON STRING; soft-delete needs {waiting_time_ndays}.",
-      "updated": "2026-06-23T02:15:56Z"
-    },
-    {
-      "service": "secretvault",
-      "covered": 1,
-      "total": 5,
-      "gap": 4,
-      "heavy": false,
-      "blockers": [
-        "needs-resource: showsecretvault needs vault_id (0 vaults; coverable with mutations).",
-        "entitlement/credential: gettemporarykey needs vault-issued headers (Svaccesskey/Svsignature/Svtimestamp/Svclienttype) - NOT derivable from SCP creds; PERMANENT blocker without vault-token injection.",
-        "mutation-gated: createsecretvault + terminatedsecretvault."
-      ],
-      "next_levers": [
-        "MUTATIONS: security-secretvault-vault -> create+show+terminate (4/5); gettemporarykey stays blocked",
-        "createsecretvault body access_key_id={env:SCP_ACCESS_KEY}, name ^[a-z0-9]* 3-63, ttls; capture $.secret_vault.id"
-      ],
-      "notes": "1/5 (listsecretvault 200, empty). gettemporarykey PERMANENT credential blocker (vault-issued headers). WAF 417 on non-UUID path. terminate body {waiting_time_ndays:7-30} (only deletion path). 503 transient.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "sts",
@@ -783,7 +765,7 @@
         "TRUE 2xx needs: fix IAM createrole 500 -> create self-assumable role -> assumerole 200 -> objectstoreauthorization 200"
       ],
       "notes": "0/3 read-only (all POST). FIXED 3 invented bodies: assumerole role_indicator (e:ACCOUNT:ROLE, not role_arn); assumerolewithsaml role_indicator+principal_indicator+saml_assertion(b64); objectstoreauthorization method+url+x_amz_content_sha256+x_amz_date (not bucket_name). STS host REGIONAL not global.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "certificatemanager",
@@ -792,34 +774,15 @@
       "gap": 2,
       "heavy": false,
       "blockers": [
-        "backend-validation-blocked: validatecertificate + createcertificate -> 400 pem-format-private-key-error for ALL PEM key formats (RSA PKCS#1/PKCS#8/EC); need real CA-chain-signed cert+key.",
-        "needs-resource: detailcertificate needs cert_id (0 certs; unblocked by selfsign).",
-        "mutation-gated: checknameduplication + selfsigncert + deletecertificate."
+        "backend-validation-blocked: validatecertificate -> 400 pem-format-private-key-error for ALL PEM key formats (RSA PKCS#1/PKCS#8/EC) CONFIRMED 2026-06-23 with real openssl keys; requires CA-chain-signed cert+key from external authority.",
+        "backend-validation-blocked: createcertificate (import) -> 500 scp-security.certificate.create-failed even with all 8 required fields (cert_body,cert_chain,name,private_key,recipients,region,tags,timezone) when given fake PEM; requires real CA-chain-signed cert+key material."
       ],
       "next_levers": [
-        "MUTATIONS+DESTRUCTIVE: security-certificatemanager-selfsign -> +4 2xx -> ceiling 5/7",
-        "create/validate need external CA cert material (unsolvable in CI without injected cert)"
+        "Inject real CA-signed cert+key via env var (SCP_CERT_BODY / SCP_PRIVATE_KEY / SCP_CERT_CHAIN) to unblock validatecertificate and createcertificate -> ceiling 7/7",
+        "selfsign lifecycle already stable at 5/7; no further gains without CA cert material"
       ],
-      "notes": "read-only 1/7 (ledger 4 stale). selfsigncert body confirmed (9 fields, YYYYMMDD dates, $.certificate.id, synchronous VALID). checknameduplication needs {name}. mutation ceiling 5/7; absolute max 5/7.",
-      "updated": "2026-06-23T02:15:56Z"
-    },
-    {
-      "service": "kms",
-      "covered": 18,
-      "total": 20,
-      "gap": 2,
-      "heavy": false,
-      "blockers": [
-        "needs-resource (system-managed): showmanagedkey+updatemanagedkeydescription - account has 0 managed keys (no create API).",
-        "unproven-purpose-enum: hmac+datakey need SYMMETRIC key; purpose=aes-256 UNPROVEN (all 70 keys rsa-2048; hmac may be the real purpose).",
-        "mutation-gated: 10 other mutating endpoints (lifecycle exists)."
-      ],
-      "next_levers": [
-        "MUTATIONS: set-description (NEW step) covers updatedescription + 10 crypto ops -> ceiling 16/20",
-        "create-sym(purpose=aes-256) confirms/rejects live; try hmac if 400"
-      ],
-      "notes": "read-only 5/20 (ledger 15 was mutation-run). updatedescription was MISSING from lifecycle - added set-description (ceiling 15->16). 0 managed keys, 70 rsa-2048 keys.",
-      "updated": "2026-06-23T02:15:56Z"
+      "notes": "1/7 smoke. 5/7 with mutations: selfsigncert(201)+checknameduplication(200)+detailcertificate(200)+listcertificates(200)+deletecertificate(204). createcertificate requires 8 fields (timezone was missing, now fixed in lifecycle body). PEM blocker confirmed 2026-06-23 for all openssl key types. Teardown clean (0 regr* certs after run). No VPCs consumed.",
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "network-logging",
@@ -836,7 +799,20 @@
         "smoke.py: add resource_type default for the 2 list GETs"
       ],
       "notes": "2/4 confirmed (both list GETs 200 with resource_type=FIREWALL; enum FIREWALL|SECURITY_GROUP|NAT, VPC_FLOW_LOG invalid). Backend transiently 503s. create body 'Field required' x2 (likely name + log_type/bucket).",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
+    },
+    {
+      "service": "kms",
+      "covered": 19,
+      "total": 20,
+      "gap": 1,
+      "heavy": false,
+      "blockers": [
+        "needs-system-managed-key (permanent): updatemanagedkeydescription (PUT /v1/managed-kms/transit/{key_id}/description) needs a system-managed key; account has 0 (count=0 confirmed live 2026-06-23); no create API for managed keys. Unblockable without system provisioning external to API."
+      ],
+      "next_levers": [],
+      "notes": "5->19/20 CONFIRMED 2xx 2026-06-23. PURPOSE ENUM CONFIRMED LIVE: valid advanced purposes are aes256-gcm96, ecdsa-p256, rsa-2048, aria, hmac (NOT 'aes-256' which 400s). Operation routing: rsa-2048->encrypt/decrypt/rewrap/sign/verify; aes256-gcm96->datakey; hmac->hmac. Lifecycle now creates 3 keys. showmanagedkey 200 via read-chain (managed keys do exist per list). updatemanagedkeydescription permanent blocker (0 managed keys). teardown clean: 0 Active regr keys.",
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "quota",
@@ -851,7 +827,24 @@
         "When account gains a UI-submitted quota request, showquotarequest auto-covers via read_chain"
       ],
       "notes": "0->3/4. All read-only GETs (global, no mutating endpoints). listaccountquota+listquotarequests+showaccountquota 200 (showaccountquota id from $.account_quotas[0].id). Fragment management__quota.json created. showquotarequest 404 with fake UUID, 417 WAF on malformed.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
+    },
+    {
+      "service": "secretvault",
+      "covered": 4,
+      "total": 5,
+      "gap": 1,
+      "heavy": false,
+      "blockers": [
+        "entitlement/credential: gettemporarykey (GET /v1/temporarykey/{id}) needs vault-issued Svaccesskey/Svsignature/Svtimestamp/Svclienttype headers NOT derivable from SCP API credentials. Live-confirmed 400 ValidationError even with real vault id. PERMANENT BLOCKER.",
+        "key-in-use: createsecretvault 400 Access key is already in use \u2014 1 auth key per vault; existing vault occupies the key until it auto-deletes after 7-day waiting period (2026-06-30). lifecycle handles gracefully via capture_soft (list captures existing vault for show probe)."
+      ],
+      "next_levers": [
+        "createsecretvault full 2xx lifecycle: wait until 2026-06-30 for existing regrsvtest vault to auto-delete, then re-run security-secretvault-vault lifecycle. Auth key UUID is now correctly captured via fetch-iam-key-id pre-step.",
+        "gettemporarykey 2xx: would need vault-issued vault-token auth headers (Sv*) \u2014 feature request or dedicated vault-token injection mechanism; classify as PERMANENT unless platform provides a mechanism."
+      ],
+      "notes": "4/5 covered (2026-06-23). LIVE-VALIDATED: create 201, show 200, terminate 200. KEY FACT: access_key_id = IAM key UUID ($.access_keys[0].id), NOT access_key string. Fixed in lifecycle via fetch-iam-key-id pre-step. gettemporarykey PERMANENT blocker (vault-issued headers). See knowledge/services.md security/secretvault section.",
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "budget",
@@ -862,7 +855,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "ALL 5 COVERED (100%) 2026-06-23. createaccountbudget 201 CONFIRMED LIVE (body shape BudgetCreateRequest{amount:int,name,start_month:'YYYY-MM',unit:'MONTHLY'|'OVERALL'} with optional notifications). KEY FIX: start_month must be >= current month (400 if in past; fixed from 2026-01 to 2026-06). showaccountbudget 200 via probe_reads. setaccountbudget 200. deleteaccountbudget 204. Teardown clean (0 budgets post-run). known_issues.json entry for createaccountbudget (added 2026-06-12) SHOULD BE REMOVED: 500 was a body-shape bug (wrong field names budget_amount/currency/period_type), not a product bug; corrected body yields 201.",
-      "updated": "2026-06-23T02:30:00Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "costexplorer",
@@ -873,7 +866,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "ALL 3 COVERED (100%) 2026-06-20. Pure read-only GETs (global), no required params. listbills(empty)+listusages(count:20)+showpaymentmonthly(empty). Covered by catalog smoke. No fragment needed.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "pricing",
@@ -884,7 +877,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "ALL 3 COVERED (100%) 2026-06-20. Pure public read GETs (global) under /v1/reports/. listbillingitemids(232 ids)+listoffering(PP/PS/PG)+listreportprice(83k records, paginated). No params/path/entitlement. No fragment needed.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "product",
@@ -895,7 +888,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "ALL 4 COVERED (100%) 2026-06-20. Pure read-only catalog (global). listproductcategories(14)+listproducts(20)+showproduct(ESS)+showproductcategory(SECURITY). IDs are string slugs not UUIDs. Fragment platform__product.json. No mutations/heavy.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     },
     {
       "service": "support",
@@ -906,7 +899,7 @@
       "blockers": [],
       "next_levers": [],
       "notes": "ALL 4 COVERED (100%) 2026-06-20. All GETs (global management), no mutating ops (no createInquiry API). getinquirylist+getservicerequestlist (smoke) + showinquiry+showservicerequest (read_chains auto-derived). Account has >=1 inquiry+service-request. No fragment needed.",
-      "updated": "2026-06-23T02:15:56Z"
+      "updated": "2026-06-23T02:22:22Z"
     }
   ]
 }

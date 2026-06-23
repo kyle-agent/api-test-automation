@@ -282,19 +282,22 @@ duplicating. Add a new `##` section when you take on a new service.
   rejected. Endpoint IS reachable (not 403). Requires a real CA-chain-signed cert
   from an external authority.
 - **`createcertificate` (POST /v1/certificatemanager):** import an external cert.
-  Required body includes: `cert_body`, `cert_chain`, `name`, `private_key`,
-  `recipients=[]`, `region`, `tags=[]`. One additional required field not yet
-  identified (7 of above = 1 still missing per validation error count). Also
-  rejects all PEM key formats same as validatecertificate.
+  Required body (CONFIRMED 2026-06-23): `cert_body`, `cert_chain`, `name`,
+  `private_key`, `recipients=[]`, `region`, `tags=[]`, `timezone` (8 fields).
+  Without `timezone`: 400 ValidationError "Field required". With all 8 fields +
+  fake PEM: 500 `scp-security.certificate.create-failed` (backend parses PEM).
+  Requires real CA-chain-signed cert+key for 2xx. Same PEM key rejection as
+  validatecertificate — all openssl-generated key types rejected.
 - **`listcertificates` (GET /v1/certificatemanager):** 200 with empty list
   (`count:0`) on fresh account. Response shape: `{certificates:[], count, page, size, sort}`.
   Optional query params: `size`, `page`, `sort`, `isMine`, `name`, `cn`, `state`.
 - **`detailcertificate` (GET /v1/certificatemanager/{certificate_id}):** needs a
   real `certificate_id` from selfsign/create. Capture path: `$.certificate.id`.
-- **Coverage ceiling (2026-06-20):** read-only floor = 1/7 (listcertificates).
-  With SCP_ALLOW_MUTATIONS: selfsigncert→detailcertificate→listcertificates→
+- **Coverage ceiling (2026-06-23):** read-only floor = 1/7 (listcertificates).
+  With mutations: selfsigncert→detailcertificate→listcertificates→
   checknameduplication→deletecertificate = 5/7. Remaining 2 (createcertificate,
-  validatecertificate) blocked by CA-cert requirement.
+  validatecertificate) blocked by CA-cert requirement — backend rejects ALL
+  self-signed PEM private keys (RSA PKCS#1, PKCS#8, EC) CONFIRMED 2026-06-23.
 
 ## management / resourcemanager
 
@@ -698,17 +701,22 @@ duplicating. Add a new `##` section when you take on a new service.
 
 - **Host:** regional (`kms.<region>.<env>...`). 20 endpoints (18 user-managed + 2 managed-kms).
 - **Key creation:** `POST /v1/kms/transit` with `key_type: advanced`, `purpose: <spec>`, `auto_rotate: Y`, `rotate_cycle: 7`. Capture `$.key.id`. Response also at `$.key.purpose`, `$.key.state`.
-- **Purpose / key type matrix (PARTIALLY VALIDATED as of 2026-06-20):**
-  - `purpose: rsa-2048` — CONFIRMED live 2xx. Asymmetric. Supports: sign/verify, encrypt/decrypt. Does NOT support hmac/datakey.
-  - `purpose: aes-256` — UNPROVEN (grounded in resource model knowledge/formal/resources/security__kms.yaml). Expected symmetric. Should support: hmac, datakey. Confirm live in first light CRUD run.
-  - `purpose: ecdsa` — UNPROVEN. Sign/verify only (no encrypt).
-  - `purpose: hmac` — UNPROVEN alternate string for HMAC-purpose key (may be the actual API value vs aes-256).
-  - Account had only `rsa-2048` keys as of 2026-06-20 (50 total, all To_Be_Terminated from prior runs).
-- **HMAC/datakey require symmetric key:** `POST /v1/kms/openapi/hmac/{key_id}` and `/datakey/{key_id}` return 400 when fired against an RSA-2048 key. Must route to an aes-256 (or HMAC-type) key. The `security-kms-transit-crypto` lifecycle now creates a separate symmetric key (`create-sym` step) and routes hmac+datakey to `sym_key_id`.
-- **Managed keys:** `GET /v1/managed-kms/transit` (listmanagedkeys) returns `{count, keys[], page, size, sort}`. Account had count=0 as of 2026-06-20. `updatemanagedkeydescription` (`PUT /v1/managed-kms/transit/{key_id}/description`) requires an existing managed key id — the account must have system-managed keys for this to 2xx.
-- **Delete:** Scheduled delete (not immediate); key enters `To_Be_Terminated` state and stays in list for days. Reconciler sees state but key is functionally gone. `DELETE /v1/kms/transit/{key_id}` returns 200/202. Cleanup in lifecycle teardown is safe.
+- **Purpose / key type matrix (FULLY VALIDATED live 2026-06-23):**
+  - `purpose: rsa-2048` — CONFIRMED 2xx. Asymmetric. Supports: sign/verify, encrypt/decrypt/rewrap. Does NOT support hmac/datakey (400 Key purpose error).
+  - `purpose: aes256-gcm96` — CONFIRMED 2xx. Symmetric. Supports: datakey. Does NOT support hmac (400 Key purpose error). WARNING: `aes-256` is NOT valid (400 ValidationError).
+  - `purpose: hmac` — CONFIRMED 2xx. Symmetric. Supports: hmac. Does NOT support datakey (400 Key purpose error).
+  - `purpose: ecdsa-p256` — API-confirmed valid enum string (from 400 validation error listing). Sign/verify only (not tested live).
+  - `purpose: aria` — API-confirmed valid enum string. KR SOUTH government accounts only; standard accounts get 400 "g offering scp" error.
+  - **Full valid enum (from API ValidationError 2026-06-23):** `aes256-gcm96`, `ecdsa-p256`, `rsa-2048`, `aria`, `hmac`.
+- **Operation-to-purpose mapping (CONFIRMED live 2026-06-23):**
+  - encrypt/decrypt/rewrap/sign/verify: needs `rsa-2048`
+  - datakey: needs `aes256-gcm96`
+  - hmac: needs `hmac` purpose key
+- **Lifecycle creates THREE keys** (`security-kms-transit-crypto`): rsa-2048 (`key_id`), aes256-gcm96 (`sym_key_id`), and hmac (`hmac_key_id`). All torn down by lifecycle cleanup on 204.
+- **Managed keys:** `GET /v1/managed-kms/transit` returns `{count, keys[], page, size, sort}`. Account count=0 (no managed keys; no create API). `updatemanagedkeydescription` is a **permanent blocker** (system-managed keys only; no provisioning path).
+- **Delete:** Soft-delete; key enters `To_Be_Terminated` state (stays in list for days, functionally gone). `DELETE /v1/kms/transit/{key_id}` returns 204. Non-stranding confirmed.
 - **Crypto ops (all require active key):** encrypt → `{ciphertext: "vault:v.."}`; decrypt/rewrap ← ciphertext; sign → `{signature}`; verify ← signature + input; hmac ← `{input: base64}` → `{hmac: "vault:v1/.."}`.
-- **Coverage 2026-06-20:** 15/20. Gaps: hmac (sym key unproven), datakey (sym key unproven), updatemanagedkeydescription (0 managed keys), plus any missed sub-ops. Lifecycle `security-kms-transit-crypto` covers 17 write ops total.
+- **Coverage 2026-06-23:** 19/20 CONFIRMED 2xx. Only gap: `updatemanagedkeydescription` (permanent blocker — no managed keys, no create API).
 
 ## security / secretsmanager
 
@@ -822,6 +830,18 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - **known_issues.json:** The entry for `financial-management/budget/createaccountbudget` (added 2026-06-12, "500 ContactAdminForAssistance") IS A BODY-SHAPE BUG, NOT a product bug. The 500 was caused by wrong field names in the request body (`budget_amount`/`currency`/`period_type` instead of the correct `amount`/`name`/`start_month`/`unit`). With the corrected body, create reliably returns 201. The entry SHOULD BE REMOVED from known_issues.json.
 - **Teardown:** delete → 204; verified account returns to 0 budgets post-run.
 - **Fragment:** `regression/scenarios/lifecycles/financial-management__budget.json` (lifecycle `budget-account-budget`).
+
+## security / secretvault
+
+- **5 endpoints** total: listsecretvault, createsecretvault, showsecretvault, terminatedsecretvault, gettemporarykey.
+- **Coverage: 4/5** (gettemporarykey = permanent blocker). Validated 2026-06-23.
+- **access_key_id in create body**: MUST be the IAM access key's UUID `id` field (from `GET /v1/access-keys $.access_keys[0].id`). NOT the access_key string (SCP_ACCESS_KEY). Error when wrong: `SecretVaultAccesskeyNotFoundError` 400.
+- **1 vault per auth key**: "Access key is already in use." 400 when same IAM key already bound to a vault. A "To be terminated" vault still occupies the key.
+- **No hard DELETE**: only `PUT /v1/secretvault/{id}/terminated` with `{waiting_time_ndays: 7-30}`. Vault stays in "To be terminated" state for the waiting period then auto-deletes.
+- **gettemporarykey PERMANENT BLOCKER**: `GET /v1/temporarykey/{id}` requires vault-issued headers `Svaccesskey`/`Svsignature`/`Svtimestamp`/`Svclienttype` — NOT derivable from SCP API creds. 400 `Svaccesskey is not existed.` even with real vault id.
+- **name constraint**: `^[a-z0-9]*$`, 3-63 chars. `temporary_key_ttl_nhours` in [1,36]. `vault_token_ttl_ndays` in [30,7300].
+- **Show envelope**: `$.secret_vault.{id, access_key, access_key_id, acl_cidr, ...}`. Create response includes `vault_token_id` + `vault_token_secret_value` (only available at create time).
+- **lifecycle**: `security-secretvault-vault` — pre-step fetches IAM key UUID, list captures existing vault for show probe.
 
 ## Services not yet deeply explored (stubs — fill in as you go)
 
