@@ -28,6 +28,15 @@ let modalSvc = null;        // service short id whose resource modal is open
 let collapsed = null;       // Set of collapsed category names (menu-tree). null = not yet initialised
 let ownedScan = null;       // last /api/owned result {status, owned, owned_total} for the run-screen panel
 
+// ---- 실행 대기열 (client-side STAGED queue) -------------------------------------
+// ① 구성 ▶ ENQUEUES a snapshot of the current selection (it no longer runs). The
+// actual run is a deliberate, budget-informed [▶ 실행] on the ② 실행 screen, where
+// each staged item shows 필요 VPC vs the live 여유(headroom) before you commit. A
+// staged item is a plain snapshot {id, selection, nServices, nResources, peak_vpcs,
+// heavy, closure} captured from /api/plan + the current selection at stage time.
+let STAGED = [];            // queued (not-yet-run) selection snapshots
+let stagedOpen = null;      // id of the staged item whose detail is expanded (1 at a time)
+
 // run/report state
 let runId = null;
 let runEvents = [];
@@ -559,11 +568,46 @@ function drawModalBody() {
 }
 
 // ================= launch bar (carry selection into ②) =================
-// Runs are ALWAYS live now (the server derives gates from the selection); there is
-// no axis/mode toggle. The launch wiring just binds the run buttons to startRun.
+// 구성 ▶ no longer RUNS — it STAGES (enqueues) the current selection and crosses to
+// ② where the deliberate, budget-informed [▶ 실행] commits it. The run-settings panel
+// on ② keeps its own direct LIVE button (startRun) for the current selection.
 function wireLaunch() {
-  const lg = $("launch-go"); if (lg) lg.onclick = startRun;
+  const lg = $("launch-go"); if (lg) lg.onclick = stageRun;
   const rg = $("run-go"); if (rg) rg.onclick = startRun;   // drawRunSettings rebuilds + rebinds this too
+}
+
+// a small uuid for a staged item key (crypto.randomUUID when available, else a
+// timestamp+random fallback so older/file:// contexts still get a unique id).
+function uuid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return "s-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+}
+
+// 구성 ▶ = STAGE: snapshot the current selection into STAGED (peak_vpcs/heavy from
+// /api/plan, nServices/nResources from the selection, closure from the live DAG),
+// then cross to ② so the user sees it in the 실행 대기열. NO /api/run here, no
+// confirm — execution is a separate, deliberate action on ②.
+function stageRun() {
+  if (!targets.size) return;
+  const selection = selectionPayload();
+  const nServices = new Set([...targets].map(id => N[id].service)).size;
+  const nResources = targets.size;
+  const closure = lastGraph ? lastGraph.nodes.length : nResources;   // dependency closure size
+  const heavyGuess = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
+  // resolve peak_vpcs + heavy from the REAL plan; fall back to the local guess if the
+  // pre-flight plan call fails (the staged item is still actionable on ②).
+  const add = (peak, heavy) => {
+    STAGED.push({ id: uuid(), selection, nServices, nResources,
+                  peak_vpcs: peak, heavy: heavy, closure });
+    go("run");
+  };
+  fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(selection) })
+    .then(r => r.json()).then(plan => {
+      plan = plan || {};
+      const peak = plan.peak_vpcs || 0;
+      const heavy = Object.values(plan.preview || {}).some(p => p && p.heavy) || heavyGuess;
+      add(peak, heavy);
+    }).catch(() => add(0, heavyGuess));
 }
 
 // ================= 스윗 (suites/*.yaml · CI 공유) =================
@@ -682,22 +726,106 @@ function launchSummary() {
   const go = $("launch-go");
   if (go) {
     go.disabled = !targets.size;
-    go.className = "btn warn";              // runs are always LIVE now
-    go.textContent = "⚠ LIVE 실행 ▶";
+    go.className = "btn stage";             // 구성 ▶ STAGES (enqueues) — not a LIVE run
+    go.textContent = "▶ 실행 대기열에 추가";
   }
 }
 
 // ================= ② 실행 & 리포트 =================
 function drawRunScreen() {
   // capacity bar (VPC budget + 진행중/대기 큐) at the TOP — the hero of concurrent
-  // execution — then the pre-flight 남은 자원(잔존) panel, then the run settings.
+  // execution — then the 실행 대기열(STAGED) where each item is committed with a
+  // budget-informed [▶ 실행], then the pre-flight 남은 자원(잔존) panel + run settings.
   $("run-left").innerHTML =
-    '<div id="cap-bar"></div><div id="leftover-panel"></div><div id="run-settings"></div>';
+    '<div id="cap-bar"></div><div id="staged-panel"></div><div id="leftover-panel"></div><div id="run-settings"></div>';
   drawCapBar();
+  drawStagedPanel();
   startCapPoll();           // poll /api/capacity every ~2s while on the run screen
   drawLeftover();
   drawRunSettings();
   drawReport();
+}
+
+// ---- 실행 대기열 (#staged-panel) — decide + execute -----------------------------
+// The STAGED list (snapshots from 구성 ▶). Each row summarises 필요 VPC; click to
+// expand 필요 VPC · 폐포 · 현재 여유(headroom from the last /api/capacity poll) + the
+// commit/discard buttons. [▶ 실행] is the ACTUAL run: POST /api/run for that item's
+// selection (server admits or auto-queues), remove it from STAGED, and drive the
+// report to the new run. [✕ 제거] just drops it. Re-rendered on every STAGED change
+// and on each capacity poll so 여유 updates live.
+function drawStagedPanel() {
+  const host = $("staged-panel"); if (!host) return;
+  const c = lastCapacity || {};
+  const headroom = c.headroom != null ? c.headroom
+    : Math.max(0, (c.cap || 0) - ((c.baseline || 0) + (c.reserved || 0)));
+  let body;
+  if (!STAGED.length) {
+    body = `<div class="staged-empty muted small">대기열 비어 있음 — ① 구성에서 선택 후 '실행 대기열에 추가'</div>`;
+  } else {
+    body = STAGED.map(it => {
+      const open = stagedOpen === it.id;
+      const over = (it.peak_vpcs || 0) > headroom;
+      const summary = `<b>${it.nServices}</b> 서비스 · <b>${it.nResources}</b> 리소스 · VPC <b>${it.peak_vpcs || 0}</b> 필요${it.heavy ? " 🜂" : ""}`;
+      const detail = open ? `<div class="staged-detail">
+          <div class="staged-facts">필요 VPC <b>${it.peak_vpcs || 0}</b> · 폐포 <b>${it.closure}</b> · 현재 여유 <b>${headroom}</b></div>
+          ${over ? `<div class="staged-over">여유 부족 → 대기 큐로 들어갑니다</div>` : ""}
+          <div class="staged-act">
+            <button class="minibtn go" data-stage-run="${esc(it.id)}">▶ 실행</button>
+            <button class="minibtn red" data-stage-del="${esc(it.id)}">✕ 제거</button>
+          </div>
+        </div>` : "";
+      return `<div class="staged-item ${open ? "open" : ""}">
+        <button class="staged-row" data-stage-tog="${esc(it.id)}" title="클릭하면 상세 · 실행/제거">
+          <span class="staged-sum">${summary}</span>
+          <span class="staged-car">${open ? "▾" : "▸"}</span>
+        </button>${detail}</div>`;
+    }).join("");
+  }
+  host.innerHTML = `<div class="panel staged-pnl">
+    <h2>실행 대기열 <span class="muted small">· 구성에서 추가</span></h2>
+    ${body}
+  </div>`;
+  els("#staged-panel [data-stage-tog]").forEach(b => b.onclick = () => {
+    const id = b.dataset.stageTog;
+    stagedOpen = stagedOpen === id ? null : id;     // toggle (one open at a time)
+    drawStagedPanel();
+  });
+  els("#staged-panel [data-stage-del]").forEach(b => b.onclick = () => {
+    STAGED = STAGED.filter(x => x.id !== b.dataset.stageDel);
+    drawStagedPanel();
+  });
+  els("#staged-panel [data-stage-run]").forEach(b => b.onclick = () => {
+    const it = STAGED.find(x => x.id === b.dataset.stageRun);
+    if (it) runStaged(it);
+  });
+}
+
+// [▶ 실행] — commit ONE staged item: POST /api/run for its selection (the server
+// admits it under the cap or auto-queues it), drop it from STAGED, and drive the
+// existing report flow (set runId, drawReport / wait banner, pollEvents) exactly as
+// the direct startRun→postRun path does. No confirm — staging WAS the deliberation.
+function runStaged(item) {
+  const body = Object.assign({ mode: "live" }, item.selection);
+  $("report-main").innerHTML = '<p class="muted small">실행 요청 중…</p>';
+  fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .then(r => r.json()).then(j => {
+      if (j.error) { $("report-main").innerHTML = '<p class="empty">실행 실패: ' + esc(j.error) + "</p>"; return; }
+      // succeeded → remove the committed item from the queue and re-render the panel
+      STAGED = STAGED.filter(x => x.id !== item.id);
+      if (stagedOpen === item.id) stagedOpen = null;
+      drawStagedPanel();
+      runId = j.id; runEvents = []; runStatus = j.status || "running";
+      detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;
+      if (runStatus === "queued") {
+        $("report-main").innerHTML =
+          '<div class="nowbar"><span class="dot"></span><b>대기 큐에서 대기 중</b> — 여유가 생기면 자동 실행</div>';
+        $("lc-picker").innerHTML = "";
+      } else {
+        drawReport();
+      }
+      pollEvents();
+      drawCapBar();           // reflect the new run in the capacity bar immediately
+    }).catch(e => { $("report-main").innerHTML = '<p class="empty">실행 연결 실패: ' + esc(e.message) + "</p>"; });
 }
 
 // ---- capacity bar (GET /api/capacity, polled ~2s while on the 실행 screen) ------
@@ -714,7 +842,7 @@ function startCapPoll() {
     fetch("/api/capacity").then(r => r.json()).then(c => {
       if (c.error) return;
       lastCapacity = c;
-      if (screen === "run") { drawCapBar(); drawLeftover(); }
+      if (screen === "run") { drawCapBar(); drawStagedPanel(); drawLeftover(); }
     }).catch(() => { /* transient — keep last good capacity */ })
       .finally(() => { if (screen === "run") capTimer = setTimeout(tick, 2000); });
   };

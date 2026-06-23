@@ -254,6 +254,28 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 .capchip.run:hover{filter:brightness(.98);border-color:var(--accent)}
 .capchip.que{border-color:#e7c98f;background:#fdf6e7;color:var(--amber)}
 
+/* ===== 실행 대기열 (#staged-panel) — staged snapshots: decide + execute ===== */
+.staged-pnl{margin-bottom:14px;border-top:2px solid var(--accent)}
+.staged-empty{padding:6px 2px}
+.staged-item{border:1px solid var(--line);border-radius:7px;background:#fff;margin:6px 0;overflow:hidden}
+.staged-item.open{border-color:var(--accent)}
+.staged-row{width:100%;display:flex;align-items:center;gap:8px;background:#fff;border:none;
+  padding:7px 11px;cursor:pointer;text-align:left;font-size:12px;color:var(--ink)}
+.staged-row:hover{background:var(--panel2)}
+.staged-item.open .staged-row{background:#e6effd}
+.staged-sum{flex:1 1 auto}.staged-sum b{font-variant-numeric:tabular-nums}
+.staged-car{flex:0 0 auto;color:var(--muted);font-size:11px}
+.staged-detail{border-top:1px dashed var(--line);padding:8px 11px;background:var(--panel)}
+.staged-facts{font-size:11.5px;color:var(--muted)}.staged-facts b{color:var(--ink);font-variant-numeric:tabular-nums}
+.staged-over{margin-top:5px;font-size:11px;color:var(--amber);background:#fdf6e7;
+  border:1px solid #e7c98f;border-radius:6px;padding:4px 8px}
+.staged-act{display:flex;gap:7px;margin-top:8px}
+.minibtn.go{color:#fff;background:var(--accent);border-color:var(--accent);font-weight:700}
+.minibtn.go:hover{filter:brightness(1.06)}
+
+/* 구성 ▶ STAGES (enqueues) — a primary action distinct from the destructive LIVE run */
+.btn.stage{background:var(--accent)}
+
 /* inline error region (강제 클린업 409 / failure — no alert/crash) */
 .lo-err{margin-top:7px;font-size:12px;color:var(--red);background:#fdeded;border:1px solid #e5a3a3;
   border-radius:6px;padding:7px 10px}
