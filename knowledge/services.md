@@ -843,8 +843,22 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - **Show envelope**: `$.secret_vault.{id, access_key, access_key_id, acl_cidr, ...}`. Create response includes `vault_token_id` + `vault_token_secret_value` (only available at create time).
 - **lifecycle**: `security-secretvault-vault` — pre-step fetches IAM key UUID, list captures existing vault for show probe.
 
+## devops-tools / devopsservice
+
+6 endpoints: listdevopsservices, checkduplicationdevopsservice, createdevopsservice, showdevopsservice, checkdeletabledevopsservice, deletedevopsservice.
+
+**Confirmed facts (2026-06-23):**
+- `GET /v1/devops-services` — 200 OK, envelope `{count, devops_services: [{id, ...}]}`. Account has 0 devops services.
+- `GET /v1/devops-services/check-duplication` — requires EXACTLY ONE of `tenant_code` OR `tenant_name` (not both). Sending both → 400 "Tenant name, Tenant code [required only one of both]". Sending `?tenant_code=regrprobesmoke` → 200 `{result: false}`. Pattern: `^[a-z0-9\-]*$`.
+- `POST /v1/devops-services` — body: `DevOpsServiceCreateRequest{tenant_name: str, tenant_code: str, members: array[string, >=1]}`. Both codes use `^[a-z0-9\-]*$`. tags optional.
+- **BLOCKER (entitlement-prereq)**: POST returns 409 `{code: scp-devops.devops-service.not-found-admin-user-service, detail: Not Found Admin User}` even with a valid IAM user id (`f2b627e6bf4f4b3996f04de4f877bd11`, the account owner) in members[]. This means the account's DevOps backend admin-user service is not configured — a platform activation prereq, not a params/body issue.
+- Account quota: 1 devops-service per account.
+- Show/create response envelope: `{devops_service: {id, account_id, tenant_name, tenant_code, status, console_url, created_at, ...}}`. Capture: `$.devops_service.id`.
+- `smoke.py _required_param_candidates`: added `{tenant_code: _DUP_NAME}` candidate for `/check-duplication` path (2026-06-23). Before this fix, smoke sent `{name:}` which 400'd on devopsservice.
+- Account IAM user id (owner): `f2b627e6bf4f4b3996f04de4f877bd11` (name: kyuh.choi+areg1@samsung.com, account_id: ec11538abf8f46d2953539521f745366).
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
 database (mysql, mariadb), data-analytics (partial),
-devops-tools, and the long tail of management/networking/storage.
+and the long tail of management/networking/storage.
 These have the most uncovered endpoints — see `scenario-catalog.md` gap list.

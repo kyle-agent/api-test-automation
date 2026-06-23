@@ -157,7 +157,11 @@ def _required_query_names(endpoint: Endpoint) -> list[str]:
 def _required_param_candidates(endpoint: Endpoint) -> list[dict]:
     p = endpoint.http_path or ""
     if p.endswith("/check-duplication") or p.endswith("/check-duplication/name"):
-        return [{"name": _DUP_NAME}, {"productName": _DUP_NAME}, {"resourceName": _DUP_NAME}]
+        # Candidates tried in order; first 200 wins. tenant_code covers devopsservice
+        # (which uses tenant_code/tenant_name, not name). name/productName/resourceName
+        # cover all other services. Live-verified: devopsservice 200 with tenant_code only.
+        return [{"name": _DUP_NAME}, {"productName": _DUP_NAME}, {"resourceName": _DUP_NAME},
+                {"tenant_code": _DUP_NAME}]
     if p.endswith("/parameters"):
         svc = endpoint.service  # e.g. mysql / postgresql / eventstreams
         return [{"dbType": svc}, {"engine": svc}, {"engineName": svc},

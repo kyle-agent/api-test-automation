@@ -722,15 +722,18 @@
       "gap": 4,
       "heavy": false,
       "blockers": [
-        "needs-create: showdevopsservice + checkdeletabledevopsservice need devops_service_id (list empty).",
-        "mutation-gated+credential-prereq: createdevopsservice needs members[] with >=1 real IAM user id; deletedevopsservice destructive."
+        {
+          "key": "createdevopsservice / showdevopsservice / checkdeletabledevopsservice / deletedevopsservice",
+          "reason": "entitlement-prereq: POST /v1/devops-services returns 409 {scp-devops.devops-service.not-found-admin-user-service} even with real IAM user id (f2b627e6bf4f4b3996f04de4f877bd11) in members[]. The account does not have the DevOps admin user service (backend entitlement) configured. id-bound GETs (show/check-deletable) and DELETE are downstream of this create blocker. No list-captured id available (list is empty).",
+          "kind": "entitlement-prereq"
+        }
       ],
       "next_levers": [
-        "MUTATIONS + real IAM user id in members[] -> create + 2 id-GETs (+3)",
-        "smoke.py: add devopsservice /check-duplication case ({tenant_code}) to fix soft/400"
+        "DevOps admin user service activation on the account would unblock create (+1 2xx) and cascade to show/check-deletable/delete (+3 2xx) = 6/6 total",
+        "check-duplication 200 now solid in smoke (2026-06-23 fix: tenant_code candidate added to smoke.py _required_param_candidates)"
       ],
-      "notes": "FIRST ANALYSIS 0->2/6. listdevopsservices 200 + checkduplicationdevopsservice 200 (needs EXACTLY ONE of tenant_code OR tenant_name). Fixed check-name-duplication step (tenant_code only). PF-05 root cause CONFIRMED: body DevOpsServiceCreateRequest{tenant_name,tenant_code,members} not {name,description}. Account quota 1/account.",
-      "updated": "2026-06-23T02:22:22Z"
+      "notes": "2026-06-20: 0->2/6. listdevopsservices 200 + checkduplicationdevopsservice 200 (EXACTLY ONE of tenant_code OR tenant_name). 2026-06-23: smoke.py fixed (added tenant_code candidate for /check-duplication). createdevopsservice LIVE-PROVEN blocker: 409 not-found-admin-user-service even with real IAM user id \u2014 platform entitlement, not a params/body issue. Body shape: DevOpsServiceCreateRequest{tenant_name,tenant_code,members[str>=1]}. Real user id confirmed: f2b627e6bf4f4b3996f04de4f877bd11 (account ec11538abf8f46d2953539521f745366).",
+      "updated": "2026-06-23T02:33:39Z"
     },
     {
       "service": "secretsmanager",

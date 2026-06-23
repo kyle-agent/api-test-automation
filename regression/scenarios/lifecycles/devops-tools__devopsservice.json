@@ -4,7 +4,7 @@
       "id": "devopsservice-write-coverage",
       "service": "devops-tools/devopsservice",
       "enabled": true,
-      "_note": "COVERAGE-ONLY guarded, light (NOT yet runtime-proven). Closes both devopsservice writes: POST /v1/devops-services (createdevopsservice) and DELETE /v1/devops-services/{devops_service_id} (deletedevopsservice). A devops-service is a control-plane CI/CD workspace (no obviously-billable infra), so this attempts a guarded REAL create -> capture id -> delete; but because the body needs a live IAM member id (members[]>=1, credential precondition) it is coverage-only: the create is optional+broad expect_status so a 400/422 (missing/wrong field) still records coverage without failing the run. devops_service_id is captured from a 2xx create when possible, else soft-captured from the read-only list so the DELETE and id-bound GETs still target a real id. The check-duplication GET pre-checks the chosen tenant_code/tenant_name. probe-reads exercises showdevopsservice + checkdeletabledevopsservice. 2026-06-14 (IB-019 / PF-05): reconciled with the corrected resource model (knowledge/formal/resources/devops-tools__devopsservice.yaml + data/api_docs.json DevOpsServiceCreateRequest). The previous create body {name, description} was the WRONG SHAPE (caused the live 400 ValidationError ['Field required']x3, run 27394211896) and is replaced by the real required members/tenant_code/tenant_name. check-duplication param was the wrong guess ?name= -> corrected to ?tenant_code=&tenant_name= (both optional query, per api_docs). List soft-capture $.contents[0].id was WRONG -> corrected to $.devops_services[0].id (DevOpsServiceListResponse.devops_services[].id, response_example confirmed). Create capture $.devops_service.id is CONFIRMED against DevOpsServiceShowResponse{devops_service: DevOpsService}.id.",
+      "_note": "COVERAGE lifecycle for devopsservice (6 endpoints). READ coverage: listdevopsservices 200 OK (confirmed), checkduplicationdevopsservice 200 OK with ?tenant_code= only (LIVE-VERIFIED 2026-06-20; smoke.py also fixed 2026-06-23 to supply tenant_code candidate). WRITE BLOCKER (2026-06-23): createdevopsservice returns 409 {not-found-admin-user-service} even with a real IAM user id (f2b627e6bf4f4b3996f04de4f877bd11) in members[]. Platform entitlement precondition — the account's DevOps admin user service is not enabled. This blocks create->show->check-deletable->delete (4 endpoints). Account quota: 1 devops-service/account. Body shape CONFIRMED: DevOpsServiceCreateRequest{tenant_name,tenant_code,members[string>=1]}. List envelope CONFIRMED: $.devops_services[0].id. Show/create response: $.devops_service.id. check-duplication: EXACTLY ONE of tenant_code OR tenant_name (sending both -> 400 'required only one of both').",
       "steps": [
         {
           "name": "check-name-duplication",
@@ -35,7 +35,7 @@
           "json": {
             "tenant_name": "regrdevops{ualpha}",
             "tenant_code": "regrdevops{ualpha}",
-            "members": []
+            "members": ["f2b627e6bf4f4b3996f04de4f877bd11"]
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "capture_soft": {
@@ -43,7 +43,7 @@
           },
           "optional": true,
           "group": "devops-create",
-          "_note": "Guarded create. Body = DevOpsServiceCreateRequest real required fields members(array[string],>=1)/tenant_code/tenant_name (tags optional, omitted) — replaces the previous INVENTED {name, description} (the PF-05 400 'Field required'x3 cause). tenant_code/tenant_name share pattern ^[a-z0-9\\-]*$ ({ualpha} is lowercase-guaranteed). members[] is a credential precondition: it needs >=1 live IAM user id that this run cannot supply, so it is sent EMPTY — which deterministically yields the expected 400 ('members' Field required) and RECORDS coverage WITHOUT creating a real workspace (the list-captured id covers DELETE). _note: to actually create a devops-service in a credentialed live run, seed members[] with a real IAM user id. Capture $.devops_service.id is CONFIRMED against the create response model DevOpsServiceShowResponse{devops_service: DevOpsService}.id (api_docs response_example)."
+          "_note": "Guarded create. Body = DevOpsServiceCreateRequest{tenant_name, tenant_code, members}. members[] contains the real account IAM user id f2b627e6bf4f4b3996f04de4f877bd11 (account owner, kyuh.choi+areg1@samsung.com, account_id ec11538abf8f46d2953539521f745366). LIVE-PROVEN BLOCKER 2026-06-23: even with a valid IAM user id in members[], POST returns 409 {code: scp-devops.devops-service.not-found-admin-user-service, detail: Not Found Admin User}. This is a platform-level entitlement precondition — the account does not have the DevOps admin user service configured in the backend; a regular IAM user is not sufficient. This blocker is distinct from the prior PF-05 field-shape fix (members was empty). The account quota is 1 devops-service per account. Capture $.devops_service.id confirmed from DevOpsServiceShowResponse.devops_service.id."
         },
         {
           "name": "get-devops-service",
