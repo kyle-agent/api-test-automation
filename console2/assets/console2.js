@@ -1155,7 +1155,8 @@ function groupEventsByLifecycle(events) {
     else if (e.kind === "step-end") { const b = ensure(id); const k = e.step;
       let c = b._apiByKey[k];
       if (!c) { c = { key: k, lifecycle: id, step: k, method: e.method, path: e.path }; b._apiByKey[k] = c; b.api.push(c); }
-      c.status = e.status; c.category = e.category; c.ms = e.elapsed_ms;
+      c.status = e.status; c.category = e.category;
+      c.ms = e.elapsed_ms != null ? Math.round(e.elapsed_ms) : null;   // integer ms (drop the long float)
       if (e.params != null) c.params = e.params;
       if (e.req_body != null) c.req_body = e.req_body;
       if (e.resp_snippet != null) c.resp_snippet = e.resp_snippet;
