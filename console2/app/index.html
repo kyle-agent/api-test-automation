@@ -6,7 +6,7 @@
 <title>console2 — SCP API 테스트 실행 콘솔</title>
 <!-- inline SVG favicon (data URI) so the browser never requests /favicon.ico (404). -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232563c9'/%3E%3Ctext x='8' y='12' font-size='10' font-family='system-ui' font-weight='700' fill='%23fff' text-anchor='middle'%3E2%3C/text%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/console2.css?v=1782181986">
+<link rel="stylesheet" href="assets/console2.css?v=1782182698">
 </head>
 <body>
 <div id="c2-demo-banner" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1f6feb;color:#fff;font:600 12px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:5px 12px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25)">DEMO · 정적 스냅샷 (백엔드 없이 미리 구운 데이터 · 실행은 모의)</div><style>body{padding-top:30px!important}</style>
@@ -21,6 +21,7 @@
     <button data-scr="run"><span class="k">②</span>실행 &amp; 리포트</button>
   </div>
   <nav class="nav">
+    <a href="../../" id="dashLink" title="결과 대시보드 — 회귀/적합성 커버리지·응답코드·서비스별 추이 (이 콘솔의 실행 결과)">📊 대시보드</a>
     <a href="https://127.0.0.1" id="modelLink" onclick="return false" title="모델 출처">resource model</a>
   </nav>
 </header>
@@ -156,9 +157,9 @@
 
 <!-- console2.js fetches /api/model, sets the model, THEN renders. resource_graph.js
      (composer.graph_view renderer, light theme) is loaded first so it's ready. -->
-<script src="data/static-data.js?v=1782181986"></script>
-<script src="assets/mock-api.js?v=1782181986"></script>
-<script src="assets/resource_graph.js?v=1782181986" defer></script>
-<script src="assets/console2.js?v=1782181986" defer></script>
+<script src="data/static-data.js?v=1782182698"></script>
+<script src="assets/mock-api.js?v=1782182698"></script>
+<script src="assets/resource_graph.js?v=1782182698" defer></script>
+<script src="assets/console2.js?v=1782182698" defer></script>
 </body>
 </html>
