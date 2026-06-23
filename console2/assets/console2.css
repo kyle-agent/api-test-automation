@@ -105,6 +105,12 @@ header.top .crumbs{color:var(--muted);font-size:12.5px}
 
 /* the left panel is a narrow, scrollable menu column */
 .treepanel{position:sticky;top:8px;max-height:86vh;display:flex;flex-direction:column}
+/* STACKED (≤1180px = single column): the menu-tree must NOT stay sticky — an 86vh
+   sticky panel covers the DAG panel that now sits BELOW it, hiding the DAG and its
+   카테고리/서비스 granularity buttons and intercepting clicks ('겹쳐져서 안보임').
+   Placed AFTER the base rule so it wins on source order (media queries add no
+   specificity, so an earlier @media would lose to this base rule). */
+@media(max-width:1180px){.treepanel{position:static;max-height:none}}
 .svctree{overflow:auto;border:1px solid var(--line);border-radius:7px;background:#fff;flex:1;min-height:220px}
 .glyph{font-size:10.5px}
 .glyph.q{color:var(--red)}
