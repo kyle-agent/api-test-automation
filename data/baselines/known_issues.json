@@ -37,13 +37,6 @@
       "note": "PUT /v1/clusters/{id}/backup-histories 401s with a valid HMAC signature (validated run 27258520218) while sibling sub-ops in the same window 2xx \u2014 same backup-family/query-string HMAC signing quirk as database/mysql/mysqlunsetbackup and database/postgresql/postgresqlunsetbackup. Not a body bug; harness-side signing fix queued, unmute when it lands."
     },
     {
-      "key": "financial-management/budget/createaccountbudget",
-      "status": 500,
-      "classification": "Product Bug",
-      "note": "POST /v1/budgets/account -> 500 ContactAdminForAssistance with a complete-looking body incl. amount (run 27395331657, gen-wave-mgmisc). A validation problem must not 500. Muted pending backend fix; node stays docs-provenance and out of composed waves.",
-      "added": "2026-06-12"
-    },
-    {
       "key": "application-service/apigateway/setresourcepolicy",
       "status": 500,
       "classification": "Product Bug",
