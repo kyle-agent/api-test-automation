@@ -392,9 +392,10 @@
           "method": "GET",
           "path": "/v1/resource-policies/{iam_srn_b64}",
           "group": "rp-real",
+          "params": {"page": 1},
           "optional": true,
           "expect_status": [200, 400, 403, 404],
-          "_note": "showresourcepolicy — GET /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23 (after setresourcepolicy creates the policy). Group 'rp-real' gates this on setresourcepolicy success. Tolerant [200,400,403,404] in case SRN is placeholder."
+          "_note": "showresourcepolicy — GET /v1/resource-policies/{srn}. CONFIRMED 200 2026-06-23 (after setresourcepolicy creates the policy). Group 'rp-real' gates this on setresourcepolicy success. params:{page:1} is a harmless/ignored param that makes the engine record this GET under its catalog key management/iam/showresourcepolicy (engine only catalog-records GET steps with non-empty params). Tolerant [200,400,403,404]."
         },
         {
           "name": "add-resource-policy-statement",
