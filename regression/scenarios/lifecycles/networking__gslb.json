@@ -102,6 +102,21 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
         {
+          "name": "wait-gslb-after-health-check",
+          "method": "GET",
+          "path": "/v1/gslbs/{gslb_id}",
+          "group": "gslb",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.gslb.state",
+            "until": ["ACTIVE", "ERROR"],
+            "timeout": 120,
+            "interval": 5
+          },
+          "_note": "set-gslb-health-check returns 202 (async EDITING->ACTIVE). Wait before set-resources which requires ACTIVE state."
+        },
+        {
           "name": "set-gslb-resources",
           "method": "PUT",
           "path": "/v1/gslbs/{gslb_id}/resources",
@@ -118,6 +133,21 @@
             ]
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "wait-gslb-after-resources",
+          "method": "GET",
+          "path": "/v1/gslbs/{gslb_id}",
+          "group": "gslb",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "poll": {
+            "field": "$.gslb.state",
+            "until": ["ACTIVE", "ERROR"],
+            "timeout": 120,
+            "interval": 5
+          },
+          "_note": "set-gslb-resources may be async (EDITING->ACTIVE). Wait before set-routing-control which requires ACTIVE state."
         },
         {
           "name": "set-gslb-routing-control",
