@@ -4,7 +4,7 @@
       "id": "networking-security-group-update",
       "service": "networking/security-group",
       "enabled": true,
-      "_note": "Closes the setsecuritygroup + listsecuritygrouprules read-only gaps. The existing 'networking-security-group' lifecycle (scenarios.json) covers create/show/rule-create/rule-show/list-rules/deletes. This fragment: (1) covers setsecuritygroup (PUT /v1/security-groups/{id}) with body {description, loggable} per proven api_docs request_example; (2) covers listsecuritygrouprules by calling GET /v1/security-group-rules?security_group_id={sg_id} — the API requires security_group_id as a required query param (confirmed live: 400 without, 200 with). No VPC needed — SGs are account/region-scoped. KEY FACTS (2026-06-20): listsecuritygrouprules requires security_group_id query param (required, not optional); setsecuritygroup body fields are {description, loggable} (name is NOT a valid setsecuritygroup field per request_example); showsecuritygrouprule needs a real rule_id (requires prior create-rule, covered by scenarios.json main lifecycle, not this fragment).",
+      "_note": "VALIDATED 2026-06-23 (all steps 2xx LIVE). Covers setsecuritygroup + listsecuritygrouprules. KEY FACTS: (1) setsecuritygroup body is {description, loggable} ONLY — 'name' is NOT valid (confirmed 200 without name; 400 with name). (2) listsecuritygrouprules requires security_group_id as REQUIRED query param (400 without, 200 with). (3) SGs are account/region-scoped — no VPC needed. (4) delete-sg returns 204 synchronously. Together with networking-security-group in scenarios.json, this achieves 9/9 coverage.",
       "steps": [
         {
           "name": "create-sg",
@@ -40,10 +40,8 @@
             "description": "API regression suite — updated description",
             "loggable": false
           },
-          "expect_status": [200, 202, 400, 403, 404, 409, 422],
-          "optional": true,
-          "group": "sg-update",
-          "_note": "setsecuritygroup body: {description, loggable} per api_docs request_example. 'name' is NOT a setsecuritygroup field (proven from docs: request_example only shows description+loggable). optional+broad expect_status so a 4xx still records without failing."
+          "expect_status": [200, 202],
+          "_note": "setsecuritygroup VALIDATED 2026-06-23 (200 live). Body: {description, loggable} ONLY. 'name' is NOT a valid field (confirmed from API docs; 400 if included). provenance: VALIDATED"
         },
         {
           "name": "list-rules",

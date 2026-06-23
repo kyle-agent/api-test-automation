@@ -124,6 +124,19 @@ duplicating. Add a new `##` section when you take on a new service.
 - **Host:** regional, but **account/region-scoped — no VPC needed**. SG
   `$.security_group.id`; rule `$.security_group_rule.id` (`direction`,
   `ethertype: IPv4`, `protocol`, `port_range_min/max`, `remote_ip_prefix`).
+- **9/9 COMPLETE** as of 2026-06-23 (live-validated).
+- **setsecuritygroup (PUT /v1/security-groups/{id})**: body is `{description, loggable}` ONLY.
+  `name` is NOT a valid field and will cause a 400. Confirmed from API docs request_example.
+- **listsecuritygrouprules (GET /v1/security-group-rules)**: `security_group_id` is a
+  REQUIRED query parameter. Returns 400 without it; 200 with a real sg_id. A freshly
+  created SG with no rules returns count:0 but status 200 — valid for coverage.
+- **createsecuritygroup** body: `{name, description, loggable:bool, tags:[]}`. Response
+  envelope: `$.security_group.id`.
+- **createsecuritygrouprule** body: `{security_group_id, direction:"ingress"|"egress",
+  ethertype:"IPv4"|"IPv6", protocol:"tcp"|"udp"|"icmp"|"all", port_range_min,
+  port_range_max, remote_ip_prefix, description}`. Response: `$.security_group_rule.id`.
+- **Teardown**: deletesecuritygrouprule 204, deletesecuritygroup 204. Both clean
+  synchronously — no async wait needed.
 
 ## container / ske (Kubernetes)
 
