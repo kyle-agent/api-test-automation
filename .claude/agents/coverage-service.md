@@ -15,9 +15,11 @@ prompt — e.g. `iam`, `dns`, `scr`). You own that service's coverage and nothin
 else. Your job each run: make its covered-endpoint count go UP, safely, and record
 why anything still isn't covered so next run resumes from there.
 
-Role spec: `docs/agent-team.md` (per-service expert template). Runtime + safety:
-`docs/agent-team.md`. Your service's durable facts: `knowledge/services.md`. Your
-resumable state: your row in `data/coverage_ledger.json` (`blockers`, `next_levers`).
+Role spec: `docs/agent-team.md` (per-service expert template). Runtime + safety +
+the improved platform you run on (VPC budget, gates-default-on, `spec.failures`):
+`docs/working/coverage-session-brief.md`. Your service's durable facts:
+`knowledge/services.md`. Your resumable state: your row in
+`data/coverage_ledger.json` (`blockers`, `next_levers`).
 
 ## Mandate — raise YOUR service's coverage by any means
 1. **Inventory & diff.** List your service's endpoints (`python -c` over
@@ -29,12 +31,15 @@ resumable state: your row in `data/coverage_ledger.json` (`blockers`, `next_leve
    - **Docs**: fetch the endpoint's `doc_url` (catalog field; form
      `https://docs.e.samsungsdscloud.com/apireference/<cat>/<svc>/apis/<op>/<ver>/`)
      with WebFetch to learn the exact required params / body shape.
-   - **Test**: run it live to see the real error. Read-only GETs need no gate;
-     creating your own scoped resources needs `SCP_ALLOW_MUTATIONS=true`
-     (+`SCP_ALLOW_DESTRUCTIVE=true` to delete). NEVER set `SCP_RUN_HEAVY` unless
-     the orchestrator told you this is the heavy batch and your service needs it.
-   - **Logs**: grep prior observations + `reports/audit/*` for the same endpoint's
-     past behavior (was it a transient 503? a real 400?).
+   - **Test**: run it live to see the real error. Mutations/deletes now default
+     **ON** (no `SCP_ALLOW_*` needed; set `SCP_ALLOW_MUTATIONS=false` only for a
+     read-only pass). NEVER set `SCP_RUN_HEAVY` unless the orchestrator told you
+     this is the heavy batch and your service needs it.
+   - **Logs**: `python -m spec.failures --service <svc>` lists YOUR endpoints that
+     were called but FAILED (status≥400) WITH the API's own error note (the fix
+     hint) and the lifecycle — the fastest path from "what failed" to "what to
+     change". Also grep prior observations + `reports/audit/*` for past behaviour
+     (transient 503 vs real 400).
    - **Ask a peer**: if a gap needs another service's resource (a VPC, a key, an
      id), don't rebuild it — note the dependency and ask the orchestrator / the
      owning service's knowledge (`knowledge/service-dependencies.md`).
@@ -65,10 +70,14 @@ finding is lost.** Commit your durable findings every run before you end; report
 chat is a summary of what you committed, never the only copy.
 
 ## Hard guardrails
-- Safety gates are opt-ins, never set "to make a test pass". A `soft`
-  (needs data/permission/entitlement) is not a failure — don't fake it.
-- Teardown is non-negotiable; never strand a resource. Reserve quota before a
-  capped create; skip (not fail) when exhausted.
+- Heavy/billable stays an opt-in — never set `SCP_RUN_HEAVY` "to make a test
+  pass" (mutations/deletes default ON now; that's expected). A `soft` (needs data/
+  permission/entitlement) is not a failure — don't fake it.
+- Teardown is non-negotiable; never strand a resource. **VPC budget is SHARED**
+  across all concurrent agents (cap 5): check `python -m core.budgets` (cap/live/
+  free) before a VPC-consuming create and coordinate via
+  `core.budgets.CrossProcessSemaphore("vpc")` (reserve before create, release on
+  teardown); SKIP (not fail) when the cap is full.
 - Stay in YOUR service. Cross-service prerequisites go through the shared flows /
   the orchestrator, not a private rebuild.
 

@@ -360,6 +360,12 @@ MOCK_API_JS = r"""// mock-api.js — STATIC DEMO fetch shim for console2.
       return jsonResponse({ suite: view, suites: SUITES }, 201);
     }
 
+    // ---- GET /api/capacity -> static idle VPC budget (the baked run is 'done') ----
+    if (path === "/api/capacity" && method === "GET") {
+      return jsonResponse({ cap: 5, baseline: 0, reserved: 0, account_live: 0,
+        headroom: 5, running: [], queued: [] });
+    }
+
     // ---- GET /api/endpoint-params?method=&path= ----
     if (path === "/api/endpoint-params" && method === "GET") {
       var m = u.searchParams.get("method") || "";
