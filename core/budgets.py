@@ -233,3 +233,71 @@ class CrossProcessSemaphore:
         finally:
             if token is not None:
                 self.release(token)
+
+
+# ---------------------------------------------------------------------------
+# Live usage probe + status CLI
+# ---------------------------------------------------------------------------
+# A capped create needs the LIVE account usage (not just in-process reservations)
+# to know real head-room. A per-service coverage agent calls this BEFORE a
+# VPC-consuming create so concurrent agents don't blow the account cap — pair it
+# with CrossProcessSemaphore("vpc") to coordinate reservations across processes.
+
+# kind -> (service short-name, read-only LIST path). Only kinds with a known
+# list endpoint are live-tracked; others report live=None (unknown, not 0).
+_LIVE_LIST = {
+    "vpc": ("vpc", "/v1/vpcs"),
+}
+
+
+def live_count(kind: str) -> int | None:
+    """Current LIVE account usage for a capped kind via a read-only LIST.
+    Returns None when the kind has no known list endpoint or the call fails
+    (so callers treat 'unknown' differently from a confirmed 0)."""
+    spec = _LIVE_LIST.get(kind)
+    if not spec:
+        return None
+    service, path = spec
+    try:
+        from core.config import Settings
+        from core.http_client import ApiClient
+        r = ApiClient(Settings()).get(path, params={"size": 1}, service=service,
+                                      timeout=15, retry=False)
+        if not getattr(r, "ok", False):
+            return None
+        b = r.body if isinstance(r.body, dict) else {}
+        n = b.get("totalCount")
+        if n is None:
+            items = b.get("contents") or b.get(path.rsplit("/", 1)[-1]) or []
+            n = len(items) if isinstance(items, list) else 0
+        return int(n)
+    except Exception:  # noqa: BLE001 — best-effort head-room probe, never raise
+        return None
+
+
+def status() -> dict:
+    """Per-capped-kind {limit, live, free}. ``free`` is None when the live count
+    is unavailable, so a scheduler never over-creates on an unknown."""
+    b = Budget()
+    out = {}
+    for kind, limit in b.limits.items():
+        live = live_count(kind)
+        out[kind] = {"limit": int(limit), "live": live,
+                     "free": (max(0, int(limit) - live) if isinstance(live, int) else None)}
+    return out
+
+
+def _main(argv=None) -> int:
+    rows = status()
+    print(f"{'kind':<14}{'limit':>6}{'live':>6}{'free':>6}")
+    for kind, v in rows.items():
+        live = "?" if v["live"] is None else v["live"]
+        free = "?" if v["free"] is None else v["free"]
+        print(f"{kind:<14}{v['limit']:>6}{str(live):>6}{str(free):>6}")
+    print("\njson: " + json.dumps(rows))
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(_main())
