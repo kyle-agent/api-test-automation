@@ -85,7 +85,7 @@ function init() {
     const id = Object.keys(N).find(i => N[i].lifecycle);
     if (id) targets.add(id);
   }
-  // a ?service=<cat>/<svc> deep-link (the dashboard's per-service "console2 →"
+  // a ?service=<cat>/<svc> deep-link (the dashboard's per-service "Platform →"
   // links) overrides the default and pre-selects that service.
   deepLinkService();
   wireNav();
@@ -97,7 +97,7 @@ function init() {
 
 // ---- ?service=<cat>/<svc> deep-link (from the dashboard's per-service links) ----
 // If present and resolvable to a selectable service, REPLACE the default selection
-// with that whole service so the dashboard "console2 →" links land here focused on
+// with that whole service so the dashboard "Platform →" links land here focused on
 // it. Accepts the full slug ("networking/vpc") or a bare short name ("vpc"); a miss
 // is silent (keeps the default). Returns true iff it changed the selection.
 function deepLinkService() {
@@ -848,16 +848,25 @@ function renderStagedPreview() {
   }
   if (host.dataset.preview === item.id && stagedScene) return;   // already showing this item
   if (stagedScene) { stagedScene.destroy(); stagedScene = null; }
+  // 현재 여유(headroom) + 부족 badge live in #sp-headroom/#sp-overbadge (filled by
+  // updateStagedPreviewBudget from the cap poll) so "그림 보고 → 바로 실행" has the
+  // budget context right by the button, without rebuilding the DAG scene each poll.
   host.dataset.preview = item.id;
-  host.innerHTML = `<div class="nowbar"><span class="dot" style="background:var(--accent)"></span>
-      <b>대기열 미리보기</b> · <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · 폐포 ${item.closure} · VPC ${item.peak_vpcs || 0} 필요${item.heavy ? " 🜂" : ""}</span>
-      <span class="muted small" style="margin-left:auto">실행 전 미리보기 — 실제 실행은 좌측 [▶ 실행]</span></div>
+  host.innerHTML = `<div class="nowbar sp-head"><span class="dot" style="background:var(--accent)"></span>
+      <b>대기열 미리보기</b>
+      <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · 폐포 ${item.closure} · VPC <b>${item.peak_vpcs || 0}</b> 필요 · 현재 여유 <b id="sp-headroom">…</b>${item.heavy ? " · 🜂 heavy" : ""}</span>
+      <span class="sp-act">
+        <span id="sp-overbadge"></span>
+        <button class="minibtn go" id="sp-run" title="이 계획을 실제 실행(LIVE) — cap 아래면 ADMIT, 아니면 대기 큐로">▶ 실행</button>
+      </span></div>
     <div class="legend" id="sp-legend"></div>
     <div class="stage-wrap"><div class="stage" id="sp-stage">
         <svg id="sp-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
         <div class="hint-pill" id="sp-hint"></div>
         <div class="zoomctl"><button id="sp-zin" title="확대">+</button><button id="sp-zout" title="축소">−</button><button id="sp-zfit" class="fit" title="전체 보기">맞춤</button></div>
       </div></div>`;
+  $("sp-run").onclick = () => runStaged(item);     // ▶ 실행 right by the DAG (그림 → 실행)
+  updateStagedPreviewBudget();                     // fill 현재 여유 / 부족 badge now (and on each cap poll)
   $("sp-legend").innerHTML = legend([["#e6effd", "★ 대상"], ["#fffaf0", "■ 공유(dedup)"], ["#f3eefc", "↓ 의존"]])
     + '<span>합성 배포 DAG · 레벨 = 생성 순서</span>';
   fetch("/api/graph", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item.selection) })
@@ -875,6 +884,24 @@ function renderStagedPreview() {
       if (host.dataset.preview === item.id)
         $("sp-svg").innerHTML = '<text x="12" y="24" fill="#cf222e">graph: ' + esc(e.message) + "</text>";
     });
+}
+
+// update ONLY the 현재 여유 number + 부족 badge in the open preview header, in place,
+// from the latest /api/capacity (so the cap poll keeps it live without rebuilding the
+// DAG scene). No-op unless a staged preview is the active 흐름 content.
+function updateStagedPreviewBudget() {
+  const host = $("report-main");
+  if (!host || runId || !host.dataset.preview) return;
+  const hr = $("sp-headroom"); if (!hr) return;
+  const item = STAGED.find(x => x.id === host.dataset.preview);
+  const ob = $("sp-overbadge");
+  const c = lastCapacity;
+  if (!c || !item) { hr.textContent = "…"; if (ob) ob.innerHTML = ""; return; }
+  const headroom = c.headroom != null ? c.headroom
+    : Math.max(0, (c.cap || 0) - ((c.baseline || 0) + (c.reserved || 0)));
+  hr.textContent = headroom;
+  if (ob) ob.innerHTML = (item.peak_vpcs || 0) > headroom
+    ? '<span class="sp-over" title="필요 VPC > 여유 — 실행하면 대기 큐로 들어갑니다">여유 부족 → 대기 큐</span>' : "";
 }
 
 // [▶ 실행] — commit ONE staged item: POST /api/run for its selection (the server
@@ -919,7 +946,7 @@ function startCapPoll() {
     fetch("/api/capacity").then(r => r.json()).then(c => {
       if (c.error) return;
       lastCapacity = c;
-      if (screen === "run") { drawCapBar(); drawStagedPanel(); drawLeftover(); }
+      if (screen === "run") { drawCapBar(); drawStagedPanel(); drawLeftover(); updateStagedPreviewBudget(); }
     }).catch(() => { /* transient — keep last good capacity */ })
       .finally(() => { if (screen === "run") capTimer = setTimeout(tick, 2000); });
   };
@@ -936,13 +963,22 @@ function drawCapBar() {
     return;
   }
   const cap = c.cap || 0;
-  const used = (c.baseline || 0) + (c.reserved || 0);
-  const headroom = c.headroom != null ? c.headroom : Math.max(0, cap - used);
+  const baseline = c.baseline || 0;          // 기존 — 서버 시작 시점 계정 VPC (내 실행 아님)
+  const reserved = c.reserved || 0;          // 내 실행 예약 (in-flight)
+  // 현재 계정 VPC = /v1/vpcs 실측(지금 실제 떠 있는 것). 내가 돌린 것 + 기존 + 타 세션 포함.
+  const acct = c.account_live != null ? c.account_live : baseline;
+  const headroom = c.headroom != null ? c.headroom : Math.max(0, cap - baseline - reserved);
   const running = c.running || [], queued = c.queued || [];
   const idTail = id => (id || "").slice(-6);
-  // a cap-cell meter: one cell per VPC slot, filled = used (baseline + reserved).
+  // meter: one cell per cap slot. Fill by the LIVE account count first ('live' =
+  // 지금 실제 떠 있는 VPC), then my not-yet-created reservations ('resv'), rest 여유.
+  const liveN = Math.min(cap, acct);
+  const resvN = Math.min(Math.max(0, cap - liveN), reserved);
   const cells = [];
-  for (let i = 0; i < cap; i++) cells.push(`<i class="${i < used ? "on" : ""}"></i>`);
+  for (let i = 0; i < cap; i++) {
+    const cls = i < liveN ? "live" : (i < liveN + resvN ? "resv" : "");
+    cells.push(`<i class="${cls}"></i>`);
+  }
   const runChips = running.length
     ? running.map(r => `<button class="capchip run" data-runid="${esc(r.id)}" title="${esc(r.id)} — 리포트 열기">
         <span class="kindtag">${esc(idTail(r.id))}</span> ${r.peak_vpcs || 0} VPC${r.heavy ? " 🜂" : ""}</button>`).join("")
@@ -953,8 +989,11 @@ function drawCapBar() {
     : '<span class="muted small">없음</span>';
   host.innerHTML = `<div class="panel cap-panel">
     <h2>실행 용량 <span class="muted small">· VPC 동시 실행 한도 (cap) — ADMIT/대기 큐</span></h2>
-    <div class="cap-head"><b>VPC ${used}/${cap}</b> <span class="muted">· 여유 ${headroom}</span></div>
+    <div class="cap-head"><b>현재 계정 VPC ${acct}/${cap}</b>
+      <span class="muted small">· 지금 실제 떠 있는 실측 (/v1/vpcs · 내 실행 + 기존 포함)</span></div>
     <div class="cap-meter">${cells.join("")}</div>
+    <div class="cap-sub muted small">기존 <b>${baseline}</b> · 내 실행 예약 <b>${reserved}</b> · 여유 <b>${headroom}</b>
+      <span class="cap-key"><i class="live"></i>떠 있음 <i class="resv"></i>내 예약 <i></i>여유</span></div>
     <div class="cap-grp"><span class="cap-lbl">진행중 (${running.length})</span><span class="cap-chips">${runChips}</span></div>
     <div class="cap-grp"><span class="cap-lbl">대기 (${queued.length})</span><span class="cap-chips">${queChips}</span></div>
   </div>`;
