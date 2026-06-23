@@ -792,8 +792,39 @@ FIRST ANALYSIS 2026-06-20. 3 endpoints, ALL POST (mutating). 0 coverable read-on
 - **Fragment:** `regression/scenarios/lifecycles/platform__sts.json` (sts-token-issuance-coverage lifecycle, corrected 2026-06-20).
 - **Coverage 2026-06-20 (read-only):** 0/3. All 3 endpoints POST-only, mutation-gated. With SCP_ALLOW_MUTATIONS: expect 400/403 on assumerole (trust policy mismatch), 400/422 on assumerolewithsaml (no real SAML provider + fake assertion), 400/401/403 on objectstoreauthorization (no session_token in auth). Coverage counting requires category=ok (2xx); 4xx from invalid credentials does NOT count.
 
+## financial-management / budget
+
+VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
+
+- **Host:** `budget.e.samsungsdscloud.com` (GLOBAL; in settings.global_services).
+- **Endpoints (all 5):** listaccountbudgets (GET /v1/budgets/account), createaccountbudget (POST), showaccountbudget (GET /v1/budgets/account/{budget_id}), setaccountbudget (PUT /v1/budgets/account/{budget_id}), deleteaccountbudget (DELETE /v1/budgets/account/{budget_id}).
+- **Account constraint:** Only 1 budget per account. A second create returns 409 Conflict.
+- **Body shape (CONFIRMED LIVE 2026-06-23) — BudgetCreateRequest:**
+  ```json
+  {
+    "amount": 1000000,
+    "name": "regr-budget-{unique}",
+    "start_month": "2026-06",
+    "unit": "MONTHLY",
+    "notifications": {
+      "is_use_notification": true,
+      "notification_send_period": "FIRST",
+      "receivers": ["email@example.com"],
+      "thresholds": [80]
+    }
+  }
+  ```
+  Required: `amount` (integer), `name` (string), `start_month` (YYYY-MM format), `unit` ("MONTHLY" or "OVERALL"). Optional: `notifications`, `prevention`.
+- **CRITICAL: start_month must be >= current month.** A past YYYY-MM yields 400 ValidationError "The start month must be the same as or later than the current month." Update this value each run (or use a future month).
+- **Response envelope:** Create: `{"budget": {"id": "<32-hex>", ...}}`. List: `{"budgets": [...], "count": N, "page": 0, "size": 20, "sort": [...]}`. NOT `$.contents[]` — must use `$.budgets[]`.
+- **budget_id format:** 32-hex UUID (e.g. `240200fd2b02490ca63bb3965048b493`). Capture from create `$.budget.id` or soft-fallback list `$.budgets[0].id`.
+- **Status codes:** create → 201, show/set → 200, delete → 204.
+- **known_issues.json:** The entry for `financial-management/budget/createaccountbudget` (added 2026-06-12, "500 ContactAdminForAssistance") IS A BODY-SHAPE BUG, NOT a product bug. The 500 was caused by wrong field names in the request body (`budget_amount`/`currency`/`period_type` instead of the correct `amount`/`name`/`start_month`/`unit`). With the corrected body, create reliably returns 201. The entry SHOULD BE REMOVED from known_issues.json.
+- **Teardown:** delete → 204; verified account returns to 0 budgets post-run.
+- **Fragment:** `regression/scenarios/lifecycles/financial-management__budget.json` (lifecycle `budget-account-budget`).
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
-database (mysql, mariadb), data-analytics, financial-management,
+database (mysql, mariadb), data-analytics (partial),
 devops-tools, and the long tail of management/networking/storage.
 These have the most uncovered endpoints — see `scenario-catalog.md` gap list.
