@@ -63,6 +63,7 @@ let scopeAuto = true;       // true until the user explicitly picks a scope (so 
 // (group/collapse · focus · zoom). buildView toggles 그림|표 on ①.
 let dagScene = null;        // 구성 (#dag-svg) scene
 let r1Scene = null;         // 흐름 (#r1-svg) scene
+let stagedScene = null;     // 실행 대기열 미리보기 (#sp-svg) — DAG of the OPEN staged item
 let buildView = "fig";      // 그림 | 표 (구성 DAG mode)
 let dagFocus = null;        // current focus info on the 구성 DAG (for 표 scoping)
 
@@ -175,6 +176,7 @@ function go(scr) {
   // (the scene shell is keyed by runId → a fresh build re-attaches everything).
   if (scr !== "run") {
     if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
+    if (stagedScene) { stagedScene.destroy(); stagedScene = null; }
     stopR4Poll();
     stopCapPoll();           // leaving the run screen → stop the capacity poll
   }
@@ -748,7 +750,9 @@ function launchSummary() {
   const go = $("launch-go");
   if (go) {
     go.disabled = !targets.size;
-    go.className = "btn stage";             // 구성 ▶ STAGES (enqueues) — not a LIVE run
+    go.className = "btn stagebtn";          // 구성 ▶ STAGES (enqueues) — not a LIVE run
+    // (NOTE: class is "stagebtn", NOT "stage" — ".stage" is the tall DAG-scene
+    //  container; sharing it gave this button a 560px min-height.)
     go.textContent = "▶ 실행 대기열에 추가";
   }
 }
@@ -811,15 +815,66 @@ function drawStagedPanel() {
     const id = b.dataset.stageTog;
     stagedOpen = stagedOpen === id ? null : id;     // toggle (one open at a time)
     drawStagedPanel();
+    renderStagedPreview();      // open item → show its 합성 DAG in the 흐름 area
   });
   els("#staged-panel [data-stage-del]").forEach(b => b.onclick = () => {
-    STAGED = STAGED.filter(x => x.id !== b.dataset.stageDel);
+    const id = b.dataset.stageDel;
+    STAGED = STAGED.filter(x => x.id !== id);
+    if (stagedOpen === id) stagedOpen = null;
     drawStagedPanel();
+    renderStagedPreview();      // removed the previewed item → restore placeholder
   });
   els("#staged-panel [data-stage-run]").forEach(b => b.onclick = () => {
     const it = STAGED.find(x => x.id === b.dataset.stageRun);
     if (it) runStaged(it);
   });
+}
+
+// ---- 대기열 미리보기: render the OPEN staged item's composition DAG into the 흐름
+// (report-main) area — which is otherwise idle until a run starts. Read-only (no
+// target selection), keyed by item id so a capacity poll never rebuilds the live
+// scene. A live run owns this area (runId set) → the preview steps aside. Clicking
+// the item again (stagedOpen=null) restores the idle placeholder. ----
+function renderStagedPreview() {
+  if (screen !== "run") return;
+  const host = $("report-main"); if (!host) return;
+  if (runId) return;                                  // a live run owns the 흐름 area
+  const item = stagedOpen ? STAGED.find(x => x.id === stagedOpen) : null;
+  if (!item) {                                        // nothing open → idle placeholder
+    if (stagedScene) { stagedScene.destroy(); stagedScene = null; }
+    host.dataset.preview = "";
+    host.innerHTML = '<p class="empty">아직 실행이 없습니다 — 대기열 항목을 클릭하면 합성 DAG가 여기 보입니다. 실제 실행은 좌측 <b>▶ 실행</b>.</p>';
+    return;
+  }
+  if (host.dataset.preview === item.id && stagedScene) return;   // already showing this item
+  if (stagedScene) { stagedScene.destroy(); stagedScene = null; }
+  host.dataset.preview = item.id;
+  host.innerHTML = `<div class="nowbar"><span class="dot" style="background:var(--accent)"></span>
+      <b>대기열 미리보기</b> · <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · 폐포 ${item.closure} · VPC ${item.peak_vpcs || 0} 필요${item.heavy ? " 🜂" : ""}</span>
+      <span class="muted small" style="margin-left:auto">실행 전 미리보기 — 실제 실행은 좌측 [▶ 실행]</span></div>
+    <div class="legend" id="sp-legend"></div>
+    <div class="stage-wrap"><div class="stage" id="sp-stage">
+        <svg id="sp-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="hint-pill" id="sp-hint"></div>
+        <div class="zoomctl"><button id="sp-zin" title="확대">+</button><button id="sp-zout" title="축소">−</button><button id="sp-zfit" class="fit" title="전체 보기">맞춤</button></div>
+      </div></div>`;
+  $("sp-legend").innerHTML = legend([["#e6effd", "★ 대상"], ["#fffaf0", "■ 공유(dedup)"], ["#f3eefc", "↓ 의존"]])
+    + '<span>합성 배포 DAG · 레벨 = 생성 순서</span>';
+  fetch("/api/graph", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item.selection) })
+    .then(r => r.json()).then(g => {
+      if (host.dataset.preview !== item.id) return;   // user moved on while we fetched
+      if (g.error || !g.nodes || !g.nodes.length) {
+        $("sp-svg").innerHTML = '<text x="12" y="24" fill="#656d76">미리볼 합성 DAG가 없습니다.</text>'; return;
+      }
+      stagedScene = window.ResourceGraph.scene($("sp-svg"), $("sp-stage"), g, { hint: $("sp-hint") });
+      stagedScene.start();
+      $("sp-zin").onclick = () => stagedScene.zoomIn();
+      $("sp-zout").onclick = () => stagedScene.zoomOut();
+      $("sp-zfit").onclick = () => stagedScene.zoomToFit();
+    }).catch(e => {
+      if (host.dataset.preview === item.id)
+        $("sp-svg").innerHTML = '<text x="12" y="24" fill="#cf222e">graph: ' + esc(e.message) + "</text>";
+    });
 }
 
 // [▶ 실행] — commit ONE staged item: POST /api/run for its selection (the server
@@ -1132,15 +1187,16 @@ function pollEvents() {
 function drawReport() {
   if (!runId) {
     if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
-    $("report-main").innerHTML = '<p class="empty">아직 실행이 없습니다 — 위에서 <b>실행 ▶</b>을 누르세요.</p>';
     $("lc-picker").innerHTML = "";
     $("md-report") && $("md-report").classList.remove("has-detail");
     $("scopebar").innerHTML = "";
     $("detail-body").innerHTML = '<p class="empty">실행이 시작되면 라이프사이클을 선택해 상세를 봅니다.</p>';
     stopR4Poll();
+    renderStagedPreview();   // 흐름 area shows the OPEN 대기열 item's DAG (else placeholder)
     loadRunRecords();
     return;
   }
+  if (stagedScene) { stagedScene.destroy(); stagedScene = null; }   // a run owns the 흐름 area now
   reconcileScope();        // auto-select for a single-lifecycle run; validate scope
   reportR1();              // MASTER: the 흐름 scene (B2) — persistent, refresh in place
   renderLcPicker();        // MASTER: compact lifecycle list (collapsed-group / dense escape)
