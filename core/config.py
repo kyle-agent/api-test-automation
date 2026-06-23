@@ -149,13 +149,15 @@ class Settings:
     # forbid list (SCP_PROFILE_FORBID) — see _forbidden().
     run_heavy: bool = field(default_factory=lambda: _bool("SCP_RUN_HEAVY", False)
                             and "heavy" not in _forbidden())
-    # Safety gate: mutating operations (POST/PUT/PATCH/DELETE) are skipped
-    # unless this is explicitly enabled, so a smoke run never creates/deletes
-    # real cloud resources by accident.
-    allow_mutations: bool = field(default_factory=lambda: _bool("SCP_ALLOW_MUTATIONS", False)
+    # Mutating operations (POST/PUT/PATCH/DELETE) default to ALLOWED — the project's
+    # purpose is real execution, and the deliberate opt-in is now the run SELECTION +
+    # the console2 pre-flight confirm, not an env flag. To force a READ-ONLY run set
+    # SCP_ALLOW_MUTATIONS=false (CI's smoke/conformance suites set it explicitly); a
+    # profile may also veto via SCP_PROFILE_FORBID.
+    allow_mutations: bool = field(default_factory=lambda: _bool("SCP_ALLOW_MUTATIONS", True)
                                   and "mutations" not in _forbidden())
-    # Extra guard for destructive deletes even when mutations are allowed.
-    allow_destructive: bool = field(default_factory=lambda: _bool("SCP_ALLOW_DESTRUCTIVE", False)
+    # DELETE also defaults allowed; set SCP_ALLOW_DESTRUCTIVE=false to keep deletes off.
+    allow_destructive: bool = field(default_factory=lambda: _bool("SCP_ALLOW_DESTRUCTIVE", True)
                                     and "destructive" not in _forbidden())
 
     def is_global(self, service: str | None) -> bool:

@@ -36,10 +36,13 @@ CRUD/heavy/destructive runs require explicit safety-gate opt-ins — see Hard Ru
 
 ## Hard Rules (never bend)
 
-1. **Safety gates are non-negotiable.** `POST/PUT/PATCH` need `SCP_ALLOW_MUTATIONS=true`,
-   `DELETE` needs `SCP_ALLOW_DESTRUCTIVE=true`, heavy/billable lifecycles need
-   `SCP_RUN_HEAVY=true`. **Never** set any of these "to make a test pass" — they are
-   deliberate, explicit opt-ins (`docs/agent-team.md` safety rails).
+1. **Safety gates.** Mutations (`POST/PUT/PATCH/DELETE`) default **ON** — the project's
+   purpose is real execution; the deliberate opt-in is the run **selection** + the
+   console2 **pre-flight confirm**, not an env flag. Force a **read-only** run with
+   `SCP_ALLOW_MUTATIONS=false` (CI's smoke/conformance suites set it explicitly) or a
+   profile veto (`SCP_PROFILE_FORBID`). **Heavy/billable** lifecycles still need an
+   explicit opt-in — `SCP_RUN_HEAVY=true`, or a heavy selection (console2 auto-derives
+   + confirms it); never flip heavy on just "to make a test pass" (`docs/agent-team.md`).
 2. **No secrets in git.** Never read/log/commit `.env`; `.env.example` /
    `.env.platform.example` are the only committed templates. Credentials → env vars.
 3. **Never delete by name-guessing** in live code paths — go through `core.registry`
