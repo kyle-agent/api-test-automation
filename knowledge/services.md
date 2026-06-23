@@ -336,7 +336,8 @@ duplicating. Add a new `##` section when you take on a new service.
 
 - **Host:** global-ish (management). 62 endpoints. Cross-link
   `validated-facts.md`.
-- **Coverage levers (2026-06-18):**
+- **Coverage 2026-06-23: 33 / 62 (53%)**
+- **Coverage levers:**
   - *Read-only LISTs (no gate, via smoke):* `accesskeylist`, `listendpoints`,
     `listgroup`, `listpolicy`, `listrole`, `listsamlprovider`,
     `listserviceaccount` all return 200 on a bare GET — pure smoke wins.
@@ -347,44 +348,71 @@ duplicating. Add a new `##` section when you take on a new service.
     collection list** (both 404). `account_id` is only derivable from a real
     role's `$.role.account_id` (a `/v1/roles` item carries `account_id`). Use it
     to call `listiamuser` = `GET /v1/accounts/{account_id}/users` (200, returns
-    `{users:[], count,page,size,sort}`). This is why read_chains can't auto-pair
-    listiamuser/getiamuser/listuserpolicybindings — the parent list doesn't exist.
+    `{users:[], count,page,size,sort}`). This account has **0 IAM users** under
+    `listiamuser` — `getiamuser` gets 404.
   - *Group/policy lifecycles (MUTATIONS gate):* `creategroup` → `$.group.id`,
-    `createpolicy` → flat `$.id`. Both delete cleanly. Already enabled.
-- **Empty-collection blockers (needs-peer-resource):** this account has **0 SAML
-  providers, 0 IAM users, 0 resource-policies** → `showsamlprovider`,
-  `getiamuser`, `listuserpolicybindings`, `updateiamuser`,
-  `updateiamuserpassword`, `deleteiamuser`, `showresourcepolicy` have no id to
-  target and can't be covered read-only until a peer creates one.
-- **Product-bug blocker (5xx, baselined):** `createrole` → 500
-  ContactAdminForAssistance. This blocks the whole role-mutation chain
-  downstream (`setrole`, `addrolepolicybindings`, `removerolepolicybinding`,
-  `removebulkrolepolicybindings`, `setroletrustpolicy`, `deleterole`,
-  `deletebulkrole`). `iam-role` lifecycle stays `enabled:false`.
-- **Entitlement / validation blockers:** `adduserpolicybinding` /
-  `removeuserpolicybinding` → 403; resource-policy mutations
-  (`addpermission`/`setpermission`/`removepermission`/`setresourcepolicy`/
-  `deleteresourcepolicy`) were 400 (SRN decoding error) — **FIXED 2026-06-20** (see
-  below).
-- **b64-SRN fix (2026-06-20):** The iam gateway decodes `{srn}` path segments
-  as base64, the same way resourcemanager does. Plain SRN in
-  `/v1/resource-policies/{srn}` yields 400 "SRN decoding error". The fix mirrors
-  the resourcemanager pattern: `GET /v1/resources` (resourcemanager cross-service
-  step) soft-captures `$.resources[0].srn` → `iam_srn`; a `b64_encode` step
-  produces `iam_srn_b64`; all 5 srn-targeted write paths use `{iam_srn_b64}`:
-  - `PUT /v1/resource-policies/{iam_srn_b64}` (setresourcepolicy)
-  - `GET /v1/resource-policies/{iam_srn_b64}` (showresourcepolicy)
-  - `POST /v1/resource-policies/{iam_srn_b64}/statements` (addpermission)
-  - `PUT /v1/resource-policies/{iam_srn_b64}/statements/{unique}` (setpermission)
-  - `DELETE /v1/resource-policies/{iam_srn_b64}/statements/{unique}` (removepermission)
-  - `DELETE /v1/resource-policies/{iam_srn_b64}` (deleteresourcepolicy)
-  The `{sid}` path segment (`{unique}`) does NOT need b64 encoding. After the fix
-  the calls will pass the SRN decoder; they may still 404 (no resource-policy on
-  that resource) or 403 (no write permission). The b64_encode step is `optional`
-  so a missed capture degrades gracefully to a placeholder that still calls the
-  endpoint. Wired in `iam-resource-policy` lifecycle (`management__iam.json`).
-- **Coverage 2026-06-18 → 2026-06-20:** 15 → **28 / 62** (read-only levers +
-  wave5-iam-bindings; b64-SRN fix is pre-mutation and awaits the light CRUD run).
+    `createpolicy` → flat `$.id`. Both delete cleanly.
+  - *Resource-policy chain:* see b64-SRN fix below. **CONFIRMED 200** for all 6
+    resource-policy endpoints 2026-06-23.
+- **CONFIRMED body shapes (validated live 2026-06-23):**
+  - `setgroup` (PUT /v1/groups/{group_id}): **REQUIRES `name` field** alongside
+    `description`. Body `{"description":"..."}` alone returns 400 "Field required".
+    Must capture `$.group.name` from creategroup and re-send it: `{"name":
+    "{group_name}", "description": "..."}`. VALIDATED 200.
+  - `creategroup` envelope: `$.group.id` (nested, not flat). `$.group.name` also
+    available for capture.
+  - `createpolicy` envelope: `$.id` (FLAT — not `$.policy.id`).
+  - `addgrouppolicybinding` (POST /v1/groups/{group_id}/policy-bindings): needs a
+    REAL policy_id in `{"policy_ids":[...]}` — synthetic id returns 404 "No Policy
+    found". Solution: create a policy in the same lifecycle and use real id. VALIDATED 200.
+  - `removegrouppolicybinding` (DELETE /v1/groups/{group_id}/policy-bindings/{policy_id}):
+    also needs real policy_id in path. VALIDATED 204.
+  - `addgroupmember` (POST /v1/groups/{group_id}/members): synthetic user_id always
+    404 "No User found". Account has 0 IAM users. Not fixable without SCP_RUN_HEAVY.
+- **b64-SRN fix (CONFIRMED 200 all 6 ops 2026-06-23):** The iam gateway decodes
+  `{srn}` path segments as base64, same as resourcemanager. Plain SRN yields 400
+  "SRN decoding error". Fix: `b64_encode` step produces `iam_srn_b64`; all 6
+  srn-targeted paths use `{iam_srn_b64}`:
+  - `PUT /v1/resource-policies/{iam_srn_b64}` (setresourcepolicy) — CONFIRMED 200
+  - `GET /v1/resource-policies/{iam_srn_b64}` (showresourcepolicy) — CONFIRMED 200
+  - `POST /v1/resource-policies/{iam_srn_b64}/statements` (addpermission) — CONFIRMED 201
+  - `PUT /v1/resource-policies/{iam_srn_b64}/statements/{sid}` (setpermission) — CONFIRMED 200
+  - `DELETE /v1/resource-policies/{iam_srn_b64}/statements/{sid}` (removepermission) — CONFIRMED 204
+  - `DELETE /v1/resource-policies/{iam_srn_b64}` (deleteresourcepolicy) — CONFIRMED 204
+  - `{sid}` path segment does NOT need b64 encoding.
+- **Resource-policy Action MUST match target service (CONFIRMED 2026-06-23):**
+  The Action in a resource-based policy body must match the service of the target
+  resource SRN. `iam:*` and `*` both return 400 "UnSupportedActionInPolicy for
+  service [vpc/secretsmanager/kms]". `kms:*` is confirmed 200 against a KMS SRN.
+  Strategy: filter resourcemanager `GET /v1/resources?resource_type=kms` to always
+  get a KMS SRN, then use `kms:*` action.
+- **probe_reads srn mapping (CONFIRMED 2026-06-23):** `probe_reads` does NOT
+  auto-resolve `{srn}` from context variable `iam_srn_b64` because `_PARAM_ALIASES`
+  only maps `srn` → `rg_srn`, not `iam_srn_b64`. Must use explicit mapping:
+  `"probe_reads": {"srn": "{iam_srn_b64}"}` to fire `GET /v1/resource-policies/{iam_srn_b64}`.
+- **setpermission/removepermission Sid (CONFIRMED 2026-06-23):** Path uses the Sid
+  returned in the addpermission response (`$.Statement.Sid`). Using `{unique}` (synthetic)
+  returns 404 "No Policy found". Must capture `capture_soft: {"rp_statement_sid": "$.Statement.Sid"}`
+  from addpermission and use `{rp_statement_sid}` in the path.
+- **Product-bug blocker (5xx, CONFIRMED 2026-06-23):** `createrole` → 500
+  ContactAdminForAssistance. Blocks 8 role-mutation endpoints: `setrole`,
+  `addrolepolicybindings`, `removerolepolicybinding`, `removebulkrolepolicybindings`,
+  `setroletrustpolicy`, `deleterole`, `deletebulkrole`. File as support ticket.
+- **Entitlement blockers (CONFIRMED 2026-06-23):**
+  - `setpolicygroupbinding` → 403 "The group is not part of the project" (even with
+    real policy_id + real group_id. Project-membership wall.)
+  - `adduserpolicybinding` / `removeuserpolicybinding` → 403 "The user is not part
+    of the project". Same wall. GET `listuserpolicybindings` returns 200 for ANY
+    user_id (returns empty list, does not 404 unknown users).
+- **HEAVY-gated (SCP_RUN_HEAVY):** 14 endpoints — accesskey CRUD (`accesskeycreate`,
+  `accesskeyset`, `accesskeydelete`, `accesskeydeletebulk`, `accesskeysendtemporaryotp`),
+  iam-user CRUD (`createiamuser`, `updateiamuser`, `updateiamuserpassword`, `deleteiamuser`,
+  `deletebulkiamuser`), saml-provider (`createsamlprovider`, `setsamlprovider`,
+  `showsamlprovider`, `deletesamlproviders`). All in `iam-credentials-heavy` lifecycle.
+- **Blast-radius waived:** `deletepolicies` (DELETE /v1/policies/bulk) — live-verified
+  fans out to delete ALL account policies (832 attempts on live run). Covered in
+  `coverage_waivers.json`.
+- **account_id:** `ec11538abf8f46d2953539521f745366` (use for listiamuser path).
 
 ## networking / dns
 
@@ -722,18 +750,18 @@ duplicating. Add a new `##` section when you take on a new service.
 
 - **Host:** regional (`secretsmanager.<region>.<env>...`). 15 endpoints total (3 read, 12 write).
 - **Read-only coverage (smoke + read-chains, no mutations needed):**
-  - `listsecretsmanager` (`GET /v1/secrets`) — smoke GET, 200 confirmed 2026-06-20.
-  - `showsecretsmanager` (`GET /v1/secrets/{secret_id}`) — read-chain (list→show), 200 confirmed 2026-06-20.
-  - `listversion` (`GET /v1/secrets/{secret_id}/versions`) — read-chain (list→versions), 200 confirmed 2026-06-20.
+  - `listsecretsmanager` (`GET /v1/secrets`) — smoke GET, 200 confirmed.
+  - `showsecretsmanager` (`GET /v1/secrets/{secret_id}`) — read-chain (list→show), 200 confirmed.
+  - `listversion` (`GET /v1/secrets/{secret_id}/versions`) — read-chain (list→versions), 200 confirmed.
 - **All write endpoints require `SCP_ALLOW_MUTATIONS=true`** (lifecycle `security-secretsmanager-writes`).
-- **Create body quirks:** `private_acl_enabled` is STRING `"false"` (not boolean). `secret_value` is a JSON STRING (e.g. `"{\"k\":\"v\"}"` not an object). `kms_id` required (must be a real transit KMS key id). `acl_cidr` is a comma-separated CIDR string.
-- **version_list response:** `GET /v1/secrets/{secret_id}/versions` returns `{"count": N, "version_list": ["<version_id_string>", ...]}`. Items are bare version_id strings (NOT objects). Capture with `$.version_list[0]` (not `.id` field). Confirmed from response_example in api_docs.json.
-- **setsecretsmanagerlabel body:** `{"label": "<name>", "move_to_version_id": "<version_id>"}`. Using only `move_to_version_id` adds the label; using only `remove_from_version_id` removes it. Both together moves a label from one version to another. Label `CURRENT` is reserved for the active version; use custom label names like `PREVIOUS` for moves.
-- **showsecretsmanagersecretvalue (reveal):** `POST /v1/secrets/{secret_id}/values` with body `{"label": "CURRENT"}` or `{"version_id": "<id>"}`. This is distinct from `updatesecretsmanagersecretvalue` (`PUT .../values`).
-- **soft-delete / restore:** `DELETE /v1/secrets/{secret_id}` requires body `{"waiting_time_ndays": 7}` (NOT a plain DELETE). Soft-deleted secret can be restored via `PUT /v1/secrets/{secret_id}/restore` within the recovery window.
-- **setsecretsmanagerkmskey (`POST /v1/secrets/kms-key`):** Provisions a service-level KMS key for secrets manager. Body `{"service_name": ""}`. Returns 400/403 if service-level key already exists or permissions missing. Treat as optional (grouped).
-- **Lifecycle coverage:** `security-secretsmanager-writes` covers all 12 write endpoints. 5 endpoints added 2026-06-20: setsecretdescription, setsecretaclcidr, setprivateacl, updatesecretsmanagersecretvalue, setsecretsmanagerlabel (with list-versions capture step). 7 previously existed: createsecretsmanager, createsecretsmanagerkmskey, generaterandompassword, deletesecretsmanager, showsecretsmanagersecretvalue, setkmsid, restoresecretsmanager.
-- **Coverage 2026-06-20 (read-only run):** 3/15 (listsecretsmanager, showsecretsmanager, listversion). 12/15 expected when lifecycle runs with `SCP_ALLOW_MUTATIONS=true`. No entitlement blockers identified.
+- **Create body quirks:** `private_acl_enabled` is STRING `"false"` (not boolean). `secret_value` is a JSON STRING (e.g. `"{\"k\":\"v\"}"` not an object). `kms_id` required (must be a real transit KMS key id). `acl_cidr` field REQUIRED (cannot be omitted; ValidationError "Field required" if missing). `acl_cidr` prefix MUST be /25 or longer (API error: "prefix length must be 25 or greater"). Test environment runner IP is in `146.148.x.y` space (observed: .42.91, .98.137, .68.33) — use `146.148.42.0/25` as default (works when runner IP is in that /25; probabilistic).
+- **version_list response (CORRECTED 2026-06-23):** `GET /v1/secrets/{secret_id}/versions` returns version OBJECTS (not bare strings). Capture version_id with `$.version_list[0].version_id` (NOT `$.version_list[0]`). Error observed: using `$.version_list[0]` serializes the whole object as a string value causing 404 "Not found with ID {..object..}".
+- **setsecretsmanagerlabel body:** `{"label": "<name>", "move_to_version_id": "<version_id>"}`. SYSTEM labels (CURRENT, PREVIOUS) require BOTH `move_to_version_id` AND `remove_from_version_id` — error: `"not-allowed-system-label"`. Use CUSTOM labels (e.g. `"v1tag"`) with only `move_to_version_id` to avoid this constraint. CONFIRMED 2xx 2026-06-23.
+- **showsecretsmanagersecretvalue (reveal):** `POST /v1/secrets/{secret_id}/values` with body `{"label": "CURRENT"}`. Returns 400 `source-cidr-error` if calling IP is not in the secret's `acl_cidr`. This is an IP-based ACL check on reveal-value calls. CONFIRMED 2xx 2026-06-23 when runner IP in range.
+- **setsecretaclcidr body:** `{"acl_cidr": "<cidr>"}`. CIDR prefix must be /25 or longer (validated same as create). CONFIRMED 2xx 2026-06-23.
+- **soft-delete / restore:** `DELETE /v1/secrets/{secret_id}` requires body `{"waiting_time_ndays": 7}` (NOT a plain DELETE). Soft-deleted secret sets state="To be terminated" with 7-day wait before actual deletion — this is expected behavior, NOT leaked resources. Can be restored via `PUT /v1/secrets/{secret_id}/restore` within recovery window. CONFIRMED 2xx 2026-06-23.
+- **createsecretsmanagerkmskey (`POST /v1/secrets/kms-key`):** CONFIRMED 404 "NotFound" in this environment across all runs — endpoint path not routed. Permanent blocker unless platform enables this feature. Lifecycle step kept as optional (accepts 404).
+- **Coverage 2026-06-23:** 14/15 CONFIRMED 2xx. Only gap: `createsecretsmanagerkmskey` (404, endpoint not routed). Lifecycle `security-secretsmanager-writes` covers 11 write endpoints 2xx + 3 read 2xx from smoke = 14 total.
 
 ## management / servicewatch
 
