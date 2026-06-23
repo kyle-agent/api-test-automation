@@ -4,7 +4,7 @@
       "id": "security-certificatemanager-import-cover",
       "service": "security/certificatemanager",
       "enabled": true,
-      "_note": "Coverage probe for 2 write-only certificatemanager ops that cannot reach 2xx read-only: POST /v1/certificatemanager/check-validation (validatecertificate) and POST /v1/certificatemanager (createcertificate/import). CONFIRMED LIVE 2026-06-20: validatecertificate returns 400 scp-security.certificate.pem-format-private-key-error for ALL key types (RSA PKCS#1 BEGIN RSA PRIVATE KEY, PKCS#8 BEGIN PRIVATE KEY, EC BEGIN EC PRIVATE KEY) — this is a backend-side validation that rejects any private key regardless of format. The selfsign lifecycle (security-certificatemanager-selfsign in scenarios.json) covers the self-sign + read + delete path. The import lifecycle (security-certificatemanager-import in scenarios.json) is blocked until real CA-signed cert material is available. This fragment merely CALLS the two write ops with placeholder bodies as guarded optional steps (4xx expected, recorded as reached) so they appear in coverage when mutations are enabled. BODY FACTS (YYYYMMDD date format, confirmed 2026-06-20): selfsigncert requires cn, name, not_before_dt=YYYYMMDD, not_after_dt=YYYYMMDD, organization, recipients=[], region, tags=[], timezone='Asia/Seoul'. checknameduplication requires only {name}: returns 200 {result:false} (non-destructive read-style POST).",
+      "_note": "Coverage probe for 2 write-only certificatemanager ops that cannot reach 2xx read-only: POST /v1/certificatemanager/check-validation (validatecertificate) and POST /v1/certificatemanager (createcertificate/import). CONFIRMED LIVE 2026-06-20: validatecertificate returns 400 scp-security.certificate.pem-format-private-key-error for ALL key types (RSA PKCS#1 BEGIN RSA PRIVATE KEY, PKCS#8 BEGIN PRIVATE KEY, EC BEGIN EC PRIVATE KEY) — this is a backend-side validation that rejects any private key regardless of format. CONFIRMED LIVE 2026-06-23: createcertificate (import) required fields are cert_body, cert_chain, name, private_key, recipients, region, tags, timezone (8 fields) — without timezone gets 400 ValidationError 'Field required', with timezone added gets 500 scp-security.certificate.create-failed meaning it passed field validation but real CA-signed cert material is still needed for 2xx. The selfsign lifecycle (security-certificatemanager-selfsign in scenarios.json) covers the self-sign + read + delete path. The import lifecycle (security-certificatemanager-import in scenarios.json) is blocked until real CA-signed cert material is available. This fragment merely CALLS the two write ops with placeholder bodies as guarded optional steps (4xx expected, recorded as reached) so they appear in coverage when mutations are enabled. BODY FACTS (YYYYMMDD date format, confirmed 2026-06-20): selfsigncert requires cn, name, not_before_dt=YYYYMMDD, not_after_dt=YYYYMMDD, organization, recipients=[], region, tags=[], timezone='Asia/Seoul'. checknameduplication requires only {name}: returns 200 {result:false} (non-destructive read-style POST).",
       "steps": [
         {
           "name": "check-validation",
@@ -35,10 +35,11 @@
             "private_key": "-----BEGIN PRIVATE KEY-----\nMIIE-regression-placeholder\n-----END PRIVATE KEY-----",
             "recipients": [],
             "region": "{region}",
-            "tags": []
+            "tags": [],
+            "timezone": "Asia/Seoul"
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "_note": "CONFIRMED 2026-06-20: 5 required fields (cert_body, name, private_key, recipients, region) + cert_chain optional. One additional required field unknown beyond these 7. Also rejects all PEM key formats same as check-validation. Needs real CA-signed cert material."
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422, 500],
+          "_note": "CONFIRMED 2026-06-23: 8 required fields: cert_body, cert_chain, name, private_key, recipients, region, tags, timezone. Without timezone: 400 ValidationError 'Field required'. With timezone + fake PEM: 500 scp-security.certificate.create-failed (backend tries to parse PEM but it's not a real CA-signed cert). Both validatecertificate and createcertificate need real CA-signed cert+key material — the backend rejects ALL self-generated PEM private keys (RSA PKCS#1, PKCS#8, EC) with scp-security.certificate.pem-format-private-key-error. CONFIRMED on multiple openssl key types 2026-06-23."
         }
       ]
     }

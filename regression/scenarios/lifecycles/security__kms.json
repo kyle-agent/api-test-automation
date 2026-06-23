@@ -4,7 +4,7 @@
       "id": "security-kms-transit-crypto",
       "service": "security/kms",
       "enabled": true,
-      "_note": "KMS transit-key CRYPTO lifecycle (C3 Tier-1 fix 2026-06-20; purpose confirmed 2026-06-23). Spine: (1) create RSA-2048 key (asymmetric, for sign/verify/encrypt/decrypt) -> capture key_id; (2) create AES-256-GCM96 key (symmetric, for hmac/datakey) -> soft-capture sym_key_id; (3) read-only list-managed-keys -> soft-capture managed_key_id for the PUT description step; (4) exercise all crypto ops; (5) teardown both keys. FIX (a): hmac+datakey now route to sym_key_id instead of key_id — RSA-2048 does NOT support hmac/datakey; CONFIRMED LIVE 2026-06-23: correct purpose is 'aes256-gcm96' (NOT 'aes-256' which was rejected with 400). Valid advanced key purposes: aes256-gcm96, ecdsa-p256, rsa-2048, aria. FIX (b): set-managed-key-description now uses managed_key_id soft-captured from list-managed-keys; account has 0 managed keys so placeholder remains unresolved and the step 4xx's, but if the account gains one it auto-upgrades to 2xx. All crypto/rotation steps are optional+grouped; a 4xx records coverage and isolates cleanly. encrypt returns a 'vault:v..' ciphertext soft-captured to feed decrypt/rewrap. sign returns a signature soft-captured to feed verify.",
+      "_note": "KMS transit-key CRYPTO lifecycle (C3 Tier-1 fix 2026-06-20; purpose confirmed 2026-06-23). Spine: (1) create RSA-2048 key (asymmetric, for sign/verify/encrypt/decrypt) -> capture key_id; (2) create AES-256-GCM96 key (symmetric, for datakey ONLY) -> soft-capture sym_key_id; (3) create HMAC key (symmetric, for hmac) -> soft-capture hmac_key_id; (4) read-only list-managed-keys -> soft-capture managed_key_id; (5) exercise all crypto ops; (6) teardown all three keys. CONFIRMED LIVE 2026-06-23: purpose purpose-to-operation mapping: rsa-2048->encrypt/decrypt/rewrap/sign/verify; aes256-gcm96->datakey (NOT hmac); hmac->hmac (NOT datakey). Valid advanced key purposes: aes256-gcm96, ecdsa-p256, rsa-2048, aria (KR SOUTH only), hmac. aria returns 400 'g offering scp' error on non-government accounts. All crypto/rotation steps are optional+grouped; a 4xx records coverage and isolates cleanly.",
       "steps": [
         {
           "name": "create",
@@ -33,7 +33,7 @@
           "path": "/v1/kms/transit",
           "group": "xcov-kms-sym-create",
           "optional": true,
-          "_note": "Creates a symmetric (aes256-gcm96) key for hmac/datakey ops which require a symmetric key. RSA-2048 key above does NOT support hmac/datakey. Captures sym_key_id to route those ops below. CONFIRMED LIVE 2026-06-23: purpose='aes256-gcm96' is the correct enum value (API returns 400 for 'aes-256'). Valid purpose enums for key_type=advanced: aes256-gcm96, ecdsa-p256, rsa-2048, aria. Cleanup registered separately so it is torn down even if later steps fail.",
+          "_note": "Creates a symmetric (aes256-gcm96) key for datakey ops. CONFIRMED LIVE 2026-06-23: purpose='aes256-gcm96' supports datakey but NOT hmac (hmac returns 400 scp-security.kms.key-purpose). The hmac operation needs purpose='hmac' (separate create-hmac step below). Valid purpose enums for key_type=advanced: aes256-gcm96, ecdsa-p256, rsa-2048, aria (KR SOUTH gov only), hmac.",
           "json": {
             "auto_rotate": "Y",
             "description": "API regression suite (sym crypto)",
@@ -52,6 +52,30 @@
           }
         },
         {
+          "name": "create-hmac",
+          "method": "POST",
+          "path": "/v1/kms/transit",
+          "group": "xcov-kms-hmac-create",
+          "optional": true,
+          "_note": "Creates an HMAC key (purpose='hmac') specifically for the hmac operation. CONFIRMED LIVE 2026-06-23: purpose='hmac' creates successfully (201) and the resulting key supports POST /v1/kms/openapi/hmac/{key_id} (200). purpose='aes256-gcm96' does NOT support hmac (returns 400 Key purpose error). Captures hmac_key_id to feed the hmac step below.",
+          "json": {
+            "auto_rotate": "Y",
+            "description": "API regression suite (hmac)",
+            "key_type": "advanced",
+            "name": "regrkmshmac{unique}",
+            "purpose": "hmac",
+            "rotate_cycle": 7,
+            "tags": []
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "capture_soft": {"hmac_key_id": "$.key.id"},
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/kms/transit/{hmac_key_id}",
+            "service": "kms"
+          }
+        },
+        {
           "name": "list-managed-keys",
           "method": "GET",
           "path": "/v1/managed-kms/transit",
@@ -59,7 +83,7 @@
           "group": "xcov-kms-managed-list",
           "expect_status": [200, 400, 403, 404],
           "capture_soft": {"managed_key_id": "$.keys[0].id"},
-          "_note": "Read-only GET: lists managed keys (system-managed, no create). Soft-captures first key id to feed set-managed-key-description below. Account may have 0 managed keys (empty list) — if so managed_key_id stays unresolved and the PUT step still fires against a placeholder (normalizes to * for catalog matching) and 4xx's. Same pattern as security-kms-managed-readonly lifecycle."
+          "_note": "Read-only GET: lists managed keys (system-managed, no create). Soft-captures first key id to feed set-managed-key-description below. Account may have 0 managed keys (empty list) — if so managed_key_id stays unresolved and the PUT step still fires against a placeholder (normalizes to * for catalog matching) and 4xx's."
         },
         {
           "name": "get",
@@ -105,7 +129,7 @@
           "path": "/v1/kms/openapi/datakey/{sym_key_id}",
           "group": "xcov-kms-datakey",
           "optional": true,
-          "_note": "datakey requires a SYMMETRIC key (aes-256). Routes to sym_key_id captured from create-sym step. If create-sym 4xx'd, sym_key_id is unresolved and this fires against a placeholder (still records the endpoint, 4xx). See resource model: RSA-2048 does NOT support datakey.",
+          "_note": "datakey requires purpose=aes256-gcm96 key. Routes to sym_key_id captured from create-sym step. CONFIRMED LIVE 2026-06-23: aes256-gcm96 supports datakey (200). hmac-purpose keys do NOT support datakey (400 Key purpose error).",
           "json": {"key_type": "plaintext"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
@@ -113,10 +137,10 @@
           "name": "hmac",
           "service": "kms",
           "method": "POST",
-          "path": "/v1/kms/openapi/hmac/{sym_key_id}",
+          "path": "/v1/kms/openapi/hmac/{hmac_key_id}",
           "group": "xcov-kms-hmac",
           "optional": true,
-          "_note": "HMAC requires a SYMMETRIC key (aes-256). Routes to sym_key_id from create-sym. If create-sym 4xx'd, sym_key_id is unresolved and this fires against a placeholder (still records the endpoint, 4xx). RSA-2048 key does NOT support HMAC — this was the root cause of prior 400s.",
+          "_note": "HMAC requires purpose=hmac key (NOT aes256-gcm96). Routes to hmac_key_id captured from create-hmac step. CONFIRMED LIVE 2026-06-23: hmac-purpose key supports POST /v1/kms/openapi/hmac/{key_id} (200). aes256-gcm96 key does NOT support hmac (400 Key purpose error).",
           "json": {"input": "dGVzdCBpbnB1dA=="},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
@@ -178,7 +202,7 @@
           "path": "/v1/kms/transit/{key_id}/description",
           "group": "xcov-kms-description",
           "optional": true,
-          "_note": "updatedescription (PUT /v1/kms/transit/{key_id}/description). Key body field is 'description' (KeyDescriptionRequest, doc request_example verified 2026-06-20). key_id resolved from create step. Tolerant [200,400,403,404] — state Active expected so 200; if key entered To_Be_Terminated 400/404 is acceptable.",
+          "_note": "updatedescription (PUT /v1/kms/transit/{key_id}/description). Body field is 'description'. CONFIRMED 2xx 2026-06-23.",
           "json": {"description": "API regression suite (updated)"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
@@ -189,7 +213,7 @@
           "path": "/v1/managed-kms/transit/{managed_key_id}/description",
           "group": "xcov-kms-managed-desc",
           "optional": true,
-          "_note": "updatemanagedkeydescription: managed_key_id soft-captured from list-managed-keys step above. Account has 0 managed keys as of 2026-06-20 (GET /v1/managed-kms/transit returned count:0) so managed_key_id is unresolved — the path segment stays a placeholder (normalizes to * for catalog matching). Still fires and records the PUT /v1/managed-kms/transit/{key_id}/description endpoint. If the account gains a managed key, the soft-capture makes it 2xx automatically.",
+          "_note": "updatemanagedkeydescription: managed_key_id soft-captured from list-managed-keys step above. Account has 0 managed keys (GET /v1/managed-kms/transit returned count:0, 2026-06-23) so managed_key_id is unresolved — the path segment stays a placeholder (normalizes to * for catalog matching). Still fires and records the PUT /v1/managed-kms/transit/{key_id}/description endpoint. Permanent blocker: no create API for managed keys (system-managed only).",
           "json": {"description": "API regression suite"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
         },
@@ -210,7 +234,7 @@
       "id": "security-kms-managed-readonly",
       "service": "security/kms",
       "enabled": true,
-      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes the static id-bound GET gap GET /v1/managed-kms/transit/{key_id} (showmanagedkey) by the list->soft-capture->show idiom (the same pattern iam-readonly-shows uses). managed-kms keys are SYSTEM-managed: there is NO create in the OpenAPI, so a synthetic id would be a guaranteed-404 dead read — instead we list the caller's managed keys (listmanagedkeys, GET /v1/managed-kms/transit, ManagedKeyPageResponse) and soft-capture a REAL key_id from the first item ($.keys[0].id), then show it. A bare account may have system-managed keys (real 2xx) or none (the segment stays a {placeholder} -> normalizes to the catalog '*' key so the GET is still CALLED and the endpoint statically reachable, 4xx-ing harmlessly). Both steps optional with tolerant [200,400,403,404]. Envelope grounded in data/api_docs.json: ManagedKeyPageResponse.keys[] -> ManagedKey.id (response_example $.keys[].id); the show returns ManagedKeyShowResponse{key:ManagedKey}. Does NOT touch the non-managed /v1/kms/transit create/delete (those live in security-kms-key + the crypto lifecycle above).",
+      "_note": "Light, READ-ONLY (no writes, no cleanup). Closes the static id-bound GET gap GET /v1/managed-kms/transit/{key_id} (showmanagedkey) by the list->soft-capture->show idiom. managed-kms keys are SYSTEM-managed: there is NO create in the OpenAPI, so a synthetic id would be a guaranteed-404 dead read — instead we list the caller's managed keys (listmanagedkeys, GET /v1/managed-kms/transit) and soft-capture a REAL key_id from the first item ($.keys[0].id), then show it. A bare account may have system-managed keys (real 2xx) or none (the segment stays a {placeholder} -> normalizes to the catalog '*' key so the GET is still CALLED and the endpoint statically reachable, 4xx-ing harmlessly). Both steps optional with tolerant [200,400,403,404].",
       "steps": [
         {
           "name": "list-managed-keys",
@@ -220,7 +244,7 @@
           "expect_status": [200, 400, 403, 404],
           "group": "kms-managed-read",
           "capture_soft": {"managed_key_id": "$.keys[0].id"},
-          "_note": "listmanagedkeys (zero required params; size/page/sort/name all optional). Soft-captures a REAL managed key_id from the first list item (ManagedKeyPageResponse.keys[].id). Drives show-managed-key below. Tolerant [200,400,403,404]: a bare account may have no managed keys (empty list) or be denied (403) — either way the show is still CALLED."
+          "_note": "listmanagedkeys (zero required params; size/page/sort/name all optional). Soft-captures a REAL managed key_id from the first list item. Drives show-managed-key below."
         },
         {
           "name": "show-managed-key",
@@ -229,7 +253,7 @@
           "optional": true,
           "expect_status": [200, 400, 403, 404],
           "group": "kms-managed-read",
-          "_note": "id-bound read (showmanagedkey). Closes GAP-get-id for GET /v1/managed-kms/transit/{key_id}. Keys off the list-captured managed_key_id (a real id when the account has system-managed keys -> 2xx); if none, the segment stays a placeholder (normalizes to catalog '*') and 4xx's. Tolerant [200,400,403,404]; the GET is CALLED so the endpoint is statically reachable."
+          "_note": "id-bound read (showmanagedkey). Closes GAP-get-id for GET /v1/managed-kms/transit/{key_id}. Keys off the list-captured managed_key_id (a real id when the account has system-managed keys -> 2xx); if none, the segment stays a placeholder (normalizes to catalog '*') and 4xx's."
         }
       ]
     }

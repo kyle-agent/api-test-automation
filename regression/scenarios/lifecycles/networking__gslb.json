@@ -33,7 +33,7 @@
               {
                 "description": "API regression suite resource",
                 "destination": "192.0.2.10",
-                "region": "{region}",
+                "region": "kr-west-1",
                 "weight": 0
               }
             ],
@@ -97,7 +97,7 @@
               {
                 "description": "API regression suite",
                 "destination": "192.0.2.10",
-                "region": "{region}",
+                "region": "kr-west-1",
                 "weight": 0
               }
             ]
@@ -111,7 +111,7 @@
           "group": "gslb",
           "optional": true,
           "json": {
-            "region": "{region}",
+            "region": "kr-west-1",
             "status": "ENABLE"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
