@@ -9,4 +9,4 @@ Built by `console2/build_static.py` (no creds, no cloud, no running server).
 Simulate AND live both surface the same pre-baked SIMULATE run — there is no
 real execution in the snapshot.
 
-Baked: model=59 services / 275 resources; graphs=58 single-service (+2 multi) ; sample run=7 lifecycle(s) / 96 API steps.
+Baked: model=59 services / 275 resources; graphs=59 single-service (+2 multi) ; sample run=7 lifecycle(s) / 96 API steps.
