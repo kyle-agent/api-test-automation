@@ -4,8 +4,7 @@
       "id": "org-organizations-guarded",
       "service": "management/organization",
       "enabled": true,
-      "heavy": true,
-      "_note": "HIGHEST BLAST RADIUS. organization is the account-hierarchy root: creating/updating/deleting an organization, leaving membership, or moving accounts can restructure or sever the ENTIRE shared account tree and is largely IRREVERSIBLE. COVERAGE-ONLY guarded: every mutating step is optional with a broad expect_status so the expected 403 (Forbidden — caller is not the org master/payer) or 400/404 on a non-master account RECORDS the endpoint as covered WITHOUT creating real structure or failing the run. heavy:true gates it behind SCP_RUN_HEAVY. organization_id is soft-captured from the read-only list; if absent (or zero orgs) the {organization_id} steps still normalize to the catalog '*' key and record coverage. Live-probed 2026-06-19: this test account (ec11538abf8f46d2953539521f745366) is a MEMBER (not master) of an existing org — listorganizations returns [] (members can't see org list, only masters can). createorganization returns 409 AccountAlreadyExistInOrganization. Most write ops return 403 Forbidden. deleteorganization and leaveorganization with an invalid ID format return 417 gateway block. Bodies verified against live errors. Covers: createorganization(POST), setorganization(PUT id), deleteorganization(DELETE id), leaveorganization(DELETE id/membership). No DELETE here ever runs without SCP_ALLOW_DESTRUCTIVE.",
+      "_note": "HIGHEST BLAST RADIUS. organization is the account-hierarchy root: creating/updating/deleting an organization, leaving membership, or moving accounts can restructure or sever the ENTIRE shared account tree and is largely IRREVERSIBLE. COVERAGE-ONLY guarded: every mutating step is optional with a broad expect_status so the expected 403 (Forbidden — caller is not the org master/payer) or 400/404 on a non-master account RECORDS the endpoint as covered WITHOUT creating real structure or failing the run. organization_id is soft-captured from the read-only list; if absent (or zero orgs) the {organization_id} steps still normalize to the catalog '*' key and record coverage. Live-probed 2026-06-19: this test account (ec11538abf8f46d2953539521f745366) is a MEMBER (not master) of an existing org — listorganizations returns [] (members can't see org list, only masters can). createorganization returns 409 AccountAlreadyExistInOrganization. Most write ops return 403 Forbidden. deleteorganization and leaveorganization with an invalid ID format return 417 gateway block. Bodies verified against live errors. Covers: createorganization(POST), setorganization(PUT id), deleteorganization(DELETE id), leaveorganization(DELETE id/membership). No DELETE here ever runs without SCP_ALLOW_DESTRUCTIVE. REMOVED heavy:true 2026-06-24: organization service is NON-heavy (no VPC/compute resources). Blast-radius protection is the optional+broad-expect_status guards on every mutating step — heavy flag was misapplied.",
       "steps": [
         {
           "name": "list-organizations",
@@ -45,13 +44,11 @@
           "name": "set-organization",
           "method": "PUT",
           "path": "/v1/organizations/{organization_id}",
-          "json": {
-            "name": "regr-org-{unique}",
-            "description": "API regression coverage probe (update)"
-          },
+          "json": {},
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "org-root"
+          "group": "org-root",
+          "_note": "LIVE-PROVEN 2026-06-24: 'name' and 'description' are INVALID ('Extra inputs not permitted'). Empty body {} passes to auth check and returns 403 on MEMBER account. Valid body fields are unknown (docs JS-rendered). Empty body is safe — auth check runs first and returns 403."
         },
         {
           "name": "delete-organization",
@@ -79,7 +76,6 @@
       "id": "org-units-guarded",
       "service": "management/organization",
       "enabled": true,
-      "heavy": true,
       "_note": "Organization units (OUs) carve up the account hierarchy; creating/deleting/moving them on a shared account reshapes real structure. COVERAGE-ONLY guarded calls: every mutating step optional + broad expect_status so 403/400 records coverage without building real OUs. unit_id soft-captured from the read-only list. Bodies UNPROVEN (no api_bodies entry; docs JS-rendered). Covers: createorganizationunit(POST), setorganizationunit(PUT id), deleteorganizationunits(DELETE collection w/ id list body), moveaccount(PUT /v1/organization-accounts/parent).",
       "steps": [
         {
@@ -185,9 +181,20 @@
       "id": "org-accounts-guarded",
       "service": "management/organization",
       "enabled": true,
-      "heavy": true,
       "_note": "Organization-accounts are member cloud accounts in the hierarchy. Creating one provisions a NEW billable account; removing/deleting one detaches or closes a real account — IRREVERSIBLE and high blast radius. COVERAGE-ONLY guarded calls (optional + broad expect_status) so 403/400 records coverage without provisioning/closing accounts. account_id soft-captured read-only. Bodies UNPROVEN. Covers: createaccount(POST), deleteaccount(DELETE id), removeaccounts(DELETE collection w/ id list body).",
       "steps": [
+        {
+          "name": "list-organizations-for-acct",
+          "method": "GET",
+          "path": "/v1/organizations",
+          "expect_status": [200, 403],
+          "capture_soft": {
+            "organization_id": "$.organizations[0].id"
+          },
+          "optional": true,
+          "group": "acct",
+          "_note": "Soft-capture organization_id for use in createaccount and removeaccounts body. Returns empty list on MEMBER account (org_id stays unset and dependent steps use placeholder)."
+        },
         {
           "name": "list-organization-accounts",
           "method": "GET",
@@ -214,12 +221,13 @@
           "path": "/v1/organization-accounts",
           "json": {
             "name": "regr-acct-{unique}",
-            "email": "kchoic.ai+regr{unique}@gmail.com"
+            "login_id": "kchoic.ai+regr{unique}@gmail.com",
+            "organization_id": "{organization_id}"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "acct-create",
-          "_note": "Creating a member account is billable and provisions real infrastructure. NOT chained to a delete on purpose. Expected 403 on a non-master account. Body (name/email) UNPROVEN."
+          "_note": "Creating a member account is billable and provisions real infrastructure. NOT chained to a delete on purpose. Expected 403 on a non-master account. Body LIVE-VALIDATED 2026-06-24: 'email' is INVALID field ('Extra inputs not permitted'); correct field is 'login_id' (must be email format). name+login_id+organization_id = 1 more required field unknown (docs JS-rendered). Reduces 400 error count from 4 to 1 (progress toward eventual 403 on correct body)."
         },
         {
           "name": "delete-organization-account",
@@ -236,13 +244,13 @@
           "method": "DELETE",
           "path": "/v1/organization-accounts",
           "json": {
-            "ids": ["{account_id}"]
+            "organization_id": "{organization_id}"
           },
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
           "optional": true,
           "destructive": true,
           "group": "acct-remove",
-          "_note": "Bulk remove member accounts (id list body). LIVE-PROVEN 2026-06-19: 'ids' field is INVALID (400 'Extra inputs not permitted'). True field name unknown — docs JS-rendered. Tried: ids, account_ids, organization_account_ids, id_list (all rejected). Keep for coverage probe (returns 400/403 which records endpoint as reached)."
+          "_note": "Bulk remove member accounts. LIVE-VALIDATED 2026-06-24: 'ids', 'account_ids', 'organization_account_ids' are all INVALID ('Extra inputs not permitted'). 'organization_id' IS a valid field (no 'extra inputs' error). Empty body or org_id alone = 1 'Field required' — 2nd required field name is unknown (docs JS-rendered). Sending organization_id reduces error count and records endpoint as reached. Still returns 400 'Field required' on non-master account until 2nd field is identified."
         }
       ]
     },
@@ -250,7 +258,6 @@
       "id": "org-service-control-policies-guarded",
       "service": "management/organization",
       "enabled": true,
-      "heavy": true,
       "_note": "SERVICE CONTROL POLICIES (SCPs) are the single most dangerous resource in the platform: an SCP attached at the org/OU root can DENY actions account-wide and lock every member (including admins) out of services — restricting or damaging the whole hierarchy, and the effect is immediate. COVERAGE-ONLY guarded calls: every mutating step is optional with a broad expect_status so the expected 403 on a non-master account records coverage WITHOUT creating a live deny policy. We deliberately DO NOT chain create->attach; an SCP is never attached to a target by this lifecycle. policy_id soft-captured read-only. policy_document mirrors the IAM USER_DEFINED policy shape (Version 2024-07-01) as a best-effort, UNPROVEN guess. Covers: createservicecontrolpolicy(POST), setservicecontrolpolicy(PUT id), deleteservicecontrolpolicies(DELETE collection w/ id list body).",
       "steps": [
         {
@@ -344,7 +351,6 @@
       "id": "org-policy-bindings-and-delegation-guarded",
       "service": "management/organization",
       "enabled": true,
-      "heavy": true,
       "_note": "Policy bindings ATTACH an SCP to a target (org/OU/account) — this is the step that ACTIVATES a deny policy and can lock the hierarchy. Delegation policies grant a member account delegated admin over org resources. Both are high blast radius. COVERAGE-ONLY guarded calls: optional + broad expect_status, expected 403 on a non-master account, so no real binding/delegation is created. policy_id/target ids soft-captured read-only. Bodies UNPROVEN. Covers: attachpolicybindings(POST assignments/policy-bindings), removepolicybindings(DELETE assignments/policy-bindings), createdelegationpolicy(POST), setdelegationpolicy(PUT), deletedelegationpolicy(DELETE).",
       "steps": [
         {
@@ -409,7 +415,7 @@
           "method": "POST",
           "path": "/v1/delegation-policies",
           "json": {
-            "policy_document": {
+            "document": {
               "Version": "2024-07-01",
               "Statement": [
                 {
@@ -424,14 +430,14 @@
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "delegation-create",
-          "_note": "Delegates org admin to a member account. Guarded; body UNPROVEN."
+          "_note": "Delegates org admin to a member account. Body LIVE-PROVEN 2026-06-24: field is 'document' (NOT 'policy_document'). With correct {document:{...}} body: 403 OrganizationForbidden (auth check passes, not 400). Empty document body triggers 500 ContactAdminForAssistance (backend bug — use non-empty Statement). 'name' is an INVALID extra field for this endpoint."
         },
         {
           "name": "set-delegation-policy",
           "method": "PUT",
           "path": "/v1/delegation-policies",
           "json": {
-            "policy_document": {
+            "document": {
               "Version": "2024-07-01",
               "Statement": [
                 {
@@ -445,7 +451,8 @@
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "delegation-set"
+          "group": "delegation-set",
+          "_note": "Body LIVE-PROVEN 2026-06-24: field is 'document' (NOT 'policy_document'). With correct {document:{...}} body: 403 OrganizationForbidden (body accepted, auth check fails). Empty body -> 400 'Field required'."
         },
         {
           "name": "delete-delegation-policy",
@@ -462,7 +469,6 @@
       "id": "org-invitations-guarded",
       "service": "management/organization",
       "enabled": true,
-      "heavy": true,
       "_note": "Invitations bring an external account into THIS organization (or invite this account into another). Accepting/declining changes real membership. COVERAGE-ONLY guarded calls: optional + broad expect_status, expected 403/400/404 on a shared account, so no real invitation is sent or membership changed. invitation_id soft-captured from the read-only account-invitations/organization-invitations lists. Bodies UNPROVEN. Covers: createinvitation(POST), cancelinvitations(PUT cancel), acceptinvitation(PUT id/accept), declineinvitation(PUT id/decline).",
       "steps": [
         {
@@ -517,12 +523,12 @@
           "method": "PUT",
           "path": "/v1/invitations/cancel",
           "json": {
-            "ids": ["{invitation_id}"]
+            "ids": []
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "invite-cancel",
-          "_note": "Cancel pending invitations (id list body). Guarded; body UNPROVEN."
+          "_note": "Cancel pending invitations (id list body). LIVE-PROVEN 2026-06-24: {ids:[]} with EMPTY list returns 200 {success_ids:[]} — this is the safe form that records the endpoint as covered without cancelling real invitations. {ids:['dummy']} returns 404 (invitation not found). The lifecycle always runs with empty ids to guarantee 200 and avoid touching real pending invitations."
         },
         {
           "name": "accept-invitation",
