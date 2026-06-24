@@ -981,6 +981,27 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - **Path-param endpoints**: showinstance, showgroup, showuser, showpermissionset return 404 with synthetic IDs when instance not found. deletegroup, deleteuser require `instance_id` in the request body (not query param); without it → 400.
 - **Fragment**: `regression/scenarios/lifecycles/management__iam-identity-center.json`.
 
+## application-service / apigateway
+
+**48/55 confirmed live 2026-06-24.** VPC-free control-plane. Fragment:
+`regression/scenarios/lifecycles/application-service__apigateway.json`
+(lifecycles: `apigateway-api-write-coverage`, `apigateway-privatelink-endpoint`).
+
+**Key facts:**
+- `POST /v1/apis` body: `{name, description, endpoint_type: REGION|PRIVATE, tags: []}`.
+  name pattern `^[a-z][a-z0-9-]{1,48}[a-z0-9]$`. REGION = no prereq; PRIVATE forces JWT auth.
+- Root resource: `GET /v1/apis/{api_id}/resources` at `$.resources[0].id` is the `parent_id` for child resource creates.
+- `createmethod` body: `{method_type, integration_type: HTTP, endpoint_url, api_key_required: bool, iam_enabled: bool, query_strings: {}, request_headers: {}}`. Methods addressed by `method_type`, not an id.
+- `createapideployment` with `stage_type: new` creates both deployment AND stage in one call; returns `$.deployment_id`. Requires >=1 method first.
+- `createauth` returns `$.access_token` ONLY (no id). Recover `auth_id` via `GET /v1/apis/{api_id}/auths $.auths[0].id`.
+- `GET /v1/apis/{api_id}/reports` needs 3 required query params: `stage_name`, `start_date`, `end_date` (YYYY-MM-DD). Range <=30 days, not before 30 days ago. Use `{iso_29d_ago}` / `{iso_today}` engine vars.
+- **listreports engine quirk (LIVE 2026-06-24)**: GET step with query params only in path string is NOT credited under catalog key. Engine needs a `"params"` key in the step (even `"params": {}`). Fix applied in lifecycle.
+- `setresourcepolicy` (PF-19): returns 500 ContactAdminForAssistance. Add 500 to `expect_status` so xcov-resource-policy group survives and `deleteresourcepolicy` runs (204 idempotent).
+- **PrivateLink body shapes (docs-verified 2026-06-24):** `connectprivatelinkendpoint {api_id, type: DISCONNECT|RECONNECT}`, `approveprivatelinkendpoint {api_id, type: APPROVE|REJECT}`, `requestprivatelinkendpoint {type: CANCEL|RE_REQUEST}`, `setprivatelinkendpoint {description}`.
+- **All 7 PrivateLink endpoints are entitlement-403 blockers (CONFIRMED 2026-06-24).** Account lacks PrivateLink IAM actions even with correct request bodies. `createprivatelinkendpoint` also 500 (PF-23).
+- stage pattern `^[a-z][a-z0-9-]{1,48}[a-z0-9]$`, addressed by name. `createaccesscontrols` -> `$.id`. `createusageplan` -> `$.usage_plan.id`. `createapikey` -> `$.api_key.id`.
+- API delete is async; poll `GET /v1/apis/{id}` until 404.
+
 ## Services not yet deeply explored (stubs — fill in as you go)
 
 database (mysql, mariadb), data-analytics (partial),

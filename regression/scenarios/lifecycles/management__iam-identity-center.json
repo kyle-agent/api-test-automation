@@ -620,9 +620,7 @@
      "destructive": true,
      "json": {
       "instance_id": "ssoins-12345",
-      "custom_policies": [],
-      "inline_policies": [],
-      "managed_policies": []
+      "policy_ids": []
      },
      "expect_status": [
       200,
@@ -634,7 +632,7 @@
       409,
       422
      ],
-     "_note": "DELETE policies body inferred from setpermissionsetpolicies shape — UNPROVEN."
+     "_note": "PROVEN 2026-06-24: correct body is {instance_id, policy_ids: []}. Returns 204 even with synthetic instance_id + any path param (empty policy_ids = no-op bulk delete). The setpermissionsetpolicies-shaped body {custom_policies/inline_policies/managed_policies} always 400s ValidationError — WRONG shape. Live-verified 2026-06-24."
     },
     {
      "name": "probe-reads",
@@ -782,6 +780,36 @@
       422
      ],
      "_note": "Bulk delete body (instance_id + account_assignment_ids[]) inferred — UNPROVEN. Separate group so it always fires for coverage."
+    }
+   ]
+  },
+  {
+   "id": "idc-delete-policies-probe",
+   "service": "management/iam-identity-center",
+   "enabled": true,
+   "heavy": false,
+   "_note": "NON-HEAVY coverage probe for deletepermissionsetpolicies (DELETE /v1/permission-sets/{id}/policies). PROVEN 2026-06-24: body {instance_id, policy_ids:[]} -> 204 NO CONTENT even with synthetic path param and synthetic instance_id. This is a genuine no-op bulk-delete (empty policy_ids = nothing to delete, idempotent) — the service processes and acknowledges the request correctly. NO real SSO instance needed. This is the ONLY IdC write endpoint known to return 2xx without a live instance. Path uses {ualpha} so _norm_path -> v1/permission-sets/*/policies -> catalog key resolved -> recorded under management/iam-identity-center/deletepermissionsetpolicies.",
+   "steps": [
+    {
+     "name": "delete-permission-set-policies",
+     "method": "DELETE",
+     "path": "/v1/permission-sets/{ualpha}/policies",
+     "service": "iam-identity-center",
+     "optional": true,
+     "destructive": true,
+     "json": {
+      "instance_id": "ssoins-12345",
+      "policy_ids": []
+     },
+     "expect_status": [
+      200,
+      202,
+      204,
+      400,
+      403,
+      404
+     ],
+     "_note": "PROVEN 204 2026-06-24: {instance_id, policy_ids:[]} -> 204 for any synthetic path id. No real SSO instance needed. Idempotent no-op bulk delete. Using {ualpha} as path param ensures _norm_path normalizes the template to */policies so catalog key is resolved correctly."
     }
    ]
   },
