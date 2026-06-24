@@ -189,6 +189,13 @@
       "classification": "Product Bug",
       "since": "2026-06-24",
       "note": "PUT /v1/cloud-functions/{fn_id}/configurations/privatelink-endpoints/{endpoint_id}/connection -> 404 scp-cloud-function.privatelink-endpoint-not-found even when endpoint_id IS valid. Same root cause as approveprivatelinkendpoint: SCF consumer-side connect endpoint is non-functional. Connection state changes (DISCONNECT/RECONNECT) must go through VPC's PUT /v1/privatelink-endpoints/{id}/connection. Live-tested 2026-06-24 in HEAVY PL run."
+    },
+    {
+      "key": "compute/scf/updateprivatelinkservice+deletecloudfunction",
+      "status": 400,
+      "classification": "Product Bug",
+      "since": "2026-06-24",
+      "note": "PrivateLink Service teardown DEADLOCK. SCF PLS can get permanently stuck in CREATING state (privatelink_service_id stays null for hours). PUT .../configurations/privatelink-services {privatelink_service_enabled:false} -> 400 scp-cloud-function.privatelink-service-not-allow-state-error ('deactivation not allowed when Creating state'). DELETE /v1/cloud-functions/{id} -> 400 scp-cloud-function.function-not-deletable-error ('Deleting allowed only when PrivateLink Service is disabled and PrivateLink Endpoint does not exist'). => stuck-CREATING PLS can neither be disabled nor force the function to delete: the function is un-teardownable via API. Live-confirmed 2026-06-24 HEAVY PL run on regrw5trg57f68be7 (9e231b01e2394d7aaa8dcca218e770cb) + regrw5trgd7ff680d (3aac2e34203a42cab56b089336bbd18d); both still stranded. Needs backend timeout of the CREATING state or console/support intervention."
     }
   ]
 }
