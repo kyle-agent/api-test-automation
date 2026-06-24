@@ -589,13 +589,33 @@ duplicating. Add a new `##` section when you take on a new service.
     (body shape incomplete but endpoint is reachable)
   - `cancelinvitations`, `acceptinvitation`, `declineinvitation` → 404 (no pending
     invitations) — reachable, not 403
-- **Proven body fields (2026-06-19):**
+- **`cancelinvitations` (PUT /v1/invitations/cancel) PROVEN 200 2026-06-24:**
+  `{"ids": []}` (empty list) returns 200 `{success_ids:[]}`. This is safe — an
+  empty list cancels nothing, confirming the endpoint without affecting real data.
+  `{"ids": ["real-id"]}` returns 404 (invitation not found). Lifecycle now uses
+  empty list to guarantee 200.
+- **Proven body fields (2026-06-19 + 2026-06-24):**
   - `createorganizationunit`: needs `name` + `parent_unit_id` (validated: these fields
     move response from 400 to 403, confirming field names are correct)
-  - `moveaccount`: needs `account_id` + `parent_unit_id` (NOT `parent_id` — `parent_id`
-    gives 400 "Extra inputs not permitted")
+  - `moveaccount`: needs `organization_id` + `parent_unit_id` (CONFIRMED 2026-06-24;
+    NOT `account_id` which gives 'Extra inputs not permitted'. Together they leave 1
+    'Field required' — third field unknown). NOTE: previous doc was WRONG about
+    `account_id` being the correct field; `organization_id` + `parent_unit_id` = 1 remaining.
   - `createinvitation`: needs `organization_id` (validated field) + 1 unknown field
-    (docs JS-rendered, not captured; `email`, `message`, `login_id` are all invalid)
+    (docs JS-rendered; `email`, `message`, `login_id`, `account_id` are all invalid)
+  - `createaccount`: `email` is INVALID ('Extra inputs not permitted'). Correct field
+    is `login_id` (must be email-format string). `name` + `login_id` + `organization_id`
+    = 1 more required field unknown. (CONFIRMED 2026-06-24)
+  - `createdelegationpolicy` / `setdelegationpolicy`: field is `document` NOT
+    `policy_document`. `{document:{Version:'2024-07-01', Statement:[...]}}` returns 403
+    (body accepted, auth check fails). `{document:{}}` triggers 500 ContactAdmin bug.
+    `name` field is invalid for both create+set delegation policy. (CONFIRMED 2026-06-24)
+  - `setorganization`: `name` and `description` are both INVALID ('Extra inputs not
+    permitted'). Empty body `{}` returns 403 (auth check passes). Valid update fields
+    are unknown (docs JS-rendered). (CONFIRMED 2026-06-24)
+  - `removeaccounts`: `ids`, `account_ids`, `organization_account_ids` all INVALID.
+    `organization_id` is valid (no extra-inputs error). `organization_id` alone still
+    leaves 1 field required. Second required field unknown. (CONFIRMED 2026-06-24)
   - `listservicecontrolpolicies`: required query param `organization_id`
   - `listorganizationunits`: required query param `parent_unit_id` ('ROOT' for root level)
 - **Response envelopes (live-proven):**
@@ -603,11 +623,16 @@ duplicating. Add a new `##` section when you take on a new service.
   - `listaccountinvitations` → `$.account_invitations[0].id`
   - Inferred (403 so not confirmed live): `organization_units`, `service_control_policies`,
     `organization_accounts`, `organization_invitations`
-- **Coverage ceiling:** 2/37 without org-master privilege. All 37 endpoints probed
-  and observations recorded. The 35-gap is blocked by entitlement-403 (org-master
-  required for most ops). Coverage would rise to potentially 25+ on an org-master
-  account (the read + write ops that return 403 here would return 200/201).
-- **Coverage 2026-06-19:** 0 → **2 / 37**. All 37 endpoints reached and classified.
+- **Lifecycle heavy flag removed 2026-06-24:** org lifecycles were incorrectly marked
+  `heavy: true` which blocked them without `SCP_RUN_HEAVY`. Organization creates no
+  VPC/compute resources — `heavy` flag was a blast-radius guard but all steps already
+  have `optional: true` + broad `expect_status`. All 6 lifecycles now run without
+  `SCP_RUN_HEAVY`. This exposed 28 previously-never-reached endpoints.
+- **Coverage ceiling:** 3/37 without org-master privilege. All 37 endpoints are now
+  canonically reached and classified. The 34-gap is blocked by entitlement-403 (org-master
+  required for most ops). Coverage would rise to ~25+ on an org-master account.
+- **Coverage 2026-06-24:** 2 → **3 / 37** (+1: `cancelinvitations` → 200).
+  All 37 endpoints reached (32 canonical soft/ok + 5 newly probed id-bound).
 
 ---
 
@@ -681,27 +706,34 @@ duplicating. Add a new `##` section when you take on a new service.
     the auto-derive cannot handle. The lifecycle uses the CORRECT path (/v2/users/addrbooks).
   Account has 0 events, 0 event-policies, 0 addrbooks. Scenario uses numeric placeholder,
   normalizes to catalog '*' key.
-- **puteventpolicy body shape (CONFIRMED cascade-revealed 2026-06-19):**
+- **puteventpolicy body shape (CONFIRMED cascade-revealed 2026-06-19, isLogMetric corrected 2026-06-24):**
   Must wrap all fields in `eventPolicyRequest` key. Required cascade-field order:
   `disableYn`, `isLogMetric`, `eventLevel`, `ftCount`, `eventThreshold`. Once all
   present the API returns `{"code":"InvalidRequest","params":[null]}` — backend
   business rule validation fails (products in NE state). Full confirmed body:
   `{"eventPolicyRequest": {"eventPolicyName": "...", "productTypeCode": "Object Storage",
   "productResourceId": "apitest-logsink", "metricKey": "<key>", "eventLevel": "WARNING",
-  "disableYn": "N", "isLogMetric": false, "eventThreshold": 100.0, "ftCount": 1}}`.
+  "disableYn": "N", "isLogMetric": "N", "eventThreshold": 100.0, "ftCount": 1}}`.
+  **CRITICAL 2026-06-24: `isLogMetric` MUST be string "N"/"Y" not boolean false/true.**
+  With boolean false: 400 `params[{name:"resourceType",value:"eventPolicyRequest.isLogMetric"}]`
+  (field validation fails). With string "N": passes field validation, proceeds to business-rule
+  check which then returns 400 InvalidRequest params=[null] (NE state blocker).
   The `InvalidRequest` with `null` params is an account-level blocker (products not
   enrolled in monitoring). **Classify: account-prereq / entitlement-class blocker.**
-- **getmetricperfdatalist body shape (CONFIRMED cascade-revealed 2026-06-19):**
+- **getmetricperfdatalist body shape (CONFIRMED cascade-revealed 2026-06-19, updated 2026-06-24):**
   POST `/v1/cloudmonitorings/product/v2/metric-data`. Required fields:
   `productTypeCode`, `productResourceId`, `queryStartDt` (ISO 8601 with T/Z suffix),
   `queryEndDt` (ISO 8601 with T/Z suffix), `metricDataConditions` (array of objects).
   Without T-suffix dates: 400 `resourceType=queryStartDt` backend bug. With T-suffix
   dates: 404 `productResourceInfos not found` — same account-level prereq.
-  Example body: `{"productTypeCode":"Object Storage","productResourceId":"apitest-logsink",
+  **Alternative body shape (tested 2026-06-24): `productResourceInfos` array instead of
+  `productResourceId` scalar.** Both formats return 404 params[productResourceInfos not found].
+  Neither format gets past the NE-state blocker. Example body:
+  `{"productTypeCode":"Object Storage","productResourceId":"apitest-logsink",
   "queryStartDt":"2026-05-21T00:00:00Z","queryEndDt":"2026-06-19T23:59:59Z",
   "metricDataConditions":[{"metricKey":"objectstorage.usage.bucketSizeBytes",
   "statisticType":"AVG","period":3600}]}`.
-  **Classify: account-prereq / products not in monitoring backend.**
+  **Classify: account-prereq / products not in monitoring backend (NE state).**
 - **Mutating endpoints (3):** `puteventpolicy` (POST create), `modifyeventpolicy`
   (PUT), `deleteeventpolicy` (DELETE). All need `SCP_ALLOW_MUTATIONS=true` +
   `SCP_ALLOW_DESTRUCTIVE=true`. Body shape now confirmed from cascade (see above).
@@ -721,19 +753,33 @@ duplicating. Add a new `##` section when you take on a new service.
   ones. This means `cloudmonitoring-readonly-shows` and `cloudmonitoring-event-policy`
   lifecycles only run during the CRUD pass (not the smoke pass). The smoke test
   records what it can (bare GETs), and direct probes fill in the rest.
-- **Coverage 2026-06-20:** **6/18** confirmed 2xx ok:
+- **modifyeventpolicy and deleteeventpolicy probe (ADDED 2026-06-24):**
+  These endpoints were previously never reached (blocked by cm-policy group failure).
+  Added `probe-modify-event-policy` (PUT, group=cm-probe-modify) and
+  `probe-delete-event-policy` (DELETE, group=cm-probe-delete) steps to lifecycle.
+  These use `{eventPolicyId}` path template (maps to catalog key via _norm_path '*' match)
+  so they ARE recorded under management/cloudmonitoring/modifyeventpolicy and
+  management/cloudmonitoring/deleteeventpolicy respectively. With literal unfilled
+  placeholder in path: API returns 400 InvalidInputValue. With real ID: 400 or 404.
+  These steps always run (own group, not blocked by cm-policy group failure).
+  CONFIRMED 2026-06-24: DELETE /event-policies/999 -> 404 ResourceNotFound params[eventPolicyId].
+  PUT /event-policies/999 -> 400 InvalidRequest params=[null] (NE state blocker).
+- **Coverage 2026-06-24:** **6/18** confirmed 2xx ok (same as 2026-06-20):
   getaccountmembers, getadressbooklist, getmetriclist, getproducttypelist (smoke);
   getaccountproductlist (X-ResourceType: Object Storage -> 200 confirmed + recorded);
   getproducteventpolicylist (X-ResourceType + productResourceId -> 200 confirmed + recorded).
-  ALL 14 non-mutating endpoints now have observations.jsonl entries.
-  Remaining 12 gap:
-  - backend-bug: getaccounteventlist, getproducteventlist, geteventpolicyhistories
-    (date-misparse, no workaround)
-  - account-prereq: puteventpolicy, modifyeventpolicy, deleteeventpolicy,
-    getmetricperfdatalist (products not enrolled in monitoring backend)
-  - no-real-id: geteventdetail, geteventnotificationstates, geteventpolicydetail,
-    geteventpolicynotification, getadressbookmemberlist (0 events/policies/addrbooks)
-    — all REACHABLE (404 with numeric id), will 2xx when real IDs exist.
+  **ALL 18 endpoints now have observations.jsonl entries (0 never-reached).**
+  Progress from 2 never-reached to 0: added probe steps for modifyeventpolicy and deleteeventpolicy.
+  Remaining 12 gap (all classified):
+  - backend-bug-400: getaccounteventlist, getproducteventlist, geteventpolicyhistories
+    (date-misparse, no client workaround exists)
+  - account-prereq-400: puteventpolicy, modifyeventpolicy, deleteeventpolicy
+    (products in NE state, monitoring backend not enrolled)
+  - account-prereq-404: getmetricperfdatalist
+    (productResourceInfos lookup fails, products NE state)
+  - no-real-id-404: geteventdetail, geteventnotificationstates, geteventpolicydetail,
+    geteventpolicynotification, getadressbookmemberlist
+    (0 events/policies/addrbooks in account — all REACHABLE, will 2xx when real IDs exist)
 
 ---
 
@@ -918,6 +964,22 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - Show/create response envelope: `{devops_service: {id, account_id, tenant_name, tenant_code, status, console_url, created_at, ...}}`. Capture: `$.devops_service.id`.
 - `smoke.py _required_param_candidates`: added `{tenant_code: _DUP_NAME}` candidate for `/check-duplication` path (2026-06-23). Before this fix, smoke sent `{name:}` which 400'd on devopsservice.
 - Account IAM user id (owner): `f2b627e6bf4f4b3996f04de4f877bd11` (name: kyuh.choi+areg1@samsung.com, account_id: ec11538abf8f46d2953539521f745366).
+
+## management / iam-identity-center (SSO)
+
+- **32 endpoints** total: listinstances, createinstance, showinstance, setinstance, deleteinstance; listgroups, creategroup, showgroup, setgroup, deletegroup, deletebulkgroups; listgroupusers, createbulkgroupusers, deletebulkgroupusers; listusers, createuser, showuser, setuser, deleteuser, deletebulkusers; listpermissionsets, createpermissionset, showpermissionset, setpermissionset, deletepermissionset, listpermissionsetpolicies, setpermissionsetpolicies, deletepermissionsetpolicies; listaccountassignments, createaccountassignment, deleteaccountassignment, deletebulkaccountassignments.
+- **Coverage: 2/32** (2026-06-24): `listinstances` (200 empty list), `deletepermissionsetpolicies` (204 no-op).
+- **Account entitlement BLOCKER**: `POST /v1/instances` returns 403 `{code: identity-center.InstanceCreateNotAllowedAccount, detail: "Allow to create identity center only for organization's management account"}`. This account is NOT the org management account. All instance creates are permanently blocked. Non-management accounts can only READ (if an instance exists) or perform no-op empty-list deletes.
+- **Account state**: `GET /v1/instances` returns 200 with `{count: 0, instances: []}` — no SSO instance provisioned.
+- **Required query param `instance_id`**: listgroups, listusers, listpermissionsets, listaccountassignments, showgroup, showuser, showpermissionset, listgroupusers, listpermissionsetpolicies all require `instance_id` as a query param. Without it → 400 ValidationError. With synthetic `ssoins-12345` → 404 ResourceNotFound. listaccountassignments additionally requires `target_account_id`.
+- **deletepermissionset** requires `instance_id` as a QUERY PARAM (not body). Without it → 400; with it → 404 (synthetic).
+- **deletepermissionsetpolicies 204 no-op pattern**: `DELETE /v1/permission-sets/{any_id}/policies` with body `{"instance_id": "<any_string>", "policy_ids": []}` returns **204 NO CONTENT** regardless of the path/instance_id validity. This is an idempotent empty-list delete — the backend short-circuits when `policy_ids` is empty and returns success without touching any resources. This is the ONLY IdC endpoint that returns 2xx without a real SSO instance. Proven 2026-06-24.
+- **WRONG BODY for deletepermissionsetpolicies**: The `setpermissionsetpolicies`-shaped body `{custom_policies:[], inline_policies:[], managed_policies:[]}` always 400s ValidationError. Correct body: `{instance_id: "<str>", policy_ids: []}`.
+- **Non-heavy lifecycle `idc-delete-policies-probe`**: exercises deletepermissionsetpolicies with correct body `{instance_id, policy_ids:[]}` and path `{ualpha}` (so `_norm_path` normalizes to `*/policies` → catalog key resolved → recorded as 2xx).
+- **Heavy lifecycle (all other writes)**: `idc-instance`, `idc-user`, `idc-group`, `idc-permission-set`, `idc-account-assignment` — all REACHABILITY-ONLY (4xx expected). These can only 2xx if the account is upgraded to org management account.
+- **listinstances**: No params, returns 200 with empty list when no instance exists. The only unconditionally-200 endpoint.
+- **Path-param endpoints**: showinstance, showgroup, showuser, showpermissionset return 404 with synthetic IDs when instance not found. deletegroup, deleteuser require `instance_id` in the request body (not query param); without it → 400.
+- **Fragment**: `regression/scenarios/lifecycles/management__iam-identity-center.json`.
 
 ## Services not yet deeply explored (stubs — fill in as you go)
 

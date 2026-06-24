@@ -33,7 +33,7 @@
               "metricKey": "objectstorage.usage.bucketSizeBytes",
               "eventLevel": "WARNING",
               "disableYn": "N",
-              "isLogMetric": false,
+              "isLogMetric": "N",
               "eventThreshold": 100.0,
               "ftCount": 1
             }
@@ -49,7 +49,7 @@
             "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
             "service": "cloudmonitoring"
           },
-          "_note": "puteventpolicy (CREATE). Body CONFIRMED via cascade probing 2026-06-19: must wrap in 'eventPolicyRequest' key. Required fields confirmed: eventPolicyName, productTypeCode, productResourceId, metricKey, eventLevel, disableYn, isLogMetric, eventThreshold, ftCount. Currently returns 400 InvalidRequest null params because account products have state NE (not enrolled in monitoring backend). Blocker: account-prereq. On 4xx the group isolates; the POST is still recorded under its catalog key."
+          "_note": "puteventpolicy (CREATE). Body CONFIRMED via cascade probing 2026-06-24: must wrap in 'eventPolicyRequest' key. Required fields confirmed: eventPolicyName, productTypeCode, productResourceId, metricKey, eventLevel, disableYn, isLogMetric (string 'N' not boolean), eventThreshold, ftCount. isLogMetric must be string 'N'/'Y' not boolean (confirmed 2026-06-24: boolean false -> 400 'isLogMetric' error; string 'N' passes field validation). Currently returns 400 InvalidRequest null params because account products have state NE (not enrolled in monitoring backend). Blocker: account-prereq. On 4xx the group isolates; the POST is still recorded under its catalog key."
         },
         {
           "name": "show-event-policy",
@@ -72,7 +72,7 @@
               "metricKey": "objectstorage.usage.bucketSizeBytes",
               "eventLevel": "CRITICAL",
               "disableYn": "Y",
-              "isLogMetric": false,
+              "isLogMetric": "N",
               "eventThreshold": 90.0,
               "ftCount": 3
             }
@@ -80,7 +80,7 @@
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "cm-policy",
-          "_note": "modifyeventpolicy (PUT). Body uses same confirmed shape as create-event-policy (eventPolicyRequest wrapper). Only runs if create-event-policy succeeds and captures eventPolicyId. Account-prereq blocker applies."
+          "_note": "modifyeventpolicy (PUT). Body uses same confirmed shape as create-event-policy (eventPolicyRequest wrapper, isLogMetric as string 'N'). Only runs if create-event-policy succeeds and captures eventPolicyId. Account-prereq blocker applies."
         },
         {
           "name": "delete-event-policy",
@@ -91,6 +91,38 @@
           "group": "cm-policy",
           "destructive": true,
           "_note": "If create captured no id (and the soft list capture also found none), {eventPolicyId} stays literal and the DELETE normalizes to the catalog '*' key (records coverage) and 404s harmlessly."
+        },
+        {
+          "name": "probe-modify-event-policy",
+          "method": "PUT",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+          "json": {
+            "eventPolicyRequest": {
+              "eventPolicyName": "regrcmep-probe",
+              "productTypeCode": "Object Storage",
+              "productResourceId": "apitest-logsink",
+              "metricKey": "objectstorage.usage.bucketSizeBytes",
+              "eventLevel": "CRITICAL",
+              "disableYn": "Y",
+              "isLogMetric": "N",
+              "eventThreshold": 90.0,
+              "ftCount": 3
+            }
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422],
+          "optional": true,
+          "group": "cm-probe-modify",
+          "_note": "modifyeventpolicy coverage probe. Uses {eventPolicyId} placeholder (maps to '*' via _norm_path, resolving to catalog key management/cloudmonitoring/modifyeventpolicy). Runs in its own group (cm-probe-modify) so it is never skipped by cm-policy group failure. If ctx has a real eventPolicyId (from create), sends a real PUT request. If not, sends literal {eventPolicyId} in path -> 400 InvalidInputValue (endpoint still reached and recorded under catalog key). CONFIRMED 2026-06-24: PUT /event-policies/999 -> 400 InvalidRequest (NE-state product), DELETE /event-policies/999 -> 404 (no such policy). Body uses confirmed shape (isLogMetric as string 'N', confirmed 2026-06-24)."
+        },
+        {
+          "name": "probe-delete-event-policy",
+          "method": "DELETE",
+          "path": "/v1/cloudmonitorings/event/v2/event-policies/{eventPolicyId}",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409],
+          "optional": true,
+          "group": "cm-probe-delete",
+          "destructive": true,
+          "_note": "deleteeventpolicy coverage probe. Uses {eventPolicyId} placeholder (maps to '*' via _norm_path, resolving to catalog key management/cloudmonitoring/deleteeventpolicy). Runs in its own group (cm-probe-delete), never skipped by cm-policy failure. If ctx has a real eventPolicyId (from create), sends a real DELETE. If not, sends literal {eventPolicyId} in path -> 400 or 404. CONFIRMED 2026-06-24: DELETE /event-policies/999 -> 404 ResourceNotFound params[name=resourceType, value=eventPolicyId] — endpoint is structurally reachable."
         },
         {
           "name": "get-metric-perf-data",
