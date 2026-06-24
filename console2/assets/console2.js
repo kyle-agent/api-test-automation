@@ -25,6 +25,7 @@ let screen = "build";       // build | run
 let lastGraph = null;       // last /api/graph response (composition DAG)
 let graphTimer = null;      // debounce for /api/graph
 let modalSvc = null;        // service short id whose resource modal is open
+let defSvc = null;          // service whose 📖 definition viewer is open (read-only)
 let collapsed = null;       // Set of collapsed category names (menu-tree). null = not yet initialised
 let ownedScan = null;       // last /api/owned result {status, owned, owned_total} for the run-screen panel
 
@@ -85,11 +86,12 @@ function init() {
     const id = Object.keys(N).find(i => N[i].lifecycle);
     if (id) targets.add(id);
   }
-  // a ?service=<cat>/<svc> deep-link (the dashboard's per-service "console2 →"
+  // a ?service=<cat>/<svc> deep-link (the dashboard's per-service "Platform →"
   // links) overrides the default and pre-selects that service.
   deepLinkService();
   wireNav();
   wireModal();
+  wireDefModal();
   wireLaunch();
   wireSuites();
   go("build");
@@ -97,7 +99,7 @@ function init() {
 
 // ---- ?service=<cat>/<svc> deep-link (from the dashboard's per-service links) ----
 // If present and resolvable to a selectable service, REPLACE the default selection
-// with that whole service so the dashboard "console2 →" links land here focused on
+// with that whole service so the dashboard "Platform →" links land here focused on
 // it. Accepts the full slug ("networking/vpc") or a bare short name ("vpc"); a miss
 // is silent (keeps the default). Returns true iff it changed the selection.
 function deepLinkService() {
@@ -348,6 +350,7 @@ function drawSvcTree() {
             <span class="tchk svc">${st === "on" ? "✓" : st === "partial" ? "◐" : ""}</span>
             <span class="tname">${esc(shortName(svc))}${heavy ? ' <span class="glyph" title="heavy 포함">🜂</span>' : ""}${quota ? ' <span class="glyph q" title="quota 제약">⛔</span>' : ""}</span>
             <span class="tcount">${fracTxt}</span>
+            <button class="tdef" data-def-svc="${esc(svc)}" title="📖 정의 보기 — 이 서비스의 생애주기·엔드포인트·지식(read-only)">📖</button>
             ${noLc
               ? '<span class="tdep" title="생애주기 없음 — 의존전용">의존전용</span>'
               : `<button class="tres ${st === "partial" ? "pick" : ""}" data-res-svc="${esc(svc)}" title="특정 리소스만 선택">리소스…</button>`}
@@ -377,7 +380,7 @@ function drawSvcTree() {
   });
   // service row click = toggle whole service
   els("#svcWrap .tsvc-row[data-svc]").forEach(row => row.onclick = ev => {
-    if (ev.target.closest("[data-res-svc]")) return;   // the "리소스…" button has its own handler
+    if (ev.target.closest("[data-res-svc]") || ev.target.closest("[data-def-svc]")) return;  // buttons have their own handlers
     const svc = row.dataset.svc;
     if (!svcSelectable(svc).length) return;             // 의존전용 row — not selectable
     setSvc(svc, svcState(svc) !== "on");
@@ -387,6 +390,11 @@ function drawSvcTree() {
   els("#svcWrap [data-res-svc]").forEach(b => b.onclick = ev => {
     ev.stopPropagation();
     openModal(b.dataset.resSvc);
+  });
+  // "📖" → read-only definition viewer (lifecycle + endpoints + knowledge)
+  els("#svcWrap [data-def-svc]").forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    openDefinition(b.dataset.defSvc);
   });
   selReadout();
 }
@@ -589,6 +597,95 @@ function drawModalBody() {
     drawModalBody();
     selectionChanged();
   });
+}
+
+// ================= 📖 definition viewer (READ-ONLY) =================
+// Surfaces a service's TEST DEFINITION (runnable lifecycle steps + each resource's
+// create/verify/delete endpoints, request options, dependencies — from the model)
+// and the accumulated KNOWLEDGE facts (knowledge/*.md paragraphs that mention it).
+// Pure read: opening it never touches the selection, the DAG, or any run.
+function wireDefModal() {
+  const close = () => closeDefinition();
+  $("def-close").onclick = close;
+  $("def-scrim").onclick = close;
+  $("def-done").onclick = close;
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && defSvc) close(); });
+}
+function openDefinition(svc) {
+  defSvc = svc;
+  $("def-title").textContent = "📖 정의 — " + shortName(svc);
+  $("def-svc").textContent = svc;
+  $("def-body").innerHTML = '<p class="empty">정의 불러오는 중…</p>';
+  $("def-modal").classList.add("open");
+  $("def-scrim").classList.add("open");
+  const q = "?service=" + encodeURIComponent(svc);
+  Promise.all([
+    fetch("/api/lifecycles" + q).then(r => r.json()).catch(e => ({ error: String(e && e.message || e) })),
+    fetch("/api/knowledge" + q).then(r => r.json()).catch(e => ({ error: String(e && e.message || e) })),
+  ]).then(([lc, kn]) => { if (defSvc === svc) renderDefBody(lc, kn); });
+}
+function closeDefinition() {
+  $("def-modal").classList.remove("open");
+  $("def-scrim").classList.remove("open");
+  defSvc = null;
+}
+function renderDefBody(lc, kn) {
+  const defm = mth => `<span class="defm defm-${esc((mth || "").toLowerCase())}">${esc(mth || "·")}</span>`;
+  const depName = x => esc((x && x.ref) ? x.ref : x) + (x && x.count > 1 ? `×${x.count}` : "");
+  let h = "";
+  // ---- runnable lifecycles (the ordered steps the engine executes) ----
+  if (lc && lc.error) {
+    h += `<div class="def-sec"><h4>생애주기</h4><p class="err">${esc(lc.error)}</p></div>`;
+  } else if (lc) {
+    const lcs = lc.lifecycles || [];
+    h += `<div class="def-sec"><h4>생애주기 <span class="muted small">${lcs.length}개 · 엔진이 실행하는 단계 (생성→검증→삭제)</span></h4>`;
+    if (!lcs.length) h += '<p class="muted small">정의된 생애주기 없음 (의존전용 서비스일 수 있음).</p>';
+    lcs.forEach(L => {
+      const steps = L.steps || [];
+      h += `<details class="def-lc"><summary><b>${esc(L.id)}</b>${L.heavy ? ' <span class="bdg heavy">🜂 heavy</span>' : ""}${L.enabled === false ? ' <span class="bdg off">disabled</span>' : ""} <span class="muted small">${L.n_steps || steps.length} steps</span></summary><ol class="def-steps">`;
+      steps.forEach(s => {
+        h += `<li>${defm(s.method)}<code>${esc(s.path || "")}</code>${s.kind ? `<span class="kind">${esc(s.kind)}</span>` : ""}${s.optional ? ' <span class="muted small">optional</span>' : ""}</li>`;
+      });
+      h += "</ol></details>";
+    });
+    h += "</div>";
+  }
+  // ---- resource definitions (endpoints · request options · dependencies) ----
+  if (lc && lc.resources) {
+    const rs = lc.resources;
+    h += `<div class="def-sec"><h4>리소스 <span class="muted small">${rs.length}개 · 엔드포인트·요청옵션·의존</span></h4>`;
+    rs.forEach(r => {
+      h += `<details class="def-res"><summary><b>${esc(r.code || r.id)}</b> <span class="prov ${r.provenance === "VALIDATED" ? "val" : "docs"}">${esc(r.provenance)}</span>${r.heavy ? ' <span class="bdg heavy">🜂</span>' : ""}${r.quota ? ' <span class="bdg q">⛔ quota</span>' : ""}</summary>`;
+      (r.api || []).forEach(a => {
+        const parts = (a.endpoint || "").split(" ");
+        h += `<div class="def-apirow"><span class="phase ${esc(a.phase)}">${esc(a.phase)}</span>${defm(parts[0])}<code>${esc(parts.slice(1).join(" "))}</code></div>`;
+      });
+      if ((r.options || []).length) {
+        h += '<div class="def-opts"><span class="def-lbl">요청 옵션</span>';
+        r.options.forEach(o => { h += `<span class="opt${o.required ? " req" : ""}">${esc(o.name)}<span class="ty">${esc(o.type)}</span>${o.ref_target ? `→${esc(o.ref_target)}` : ""}</span>`; });
+        h += "</div>";
+      }
+      const d = r.deps || {};
+      if ((d.and || []).length) h += `<div class="def-deps"><span class="def-lbl">의존(필수)</span> ${d.and.map(depName).join(", ")}</div>`;
+      if ((d.one_of || []).length) h += `<div class="def-deps"><span class="def-lbl">택1</span> ${d.one_of.map(depName).join(" | ")}</div>`;
+      if ((d.creds || []).length) h += `<div class="def-deps"><span class="def-lbl">자격</span> ${d.creds.map(esc).join(", ")}</div>`;
+      h += "</details>";
+    });
+    h += "</div>";
+  }
+  // ---- knowledge facts (filtered view of knowledge/*.md) ----
+  if (kn && kn.error) {
+    h += `<div class="def-sec"><h4>지식</h4><p class="err">${esc(kn.error)}</p></div>`;
+  } else if (kn) {
+    const facts = kn.facts || [];
+    h += `<div class="def-sec"><h4>지식 <span class="muted small">knowledge/*.md · ${facts.length} facts${kn.truncated ? "+" : ""}</span></h4>`;
+    if (!facts.length) h += '<p class="muted small">이 서비스에 매칭된 지식 항목 없음.</p>';
+    facts.forEach(f => {
+      h += `<details class="def-fact"><summary><span class="kfile">${esc(f.file)}</span>${f.anchor ? ` › <span class="kanchor">${esc(f.anchor)}</span>` : ""}</summary><pre class="ksnip">${esc(f.snippet)}</pre></details>`;
+    });
+    h += "</div>";
+  }
+  $("def-body").innerHTML = h || '<p class="empty">정의 없음.</p>';
 }
 
 // ================= launch bar (carry selection into ②) =================
@@ -848,16 +945,25 @@ function renderStagedPreview() {
   }
   if (host.dataset.preview === item.id && stagedScene) return;   // already showing this item
   if (stagedScene) { stagedScene.destroy(); stagedScene = null; }
+  // 현재 여유(headroom) + 부족 badge live in #sp-headroom/#sp-overbadge (filled by
+  // updateStagedPreviewBudget from the cap poll) so "그림 보고 → 바로 실행" has the
+  // budget context right by the button, without rebuilding the DAG scene each poll.
   host.dataset.preview = item.id;
-  host.innerHTML = `<div class="nowbar"><span class="dot" style="background:var(--accent)"></span>
-      <b>대기열 미리보기</b> · <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · 폐포 ${item.closure} · VPC ${item.peak_vpcs || 0} 필요${item.heavy ? " 🜂" : ""}</span>
-      <span class="muted small" style="margin-left:auto">실행 전 미리보기 — 실제 실행은 좌측 [▶ 실행]</span></div>
+  host.innerHTML = `<div class="nowbar sp-head"><span class="dot" style="background:var(--accent)"></span>
+      <b>대기열 미리보기</b>
+      <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · 폐포 ${item.closure} · VPC <b>${item.peak_vpcs || 0}</b> 필요 · 현재 여유 <b id="sp-headroom">…</b>${item.heavy ? " · 🜂 heavy" : ""}</span>
+      <span class="sp-act">
+        <span id="sp-overbadge"></span>
+        <button class="minibtn go" id="sp-run" title="이 계획을 실제 실행(LIVE) — cap 아래면 ADMIT, 아니면 대기 큐로">▶ 실행</button>
+      </span></div>
     <div class="legend" id="sp-legend"></div>
     <div class="stage-wrap"><div class="stage" id="sp-stage">
         <svg id="sp-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
         <div class="hint-pill" id="sp-hint"></div>
         <div class="zoomctl"><button id="sp-zin" title="확대">+</button><button id="sp-zout" title="축소">−</button><button id="sp-zfit" class="fit" title="전체 보기">맞춤</button></div>
       </div></div>`;
+  $("sp-run").onclick = () => runStaged(item);     // ▶ 실행 right by the DAG (그림 → 실행)
+  updateStagedPreviewBudget();                     // fill 현재 여유 / 부족 badge now (and on each cap poll)
   $("sp-legend").innerHTML = legend([["#e6effd", "★ 대상"], ["#fffaf0", "■ 공유(dedup)"], ["#f3eefc", "↓ 의존"]])
     + '<span>합성 배포 DAG · 레벨 = 생성 순서</span>';
   fetch("/api/graph", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item.selection) })
@@ -875,6 +981,24 @@ function renderStagedPreview() {
       if (host.dataset.preview === item.id)
         $("sp-svg").innerHTML = '<text x="12" y="24" fill="#cf222e">graph: ' + esc(e.message) + "</text>";
     });
+}
+
+// update ONLY the 현재 여유 number + 부족 badge in the open preview header, in place,
+// from the latest /api/capacity (so the cap poll keeps it live without rebuilding the
+// DAG scene). No-op unless a staged preview is the active 흐름 content.
+function updateStagedPreviewBudget() {
+  const host = $("report-main");
+  if (!host || runId || !host.dataset.preview) return;
+  const hr = $("sp-headroom"); if (!hr) return;
+  const item = STAGED.find(x => x.id === host.dataset.preview);
+  const ob = $("sp-overbadge");
+  const c = lastCapacity;
+  if (!c || !item) { hr.textContent = "…"; if (ob) ob.innerHTML = ""; return; }
+  const headroom = c.headroom != null ? c.headroom
+    : Math.max(0, (c.cap || 0) - ((c.baseline || 0) + (c.reserved || 0)));
+  hr.textContent = headroom;
+  if (ob) ob.innerHTML = (item.peak_vpcs || 0) > headroom
+    ? '<span class="sp-over" title="필요 VPC > 여유 — 실행하면 대기 큐로 들어갑니다">여유 부족 → 대기 큐</span>' : "";
 }
 
 // [▶ 실행] — commit ONE staged item: POST /api/run for its selection (the server
@@ -919,7 +1043,7 @@ function startCapPoll() {
     fetch("/api/capacity").then(r => r.json()).then(c => {
       if (c.error) return;
       lastCapacity = c;
-      if (screen === "run") { drawCapBar(); drawStagedPanel(); drawLeftover(); }
+      if (screen === "run") { drawCapBar(); drawStagedPanel(); drawLeftover(); updateStagedPreviewBudget(); }
     }).catch(() => { /* transient — keep last good capacity */ })
       .finally(() => { if (screen === "run") capTimer = setTimeout(tick, 2000); });
   };
@@ -936,13 +1060,22 @@ function drawCapBar() {
     return;
   }
   const cap = c.cap || 0;
-  const used = (c.baseline || 0) + (c.reserved || 0);
-  const headroom = c.headroom != null ? c.headroom : Math.max(0, cap - used);
+  const baseline = c.baseline || 0;          // 기존 — 서버 시작 시점 계정 VPC (내 실행 아님)
+  const reserved = c.reserved || 0;          // 내 실행 예약 (in-flight)
+  // 현재 계정 VPC = /v1/vpcs 실측(지금 실제 떠 있는 것). 내가 돌린 것 + 기존 + 타 세션 포함.
+  const acct = c.account_live != null ? c.account_live : baseline;
+  const headroom = c.headroom != null ? c.headroom : Math.max(0, cap - baseline - reserved);
   const running = c.running || [], queued = c.queued || [];
   const idTail = id => (id || "").slice(-6);
-  // a cap-cell meter: one cell per VPC slot, filled = used (baseline + reserved).
+  // meter: one cell per cap slot. Fill by the LIVE account count first ('live' =
+  // 지금 실제 떠 있는 VPC), then my not-yet-created reservations ('resv'), rest 여유.
+  const liveN = Math.min(cap, acct);
+  const resvN = Math.min(Math.max(0, cap - liveN), reserved);
   const cells = [];
-  for (let i = 0; i < cap; i++) cells.push(`<i class="${i < used ? "on" : ""}"></i>`);
+  for (let i = 0; i < cap; i++) {
+    const cls = i < liveN ? "live" : (i < liveN + resvN ? "resv" : "");
+    cells.push(`<i class="${cls}"></i>`);
+  }
   const runChips = running.length
     ? running.map(r => `<button class="capchip run" data-runid="${esc(r.id)}" title="${esc(r.id)} — 리포트 열기">
         <span class="kindtag">${esc(idTail(r.id))}</span> ${r.peak_vpcs || 0} VPC${r.heavy ? " 🜂" : ""}</button>`).join("")
@@ -953,8 +1086,11 @@ function drawCapBar() {
     : '<span class="muted small">없음</span>';
   host.innerHTML = `<div class="panel cap-panel">
     <h2>실행 용량 <span class="muted small">· VPC 동시 실행 한도 (cap) — ADMIT/대기 큐</span></h2>
-    <div class="cap-head"><b>VPC ${used}/${cap}</b> <span class="muted">· 여유 ${headroom}</span></div>
+    <div class="cap-head"><b>현재 계정 VPC ${acct}/${cap}</b>
+      <span class="muted small">· 지금 실제 떠 있는 실측 (/v1/vpcs · 내 실행 + 기존 포함)</span></div>
     <div class="cap-meter">${cells.join("")}</div>
+    <div class="cap-sub muted small">기존 <b>${baseline}</b> · 내 실행 예약 <b>${reserved}</b> · 여유 <b>${headroom}</b>
+      <span class="cap-key"><i class="live"></i>떠 있음 <i class="resv"></i>내 예약 <i></i>여유</span></div>
     <div class="cap-grp"><span class="cap-lbl">진행중 (${running.length})</span><span class="cap-chips">${runChips}</span></div>
     <div class="cap-grp"><span class="cap-lbl">대기 (${queued.length})</span><span class="cap-chips">${queChips}</span></div>
   </div>`;
@@ -1709,7 +1845,13 @@ function reportR3() {
   } else {
     body = calls.map(apiRow).join("");
   }
-  $("detail-body").innerHTML = `<h3 class="detail-h">API <span class="muted small">· ${d.agg ? "런 전체" : "이 라이프사이클"} — 행 클릭 → 요청·응답·파라미터 스키마</span></h3>
+  // 📖 정의 link(s) for the service(s) this scope's calls belong to (lifecycle→service
+  // via the model) — jump from "what ran" to "what the definition + knowledge say".
+  const defSvcs = [...new Set(calls.map(c => ((MODEL && MODEL.lifecycles || {})[c._lc || c.lifecycle] || {}).service).filter(Boolean))];
+  const defLinks = defSvcs.slice(0, 3).map(s =>
+    `<button class="deflink" data-defsvc="${esc(s)}" title="📖 ${esc(s)} 정의 — 생애주기·엔드포인트·지식">📖 ${esc(shortName(s))}</button>`).join("")
+    + (defSvcs.length > 3 ? `<span class="muted small">+${defSvcs.length - 3}</span>` : "");
+  $("detail-body").innerHTML = `<h3 class="detail-h">API <span class="muted small">· ${d.agg ? "런 전체" : "이 라이프사이클"} — 행 클릭 → 요청·응답·파라미터 스키마</span> ${defLinks}</h3>
     <div class="kpi">
       <div class="s"><b>${calls.length}</b><span>api 호출</span></div>
       <div class="s"><b style="color:var(--ok)">${okN}</b><span>ok</span></div>
@@ -1725,6 +1867,8 @@ function reportR3() {
     expandedApi = expandedApi === k ? null : k;
     keepDetailScroll(reportR3);
   });
+  // 📖 정의 link → open the read-only definition viewer for that service
+  els("#detail-body [data-defsvc]").forEach(b => b.onclick = () => openDefinition(b.dataset.defsvc));
 }
 
 // the set of param NAMES this call actually SENT — query params (object keys) +
