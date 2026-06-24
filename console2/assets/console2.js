@@ -170,6 +170,14 @@ function wireNav() {
   // detail sub-tabs (자원·API·로그) — switch the DETAIL pane's tab; the master 흐름
   // scene is persistent and untouched by a tab switch.
   els("#detail-subtabs button").forEach(b => b.onclick = () => { setDetailTab(b.dataset.d); });
+  // 🌐 런타임 뷰 — open the current live-resource topology in a separate popup.
+  // Static demo (no backend) → baked snapshot; live server → the dynamic endpoint.
+  const rl = $("runtimeLink");
+  if (rl) rl.onclick = (e) => {
+    e.preventDefault();
+    const url = window.__C2_STATIC__ ? "runtime.html" : "runtime";
+    window.open(url, "scp-runtime", "width=1320,height=900,scrollbars=yes,resizable=yes");
+  };
 }
 function go(scr) {
   screen = scr;
