@@ -307,7 +307,7 @@
       "service": "networking/vpc",
       "enabled": true,
       "heavy": true,
-      "_note": "Closes privatelink-services: POST /v1/privatelink-services, PUT/DELETE /v1/privatelink-services/{id}. (privatelink-ENDPOINTS POST/PUT/DELETE are already covered elsewhere and out of scope.) Body from data/api_bodies.json (networking/vpc/createprivatelinkservice) -> UNPROVEN. Needs a real connected_resource_id (a load balancer) + security_group_ids + a subnet under a VPC; we adopt the shared VPC and create our own subnet, but the connected_resource_id is a {unique} placeholder we do not own, so the create likely 4xx's. All steps optional+grouped+broad expect_status. capture envelope $.privatelink_service.id UNPROVEN. heavy:true (real VPC fallback + would-be billable service).",
+      "_note": "Closes privatelink-services: POST /v1/privatelink-services, GET list, GET show, GET connected-endpoints, PUT set, DELETE. CONFIRMED LIVE 2026-06-24: IP-type PLS (connected_resource_type=IP with two IPs in subnet CIDR) reaches ACTIVE in ~30s without a real load balancer. capture envelope $.privatelink_service.id CONFIRMED. PLS DELETE must wait until all PLEs are removed (409 exist-connected-endpoint otherwise). heavy:true (real VPC + subnet).",
       "steps": [
         {
           "name": "create-vpc",
@@ -404,15 +404,16 @@
           "path": "/v1/privatelink-services",
           "group": "pls",
           "optional": true,
+          "_note": "IP-type PLS: uses connected_resource_type=IP with two IPs from the subnet CIDR. No real load balancer required. CONFIRMED LIVE 2026-06-24: reaches ACTIVE in ~30s. connected_resource_ip_address REQUIRED when type=IP (same value as connected_resource_id). service_ip_address must also be provided.",
           "json": {
             "approval_type": "AUTO",
-            "connected_resource_id": "{unique}",
-            "connected_resource_ip_address": "10.124.0.6",
-            "connected_resource_type": "LB",
+            "connected_resource_id": "10.128.7.10",
+            "connected_resource_ip_address": "10.128.7.10",
+            "connected_resource_type": "IP",
             "description": "API regression privatelink service",
             "high_speed_transfer": false,
             "name": "regrpls{unique}",
-            "service_ip_address": "10.124.0.5",
+            "service_ip_address": "10.128.7.5",
             "subnet_id": "{subnet_id}",
             "tags": []
           },
@@ -2902,7 +2903,9 @@
           "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/request",
           "group": "ple",
           "optional": true,
-          "json": {},
+          "json": {
+            "type": "CANCEL"
+          },
           "expect_status": [
             200,
             201,
@@ -2913,7 +2916,7 @@
             409,
             422
           ],
-          "_note": "Closes requestprivatelinkendpoint (PUT .../request). Fires with placeholder id -> 4xx but still records the endpoint as reached."
+          "_note": "Closes requestprivatelinkendpoint (PUT .../request). Body: {type: CANCEL|RE_REQUEST}. CANCEL from REQUESTING → CANCELED; RE_REQUEST from CANCELED → REQUESTING. CONFIRMED LIVE 2026-06-24. Fires with placeholder id -> 4xx but still records the endpoint as reached."
         },
         {
           "name": "approve-privatelink-endpoint",
@@ -2944,7 +2947,9 @@
           "path": "/v1/privatelink-endpoints/{privatelink_endpoint_id}/connection",
           "group": "ple",
           "optional": true,
-          "json": {},
+          "json": {
+            "type": "DISCONNECT"
+          },
           "expect_status": [
             200,
             201,
@@ -2955,7 +2960,7 @@
             409,
             422
           ],
-          "_note": "Closes connectprivatelinkendpoint (PUT .../connection). Fires with placeholder id -> 4xx."
+          "_note": "Closes connectprivatelinkendpoint (PUT .../connection). Body: {type: DISCONNECT|RECONNECT}. DISCONNECT from ACTIVE → DISCONNECTED; RECONNECT from DISCONNECTED → ACTIVE. CONFIRMED LIVE 2026-06-24. Fires with placeholder id -> 4xx."
         },
         {
           "name": "set-privatelink-endpoint",
