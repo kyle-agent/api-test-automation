@@ -151,6 +151,33 @@ duplicating. Add a new `##` section when you take on a new service.
   - VPC budget `core.budgets` live count can be wrong (API eventually-consistent).
     Always `GET /v1/vpcs` to confirm actual live count before running VPC-consuming lifecycles.
   - **29/95 covered** as of 2026-06-23 (up from 13 at start of session).
+- **VPC PrivateLink service (PLS) — CONFIRMED LIVE 2026-06-24 (all 14/14 PL endpoints covered):**
+  - `POST /v1/privatelink-services` required fields (flat, no wrapper):
+    `name` (3-20 chars, lowercase+digits+hyphens), `subnet_id`, `approval_type` (AUTO|MANUAL),
+    `connected_resource_type` (IP|LB), `connected_resource_id` (IP string),
+    `connected_resource_ip_address` (required when type=IP; same as connected_resource_id),
+    `secondary_connected_resource_id` (secondary IP), `service_ip_address`,
+    `high_speed_transfer` (bool), `tags: []`. No body wrapper key.
+  - **IP type PLS works without a real load balancer.** Use `connected_resource_type: IP` with
+    two IPs within the subnet CIDR — no LB needed. PLS reaches ACTIVE in ~30 seconds.
+  - **State machine (PLS):** CREATING → ACTIVE (after ~30s). MANUAL approval makes PLEs go to
+    REQUESTING state; AUTO makes them go ACTIVE directly.
+  - **`setprivatelinkservice` (PUT /v1/privatelink-services/{id})** body: `{description}` only.
+  - **`requestprivatelinkendpoint` (PUT /v1/privatelink-endpoints/{id}/request)** body:
+    `{type: CANCEL|RE_REQUEST}`. CANCEL from REQUESTING → CANCELED; RE_REQUEST from CANCELED
+    → REQUESTING.
+  - **`approveprivatelinkendpoint`** body: `{type: APPROVE|REJECT}`. Only works when PLE is in
+    REQUESTING state (MANUAL PLS). APPROVE → CREATING → ACTIVE.
+  - **`connectprivatelinkendpoint`** body: `{type: DISCONNECT|RECONNECT}`. DISCONNECT from
+    ACTIVE → DISCONNECTED; RECONNECT from DISCONNECTED → ACTIVE.
+  - **`setprivatelinkendpoint`** body: `{description}`.
+  - **Delete order:** PLEs first (DELETE /v1/privatelink-endpoints/{id}), wait for all PLEs to
+    be 404, then delete PLS (DELETE /v1/privatelink-services/{id}). PLS DELETE → 409
+    `exist-connected-endpoint` until all PLEs are gone.
+  - VPC create returns 201 (not 200/202); body: top-level fields not wrapped.
+  - Subnet create: POST /v1/subnets (NOT /v1/vpcs/{id}/subnets); body: top-level fields
+    `{name, cidr, type: GENERAL, vpc_id, tags: []}`. Returns 202; poll $.subnet.state → ACTIVE.
+  - Response fields: `$.privatelink_service.id`, `$.privatelink_endpoint.id`.
 
 ## networking / firewall
 
@@ -1081,6 +1108,44 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - **All 7 PrivateLink endpoints are entitlement-403 blockers (CONFIRMED 2026-06-24).** Account lacks PrivateLink IAM actions even with correct request bodies. `createprivatelinkendpoint` also 500 (PF-23).
 - stage pattern `^[a-z][a-z0-9-]{1,48}[a-z0-9]$`, addressed by name. `createaccesscontrols` -> `$.id`. `createusageplan` -> `$.usage_plan.id`. `createapikey` -> `$.api_key.id`.
 - API delete is async; poll `GET /v1/apis/{id}` until 404.
+
+## compute / scf (Serverless Cloud Function)
+
+**Coverage: 17/36 as of 2026-06-24.** VPC-free control-plane for cloud functions.
+
+- **PrivateLink service for SCF — CONFIRMED LIVE 2026-06-24:**
+  - `PUT /v1/cloud-functions/{fn_id}/configurations/privatelink-services` enables/disables PL.
+    Body: `{privatelink_service_enabled: true|false}` (top-level, no wrapper). Returns 202.
+  - `GET /v1/cloud-functions/{fn_id}/configurations/privatelink-services` returns 200 with:
+    `{privatelink_service_enabled, privatelink_service_state, privatelink_service_id, privatelink_service_name, private_url, ...}`.
+  - **CAUTION: enabling PL service can strand the function in CREATING state indefinitely.**
+    When `privatelink_service_enabled: true` → backend creates a PL service. The PL service
+    can get stuck in CREATING state (seen: >40 minutes, still CREATING). In CREATING state:
+    `privatelink_service_state = CREATING`, `privatelink_service_id = null`.
+    **Disabling is blocked:** 400 `scp-cloud-function.privatelink-service-not-allow-state-error:
+    Privatelink Service deactivation is not allowed when Creating state.` Wait for ACTIVE.
+  - Once PL service is ACTIVE, disable with `{privatelink_service_enabled: false}`.
+
+- **PrivateLink endpoint for SCF — CONFIRMED LIVE 2026-06-24:**
+  - `POST /v1/cloud-functions/{fn_id}/configurations/privatelink-endpoints` creates endpoint.
+    Body: `{endpoint: {alias, service_id}}` where service_id is a VPC PLS id. Returns 200.
+    Response: `{endpoint: {endpoint_alias, endpoint_id, service_id, state}}`. Note:
+    **response field is `endpoint_id` (not `id`)**.
+  - `GET /v1/cloud-functions/{fn_id}/configurations/privatelink-endpoints` lists endpoints.
+    Response: `{privatelink_endpoints: [{endpoint_alias, endpoint_id, service_id, state}]}`.
+    Note: **key is `privatelink_endpoints` (not `endpoints`)**.
+  - `PUT .../request` body: `{type: CANCEL|RE_REQUEST}`. CANCEL from REQUESTING → CANCELED;
+    RE_REQUEST from CANCELED → REQUESTING. Returns 200.
+  - `DELETE .../configurations/privatelink-endpoints/{endpoint_id}` deletes. Returns 204.
+    Note: DELETE requires endpoint NOT be in REQUESTING state (400 invalid-state-error).
+    CANCEL first, then DELETE.
+  - **PRODUCT BUG (CONFIRMED 2026-06-24):** `PUT .../approval` and `PUT .../connection`
+    always return 404 `scp-cloud-function.privatelink-endpoint-not-found` even when the
+    endpoint_id IS valid (returned by list + used successfully in /request and DELETE).
+    Approval of SCF PLEs must be done via VPC's `PUT /v1/privatelink-endpoints/{id}/approval`.
+    These two SCF endpoints are non-functional — classify as product-bug-404.
+  - **SCF PLE requires a VPC PLS that is ACTIVE and the function itself must be in READY state.**
+    If function is DEPLOYING (due to stuck PL service), createprivatelinkendpoint → 400.
 
 ## Services not yet deeply explored (stubs — fill in as you go)
 

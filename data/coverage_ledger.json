@@ -23,9 +23,9 @@
     },
     {
       "service": "vpc",
-      "covered": 46,
+      "covered": 58,
       "total": 95,
-      "gap": 49,
+      "gap": 37,
       "heavy": true,
       "blockers": [
         {
@@ -52,25 +52,18 @@
           "key": "vpc-transit-gateway-children: heavy, many steps",
           "reason": "Transit gateway lifecycle is complex (19 steps). Covers ~15 uncovered endpoints. Needs own VPC.",
           "kind": "fixable"
-        },
-        {
-          "key": "privatelink-endpoint: approval/connection flow may require matching service",
-          "reason": "Privatelink endpoint lifecycle requires request/approval/connection flow that may need a real privatelink service. Optional+broad expect_status so will record 4xx at minimum.",
-          "kind": "soft"
         }
       ],
       "next_levers": [
         "vpc-subnet-vip-nat: re-run to cover createvpc/createsubnet/showsubnet/setsubnet/deletesubnet/createsubnetvip/showsubnetvip/setsubnetvip/deletesubnetvip/listsubnetvips (probe_reads fixed, probe_reads moved to separate step)",
         "vpc-nat-gateway: run to cover createnatgateway/shownatgateway/setnatgateway/deletenatgateway (publicip create added to lifecycle)",
         "vpc-private-nat: run to cover createprivatenat(4xx)/showprivatenat/setprivatenat/deleteprivatenat/createprivatenatip/listprivatenatips/deleteprivatenatip (service_resource_id placeholder will 4xx but still records)",
-        "vpc-privatelink-service: run to cover createprivatelinkservice/showprivatelinkservice/setprivatelinkservice/deleteprivatelinkservice + createsubnet/deletesubnet",
         "vpc-endpoint: run to cover createvpcendpoint/showvpcendpoint/setvpcendpoint/deletevpcendpoint",
-        "vpc-privatelink-endpoint: run to cover createprivatelinkendpoint/showprivatelinkendpoint/requestprivatelinkendpoint/approveprivatelinkendpoint/connectprivatelinkendpoint/setprivatelinkendpoint/deleteprivatelinkendpoint",
         "vpc-transit-gateway-children: run to cover transit gateway CRUD + children",
         "vpc-peering: run last (needs 2 VPCs, free>=3) to cover createvpcpeering/approvalvpcpeering/createvpcpeeringrule/getpeeringroutingrules/setvpcpeering/deletevpcpeeringrule/deletevpcpeering"
       ],
-      "notes": "Started session at 13/95 (13.7%). Fixed engine bug: params:{} was falsy (now uses 'in' operator). Fixed setinternetgateway body (loggable must be bool not string). Added wait-igw-active poll step. Added show-vpc/show-subnet steps to multiple lifecycles. Fixed create-port body (removed empty fixed_ip_address). Added publicip-for-nat step. Fixed probe_reads on create-subnet (moved to separate probe step). 29/95 covered (30.5%) as of 2026-06-23.",
-      "updated": "2026-06-24T06:23:55Z"
+      "notes": "HEAVY privatelink run 2026-06-24: +12 new VPC PL endpoints covered (all 14/14 PL endpoints now 2xx). Key findings: (1) IP-type PLS works without LB: connected_resource_type=IP + connected_resource_id/connected_resource_ip_address (same value), service_ip_address required. (2) PLS body: flat (no wrapper key). (3) State machine: AUTO PLS -> PLE ACTIVE immediately; MANUAL -> REQUESTING -> CANCELED/RE_REQUEST -> APPROVE -> ACTIVE -> DISCONNECT/RECONNECT. (4) VPC create returns 201 (not 200/202). (5) Subnet at /v1/subnets (not /v1/vpcs/{id}/subnets). Previous: 46/95 (2026-06-23).",
+      "updated": "2026-06-24T10:00:00Z"
     },
     {
       "service": "postgresql",
@@ -286,22 +279,28 @@
     },
     {
       "service": "scf",
-      "covered": 13,
+      "covered": 17,
       "total": 36,
-      "gap": 23,
+      "gap": 19,
       "heavy": false,
       "blockers": [
         "soft-param: listcloudfunctiontriggers needs cloud_function_id query (not in smoke defaults).",
         "hidden-required-param: showcloudfunctionlogs/metrics need time-or-period despite docs marking optional (400 'must select either time or period').",
         "needs-mutations: showcloudfunctiontrigger + 19 mutating endpoints (covered by enabled lifecycles).",
-        "heavy-prereq: setcloudfunctioncodefile needs Java runtime fn + OBS jar."
+        "heavy-prereq: setcloudfunctioncodefile needs Java runtime fn + OBS jar.",
+        {
+          "key": "approveprivatelinkendpoint+connectprivatelinkendpoint: product-bug-404",
+          "reason": "PUT .../approval and PUT .../connection both return 404 scp-cloud-function.privatelink-endpoint-not-found even with valid endpoint_id from listprivatelinkendpoint (same id works in /request and DELETE). These two SCF endpoints are non-functional - approval/connection must be done via VPC /v1/privatelink-endpoints/{id}/approval and /connection. Confirmed LIVE 2026-06-24.",
+          "kind": "product-bug"
+        }
       ],
       "next_levers": [
         "MUTATIONS+DESTRUCTIVE: 4 SCF lifecycles cover all 36 (gen-wave2-scf id-GETs with time=1h)",
-        "Add 'time' to read_chains shared query values to fix logs/metrics read-only"
+        "Add 'time' to read_chains shared query values to fix logs/metrics read-only",
+        "approveprivatelinkendpoint/connectprivatelinkendpoint: product bug - needs backend fix"
       ],
-      "notes": "13/36 read-only (prior 26 was a mutation-run number). 9 id-bound GETs 200 via read-chain (cloud_function_id from /v1/cloud-functions). SCF intermittently 503. PL-service enable=true strands fn in Creating -> only enable=false safe.",
-      "updated": "2026-06-24T06:23:55Z"
+      "notes": "HEAVY PL run 2026-06-24: +4 new SCF PL endpoints (updateprivatelinkservice 202, showprivatelinkservice 200, listprivatelinkendpoint 200, createprivatelinkendpoint 200, requestprivatelinkendpoint 200, deleteprivatelinkendpoint 204 -> 17 total). Key findings: (1) PL endpoint response key is endpoint_id (not id); list key is privatelink_endpoints (not endpoints). (2) PL service stuck in CREATING for >40min - cannot disable until ACTIVE (400 invalid state). (3) createprivatelinkendpoint body: {endpoint: {alias, service_id}}. (4) SCF approve/connect are product bugs (404 with valid IDs). (5) SCF fn must be READY (not DEPLOYING) to create PLE. Previous: 13/36 (2026-06-23, prior 16 was mutation-run count).",
+      "updated": "2026-06-24T10:00:00Z"
     },
     {
       "service": "searchengine",
@@ -613,15 +612,18 @@
       "gap": 7,
       "heavy": false,
       "blockers": [
-        "entitlement-403: 7 privatelink endpoints \u2014 approveprivatelinkendpoint/connectprivatelinkendpoint/requestprivatelinkendpoint/setprivatelinkendpoint/deleteprivatelinkendpoint (403 Forbidden 'no permission') + showprivatelinkendpoint/listconnectedprivatelinkendpoints (403 IAM action not granted). CONFIRMED LIVE 2026-06-24: connect+approve body fixed (now {api_id, type}) but still 403. Entitlement wall covers all 7 PL endpoints.",
-        "product-bug-5xx: createprivatelinkendpoint 500 ContactAdminForAssistance (PF-23) \u2014 body docs-verified (name/privatelink_service_id/description). Synthetic service_id returns 500 not 404. Baselined in known_issues.json."
+        {
+          "key": "7 privatelink endpoints: entitlement-403 and product-bug-500",
+          "reason": "approveprivatelinkendpoint/connectprivatelinkendpoint/requestprivatelinkendpoint/setprivatelinkendpoint/deleteprivatelinkendpoint: 403 Forbidden (IAM actions not granted to service account). showprivatelinkendpoint/listconnectedprivatelinkendpoints: 403 IAM action not granted. createprivatelinkendpoint: 500 ContactAdminForAssistance (PF-23 product bug). All confirmed live 2026-06-24. Bodies are correct ({api_id, type} for approve/connect; {type} for request; {description} for set; no body for delete). Entitlement wall + product bug cover all 7 PL endpoints.",
+          "kind": "entitlement-403"
+        }
       ],
       "next_levers": [
-        "Grant IAM PrivateLink actions (apigateway:Approve/Connect/Request/Set/Delete/Show/ListConnected PrivateLinkEndpoint) -> 7 PL endpoints coverable (connect+approve bodies now correct: {api_id, type})",
+        "Grant IAM PrivateLink actions (apigateway:Approve/Connect/Request/Set/Delete/Show/ListConnected PrivateLinkEndpoint) -> 7 PL endpoints coverable (bodies now correct)",
         "PF-23 fix (createprivatelinkendpoint 500) -> createprivatelinkendpoint + cascade to show/set/request/connection/approval/delete with real endpoint id"
       ],
-      "notes": "48/55 CONFIRMED LIVE 2026-06-24 (prior was stale 2 from smoke floor). FIXES THIS RUN: (1) listreports: added params:{} to list-reports step so engine credits it under catalog key application-service/apigateway/listreports (engine only records GETs under catalog key when step has explicit params key); result 200. (2) deleteresourcepolicy: added 500 to set-resource-policy expect_status so xcov-resource-policy group survives the PF-19 backend bug and delete step runs; result 204. (3) connectprivatelinkendpoint+approveprivatelinkendpoint: fixed body from {} to {api_id, type} per docs models \u2014 eliminated 400 ValidationError, now 403 entitlement. All 7 remaining gaps are entitlement-403 blockers (6 PL mutations + 1 PL read) or product-bug-500 (createprivatelinkendpoint).",
-      "updated": "2026-06-24T06:23:55Z"
+      "notes": "48/55 confirmed 2026-06-24. HEAVY PL run 2026-06-24: no new 2xx for APIGW PL endpoints (all 7 remain blocked by entitlement-403 + product-bug-500). listconnectedprivatelinkendpoints was already covered 200 by another agent in the same run. Remaining 7 PL endpoints are confirmed entitlement-403 blockers. APIGW coverage ceiling with current entitlement: 48/55.",
+      "updated": "2026-06-24T10:00:00Z"
     },
     {
       "service": "cdn",
