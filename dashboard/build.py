@@ -304,7 +304,7 @@ def per_service(cat, tsv_rows, prior_verified=None, prior_status=None, sha=""):
 # ---------------------------------------------------------------------------
 
 def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None,
-            prior_verified=None):
+            prior_verified=None, prior_touched=None):
     total = len(cat)
     cat_total = Counter(e["category"] for e in cat)
     cat_get = Counter(e["category"] for e in cat if e["method"] == "GET")
@@ -325,6 +325,11 @@ def compute(cat, tsv_rows, crud, lifecycles, known, param_rows=(), waivers=None,
     # category bars, C3) sees the same verified set — an endpoint verified by
     # any past run stays verified unless THIS run hard-failed it.
     cat_keys_all = {e["key"] for e in cat}
+    # `touched` is cumulative on the same principle: an endpoint REACHED by any
+    # past run stays reached on a scoped rebuild (drives reachability-covered).
+    # Without this, a rebuild that didn't re-run the reachability-waived services
+    # would collapse reach_covered to this run's scope and regress the headline.
+    touched = touched | ((prior_touched or set()) & cat_keys_all)
     prior_set = (prior_verified or set()) & cat_keys_all
     failed_now = {k for k, v in verdict.items() if v == "failed"}
     verified = verified | (prior_set - failed_now)
@@ -1684,11 +1689,25 @@ def build(
         except (ValueError, OSError):
             pass
 
+    # cumulative last-known observation per endpoint (status/elapsed/run). Loaded
+    # BEFORE compute() so the reachability-covered tally (which keys on "touched")
+    # is cumulative like `verified` — a reachability waiver REACHED by any past
+    # run stays reach-covered on a scoped rebuild, instead of collapsing to this
+    # run's scope. Used again below for the drill-down status cells.
+    prior_status = {}
+    _ps_path = os.path.join(os.path.dirname(prior or "data/x"), "endpoint_status.json")
+    if os.path.exists(_ps_path):
+        try:
+            prior_status = json.load(open(_ps_path)).get("status", {})
+        except (ValueError, OSError):
+            pass
+
     # ------------------------------------------------------------------
     # 5. Compute, history, render
     # ------------------------------------------------------------------
     d = compute(cat, tsv_rows, crud_results, lc_data, known_data, param_rows,
-                waivers=waiver_data, prior_verified=prior_verified)
+                waivers=waiver_data, prior_verified=prior_verified,
+                prior_touched=set(prior_status))
     # (2) stable static ceiling from committed scenarios (reflects authoring work
     # immediately, no live run needed) + remaining gap = what to improve next.
     d.update(reachable_ceiling(cat, lc_data))
@@ -1699,15 +1718,8 @@ def build(
     d["crud_ran"] = (any(o.get("source") == "crud_probe" for o in unified_obs)
                      or any(v == "pass" for v in crud_results.values()))
     hist = append_history(history, d, run_type, sha)
-    # cumulative last-known observation per endpoint (status/elapsed/run) —
-    # fills the drill-down status cells for endpoints this run didn't call.
-    prior_status = {}
-    _ps_path = os.path.join(os.path.dirname(prior or "data/x"), "endpoint_status.json")
-    if os.path.exists(_ps_path):
-        try:
-            prior_status = json.load(open(_ps_path)).get("status", {})
-        except (ValueError, OSError):
-            pass
+    # prior_status (loaded above) also fills the drill-down status cells for
+    # endpoints this run didn't call.
     services, merged_status = per_service(cat, tsv_rows, prior_verified=prior_verified,
                                           prior_status=prior_status, sha=sha)
 
