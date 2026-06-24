@@ -170,6 +170,14 @@ function wireNav() {
   // detail sub-tabs (자원·API·로그) — switch the DETAIL pane's tab; the master 흐름
   // scene is persistent and untouched by a tab switch.
   els("#detail-subtabs button").forEach(b => b.onclick = () => { setDetailTab(b.dataset.d); });
+  // 🌐 런타임 뷰 — open the current live-resource topology in a separate popup.
+  // Static demo (no backend) → baked snapshot; live server → the dynamic endpoint.
+  const rl = $("runtimeLink");
+  if (rl) rl.onclick = (e) => {
+    e.preventDefault();
+    const url = window.__C2_STATIC__ ? "runtime.html" : "runtime";
+    window.open(url, "scp-runtime", "width=1320,height=900,scrollbars=yes,resizable=yes");
+  };
 }
 function go(scr) {
   screen = scr;
@@ -1520,9 +1528,23 @@ function renderDetailCounts() {
 // route the detail body to the scoped 자원 / API / 로그 view.
 function renderDetailBody() {
   if (!runId) return;
-  if (detailTab === "res") reportR2();
-  else if (detailTab === "api") reportR3();
-  else reportR4();
+  keepDetailScroll(() => {
+    if (detailTab === "res") reportR2();
+    else if (detailTab === "api") reportR3();
+    else reportR4();
+  });
+}
+
+// Preserve the detail list's scroll position across a re-render. The live poll
+// re-renders the whole detail body via innerHTML (reportR2/R3/R4 each rebuild the
+// inner `.scroll` container), which would otherwise snap the 자원/API/로그 list
+// back to the top every refresh while the user is scrolled down reading it.
+function keepDetailScroll(render) {
+  const before = $("detail-body") && $("detail-body").querySelector(".scroll");
+  const top = before ? before.scrollTop : 0;
+  render();
+  const after = $("detail-body") && $("detail-body").querySelector(".scroll");
+  if (after && top) after.scrollTop = top;
 }
 
 // derive live lifecycle state from events: queued/running/done/fail/skip
@@ -1851,7 +1873,7 @@ function reportR3() {
   els("#detail-body .apirow[data-apik]").forEach(row => row.onclick = () => {
     const k = row.dataset.apik;
     expandedApi = expandedApi === k ? null : k;
-    reportR3();
+    keepDetailScroll(reportR3);
   });
   // 📖 정의 link → open the read-only definition viewer for that service
   els("#detail-body [data-defsvc]").forEach(b => b.onclick = () => openDefinition(b.dataset.defsvc));
