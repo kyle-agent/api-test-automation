@@ -1,0 +1,564 @@
+{
+  "_comment": "HEAVY lifecycle — covers all 24 autoscaling-group endpoints (compute/virtualserver). Requires SCP_RUN_HEAVY=true. Creates: keypair, LC, SG, VPC, subnet, ASG (desired_server_count=0 to avoid billable VMs), policy, schedule, notification — exercises all 24 endpoints — then tears down in reverse order. Service account user id f2b627e6bf4f4b3996f04de4f877bd11 used for notification user_ids.",
+  "lifecycles": [
+    {
+      "id": "heavy-asg-full-coverage",
+      "service": "compute/virtualserver",
+      "heavy": true,
+      "enabled": true,
+      "_note": "Full autoscaling lifecycle: creates all resources with desired_server_count=0 (no billable VMs spin up), exercises all 24 ASG endpoints in the catalog, then tears down. notification user_ids=[f2b627e6bf4f4b3996f04de4f877bd11] (service account user id confirmed from GET /v1/access-keys). Notification id capture: $.notifications[0].id (list envelope). update-asg body: all optional per model autoscalinggroupsetrequestv1dot2. update-policy body: all optional per autoscalinggrouppolicyupdaterequestv1dot2. update-schedule body: all optional per autoscalinggroupscheduleupdaterequest. update-notification body: {notification_events, notification_state} per autoscalinggroupnotificationupdaterequest.",
+      "steps": [
+        {
+          "name": "list-asg-initial",
+          "_note": "Covers listautoscalinggroups (GET with params -> catalog key credit).",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "params": {}
+        },
+        {
+          "name": "get-image",
+          "_note": "Seed a real standard image id for the LC. Picks first standard image.",
+          "method": "GET",
+          "path": "/v1/images",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "params": {
+            "status": "active",
+            "scp_original_image_type": "standard",
+            "visibility": "public",
+            "limit": 5
+          },
+          "capture": {
+            "lc_image_id": "$.images[0].id"
+          }
+        },
+        {
+          "name": "create-keypair",
+          "_note": "Create a throwaway keypair for the LC. SCP generates the key pair; name is the only required field.",
+          "method": "POST",
+          "path": "/v1/keypairs",
+          "service": "virtualserver",
+          "json": {
+            "name": "regraskp{unique}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "asg_keypair_name": "$.name"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/keypairs/{asg_keypair_name}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "create-launch-configuration",
+          "_note": "PROVEN 2xx (2026-06-19). Any standard image works. volume size divisible by 8; no delete_on_termination field. Captures launch_configuration_id from flat $.id.",
+          "method": "POST",
+          "path": "/v1/launch-configurations",
+          "service": "virtualserver",
+          "json": {
+            "name": "regrasglc{unique}",
+            "image_id": "{lc_image_id}",
+            "server_type_id": "s1v1m2",
+            "keypair_name": "{asg_keypair_name}",
+            "volumes": [
+              {
+                "boot_index": 0,
+                "size": 32,
+                "type": "SSD"
+              }
+            ],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "launch_configuration_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/launch-configurations/{launch_configuration_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "create-security-group",
+          "_note": "Create a throwaway SG for the ASG. Returns $.security_group.id.",
+          "method": "POST",
+          "path": "/v1/security-groups",
+          "service": "security-group",
+          "json": {
+            "name": "regrasksg{unique}",
+            "description": "ASG coverage test",
+            "loggable": false,
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "asg_sg_id": "$.security_group.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/security-groups/{asg_sg_id}",
+            "service": "security-group"
+          }
+        },
+        {
+          "name": "create-vpc",
+          "_note": "Create a VPC for the ASG subnet. Budget: 4 free. CIDR 10.175.0.0/20 (unique range). Poll state->ACTIVE.",
+          "method": "POST",
+          "path": "/v1/vpcs",
+          "service": "vpc",
+          "json": {
+            "name": "regraskpc{unique}",
+            "description": "ASG coverage test VPC",
+            "cidr": "10.175.0.0/20",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "asg_vpc_id": "$.vpc.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/vpcs/{asg_vpc_id}",
+            "service": "vpc"
+          },
+          "adopt": "vpc"
+        },
+        {
+          "name": "wait-vpc-active",
+          "_note": "Poll until VPC ACTIVE before creating subnet.",
+          "method": "GET",
+          "path": "/v1/vpcs/{asg_vpc_id}",
+          "service": "vpc",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.vpc.state",
+            "until": ["ACTIVE"],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-subnet",
+          "_note": "Create a subnet in the VPC. CIDR 10.175.8.0/24. Poll state->ACTIVE.",
+          "method": "POST",
+          "path": "/v1/subnets",
+          "service": "vpc",
+          "json": {
+            "name": "regrasknet{unique}",
+            "description": "ASG coverage test subnet",
+            "cidr": "10.175.8.0/24",
+            "type": "GENERAL",
+            "vpc_id": "{asg_vpc_id}",
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "asg_subnet_id": "$.subnet.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/subnets/{asg_subnet_id}",
+            "service": "vpc"
+          },
+          "adopt": "subnet"
+        },
+        {
+          "name": "wait-subnet-active",
+          "_note": "Poll until subnet ACTIVE before creating ASG.",
+          "method": "GET",
+          "path": "/v1/subnets/{asg_subnet_id}",
+          "service": "vpc",
+          "expect_status": [200],
+          "poll": {
+            "field": "$.subnet.state",
+            "until": ["ACTIVE"],
+            "timeout": 180,
+            "interval": 10
+          }
+        },
+        {
+          "name": "create-auto-scaling-group",
+          "_note": "HEAVY: creates ASG with desired_server_count=0 so no billable VMs are spun up. min=0, max=1. Captures $.id (flat, not nested). security_group_ids array (not security_groups). subnet_ids array.",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups",
+          "service": "virtualserver",
+          "json": {
+            "name": "regrasg{ualpha}",
+            "launch_configuration_id": "{launch_configuration_id}",
+            "desired_server_count": 0,
+            "desired_server_count_editable": true,
+            "min_server_count": 0,
+            "max_server_count": 1,
+            "server_name_prefix": "regrvm{ualpha}",
+            "state_check_delay_time": 300,
+            "use_lb_state_check": false,
+            "subnet_ids": ["{asg_subnet_id}"],
+            "security_group_ids": ["{asg_sg_id}"],
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {
+            "auto_scaling_group_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "show-auto-scaling-group",
+          "_note": "Covers showautoscalinggroup. params:{} forces catalog key recording for GET steps.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "params": {}
+        },
+        {
+          "name": "list-auto-scaling-groups-after-create",
+          "_note": "Covers listautoscalinggroups again to confirm the ASG appears. Separate step to show state after create.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "params": {}
+        },
+        {
+          "name": "update-auto-scaling-group",
+          "_note": "Covers updateautoscalinggroup. All fields optional per autoscalinggroupsetrequestv1dot2. CONFIRMED: do NOT include use_lb_state_check (even false triggers AutoScalingGroupLbStateCheckLbRequired when no LB attached). Send only desired_server_count_editable and state_check_delay_time.",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+          "service": "virtualserver",
+          "json": {
+            "desired_server_count_editable": true,
+            "state_check_delay_time": 300
+          },
+          "expect_status": [200, 202]
+        },
+        {
+          "name": "update-asg-server-count",
+          "_note": "Covers updateautoscalinggroupservercount. Set desired_server_count=0 (no VMs to spin up).",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/server-count",
+          "service": "virtualserver",
+          "json": {
+            "desired_server_count": 0
+          },
+          "expect_status": [200, 202]
+        },
+        {
+          "name": "list-asg-virtual-servers",
+          "_note": "Covers listautoscalinggroupvirtualservers. Will return empty list since desired=0.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/virtual-servers",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "params": {}
+        },
+        {
+          "name": "list-asg-lb-server-groups",
+          "_note": "Covers listautoscalinggrouplbservergroups. Will return empty list.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/lb-server-groups",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "params": {}
+        },
+        {
+          "name": "update-asg-lb-server-groups",
+          "_note": "Covers updateautoscalinggrouplbservergroups. Body requires lb_server_groups array of objects {id, port}. Empty array = detach all (safe no-op since no LBs attached).",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/lb-server-groups",
+          "service": "virtualserver",
+          "json": {
+            "lb_server_groups": []
+          },
+          "expect_status": [200, 202]
+        },
+        {
+          "name": "create-asg-policy",
+          "_note": "Covers createautoscalinggrouppolicy. Body confirmed: scale_type/scale_method/scale_value/metric_type/metric_method/comparison_operator/threshold/evaluation_minutes/cooldown_seconds. comparison_operator=ge (short-code). Captures $.id for policy_id.",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies",
+          "service": "virtualserver",
+          "json": {
+            "name": "regrpol{unique}",
+            "scale_type": "SCALE_OUT",
+            "scale_method": "AMOUNT",
+            "scale_value": 1,
+            "metric_type": "CPU",
+            "metric_method": "AVG",
+            "comparison_operator": "ge",
+            "threshold": 80,
+            "evaluation_minutes": 5,
+            "cooldown_seconds": 300
+          },
+          "expect_status": [200, 201, 202],
+          "group": "asg-policy",
+          "capture": {
+            "policy_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "list-asg-policies",
+          "_note": "Covers listautoscalinggrouppolicies. params:{} for catalog key credit.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "group": "asg-policy",
+          "params": {}
+        },
+        {
+          "name": "show-asg-policy",
+          "_note": "Covers showautoscalinggrouppolicy. params:{} for catalog key credit.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "group": "asg-policy",
+          "params": {}
+        },
+        {
+          "name": "update-asg-policy",
+          "_note": "Covers updateautoscalinggrouppolicy. All fields optional per autoscalinggrouppolicyupdaterequestv1dot2. Send updated threshold + state=ACTIVE.",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+          "service": "virtualserver",
+          "json": {
+            "threshold": 90,
+            "cooldown_seconds": 600,
+            "state": "ACTIVE"
+          },
+          "expect_status": [200, 202],
+          "group": "asg-policy"
+        },
+        {
+          "name": "delete-asg-policy",
+          "_note": "Covers deleteautoscalinggrouppolicy.",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}",
+          "service": "virtualserver",
+          "expect_status": [200, 202, 204],
+          "group": "asg-policy",
+          "destructive": true
+        },
+        {
+          "name": "create-asg-schedule",
+          "_note": "Covers createautoscalinggroupschedule. frequency=ONCE (no day_of_week needed). far-future start_date. Captures $.id for schedule_id.",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules",
+          "service": "virtualserver",
+          "json": {
+            "name": "regrsch{unique}",
+            "frequency": "ONCE",
+            "desired_server_count": 0,
+            "min_server_count": 0,
+            "max_server_count": 1,
+            "start_date": "2099-01-01",
+            "hour": 3,
+            "minute": 0,
+            "timezone": "Asia/Seoul"
+          },
+          "expect_status": [200, 201, 202],
+          "group": "asg-schedule",
+          "capture": {
+            "schedule_id": "$.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "list-asg-schedules",
+          "_note": "Covers listautoscalinggroupschedules. params:{} for catalog key credit.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "group": "asg-schedule",
+          "params": {}
+        },
+        {
+          "name": "show-asg-schedule",
+          "_note": "Covers showautoscalinggroupschedule. params:{} for catalog key credit.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "group": "asg-schedule",
+          "params": {}
+        },
+        {
+          "name": "update-asg-schedule",
+          "_note": "Covers updateautoscalinggroupschedule. All optional per autoscalinggroupscheduleupdaterequest. Update description and state.",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+          "service": "virtualserver",
+          "json": {
+            "desired_server_count": 0,
+            "state": "ACTIVE"
+          },
+          "expect_status": [200, 202],
+          "group": "asg-schedule"
+        },
+        {
+          "name": "delete-asg-schedule",
+          "_note": "Covers deleteautoscalinggroupschedule.",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}",
+          "service": "virtualserver",
+          "expect_status": [200, 202, 204],
+          "group": "asg-schedule",
+          "destructive": true
+        },
+        {
+          "name": "create-asg-notification",
+          "_note": "Covers createautoscalinggroupnotification. user_ids=[f2b627e6bf4f4b3996f04de4f877bd11] (the service account user id confirmed from GET /v1/access-keys created_by field). notification_id captured from $.notifications[0].id (list envelope, NOT $.id).",
+          "method": "POST",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications",
+          "service": "virtualserver",
+          "json": {
+            "user_ids": ["f2b627e6bf4f4b3996f04de4f877bd11"],
+            "notification_events": ["SCALE_OUT", "SCALE_OUT_FAIL"]
+          },
+          "expect_status": [200, 201, 202],
+          "group": "asg-notify",
+          "capture": {
+            "notification_id": "$.notifications[0].id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
+            "service": "virtualserver"
+          }
+        },
+        {
+          "name": "list-asg-notifications",
+          "_note": "Covers listautoscalinggroupnotifications. params:{} for catalog key credit.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "group": "asg-notify",
+          "params": {}
+        },
+        {
+          "name": "show-asg-notification",
+          "_note": "Covers showautoscalinggroupnotification. params:{} for catalog key credit.",
+          "method": "GET",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
+          "service": "virtualserver",
+          "expect_status": [200],
+          "group": "asg-notify",
+          "params": {}
+        },
+        {
+          "name": "update-asg-notification",
+          "_note": "Covers updateautoscalinggroupnotification. Body: notification_events (optional array) + notification_state (optional string). Both optional per autoscalinggroupnotificationupdaterequest.",
+          "method": "PUT",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
+          "service": "virtualserver",
+          "json": {
+            "notification_events": ["SCALE_IN", "SCALE_IN_FAIL"],
+            "notification_state": "ACTIVE"
+          },
+          "expect_status": [200, 202],
+          "group": "asg-notify"
+        },
+        {
+          "name": "delete-asg-notification",
+          "_note": "Covers deleteautoscalinggroupnotification.",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/notifications/{notification_id}",
+          "service": "virtualserver",
+          "expect_status": [200, 202, 204],
+          "group": "asg-notify",
+          "destructive": true
+        },
+        {
+          "name": "delete-auto-scaling-group",
+          "_note": "Covers deleteautoscalinggroup. Retry on 409 (state conflict) since ASG may be transitioning.",
+          "method": "DELETE",
+          "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}",
+          "service": "virtualserver",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30
+        },
+        {
+          "name": "delete-subnet",
+          "_note": "Teardown subnet. Retry on 409 (ASG still holding subnet reference).",
+          "method": "DELETE",
+          "path": "/v1/subnets/{asg_subnet_id}",
+          "service": "vpc",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "subnet"
+        },
+        {
+          "name": "delete-vpc",
+          "_note": "Teardown VPC. Retry on 409.",
+          "method": "DELETE",
+          "path": "/v1/vpcs/{asg_vpc_id}",
+          "service": "vpc",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 40,
+          "retry_interval": 30,
+          "adopt": "vpc"
+        },
+        {
+          "name": "delete-security-group",
+          "_note": "Teardown security group.",
+          "method": "DELETE",
+          "path": "/v1/security-groups/{asg_sg_id}",
+          "service": "security-group",
+          "expect_status": [200, 202, 204, 409, 404],
+          "destructive": true,
+          "retry_on_status": [409],
+          "retries": 10,
+          "retry_interval": 10
+        },
+        {
+          "name": "delete-launch-configuration",
+          "_note": "Teardown LC.",
+          "method": "DELETE",
+          "path": "/v1/launch-configurations/{launch_configuration_id}",
+          "service": "virtualserver",
+          "expect_status": [200, 202, 204, 404],
+          "destructive": true
+        },
+        {
+          "name": "delete-keypair",
+          "_note": "Teardown keypair.",
+          "method": "DELETE",
+          "path": "/v1/keypairs/{asg_keypair_name}",
+          "service": "virtualserver",
+          "expect_status": [200, 202, 204, 404],
+          "destructive": true
+        }
+      ]
+    }
+  ]
+}

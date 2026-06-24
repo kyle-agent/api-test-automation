@@ -25,39 +25,84 @@ duplicating. Add a new `##` section when you take on a new service.
 
 ## compute / virtualserver — autoscaling
 
-- **28 autoscaling endpoints** (`/v1/auto-scaling-groups/...`, `/v1/launch-configurations/...`).
-  Only **2/28 covered** read-only: `listautoscalinggroups`, `listlaunchconfigurations`
-  (bare smoke GETs, 200 with empty lists — account has 0 ASGs / 0 LCs).
-- **Root cause the other 26 are uncovered:** two lifecycles already exist, are
-  `enabled: true`, and cover them — `vs-autoscaling-coverage` (26 steps, in
-  `regression/scenarios/lifecycles/compute__virtualserver.json`) and `gen-wave4-asg`
-  (28 steps, VPC+subnet chain, `desired_server_count: 0` to avoid billable VMs, in
-  `generated__wave4.json`). But **both are mutation-gated**: `run_lifecycle()` returns
-  `status: skipped` immediately when `SCP_ALLOW_MUTATIONS=false` (engine ~line 642),
-  before any step (including the lifecycle's GET steps) runs. So read-only runs never
-  start them; that is why only the 2 bare smoke GETs are covered.
-- **Levers:**
-  - `SCP_ALLOW_MUTATIONS=true` + `SCP_ALLOW_DESTRUCTIVE=true` alone → `vs-autoscaling-coverage`
-    records ~23 catalog keys (LC create/show/delete to 2xx; ASG sub-ops to 4xx via a
-    literal placeholder asg_id, still recorded under their catalog key).
-  - add `SCP_RUN_HEAVY=true` + a shared VPC/subnet → `gen-wave4-asg` takes ASG and all
-    sub-resources to 2xx.
-- **Form gate:** `createautoscalinggroupnotification` needs a `user_ids` array with a
-  REAL account user id (no default) — set a `user_id` env var from console. Until it
-  creates a notification, the 4 child notification GET/PUT/DELETE endpoints stay blocked.
-- **Proven create facts:** `createlaunchconfiguration` PROVEN 2xx (`regrlcc1db18b2`, CI heavy
-  run 2026-06-19) with a real `image_id` + real `keypair_name`. The image is **NOT
-  OS-specific** — any valid **standard** image works (`scp_original_image_type=standard`, the
-  same image lookup as the plain VM path). Evidence: `vs-autoscaling-coverage` seeds the image
-  from an UNFILTERED `GET /v1/images?limit=50` → `images[0]` and still creates the LC, and
-  `gen-wave4-asg` uses `scp_original_image_type=standard&visibility=public`; both succeed.
-  (A prior note claimed a **windows** image was required / non-windows rejected with
-  InvalidImage — that was a **mis-diagnosis, corrected 2026-06-19**; the real constraint is a
-  valid standard image type, not the OS.) volume `size` must be divisible by 8;
-  `delete_on_termination` is NOT a valid field. ASG policy `comparison_operator: "ge"` (short-code, not GREATER_THAN_OR_EQUAL_TO);
-  schedule `frequency` enum ONCE|DAILY|WEEKLY|MONTHLY. ASG create uses arrays `subnet_ids`,
-  `security_group_ids` (not scalar/`security_groups`); notification id is `$.notifications[0].id`
-  (list envelope, not `$.id`).
+**STATUS: ALL 24 ASG ENDPOINTS CONFIRMED 2xx — LIVE HEAVY RUN 2026-06-24** via
+lifecycle `heavy-asg-full-coverage` in
+`regression/scenarios/lifecycles/compute__virtualserver-autoscaling.json`.
+
+### Confirmed body shapes (all PROVEN 2xx)
+
+- **createlaunchconfiguration**: `{name, keypair_name, image_id, server_type: "s1v1m2",
+  volume_type: "SSD_Provisioned", volume_size: 40, tags: []}`. Volume size MUST be
+  divisible by 8. `delete_on_termination` is NOT a valid field (400). Image is NOT
+  OS-specific — any valid standard image (`scp_original_image_type=standard&visibility=public`).
+
+- **createautoscalinggroup**: `{name, launch_configuration_id, desired_server_count: 0,
+  desired_server_count_editable: true, min_server_count: 0, max_server_count: 1,
+  server_name_prefix, state_check_delay_time: 300, use_lb_state_check: false,
+  subnet_ids: ["<id>"], security_group_ids: ["<id>"], tags: []}`. Uses arrays
+  `subnet_ids` / `security_group_ids` (NOT scalar / NOT `security_groups`).
+  `desired_server_count: 0` avoids billable VM spin-up.
+
+- **updateautoscalinggroup**: `{desired_server_count_editable: true,
+  state_check_delay_time: 300}`. **MUST omit `use_lb_state_check`** when no LB is
+  attached — API returns 400
+  `AutoScalingGroup.AutoScalingGroupLbStateCheckLbRequired` even if value is `false`.
+
+- **updateautoscalinggroupservercount**: `{desired_server_count: 0}`.
+
+- **updateautoscalinggrouplbservergroups**: `{lb_server_groups: []}` (array of
+  `{id, port}` objects — NOT `lb_server_group_ids`). Empty array is a no-op 202.
+
+- **createautoscalinggroupnotification**: `{user_ids:
+  ["f2b627e6bf4f4b3996f04de4f877bd11"], notification_events: ["SCALE_OUT",
+  "SCALE_OUT_FAIL"]}`. `user_ids` MUST be a real account user. Service-account user id
+  = `f2b627e6bf4f4b3996f04de4f877bd11` (from `GET /v1/access-keys` → `created_by`).
+  Response is a LIST envelope: capture `$.notifications[0].id` (NOT `$.id`).
+
+- **updateautoscalinggroupnotification**: `{notification_events: ["SCALE_OUT",
+  "SCALE_OUT_FAIL", "SCALE_IN"], notification_state: "ACTIVE"}`.
+
+- **createautoscalinggrouppolicy**: `{name, scale_type: "SCALE_OUT", scale_method:
+  "AMOUNT", scale_value: 1, metric_type: "CPU", metric_method: "AVG",
+  comparison_operator: "ge", threshold: 80, evaluation_minutes: 5,
+  cooldown_seconds: 300}`. `comparison_operator` is short-code `"ge"` (NOT
+  `"GREATER_THAN_OR_EQUAL_TO"`).
+
+- **updateautoscalinggrouppolicy**: `{threshold: 90, cooldown_seconds: 600, state:
+  "ACTIVE"}`.
+
+- **createautoscalinggroupschedule**: `{name, frequency: "ONCE", desired_server_count:
+  0, min_server_count: 0, max_server_count: 1, start_date: "2099-01-01", hour: 3,
+  minute: 0, timezone: "Asia/Seoul"}`. `frequency` enum: `ONCE|DAILY|WEEKLY|MONTHLY`.
+
+- **updateautoscalinggroupschedule**: `{desired_server_count: 0, state: "ACTIVE"}`.
+
+### Critical facts
+
+- **GET steps need `params: {}`** in the lifecycle step definition so the engine
+  credits the catalog key (engine only records catalog keys for GET steps that have an
+  explicit `params` key in the step definition; engine.py ~line 1118).
+- **Notification id capture path**: `$.notifications[0].id` (list envelope, NOT
+  `$.id`).
+- **Service-account user id** for notification `user_ids`:
+  `f2b627e6bf4f4b3996f04de4f877bd11` (from `GET /v1/access-keys` → `created_by`).
+- **VPC CIDR** used in HEAVY run: `10.175.0.0/20`; subnet: `10.175.8.0/24`.
+- Teardown order: notification→schedule→policy→ASG→subnet→VPC→SG→LC→keypair
+  (child-first). Subnet delete is async; poll until DELETED before attempting VPC delete
+  or VPC delete returns 400.
+- **All 24 ASG endpoint catalog keys confirmed 2xx live 2026-06-24:**
+  createautoscalinggroup, createautoscalinggroupnotification,
+  createautoscalinggrouppolicy, createautoscalinggroupschedule,
+  deleteautoscalinggroup, deleteautoscalinggroupnotification,
+  deleteautoscalinggrouppolicy, deleteautoscalinggroupschedule,
+  listautoscalinggrouplbservergroups, listautoscalinggroupnotifications,
+  listautoscalinggrouppolicies, listautoscalinggroups,
+  listautoscalinggroupschedules, listautoscalinggroupvirtualservers,
+  showautoscalinggroup, showautoscalinggroupnotification,
+  showautoscalinggrouppolicy, showautoscalinggroupschedule,
+  updateautoscalinggroup, updateautoscalinggrouplbservergroups,
+  updateautoscalinggroupnotification, updateautoscalinggrouppolicy,
+  updateautoscalinggroupschedule, updateautoscalinggroupservercount.
 
 ## storage / backup
 
