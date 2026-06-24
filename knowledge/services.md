@@ -77,10 +77,50 @@ duplicating. Add a new `##` section when you take on a new service.
 
 ## storage / filestorage
 
-- **Host:** regional. Owns NFS volumes.
-- **Volume:** `POST /v1/volumes {name, protocol:NFS, type_name:HDD}` → capture
-  **`$.volume_id`** (flat, service-specific), poll `$.state` → `available` →
-  delete → poll 404. No VPC needed.
+- **Host:** regional. Owns NFS volumes. No VPC needed. Base URL:
+  `https://filestorage.{region}.e.samsungsdscloud.com` (e.g. kr-west1).
+- **Coverage (2026-06-24 live validated):** 17/21. 4 gaps classified (see ledger).
+- **Volume create:** `POST /v1/volumes {name, protocol:NFS, type_name:HDD}` →
+  response envelope `$.filestorages[]` for list; **create response: flat `$.volume_id`**
+  (NOT nested). Name rules: 3-21 chars, lowercase letters + numbers + underscore only
+  (no hyphens, no uppercase). State becomes `available` immediately (no poll needed).
+- **Snapshot:** `POST /v1/snapshots?volume_id=X {volume_id}` → 202, capture
+  `$.snapshot.id`. Available immediately. Restore: `PUT /v1/snapshots/{id}/restore`
+  with `?volume_id=X` query param and empty JSON body `{}` → 202.
+- **Snapshot schedule:** `POST /v1/snapshot-schedules {volume_id,
+  snapshot_retention_count: int, snapshot_schedule: {frequency: WEEKLY, day_of_week: MON, hour: 23}}`
+  → 202. CRITICAL: create response has NO id field. Must call
+  `GET /v1/snapshot-schedules?volume_id=X` and capture `$.snapshot_schedule[0].id`.
+  Update: `PUT /v1/snapshot-schedules/{id} {snapshot_retention_count, snapshot_schedule:
+  {frequency: DAILY, hour: 12}}` (DAILY: omit day_of_week). Delete: 202.
+- **Replication:** `POST /v1/replications {name, volume_id, region: kr-east1,
+  replication_frequency: 5min, replication_type: replication, backup_retention_count: 2}`
+  → 202, capture `$.replication_id` AND `$.replication_volume_id` (the DR volume id in kr-east1).
+  List: `GET /v1/replications?volume_id=X` (volume_id REQUIRED query param).
+  List-region: `GET /v1/volume-replication/regions?type_name=HDD&source_region_name=kr-west1&replication_type=replication`
+  (all 3 params required).
+- **PRODUCT CONSTRAINT (2026-06-24 confirmed):** `setvolumereplication` (PUT) and
+  `deletevolumereplication` (DELETE) on `/v1/replications/{id}` both return 400
+  `filestorage.BadRequest.Invalid.volume.purpose` when called from the source region
+  (kr-west1) against a volume with `purpose=original`. Replication management MUST be
+  done from the DR region (kr-east1) side using the DR volume id and the kr-east1 endpoint.
+  To manage from DR side: use `SCP_SERVICE_HOSTS={"filestorage-dr":
+  "https://filestorage.kr-east1.e.samsungsdscloud.com"}` and call with `?volume_id={dr_volume_id}`.
+  Teardown sequence: set policy=paused (kr-east1) → delete replication (kr-east1) →
+  delete DR volume (kr-east1) → delete source volume (kr-west1, now unblocked).
+- **`setaccessrule` (PUT /v1/access-rules/{volume_id}):** Body is SCALAR (not array):
+  `{object_id: UUID, object_type: VM|BM|GPU|GPU_NODE|ENDPOINT, action: add|remove}`.
+  Returns 404 VirtualServer.VirtualServerNotFound for fake UUIDs. Requires real VM id
+  (needs-peer blocker — provision a VM first via virtualserver lifecycle).
+- **`deletevolume`:** Returns 400 "Cannot delete volume because replication is in use"
+  while any replication exists. Must tear down replication from DR side first.
+- **listsnapshotschedule / listsnapshots / listreplications:** All require `?volume_id=`
+  as REQUIRED query param. Without it → 400 ValidationError "Field required". Smoke
+  defaults must include `volume_id` for these list endpoints.
+- **Coverage session 2026-06-24 gains (8 → 17/21):** createvolume, createsnapshotschedule,
+  createsnapshot, restoresnapshot, setvolume, setsnapshotschedule, deletesnapshotschedule,
+  createvolumereplication, listvolumereplications, showvolumereplication,
+  listsnapshotschedule, listsnapshots, deletesnapshot all newly 202/200.
 
 ## networking / vpc (+ subnet, port, public-ip, internet-gateway)
 

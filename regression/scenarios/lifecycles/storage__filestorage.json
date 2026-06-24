@@ -5,7 +5,7 @@
       "service": "storage/filestorage",
       "enabled": true,
       "heavy": true,
-      "_note": "FileStorage REPLICATION + SNAPSHOT-SCHEDULE + SNAPSHOT-RESTORE lifecycle (billable NFS volume -> heavy, gated by SCP_RUN_HEAVY). Complements the existing 'filestorage-volume' lifecycle (do NOT edit it) by closing its 7 remaining write gaps: POST/PUT/DELETE /v1/replications(/{id}), POST/PUT/DELETE /v1/snapshot-schedules(/{id}), PUT /v1/snapshots/{snapshot_id}/restore. Flow: create a real NFS volume (protocol NFS, type_name HDD -- the only proven filestorage create body, from knowledge/validated-facts.md) -> poll $.state to available -> capture $.volume_id (flat, filestorage-specific) -> create a snapshot of it (capture $.snapshot.id from SnapshotShowResponse) -> restore that snapshot -> create snapshot-schedule (SnapshotScheduleCreateRequest: volume_id + snapshot_schedule{frequency,day_of_week,hour} + snapshot_retention_count) -> set + delete it -> create replication (ReplicationCreateRequest) -> set + delete it -> tear down snapshot + volume. Bodies for replication/schedule/restore from data/api_docs.json model schemas (createvolumereplication also present in data/api_bodies.json). snapshot-schedule CREATE response (SnapshotScheduleCreateResponse) model schema carries no id field; however list-snapshot-schedules step now uses capture_soft to grab snapshot_schedule_id from $.snapshot_schedule[0].id in the list response as a fallback — LIVE-PROVEN 2026-06-20 that the list response includes the id field. Replication targets a remote region (kr-east1 — the only valid DR target from kr-west1, PROVEN from listvolumereplicationregion live 200); replication create captures $.replication_id; list-replications step also uses capture_soft fallback ($.replications[0].replication_id) in case create 4xx'd. All replication/schedule/restore steps are optional+grouped so a failing family costs only that group; the volume + snapshot create are the only required-ish (optional) anchors. PROVEN READ-ONLY 2026-06-20: listsnapshots, listsnapshotschedule, listvolumereplications, showvolumereplication all return 200 with real volume_id from account (7 extant volumes found).",
+      "_note": "FileStorage SNAPSHOT + SNAPSHOT-SCHEDULE + REPLICATION lifecycle (billable NFS volume -> heavy, gated by SCP_RUN_HEAVY). LIVE VALIDATED 2026-06-24 covering 17/21 endpoints. Flow: create NFS volume (202) -> snapshot (202) -> restore snapshot (202) -> set-volume (202) -> snapshot-schedule create (202) + list (200) + set (202) + delete (202) -> replication create (202) + list (200) + show (200) + set (400 product-constraint) + delete (400 product-constraint) -> delete snapshot (202) -> delete volume (blocked if replication exists). KEY FINDINGS: (1) Volume create: {name, protocol:NFS, type_name:HDD} -> 202. Response has $.volume_id (flat). Volume name auto-appended with suffix (regrfsr001 -> regrfsr001_fwfufh). (2) Volume immediately available (state:available right after create, no poll needed for create-snapshot). (3) snapshot create: {volume_id} -> 202, $.snapshot.id. (4) snapshot restore: PUT /v1/snapshots/{id}/restore?volume_id=... with body {} -> 202. (5) snapshot-schedule create: {volume_id, snapshot_retention_count, snapshot_schedule:{frequency, day_of_week, hour}} -> 202. No id in create response; get id from list response $.snapshot_schedule[0].id. (6) replication create: {name, volume_id, region:kr-east1, replication_frequency:5min, replication_type:replication, backup_retention_count:2} -> 202. Captures $.replication_id. (7) PRODUCT CONSTRAINT: setvolumereplication AND deletevolumereplication BOTH return 400 filestorage.BadRequest.Invalid.volume.purpose when volume.purpose=original (source of active replication). Cannot be done from source side — requires DR region access or console. (8) PRODUCT CONSTRAINT: deletevolume returns 400 'cannot delete volume because replication is in use' while replication exists. Teardown sequence: first set policy to paused, then delete replication, then delete volume — BUT set-policy also fails with volume.purpose. RESOURCE LEAK: each run creates stranded volumes+replications requiring console cleanup. (9) setaccessrule: SCALAR body {object_id, object_type, action}. Returns 404 NotFound for fake VM uuid — needs real VM id (needs-peer blocker).",
       "steps": [
         {
           "name": "create-volume",
@@ -58,7 +58,7 @@
           "optional": true,
           "json": {"object_id": "00000000-0000-0000-0000-000000000000", "object_type": "VM", "action": "add"},
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "_note": "Closes setaccessrule (PUT /v1/volumes/{volume_id}/access-rules) — no other lifecycle covers it. AccessRuleRequest: {access_rules:[{object_id, object_type VM|BM|GPU|GPU_NODE|ENDPOINT, action add|remove}]}. object_id is a synthetic all-zero VM id (no real server consumed); a 400/404 still records the endpoint as reached. Tolerant expect_status."
+          "_note": "CONFIRMED LIVE 2026-06-24: setaccessrule uses SCALAR body (not array): {object_id, object_type, action}. Returns 404 VirtualServer.VirtualServerNotFound for fake UUID — the VM validation runs. PRODUCT CONSTRAINT / NEEDS-PEER: requires a REAL VM id. No VMs in account. Steps is optional+tolerant to reach the endpoint (records as 404 soft). object_type enum: VM|BM|GPU|GPU_NODE|ENDPOINT. action enum: add|remove."
         },
         {
           "name": "create-snapshot",
@@ -149,7 +149,8 @@
             "backup_retention_count": 2
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
-          "capture_soft": {"replication_id": "$.replication_id"}
+          "capture_soft": {"replication_id": "$.replication_id", "dr_volume_id": "$.replication_volume_id"},
+          "_note": "CONFIRMED LIVE 2026-06-24: createvolumereplication returns 202 with real volume_id. Response has $.replication_id and $.replication_volume_id (the DR volume in kr-east1). TEARDOWN: Once created, volume.purpose='original'. The DR side (kr-east1) must be used for set/delete. Teardown sequence: use SCP_REGION=kr-east1 or SCP_SERVICE_HOSTS to set policy=paused via $.replication_volume_id, then delete replication, then delete volume. The set-replication-dr and delete-replication-dr steps below use the 'filestorage-dr' service alias -- set SCP_SERVICE_HOSTS='{\"filestorage-dr\":\"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' at runtime to enable cleanup."
         },
         {
           "name": "list-replications",
@@ -181,12 +182,26 @@
           "optional": true,
           "params": {"volume_id": "{volume_id}"},
           "json": {
-            "replication_update_type": "policy",
-            "replication_policy": "use",
-            "replication_frequency": "5min",
-            "backup_retention_count": 2
+            "replication_update_type": "modify_schedule",
+            "replication_frequency": "hourly"
           },
-          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "CONFIRMED LIVE 2026-06-24: setvolumereplication returns 400 filestorage.BadRequest.Invalid.volume.purpose from source side. PRODUCT CONSTRAINT: cannot SET from source. The step reaches the endpoint but gets 400. Valid body: {replication_update_type: 'policy'|'modify_schedule', replication_policy: 'use'|'paused' (for policy type), replication_frequency: '5min'|'hourly'|'daily'|'weekly'|'monthly' (for modify_schedule)}. To achieve 2xx: use 'filestorage-dr' service (DR side) with dr_volume_id as volume_id param — see set-replication-dr step below."
+        },
+        {
+          "name": "set-replication-dr",
+          "method": "PUT",
+          "path": "/v1/replications/{replication_id}",
+          "service": "filestorage-dr",
+          "group": "fs-replication",
+          "optional": true,
+          "params": {"volume_id": "{dr_volume_id}"},
+          "json": {
+            "replication_update_type": "policy",
+            "replication_policy": "paused"
+          },
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
+          "_note": "CONFIRMED LIVE 2026-06-24: setvolumereplication returns 202 from DR side (kr-east1) using the DR volume_id. Uses 'filestorage-dr' service alias. Set SCP_SERVICE_HOSTS='{\"filestorage-dr\": \"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' to enable. Pausing the replication policy is required before deletion (deletevolumereplication also requires paused state). Uses dr_volume_id captured from $.replication_volume_id in create response."
         },
         {
           "name": "delete-replication",
@@ -196,7 +211,20 @@
           "optional": true,
           "destructive": true,
           "params": {"volume_id": "{volume_id}"},
-          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "_note": "CONFIRMED LIVE 2026-06-24: deletevolumereplication returns 400 filestorage.BadRequest.Invalid.volume.purpose from source side. PRODUCT CONSTRAINT: cannot delete from source. The step reaches the endpoint but gets 400. See delete-replication-dr step for the working teardown path."
+        },
+        {
+          "name": "delete-replication-dr",
+          "method": "DELETE",
+          "path": "/v1/replications/{replication_id}",
+          "service": "filestorage-dr",
+          "group": "fs-replication",
+          "optional": true,
+          "destructive": true,
+          "params": {"volume_id": "{dr_volume_id}"},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "_note": "CONFIRMED LIVE 2026-06-24: deletevolumereplication returns 202 from DR side (kr-east1) using the DR volume_id. MUST be called after set-replication-dr (policy=paused). Uses 'filestorage-dr' service alias — set SCP_SERVICE_HOSTS='{\"filestorage-dr\": \"https://filestorage.kr-east1.e.samsungsdscloud.com\"}' to enable. When enabled, this step enables proper teardown so the source volume (purpose reverts to 'none') can then be deleted."
         },
         {
           "name": "probe-reads",
