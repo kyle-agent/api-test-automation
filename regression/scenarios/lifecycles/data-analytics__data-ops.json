@@ -5,7 +5,7 @@
       "service": "data-analytics/data-ops",
       "enabled": true,
       "heavy": true,
-      "_note": "COVERAGE-ONLY guarded lifecycle for data-ops's uncovered WRITE endpoints: createdataopsservice (POST /v1/data-ops-services), updatedataopsservice (PUT), deletedataopsservice (DELETE), the two validate-resources POSTs (create- and update-scope), and createdataops/updatedataopsv1/deletedataopsv1 on /v1/data-ops. data-ops provisions a billable analytics cluster + service, so this is heavy:true and does NOT spin up a real cluster: it soft-captures any EXISTING service/ops id from the read-only lists; when none exist the {data_ops_service_id}/{data_ops_id}/{cluster_id} tokens still normalize to the catalog '*' key so each endpoint is CALLED and RECORDED (a 4xx counts as covered per the engine). Every mutating step is optional + grouped + broad expect_status so an isolated 4xx isolates to its group and never fails the run or chains a real create->mutate->delete. DELETEs are destructive:true (gated by SCP_ALLOW_DESTRUCTIVE). No data/api_bodies.json entries exist for data-ops, so bodies are best-effort from path/field semantics + the shared SCP analytics-console shape (mirrors data-flow which mirrors the dbaas instance_groups/block_storage shape) and are UNPROVEN — promote to validated after a real 2xx. validate-resources is a dry-run preflight the console calls before create/update.",
+      "_note": "COVERAGE-ONLY guarded lifecycle for data-ops's uncovered WRITE endpoints. Live-run 2026-06-24 confirmed: (1) createdataops: storage_class_name must be non-empty ('' causes 400 'storage class name should not be null'; 'default' gets 404 cluster not found - body passes validation). (2) createdataopsservice: service_workload format 'Input dataOpsServiceWorkload is not valid' for all tried formats (scheduler/web_server/worker with cpu/memory/replica/version strings/ints) - unknown valid format, backend validates before ID lookup. (3) id-bound PUTs/DELETEs: 400 'Input id must start with DOPS-/DOPS_SERVICE-' when soft-capture returns nothing (empty account) - need real IDs. (4) validate-resources-update: same id format error. All 12 remaining are heavy-prereq: need a real billable Airflow cluster to get 2xx. This lifecycle is heavy:true; when run with SCP_RUN_HEAVY=true it records 8 catalog-key 4xxes providing diagnostic data. DELETEs are destructive:true.",
       "steps": [
         {
           "name": "list-data-ops-services",
@@ -85,13 +85,14 @@
             "host_alias_list": [],
             "image_id": "IMAGE-ef7a8ad7-ec47-41b7-aef9-e6dfe4edfd21",
             "ingress_controller_name": "{ingress_controller_name}",
-            "storage_class_name": "",
+            "storage_class_name": "default",
             "description": "API regression coverage probe",
             "tags": []
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
-          "group": "do-ops"
+          "group": "do-ops",
+          "_note": "storage_class_name must be non-empty; empty string causes 400 'storage class name should not be null' (live-proven 2026-06-24). 'default' passes body validation and gets 404 (cluster not found) with a fake cluster_id. With a real cluster_id and ingress_controller_name this would proceed to create."
         },
         {
           "name": "update-data-ops",
@@ -119,7 +120,7 @@
               "web_server": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"},
               "worker": {"cpu": "2000", "memory": "1024", "replica": "1", "version": "2.7.3"}
             },
-            "storage_class_name": "",
+            "storage_class_name": "default",
             "worker_type": "KubernetesExecutor",
             "description": "API regression coverage probe",
             "tags": []

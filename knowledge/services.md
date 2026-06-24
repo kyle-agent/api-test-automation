@@ -537,16 +537,18 @@ duplicating. Add a new `##` section when you take on a new service.
   - `getdataopsservice` (`/v1/data-ops-services/{data_ops_service_id}`) → 404 when missing
   - `getdataopssubversion` (`/v1/data-ops-services/data-ops/{data_ops_id}/sub-versions`) → **400** (NOT 404!) "dataOps is null" when ID valid format but resource missing
   - `getingresscontrollerlistv1` (`/v1/data-ops/clusters/{cluster_id}/ingress-controllers`) → 404 when cluster missing
-- **validate-resources POSTs:** dry-run preflight the console calls before create/update.
-  Still classified `mutating=True` (POST). Need real cluster_id/service_id AND
-  `SCP_ALLOW_MUTATIONS=true`. Heavy-prereq blockers.
-- **Response envelope:** list endpoints use `{contents:[], total_count}`. Detail uses
-  flat object or wrapped object (not yet confirmed — no existing resources).
-- **image-versions:** `GET /v1/data-ops/image-versions` → `{contents:[{image_id, image_name, version}], total_count}`. Currently returns 1 version: `4.1.1`.
-- **Coverage 2026-06-20 (this run):** confirmed 3 → **5/17** read-only via direct probes:
-  `checkduplicationcontroller` and `checkduplicationcontrollerv1` both return `200 {"result":false}`
-  for any probe name (e.g. `apiregr-probe`). Recorded via `core.results.record(Observation(...))` with
-  `source=read_chain`. Remaining 12 are heavy-prereq blockers (4 id-bound GETs + 8 mutating writes).
+- **validate-resources POSTs (live-probed 2026-06-24):** dry-run preflight the console calls before create/update.
+  - `getdataopsservicevalidateresourcescreation` (POST /v1/data-ops-services/clusters/{cluster_id}/validate-resources): returns 400 "Input dataOpsServiceWorkload is not valid" for ALL tried service_workload formats (scheduler/web_server/worker with cpu/memory/replica/version as strings, ints, millicore notation, with or without version). Backend validates service_workload BEFORE looking up cluster_id (data-flow validate-resources gets 404 for unknown cluster which confirms data-ops validates body first). Unknown valid format. Docs returned 503.
+  - `getdataopsservicevalidateresourcesupdate` (POST /v1/data-ops-services/{data_ops_service_id}/validate-resources): same workload issue + needs real DOPS_SERVICE- ID. doubly blocked.
+- **create-data-ops body quirk (live-proven 2026-06-24):** `storage_class_name` must be **non-null/non-empty string**. Empty string `""` causes 400 "Input storage class name should not be null". Value `"default"` passes body validation and returns 404 (cluster not found) with a fake cluster_id. Lifecycle updated to use `"default"`. With a real cluster_id + ingress_controller_name this should proceed to create.
+- **create-data-ops-service body (UNKNOWN valid format 2026-06-24):** `service_workload` field consistently returns 400 "Input dataOpsServiceWorkload is not valid" regardless of tried formats (scheduler/web_server/worker, integer or string cpu/memory, with/without version, with/without extra fields). `storage_class_name` must also be non-empty. Docs site returned 503. This endpoint needs real billable Airflow cluster AND valid service_workload format to reach 2xx.
+- **Response envelope:** list endpoints use `{contents:[], total_count}`. Detail uses flat object (not confirmed — no resources in account).
+- **image-versions:** `GET /v1/data-ops/image-versions` → `{contents:[{image_id, image_name, version}], total_count}`. Only 1 version available: `4.1.1` (IMAGE-ef7a8ad7-ec47-41b7-aef9-e6dfe4edfd21).
+- **Coverage 2026-06-24:** confirmed **5/17** 2xx (no change from previous run):
+  - `getdataopsimageversionv1`, `getdataopslistconsole`, `getdataopsservicelistconsole` (smoke 200)
+  - `checkduplicationcontroller`, `checkduplicationcontrollerv1` (200 for any name)
+  - Remaining 12 are all heavy-prereq (4 id-bound GETs + 8 mutating writes needing real Airflow cluster).
+- **Guarded lifecycle diagnostics 2026-06-24 (heavy=true run):** 8 write endpoint catalog keys now have 4xx observations (not 2xx but reach-confirmed). Fix for next heavy run: storage_class_name='default' is in the lifecycle. service_workload format unknown — will need to inspect API source or docs once 503 clears.
 - **Entitlement-403 for parent paths:** `/v1/data-ops-services/data-ops` and `/v1/data-ops/clusters`
   both return 403 `Action definition is not found` — these are IAM-unregistered paths for ROOT user.
   `getdataopssubversion` and `getingresscontrollerlistv1` are thus doubly-blocked (entitlement-403 on

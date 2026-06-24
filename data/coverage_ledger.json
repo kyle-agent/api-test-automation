@@ -501,15 +501,17 @@
       "gap": 12,
       "heavy": false,
       "blockers": [
-        "heavy-prereq: all 12 remaining need a billable Airflow cluster (0 data-ops-services, 0 data-ops).",
-        "entitlement-403: parent paths /v1/data-ops-services/data-ops + /v1/data-ops/clusters -> 403 'Action definition is not found' (doubly blocks getdataopssubversion+getingresscontrollerlistv1)."
+        "heavy-prereq: all 12 remaining need a billable Airflow cluster (0 data-ops-services, 0 data-ops in account).",
+        "entitlement-403: parent paths /v1/data-ops-services/data-ops + /v1/data-ops/clusters -> 403 Action definition is not found (doubly blocks getdataopssubversion + getingresscontrollerlistv1).",
+        "unknown-body-format: createdataopsservice + getdataopsservicevalidateresourcescreation: service_workload format invalid (400 Input dataOpsServiceWorkload is not valid) for all tried formats (scheduler/web_server/worker with cpu/memory/replica/version strings or ints). Docs returned 503. Must inspect API source or await docs fix."
       ],
       "next_levers": [
-        "HEAVY+MUTATIONS: data-ops-service-and-ops-guarded",
-        "Borrow-read: if another team creates a resource, list to harvest ids"
+        "heavy-prereq: SCP_RUN_HEAVY=true with real Airflow cluster -- all 12 gap endpoints covered once cluster+service exist.",
+        "service_workload-fix: find valid format for scheduler/web_server/worker fields (docs 503 during this run; try again or inspect API source).",
+        "storage_class_name: FIXED in lifecycle (was empty string, now default -- gets 404 not 400 for createdataops)."
       ],
-      "notes": "5/17 confirmed (2 check-duplication 200 for any name). ID formats DOPS-<uuid>, DOPS_SERVICE-<uuid>, 32-hex cluster_id. getdataopssubversion 400 (not 404) for fake id. Only image version 4.1.1.",
-      "updated": "2026-06-24T03:09:05Z"
+      "notes": "5/17 confirmed 2xx (smoke+read-chain). ID formats: DOPS-<uuid>, DOPS_SERVICE-<uuid>, 32-hex cluster_id. getdataopssubversion 400 (not 404) for fake id. Only image: 4.1.1 (IMAGE-ef7a8ad7-ec47-41b7-aef9-e6dfe4edfd21). Guarded lifecycle (heavy=true) run 2026-06-24 recorded 8 write endpoint catalog keys as 4xx. storage_class_name fix applied (lifecycle updated). service_workload unknown format is the main body-shape blocker for create/validate endpoints.",
+      "updated": "2026-06-24T03:12:56Z"
     },
     {
       "service": "multinodegpucluster",
