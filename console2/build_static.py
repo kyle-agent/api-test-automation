@@ -236,11 +236,17 @@ def bake() -> dict:
     # (save) is served in-memory by the shim (no persistence in a snapshot). -----
     suites = server._list_suites_view()
 
+    # ----- knowledge (GET /api/knowledge?service=): the 📖 정의 viewer's facts pane.
+    # The lifecycle/resource DEFINITION is derived client-side from the baked model
+    # (mock-api lifecyclesView), so only the knowledge/*.md facts need baking. -----
+    knowledge = {svc: server._knowledge_view(svc) for svc in services}
+
     return {
         "model": model,
         "graphs": graphs,
         "run": run_payload,
         "suites": suites,
+        "knowledge": knowledge,
         # The app's init() seeds targets with ["vpc","subnet"] and POSTs that on
         # load; we record the SAME here so the documented default matches what the
         # unchanged front-end actually selects (its DAG is baked verbatim above).
@@ -284,7 +290,36 @@ MOCK_API_JS = r"""// mock-api.js — STATIC DEMO fetch shim for console2.
   var REC = RUN.record || {};
   var RUN_ID = REC.id || "demo-run";
   var SUITES = (DATA.suites || []).slice();   // named run-shape presets (Suite ▾)
+  var KNOWLEDGE = DATA.knowledge || {};       // baked knowledge facts per service (📖 정의)
   var realFetch = window.fetch ? window.fetch.bind(window) : null;
+
+  // GET /api/lifecycles?service= — the per-service DEFINITION, projected from the
+  // baked MODEL exactly like the server's _lifecycles_view (so no duplicate bake).
+  function lifecyclesView(svc) {
+    var nodes = MODEL.nodes || {}, lcs = MODEL.lifecycles || {};
+    var resources = [], lcIds = {};
+    Object.keys(nodes).forEach(function (nid) {
+      var n = nodes[nid];
+      if (n.service !== svc) return;
+      if (n.lifecycle) lcIds[n.lifecycle] = 1;
+      resources.push({ id: nid, code: n.code || "", provenance: n.provenance || "?",
+        heavy: !!n.heavy, quota: n.quota, endpoint: n.endpoint || "", api: n.api || [],
+        options: n.options || [],
+        deps: { and: n["and"] || [], one_of: n.one_of || [], creds: n.creds || [] },
+        lifecycle: n.lifecycle });
+    });
+    resources.sort(function (a, b) {
+      var ak = a.code ? 0 : 1, bk = b.code ? 0 : 1;
+      if (ak !== bk) return ak - bk;
+      return (a.code || a.id) < (b.code || b.id) ? -1 : 1;
+    });
+    var lifecycles = Object.keys(lcs).filter(function (lid) {
+      return lcs[lid].service === svc || lcIds[lid];
+    }).map(function (lid) { return lcs[lid]; });
+    lifecycles.sort(function (a, b) { return a.id < b.id ? -1 : 1; });
+    return { service: svc, resources: resources, lifecycles: lifecycles,
+             n_resources: resources.length, n_lifecycles: lifecycles.length };
+  }
 
   function jsonResponse(obj, status) {
     var body = JSON.stringify(obj);
@@ -388,6 +423,20 @@ MOCK_API_JS = r"""// mock-api.js — STATIC DEMO fetch shim for console2.
       if (!hit) return jsonResponse({ error: "endpoint not in catalog",
         method: m.toUpperCase(), path: pth }, 404);
       return jsonResponse(hit);
+    }
+
+    // ---- GET /api/lifecycles?service= -> definition projected from baked model ----
+    if (path === "/api/lifecycles" && method === "GET") {
+      var lsvc = u.searchParams.get("service") || "";
+      if (!lsvc) return jsonResponse({ error: "service query param required (cat/svc)" }, 400);
+      return jsonResponse(lifecyclesView(lsvc));
+    }
+
+    // ---- GET /api/knowledge?service= -> baked knowledge facts (filtered .md view) ----
+    if (path === "/api/knowledge" && method === "GET") {
+      var ksvc = u.searchParams.get("service") || "";
+      if (!ksvc) return jsonResponse({ error: "service query param required (cat/svc)" }, 400);
+      return jsonResponse(KNOWLEDGE[ksvc] || { service: ksvc, facts: [], n_facts: 0, truncated: false });
     }
 
     // ---- POST /api/graph {selection} ----

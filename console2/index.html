@@ -154,6 +154,21 @@
   </div>
 </div>
 
+<!-- definition viewer (READ-ONLY: lifecycle steps + endpoints + knowledge facts) -->
+<div class="scrim" id="def-scrim"></div>
+<div class="modal def-modal" id="def-modal">
+  <div class="mh">
+    <h3 id="def-title">📖 정의</h3>
+    <span class="msvc" id="def-svc"></span>
+    <button class="mclose" id="def-close">×</button>
+  </div>
+  <div class="mbody" id="def-body"></div>
+  <div class="mfoot">
+    <span class="muted small" id="def-hint">읽기 전용 — 정의(생애주기·엔드포인트)는 모델, 지식은 knowledge/*.md. 합성·실행에는 영향 없음.</span>
+    <button class="btn" id="def-done">닫기</button>
+  </div>
+</div>
+
 <!-- console2.js fetches /api/model, sets the model, THEN renders. resource_graph.js
      (composer.graph_view renderer, light theme) is loaded first so it's ready. -->
 <script src="assets/resource_graph.js" defer></script>

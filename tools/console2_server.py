@@ -232,6 +232,98 @@ def _model() -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# read-only DEFINITION views — surface the per-service test definition (lifecycle
+# steps + resource endpoints/options/deps, all already in the model) and the
+# accumulated knowledge facts (knowledge/*.md). Pure offline reads — no creds, no
+# network, no mutation. Served by GET /api/lifecycles and GET /api/knowledge so the
+# console can show "📖 정의" for a service; later a POST sibling can make it editable.
+# --------------------------------------------------------------------------- #
+def _lifecycles_view(service: str) -> dict:
+    """For one ``cat/svc`` service: its resource tasks (code, provenance, the
+    create/verify/delete endpoints, request-body options, dependencies) + the
+    runnable lifecycles (id + ordered steps). Projected from the built model."""
+    m = _model()
+    resources = []
+    lc_ids: set[str] = set()
+    for nid, n in m["nodes"].items():
+        if n.get("service") != service:
+            continue
+        if n.get("lifecycle"):
+            lc_ids.add(n["lifecycle"])
+        resources.append({
+            "id": nid, "code": n.get("code", ""), "provenance": n.get("provenance", "?"),
+            "heavy": bool(n.get("heavy")), "quota": n.get("quota"),
+            "endpoint": n.get("endpoint", ""), "api": n.get("api") or [],
+            "options": n.get("options") or [],
+            "deps": {"and": n.get("and") or [], "one_of": n.get("one_of") or [],
+                     "creds": n.get("creds") or []},
+            "lifecycle": n.get("lifecycle"),
+        })
+    resources.sort(key=lambda r: (not r["code"], r["code"] or r["id"]))
+    lifecycles = [lc for lid, lc in m["lifecycles"].items()
+                  if lc.get("service") == service or lid in lc_ids]
+    lifecycles.sort(key=lambda lc: lc["id"])
+    return {"service": service, "resources": resources, "lifecycles": lifecycles,
+            "n_resources": len(resources), "n_lifecycles": len(lifecycles)}
+
+
+def _knowledge_view(service: str, cap: int = 24) -> dict:
+    """Best-effort: pull the paragraphs in ``knowledge/*.md`` that mention this
+    service — by its ``cat/svc`` path, its short name, or any of its resource
+    codes — each tagged with the nearest ``#`` heading. Read-only; the markdown is
+    the source of truth (this is a filtered view, not a copy)."""
+    import re
+    m = _model()
+    short = service.split("/")[-1]
+    codes = sorted({n["code"] for n in m["nodes"].values()
+                    if n.get("service") == service and n.get("code")})
+    # specific tokens (service path + resource codes) rank above the bare short name
+    specific = [service] + codes
+    toks = specific + ([short] if short else [])
+    pat = re.compile(r"(?<![\w/-])(" + "|".join(re.escape(t) for t in toks if t) + r")(?![\w-])")
+    spec_pat = re.compile(r"(?<![\w/-])(" + "|".join(re.escape(t) for t in specific if t) + r")(?![\w-])") if specific else None
+    facts = []
+    seen = set()
+    kdir = ROOT / "knowledge"
+    for path in sorted(kdir.glob("*.md")):
+        if path.name == "README.md":
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        heading = ""
+        i = 0
+        while i < len(lines):
+            ln = lines[i]
+            if ln.lstrip().startswith("#"):
+                heading = ln.lstrip("#").strip()
+                i += 1
+                continue
+            if not ln.strip():
+                i += 1
+                continue
+            # gather one block (contiguous non-blank, non-heading lines)
+            block = []
+            while i < len(lines) and lines[i].strip() and not lines[i].lstrip().startswith("#"):
+                block.append(lines[i])
+                i += 1
+            text = "\n".join(block)
+            if pat.search(text):
+                key = (path.name, heading, text[:60])
+                if key in seen:
+                    continue
+                seen.add(key)
+                facts.append({"file": path.name, "anchor": heading,
+                              "snippet": text if len(text) <= 900 else text[:900] + " …",
+                              "_spec": bool(spec_pat and spec_pat.search(text))})
+    # specific (path/code) matches first, then short-name-only; cap the total
+    facts.sort(key=lambda f: not f["_spec"])
+    for f in facts:
+        f.pop("_spec", None)
+    return {"service": service, "facts": facts[:cap], "n_facts": min(len(facts), cap),
+            "truncated": len(facts) > cap, "tokens": toks}
+
+
+
+# --------------------------------------------------------------------------- #
 # endpoint parameter SCHEMA (per-endpoint param defs for the API-tab coverage hint)
 # --------------------------------------------------------------------------- #
 def _ep_norm_path(p: str) -> str:
@@ -1051,6 +1143,26 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, m)
             except Exception as exc:  # noqa: BLE001
                 return self._json(500, {"error": f"model build failed: {exc}"})
+        if p == "/api/lifecycles":
+            # read-only DEFINITION: /api/lifecycles?service=cat/svc -> resources
+            # (endpoints/options/deps) + runnable lifecycles (steps).
+            svc = (parse_qs(urlparse(self.path).query).get("service") or [""])[0]
+            if not svc:
+                return self._json(400, {"error": "service query param required (cat/svc)"})
+            try:
+                return self._json(200, _lifecycles_view(svc))
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"lifecycles view failed: {exc}"})
+        if p == "/api/knowledge":
+            # read-only FACTS: /api/knowledge?service=cat/svc -> knowledge/*.md
+            # paragraphs mentioning the service (filtered view, source = the .md).
+            svc = (parse_qs(urlparse(self.path).query).get("service") or [""])[0]
+            if not svc:
+                return self._json(400, {"error": "service query param required (cat/svc)"})
+            try:
+                return self._json(200, _knowledge_view(svc))
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"knowledge view failed: {exc}"})
         if p == "/api/endpoint-params":
             # on-demand single lookup: /api/endpoint-params?method=GET&path=/v1/vpcs
             q = parse_qs(urlparse(self.path).query)
