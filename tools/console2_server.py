@@ -324,6 +324,80 @@ def _knowledge_view(service: str, cap: int = 24) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# RUNTIME view — the account's CURRENT live resource topology (each instance + its
+# relationships), reusing audit.live_view.render_flow over a recent loggingaudit
+# window. Served as standalone self-contained HTML so the console can open it in a
+# 별도 popup (기존 live.html 처럼). A cold harvest is slow (loggingaudit pagination)
+# and flaky, so generation runs in a BACKGROUND thread and the request returns
+# immediately — fresh cache → topology; stale cache → that (still useful); nothing
+# yet → a 수집 중 placeholder that auto-refreshes. Needs creds (no creds → error
+# card). One harvest at a time (the `generating` flag).
+# --------------------------------------------------------------------------- #
+_RUNTIME_CACHE: dict = {"html": None, "ts": 0.0, "hours": None, "generating": False}
+_RUNTIME_TTL = 60.0
+_RUNTIME_LOCK = threading.Lock()
+
+
+def _runtime_error_html(msg: str) -> str:
+    esc = msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return ("<!doctype html><meta charset=utf-8><title>런타임 뷰</title>"
+            "<body style='font-family:system-ui;padding:40px;color:#1f2328'>"
+            "<h2>런타임 뷰를 생성하지 못했습니다</h2>"
+            f"<p style='color:#cf222e'>{esc}</p>"
+            "<p>현재 계정의 라이브 토폴로지는 <b>loggingaudit</b>에서 수집합니다 — "
+            ".env에 SCP 자격증명이 필요합니다.</p></body>")
+
+
+def _runtime_wait_html(hours: float) -> str:
+    return ("<!doctype html><meta charset=utf-8><title>런타임 뷰 · 수집 중</title>"
+            "<meta http-equiv='refresh' content='4'>"
+            "<body style='font-family:system-ui;display:flex;align-items:center;"
+            "justify-content:center;height:90vh;flex-direction:column;gap:14px;color:#57606a'>"
+            "<div style='font-size:15px'>🌐 현재 계정 토폴로지 수집 중… <b>loggingaudit</b></div>"
+            f"<div style='font-size:12px;color:#8c959f'>최근 {hours:g}시간 · 자동 새로고침</div>"
+            "<div style='width:38px;height:38px;border:4px solid #d0d7de;border-top-color:#2563c9;"
+            "border-radius:50%;animation:spin 1s linear infinite'></div>"
+            "<style>@keyframes spin{to{transform:rotate(360deg)}}</style></body>")
+
+
+def _runtime_generate(hours: float) -> None:
+    """The slow part (harvest + render_flow) — runs in a bg thread, updates cache."""
+    from datetime import datetime, timezone, timedelta
+    try:
+        from audit import live_view as lv
+        now = datetime.now(timezone.utc)
+        end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        start = (now - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        ev_path = str(ROOT / "reports" / "audit" / "_runtime.jsonl")
+        events: list[dict] = []
+        lv.harvest(start, end, ev_path)             # loggingaudit → jsonl (needs creds)
+        for line in open(ev_path, encoding="utf-8"):
+            line = line.strip()
+            if line:
+                events.append(json.loads(line))
+        spans = lv.build_spans(events, now, ours_only=True)
+        html_out = lv.render_flow(spans, now, {"start": start, "end": end}, refresh=0)
+    except Exception as exc:                         # noqa: BLE001
+        html_out = _runtime_error_html(str(exc))
+    with _RUNTIME_LOCK:
+        _RUNTIME_CACHE.update(html=html_out, ts=time.monotonic(), hours=hours, generating=False)
+
+
+def _runtime_view(hours: float = 6.0):
+    """Return ``(html_or_None, ready)`` without blocking — kick a bg harvest when the
+    cache is stale so the popup never hangs on a cold load."""
+    with _RUNTIME_LOCK:
+        if (_RUNTIME_CACHE["html"] and _RUNTIME_CACHE["hours"] == hours
+                and (time.monotonic() - _RUNTIME_CACHE["ts"]) < _RUNTIME_TTL):
+            return _RUNTIME_CACHE["html"], True
+        if not _RUNTIME_CACHE["generating"]:
+            _RUNTIME_CACHE["generating"] = True
+            threading.Thread(target=_runtime_generate, args=(hours,), daemon=True).start()
+        stale = _RUNTIME_CACHE["html"] if _RUNTIME_CACHE["hours"] == hours else None
+        return stale, False
+
+
+# --------------------------------------------------------------------------- #
 # endpoint parameter SCHEMA (per-endpoint param defs for the API-tab coverage hint)
 # --------------------------------------------------------------------------- #
 def _ep_norm_path(p: str) -> str:
@@ -1163,6 +1237,26 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, _knowledge_view(svc))
             except Exception as exc:  # noqa: BLE001
                 return self._json(500, {"error": f"knowledge view failed: {exc}"})
+        if p == "/runtime" or p == "/api/runtime":
+            # RUNTIME view (HTML, for a 별도 popup): current account live-resource
+            # topology + relationships, from loggingaudit via audit.live_view. Non-
+            # blocking — a cold load returns the 수집 중 placeholder (auto-refresh).
+            q = parse_qs(urlparse(self.path).query)
+            try:
+                hours = float((q.get("hours") or ["6"])[0] or 6)
+            except ValueError:
+                hours = 6.0
+            out, _ready = _runtime_view(hours)
+            if not out:
+                out = _runtime_wait_html(hours)
+            body = out.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if p == "/api/endpoint-params":
             # on-demand single lookup: /api/endpoint-params?method=GET&path=/v1/vpcs
             q = parse_qs(urlparse(self.path).query)

@@ -600,6 +600,30 @@ def assemble(baked: dict) -> None:
         html = html.replace(f'"{ref}"', f'"{ref}?v={ver}"')
     (OUT / "index.html").write_text(html, encoding="utf-8")
 
+    # 🌐 런타임 뷰 snapshot — a representative live-resource topology so the static
+    # demo's "런타임 뷰" button shows something (the live server generates this fresh
+    # from loggingaudit). Same self-contained render_flow as live; synthetic data.
+    try:
+        from audit import live_view as lv
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+
+        def _ev(rt, name, mins_ago):
+            ts = (now - timedelta(minutes=mins_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            return {"resource_type": rt, "resource_name": name, "timestamp": ts,
+                    "event_name": "Create" + rt.replace("-", "").title() + "End"}
+        sample = [
+            _ev("vpc", "regrdemo01-vpc", 32), _ev("subnet", "regrdemo01-subnet-a", 30),
+            _ev("subnet", "regrdemo01-subnet-b", 29), _ev("security-group", "regrdemo01-sg", 28),
+            _ev("virtual-server", "regrdemo01-vs1", 26), _ev("virtual-server", "regrdemo01-vs2", 25),
+            _ev("loadbalancer", "regrdemo02-lb", 24),
+        ]
+        spans = lv.build_spans(sample, now, ours_only=True)
+        rt_html = lv.render_flow(spans, now, {"start": "static demo · 샘플 토폴로지", "end": "now"}, refresh=0)
+        (OUT / "runtime.html").write_text(rt_html, encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001 — snapshot is best-effort
+        print(f"  warning: runtime.html snapshot skipped ({exc})")
+
     # a short README note in the bundle (what this is / how it was built)
     readme = (
         "# console2 — STATIC DEMO SNAPSHOT\n\n"
