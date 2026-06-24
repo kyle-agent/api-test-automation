@@ -1299,6 +1299,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", _CT.get(path.suffix, "application/octet-stream"))
         self.send_header("Content-Length", str(len(data)))
+        # dev/preview server: never let the browser keep a stale console2.js/css after
+        # a `git pull` + restart — always serve fresh assets (avoids "I changed the
+        # code but the page shows old behavior" confusion).
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.end_headers()
         self.wfile.write(data)
 
