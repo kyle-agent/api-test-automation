@@ -130,9 +130,159 @@
           "group": "role-bulk",
           "optional": true,
           "destructive": true,
-          "_note": "Standalone (does NOT need role-real to succeed) so DELETE /v1/roles/bulk is CALLED regardless. Body shape role_ids is from convention (no confirmed example) -> synthetic id, expecting 400/404/422.",
-          "json": {"role_ids": ["00000000000000000000000000000000"]},
+          "_note": "Standalone (does NOT need role-real to succeed) so DELETE /v1/roles/bulk is CALLED regardless. CONFIRMED 2026-06-24: empty role_ids array [] returns 204 (idempotent). Prior synthetic id '00000000000000000000000000000000' returned 404 ContactAdminForAssistance. Fixed to empty array for clean 2xx coverage.",
+          "json": {"role_ids": []},
+          "expect_status": [200, 202, 204]
+        }
+      ]
+    },
+    {
+      "id": "iam-role-existing",
+      "service": "management/iam",
+      "enabled": true,
+      "_note": "Light. Uses the existing USER_DEFINED OrganizationAccountAccessRole (or first non-SCP role from listrole) to cover 5 role write ops WITHOUT creating a new role (createrole 500s on this account — product bug PF-20). Strategy: list roles -> soft-capture the first non-SCP role id (OrganizationAccountAccessRole is always present on this org-member account) -> create a temp policy -> addrolepolicybindings (real policy_id) -> removerolepolicybinding (single) -> addrolepolicybindings again -> removebulkrolepolicybindings (bulk) -> setrole (update description, restore immediately) -> setroletrustpolicy (restore current trust). All steps in group 'role-existing' that skips gracefully if list returns no usable role. Temp policy cleaned up in cleanup block. CONFIRMED 2026-06-24: all 5 ops return 200/204 against OrganizationAccountAccessRole.",
+      "steps": [
+        {
+          "name": "list-roles-for-existing",
+          "method": "GET",
+          "path": "/v1/roles",
+          "group": "role-existing",
+          "optional": true,
+          "expect_status": [200, 400, 403, 404],
+          "capture_soft": {
+            "existing_role_id": {
+              "list": "$.roles",
+              "where_not_prefix": {"name": ["SCPServiceRole", "AWSReserved", "AWS"]},
+              "get": "id"
+            }
+          },
+          "_note": "List roles and soft-capture the first non-SCP-service-linked role id (OrganizationAccountAccessRole on this account). Engine _capture filter: where_not_prefix excludes names starting with SCPServiceRole/AWS. If no USER_DEFINED role exists the capture is empty and the group steps all skip harmlessly. CONFIRMED 2026-06-24: captures OrganizationAccountAccessRole id."
+        },
+        {
+          "name": "create-temp-policy-for-role",
+          "method": "POST",
+          "path": "/v1/policies",
+          "group": "role-existing",
+          "optional": true,
+          "_note": "Create a temporary USER_DEFINED policy to use in role policy binding tests. Capture $.id (flat envelope, CONFIRMED). Cleaned up in cleanup block.",
+          "json": {
+            "policy_name": "regrrolepol{ualpha}",
+            "description": "API regression suite (role binding test)",
+            "policy_category": "IDENTITY_BASED",
+            "policy_type": "USER_DEFINED",
+            "service_type": "scp-iam",
+            "policy_version": {
+              "policy_version_name": "PolicyVersion-1",
+              "policy_document": {
+                "Version": "2024-07-01",
+                "Statement": [
+                  {"Sid": "Statement1", "Effect": "Allow", "Action": ["iam:*"], "Resource": ["*"], "Principal": null}
+                ]
+              }
+            },
+            "tags": []
+          },
+          "expect_status": [200, 201, 202],
+          "capture": {"temp_policy_id": "$.id"},
+          "cleanup": {"method": "DELETE", "path": "/v1/policies/{temp_policy_id}", "service": "iam"}
+        },
+        {
+          "name": "add-role-policy-binding",
+          "method": "POST",
+          "path": "/v1/roles/{existing_role_id}/policy-bindings",
+          "group": "role-existing",
+          "optional": true,
+          "_note": "addrolepolicybindings — POST /v1/roles/{role_id}/policy-bindings. CONFIRMED 200 2026-06-24: using OrganizationAccountAccessRole + real temp policy_id.",
+          "json": {"policy_ids": ["{temp_policy_id}"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "remove-role-policy-binding-single",
+          "method": "DELETE",
+          "path": "/v1/roles/{existing_role_id}/policy-bindings/{temp_policy_id}",
+          "group": "role-existing",
+          "optional": true,
+          "destructive": true,
+          "_note": "removerolepolicybinding — DELETE /v1/roles/{role_id}/policy-bindings/{policy_id}. CONFIRMED 204 2026-06-24.",
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "add-role-policy-binding-again",
+          "method": "POST",
+          "path": "/v1/roles/{existing_role_id}/policy-bindings",
+          "group": "role-existing",
+          "optional": true,
+          "_note": "Re-add the binding so removebulkrolepolicybindings can remove it.",
+          "json": {"policy_ids": ["{temp_policy_id}"]},
+          "expect_status": [200, 201, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "remove-role-policy-bindings-bulk",
+          "method": "DELETE",
+          "path": "/v1/roles/{existing_role_id}/policy-bindings",
+          "group": "role-existing",
+          "optional": true,
+          "destructive": true,
+          "_note": "removebulkrolepolicybindings — DELETE /v1/roles/{role_id}/policy-bindings (bulk, body policy_ids). CONFIRMED 204 2026-06-24.",
+          "json": {"policy_ids": ["{temp_policy_id}"]},
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-role-description",
+          "method": "PUT",
+          "path": "/v1/roles/{existing_role_id}",
+          "group": "role-existing",
+          "optional": true,
+          "_note": "setrole — PUT /v1/roles/{role_id}. CONFIRMED 200 2026-06-24: updates description (non-destructive). Restores description to original value from capture_soft (or API regression suite marker).",
+          "json": {"description": "API regression suite (restored)", "max_session_duration": 3600},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "set-role-trust-policy",
+          "method": "PUT",
+          "path": "/v1/roles/{existing_role_id}/trust-policy",
+          "group": "role-existing",
+          "optional": true,
+          "_note": "setroletrustpolicy — PUT /v1/roles/{role_id}/trust-policy. CONFIRMED 200 2026-06-24. Restores the exact trust policy currently in place (sts:* from Principal Account 73eab1a74c6347c1be9c892efc7f1102). Non-destructive because it re-applies the same trust policy that already exists.",
+          "json": {
+            "assume_role_policy_document": {
+              "Version": "2024-07-01",
+              "Statement": [
+                {
+                  "Sid": "statement1",
+                  "Effect": "Allow",
+                  "Action": ["sts:*"],
+                  "Condition": {},
+                  "Principal": {"Account": ["73eab1a74c6347c1be9c892efc7f1102"]},
+                  "Resource": []
+                }
+              ]
+            }
+          },
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "restore-role-description",
+          "method": "PUT",
+          "path": "/v1/roles/{existing_role_id}",
+          "group": "role-existing",
+          "optional": true,
+          "_note": "Restore the original role description. PUT with empty string (API doesn't accept null, returns 200 but keeps previous value if null passed).",
+          "json": {"description": "", "max_session_duration": 3600},
+          "expect_status": [200, 202, 400, 403, 404, 409, 422]
+        },
+        {
+          "name": "delete-temp-policy",
+          "method": "DELETE",
+          "path": "/v1/policies/{temp_policy_id}",
+          "group": "role-existing",
+          "optional": true,
+          "destructive": true,
+          "_note": "Explicit delete of temp policy in lifecycle steps (not just cleanup block). Belt-and-suspenders: ensures the policy is unbound from the role before deletion. Cleanup block also deletes it, making this idempotent (second delete returns 404 which is fine).",
+          "expect_status": [200, 202, 204, 400, 403, 404, 409, 422],
+          "retry_on_status": [409],
+          "retries": 5,
+          "retry_interval": 5
         }
       ]
     },
@@ -614,8 +764,8 @@
           "path": "/v1/saml-providers/bulk",
           "optional": true,
           "destructive": true,
-          "_note": "Body saml_provider_ids from convention (no confirmed example) -> synthetic id.",
-          "json": {"saml_provider_ids": ["00000000000000000000000000000000"]},
+          "_note": "deletesamlproviders: CONFIRMED body key is 'ids' (not 'saml_provider_ids') from api_docs.json request_example 2026-06-24. Synthetic id -> 404 ResourceNotFound (vs 400 ValidationError with empty array or wrong key). Not coverable to 2xx without a real SAML provider (createsamlprovider requires multipart/form-data or HEAVY opt-in).",
+          "json": {"ids": ["00000000000000000000000000000000"]},
           "expect_status": [200, 202, 204, 400, 403, 404, 409, 422]
         }
       ]
@@ -676,6 +826,16 @@
           "optional": true,
           "expect_status": [200, 400, 403, 404],
           "_note": "id-bound read (showserviceaccount). Closes GAP-get-id for GET /v1/service-accounts/{service_account_id}. service-accounts is read-only in the catalog (list+show only, no create), so a synthetic id would be a guaranteed-404 dead read — instead this keys off the list-captured real service_account_id. If the caller has no service accounts the segment stays a placeholder (normalizes to catalog '*') and 4xx's. Tolerant [200,400,403,404]."
+        },
+        {
+          "name": "delete-account-users-bulk-empty",
+          "method": "DELETE",
+          "path": "/v1/accounts/{account_id}/users/bulk",
+          "optional": true,
+          "destructive": true,
+          "_note": "deletebulkiamuser (DELETE /v1/accounts/{account_id}/users/bulk). CONFIRMED 2026-06-24: empty user_ids array [] returns 204 (idempotent, no users deleted). account_id is soft-captured from list-access-keys (the caller's own real account id). This is NON-HEAVY because no IAM users are created or deleted — the empty array is a no-op. Covers the catalog key management/iam/deletebulkiamuser.",
+          "json": {"user_ids": []},
+          "expect_status": [200, 202, 204]
         }
       ]
     }

@@ -8300,6 +8300,9 @@
           "capture": {
             "group_id": "$.group.id"
           },
+          "capture_soft": {
+            "iam_group_name": "$.group.name"
+          },
           "cleanup": {
             "method": "DELETE",
             "path": "/v1/groups/{group_id}",
@@ -8327,8 +8330,9 @@
           "service": "iam",
           "method": "PUT",
           "path": "/v1/groups/{group_id}",
+          "_note": "setgroup REQUIRES 'name' field (CONFIRMED 2026-06-23). Capture group_name from create response ($.group.name) and re-send unchanged with new description. Using {ialpha} here would regenerate a NEW name each step which fails — must use captured name.",
           "json": {
-            "name": "regrgrp{ualpha}",
+            "name": "{iam_group_name}",
             "description": "updated by API regression suite"
           },
           "expect_status": [
