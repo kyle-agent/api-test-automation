@@ -48,6 +48,11 @@ MOCK_JS = r"""
     if (url.indexOf("/api/local/runs/") >= 0 && url.indexOf("/events") >= 0)
       return ok({ run: { id: "demo-run", mode: "simulate", status: "done" },
                   events: D.events || [], states: D.states || {} });
+    if ((url.indexOf("/api/local/cleanup") >= 0 || url.indexOf("/api/local/verify") >= 0) && opts && opts.method === "POST")
+      return ok({ ok: true, run: { id: "demo-util", mode: "verify", status: "done", rc: 0 } });
+    if (url.indexOf("/api/local/runs/") >= 0 && url.indexOf("/log") >= 0)
+      return ok({ run: { id: "demo-util", status: "done", rc: 0 },
+                  log: "(데모 — 실제 클린업/확인은 control plane 호스트에서 SCP를 호출합니다)" });
     return real ? real(url, opts) : ok({});
   };
   // clean-URL demo: if no query, auto-select the demo + auto-run once.
