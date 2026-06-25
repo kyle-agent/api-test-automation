@@ -108,6 +108,47 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **LATEST (2026-06-25, hand-driven heavy coverage session — committed DIRECTLY to
+  `main` at user request, NOT a feature branch):** three HEAVY live runs landed on
+  `main` (origin/main tip `44db7896` at handoff; verify with `git log --oneline -1
+  origin/main`). Coverage gains: **filestorage 8→17/21** (snapshot+schedule CRUD +
+  restore; replication teardown must go via DR region `kr-east1`); **virtualserver
+  17→29/113** — ALL 24 autoscaling-group endpoints now 2xx (new lifecycle
+  `regression/scenarios/lifecycles/compute__virtualserver-autoscaling.json`,
+  `heavy-asg-full-coverage`, 38 steps); **vpc 46→58/95** (all 14 PrivateLink
+  endpoints 2xx — IP-type PLS works without an LB: `connected_resource_type=IP`),
+  **scf 13→17/36** (PL service/endpoint). **Dashboard republished: C3 62.6→63.6%**
+  (804/1264, verified-2xx 709, C2-called 89.7%). console2 fix also merged: detail
+  pane preserves scroll across live-poll re-renders (`keepDetailScroll`). Heavy runs
+  used isolated git worktrees (now removed) → merged to main.
+  - **⚠️ OPEN — 2 stranded SCF cloud-functions, un-teardownable (product deadlock).**
+    `regrw5trg57f68be7` (`9e231b01e2394d7aaa8dcca218e770cb`) + `regrw5trgd7ff680d`
+    (`3aac2e34203a42cab56b089336bbd18d`). Their PrivateLink **Service config is stuck
+    in CREATING** (`pls_id=null`, hours+): PUT disable → 400
+    `privatelink-service-not-allow-state-error` ("not allowed when Creating");
+    DELETE function → 400 `function-not-deletable-error` ("only when PLS disabled &
+    no PLE"). Deadlock. Documented in `data/baselines/known_issues.json`
+    (`compute/scf/updateprivatelinkservice+deletecloudfunction`) + scf
+    `coverage_ledger` `stranded_resources`. **Note:** SCF PLS is a *config field on
+    the function* (no standalone id) — NOT the same as a **VPC** privatelink-service
+    (standalone, deletes fine; all VPC PLS now 0). Function body shows
+    `eots_date: 2026-07-31` (platform auto-expiry) — likely auto-reclaimed then.
+    **Next-session lever:** poll the two PLS states; the instant either leaves
+    CREATING, `PUT .../privatelink-services {privatelink_service_enabled:false}` then
+    `DELETE /v1/cloud-functions/{id}` (needs `SCP_ALLOW_DESTRUCTIVE=true`).
+  - **Teardown otherwise CLEAN:** live infra all 0 residual (VPC/subnet/PLS/PLE/LB/
+    ASG/VM/volume) — verified post-run. Earlier in the session 4 stranded shared
+    VPCs (heavy-wave leftovers) were also reclaimed via local-registry ownership;
+    one VPC NOT in our registry was left untouched (cross-env shared account — same
+    rule that protects the other env's `kyuh.choi+areg1@samsung.com` resources).
+  - **What to advance next (2026-06-25, supersedes 2026-06-19):** (1) retry the 2
+    SCF teardowns once PLS un-sticks (above); (2) remaining privatelink gaps are
+    cross-side/entitlement — scf `approve/connect` are baselined product bugs (404
+    with valid ids), apigateway 7 PL gaps are 403-entitlement/500; (3) virtualserver
+    still 84-gap: the big lever is a **HEAVY VM lifecycle** (createserver→...→delete,
+    desired_count low) to unlock ~60 server/volume/snapshot endpoints + ~20 id-GETs;
+    (4) filestorage 4 gaps = replication DR-side (`filestorage-dr`/`kr-east1`) + 1
+    needs-VM. Earlier 2026-06-19 ranked plan still valid for the broader campaign.
 - **LATEST (2026-06-20, session 2b — live FULL-HEAVY run + makespan scheduler work,
   `claude/start-here-review-5z8jt2`):** ran the full heavy DAG live via
   `tools/dag_run_live.py ALL` (dynamic AIMD, all gates on). **184/184 · 156P/25F/3S ·

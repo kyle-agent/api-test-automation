@@ -17,8 +17,8 @@
       "service": "virtualserver",
       "fragment": "compute__virtualserver.json",
       "write_gap": 0,
-      "getid_gap": 22,
-      "status": "authored",
+      "getid_gap": 84,
+      "status": "live-validated",
       "owner": "wave2-service-agent",
       "lifecycles": [
         "vs-autoscaling-coverage",
@@ -26,7 +26,7 @@
         "vs-volume-transfer-coverage",
         "vs-server-action-coverage"
       ],
-      "notes": ""
+      "notes": "2026-06-25 HEAVY: all 24 autoscaling-group endpoints 2xx (compute__virtualserver-autoscaling.json / heavy-asg-full-coverage). Remaining 84-gap = HEAVY VM lifecycle (server/volume/snapshot CRUD + id-GETs)."
     },
     {
       "category": "networking",
@@ -34,7 +34,7 @@
       "fragment": "networking__vpc.json",
       "write_gap": 0,
       "getid_gap": 13,
-      "status": "authored",
+      "status": "live-validated",
       "owner": "wave2-service-agent",
       "lifecycles": [
         "vpc-cidr-secondary",
@@ -45,7 +45,7 @@
         "vpc-transit-gateway-children",
         "vpc-subnet-vip-nat"
       ],
-      "notes": ""
+      "notes": "2026-06-25 HEAVY: all 14 PrivateLink endpoints 2xx (IP-type PLS, no LB needed). vpc 58/95. Remaining gaps: private-nat (Direct Connect peer), subnet VIP/NAT (real port/publicip), peering (VPC budget)."
     },
     {
       "category": "management",
@@ -400,12 +400,12 @@
       "fragment": "compute__scf.json",
       "write_gap": 0,
       "getid_gap": 11,
-      "status": "authored",
+      "status": "live-validated",
       "owner": "wave3-service-agent",
       "lifecycles": [
         "scf-privatelink-apigateway-coverage"
       ],
-      "notes": ""
+      "notes": "2026-06-25 HEAVY: PL service/endpoint 17/36. STRANDED: 2 cloud-functions un-teardownable (PLS stuck CREATING deadlock) ids 9e231b01e2394d7aaa8dcca218e770cb + 3aac2e34203a42cab56b089336bbd18d — retry teardown when PLS leaves CREATING; see known_issues compute/scf/updateprivatelinkservice+deletecloudfunction. scf approve/connect = baselined product bugs."
     },
     {
       "category": "networking",
@@ -426,12 +426,12 @@
       "fragment": "storage__filestorage.json",
       "write_gap": 0,
       "getid_gap": 2,
-      "status": "authored",
+      "status": "live-validated",
       "owner": "wave2-service-agent",
       "lifecycles": [
         "filestorage-replication-schedule"
       ],
-      "notes": ""
+      "notes": "2026-06-25 HEAVY: snapshot+schedule CRUD + restore, 17/21. Remaining 4 = replication DR-side (kr-east1 / filestorage-dr) + 1 needs-VM."
     },
     {
       "category": "management",
@@ -733,5 +733,5 @@
       "notes": ""
     }
   ],
-  "campaign_status": "write-coverage COMPLETE \u2014 all 547 write ops reachable AND static ceiling 100.0% (gap=0, getid 0/write 0, 2026-06-17). R3 model-validation mid-flight: 131/275 resource nodes VALIDATED (144 still provenance:docs). Next: continue R3 verification waves + live CI validation."
+  "campaign_status": "write-coverage COMPLETE — all 547 write ops reachable AND static ceiling 100.0% (gap=0, getid 0/write 0, 2026-06-17). R3 model-validation mid-flight: 131/275 resource nodes VALIDATED (144 still provenance:docs). Next: continue R3 verification waves + live CI validation."
 }
