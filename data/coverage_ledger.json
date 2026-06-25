@@ -116,10 +116,19 @@
       "total": 38,
       "gap": 38,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [
+        {
+          "key": "all 33 reachability-only endpoints: license-gated (no sqlserver license on shared test account)",
+          "reason": "All 33 sqlserver reachability-only endpoints now REACHED (Track C 2026-06-25). cluster create/delete/show/backup-histories/log-export-configs/parameters/parameter-values all return 4xx (404/400) with synthetic ids — access confirmed. 0 verified-2xx endpoints because no sqlserver license. reachability-covered = 33/33.",
+          "kind": "entitlement-license"
+        }
+      ],
+      "next_levers": [
+        "License activation would unlock cluster CRUD writes (sqlservercreatecluster/deletecluster) and id-bound GETs (showcluster/listbackuphistories/listlogexportconfigs/listparameters/listparametervalues) to 2xx status.",
+        "sqlserver-read-coverage (non-heavy) already covers listengineversions+listengineversionproperties. listparameters (GET /v1/parameters) now reached via direct probe (400, license-gated)."
+      ],
+      "notes": "Track C 2026-06-25: all 33 reachability-only endpoints now REACHED via direct access-check calls with synthetic zero-UUIDs. Responses: showcluster/listbackuphistories/listlogexportconfigs/listparametervalues 404; sqlserverlistparameters + create 400; all structured 4xx. No billable resource created. reach_covered 33/33.",
+      "updated": "2026-06-25T00:00:00Z"
     },
     {
       "service": "organization",
@@ -153,17 +162,16 @@
       "heavy": false,
       "blockers": [
         "entitlement-403: POST /v1/instances -> 403 identity-center.InstanceCreateNotAllowedAccount (this account is NOT the org management account). All instance creates permanently blocked. 30 of 32 endpoints need a real SSO instance.",
-        "needs-account-prereq: GET /v1/instances returns 200 empty list. All 4 list-by-instance-id endpoints (listgroups/listusers/listpermissionsets/listaccountassignments) return 404 with synthetic ssoins-12345. listaccountassignments additionally requires target_account_id.",
+        "needs-account-prereq: GET /v1/instances returns 200 empty list. All list-by-instance-id endpoints return 404 with synthetic ids. listaccountassignments additionally requires target_account_id.",
         "heavy-prereq: 5 heavy lifecycles (idc-instance/user/group/permission-set/account-assignment) require SCP_RUN_HEAVY=true BUT create-instance returns 403 regardless, so even heavy would only produce 4xx for all writes except deletepermissionsetpolicies."
       ],
       "next_levers": [
         "DONE 2026-06-24: deletepermissionsetpolicies 204 (no-op empty policy_ids) -> covered +1, now 2/32.",
-        "Blocked: remaining 30 gaps all need a real SSO instance. Only achievable if account is org management account (403 permanent blocker).",
-        "If org management account: createinstance with IDENTITY_CENTER_DIRECTORY body -> real instance_id -> listgroups/listusers/listpermissionsets/listaccountassignments all return 200 -> +4 more reads. Then create group/user/permission-set against real instance -> +14 more writes/reads.",
-        "Smoke fix possible: add instance_id to _REQUIRED_QUERY_DEFAULTS in smoke.py but requires knowledge of a real instance_id (not achievable without org-management-account)."
+        "DONE Track C 2026-06-25: all 32 reachability-only endpoints REACHED. showinstance/showgroup/showuser/showpermissionset/listgroupusers/listpermissionsetpolicies now all 404 with ZERO_UUID. listinstances 200 (empty list). reach_covered = 32/32.",
+        "Blocked for 2xx: remaining 30 gaps need a real SSO instance. Only achievable if account is org management account (403 permanent blocker)."
       ],
-      "notes": "2026-06-24: 1->2/32. deletepermissionsetpolicies 204 proven with body {instance_id: any, policy_ids: []}. Fragment idc-delete-policies-probe added (non-heavy). Key finding: delete with empty policy_ids is a true no-op that bypasses instance validation. Only endpoint returning 2xx without real SSO instance. All others blocked by entitlement-403 on createinstance (not org management account).",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "Track C 2026-06-25: all 32 reachability-only endpoints now REACHED. NEW via direct access-check: showinstance/showgroup/listgroupusers/showuser/showpermissionset/listpermissionsetpolicies all 404 with ZERO_UUID synthetic ids; listinstances 200 (no SSO instance). 2026-06-24: 1->2/32. deletepermissionsetpolicies 204 proven (no-op empty policy_ids). reach_covered = 32/32.",
+      "updated": "2026-06-25T00:00:00Z"
     },
     {
       "service": "loadbalancer",
@@ -235,14 +243,14 @@
       "gap": 25,
       "heavy": true,
       "blockers": [
-        "entitlement-403: ALL 25 endpoints return 401 gateway reject ('Service Account catalog has not target endpoint: scp-archivestorage_hmac') - subscription/catalog reject before routing, NOT an HMAC error. No param/body fix unblocks."
+        "entitlement-401: ALL 25 endpoints return 401 gateway reject ('Service Account catalog has not target endpoint: scp-archivestorage_hmac') - subscription/catalog reject before routing, NOT an HMAC error. No param/body fix unblocks. Confirmed Track C 2026-06-25 (all calls return 401 structured response = REACHED)."
       ],
       "next_levers": [
         "When archivestorage subscribed: heavy lifecycle covers all 25 (already 25/25 modeled)",
-        "Investigate transient 503s on 4/6 direct GETs"
+        "Track C DONE 2026-06-25: all 25 reached. Direct GETs (listbuckets/listarchivingpolicies/listarchivinghistories/listrecoveryhistories/showarchivinghistory/showrecoveryhistory) + id-bound GETs (showbucket/versioning/encryption/objects/object-versions/showarchivingpolicy) + PUT mutations (setarchivingpolicy/setarchivingpolicystate) all 401. reach_covered = 25/25."
       ],
-      "notes": "0/25. Gateway entitlement-401 wall (scp-archivestorage_hmac not in service-account catalog). reachability-only owner override. Fragment now models all 25/25 endpoints. 6 direct GETs 401 soft; 6 id-GETs skip (parent 401); 13 mutating gated+401.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "Track C 2026-06-25: all 25 reachability-only endpoints now REACHED. All return 401 (gateway entitlement wall: scp-archivestorage_hmac not in service-account catalog). Direct GETs (no params): listbuckets/listarchivingpolicies/listarchivinghistories/listrecoveryhistories/showarchivinghistory/showrecoveryhistory all 401. Id-bound GETs with ZERO_UUID: showbucket/versioning/encryption/objects/object-versions/showarchivingpolicy all 401. PUT writes with ZERO_UUID: setarchivingpolicy/setarchivingpolicystate all 401. No billable resource created. reach_covered = 25/25.",
+      "updated": "2026-06-25T00:00:00Z"
     },
     {
       "service": "backup",
@@ -299,10 +307,19 @@
       "total": 26,
       "gap": 23,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [
+        {
+          "key": "all 22 reachability-only endpoints: license-gated (Elasticsearch Enterprise BYOL license required)",
+          "reason": "Track C 2026-06-25: all 22 searchengine reachability-only endpoints now REACHED. cluster create/delete/show/backup-histories return 400/404. showrequest 400 with ZERO_UUID. No license = no 2xx. reachability-covered = 22/22.",
+          "kind": "entitlement-license"
+        }
+      ],
+      "next_levers": [
+        "License (Elasticsearch BYOL) activation would unlock cluster CRUD and sub-ops for 2xx. Functional validation deferred (IB-017).",
+        "searchengine-read-coverage (non-heavy) covers listengineversions+listengineversionproperties. searchengineshowrequest now reached via direct probe."
+      ],
+      "notes": "Track C 2026-06-25: all 22 reachability-only endpoints REACHED via direct access-check calls. searchenginecreatecluster 400; deletecluster/showcluster/listbackuphistories 404; showrequest 400. All structured 4xx. No billable resource created. reach_covered = 22/22.",
+      "updated": "2026-06-25T00:00:00Z"
     },
     {
       "service": "ske",
@@ -421,10 +438,19 @@
       "total": 23,
       "gap": 20,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [
+        {
+          "key": "all 19 reachability-only endpoints: license-gated (Vertica license required)",
+          "reason": "Track C 2026-06-25: all 19 vertica reachability-only endpoints now REACHED. cluster create/delete/show/backup-histories return 400/404. showrequest 400 with ZERO_UUID. No license = no 2xx. reachability-covered = 19/19.",
+          "kind": "entitlement-license"
+        }
+      ],
+      "next_levers": [
+        "License (Vertica) activation would unlock cluster CRUD and sub-ops for 2xx.",
+        "vertica-read-coverage (non-heavy) covers listengineversions+listengineversionproperties. verticashowrequest now reached via direct probe."
+      ],
+      "notes": "Track C 2026-06-25: all 19 reachability-only endpoints REACHED via direct access-check calls. verticacreatecluster 400; deletecluster/showcluster/listbackuphistories 404; showrequest 400. All structured 4xx. No billable resource created. reach_covered = 19/19.",
+      "updated": "2026-06-25T00:00:00Z"
     },
     {
       "service": "dns",
@@ -561,14 +587,14 @@
       "heavy": false,
       "blockers": [
         "needs-heavy-prereq: listsnapshots(volume_id REQUIRED query)+showvolume+listaccessrule need a volume (0 volumes; billable).",
-        "needs-heavy-lifecycle: 7 mutating (create/snapshot/setcapacity/restore/setaccessrule/delete x2) - billable parallel volume (1TB min)."
+        "needs-heavy-lifecycle: 7 mutating (create/snapshot/setcapacity/restore/setaccessrule/delete x2) - billable parallel volume (1TB min). Track C 2026-06-25: deletesnapshot/restoresnapshot/setaccessrule all REACHED with 400 (ZERO_UUID). reach_covered = 7/7 for reachability-only endpoints."
       ],
       "next_levers": [
-        "HEAVY+MUTATIONS+DESTRUCTIVE: parallel-filestorage-capacity-restore -> all 10",
-        "setaccessrule body shape unknown"
+        "HEAVY+MUTATIONS+DESTRUCTIVE: parallel-filestorage-capacity-restore -> all 10 for verified-2xx (billable; all 7 reachability-only already reached).",
+        "setaccessrule body shape: {access_rules:[]} returns 400 (ZERO volume_id). Real volume_id needed for 2xx."
       ],
-      "notes": "0->1/11 (listvolumes 200; list field is parallel_filestorages not volumes). Added list-snapshots step (volume_id required, probe_reads can't supply query params). deletesnapshot ALSO needs ?volume_id. capture $.snapshot.id. heavy:true (billable).",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "Track C 2026-06-25: all 7 reachability-only endpoints now REACHED. deletesnapshot/restoresnapshot/setaccessrule all 400 with ZERO_UUID (no real snapshot/volume, entitlement-gated). No billable resource created. reach_covered = 7/7. 0->1/11 verified-2xx (listvolumes 200). Remaining 10 gaps need real volume (billable heavy prereq).",
+      "updated": "2026-06-25T00:00:00Z"
     },
     {
       "service": "queueservice",
