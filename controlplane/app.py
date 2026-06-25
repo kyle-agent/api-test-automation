@@ -749,6 +749,34 @@ def api_local_plan(lifecycle_ids: str = ""):
     return local_run.build_plan(ids)
 
 
+@app.get("/resource_graph.js")
+def resource_graph_js():
+    """Serve the scene() renderer (ported from console2; light theme = controlplane)."""
+    return Response((HERE / "static" / "resource_graph.js").read_text(encoding="utf-8"),
+                    media_type="application/javascript")
+
+
+@app.get("/api/local/graph")
+def api_local_graph(lifecycle_ids: str = ""):
+    """The composition DAG (composer.graph_view) for a lifecycle selection + a
+    node->lifecycle map, so the live run state can color the resource nodes."""
+    from regression.scenarios import composer
+    ids = {s for s in lifecycle_ids.split(",") if s}
+    empty = {"nodes": [], "edges": [], "levels": [0], "node_lifecycle": {}}
+    if not ids:
+        return empty
+    model = composer.load_model()
+    targets = sorted(nid for nid, task in model.items()
+                     if ((task.get("source") or {}).get("lifecycle")) in ids)
+    if not targets:
+        return empty
+    g = composer.graph_view(targets, model=model)
+    g["node_lifecycle"] = {
+        n["id"]: (((model.get(n["id"]) or {}).get("source") or {}).get("lifecycle") or "")
+        for n in g["nodes"]}
+    return g
+
+
 @app.get("/local-run")
 def local_run_page(request: Request):
     """Local Run screen (S3) — pick a selection → run simulate/live in-process →

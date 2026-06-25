@@ -1,27 +1,68 @@
 {% extends "base.html" %}
 {% block title %}Local Run — SCP API Regression{% endblock %}
 {% block content %}
-<h2>🖥️ Local Run
-  <span class="hint">선택 → 실행(simulate/live) → 라이브 DAG + 이벤트. 인프로세스 실행 (<code>/api/local/*</code>).</span>
-</h2>
+<style>
+  .dag-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 8px}
+  .tgroup{display:flex;border:1px solid #d8dde3;border-radius:7px;overflow:hidden}
+  .tgroup button{background:#fff;border:none;border-left:1px solid #e4e7eb;color:#6b7480;
+    padding:5px 11px;cursor:pointer;font-size:11.5px;font-weight:700}
+  .tgroup button:first-child{border-left:none}
+  .tgroup button.on{background:#eef1f4;color:#1d2530}
+  .gran-note{font-size:11px;color:#6b7480}
+  .statchip{font-size:11px;color:#6b7480;background:#f5f7f9;border:1px solid #e4e7eb;border-radius:13px;
+    padding:3px 11px;font-variant-numeric:tabular-nums}
+  .statchip b{color:#1d2530}
+  .stage-wrap{position:relative;border:1px solid #e4e7eb;border-radius:8px;overflow:hidden;background:#fff}
+  .stage{position:relative;width:100%;height:min(66vh,500px);min-height:360px;overflow:hidden;cursor:grab;
+    background:radial-gradient(circle,#eef1f4 1px,transparent 1px);background-size:26px 26px}
+  .stage.grabbing{cursor:grabbing}
+  #dag-svg{position:absolute;top:0;left:0;transform-origin:0 0}
+  .stage svg text{fill:#1d2530}
+  g.rg-unit{cursor:pointer} g.rg-unit .nrect{transition:opacity .12s}
+  g.rg-unit.dimmed{opacity:.13} g.rg-selbox{cursor:pointer}
+  .rg-edge{stroke:#cfd6dd;stroke-width:1.3;fill:none}
+  .rg-edge.hot{stroke:#2563c9;stroke-width:2.2} .rg-edge.dim{opacity:.08}
+  .rg-active{filter:drop-shadow(0 0 3px rgba(37,99,201,.45))}
+  .zoomctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:5px;z-index:5}
+  .zoomctl button{width:30px;height:30px;border:1px solid #e4e7eb;background:#fff;border-radius:7px;cursor:pointer;
+    font-size:15px;font-weight:700;color:#1d2530;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(31,35,40,.12)}
+  .zoomctl button:hover{border-color:#2563c9;color:#2563c9} .zoomctl button.fit{font-size:10.5px}
+</style>
 
+<h2>🖥️ Local Run
+  <span class="hint">선택 → 합성 DAG → 실행(simulate/live) → 라이브 색칠 + 이벤트. 인프로세스 (<code>/api/local/*</code>).</span>
+</h2>
 <div class="banner">
-  CI 디스패치가 아니라 <b>이 서버에서 직접</b> 실행 — <b>simulate</b> = 플랜 무클라우드 재생 · <b>live</b> = 실제 SCP 호출.
-  실행 엔진은 <b>레벨 병렬</b>(독립 lifecycle 동시) + longest-first 스케줄로 전체 시간을 최소화합니다(<code>pytest -n</code>).
+  CI 디스패치가 아니라 <b>이 서버에서 직접</b> 실행 — <b>simulate</b>=무클라우드 재생 · <b>live</b>=실제 SCP 호출.
+  실행 엔진은 <b>레벨 병렬</b>(독립 lifecycle 동시) + longest-first 스케줄로 전체 시간 최소화(<code>pytest -n</code>).
 </div>
 
-<!-- ── 실행 그래프 (DAG) ─────────────────────────────────── -->
+<!-- ── 합성 DAG (scene: group/zoom/focus) ─────────────────── -->
 <div class="card pad" style="margin-bottom:13px">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
-    <b>실행 그래프</b>
-    <span class="muted small">열(레벨) = <b>동시 실행 그룹</b> · 노드 색 = 실행 상태</span>
-    <span class="mono small" id="timing" style="margin-left:auto"></span>
+  <div class="dag-toolbar">
+    <b>합성 DAG</b>
+    <div class="tgroup" id="granctl">
+      <button data-g="category" class="on">카테고리</button>
+      <button data-g="service">서비스</button>
+      <button data-g="resource">리소스</button>
+    </div>
+    <button class="btn" id="collapseAll" style="padding:5px 11px;font-size:11.5px">전체 접기</button>
+    <span class="gran-note" id="granNote">그룹 클릭=펼치기 · 노드 클릭=focus · 휠/드래그=줌·이동</span>
+    <span class="statchip" id="statchip" style="margin-left:auto"></span>
   </div>
-  <div style="overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:6px">
-    <svg id="dag" style="display:block"></svg>
-    <div class="muted small pad" id="daghint">좌측에서 lifecycle을 골라주세요 — 선택하면 실행 그래프가 그려집니다.</div>
+  <div class="mono small" id="timing" style="margin:0 0 7px;color:#6b7480"></div>
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <svg id="dag-svg"></svg>
+      <div class="zoomctl">
+        <button id="zin" title="확대">+</button>
+        <button id="zout" title="축소">−</button>
+        <button class="fit" id="zfit" title="맞춤">맞춤</button>
+      </div>
+    </div>
   </div>
-  <div class="legend small" style="margin-top:7px">
+  <div class="muted small" id="daghint" style="margin-top:7px">좌측에서 lifecycle을 골라주세요 — 합성 DAG가 그려집니다.</div>
+  <div class="legend small" style="margin-top:6px">
     <span><i style="background:#9aa3ad"></i>queued</span>
     <span><i style="background:#b5740b"></i>running</span>
     <span><i style="background:#15924f"></i>done</span>
@@ -30,13 +71,12 @@
 </div>
 
 <div class="grid2">
-  <!-- ── 선택 ───────────────────────────────────────────── -->
   <div class="card pad">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:9px">
       <input class="search" id="q" placeholder="lifecycle / service 검색…" autocomplete="off">
       <span class="muted small" id="selcount" style="margin-left:auto">0 선택</span>
     </div>
-    <div id="lclist" style="max-height:360px;overflow:auto;border:1px solid var(--border);border-radius:9px">
+    <div id="lclist" style="max-height:330px;overflow:auto;border:1px solid var(--border);border-radius:9px">
       <div class="muted small pad">로딩 중…</div>
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
@@ -47,7 +87,6 @@
     </div>
   </div>
 
-  <!-- ── 라이브 이벤트 ──────────────────────────────────── -->
   <div class="card pad">
     <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
       <b>라이브</b>
@@ -56,146 +95,108 @@
       <span class="muted small" id="evcount" style="margin-left:auto"></span>
     </div>
     <div id="states" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px"></div>
-    <div style="max-height:360px;overflow:auto">
+    <div style="max-height:330px;overflow:auto">
       <table>
         <thead><tr><th>lifecycle</th><th>method</th><th>path</th><th>status</th></tr></thead>
-        <tbody id="evbody">
-          <tr><td colspan="4" class="muted small">아직 실행 없음 — 좌측에서 골라 <b>▶ Simulate</b></td></tr>
-        </tbody>
+        <tbody id="evbody"><tr><td colspan="4" class="muted small">아직 실행 없음 — 좌측에서 골라 <b>▶ Simulate</b></td></tr></tbody>
       </table>
     </div>
   </div>
 </div>
 
+<script src="/resource_graph.js"></script>
 <script>
 {% raw %}
 (function () {
-  var LCS = [], SEL = new Set(), TIMER = null, PLAN = null, planTimer = null;
+  var LCS = [], SEL = new Set(), TIMER = null, gTimer = null;
+  var SCENE = null, GRAPH = null, NODE_LC = {}, STATES = {}, PLAN = null;
   var $ = function (s) { return document.querySelector(s); };
   var esc = function (s) { return (s + "").replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
-  var COL = { done: "#15924f", running: "#b5740b", fail: "#c63434", queued: "#9aa3ad" };
-  var BG = { done: "#e7f6ed", running: "#fdf3e2", fail: "#fbe9e9", queued: "#f5f7f9" };
+  var PAL = { done: ["#e7f6ed", "#15924f"], running: ["#fdf3e2", "#b5740b"], fail: ["#fbe9e9", "#c63434"] };
 
   function render() {
     var q = ($("#q").value || "").toLowerCase();
-    var rows = LCS.filter(function (l) {
-      return !q || l.id.toLowerCase().indexOf(q) >= 0 || (l.service || "").toLowerCase().indexOf(q) >= 0;
-    });
+    var rows = LCS.filter(function (l) { return !q || l.id.toLowerCase().indexOf(q) >= 0 || (l.service || "").toLowerCase().indexOf(q) >= 0; });
     $("#lclist").innerHTML = rows.length ? rows.map(function (l) {
       return '<label style="display:flex;gap:8px;align-items:center;padding:6px 11px;border-bottom:1px solid #eef1f3;cursor:pointer">'
         + '<input type=checkbox data-id="' + esc(l.id) + '"' + (SEL.has(l.id) ? " checked" : "") + ">"
-        + '<span class="mono" style="font-size:12px">' + esc(l.id) + "</span>"
-        + '<span class="srv" style="margin-left:auto">' + esc(l.service || "") + "</span>"
+        + '<span class="mono" style="font-size:12px">' + esc(l.id) + '</span>'
+        + '<span class="srv" style="margin-left:auto">' + esc(l.service || "") + '</span>'
         + (l.heavy ? '<span class="tag heavy">heavy</span>' : "") + "</label>";
     }).join("") : '<div class="muted small pad">일치 없음</div>';
     Array.prototype.forEach.call($("#lclist").querySelectorAll("input"), function (c) {
       c.onchange = function () {
         c.checked ? SEL.add(c.dataset.id) : SEL.delete(c.dataset.id);
-        $("#selcount").textContent = SEL.size + " 선택";
-        schedulePlan();
+        $("#selcount").textContent = SEL.size + " 선택"; scheduleGraph();
       };
     });
   }
 
-  // debounce plan refresh on selection change
-  function schedulePlan() {
-    if (planTimer) clearTimeout(planTimer);
-    planTimer = setTimeout(refreshPlan, 250);
+  // ---- scene (resource DAG) overlays driven by run state ----
+  function nodeOverlay(resId) {
+    var st = STATES[NODE_LC[resId]]; var c = PAL[st];
+    return c ? { fill: c[0], stroke: c[1], pulse: st === "running" } : null;
   }
-  function refreshPlan() {
-    if (!SEL.size) { PLAN = null; drawDag({}); return; }
-    fetch("/api/local/plan?lifecycle_ids=" + encodeURIComponent(Array.from(SEL).join(",")))
-      .then(function (r) { return r.json(); })
-      .then(function (p) { PLAN = p; drawDag(lastStates); });
+  function groupOverlay(u) {
+    var sts = (u.members || []).map(function (id) { return STATES[NODE_LC[id]]; }).filter(Boolean);
+    if (!sts.length) return null;
+    var st = sts.indexOf("fail") >= 0 ? "fail" : sts.indexOf("running") >= 0 ? "running"
+      : sts.every(function (s) { return s === "done"; }) ? "done" : null;
+    var c = PAL[st]; if (!c) return null;
+    var done = sts.filter(function (s) { return s === "done"; }).length;
+    return { fill: c[0], stroke: c[1], badge: done + "/" + u.members.length, pulse: st === "running" };
   }
-
-  var lastStates = {};
-  // draw the level/wave DAG: column per wave (= concurrent group), node per lifecycle.
-  function drawDag(states) {
-    states = states || {};
-    var svg = $("#dag");
-    var waves = (PLAN && PLAN.waves) || [];
-    if (!waves.length) {
-      svg.setAttribute("width", 0); svg.setAttribute("height", 0); svg.innerHTML = "";
-      $("#daghint").style.display = ""; return;
-    }
+  function buildScene() {
+    var svg = $("#dag-svg"), stage = $("#stage");
+    if (SCENE && SCENE.destroy) SCENE.destroy();
+    SCENE = window.ResourceGraph.scene(svg, stage, GRAPH,
+      { overlay: nodeOverlay, groupOverlay: groupOverlay, stat: $("#statchip"), granNote: $("#granNote") });
+    SCENE.start();
     $("#daghint").style.display = "none";
-    var COLW = 196, ROWH = 50, PADX = 14, PADY = 22, BW = 170, BH = 38;
-    var maxRows = 1; waves.forEach(function (w) { maxRows = Math.max(maxRows, (w.lifecycles || []).length); });
-    var W = PADX * 2 + waves.length * COLW, H = PADY + maxRows * ROWH + 8;
-    var s = "", pos = {};
-    waves.forEach(function (w, ci) {
-      var x = PADX + ci * COLW;
-      s += '<text x="' + x + '" y="13" font-size="10" font-weight="700" fill="#6b7480">L' + ci
-        + " · " + esc(w.kind || "") + " · " + (w.lifecycles || []).length + "개</text>";
-      (w.lifecycles || []).forEach(function (lid, ri) {
-        pos[lid] = { x: x, y: PADY + ri * ROWH, ci: ci };
-      });
-    });
-    // edges: each node -> nodes in the next wave (dependency flow hint)
-    waves.forEach(function (w, ci) {
-      if (ci + 1 >= waves.length) return;
-      (w.lifecycles || []).forEach(function (a) {
-        (waves[ci + 1].lifecycles || []).forEach(function (b) {
-          var pa = pos[a], pb = pos[b]; if (!pa || !pb) return;
-          var x1 = pa.x + BW, y1 = pa.y + BH / 2, x2 = pb.x, y2 = pb.y + BH / 2;
-          s += '<path d="M' + x1 + "," + y1 + " C" + (x1 + 30) + "," + y1 + " " + (x2 - 30) + "," + y2
-            + " " + x2 + "," + y2 + '" fill="none" stroke="#cfd6dd" stroke-width="1.2"/>';
-        });
-      });
-    });
-    // nodes
-    Object.keys(pos).forEach(function (lid) {
-      var p = pos[lid], st = states[lid] || "queued";
-      var pulse = st === "running" ? '<animate attributeName="stroke-width" values="1.6;3.4;1.6" dur="1.1s" repeatCount="indefinite"/>' : "";
-      s += '<g><rect x="' + p.x + '" y="' + p.y + '" width="' + BW + '" height="' + BH + '" rx="8" fill="'
-        + BG[st] + '" stroke="' + COL[st] + '" stroke-width="1.7">' + pulse + "</rect>"
-        + '<text x="' + (p.x + 9) + '" y="' + (p.y + 16) + '" font-size="11" font-weight="700" fill="#1d2530">'
-        + esc(lid.length > 24 ? lid.slice(0, 23) + "…" : lid) + "</text>"
-        + '<text x="' + (p.x + 9) + '" y="' + (p.y + 29) + '" font-size="9.5" fill="' + COL[st] + '">' + st + "</text></g>";
-    });
-    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
-    svg.setAttribute("width", W); svg.setAttribute("height", H);
-    svg.innerHTML = s;
+    Array.prototype.forEach.call($("#granctl").children, function (x) { x.classList.toggle("on", x.dataset.g === SCENE.gran); });
+  }
+  function scheduleGraph() { if (gTimer) clearTimeout(gTimer); gTimer = setTimeout(refreshGraph, 250); }
+  function refreshGraph() {
+    if (!SEL.size) {
+      GRAPH = null; NODE_LC = {}; if (SCENE && SCENE.destroy) SCENE.destroy(); SCENE = null;
+      $("#dag-svg").innerHTML = ""; $("#daghint").style.display = ""; $("#statchip").textContent = ""; return;
+    }
+    var qs = encodeURIComponent(Array.from(SEL).join(","));
+    fetch("/api/local/graph?lifecycle_ids=" + qs).then(function (r) { return r.json(); })
+      .then(function (g) { GRAPH = g; NODE_LC = g.node_lifecycle || {}; if (g.nodes && g.nodes.length) buildScene(); });
+    fetch("/api/local/plan?lifecycle_ids=" + qs).then(function (r) { return r.json(); }).then(function (p) { PLAN = p; });
   }
 
-  // sequential-sum vs level-parallel wall-clock (the optimization, made visible)
+  // ---- seq vs level-parallel timing (the optimization, visible) ----
   function timing(events) {
-    var per = {};   // lifecycle -> summed elapsed_ms
-    (events || []).forEach(function (e) {
-      if (e.kind === "step-end") per[e.lifecycle] = (per[e.lifecycle] || 0) + (e.elapsed_ms || 0);
-    });
+    var per = {};
+    (events || []).forEach(function (e) { if (e.kind === "step-end") per[e.lifecycle] = (per[e.lifecycle] || 0) + (e.elapsed_ms || 0); });
     var waves = (PLAN && PLAN.waves) || [];
     if (!waves.length || !Object.keys(per).length) { $("#timing").textContent = ""; return; }
     var seq = 0, par = 0;
     Object.keys(per).forEach(function (k) { seq += per[k]; });
-    waves.forEach(function (w) {
-      var m = 0; (w.lifecycles || []).forEach(function (l) { m = Math.max(m, per[l] || 0); }); par += m;
-    });
-    var sx = (seq / 1000).toFixed(1), px = (par / 1000).toFixed(1);
+    waves.forEach(function (w) { var m = 0; (w.lifecycles || []).forEach(function (l) { m = Math.max(m, per[l] || 0); }); par += m; });
     var spd = par ? (seq / par).toFixed(1) : "1.0";
-    $("#timing").textContent = "순차 " + sx + "s → 레벨병렬 " + px + "s · " + spd + "× 빠름";
+    $("#timing").textContent = "순차 " + (seq / 1000).toFixed(1) + "s → 레벨병렬 " + (par / 1000).toFixed(1) + "s · " + spd + "× 빠름";
   }
 
   function paint(j) {
-    var st = $("#runstat"); st.style.display = "";
-    st.textContent = j.run.status;
+    var st = $("#runstat"); st.style.display = ""; st.textContent = j.run.status;
     st.className = "status " + (j.run.status === "done" ? "done" : j.run.status === "running" ? "running" : "failed");
     var STC = { done: "s-verified", running: "s-reached", fail: "s-regress", queued: "s-unobs" };
-    lastStates = j.states || {};
-    $("#states").innerHTML = Object.keys(lastStates).map(function (lc) {
-      return '<span class="chip ' + (STC[lastStates[lc]] || "s-unobs") + '">' + esc(lc) + ": " + lastStates[lc] + "</span>";
+    STATES = j.states || {};
+    $("#states").innerHTML = Object.keys(STATES).map(function (lc) {
+      return '<span class="chip ' + (STC[STATES[lc]] || "s-unobs") + '">' + esc(lc) + ": " + STATES[lc] + "</span>";
     }).join("");
-    drawDag(lastStates);
+    if (SCENE && SCENE.refresh) SCENE.refresh();      // recolor DAG by live state (keeps zoom/focus)
     timing(j.events);
     var ev = (j.events || []).filter(function (e) { return e.kind === "step-end"; });
     $("#evcount").textContent = (j.events || []).length + " events";
     $("#evbody").innerHTML = ev.length ? ev.slice(-250).map(function (e) {
       var mc = e.method === "GET" ? "read" : "mutation";
-      return "<tr><td class='mono small'>" + esc(e.lifecycle || "") + "</td>"
-        + "<td><span class='tag " + mc + "'>" + esc(e.method || "") + "</span></td>"
-        + "<td class='mono small'>" + esc(e.path || "") + "</td>"
-        + "<td>" + esc(e.status || "") + " <span class='muted'>" + esc(e.category || "") + "</span></td></tr>";
+      return "<tr><td class='mono small'>" + esc(e.lifecycle || "") + "</td><td><span class='tag " + mc + "'>" + esc(e.method || "")
+        + "</span></td><td class='mono small'>" + esc(e.path || "") + "</td><td>" + esc(e.status || "")
+        + " <span class='muted'>" + esc(e.category || "") + "</span></td></tr>";
     }).join("") : "<tr><td colspan=4 class='muted small'>…</td></tr>";
   }
 
@@ -208,7 +209,6 @@
     };
     TIMER = setInterval(tick, 400); tick();
   }
-
   function run(mode) {
     if (!SEL.size) { alert("lifecycle을 하나 이상 고르세요"); return; }
     if (mode === "live" && !confirm("실제 클라우드 자원을 생성/삭제합니다. 계속할까요?")) return;
@@ -219,6 +219,16 @@
       .then(function (r) { return r.json(); }).then(function (j) { if (j && j.run) poll(j.run.id); else alert("실행 시작 실패"); });
   }
 
+  // toolbar / zoom wiring
+  $("#granctl").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-g]"); if (!b || !SCENE) return;
+    Array.prototype.forEach.call($("#granctl").children, function (x) { x.classList.remove("on"); });
+    b.classList.add("on"); SCENE.setGranularity(b.dataset.g);
+  });
+  $("#collapseAll").onclick = function () { if (SCENE) SCENE.collapseAll(); };
+  $("#zin").onclick = function () { if (SCENE) SCENE.zoomIn(); };
+  $("#zout").onclick = function () { if (SCENE) SCENE.zoomOut(); };
+  $("#zfit").onclick = function () { if (SCENE) SCENE.zoomToFit(); };
   $("#q").oninput = render;
   $("#runSim").onclick = function () { run("simulate"); };
   $("#runLive").onclick = function () { run("live"); };
@@ -231,8 +241,8 @@
       $("#selcount").textContent = SEL.size + " 선택";
     } catch (e) {}
     render();
-    if (SEL.size) refreshPlan();
-    if (new URLSearchParams(location.search).get("auto") === "1" && SEL.size) setTimeout(function () { run("simulate"); }, 300);
+    if (SEL.size) refreshGraph();
+    if (new URLSearchParams(location.search).get("auto") === "1" && SEL.size) setTimeout(function () { run("simulate"); }, 500);
   });
 })();
 {% endraw %}
