@@ -1,0 +1,136 @@
+"""In-process ``local`` executor (convergence S2).
+
+Runs a selection's **simulate** (later: live) pipeline ON the control-plane host
+via ``regression.scenarios.local_run``, streaming the canonical console-event
+vocabulary to a per-run JSONL file. :func:`read_events` normalizes that file
+through ``core.events_contract`` (S1a) and folds it to per-lifecycle states for the
+live DAG overlay.
+
+This is console2's local execution brought into the spine. It has **no web-framework
+dependency** — the FastAPI routes in ``app.py`` are thin wrappers over these
+functions, so the executor is unit-testable without a running server (and without
+fastapi installed). Concurrent runs are isolated by per-run file (no shared global
+event sink), so two local simulates never interleave.
+"""
+from __future__ import annotations
+
+import itertools
+import json
+import threading
+import time
+from pathlib import Path
+
+from core import events_contract
+from regression.scenarios import local_run
+
+ROOT = Path(__file__).resolve().parent.parent
+RUN_DIR = ROOT / "reports" / "controlplane-local"        # gitignored
+_RUNS: dict[str, dict] = {}
+_LOCK = threading.Lock()
+_SEQ = itertools.count(1)        # disambiguates ids when two runs start in the same ms
+
+_PUBLIC_KEYS = ("id", "mode", "status", "lifecycle_ids", "runnable",
+                "started", "ended", "error")
+
+
+def _append(evpath: str, evkind: str, **fields) -> None:
+    """Append one canonical console-event line (same shape as ``core.console_events``)
+    to a run's file. ``evpath``/``evkind`` are deliberately NOT named ``path``/``kind``
+    so an event's own ``path`` field can't collide with the positional arg. Append-mode
+    write so a concurrent reader/poll never tears it."""
+    rec = {"ts": round(time.time(), 3), "kind": evkind, **fields}
+    with open(evpath, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec, ensure_ascii=False, default=str) + "\n")
+
+
+def _public(rec: dict) -> dict:
+    """Run record minus internals (the thread handle / file path)."""
+    return {k: rec.get(k) for k in _PUBLIC_KEYS}
+
+
+def start_simulate(lifecycle_ids, *, step_delay: float = 0.0, sleep=None) -> dict:
+    """Start a SIMULATE run in a daemon thread; return the run record immediately.
+    Events stream to the per-run file as the replay advances — poll :func:`read_events`
+    for the live view. ``step_delay``>0 paces it watchably (defaults to real sleep)."""
+    if sleep is None and step_delay > 0:
+        sleep = time.sleep                                # pace a watchable live run
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    run_id = "local-%d-%d" % (int(time.time() * 1000), next(_SEQ))
+    evp = str(RUN_DIR / f"{run_id}.jsonl")
+    open(evp, "w").close()                                # truncate / create
+    rec = {"id": run_id, "mode": "simulate", "status": "running",
+           "lifecycle_ids": list(lifecycle_ids), "runnable": [], "events_path": evp,
+           "started": time.time(), "ended": None, "error": None}
+    with _LOCK:
+        _RUNS[run_id] = rec
+
+    def _worker():
+        try:
+            plan = local_run.build_plan(lifecycle_ids)
+            rec["runnable"] = plan["runnable"]
+            local_run.simulate_run(
+                plan["waves"], plan["preview"],
+                lambda kind, **f: _append(evp, kind, **f),
+                step_delay=step_delay, sleep=sleep,
+                meta={"runnable": plan["runnable"]})
+            with _LOCK:
+                rec["status"], rec["ended"] = "done", time.time()
+        except Exception as exc:                          # surface; never crash the host
+            try:
+                _append(evp, "run-end", status="error", error=str(exc))
+            except Exception:
+                pass
+            with _LOCK:
+                rec["status"], rec["ended"], rec["error"] = "error", time.time(), str(exc)
+
+    t = threading.Thread(target=_worker, daemon=True)
+    rec["_thread"] = t
+    t.start()
+    return _public(rec)
+
+
+def join(run_id: str, timeout: float = 15.0) -> dict | None:
+    """Block until a run's worker finishes — for tests / synchronous callers."""
+    rec = _RUNS.get(run_id)
+    if not rec:
+        return None
+    t = rec.get("_thread")
+    if t:
+        t.join(timeout)
+    return _public(rec)
+
+
+def get(run_id: str) -> dict | None:
+    rec = _RUNS.get(run_id)
+    return _public(rec) if rec else None
+
+
+def list_runs() -> list[dict]:
+    with _LOCK:
+        recs = sorted(_RUNS.values(), key=lambda r: r["started"], reverse=True)
+    return [_public(r) for r in recs]
+
+
+def read_events(run_id: str) -> dict | None:
+    """The fine live view: read the per-run console-event file, normalize each line
+    through the S1a contract, and fold to per-lifecycle states for the graph overlay.
+    Safe to poll mid-run (append-only file). Returns ``None`` for an unknown run."""
+    rec = _RUNS.get(run_id)
+    if not rec:
+        return None
+    raw: list[dict] = []
+    try:
+        with open(rec["events_path"], encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    raw.append(json.loads(line))
+                except Exception:
+                    pass                                  # torn line under concurrent append
+    except FileNotFoundError:
+        pass
+    norm = [ev for r in raw for ev in events_contract.normalize(r, "console")]
+    return {"run": _public(rec), "events": norm,
+            "states": events_contract.lifecycle_states(norm)}

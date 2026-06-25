@@ -30,7 +30,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from controlplane import (authoring, compare, dashdata, db, dispatch,
-                          resources, scheduler, snapshots, triage)
+                          local_executor, resources, scheduler, snapshots, triage)
 from core import profiles as core_profiles
 from core import suites as core_suites
 
@@ -681,3 +681,39 @@ async def ingest(request: Request):
     else:
         raise HTTPException(400, f"unknown kind {kind!r}")
     return {"ok": True}
+
+
+# --- local executor (S2) — run a SELECTION's simulate in-process and stream the
+# fine console-events for the live DAG view (no CI dispatch, no cloud). Selection is
+# lifecycle ids (console2's model), distinct from the suite-based dispatch above.
+@app.post("/api/local/run")
+async def api_local_run(request: Request):
+    try:
+        payload = await request.json()
+    except ValueError:
+        raise HTTPException(400, "invalid JSON")
+    ids = payload.get("lifecycle_ids") or []
+    if not ids:
+        raise HTTPException(400, "lifecycle_ids required")
+    try:
+        step_delay = float(payload.get("step_delay", 0) or 0)
+    except (TypeError, ValueError):
+        step_delay = 0.0
+    rec = local_executor.start_simulate(ids, step_delay=step_delay)
+    # surface in the run list too (gh_run_id = the local run id)
+    db.create_run("(local simulate)", "", trigger="local", gh_run_id=rec["id"],
+                  detail="lifecycle_ids=" + ",".join(map(str, ids)))
+    return {"ok": True, "run": rec}
+
+
+@app.get("/api/local/runs")
+def api_local_runs():
+    return {"runs": local_executor.list_runs()}
+
+
+@app.get("/api/local/runs/{run_id}/events")
+def api_local_events(run_id: str):
+    res = local_executor.read_events(run_id)
+    if res is None:
+        raise HTTPException(404, "no such local run")
+    return res
