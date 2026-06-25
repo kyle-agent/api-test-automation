@@ -250,3 +250,28 @@ def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
                     "  account-wide reaping = the manual 강제 클린업 (POST /api/cleanup).\n")
         f.flush()
     return {"rc": rc, "runner_missing": runner_missing}
+
+
+def cleanup_sweep(log_path: str) -> dict:
+    """FORCE account-wide reconciler sweep — delete ALL owner-tagged resources,
+    ignoring TTL (DESTRUCTIVE). The explicit opt-in is the operator's button click;
+    only OUR owner tag is reaped (Hard Rule 3 — no name-guessing). Writes ``log_path``."""
+    env = {**os.environ, "PYTHONPATH": str(_ROOT), "SCP_ALLOW_MUTATIONS": "true",
+           "SCP_ALLOW_DESTRUCTIVE": "true", "SCP_SWEEP_IGNORE_TTL": "true"}
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write("# FORCE cleanup — reconciler sweep (owner-tagged only, ignore TTL)\n\n")
+        f.flush()
+        rc = subprocess.run([sys.executable, "-m", "cleanup.reconciler"],
+                            cwd=str(_ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+    return {"rc": rc}
+
+
+def verify_clean(log_path: str) -> dict:
+    """Read-only owned-resource inventory (no deletes) — counts survivors. Writes log."""
+    env = {**os.environ, "PYTHONPATH": str(_ROOT), "SCP_ALLOW_DESTRUCTIVE": "false"}
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write("# verify clean — owned inventory (read-only, no deletes)\n\n")
+        f.flush()
+        rc = subprocess.run([sys.executable, "-m", "cleanup.verify_clean"],
+                            cwd=str(_ROOT), env=env, stdout=f, stderr=subprocess.STDOUT).returncode
+    return {"rc": rc}

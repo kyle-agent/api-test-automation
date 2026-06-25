@@ -174,3 +174,56 @@ def read_events(run_id: str) -> dict | None:
     norm = [ev for r in raw for ev in events_contract.normalize(r, "console")]
     return {"run": _public(rec), "events": norm,
             "states": events_contract.lifecycle_states(norm)}
+
+
+# --- account-hygiene utilities (force cleanup / verify) ----------------------
+def _start_util(mode: str, fn) -> dict:
+    """Run a log-producing utility (cleanup/verify) in a daemon thread."""
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    run_id = "local-%d-%d" % (int(time.time() * 1000), next(_SEQ))
+    logp = str(RUN_DIR / f"{run_id}.log")
+    rec = {"id": run_id, "mode": mode, "status": "running", "lifecycle_ids": [],
+           "runnable": [], "log_path": logp, "rc": None, "started": time.time(),
+           "ended": None, "error": None}
+    with _LOCK:
+        _RUNS[run_id] = rec
+
+    def _worker():
+        try:
+            res = fn(logp)
+            with _LOCK:
+                rec["rc"] = res.get("rc"); rec["status"] = "done"; rec["ended"] = time.time()
+        except Exception as exc:
+            with _LOCK:
+                rec["status"], rec["ended"], rec["error"] = "error", time.time(), str(exc)
+
+    t = threading.Thread(target=_worker, daemon=True)
+    rec["_thread"] = t
+    t.start()
+    return _public(rec)
+
+
+def start_cleanup() -> dict:
+    """FORCE reconciler sweep (destructive — owner-tagged only). Operator opt-in."""
+    return _start_util("cleanup", local_run.cleanup_sweep)
+
+
+def start_verify() -> dict:
+    """Read-only owned-resource inventory (no deletes)."""
+    return _start_util("verify", local_run.verify_clean)
+
+
+def read_log(run_id: str) -> dict | None:
+    """The raw log of a run (live pytest / cleanup / verify). Safe to poll mid-run."""
+    rec = _RUNS.get(run_id)
+    if not rec:
+        return None
+    lp = rec.get("log_path")
+    log = ""
+    if lp:
+        try:
+            with open(lp, encoding="utf-8") as fh:
+                log = fh.read()
+        except Exception:
+            pass
+    return {"run": _public(rec), "log": log}

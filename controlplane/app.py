@@ -777,6 +777,26 @@ def api_local_graph(lifecycle_ids: str = ""):
     return g
 
 
+@app.post("/api/local/cleanup")
+def api_local_cleanup():
+    """FORCE account-wide reconciler sweep (destructive — owner-tagged only)."""
+    return {"ok": True, "run": local_executor.start_cleanup()}
+
+
+@app.post("/api/local/verify")
+def api_local_verify():
+    """Read-only owned-resource inventory (no deletes)."""
+    return {"ok": True, "run": local_executor.start_verify()}
+
+
+@app.get("/api/local/runs/{run_id}/log")
+def api_local_log(run_id: str):
+    res = local_executor.read_log(run_id)
+    if res is None:
+        raise HTTPException(404, "no such local run")
+    return res
+
+
 @app.get("/local-run")
 def local_run_page(request: Request):
     """Local Run screen (S3) — pick a selection → run simulate/live in-process →

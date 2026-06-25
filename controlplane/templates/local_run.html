@@ -112,6 +112,17 @@
   </div>
 </div>
 
+<div class="card pad" style="margin-top:13px">
+  <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+    <b>계정 위생</b>
+    <button class="btn" id="btnVerify" style="padding:6px 12px">🔍 클린업 확인 <span class="muted">(read-only)</span></button>
+    <button class="btn" id="btnCleanup" style="padding:6px 12px;border-color:#c63434;color:#c63434">🧹 강제 클린업 <span style="color:#c63434">(삭제)</span></button>
+    <span class="muted small">owner 태그 자원만 — reconciler</span>
+    <span class="muted small mono" id="utilstat" style="margin-left:auto"></span>
+  </div>
+  <pre id="utillog" class="mono small" style="display:none;margin:9px 0 0;max-height:240px;overflow:auto;white-space:pre-wrap;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px"></pre>
+</div>
+
 <script src="/resource_graph.js"></script>
 <script>
 {% raw %}
@@ -225,6 +236,25 @@
     Array.prototype.forEach.call($("#rtabs").children, function (a) { a.classList.toggle("active", a.dataset.t === t); });
   }
 
+  // ---- account hygiene (cleanup / verify) ----
+  function pollLog(id) {
+    var t = setInterval(function () {
+      fetch("/api/local/runs/" + id + "/log").then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+        if (!j) return;
+        $("#utillog").textContent = j.log || "…";
+        $("#utilstat").textContent = j.run.status + (j.run.rc != null ? " (rc " + j.run.rc + ")" : "");
+        if (j.run.status !== "running") clearInterval(t);
+      });
+    }, 800);
+  }
+  function utilRun(url, confirmMsg) {
+    if (confirmMsg && !confirm(confirmMsg)) return;
+    $("#utillog").style.display = ""; $("#utillog").textContent = "실행 중…"; $("#utilstat").textContent = "running";
+    fetch(url, { method: "POST" }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.run) pollLog(j.run.id); else $("#utilstat").textContent = "실패";
+    });
+  }
+
   function paint(j) {
     var st = $("#runstat"); st.style.display = ""; st.textContent = j.run.status;
     st.className = "status " + (j.run.status === "done" ? "done" : j.run.status === "running" ? "running" : "failed");
@@ -270,6 +300,8 @@
   $("#zout").onclick = function () { if (SCENE) SCENE.zoomOut(); };
   $("#zfit").onclick = function () { if (SCENE) SCENE.zoomToFit(); };
   $("#rtabs").addEventListener("click", function (e) { var a = e.target.closest("a[data-t]"); if (a) setTab(a.dataset.t); });
+  $("#btnVerify").onclick = function () { utilRun("/api/local/verify", null); };
+  $("#btnCleanup").onclick = function () { utilRun("/api/local/cleanup", "계정 전체에서 우리 소유(owner 태그) 자원을 삭제합니다. 되돌릴 수 없습니다. 계속할까요?"); };
   $("#q").oninput = render;
   $("#runSim").onclick = function () { run("simulate"); };
   $("#runLive").onclick = function () { run("live"); };
