@@ -60,7 +60,12 @@ for k, v in {
 from regression.scenarios import (  # noqa: E402 — must follow sys.path + env setup
     catalog_run, dag_planner, dag_runner, dag_runner_live)
 
-argv = sys.argv[1:] or ["ALL"]
+# --schema-diff: ALSO run the conformance schema-live drift probe over THIS DAG
+# run (reusing the platform's provisioner + dependency-ordered, slot-gated parallel
+# scheduler) instead of conformance.schema_live's serial loop. The schema-diff hook
+# is fanned across the executor threads; drift is emitted as runtime Findings.
+_SCHEMA_DIFF = "--schema-diff" in sys.argv[1:]
+argv = [a for a in (sys.argv[1:] or ["ALL"]) if a != "--schema-diff"] or ["ALL"]
 if argv == ["ALL"]:
     leaf = None
     plan = dag_planner.plan()
@@ -226,7 +231,14 @@ def main():
     state["phase"] = "building executor"
     render()
     mw = int(os.environ.get("CATRUN_MAX_WORKERS", "8"))
-    executor, provisioner = dag_runner_live.build(plan, max_workers=mw)
+    on_response = _finalize = None
+    if _SCHEMA_DIFF:
+        from conformance.runtime import _docs
+        from conformance.schema_live import make_schema_diff_hook
+        on_response, _finalize = make_schema_diff_hook(_docs())
+        log("schema-diff=ON — conformance schema-live drift folded into this DAG run")
+    executor, provisioner = dag_runner_live.build(plan, max_workers=mw,
+                                                  on_response=on_response)
     _LIM["ref"] = getattr(executor, "limiter", None)
     log(f"adaptive={'on' if _LIM['ref'] is not None else 'off'} "
         f"start={os.environ.get('SCP_ADAPTIVE_START')} ceil={mw} "
@@ -258,6 +270,10 @@ def main():
     state["phase"] = "DONE"
     by = result.by_status()
     log(f"DONE — {by}")
+    if _finalize is not None:
+        summ = _finalize(via="dag_run_live", include_heavy=True)
+        log(f"schema-diff: responses checked={summ['checked']} "
+            f"with-drift={summ['with_drift']}")
     # A2: fold this run's measured wall-times into the duration store so the next
     # schedule's critical-path / longest-first priority improves (dag_run_live never
     # did this before — every node stayed n:1). Learning must never fail the run.

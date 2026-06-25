@@ -683,7 +683,8 @@ class LifecycleSkip(Exception):
 def run_lifecycle(lifecycle: dict, client, cfg, *,
                   budget: _budgets.Budget | None = None,
                   resource_registry: ResourceRegistry | None = None,
-                  shared_ctx: dict | None = None) -> dict:
+                  shared_ctx: dict | None = None,
+                  on_response=None) -> dict:
     """Run one lifecycle's steps in order. Returns a result dict
     ``{id, status: 'passed'|'skipped'|'failed', reason?, failed_groups, created}``.
 
@@ -1133,6 +1134,20 @@ def run_lifecycle(lifecycle: dict, client, cfg, *,
                 _cev.emit("resource-deleted", lifecycle=lifecycle["id"],
                           resource_type=(step_service or ""),
                           service=(step_service or ""), path=path)
+
+            # AXIS-2 hook: let a caller (conformance.schema_live) inspect every
+            # executed step's live response (e.g. diff it against the documented
+            # response model) without coupling the engine to conformance. Reusing
+            # the engine this way is what makes the heavy schema-live probe SAFE:
+            # it inherits poll-to-ACTIVE, owner-tagging, budget reservation,
+            # shared-VPC adoption and reverse-order (retry) teardown instead of
+            # re-implementing a naive loop. Additive + best-effort — a hook error
+            # never affects the run or its teardown.
+            if on_response is not None:
+                try:
+                    on_response(lifecycle, step, path, step_service, resp)
+                except Exception as _hook_exc:  # noqa: BLE001
+                    print(f"  on_response hook error: {_hook_exc}")
 
             expected = _as_status_list(step.get("expect_status")) or [200]
             _txt = resp.raw_text or ""

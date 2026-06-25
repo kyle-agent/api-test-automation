@@ -91,111 +91,152 @@ def _diff(docs, e, body):
             "item_undocumented_fields": item_extra, "item_missing_required": item_missing}
 
 
-def probe_schema_live(client, cfg, docs, *, filter_id: str = ""):
-    """Run LIGHT enabled CRUD lifecycles, diffing every 2xx GET/POST body against
-    the documented model, then tear everything down. Returns 0 on completion, 3
-    if the destructive gate is not set (matching the legacy exit codes).
+def make_schema_diff_hook(docs):
+    """Build a thread-safe ``(on_response, finalize)`` pair for schema-drift.
 
-    Double-gated: requires ``cfg.allow_mutations and cfg.allow_destructive``
-    (teardown needs DELETE). Without both, it creates and records nothing.
+    ``on_response(lifecycle, step, path, service, resp)`` diffs every 2xx GET/POST
+    response body against the documented model and emits a Finding per drift (same
+    semantics as the read-only :func:`probe_schema`, but on bodies only visible
+    AFTER a create). ``finalize(**meta)`` writes the legacy JSON+CSV artifacts and
+    returns a summary. Shared by BOTH the serial :func:`probe_schema_live` and the
+    DAG-orchestrated heavy run (``tools.dag_run_live --schema-diff``) so the diff
+    logic lives in one place. Thread-safe: the DAG executor calls ``on_response``
+    from several worker threads concurrently.
     """
-    # reuse the proven lifecycle definitions + step helpers (no reinvention)
-    from core.http_client import MutationBlocked
+    import threading
+    idx = _endpoint_index(docs)
+    rows: list = []
+    drift_rows: list = []
+    lock = threading.Lock()
+
+    def on_response(lifecycle, step, path, service, resp):
+        if step.get("method") not in ("GET", "POST"):
+            return
+        if not (200 <= resp.status < 300) or not isinstance(resp.body, dict):
+            return
+        match = next((e for rx, e in idx.get((step["method"], service), [])
+                      if rx.match(path)), None)
+        if not match:
+            return
+        ekey = f"{match['category']}/{match['service']}/{match['name']}"
+        d = _diff(docs, match, resp.body)
+        if not d:
+            return
+        row = {"lifecycle": lifecycle["id"], "step": step.get("name", ""),
+               "endpoint": ekey, "method": step["method"], **d}
+        miss = d["missing_required_fields"] or d["item_missing_required"]
+        extra = d["undocumented_fields"] or d["item_undocumented_fields"]
+        with lock:
+            rows.append(row)
+            if miss or extra:
+                drift_rows.append(row)
+                print(f"  DRIFT {ekey}: extra=[{d['undocumented_fields']}] "
+                      f"missing=[{d['missing_required_fields']}] "
+                      f"item_extra=[{d['item_undocumented_fields']}]")
+                if miss:
+                    _emit(ekey, "schema-live-missing-field", "red",
+                          f"live (created) response omits documented required "
+                          f"field(s): {miss}")
+                elif extra:
+                    _emit(ekey, "schema-live-undocumented-field", "yellow",
+                          f"live (created) response has undocumented field(s): {extra}")
+
+    def finalize(**meta):
+        OUT.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"checked": len(rows), "with_drift": len(drift_rows),
+                   "results": rows}
+        payload.update(meta)
+        OUT.write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+        CSV.parent.mkdir(parents=True, exist_ok=True)
+        cols = ["lifecycle", "step", "endpoint", "method", "model",
+                "undocumented_fields", "missing_required_fields", "item_model",
+                "item_undocumented_fields", "item_missing_required"]
+        with CSV.open("w", newline="", encoding="utf-8-sig") as fh:
+            w = csv.DictWriter(fh, fieldnames=cols)
+            w.writeheader()
+            for r in rows:
+                w.writerow({c: r.get(c, "") for c in cols})
+        print(f"\n## data-based schema drift\n"
+              f"- responses checked: {len(rows)}\n"
+              f"- responses WITH drift: {len(drift_rows)}")
+        print(f"_wrote {OUT} + {CSV}_")
+        return {"checked": len(rows), "with_drift": len(drift_rows), "rows": rows}
+
+    return on_response, finalize
+
+
+def probe_schema_live(client, cfg, docs, *, filter_id: str = ""):
+    """Run enabled CRUD lifecycles via the regression ENGINE (SERIAL), diffing every
+    2xx GET/POST response body against the documented model, and let the engine tear
+    everything down. Returns 0 on completion, 3 if the destructive gate is unset.
+
+    Delegates to :func:`regression.scenarios.engine.run_lifecycle` through the
+    ``on_response`` hook from :func:`make_schema_diff_hook` instead of re-implementing
+    a step loop, so it inherits the engine's safety machinery: poll-to-ACTIVE before
+    use, owner/run/ttl tagging, quota-budget reservation, shared-VPC adoption and
+    reverse-order (retry-aware) teardown. That is what makes including HEAVY safe — a
+    heavy resource is polled to a deletable state and torn down with retries rather
+    than DELETEd while still CREATING (which would strand a billable cluster). The old
+    hand-rolled loop had none of this, hence the LIGHT-only restriction.
+
+    For a LARGE heavy run prefer the DAG-orchestrated path
+    (``tools.dag_run_live --schema-diff``): it fans the SAME hook across the
+    dependency-ordered, VPC-slot-gated PARALLEL scheduler (the platform's existing
+    orchestration) instead of this serial loop.
+
+    HEAVY lifecycles are included only when ``cfg.run_heavy`` (SCP_RUN_HEAVY=true);
+    otherwise the LIGHT set runs exactly as before. Double-gated: requires
+    ``cfg.allow_mutations and cfg.allow_destructive`` (teardown needs DELETE).
+    Without both, it creates and records nothing.
+    """
     from regression.scenarios.engine import (
-        LIFECYCLES, _fill, _fill_obj, _capture, _run_step)
+        LIFECYCLES, run_lifecycle, provision_shared_vpc)
+    from core.registry import ResourceRegistry
 
     if not (cfg.allow_mutations and cfg.allow_destructive):
         print("::error::schema_live needs SCP_ALLOW_MUTATIONS=true and "
               "SCP_ALLOW_DESTRUCTIVE=true (creates + tears down real resources)")
         return 3
 
-    idx = _endpoint_index(docs)
+    include_heavy = bool(getattr(cfg, "run_heavy", False))
     lifecycles = [lc for lc in LIFECYCLES
-                  if lc.get("enabled") and not lc.get("heavy") and filter_id in lc["id"]]
+                  if lc.get("enabled")
+                  and (include_heavy or not lc.get("heavy"))
+                  and filter_id in lc["id"]]
 
-    rows = []
-    drift_rows = []
-    for lc in lifecycles:
-        service = lc.get("service", "").split("/")[-1] or None
-        _now = time.gmtime()
-        ctx = {"unique": format(int(time.time()), "x"), "region": cfg.region,
-               "today": time.strftime("%Y%m%d", _now),
-               "today_plus_5y": f"{_now.tm_year + 5}{time.strftime('%m%d', _now)}"}
-        cleanups = []
-        print(f"\n=== lifecycle {lc['id']} ===")
+    on_response, finalize = make_schema_diff_hook(docs)
+
+    # One shared registry owner-tracks the shared VPC AND every lifecycle's creates
+    # so the cleanup.reconciler backstop can reclaim anything a per-lifecycle teardown
+    # missed. Heavy/ADOPT-class lifecycles adopt ONE shared VPC+subnet (vs each
+    # consuming a slot against the 5-VPC cap); light-only runs skip it.
+    reg = ResourceRegistry()
+    shared_ctx, shared_teardown = ({}, lambda: None)
+    if include_heavy:
+        shared_ctx, shared_teardown = provision_shared_vpc(
+            client, cfg, resource_registry=reg)
+
+    n_run = n_passed = 0
+    try:
+        for lc in lifecycles:
+            print(f"\n=== schema-live lifecycle {lc['id']} "
+                  f"(heavy={bool(lc.get('heavy'))}) ===")
+            try:
+                res = run_lifecycle(lc, client, cfg, shared_ctx=shared_ctx,
+                                    resource_registry=reg, on_response=on_response)
+                n_run += 1
+                if res.get("status") == "passed":
+                    n_passed += 1
+                print(f"  -> {res.get('status')}"
+                      f"{': ' + str(res['reason']) if res.get('reason') else ''}")
+            except Exception as exc:  # noqa: BLE001 — one bad lifecycle never aborts the probe
+                print(f"  lifecycle error [{lc['id']}]: {exc}")
+    finally:
         try:
-            for step in lc["steps"]:
-                if step.get("probe_reads"):
-                    continue
-                svc = step.get("service") or service
-                if step.get("wait"):
-                    time.sleep(float(step["wait"]))
-                path = _fill(step["path"], ctx)
-                body = _fill_obj(step.get("json"), ctx)
-                try:
-                    resp = _run_step(client, step, path, body, svc, ctx)
-                except MutationBlocked as exc:
-                    print(f"  blocked: {exc}")
-                    break
-                expected = step.get("expect_status", [200])
-                # capture ids for later steps / teardown
-                if resp.status in expected:
-                    for var, expr in {**step.get("capture", {}), **step.get("capture_soft", {})}.items():
-                        v = _capture(resp.body, expr)
-                        if v is not None:
-                            ctx[var] = str(v)
-                    cu = step.get("cleanup")
-                    if cu:
-                        cleanups.append((cu["method"], _fill(cu["path"], ctx),
-                                         cu.get("service") or svc, _fill_obj(cu.get("json"), ctx)))
-                # diff GET/POST 2xx responses against the documented model
-                if step["method"] in ("GET", "POST") and 200 <= resp.status < 300 and isinstance(resp.body, dict):
-                    match = next((e for rx, e in idx.get((step["method"], svc), []) if rx.match(path)), None)
-                    if match:
-                        ekey = f"{match['category']}/{match['service']}/{match['name']}"
-                        d = _diff(docs, match, resp.body)
-                        if d:
-                            row = {"lifecycle": lc["id"], "step": step["name"],
-                                   "endpoint": ekey, "method": step["method"], **d}
-                            rows.append(row)
-                            miss = d["missing_required_fields"] or d["item_missing_required"]
-                            extra = d["undocumented_fields"] or d["item_undocumented_fields"]
-                            if miss or extra:
-                                drift_rows.append(row)
-                                print(f"  DRIFT {ekey}: extra=[{d['undocumented_fields']}] "
-                                      f"missing=[{d['missing_required_fields']}] "
-                                      f"item_extra=[{d['item_undocumented_fields']}]")
-                                # unified findings (same semantics as probe_schema)
-                                if miss:
-                                    _emit(ekey, "schema-live-missing-field", "red",
-                                          f"live (created) response omits documented required "
-                                          f"field(s): {miss}")
-                                elif extra:
-                                    _emit(ekey, "schema-live-undocumented-field", "yellow",
-                                          f"live (created) response has undocumented "
-                                          f"field(s): {extra}")
-        except Exception as exc:
-            print(f"  lifecycle error: {exc}")
-        finally:
-            for method, p, svc, j in reversed(cleanups):
-                try:
-                    client.request(method, p, json=j, service=svc)
-                    print(f"  cleanup {method} {p}")
-                except Exception as exc:
-                    print(f"  cleanup FAILED {p}: {exc}")
+            shared_teardown()
+        except Exception as exc:  # noqa: BLE001
+            print(f"  shared-VPC teardown error: {exc}")
 
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps({"checked": len(rows), "with_drift": len(drift_rows),
-                               "results": rows}, indent=2, ensure_ascii=False))
-    CSV.parent.mkdir(parents=True, exist_ok=True)
-    cols = ["lifecycle", "step", "endpoint", "method", "model", "undocumented_fields",
-            "missing_required_fields", "item_model", "item_undocumented_fields", "item_missing_required"]
-    with CSV.open("w", newline="", encoding="utf-8-sig") as fh:
-        w = csv.DictWriter(fh, fieldnames=cols)
-        w.writeheader()
-        for r in rows:
-            w.writerow({c: r.get(c, "") for c in cols})
-    print(f"\n## data-based schema drift\n- responses checked: {len(rows)}\n"
-          f"- responses WITH drift: {len(drift_rows)}")
-    print(f"_wrote {OUT} + {CSV}_")
+    finalize(include_heavy=include_heavy, lifecycles_run=n_run,
+             lifecycles_passed=n_passed)
     return 0

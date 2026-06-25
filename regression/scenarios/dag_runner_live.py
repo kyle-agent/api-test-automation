@@ -283,7 +283,7 @@ class AdaptiveLimiter:
         return self._limit
 
 
-def _make_executor(cfg, max_workers: int | None = None):
+def _make_executor(cfg, max_workers: int | None = None, on_response=None):
     """Build the executor closure bound to the shared cfg. It shares ONE pooled
     ApiClient AND one thread-safe Budget across all concurrent lifecycle threads:
 
@@ -336,6 +336,7 @@ def _make_executor(cfg, max_workers: int | None = None):
                 budget=shared_budget,
                 resource_registry=ResourceRegistry(),
                 shared_ctx=_shared_ctx_from_env(),
+                on_response=on_response,
             )
             status = result.get("status", "failed")
             reason = result.get("reason")
@@ -354,7 +355,7 @@ def _make_executor(cfg, max_workers: int | None = None):
     return executor
 
 
-def build(plan: dag_planner.Plan, max_workers: int | None = None):
+def build(plan: dag_planner.Plan, max_workers: int | None = None, on_response=None):
     """Build the (executor, provisioner) pair for a live run of ``plan``.
 
     LIVE PATH — refuses to proceed unless SCP_ALLOW_MUTATIONS=true (raises a
@@ -363,12 +364,18 @@ def build(plan: dag_planner.Plan, max_workers: int | None = None):
     applies the same cap to its thread pool), so concurrent lifecycles reuse
     keep-alive connections rather than exhausting sockets.
 
+    ``on_response`` is an optional per-step response observer forwarded to
+    :func:`engine.run_lifecycle` — the conformance schema-diff probe passes its
+    thread-safe hook here so a heavy schema-live run reuses THIS orchestration
+    (provisioner + dependency-ordered, VPC-slot-gated parallel scheduler) instead
+    of a serial loop. ``None`` (the default) is the plain regression path.
+
     Returns ``(executor, provisioner)`` ready to pass to
     ``dag_runner.run_plan(plan, executor, provisioner=provisioner,
     max_workers=max_workers)``.
     """
     _require_mutation_gate("build live DAG-runner adapters")
     cfg = engine_settings()
-    executor = _make_executor(cfg, max_workers=max_workers)
+    executor = _make_executor(cfg, max_workers=max_workers, on_response=on_response)
     provisioner = SharedInfraProvisioner(plan, cfg)
     return executor, provisioner
