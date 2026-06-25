@@ -1,0 +1,5110 @@
+{
+  "generated": "2026-06-25",
+  "run_context": "AXIS-2 read-only runtime probes (8 probe types) + heavy schema-live drift (DAG --schema-diff). Session 2026-06-25.",
+  "note": "Behavior/runtime + schema-live-drift findings. Static DESIGN findings live in conformance.json. UI panel for these is a pending dashboard enhancement; this artifact is the machine-readable source.",
+  "summary": {
+    "total": 579,
+    "by_source": {
+      "runtime": 579
+    },
+    "by_severity": {
+      "red": 40,
+      "yellow": 539
+    },
+    "distinct_rules": 15,
+    "distinct_endpoints": 334
+  },
+  "by_rule": {
+    "notfound-inconsistent": {
+      "count": 146,
+      "severity": "yellow",
+      "endpoint_count": 73,
+      "endpoints": [
+        "ai-ml/aimlops-platform/checkaimlopsplatformversionv1",
+        "ai-ml/aimlops-platform/getaimlopsplatformv1",
+        "ai-ml/aimlops-platform/validateclusternamespaceforaimlopsplatformv1",
+        "ai-ml/aimlops-platform/validateclusterresourcesizeforaimlopsplatformv1",
+        "application-service/apigateway/listaccesscontrols",
+        "application-service/apigateway/listapideployments",
+        "application-service/apigateway/listauths",
+        "application-service/apigateway/listconnectedprivatelinkendpoints",
+        "application-service/apigateway/listreports",
+        "application-service/apigateway/listresources",
+        "application-service/apigateway/liststages",
+        "application-service/apigateway/listusageplans",
+        "application-service/apigateway/showapi",
+        "application-service/apigateway/showprivatelinkendpoint",
+        "application-service/apigateway/showresourcepolicy",
+        "application-service/queueservice/getqueueattributes",
+        "application-service/queueservice/showqueue",
+        "compute/scf/listenvironmentvariables",
+        "compute/scf/listprivatelinkendpoint",
+        "compute/scf/showcloudfunction",
+        "compute/scf/showcloudfunctioncode",
+        "compute/scf/showcloudfunctionconfiguration",
+        "compute/scf/showcloudfunctionlogs",
+        "compute/scf/showcloudfunctionmetrics",
+        "compute/scf/showcloudfunctiontrigger",
+        "compute/scf/showgeneralconfig",
+        "compute/scf/showprivatelinkservice",
+        "compute/scf/showresourcepolicy",
+        "compute/scf/showurlconfig",
+        "container/ske/createclusterkubeconfig",
+        "container/ske/listnodepools",
+        "container/ske/showcluster",
+        "container/ske/showclusteruserkubeconfig",
+        "data-analytics/data-flow/getdataflow",
+        "data-analytics/data-flow/getdataflowserviceconsole",
+        "data-analytics/data-flow/getdataflowservicesubversions",
+        "data-analytics/data-flow/ingresscluster",
+        "data-analytics/data-ops/getdataopsdetail",
+        "data-analytics/data-ops/getdataopsservice",
+        "data-analytics/data-ops/getdataopssubversion",
+        "data-analytics/data-ops/getingresscontrollerlistv1",
+        "data-analytics/eventstreams/eventstreamsshowrequest",
+        "data-analytics/searchengine/searchengineshowrequest",
+        "data-analytics/vertica/verticashowrequest",
+        "database/cachestore/cachestoreshowrequest",
+        "database/epas/epasshowrequest",
+        "database/mariadb/mariadbshowrequest",
+        "database/mysql/mysqlshowrequest",
+        "database/postgresql/postgresqlshowrequest",
+        "database/sqlserver/sqlservershowrequest"
+      ]
+    },
+    "l10n-not-localized": {
+      "count": 124,
+      "severity": "yellow",
+      "endpoint_count": 124,
+      "endpoints": [
+        "ai-ml/aimlops-platform/releaseaimlopsplatformv1",
+        "application-service/apigateway/createapi",
+        "application-service/apigateway/createprivatelinkendpoint",
+        "application-service/queueservice/createqueue",
+        "compute/baremetal/createbaremetals",
+        "compute/baremetal/startbaremetals",
+        "compute/baremetal/stopbaremetals",
+        "compute/multinodegpucluster/creategpunodes",
+        "compute/multinodegpucluster/modifyclusterfabricmembers",
+        "compute/multinodegpucluster/startgpunodes",
+        "compute/multinodegpucluster/stopgpunodes",
+        "compute/scf/createcloudfunction",
+        "compute/scf/createcloudfunctionapigatewaytrigger",
+        "compute/scf/createcloudfunctioncronjobtrigger",
+        "compute/virtualserver/createautoscalinggroup",
+        "compute/virtualserver/createimage",
+        "compute/virtualserver/createkeypair",
+        "compute/virtualserver/createlaunchconfiguration",
+        "compute/virtualserver/createservergroup",
+        "compute/virtualserver/createsnapshot",
+        "compute/virtualserver/createvirtualserver",
+        "compute/virtualserver/createvolume",
+        "compute/virtualserver/createvolumetransfer",
+        "container/scr/createregistry",
+        "container/scr/createrepository",
+        "container/ske/createcluster",
+        "container/ske/createnodepool",
+        "data-analytics/data-flow/createdataflow",
+        "data-analytics/data-flow/createdataflowserviceconsole",
+        "data-analytics/data-ops/createdataops",
+        "data-analytics/data-ops/createdataopsservice",
+        "data-analytics/eventstreams/eventstreamscreatecluster",
+        "data-analytics/quick-query/createquickquery",
+        "data-analytics/quick-query/validatequickqueryresources",
+        "data-analytics/searchengine/searchenginecreatecluster",
+        "data-analytics/vertica/verticacreatecluster",
+        "database/cachestore/cachestorecreatecluster",
+        "database/epas/epascreatecluster",
+        "database/mariadb/mariadbcreatecluster",
+        "database/mysql/mysqlcreatecluster",
+        "database/postgresql/postgresqlcreatecluster",
+        "database/sqlserver/sqlservercreatecluster",
+        "devops-tools/devopsservice/createdevopsservice",
+        "financial-management/billingplan/createplannedcomputes",
+        "financial-management/billingplan/showcancellationfee",
+        "financial-management/budget/createaccountbudget",
+        "management/cloudcontrol/createaccountfactoryaccount",
+        "management/cloudcontrol/createlandingzone",
+        "management/cloudcontrol/enableguardrailbindings",
+        "management/iam-identity-center/createaccountassignment"
+      ]
+    },
+    "unauth-non-401": {
+      "count": 58,
+      "severity": "yellow",
+      "endpoint_count": 58,
+      "endpoints": [
+        "ai-ml/aimlops-platform/checkduplicationaimlopsplatformnamev1",
+        "ai-ml/cloud-ml/checkduplicationnameanddomainname",
+        "application-service/apigateway/listprivatelinkendpoints",
+        "application-service/queueservice/listqueue",
+        "compute/baremetal/listbaremetals",
+        "compute/multinodegpucluster/listnodepools",
+        "compute/scf/listsamplecodes",
+        "compute/virtualserver/listvolumetypes",
+        "container/scr/listregistries",
+        "container/ske/listkubernetesversions",
+        "data-analytics/data-flow/getdataflowimages",
+        "data-analytics/data-ops/getdataopsimageversionv1",
+        "data-analytics/eventstreams/eventstreamslistclusters",
+        "data-analytics/quick-query/getquickqueryimageversions",
+        "data-analytics/searchengine/searchenginelistclusters",
+        "data-analytics/vertica/verticalistclusters",
+        "database/cachestore/cachestorelistclusters",
+        "database/epas/epaslistclusters",
+        "database/mariadb/mariadblistclusters",
+        "database/mysql/mysqllistclusters",
+        "database/postgresql/postgresqllistclusters",
+        "database/sqlserver/sqlserverlistclusters",
+        "devops-tools/devopsservice/listdevopsservices",
+        "financial-management/billingplan/listplannedcomputeservicetypes",
+        "financial-management/budget/listaccountbudgets",
+        "financial-management/costexplorer/listusages",
+        "financial-management/pricing/listreportprice",
+        "management/cloudcontrol/listtargetsforguardrail",
+        "management/cloudmonitoring/getaccounteventlist",
+        "management/iam-identity-center/listusers",
+        "management/iam/listserviceaccount",
+        "management/loggingaudit/listtrails",
+        "management/network-logging/listnetworkloggingstorages",
+        "management/organization/listtargetsforpolicy",
+        "management/quota/listquotarequests",
+        "management/resourcemanager/listtagvalues",
+        "management/servicewatch/listloggroups",
+        "management/support/getinquirylist",
+        "networking/cdn/listcdnservice",
+        "networking/direct-connect/listdirectconnects",
+        "networking/dns/listpublicdomainnames",
+        "networking/firewall/listfirewalls",
+        "networking/gslb/listgslbsregionalroutingcontrol",
+        "networking/loadbalancer/listloadbalancers",
+        "networking/security-group/listsecuritygroups",
+        "networking/vpc/listvpcs",
+        "networking/vpn/listvpntunnels",
+        "platform/product/listproducts",
+        "security/certificatemanager/listcertificates",
+        "security/configinspection/configinspectionlist"
+      ]
+    },
+    "cors-missing": {
+      "count": 58,
+      "severity": "yellow",
+      "endpoint_count": 58,
+      "endpoints": [
+        "ai-ml/aimlops-platform/checkduplicationaimlopsplatformnamev1",
+        "ai-ml/cloud-ml/checkduplicationnameanddomainname",
+        "application-service/apigateway/listapis",
+        "application-service/queueservice/checkqueuenameduplication",
+        "compute/baremetal/listbaremetalimages",
+        "compute/multinodegpucluster/listclusterfabrics",
+        "compute/scf/checkfunctionnameduplication",
+        "compute/virtualserver/listvirtualservers",
+        "container/scr/checkregistrynameduplication",
+        "container/ske/listclusters",
+        "data-analytics/data-flow/getdataflowimages",
+        "data-analytics/data-ops/getdataopsimageversionv1",
+        "data-analytics/eventstreams/eventstreamslistclusters",
+        "data-analytics/quick-query/getquickqueryimageversions",
+        "data-analytics/searchengine/searchenginelistclusters",
+        "data-analytics/vertica/verticalistclusters",
+        "database/cachestore/cachestorelistclusters",
+        "database/epas/epaslistclusters",
+        "database/mariadb/mariadblistclusters",
+        "database/mysql/mysqllistclusters",
+        "database/postgresql/postgresqllistclusters",
+        "database/sqlserver/sqlserverlistclusters",
+        "devops-tools/devopsservice/checkduplicationdevopsservice",
+        "financial-management/billingplan/listcontracttypes",
+        "financial-management/budget/listaccountbudgets",
+        "financial-management/costexplorer/listbills",
+        "financial-management/pricing/listbillingitemids",
+        "management/cloudcontrol/listbaselineassignments",
+        "management/cloudmonitoring/getaccounteventlist",
+        "management/iam-identity-center/listaccountassignments",
+        "management/iam/accesskeylist",
+        "management/loggingaudit/listlogs",
+        "management/network-logging/listnetworkloggingconfigurations",
+        "management/organization/listaccountinvitations",
+        "management/quota/listaccountquota",
+        "management/resourcemanager/listresourcegroups",
+        "management/servicewatch/listdashboards",
+        "management/support/getinquirylist",
+        "networking/cdn/listcdnservice",
+        "networking/direct-connect/listdirectconnects",
+        "networking/dns/listhostedzone",
+        "networking/firewall/listfirewallrules",
+        "networking/gslb/listgslbs",
+        "networking/loadbalancer/listlbhealthchecks",
+        "networking/security-group/listsecuritygrouprules",
+        "networking/vpc/listinternetgateways",
+        "networking/vpn/listvpngateways",
+        "platform/product/listproductcategories",
+        "security/certificatemanager/listcertificates",
+        "security/configinspection/configinspectionlist"
+      ]
+    },
+    "pagination-ignores-size": {
+      "count": 57,
+      "severity": "yellow",
+      "endpoint_count": 57,
+      "endpoints": [
+        "compute/baremetal/listbaremetalproducts",
+        "compute/multinodegpucluster/listgpunodeproducts",
+        "compute/scf/listruntimes",
+        "compute/scf/listsamplecodes",
+        "compute/virtualserver/listimages",
+        "compute/virtualserver/listservergroups",
+        "compute/virtualserver/listservertypes",
+        "compute/virtualserver/listvolumetypes",
+        "container/scr/listconnectableresources",
+        "container/ske/listkubernetesversions",
+        "financial-management/billingplan/listcontracttypes",
+        "financial-management/billingplan/listostypes",
+        "financial-management/billingplan/listplannedcomputeservertypes",
+        "financial-management/billingplan/listplannedcomputeservicetypes",
+        "financial-management/budget/listaccountbudgets",
+        "financial-management/costexplorer/listbills",
+        "financial-management/costexplorer/listusages",
+        "financial-management/pricing/listbillingitemids",
+        "financial-management/pricing/listoffering",
+        "management/iam-identity-center/listinstances",
+        "management/iam/listendpoints",
+        "management/iam/listgroup",
+        "management/iam/listpolicy",
+        "management/iam/listrole",
+        "management/iam/listsamlprovider",
+        "management/iam/listserviceaccount",
+        "management/organization/listorganizations",
+        "management/quota/listaccountquota",
+        "management/quota/listquotarequests",
+        "management/resourcemanager/listtagkeys",
+        "management/resourcemanager/listtagvalues",
+        "management/servicewatch/listloggroups",
+        "networking/direct-connect/listdirectconnects",
+        "networking/dns/listprivatedns",
+        "networking/firewall/listfirewalls",
+        "networking/gslb/listgslbs",
+        "networking/gslb/listgslbsregionalroutingcontrol",
+        "networking/vpc/listinternetgateways",
+        "networking/vpc/listnatgateways",
+        "networking/vpc/listprivatelinkendpoints",
+        "networking/vpc/listprivatelinkservices",
+        "networking/vpc/listprivatenats",
+        "networking/vpc/listpublicip",
+        "networking/vpc/listsubnets",
+        "networking/vpc/listtransitgateways",
+        "networking/vpc/listvpcendpoints",
+        "networking/vpc/listvpcpeerings",
+        "networking/vpc/listvpcs",
+        "networking/vpn/listvpngateways",
+        "networking/vpn/listvpntunnels"
+      ]
+    },
+    "pagination": {
+      "count": 54,
+      "severity": "yellow",
+      "endpoint_count": 54,
+      "endpoints": [
+        "compute/baremetal/listbaremetalproducts",
+        "compute/multinodegpucluster/listgpunodeproducts",
+        "compute/scf/listruntimes",
+        "compute/scf/listsamplecodes",
+        "compute/virtualserver/listimages",
+        "compute/virtualserver/listkeypairs",
+        "compute/virtualserver/listservertypes",
+        "compute/virtualserver/listvolumetypes",
+        "container/ske/listkubernetesversions",
+        "financial-management/billingplan/listcontracttypes",
+        "financial-management/billingplan/listostypes",
+        "financial-management/billingplan/listplannedcomputeservicetypes",
+        "financial-management/budget/listaccountbudgets",
+        "financial-management/costexplorer/listbills",
+        "financial-management/costexplorer/listusages",
+        "financial-management/pricing/listbillingitemids",
+        "financial-management/pricing/listoffering",
+        "management/iam-identity-center/listinstances",
+        "management/iam/listendpoints",
+        "management/iam/listgroup",
+        "management/iam/listpolicy",
+        "management/iam/listrole",
+        "management/iam/listsamlprovider",
+        "management/iam/listserviceaccount",
+        "management/organization/listorganizations",
+        "management/quota/listaccountquota",
+        "management/quota/listquotarequests",
+        "management/servicewatch/listloggroups",
+        "networking/direct-connect/listdirectconnects",
+        "networking/dns/listprivatedns",
+        "networking/firewall/listfirewalls",
+        "networking/gslb/listgslbs",
+        "networking/gslb/listgslbsregionalroutingcontrol",
+        "networking/vpc/listinternetgateways",
+        "networking/vpc/listnatgateways",
+        "networking/vpc/listprivatelinkendpoints",
+        "networking/vpc/listprivatelinkservices",
+        "networking/vpc/listprivatenats",
+        "networking/vpc/listpublicip",
+        "networking/vpc/listsubnets",
+        "networking/vpc/listtransitgateways",
+        "networking/vpc/listvpcendpoints",
+        "networking/vpc/listvpcpeerings",
+        "networking/vpc/listvpcs",
+        "networking/vpn/listvpngateways",
+        "networking/vpn/listvpntunnels",
+        "platform/product/listproductcategories",
+        "platform/product/listproducts",
+        "security/kms/listkeys",
+        "security/kms/listmanagedkeys"
+      ]
+    },
+    "opaque-validation": {
+      "count": 24,
+      "severity": "red",
+      "endpoint_count": 13,
+      "endpoints": [
+        "data-analytics/eventstreams/eventstreamscreatecluster",
+        "data-analytics/searchengine/searchenginecreatecluster",
+        "data-analytics/vertica/verticacreatecluster",
+        "database/cachestore/cachestorecreatecluster",
+        "database/epas/epascreatecluster",
+        "database/mariadb/mariadbcreatecluster",
+        "database/mysql/mysqlcreatecluster",
+        "database/postgresql/postgresqlcreatecluster",
+        "database/sqlserver/sqlservercreatecluster",
+        "management/cloudmonitoring/getmetricperfdatalist",
+        "management/cloudmonitoring/puteventpolicy",
+        "management/iam-identity-center/creategroup",
+        "management/iam-identity-center/createpermissionset"
+      ]
+    },
+    "pagination-no-meta": {
+      "count": 19,
+      "severity": "yellow",
+      "endpoint_count": 19,
+      "endpoints": [
+        "compute/baremetal/listbaremetalproducts",
+        "compute/multinodegpucluster/listgpunodeproducts",
+        "compute/virtualserver/listimages",
+        "compute/virtualserver/listkeypairs",
+        "compute/virtualserver/listpendingimages",
+        "compute/virtualserver/listservergroups",
+        "compute/virtualserver/listservertypes",
+        "compute/virtualserver/listvirtualservers",
+        "compute/virtualserver/listvolumetransfer",
+        "compute/virtualserver/listvolumetypes",
+        "container/ske/listkubernetesversions",
+        "financial-management/billingplan/listcontracttypes",
+        "financial-management/billingplan/listostypes",
+        "financial-management/billingplan/listplannedcomputeservertypes",
+        "financial-management/billingplan/listplannedcomputeservicetypes",
+        "financial-management/pricing/listbillingitemids",
+        "financial-management/pricing/listoffering",
+        "management/iam/listendpoints",
+        "management/iam/listserviceaccount"
+      ]
+    },
+    "schema-live-undocumented-field": {
+      "count": 13,
+      "severity": "yellow",
+      "endpoint_count": 5,
+      "endpoints": [
+        "application-service/apigateway/createapi",
+        "application-service/apigateway/listapis",
+        "application-service/apigateway/showapi",
+        "financial-management/costexplorer/listusages",
+        "management/servicewatch/showalert"
+      ]
+    },
+    "schema-undocumented-field": {
+      "count": 6,
+      "severity": "yellow",
+      "endpoint_count": 5,
+      "endpoints": [
+        "application-service/apigateway/createapi",
+        "application-service/apigateway/listapis",
+        "application-service/apigateway/showapi",
+        "compute/virtualserver/showvolumequotaset",
+        "financial-management/costexplorer/listusages"
+      ]
+    },
+    "schema-live-missing-field": {
+      "count": 6,
+      "severity": "red",
+      "endpoint_count": 3,
+      "endpoints": [
+        "application-service/queueservice/getqueueattributes",
+        "data-analytics/quick-query/getquickquery",
+        "management/resourcemanager/listresourcetags"
+      ]
+    },
+    "5xx-on-bad-input": {
+      "count": 4,
+      "severity": "red",
+      "endpoint_count": 2,
+      "endpoints": [
+        "storage/baremetal-blockstorage/createvolume",
+        "storage/baremetal-blockstorage/createvolumegroup"
+      ]
+    },
+    "notfound-200-list": {
+      "count": 4,
+      "severity": "yellow",
+      "endpoint_count": 2,
+      "endpoints": [
+        "compute/virtualserver/listautoscalinggroupnotifications",
+        "management/iam/listuserpolicybindings"
+      ]
+    },
+    "notfound-200": {
+      "count": 4,
+      "severity": "red",
+      "endpoint_count": 2,
+      "endpoints": [
+        "management/servicewatch/showeventrule",
+        "management/servicewatch/showloggroup"
+      ]
+    },
+    "schema-missing-field": {
+      "count": 2,
+      "severity": "red",
+      "endpoint_count": 1,
+      "endpoints": [
+        "data-analytics/data-ops/getdataopsimageversionv1"
+      ]
+    }
+  },
+  "findings": [
+    {
+      "rule_id": "5xx-on-bad-input",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "storage/baremetal-blockstorage/createvolume",
+      "service": "",
+      "detail": "empty body -> 500 (should be 400)"
+    },
+    {
+      "rule_id": "5xx-on-bad-input",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "storage/baremetal-blockstorage/createvolumegroup",
+      "service": "",
+      "detail": "empty body -> 500 (should be 400)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/checkaimlopsplatformversionv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/getaimlopsplatformv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/validateclusternamespaceforaimlopsplatformv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/validateclusterresourcesizeforaimlopsplatformv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listaccesscontrols",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listapideployments",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listauths",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listconnectedprivatelinkendpoints",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listreports",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listresources",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/liststages",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listusageplans",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showapi",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showprivatelinkendpoint",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showresourcepolicy",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/getqueueattributes",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/showqueue",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listenvironmentvariables",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listprivatelinkendpoint",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunction",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctioncode",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctionconfiguration",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctionlogs",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctionmetrics",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctiontrigger",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showgeneralconfig",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showprivatelinkservice",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showresourcepolicy",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showurlconfig",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-200-list",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listautoscalinggroupnotifications",
+      "service": "",
+      "detail": "sub-resource list of a non-existent parent -> 200 (empty), not 404"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/createclusterkubeconfig",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/listnodepools",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/showcluster",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/showclusteruserkubeconfig",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/getdataflow",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/getdataflowserviceconsole",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/getdataflowservicesubversions",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/ingresscluster",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopsdetail",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopsservice",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopssubversion",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getingresscontrollerlistv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/eventstreams/eventstreamsshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/searchengine/searchengineshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/vertica/verticashowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/cachestore/cachestoreshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/epas/epasshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mariadb/mariadbshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mysql/mysqlshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/postgresql/postgresqlshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/sqlserver/sqlservershowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/showguardrail",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/showlandingzone",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/getadressbookmemberlist",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/geteventpolicydetail",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/geteventpolicyhistories",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/geteventpolicynotification",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/listgroupusers",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/listpermissionsetpolicies",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/showgroup",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/showpermissionset",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/showuser",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listiamuser",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-200-list",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listuserpolicybindings",
+      "service": "",
+      "detail": "sub-resource list of a non-existent parent -> 200 (empty), not 404"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/showresourcepolicy",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/listparents",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/showaccount",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/showorganization",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/showservicecontrolpolicy",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/listresourcetags",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/showresource",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-200",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/showeventrule",
+      "service": "",
+      "detail": "non-existent id -> 200 (should be 404)"
+    },
+    {
+      "rule_id": "notfound-200",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/showloggroup",
+      "service": "",
+      "detail": "non-existent id -> 200 (should be 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretvault/gettemporarykey",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/listbackuprestoresubnets",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/listfilesystempath",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/showvolumereplication",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "schema-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/showvolumequotaset",
+      "service": "",
+      "detail": "response has undocumented field(s): snapshots_SSD,snapshots_SSD_KMS,snapshots_SSD_MultiAttach,snapshots_SSD_Provisioned,snapshots_hdd0,snapshots_ssd0,usages_SSD,usages_SSD_KMS,usages_SSD_MultiAttach,usages_SSD_Provisioned,usages_hdd0,usages"
+    },
+    {
+      "rule_id": "schema-missing-field",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopsimageversionv1",
+      "service": "",
+      "detail": "response omits documented required field(s): image_attr"
+    },
+    {
+      "rule_id": "schema-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createapi",
+      "service": "",
+      "detail": "response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showapi",
+      "service": "",
+      "detail": "response has undocumented field(s): endpoint_type,privatelink_service_id"
+    },
+    {
+      "rule_id": "schema-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listapis",
+      "service": "",
+      "detail": "response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/baremetal/listbaremetalproducts",
+      "service": "",
+      "detail": "ignores size=1 (returned 31)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/listgpunodeproducts",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listruntimes",
+      "service": "",
+      "detail": "ignores size=1 (returned 15)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listsamplecodes",
+      "service": "",
+      "detail": "ignores size=1 (returned 64)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listimages",
+      "service": "",
+      "detail": "ignores size=1 (returned 20)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listkeypairs",
+      "service": "",
+      "detail": "ignores size=1 (returned 3)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listservertypes",
+      "service": "",
+      "detail": "ignores size=1 (returned 121)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listvolumetypes",
+      "service": "",
+      "detail": "ignores size=1 (returned 4)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/listkubernetesversions",
+      "service": "",
+      "detail": "ignores size=1 (returned 6)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listcontracttypes",
+      "service": "",
+      "detail": "ignores size=1 (returned 4)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listostypes",
+      "service": "",
+      "detail": "ignores size=1 (returned 4)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listplannedcomputeservicetypes",
+      "service": "",
+      "detail": "ignores size=1 (returned 12)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/budget/listaccountbudgets",
+      "service": "",
+      "detail": "ignores size=1 (returned 4)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listbills",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listusages",
+      "service": "",
+      "detail": "ignores size=1 (returned 20)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/pricing/listbillingitemids",
+      "service": "",
+      "detail": "ignores size=1 (returned 232)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/pricing/listoffering",
+      "service": "",
+      "detail": "ignores size=1 (returned 3)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/listinstances",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listendpoints",
+      "service": "",
+      "detail": "ignores size=1 (returned 169)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listgroup",
+      "service": "",
+      "detail": "ignores size=1 (returned 3)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listpolicy",
+      "service": "",
+      "detail": "ignores size=1 (returned 3)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listrole",
+      "service": "",
+      "detail": "ignores size=1 (returned 3)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listsamlprovider",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listserviceaccount",
+      "service": "",
+      "detail": "ignores size=1 (returned 8)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/listorganizations",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/quota/listaccountquota",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/quota/listquotarequests",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/listloggroups",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/direct-connect/listdirectconnects",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/dns/listprivatedns",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/firewall/listfirewalls",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/gslb/listgslbs",
+      "service": "",
+      "detail": "ignores size=1 (returned 3)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/gslb/listgslbsregionalroutingcontrol",
+      "service": "",
+      "detail": "ignores size=1 (returned 3)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listinternetgateways",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listnatgateways",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listprivatelinkendpoints",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listprivatelinkservices",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listprivatenats",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listpublicip",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listsubnets",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listtransitgateways",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listvpcendpoints",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listvpcpeerings",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listvpcs",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpn/listvpngateways",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpn/listvpntunnels",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "platform/product/listproductcategories",
+      "service": "",
+      "detail": "ignores size=1 (returned 14)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "platform/product/listproducts",
+      "service": "",
+      "detail": "ignores size=1 (returned 20)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/kms/listkeys",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/kms/listmanagedkeys",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretsmanager/listsecretsmanager",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretvault/listsecretvault",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/listbackupregionrelationship",
+      "service": "",
+      "detail": "ignores size=1 (returned 2)"
+    },
+    {
+      "rule_id": "pagination",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/listvolumes",
+      "service": "",
+      "detail": "ignores size=1 (returned 4)"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/eventstreams/eventstreamscreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/searchengine/searchenginecreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/vertica/verticacreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/cachestore/cachestorecreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/epas/epascreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/mariadb/mariadbcreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/mysql/mysqlcreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/postgresql/postgresqlcreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/sqlserver/sqlservercreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/getmetricperfdatalist",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/puteventpolicy",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/creategroup",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/createpermissionset",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "schema-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/showvolumequotaset",
+      "service": "",
+      "detail": "response has undocumented field(s): ['snapshots_SSD', 'snapshots_SSD_KMS', 'snapshots_SSD_MultiAttach', 'snapshots_SSD_Provisioned', 'snapshots_hdd0', 'snapshots_ssd0', 'usages_SSD', 'usages_SSD_KMS', 'usages_SSD_MultiAttach', 'usages_SSD_P"
+    },
+    {
+      "rule_id": "schema-missing-field",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopsimageversionv1",
+      "service": "",
+      "detail": "response omits documented required field(s): ['image_attr']"
+    },
+    {
+      "rule_id": "schema-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listusages",
+      "service": "",
+      "detail": "response has undocumented field(s): ['end_time', 'metrics', 'start_time', 'used_time']"
+    },
+    {
+      "rule_id": "5xx-on-bad-input",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "storage/baremetal-blockstorage/createvolume",
+      "service": "",
+      "detail": "empty body -> 500 (should be 400)"
+    },
+    {
+      "rule_id": "5xx-on-bad-input",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "storage/baremetal-blockstorage/createvolumegroup",
+      "service": "",
+      "detail": "empty body -> 500 (should be 400)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/checkaimlopsplatformversionv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/getaimlopsplatformv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/validateclusternamespaceforaimlopsplatformv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/validateclusterresourcesizeforaimlopsplatformv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listaccesscontrols",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listapideployments",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listauths",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listconnectedprivatelinkendpoints",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listreports",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listresources",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/liststages",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listusageplans",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showapi",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showprivatelinkendpoint",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showresourcepolicy",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/getqueueattributes",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/showqueue",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listenvironmentvariables",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listprivatelinkendpoint",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunction",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctioncode",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctionconfiguration",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctionlogs",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctionmetrics",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showcloudfunctiontrigger",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showgeneralconfig",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showprivatelinkservice",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showresourcepolicy",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/showurlconfig",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-200-list",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listautoscalinggroupnotifications",
+      "service": "",
+      "detail": "sub-resource list of a non-existent parent -> 200 (empty), not 404"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/createclusterkubeconfig",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/listnodepools",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/showcluster",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/showclusteruserkubeconfig",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/getdataflow",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/getdataflowserviceconsole",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/getdataflowservicesubversions",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/ingresscluster",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopsdetail",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopsservice",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopssubversion",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getingresscontrollerlistv1",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/eventstreams/eventstreamsshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/searchengine/searchengineshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/vertica/verticashowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/cachestore/cachestoreshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/epas/epasshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mariadb/mariadbshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mysql/mysqlshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/postgresql/postgresqlshowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/sqlserver/sqlservershowrequest",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/showguardrail",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/showlandingzone",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/getadressbookmemberlist",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/geteventpolicydetail",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/geteventpolicyhistories",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/geteventpolicynotification",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/listgroupusers",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/listpermissionsetpolicies",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/showgroup",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/showpermissionset",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/showuser",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listiamuser",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-200-list",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listuserpolicybindings",
+      "service": "",
+      "detail": "sub-resource list of a non-existent parent -> 200 (empty), not 404"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/showresourcepolicy",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/listparents",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/showaccount",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/showorganization",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/showservicecontrolpolicy",
+      "service": "",
+      "detail": "non-existent id -> 403 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/listresourcetags",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/showresource",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-200",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/showeventrule",
+      "service": "",
+      "detail": "non-existent id -> 200 (should be 404)"
+    },
+    {
+      "rule_id": "notfound-200",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/showloggroup",
+      "service": "",
+      "detail": "non-existent id -> 200 (should be 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretvault/gettemporarykey",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/listbackuprestoresubnets",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/listfilesystempath",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "notfound-inconsistent",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/showvolumereplication",
+      "service": "",
+      "detail": "non-existent id -> 400 (not 404)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/checkduplicationaimlopsplatformnamev1",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/cloud-ml/checkduplicationnameanddomainname",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listprivatelinkendpoints",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/listqueue",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/baremetal/listbaremetals",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/listnodepools",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listsamplecodes",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listvolumetypes",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/scr/listregistries",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/listkubernetesversions",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/getdataflowimages",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopsimageversionv1",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/eventstreams/eventstreamslistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/quick-query/getquickqueryimageversions",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/searchengine/searchenginelistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/vertica/verticalistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/cachestore/cachestorelistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/epas/epaslistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mariadb/mariadblistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mysql/mysqllistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/postgresql/postgresqllistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/sqlserver/sqlserverlistclusters",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "devops-tools/devopsservice/listdevopsservices",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listplannedcomputeservicetypes",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/budget/listaccountbudgets",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listusages",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/pricing/listreportprice",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/listtargetsforguardrail",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/getaccounteventlist",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listserviceaccount",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/listusers",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/loggingaudit/listtrails",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/network-logging/listnetworkloggingstorages",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/listtargetsforpolicy",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/quota/listquotarequests",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/listtagvalues",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/listloggroups",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/support/getinquirylist",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/cdn/listcdnservice",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/direct-connect/listdirectconnects",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/dns/listpublicdomainnames",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/firewall/listfirewalls",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/gslb/listgslbsregionalroutingcontrol",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/loadbalancer/listloadbalancers",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/security-group/listsecuritygroups",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listvpcs",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpn/listvpntunnels",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "platform/product/listproducts",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/certificatemanager/listcertificates",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/configinspection/configinspectionlist",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/kms/listmanagedkeys",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretsmanager/listsecretsmanager",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretvault/listsecretvault",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/archivestorage/listrecoveryhistories",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/listbackups",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/baremetal-blockstorage/listvolumes",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/listvolumes",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "unauth-non-401",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/parallel-filestorage/listvolumes",
+      "service": "",
+      "detail": "unauthenticated request -> 404 (not 401)"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/eventstreams/eventstreamscreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/searchengine/searchenginecreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/vertica/verticacreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/cachestore/cachestorecreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/epas/epascreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/mariadb/mariadbcreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/mysql/mysqlcreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/postgresql/postgresqlcreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "database/sqlserver/sqlservercreatecluster",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/getmetricperfdatalist",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "opaque-validation",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/puteventpolicy",
+      "service": "",
+      "detail": "400 names neither field nor rule"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listvirtualservers",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/baremetal/listbaremetalproducts",
+      "service": "",
+      "detail": "requested size=1 but response returned 31 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/baremetal/listbaremetalproducts",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/listgpunodeproducts",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/listgpunodeproducts",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listruntimes",
+      "service": "",
+      "detail": "requested size=1 but response returned 15 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/listsamplecodes",
+      "service": "",
+      "detail": "requested size=1 but response returned 64 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listimages",
+      "service": "",
+      "detail": "requested size=1 but response returned 20 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listimages",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listkeypairs",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listpendingimages",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listservergroups",
+      "service": "",
+      "detail": "requested size=1 but response returned 4 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listservergroups",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listservertypes",
+      "service": "",
+      "detail": "requested size=1 but response returned 121 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listservertypes",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listvolumetransfer",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listvolumetypes",
+      "service": "",
+      "detail": "requested size=1 but response returned 4 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listvolumetypes",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/scr/listconnectableresources",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/listkubernetesversions",
+      "service": "",
+      "detail": "requested size=1 but response returned 6 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/listkubernetesversions",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listcontracttypes",
+      "service": "",
+      "detail": "requested size=1 but response returned 4 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listcontracttypes",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listostypes",
+      "service": "",
+      "detail": "requested size=1 but response returned 4 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listostypes",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listplannedcomputeservertypes",
+      "service": "",
+      "detail": "requested size=1 but response returned 371 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listplannedcomputeservertypes",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listplannedcomputeservicetypes",
+      "service": "",
+      "detail": "requested size=1 but response returned 12 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listplannedcomputeservicetypes",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/budget/listaccountbudgets",
+      "service": "",
+      "detail": "requested size=1 but response returned 4 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listbills",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listusages",
+      "service": "",
+      "detail": "requested size=1 but response returned 20 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/pricing/listbillingitemids",
+      "service": "",
+      "detail": "requested size=1 but response returned 232 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/pricing/listbillingitemids",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/pricing/listoffering",
+      "service": "",
+      "detail": "requested size=1 but response returned 4 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/pricing/listoffering",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/listinstances",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listendpoints",
+      "service": "",
+      "detail": "requested size=1 but response returned 169 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listendpoints",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listgroup",
+      "service": "",
+      "detail": "requested size=1 but response returned 3 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listpolicy",
+      "service": "",
+      "detail": "requested size=1 but response returned 3 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listrole",
+      "service": "",
+      "detail": "requested size=1 but response returned 3 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listsamlprovider",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listserviceaccount",
+      "service": "",
+      "detail": "requested size=1 but response returned 8 items"
+    },
+    {
+      "rule_id": "pagination-no-meta",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/listserviceaccount",
+      "service": "",
+      "detail": "list response carries no pagination metadata (page/size/total/next/...)"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/listorganizations",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/quota/listaccountquota",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/quota/listquotarequests",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/listtagkeys",
+      "service": "",
+      "detail": "requested size=1 but response returned 5 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/listtagvalues",
+      "service": "",
+      "detail": "requested size=1 but response returned 513 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/listloggroups",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/direct-connect/listdirectconnects",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/dns/listprivatedns",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/firewall/listfirewalls",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/gslb/listgslbs",
+      "service": "",
+      "detail": "requested size=1 but response returned 3 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/gslb/listgslbsregionalroutingcontrol",
+      "service": "",
+      "detail": "requested size=1 but response returned 3 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listinternetgateways",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listnatgateways",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listprivatelinkendpoints",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listprivatelinkservices",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listprivatenats",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listpublicip",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listsubnets",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listtransitgateways",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listvpcendpoints",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listvpcpeerings",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listvpcs",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpn/listvpngateways",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpn/listvpntunnels",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "platform/product/listproductcategories",
+      "service": "",
+      "detail": "requested size=1 but response returned 14 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "platform/product/listproducts",
+      "service": "",
+      "detail": "requested size=1 but response returned 20 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/kms/listkeys",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/kms/listmanagedkeys",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretsmanager/listsecretsmanager",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretvault/listsecretvault",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "pagination-ignores-size",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/listbackupregionrelationship",
+      "service": "",
+      "detail": "requested size=1 but response returned 2 items"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/checkduplicationaimlopsplatformnamev1",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/cloud-ml/checkduplicationnameanddomainname",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listapis",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/checkqueuenameduplication",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/baremetal/listbaremetalimages",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/listclusterfabrics",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/checkfunctionnameduplication",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/listvirtualservers",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/scr/checkregistrynameduplication",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/listclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/getdataflowimages",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/getdataopsimageversionv1",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/eventstreams/eventstreamslistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/quick-query/getquickqueryimageversions",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/searchengine/searchenginelistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/vertica/verticalistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/cachestore/cachestorelistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/epas/epaslistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mariadb/mariadblistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mysql/mysqllistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/postgresql/postgresqllistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/sqlserver/sqlserverlistclusters",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "devops-tools/devopsservice/checkduplicationdevopsservice",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/listcontracttypes",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/budget/listaccountbudgets",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listbills",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/pricing/listbillingitemids",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/listbaselineassignments",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudmonitoring/getaccounteventlist",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/accesskeylist",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/listaccountassignments",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/loggingaudit/listlogs",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/network-logging/listnetworkloggingconfigurations",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/listaccountinvitations",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/quota/listaccountquota",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/listresourcegroups",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/listdashboards",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/support/getinquirylist",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/cdn/listcdnservice",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/direct-connect/listdirectconnects",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/dns/listhostedzone",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/firewall/listfirewallrules",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/gslb/listgslbs",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/loadbalancer/listlbhealthchecks",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/security-group/listsecuritygrouprules",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/listinternetgateways",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpn/listvpngateways",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "platform/product/listproductcategories",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/certificatemanager/listcertificates",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/configinspection/configinspectionlist",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/kms/checkduplicatename",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretsmanager/listsecretsmanager",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretvault/listsecretvault",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/archivestorage/listarchivinghistories",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/checkbackupnameduplicate",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/baremetal-blockstorage/listvolumegroups",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/listsnapshots",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "cors-missing",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/parallel-filestorage/listsnapshots",
+      "service": "",
+      "detail": "OPTIONS preflight -> 403 with no CORS headers (Access-Control-Allow-Origin/Methods)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "ai-ml/aimlops-platform/releaseaimlopsplatformv1",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createapi",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createprivatelinkendpoint",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/createqueue",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/baremetal/createbaremetals",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/baremetal/startbaremetals",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/baremetal/stopbaremetals",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/creategpunodes",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/modifyclusterfabricmembers",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/startgpunodes",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/multinodegpucluster/stopgpunodes",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/createcloudfunction",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/createcloudfunctionapigatewaytrigger",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/scf/createcloudfunctioncronjobtrigger",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createautoscalinggroup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createimage",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createkeypair",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createlaunchconfiguration",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createservergroup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createsnapshot",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createvirtualserver",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createvolume",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "compute/virtualserver/createvolumetransfer",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/scr/createregistry",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/scr/createrepository",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/createcluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "container/ske/createnodepool",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/createdataflow",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-flow/createdataflowserviceconsole",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/createdataops",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/data-ops/createdataopsservice",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/eventstreams/eventstreamscreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/quick-query/createquickquery",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/quick-query/validatequickqueryresources",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/searchengine/searchenginecreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/vertica/verticacreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/cachestore/cachestorecreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/epas/epascreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mariadb/mariadbcreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/mysql/mysqlcreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/postgresql/postgresqlcreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "database/sqlserver/sqlservercreatecluster",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "devops-tools/devopsservice/createdevopsservice",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/createplannedcomputes",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/billingplan/showcancellationfee",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/budget/createaccountbudget",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/createaccountfactoryaccount",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/createlandingzone",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/cloudcontrol/enableguardrailbindings",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/createaccountassignment",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/creategroup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/createinstance",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/createpermissionset",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam-identity-center/createuser",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/accesskeycreate",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/accesskeysendtemporaryotp",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/creategroup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/createpolicy",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/createrole",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/iam/createsamlprovider",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/loggingaudit/createtrail",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/loggingaudit/downloadlogs",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/network-logging/createnetworkloggingstorage",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/createaccount",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/createdelegationpolicy",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/createinvitation",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/createorganization",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/organization/createorganizationunit",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/createresourcegroup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/createalert",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/createcustomlogevents",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/createcustomlogstream",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/createcustommetricmetas",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/createcustommetrics",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/createdashboard",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/createeventrule",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/createloggroup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/downloadmetricdataimage",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/listmetricdata",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/cdn/createcdnservice",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/direct-connect/createdirectconnect",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/dns/activateprivatedns",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/dns/createhostedzone",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/dns/createprivatedns",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/dns/createpublicdomainname",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/firewall/createfirewallrule",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/gslb/creategslb",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/loadbalancer/createlbhealthcheck",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/loadbalancer/createlblistener",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/loadbalancer/createlbservergroup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/loadbalancer/createloadbalancer",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/security-group/createsecuritygroup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/security-group/createsecuritygrouprule",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createinternetgateway",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createnatgateway",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createport",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createprivatelinkendpoint",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createprivatelinkservice",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createprivatenat",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createpublicip",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createsubnet",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createtransitgateway",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createvpc",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createvpcendpoint",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpc/createvpcpeering",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpn/createvpngateway",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "networking/vpn/createvpntunnel",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/certificatemanager/checknameduplication",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/certificatemanager/createcertificate",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/certificatemanager/selfsigncert",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/certificatemanager/validatecertificate",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/configinspection/creatediagnosisobject",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/configinspection/diagnosisrequest",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/kms/createkey",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretsmanager/createsecretsmanager",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "security/secretvault/createsecretvault",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/createbackup",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/backup/createbackupagent",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/createsnapshot",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/createsnapshotschedule",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/createvolume",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/filestorage/createvolumereplication",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/parallel-filestorage/createsnapshot",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "l10n-not-localized",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "storage/parallel-filestorage/createvolume",
+      "service": "",
+      "detail": "error message does not change with Accept-Language (ko-KR vs en-US)"
+    },
+    {
+      "rule_id": "schema-live-missing-field",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/getqueueattributes",
+      "service": "",
+      "detail": "live (created) response omits documented required field(s): content_based_deduplication,deduplication_scope"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createapi",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showapi",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type,privatelink_service_id"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listapis",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createapi",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-live-missing-field",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "application-service/queueservice/getqueueattributes",
+      "service": "",
+      "detail": "live (created) response omits documented required field(s): content_based_deduplication,deduplication_scope"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createapi",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createapi",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createapi",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-live-missing-field",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/listresourcetags",
+      "service": "",
+      "detail": "live (created) response omits documented required field(s): content,page,size"
+    },
+    {
+      "rule_id": "schema-live-missing-field",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "management/resourcemanager/listresourcetags",
+      "service": "",
+      "detail": "live (created) response omits documented required field(s): content,page,size"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/createapi",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/showapi",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type,privatelink_service_id"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "application-service/apigateway/listapis",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): endpoint_type"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "management/servicewatch/showalert",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): last_policy_updated_at,timestamp"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listusages",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): end_time,metrics,start_time,used_time"
+    },
+    {
+      "rule_id": "schema-live-undocumented-field",
+      "severity": "yellow",
+      "source": "runtime",
+      "endpoint_key": "financial-management/costexplorer/listusages",
+      "service": "",
+      "detail": "live (created) response has undocumented field(s): end_time,metrics,start_time,used_time"
+    },
+    {
+      "rule_id": "schema-live-missing-field",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/quick-query/getquickquery",
+      "service": "",
+      "detail": "live (created) response omits documented required field(s): cluster_id,created_dt,modified_dt,provisioning_state,quick_query_id,quick_query_name,quick_query_state,quick_query_version"
+    },
+    {
+      "rule_id": "schema-live-missing-field",
+      "severity": "red",
+      "source": "runtime",
+      "endpoint_key": "data-analytics/quick-query/getquickquery",
+      "service": "",
+      "detail": "live (created) response omits documented required field(s): cluster_id,created_dt,modified_dt,provisioning_state,quick_query_id,quick_query_name,quick_query_state,quick_query_version"
+    }
+  ]
+}
