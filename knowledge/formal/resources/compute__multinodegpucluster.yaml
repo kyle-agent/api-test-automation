@@ -25,7 +25,7 @@ resources:
     capture: {image_id: "$.images[0].id"}
     verify:
       - {name: list, endpoint: "GET /v1/gpu-nodes/images", expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key gen-gpu-node-image:verify-gpu-node-image-list count=5 (wave-A batch 2026-06-25)
     source: {lifecycle: mngc-gpu-node-coverage, steps: []}
     notes: "읽기 전용 LOOKUP 노드 — create가 GET, teardown 없음이 의도. 이미지: Ubuntu 22.04(NVIDIA 535.86.10/535.183.06) / Ubuntu 24.04(580.105.08) (services constraint mngc-admin-account-root). capture envelope $.images[0].id는 docs 추정 — 2xx 미관측이라 라이브에서 확정 필요(R3). 소스 mngc-gpu-node-coverage는 이 lookup을 쓰지 않고 synthetic image literal로 4xx — 실 lookup 배선은 이 모델이 처음 제공."
 

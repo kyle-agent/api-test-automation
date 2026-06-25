@@ -95,6 +95,6 @@ resources:
     # tolerant [200,400,403,404] (a fresh account may have no logs in the window).
     # Closes the static id-bound GET gap GET /v1/logs/{logging_id}.
     delete: {endpoint: "DELETE /v1/trails/{trail_id}", destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key management/loggingaudit/createtrail count=7 (wave-A batch 2026-06-25)
     source: {lifecycle: loggingaudit-trail, steps: [create-trail, delete-trail]}
     notes: "CloudTrail-equivalent 감사 trail (90일 콘솔 보관 + Object Storage 장기 보관). 2026-06-14 정정: create body는 종전 {name, object_storage_bucket_name, is_multi_region, tags} 추정값이 아니라 docs TrailCreateRequestV1dot1 모델(필수 account_id/bucket_name/bucket_region; 표시명은 trail_name; multi-region은 region_total_yn/region_names). capture $.trail.id는 응답 모델 TrailShowResponseV1dot1{trail: Trail1dot1}, Trail1dot1.id로 CONFIRMED(라이브 2xx 후 VALIDATED 승격). start/stop은 body 없는 POST /v1/trails/{trail_id}/start|stop 오퍼레이션(자원 아님 — 핸드라이트 lifecycle에 유지). downloadlogs는 POST /v1/logs/download. Object Storage 버킷이 선행 필수(userguide Prerequisites) — cross-service 엣지 후보(아래 리포트). Landing Zone 선행 체인 구성요소이기도 함(cloudcontrol-landing-zone notes). _note(smoke-400 관련 아님): loggingaudit의 listlogs(GET /v1/logs)는 start_at/end_at(필수 시간범위)를, listtrails(GET /v1/trails)는 필수 없음 — service yaml constraints 참조."

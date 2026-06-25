@@ -87,7 +87,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/volume-types/{volume_type_id}",
          expect_status: [200, 404]}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key vs-volume-transfer-coverage:list-volume-types count=5 (wave-A batch 2026-06-25)
     source: {lifecycle: vs-volume-transfer-coverage, steps: [list-volume-types, read-volume-type]}
     notes: "읽기 전용 LOOKUP 노드 (image/server-type와 동형) — create가 GET이고 teardown 없음이 의도. 응답 봉투 VolumeTypeListResponse = {volume_types:[{id,name,extra_specs,...}]} (api_docs listvolumetypes), capture $.volume_types[0].id verbatim. showvolumetype(GET /v1/volume-types/{volume_type_id})은 gap_getid였던 마지막 볼륨 카탈로그 read — 이 lookup이 list+show로 닫는다. /v1/volume-types/default(showdefaultvolumetype)은 path-param 없는 GET이라 smoke floor가 이미 커버. UNPROVEN(docs) — 라이브 GET 후 VALIDATED 승급."
 
@@ -264,7 +264,7 @@ resources:
       - {name: server-volume-show,
          endpoint: "GET /v1/servers/{server.server_id}/volumes/{block-volume.vol_id}",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key gen-heavy-vs-netops:create-volume-attachment count=5 (wave-A batch 2026-06-25)
     source: {lifecycle: compute-virtualserver-full, steps: []}
     notes: "VolumeServerAttachRequest {server_id, delete_on_termination} (api_docs). capture 없음 — detach가 prereq 토큰만 사용 (dotted-prereq-token-in-delete). delete_on_termination false: 볼륨 수명은 우리가 관리(역순 teardown이 detach 후 volume 삭제). [block_storage_vm userguide 2026-06-14] attach 게이트: 볼륨 Available 상태 + VM과 동일 location(블록 스토리지와 서버가 같은 location이어야 연결 대상). VM당 OS(basic) 볼륨 외에 추가 데이터 볼륨 최대 26개. running/stopped VM 모두 온라인 attach 지원(docs는 VM 상태 게이트 명시 안 함). detach는 게스트 OS에서 umount(Linux)/disk-offline(Windows)을 먼저 해야 연결 서버 hang(상태 에러)을 피함 — 우리 합성은 OS 미진입이라 데이터 볼륨(boot 아님)을 빈 채로 detach(안전). OS/boot 볼륨은 detach 불가(termination 차단 조건). _MultiAttach 타입만 다중 서버 동시 attach(Windows VM 불가)."
 
@@ -393,7 +393,7 @@ resources:
          expect_status: [200]}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto_scaling_group_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key compute/virtualserver/createautoscalinggroup count=10 (wave-A batch 2026-06-25)
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-auto-scaling-group, delete-auto-scaling-group]}
     notes: "비용 경고: ASG는 REAL billable VM을 관리한다 — desired 1이 성공하면 VM 1대가 켜진다 (소스는 그래서 synthetic id로 4xx 보장). body/capture UNPROVEN(docs); 라이브 검증 전 합성 run은 비용·잔존 VM 리스크를 명시 승인해야 한다."
@@ -421,7 +421,7 @@ resources:
          endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key compute/virtualserver/createautoscalinggrouppolicy count=10 (wave-A batch 2026-06-25)
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-asg-policy, list-asg-policies, read-asg-policy, delete-asg-policy]}
     notes: "comparison_operator=ge VERIFIED (run 27466988779). UNVERIFIED enums — metric_type CPU, metric_method AVG, scale_type SCALE_OUT, scale_method AMOUNT — NOT flagged by the API (comparison_operator validated first); may also need short-code values, error-driven on the next run. 정책 자체는 무자원이지만 부모 ASG가 billable — auto-scaling-group 노트 참조."
@@ -447,7 +447,7 @@ resources:
          endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key compute/virtualserver/createautoscalinggroupschedule count=10 (wave-A batch 2026-06-25)
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-asg-schedule, list-asg-schedules, read-asg-schedule, delete-asg-schedule]}
     notes: "UNPROVEN. start_time은 {today_plus_5y} builtin으로 원샷 스케줄을 먼 미래에 묶는다 (소스 verbatim — 실제로 스케일이 발화하지 않게 하는 안전장치)."
@@ -477,7 +477,7 @@ resources:
          endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/notifications/{notification_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key compute/virtualserver/createautoscalinggroupnotification count=5 (wave-A batch 2026-06-25)
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-asg-notification, list-asg-notifications, read-asg-notification, delete-asg-notification]}
     notes: "UNPROVEN body/capture (소스는 literal-seed ASG에 4xx). IB-026: capture를 $.id→$.notifications[0].id로 정정 — 응답 모델 autoscalinggroupnotificationlistresponse는 list 봉투(api_docs); 라이브 재검증 대기."

@@ -194,7 +194,7 @@ resources:
       endpoint: "DELETE /v1/alerts"
       json: {ids: ["{alert_id}"]}
       destructive: true
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key management/servicewatch/createalert count=7 (wave-A batch 2026-06-25)
     source: {lifecycle: servicewatch-alert, steps: [create-alert, delete-alert]}
     notes: "wave5: metric_id/namespace_id를 sw-metric-catalog LOOKUP capture로 배선 — doc 샘플 uuid로는 라이브 400이라 createalert가 미검증으로 남아 있었음(COMPOSITION-BLOCKED 해제). recipient_ids는 빈 배열 유지 — 유저가이드 경보 페이지: '로그인 이력이 있는 사용자(이메일, 휴대전화 번호 등록 사용자)만 알림 수신자로 추가할 수 있습니다' → 수신자는 콘솔 지식 없이 안전하게 생략 가능(최대 100명, 선택 입력). 평가 주기는 60의 배수·최대 604,800초(유저가이드) — period 300 적합. Auto-Scaling Group 연동 정책은 ServiceWatch에서 수정/삭제 불가(유저가이드) — 본 노드는 자체 생성분만 다루므로 비해당. threshold/RANGE 충돌은 수정됨(run 27395331657)."
 

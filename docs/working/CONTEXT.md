@@ -141,8 +141,21 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
     VPCs (heavy-wave leftovers) were also reclaimed via local-registry ownership;
     one VPC NOT in our registry was left untouched (cross-env shared account — same
     rule that protects the other env's `kyuh.choi+areg1@samsung.com` resources).
+  - **LATEST (2026-06-25, Track A wave-A batch-2 — branch
+    `claude/tender-babbage-c5y458`, Pass 2):** Promoted **17 resource nodes**
+    `docs`→`VALIDATED` using pre-existing 2xx evidence from `data/baselines/verified_endpoints.json`
+    (IB-041 compliant; all same-service key matches). Resource model now **148 VALIDATED / 127 docs**
+    (was 131/144). Nodes promoted: management/loggingaudit/trail, management/servicewatch/alert,
+    management/cloudmonitoring/cm-account-resource + cm-addrbook, financial-management/budget/account-budget,
+    management/iam/iam-role-policy-binding + iam-resource-policy, networking/cdn/cdn, networking/gslb/gslb,
+    compute/virtualserver/auto-scaling-group + asg-policy + asg-schedule + asg-notification + volume-type + volume-attachment,
+    compute/multinodegpucluster/gpu-node-image, storage/filestorage/fs-replication.
+    10 nodes marked needs-deep-work (sts-token 404, secretvault 400-quota, cert-import 400, configinspection 400,
+    quick-query-validate 500, cm-event-policy 400-no-VM, iam-role 500, iam-user heavy, iam-saml disabled,
+    iam-group-member no-lifecycle). 24 cross-service path-collision false-matches skipped per IB-041.
+    Queue updated; validated-facts.md locked. `python knowledge/formal/validate.py` → 0 errors.
   - **LATEST (2026-06-25, Track A free surgical micro-sweep — branch
-    `claude/tender-babbage-c5y458`):** Fixed `management__loggingaudit.json`
+    `claude/tender-babbage-c5y458`, Pass 1):** Fixed `management__loggingaudit.json`
     (`service_watch_yn: Y→N`, LIVE-VERIFIED 2026-06-25: Y caused 400 "invalid
     service watch values"; N returns 201); added `params:{}` to `show-trail` step to
     trigger catalog-key recording (engine line-1119 condition). Re-ran

@@ -219,7 +219,7 @@ resources:
          expect_status: [200]}
     delete: {endpoint: "DELETE /v1/roles/{iam-role.role_id}/policy-bindings/{iam-policy.2.policy_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key management/iam/addrolepolicybindings count=14 (wave-A batch 2026-06-25)
     source: {lifecycle: iam-role-full, steps: [add-role-policy-bindings, remove-role-policy-binding],
              docs: "management/iam/addrolepolicybindings (rolepolicybindingrequest: policy_ids REQUIRED) + removerolepolicybinding"}
     notes: "역할↔정책 바인딩 — iam-role이 create 시점에 policy#1을 연결하므로(필수 policy_ids) 이 노드는 policy#2를 추가 바인딩/단건 해제한다. removebulkrolepolicybindings(동일 경로 DELETE+body)는 iam-role의 unbind-bulk verify가 커버. 응답 {policies:[...]} — capture 불필요."
@@ -362,7 +362,7 @@ resources:
          expect_status: [200, 204]}
     delete: {endpoint: "DELETE /v1/resource-policies/{opt.srn}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key management/iam/setresourcepolicy count=7 (wave-A batch 2026-06-25)
     source: {lifecycle: iam-resource-policy, steps: [set-resource-policy, add-resource-policy-statement, set-resource-policy-statement, remove-resource-policy-statement, delete-resource-policy],
              docs: "management/iam/setresourcepolicy (resourcepolicysetrequest: policy_version REQUIRED → resourcepolicyversioncreaterequest: policy_document REQUIRED) + showresourcepolicy/deleteresourcepolicy + addpermission/setpermission/removepermission (statementcreaterequest: Effect REQUIRED, Sid 경로 파라미터)"}
     notes: "SAFETY(정책 내용): Statement는 의도적으로 Deny + 좁은 단일 액션(virtualserver:ShowVirtualServer) — Principal '*' + Allow로 자원 접근을 '여는' 정책은 절대 쓰지 않는다. Deny라도 대상 자원의 해당 읽기를 막으므로 owner는 버려도 되는 자원만 제공할 것; teardown이 정책 전체를 제거해 원상복구. create가 PUT(set)인 upsert형 — capture 불필요 (경로가 opt 토큰 재사용). statements의 {sid}는 body Sid와 동일 리터럴 Statement2 사용."

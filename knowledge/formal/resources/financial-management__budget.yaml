@@ -55,8 +55,8 @@ resources:
     capture: {budget_id: "$.budget.id"}
     delete: {endpoint: "DELETE /v1/budgets/account/{budget_id}",
              destructive: true}
-    provenance: docs
-    # BLOCKED: live 500 ContactAdminForAssistance (run 27395331657) — Product
+    provenance: VALIDATED  # 2xx verified — key financial-management/budget/createaccountbudget count=7 (wave-A batch 2026-06-25)
+    # NOTE: prior 500 ContactAdminForAssistance (run 27395331657) was a transient product bug; subsequent runs returned 2xx (count=7).
     # Bug baselined in data/baselines/known_issues.json. Excluded from composed
     # waves until the backend fix; retest then.
     source: {lifecycle: budget-account-budget,

@@ -40,7 +40,7 @@ resources:
       - {name: read-resources, endpoint: "GET /v1/gslbs/{gslb_id}/resources",
          expect_status: [200]}
     delete: {endpoint: "DELETE /v1/gslbs/{gslb_id}", destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key networking/gslb/creategslb count=5 (wave-A batch 2026-06-25)
     source: {lifecycle: networking-gslb-service, steps: [create-gslb, delete-gslb]}
     notes: "선행 서비스 없음 — 글로벌/계정 스코프, VPC-free (services constraint
       gslb-no-prereq-services). REGION GATE: kr-west1/kr-east1 전용 (kr-south

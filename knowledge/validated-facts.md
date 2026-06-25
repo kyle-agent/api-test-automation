@@ -18,6 +18,51 @@ not infer from the spec) — feed it to the AI-Evaluator agent.
 > store every session. Bump `conf`/`obs` and refresh `seen` when a fact re-confirms;
 > lower `conf` (or prune) when a fact drifts or is contradicted by current state.
 
+## Wave-A batch-2 promotions (2026-06-25, branch claude/tender-babbage-c5y458)
+
+> conf: 0.9 · seen: 2026-06-25 · obs: 7+
+
+The following resource nodes were promoted `docs`→`VALIDATED` in the wave-A batch-2 sweep on 2026-06-25. All evidence comes from per-endpoint genuine 2xx observations in `data/baselines/verified_endpoints.json` (IB-041 compliant — no cross-service path collision; each key is same-service).
+
+| node | evidence key | count |
+|------|-------------|-------|
+| management/loggingaudit/trail | management/loggingaudit/createtrail | 7 |
+| management/servicewatch/alert | management/servicewatch/createalert | 7 |
+| management/cloudmonitoring/cm-account-resource | management/cloudmonitoring/getaccountproductlist | 10 |
+| management/cloudmonitoring/cm-addrbook | management/cloudmonitoring/getadressbooklist | 9 |
+| financial-management/budget/account-budget | financial-management/budget/createaccountbudget | 7 |
+| management/iam/iam-role-policy-binding | management/iam/addrolepolicybindings | 14 |
+| management/iam/iam-resource-policy | management/iam/setresourcepolicy | 7 |
+| networking/cdn/cdn | networking/cdn/createcdnservice | 5 |
+| networking/gslb/gslb | networking/gslb/creategslb | 5 |
+| compute/virtualserver/auto-scaling-group | compute/virtualserver/createautoscalinggroup | 10 |
+| compute/virtualserver/asg-policy | compute/virtualserver/createautoscalinggrouppolicy | 10 |
+| compute/virtualserver/asg-schedule | compute/virtualserver/createautoscalinggroupschedule | 10 |
+| compute/virtualserver/asg-notification | compute/virtualserver/createautoscalinggroupnotification | 5 |
+| compute/virtualserver/volume-type | vs-volume-transfer-coverage:list-volume-types | 5 |
+| compute/virtualserver/volume-attachment | gen-heavy-vs-netops:create-volume-attachment | 5 |
+| compute/multinodegpucluster/gpu-node-image | gen-gpu-node-image:verify-gpu-node-image-list | 5 |
+| storage/filestorage/fs-replication | storage/filestorage/createvolumereplication | 5 |
+
+**Nodes marked needs-deep-work (not promotable this batch):**
+- `platform/sts/sts-token`: POST /v1/assume-role → 404 (no valid role ARN / entitlement-gated)
+- `security/secretvault/secretvault-vault`: POST /v1/secretvault → 400 "Access key is already in use" (1-per-key quota)
+- `security/certificatemanager/certificate-import`: POST /v1/certificatemanager → 400 (import body shape)
+- `security/configinspection/diagnosis`: POST /v1/configinspection/diagnosis/save → 400 (body shape)
+- `data-analytics/quick-query/quick-query-validate`: POST /v1/quick-query/validate-resources → 500 ContactAdminForAssistance
+- `management/cloudmonitoring/cm-event-policy`: POST /v1/cloudmonitorings/event/v2/event-policies → 400 (requires Running VM)
+- `management/iam/iam-role`: POST /v1/roles → 500 ContactAdminForAssistance (account-level restriction)
+- `management/iam/iam-user`: in iam-credentials-heavy lifecycle (heavy=True)
+- `management/iam/iam-saml-provider`: lifecycle disabled (enabled=False)
+- `management/iam/iam-group-member`: no standalone create lifecycle found
+
+**Cross-service path collisions NOT promoted (IB-041 — different service hosts, cannot cross-attribute):**
+- searchengine/vertica/eventstreams/sqlserver `POST /v1/clusters` (matched epas evidence only)
+- pfs-volume/bm-block-volume `POST /v1/volumes` (matched filestorage evidence only)
+- idc-group `POST /v1/groups` (matched IAM group evidence only)
+- mariadb/mysql stop/start/restart via postgresql evidence
+- epas/ss parameter GET via postgresql evidence
+
 ## API design quirks — composite "create-all-in-one" verbs (AXIS-2 / AI-usability)
 
 > conf: 0.3 · seen: 2026-06-17 · obs: 1

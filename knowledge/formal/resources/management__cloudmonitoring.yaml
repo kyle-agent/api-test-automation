@@ -76,7 +76,7 @@ resources:
       - {name: read,
          endpoint: "GET /v1/cloudmonitorings/product/v2/accounts/products",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key management/cloudmonitoring/getaccountproductlist count=10 (wave-A batch 2026-06-25)
     notes: "읽기 전용 LOOKUP 노드 — docs getaccountproductlist(ListAccountResources) 응답 모델 PageResponseAccountProductDto/AccountProductDto에서 파생(UNPROVEN). 이 GET 자체는 필수 쿼리 파라미터가 없으므로(page/size/sort 전부 optional) bare 호출이 200이어야 한다 — 종전 X-ResourceType 헤더는 스펙에 없는 추정값이라 제거(그게 400 InvalidHeaderValue의 원인). where_prefix INSTANCE-는 cm-event-policy의 metricKey(system.* — VM 메트릭)와 상품 유형을 맞추기 위한 필터 — 계정에 Running VM이 하나도 없으면 capture가 실패한다(의도적 fail-fast; compute server를 requires로 끌면 HEAVY 체인이라 배제). 모니터링 등록 지연으로 새 VM이 목록에 늦게 뜰 수 있음도 라이브 검증 대상. _note(smoke-400 진단): productResourceId는 events/event-policies 조회의 필수 쿼리 파라미터이므로 이 lookup이 그쪽 400을 푸는 선행 노드다."
 
   cm-event-policy:
@@ -195,5 +195,5 @@ resources:
          endpoint: "GET /v1/cloudmonitorings/product/v2/addrbooks/{addrbookId}/members",
          expect_status: [200, 400, 403, 404],
          _note: "getadressbookmemberlist — id-bound read, EOL entitlement-waived, tolerant (C1 reachability only)."}
-    provenance: docs
+    provenance: VALIDATED  # 2xx verified — key management/cloudmonitoring/getadressbooklist count=9 (wave-A batch 2026-06-25)
     notes: "읽기 전용 LOOKUP 노드 — docs getadressbooklist 응답 모델 PageResponseAlarmAddrBookDto/AlarmAddrBookDto에서 파생(addrbookId required). getadressbooklist는 필수 쿼리 파라미터가 없어(page/size/sort optional) 주소록이 하나라도 있으면 bare 호출이 200이어야 한다. EOL(IB-034)이라 getadressbookmemberlist id-bound read는 coverage_waivers.json에서 entitlement 면제 — C1 도달성만 문서화(tolerant read only). 주소록이 없으면 {addrbookId}는 catalog '*' 키로 정규화된다. cloudmonitoring-readonly-shows 라이프사이클이 실제로 호출한다."

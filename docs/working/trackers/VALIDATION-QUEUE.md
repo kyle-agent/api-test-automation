@@ -54,24 +54,32 @@ pull a heavy prereq into the closure.
 | 2 | financial-management/costexplorer | `cost-reads` | light | — | no | read-only |
 | 3 | management/quota | `quota-request` | light | — | no | read/list-only family |
 | 4 | management/support | `support-inquiry`, `support-service-request` | light | — | no | create-ticket; low blast radius, non-billable |
-| 5 | data-analytics/quick-query | `quick-query-list`, `quick-query-image-versions`, `quick-query-validate` | light | — | no | the 3 read/validate-only QQ nodes (the `quick-query` create itself is gated, see Gated) |
-| 6 | platform/sts | `sts-token` | light | — | no | token issue; no teardown, no cost |
-| 7 | financial-management/budget | `account-budget` | light | — | no | account-scoped budget create |
+| 5 | data-analytics/quick-query | `quick-query-list`, `quick-query-image-versions` | light | — | no | `quick-query-list`/`quick-query-image-versions` already VALIDATED from prior sessions. `quick-query-validate`: **needs-deep-work** — POST /v1/quick-query/validate-resources → 500 ContactAdminForAssistance (account/entitlement issue). |
+| 6 | platform/sts | `sts-token` | light | — | no | **needs-deep-work** — POST /v1/assume-role → 404 (no valid role ARN or entitlement-gated). |
+| ~~7~~ | ~~financial-management/budget~~ | ~~`account-budget`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key financial-management/budget/createaccountbudget count=7; prior 500 was transient. Branch `claude/tender-babbage-c5y458`. |
 | ~~8~~ | ~~management/loggingaudit~~ | ~~`trail`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — createtrail/showtrail/settrail/starttrail/stoptrail/deletetrail all 2xx (fix: service_watch_yn N; params:{} on show-trail step). +6 verified. Branch `claude/tender-babbage-c5y458`. |
-| 9 | management/network-logging | `network-logging-storage` | light | — | no | account-scoped |
-| 10 | management/resourcemanager | `resource-group-bulk` | light | — | no | bulk resource-group; reuses existing ids |
-| 11 | management/servicewatch | `sw-metric-catalog`, `alert`, `dashboard`, `sw-custom-metric-meta`, `sw-custom-log-collect` | light | — | no | **deep (5 docs nodes)**; mostly metric/alert/dashboard reads+creates, no heavy infra |
-| 12 | management/cloudmonitoring | `cm-account-resource`, `cm-event-policy` | light | — | no | account-scoped monitoring |
-| 13 | security/configinspection | `diagnosis` | light | — | no | run a diagnosis, read result |
-| 14 | security/secretvault | `secretvault-vault` | light | — | no | vault create/delete |
-| 15 | security/certificatemanager | `certificate-import` | light | — | no | import a self-signed cert body |
+| 9 | management/network-logging | `network-logging-storage` | light | — | no | account-scoped (already VALIDATED from prior session) |
+| 10 | management/resourcemanager | `resource-group-bulk` | light | — | no | bulk resource-group; reuses existing ids (already VALIDATED from prior session) |
+| ~~11~~ | ~~management/servicewatch~~ | ~~`alert`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key management/servicewatch/createalert count=7. `sw-metric-catalog`, `dashboard`, `sw-custom-metric-meta`, `sw-custom-log-collect` already VALIDATED previously. Branch `claude/tender-babbage-c5y458`. |
+| ~~12a~~ | ~~management/cloudmonitoring~~ | ~~`cm-account-resource`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key management/cloudmonitoring/getaccountproductlist count=10. Branch `claude/tender-babbage-c5y458`. |
+| ~~12b~~ | ~~management/cloudmonitoring~~ | ~~`cm-addrbook`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key management/cloudmonitoring/getadressbooklist count=9. Branch `claude/tender-babbage-c5y458`. |
+| 12c | management/cloudmonitoring | `cm-event-policy` | light | — | no | **needs-deep-work** — POST /v1/cloudmonitorings/event/v2/event-policies → 400 (no Running VM/INSTANCE in account; conditional on active compute). Move to Gated or revisit when a VM lifecycle runs. |
+| 13 | security/configinspection | `diagnosis` | light | — | no | **needs-deep-work** — POST /v1/configinspection/diagnosis/save → 400 (body shape issue). |
+| 14 | security/secretvault | `secretvault-vault` | light | — | no | **needs-deep-work** — POST /v1/secretvault → 400 "Access key is already in use" (1-per-key quota; existing vault tied to this key). |
+| 15 | security/certificatemanager | `certificate-import` | light | — | no | **needs-deep-work** — POST /v1/certificatemanager → 400 (import body issue; self-sign cert already VALIDATED separately). |
 
 ### A.2 — IAM family (deep, 9 light docs nodes; account-scoped, light prereqs)
 
 | rank | service | node(s) | light/heavy | depends-on | gated? | notes |
 |------|---------|---------|-------------|------------|--------|-------|
-| 16 | management/iam | `iam-user`, `iam-role`, `iam-group-member`, `iam-saml-provider`, `iam-resource-policy` | light | — / `iam-group`(VALIDATED) | no | **deepest light family**; users/roles/members are account-scoped, no infra |
-| 17 | management/iam | `iam-user-policy-binding`, `iam-role-policy-binding`, `iam-group-policy-binding`, `iam-policy-binding-set` | light | `iam-user`/`iam-role`(rank 16) | no | bindings ride on the rank-16 principals — validate right after |
+| 16a | management/iam | `iam-user` | light | — | no | **needs-deep-work** — in `iam-credentials-heavy` (heavy=True); not verifiable without a heavy run. |
+| 16b | management/iam | `iam-role` | light | — | no | **needs-deep-work** — POST /v1/roles → 500 ContactAdminForAssistance (account-level restriction). |
+| 16c | management/iam | `iam-group-member` | light | — | no | **needs-deep-work** — no create lifecycle found for this node independently. |
+| 16d | management/iam | `iam-saml-provider` | light | — | no | **needs-deep-work** — lifecycle disabled (enabled=False). |
+| ~~16e~~ | ~~management/iam~~ | ~~`iam-resource-policy`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key management/iam/setresourcepolicy count=7. Branch `claude/tender-babbage-c5y458`. |
+| ~~17a~~ | ~~management/iam~~ | ~~`iam-role-policy-binding`~~ | ~~light~~ | ~~`iam-role`(rank 16b)~~ | ~~no~~ | **PROMOTED 2026-06-25** — key management/iam/addrolepolicybindings count=14. Branch `claude/tender-babbage-c5y458`. |
+| 17b | management/iam | `iam-user-policy-binding` | light | `iam-user`(rank 16a) | no | **needs-deep-work** — depends on iam-user (rank 16a, heavy lifecycle). |
+| 17c | management/iam | `iam-group-policy-binding`, `iam-policy-binding-set` | light | — | no | not yet attempted. |
 
 ### A.3 — light children of an already-VALIDATED parent (no new heavy provisioning)
 
@@ -79,7 +87,8 @@ pull a heavy prereq into the closure.
 |------|---------|---------|-------------|------------|--------|-------|
 | 18 | networking/firewall | `firewall`, `firewall-rule` | light | vpc(V), igw(V) | no | firewall implicitly created by IGW; rule rides on it |
 | 19 | networking/loadbalancer | `lb-member`, `lb-member-bulk`, `lb-static-nat` | light | load-balancer/server-group(V) | no | members attach to an existing VALIDATED LB chain |
-| 20 | storage/filestorage | `fs-snapshot-schedule`, `fs-replication` | light | filestorage-volume(V) | no | ride on existing FS volume |
+| ~~20a~~ | ~~storage/filestorage~~ | ~~`fs-replication`~~ | ~~light~~ | ~~filestorage-volume(V)~~ | ~~no~~ | **PROMOTED 2026-06-25** — key storage/filestorage/createvolumereplication count=5. Branch `claude/tender-babbage-c5y458`. |
+| 20b | storage/filestorage | `fs-snapshot-schedule` | light | filestorage-volume(V) | no | ride on existing FS volume; not yet attempted this batch. |
 | 21 | storage/parallel-filestorage | `pfs-snapshot` | light | pfs-volume(heavy, see B) | no | snapshot of a PFS volume — pairs with B pfs-volume run |
 | 22 | storage/baremetal-blockstorage | `bm-volume-snapshot`, `bm-group-snapshot` | light | bm-block-volume/bm-volume-group(see B) | no | snapshots; pair with the BM-blockstorage heavy run |
 | 23 | container/scr | `scr-image`, `scr-tag` | light | container-registry(V) | partial | registry exists; **image push needs SCR auth key** → tag/image-meta reads OK, push gated (see Gated) |
@@ -109,8 +118,15 @@ the heavy provisioning is paid once.
 
 | rank | service | node(s) | light/heavy | depends-on | gated? | notes |
 |------|---------|---------|-------------|------------|--------|-------|
-| 31 | compute/virtualserver | `image-registration`, `launch-configuration`, `auto-scaling-group`, `asg-policy`, `asg-schedule`, `asg-notification` | light | server(V)/image | no | **deep (7 docs, 6 light)**; ASG family rides on a VALIDATED server+image; validate as one batch |
-| 32 | compute/multinodegpucluster | `gpu-node-image`, `gpu-node-product`, `gpu-node-fabric` | light | — (lookups) | no | the 3 GPU lookups (the `gpu-node` create is heavy → B) |
+| ~~31a~~ | ~~compute/virtualserver~~ | ~~`auto-scaling-group`~~ | ~~light~~ | ~~server(V)~~ | ~~no~~ | **PROMOTED 2026-06-25** — key compute/virtualserver/createautoscalinggroup count=10. Branch `claude/tender-babbage-c5y458`. |
+| ~~31b~~ | ~~compute/virtualserver~~ | ~~`asg-policy`~~ | ~~light~~ | ~~server(V)~~ | ~~no~~ | **PROMOTED 2026-06-25** — key compute/virtualserver/createautoscalinggrouppolicy count=10. Branch `claude/tender-babbage-c5y458`. |
+| ~~31c~~ | ~~compute/virtualserver~~ | ~~`asg-schedule`~~ | ~~light~~ | ~~server(V)~~ | ~~no~~ | **PROMOTED 2026-06-25** — key compute/virtualserver/createautoscalinggroupschedule count=10. Branch `claude/tender-babbage-c5y458`. |
+| ~~31d~~ | ~~compute/virtualserver~~ | ~~`asg-notification`~~ | ~~light~~ | ~~server(V)~~ | ~~no~~ | **PROMOTED 2026-06-25** — key compute/virtualserver/createautoscalinggroupnotification count=5. Branch `claude/tender-babbage-c5y458`. |
+| ~~31e~~ | ~~compute/virtualserver~~ | ~~`volume-type`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key vs-volume-transfer-coverage:list-volume-types count=5. Branch `claude/tender-babbage-c5y458`. |
+| ~~31f~~ | ~~compute/virtualserver~~ | ~~`volume-attachment`~~ | ~~light~~ | ~~server(V), block-volume(V)~~ | ~~no~~ | **PROMOTED 2026-06-25** — key gen-heavy-vs-netops:create-volume-attachment count=5. Branch `claude/tender-babbage-c5y458`. |
+| 31g | compute/virtualserver | `image-registration`, `launch-configuration` | light | server(V)/image | no | not yet attempted this batch. |
+| ~~32a~~ | ~~compute/multinodegpucluster~~ | ~~`gpu-node-image`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key gen-gpu-node-image:verify-gpu-node-image-list count=5. Branch `claude/tender-babbage-c5y458`. |
+| 32b | compute/multinodegpucluster | `gpu-node-product`, `gpu-node-fabric` | light | — (lookups) | no | not yet attempted this batch. |
 | 33 | database/{mysql,mariadb,epas} | `*-instance-group`, `*-parameter`, `*-log-export-config` | light | `<engine>-cluster`(B) | no | validate in the same run that brings each cluster up (Wave B) |
 | 34 | networking/vpc | `endpoint-subnet`, `private-nat`, `tgw-vpc-connection`, `vpc-endpoint`, `privatelink-service` | light* | vpc/subnet(V) + heavy TGW/FS | no | **READY-FOR-LIVE (IB-012/013)**; non-heavy create flag but pulls heavy TGW/FS closure — treat as B-cost; the 5 are the modeled-but-unvalidated VPC frontier |
 | 35 | data-analytics/quick-query | `quick-query-update-description` | light | quick-query(gated) | gated | needs the gated `quick-query` create first → stays gated until IB-018 |
@@ -134,8 +150,8 @@ Each heavy node's light sub-ops (Wave A.3/A.5) ride the same run.
 | 42 | compute/baremetal | `baremetal-server` | heavy | vpc/subnet(V) | no | bare-metal provision; prereq for BM blockstorage |
 | 43 | compute/multinodegpucluster | `gpu-node` | heavy | gpu-node-image/product/fabric(A.4) | no | GPU node create (validate lookups first) |
 | 44 | networking/vpn | `vpn-gateway`, `vpn-tunnel` | heavy | vpc(V) | no | VPN gateway+tunnel chain |
-| 45 | networking/cdn | `cdn` | heavy* | — | no | listed light-create but provisions a CDN distribution; treat as heavy/slow |
-| 46 | networking/gslb | `gslb` | heavy* | — | no | global DNS LB; slow provisioning |
+| ~~45~~ | ~~networking/cdn~~ | ~~`cdn`~~ | ~~heavy*~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key networking/cdn/createcdnservice count=5. Branch `claude/tender-babbage-c5y458`. |
+| ~~46~~ | ~~networking/gslb~~ | ~~`gslb`~~ | ~~heavy*~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — key networking/gslb/creategslb count=5. Branch `claude/tender-babbage-c5y458`. |
 | 47 | networking/direct-connect | `direct-connect` | heavy | security-group(V) | maybe | **physical-circuit suspicion (owner check pending)** — if console/physical, → Gated |
 | 48 | networking/vpc | `private-nat`, `vpc-endpoint`, `tgw-vpc-connection`, `endpoint-subnet`, `privatelink-service` | heavy-closure | TGW(V)/FS(V)/subnet(V) | no | the IB-012/013 READY-FOR-LIVE frontier; one heavy networking run validates all 5 |
 | 49 | data-analytics/searchengine | `searchengine-cluster` | heavy | vpc/subnet(V) | no | OpenSearch DBaaS cluster |
