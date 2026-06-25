@@ -859,8 +859,8 @@ tr.cov-n .cbar{background:#dde2e7}tr.cov-f .cbar{background:var(--red)}
 .mb{font-family:ui-monospace,monospace;font-size:11px;font-weight:800;letter-spacing:.4px;padding:3px 8px;border-radius:5px;display:inline-block;min-width:62px;text-align:center;color:#fff}
 .mb.GET{background:#2f78c4}.mb.POST{background:#2c9a5e}.mb.PUT{background:#d97a0a}
 .mb.DELETE{background:#d63a3a}.mb.PATCH{background:#7a45c2}
-td.path code{font-size:12px;color:var(--text);word-break:break-word;overflow-wrap:anywhere}
-td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-weight:600;word-break:break-word;overflow-wrap:anywhere}
+td.path code{font-size:12px;color:var(--text);word-break:normal;overflow-wrap:break-word}
+td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-weight:600;word-break:normal;overflow-wrap:break-word}
 .defbtn{border:0;background:var(--amber-bg);color:var(--amber);font-size:11px;font-weight:700;
   padding:3px 10px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
 .defbtn .ca{font-size:9px;transition:transform .15s}
@@ -895,6 +895,11 @@ td.api{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);font-
 @media (max-width:640px){
   table{table-layout:auto}
   thead th,tbody td{padding:6px 8px}
+  /* MOBILE: keep 경로/API on one line so the wide table scrolls horizontally inside
+     .tbl-scroll. Some mobile browsers (Samsung Internet / WebKit) ignore the table
+     min-width, which let the break-anywhere cells collapse to 1 character per line
+     ('경로'→경/로, path→one char per row). nowrap forces real content width. */
+  td.path code,td.api{white-space:nowrap}
 }
 </style></head><body><div class="wrap">
 
