@@ -163,11 +163,13 @@ def lifecycle_states(events: Iterable[dict]) -> dict:
     graph overlay. Order-sensitive (replay in arrival order); ``FAIL`` is sticky so
     one bad step is not overwritten by a later "running":
 
-      lifecycle-start                      -> running
-      step-end (error / status >= 400)     -> fail (sticky)
-      step-end (otherwise)                 -> running (unless already fail)
-      lifecycle-end (passed-ish status)    -> done (unless already fail)
-      lifecycle-end (any other status)     -> fail
+      lifecycle-start                          -> running
+      step-end (category error/fail)           -> fail (sticky)
+      step-end (any other classified step)     -> running — category beats raw status,
+                                                  so a "soft" 404 (GET-after-delete) is NOT a fail
+      step-end (no category, raw status >= 400) -> fail (fallback only)
+      lifecycle-end (passed-ish status)        -> done (unless already fail)
+      lifecycle-end (any other status)         -> fail
 
     A lifecycle never seen stays absent (the UI renders that as ``queued``).
     """
@@ -183,13 +185,18 @@ def lifecycle_states(events: Iterable[dict]) -> dict:
             if st.get(lc) != FAIL:
                 st[lc] = RUNNING
         elif k == STEP_END:
-            status = ev.get("status")
             cat = str(ev.get("category", "")).lower()
-            bad = (cat in ("error", "fail", "failed")
-                   or (isinstance(status, int) and not isinstance(status, bool)
-                       and status >= 400))
-            if bad:
+            status = ev.get("status")
+            if cat in ("error", "fail", "failed"):
                 st[lc] = FAIL
+            elif cat:
+                # a classified non-error step (ok / soft / warn …) never fails the
+                # lifecycle — the engine's category is authoritative over the raw
+                # status, so a "soft" 404 (GET-after-delete) is expected, not a fail
+                if st.get(lc) != FAIL:
+                    st[lc] = RUNNING
+            elif isinstance(status, int) and not isinstance(status, bool) and status >= 400:
+                st[lc] = FAIL                      # no category to trust → raw status
             elif st.get(lc) != FAIL:
                 st[lc] = RUNNING
         elif k == LIFECYCLE_END:

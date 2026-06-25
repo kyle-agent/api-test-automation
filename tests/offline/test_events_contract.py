@@ -124,11 +124,25 @@ def test_lifecycle_states_fail_is_sticky():
 
 
 def test_lifecycle_states_http_4xx_is_fail():
+    # no category to trust → fall back to the raw status
     events = [
         {"kind": "lifecycle-start", "lifecycle": "a"},
         {"kind": "step-end", "lifecycle": "a", "category": "", "status": 404},
     ]
     assert ec.lifecycle_states(events)["a"] == ec.FAIL
+
+
+def test_lifecycle_states_soft_non_2xx_is_not_fail():
+    # regression (found by a LIVE run): a classified "soft" 404 — e.g. the
+    # GET-after-delete that confirms teardown — must NOT fail the lifecycle. The
+    # engine's category is authoritative over the raw HTTP status.
+    events = [
+        {"kind": "lifecycle-start", "lifecycle": "a"},
+        {"kind": "step-end", "lifecycle": "a", "category": "ok", "status": 204},
+        {"kind": "step-end", "lifecycle": "a", "category": "soft", "status": 404},
+        {"kind": "lifecycle-end", "lifecycle": "a", "status": "passed"},
+    ]
+    assert ec.lifecycle_states(events)["a"] == ec.DONE
 
 
 def test_lifecycle_states_end_non_pass_is_fail():
