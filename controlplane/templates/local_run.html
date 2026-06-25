@@ -88,18 +88,26 @@
   </div>
 
   <div class="card pad">
-    <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:9px">
       <b>라이브</b>
       <span class="status" id="runstat" style="display:none"></span>
       <span class="muted small mono" id="runid"></span>
+      <span class="muted small" id="focusnote"></span>
       <span class="muted small" id="evcount" style="margin-left:auto"></span>
     </div>
-    <div id="states" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px"></div>
-    <div style="max-height:330px;overflow:auto">
-      <table>
-        <thead><tr><th>lifecycle</th><th>method</th><th>path</th><th>status</th></tr></thead>
-        <tbody id="evbody"><tr><td colspan="4" class="muted small">아직 실행 없음 — 좌측에서 골라 <b>▶ Simulate</b></td></tr></tbody>
-      </table>
+    <div id="states" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div class="subtabs" id="rtabs">
+      <a data-t="api" class="active">API</a><a data-t="res">자원</a><a data-t="log">로그</a>
+    </div>
+    <div style="max-height:320px;overflow:auto">
+      <div id="tab-api">
+        <table><thead><tr><th>lifecycle</th><th>method</th><th>path</th><th>status</th></tr></thead>
+        <tbody id="evbody"><tr><td colspan="4" class="muted small">아직 실행 없음 — 좌측에서 골라 ▶ Simulate · DAG 노드 클릭 = 해당 lifecycle만 보기</td></tr></tbody></table>
+      </div>
+      <div id="tab-res" style="display:none">
+        <table><thead><tr><th>자원</th><th>id</th><th>lifecycle</th></tr></thead><tbody id="resbody"></tbody></table>
+      </div>
+      <div id="tab-log" style="display:none"><pre id="logbody" class="mono small" style="margin:0;white-space:pre-wrap">—</pre></div>
     </div>
   </div>
 </div>
@@ -109,7 +117,7 @@
 {% raw %}
 (function () {
   var LCS = [], SEL = new Set(), TIMER = null, gTimer = null;
-  var SCENE = null, GRAPH = null, NODE_LC = {}, STATES = {}, PLAN = null;
+  var SCENE = null, GRAPH = null, NODE_LC = {}, STATES = {}, PLAN = null, EVENTS = [], FOCUS_LC = null;
   var $ = function (s) { return document.querySelector(s); };
   var esc = function (s) { return (s + "").replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
   var PAL = { done: ["#e7f6ed", "#15924f"], running: ["#fdf3e2", "#b5740b"], fail: ["#fbe9e9", "#c63434"] };
@@ -150,7 +158,16 @@
     var svg = $("#dag-svg"), stage = $("#stage");
     if (SCENE && SCENE.destroy) SCENE.destroy();
     SCENE = window.ResourceGraph.scene(svg, stage, GRAPH,
-      { overlay: nodeOverlay, groupOverlay: groupOverlay, stat: $("#statchip"), granNote: $("#granNote") });
+      { overlay: nodeOverlay, groupOverlay: groupOverlay, stat: $("#statchip"), granNote: $("#granNote"),
+        onFocus: function (info) {
+          if (info && info.resourceIds && info.resourceIds.length) {
+            var s = {}; info.resourceIds.forEach(function (id) { if (NODE_LC[id]) s[NODE_LC[id]] = 1; });
+            FOCUS_LC = new Set(Object.keys(s));
+          } else { FOCUS_LC = null; }
+          $("#focusnote").textContent = FOCUS_LC ? ("focus " + FOCUS_LC.size + " lifecycle · 빈곳/노드 클릭=해제") : "";
+          $("#evcount").textContent = EVENTS.length + " events" + (FOCUS_LC ? " · focus" : "");
+          renderTabs();
+        } });
     SCENE.start();
     $("#daghint").style.display = "none";
     Array.prototype.forEach.call($("#granctl").children, function (x) { x.classList.toggle("on", x.dataset.g === SCENE.gran); });
@@ -180,6 +197,34 @@
     $("#timing").textContent = "순차 " + (seq / 1000).toFixed(1) + "s → 레벨병렬 " + (par / 1000).toFixed(1) + "s · " + spd + "× 빠름";
   }
 
+  // ---- report tabs (API / 자원 / 로그), cross-filtered by the DAG focus ----
+  function inFocus(lc) { return !FOCUS_LC || FOCUS_LC.has(lc); }
+  function renderTabs() {
+    var ev = EVENTS || [];
+    var api = ev.filter(function (e) { return e.kind === "step-end" && inFocus(e.lifecycle); });
+    $("#evbody").innerHTML = api.length ? api.slice(-300).map(function (e) {
+      var mc = e.method === "GET" ? "read" : "mutation";
+      return "<tr><td class='mono small'>" + esc(e.lifecycle || "") + "</td><td><span class='tag " + mc + "'>"
+        + esc(e.method || "") + "</span></td><td class='mono small'>" + esc(e.path || "") + "</td><td>"
+        + esc(e.status || "") + " <span class='muted'>" + esc(e.category || "") + "</span></td></tr>";
+    }).join("") : "<tr><td colspan=4 class='muted small'>—</td></tr>";
+    var res = ev.filter(function (e) { return (e.kind === "resource-tracked" || e.kind === "resource-deleted") && inFocus(e.lifecycle); });
+    $("#resbody").innerHTML = res.length ? res.slice(-300).map(function (e) {
+      var del = e.kind === "resource-deleted";
+      return "<tr><td>" + (del ? "🗑 " : "➕ ") + esc(e.resource_type || "") + "</td><td class='mono small'>"
+        + esc(e.resource_id || "") + "</td><td class='mono small'>" + esc(e.lifecycle || "") + "</td></tr>";
+    }).join("") : "<tr><td colspan=3 class='muted small'>—</td></tr>";
+    var log = ev.filter(function (e) { return inFocus(e.lifecycle); });
+    $("#logbody").textContent = log.length ? log.map(function (e) {
+      return e.kind + (e.lifecycle ? " · " + e.lifecycle : "") + (e.step ? " · " + e.step : "")
+        + (e.method ? " · " + e.method + " " + e.path : "") + (e.status != null ? " → " + e.status : "");
+    }).join("\n") : "—";
+  }
+  function setTab(t) {
+    ["api", "res", "log"].forEach(function (x) { $("#tab-" + x).style.display = x === t ? "" : "none"; });
+    Array.prototype.forEach.call($("#rtabs").children, function (a) { a.classList.toggle("active", a.dataset.t === t); });
+  }
+
   function paint(j) {
     var st = $("#runstat"); st.style.display = ""; st.textContent = j.run.status;
     st.className = "status " + (j.run.status === "done" ? "done" : j.run.status === "running" ? "running" : "failed");
@@ -190,14 +235,9 @@
     }).join("");
     if (SCENE && SCENE.refresh) SCENE.refresh();      // recolor DAG by live state (keeps zoom/focus)
     timing(j.events);
-    var ev = (j.events || []).filter(function (e) { return e.kind === "step-end"; });
-    $("#evcount").textContent = (j.events || []).length + " events";
-    $("#evbody").innerHTML = ev.length ? ev.slice(-250).map(function (e) {
-      var mc = e.method === "GET" ? "read" : "mutation";
-      return "<tr><td class='mono small'>" + esc(e.lifecycle || "") + "</td><td><span class='tag " + mc + "'>" + esc(e.method || "")
-        + "</span></td><td class='mono small'>" + esc(e.path || "") + "</td><td>" + esc(e.status || "")
-        + " <span class='muted'>" + esc(e.category || "") + "</span></td></tr>";
-    }).join("") : "<tr><td colspan=4 class='muted small'>…</td></tr>";
+    EVENTS = j.events || [];
+    $("#evcount").textContent = EVENTS.length + " events" + (FOCUS_LC ? " · focus" : "");
+    renderTabs();
   }
 
   function poll(id) {
@@ -229,6 +269,7 @@
   $("#zin").onclick = function () { if (SCENE) SCENE.zoomIn(); };
   $("#zout").onclick = function () { if (SCENE) SCENE.zoomOut(); };
   $("#zfit").onclick = function () { if (SCENE) SCENE.zoomToFit(); };
+  $("#rtabs").addEventListener("click", function (e) { var a = e.target.closest("a[data-t]"); if (a) setTab(a.dataset.t); });
   $("#q").oninput = render;
   $("#runSim").onclick = function () { run("simulate"); };
   $("#runLive").onclick = function () { run("live"); };
