@@ -141,6 +141,36 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
     VPCs (heavy-wave leftovers) were also reclaimed via local-registry ownership;
     one VPC NOT in our registry was left untouched (cross-env shared account — same
     rule that protects the other env's `kyuh.choi+areg1@samsung.com` resources).
+  - **What to advance next (2026-06-25 LATE — post combined-heavy-run + verified
+    backlog re-audit; supersedes the earlier 2026-06-25 block immediately below):**
+    Published state = **740/1372 verified-2xx (C3 66.6%)**, reach_covered 107,
+    `conformance_runtime.json` now on dashboard-data (579 runtime/schema-live
+    findings). **verified-2xx is at the practical ceiling (~66%) for this single
+    shared, non-admin, cost-capped account** — re-audited the 632 "unverified" vs
+    catalog + `coverage_waivers.json` + lifecycle `_note`s; the cheap-AND-tractable
+    remainder is small. CORRECTIONS to the block below (current state wins, Hard
+    Rule 5): (a) **virtualserver = 90/113 (gap 23), NOT 84-gap** — the "HEAVY VM
+    lifecycle big lever" is STALE/largely done; do NOT run it chasing the 84.
+    (b) **archivestorage (0/25) is entitlement `reachability-only`** (owner
+    2026-06-16) — never 2xx. (c) **cloudcontrol (0/15) is blast-radius governance,
+    coverage-only, 403-expected** — never 2xx. Honest taxonomy of the 632:
+    reachability-only **138** (sqlserver/searchengine/vertica/iam-identity-center/
+    archivestorage/parallel-filestorage — license/entitlement, covered-when-REACHED
+    ≠ verified) · hard-excluded waivers **108** · coverage-only-by-design **~80**
+    (cloudcontrol/baremetal/multinodegpucluster/cloud-ml/organization — synthetic-id
+    4xx, already CALLED) · heavy/billable **~150** (epas/mariadb/mysql/postgresql/
+    cachestore/eventstreams/virtualserver-real-VM/data-ops — note the prior DB heavy
+    run netted only **+5** verified: low ROI/$) · genuinely-free-surgical **~10-25**
+    (vpc edges / scr extras / backup id-GETs — several need a live id first or are
+    quota/2-account-blocked). **Ranked next tracks:** (1) highest-value & $0 =
+    platform/quality — wire a dashboard UI panel for the runtime findings (data
+    already published) + verify pytest `-n` xdist `merge_worker_shards()` fires at
+    sessionfinish (this session's shards needed a MANUAL merge → CI may undercount
+    coverage); (2) $0 number-nudge = free surgical micro-sweep (+10-25), scope the
+    exact endpoint list read-only before any live call; (3) separate KPI =
+    reachability confirmation of the 138 (4xx = reached); (4) low-ROI = billable
+    heavy DB/compute (explicit `SCP_RUN_HEAVY` opt-in). Earlier ranked plans below
+    still hold for the broader campaign.
   - **What to advance next (2026-06-25, supersedes 2026-06-19):** (1) retry the 2
     SCF teardowns once PLS un-sticks (above); (2) remaining privatelink gaps are
     cross-side/entitlement — scf `approve/connect` are baselined product bugs (404
