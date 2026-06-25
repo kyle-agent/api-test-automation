@@ -725,3 +725,21 @@ def api_local_events(run_id: str):
     if res is None:
         raise HTTPException(404, "no such local run")
     return res
+
+
+@app.get("/api/local/lifecycles")
+def api_local_lifecycles():
+    """Runnable lifecycles (id · service · heavy) for the Local Run picker."""
+    from regression.scenarios.loader import load_lifecycles
+    lcs, _ = load_lifecycles(with_sources=True)
+    out = [{"id": lc["id"], "service": lc.get("service", ""), "heavy": bool(lc.get("heavy"))}
+           for lc in lcs if lc.get("enabled")]
+    out.sort(key=lambda r: (r["service"], r["id"]))
+    return {"lifecycles": out}
+
+
+@app.get("/local-run")
+def local_run_page(request: Request):
+    """Local Run screen (S3) — pick a selection → run simulate/live in-process →
+    watch the live event stream + per-lifecycle state, driven by /api/local/*."""
+    return templates.TemplateResponse(request, "local_run.html", {"active": "testing"})

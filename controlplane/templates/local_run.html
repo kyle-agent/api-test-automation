@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Local Run — SCP API Regression{% endblock %}
+{% block content %}
+<h2>🖥️ Local Run
+  <span class="hint">선택 → 실행(simulate/live) → 라이브 이벤트. 컨트롤플레인 호스트에서 인프로세스 실행 (<code>/api/local/*</code>).</span>
+</h2>
+
+<div class="banner">
+  이 화면은 CI 디스패치가 아니라 <b>이 서버에서 직접</b> 실행합니다.
+  <b>simulate</b> = dag_planner 플랜을 무클라우드로 재생 · <b>live</b> = 실제 SCP 호출(VPC 생성·삭제). 게이트는 명시적 opt-in.
+</div>
+
+<div class="grid2">
+  <!-- ── 선택 ───────────────────────────────────────────── -->
+  <div class="card pad">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:9px">
+      <input class="search" id="q" placeholder="lifecycle / service 검색…" autocomplete="off">
+      <span class="muted small" id="selcount" style="margin-left:auto">0 선택</span>
+    </div>
+    <div id="lclist" style="max-height:430px;overflow:auto;border:1px solid var(--border);border-radius:9px">
+      <div class="muted small pad">로딩 중…</div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+      <button class="btn primary" id="runSim">▶ Simulate</button>
+      <button class="btn" id="runLive">▶ Live (실제 자원)</button>
+      <label class="muted small" style="margin-left:auto;display:flex;gap:5px;align-items:center">
+        <input type="checkbox" id="heavy"> heavy 허용</label>
+    </div>
+  </div>
+
+  <!-- ── 라이브 ─────────────────────────────────────────── -->
+  <div class="card pad">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px">
+      <b>라이브</b>
+      <span class="status" id="runstat" style="display:none"></span>
+      <span class="muted small mono" id="runid"></span>
+      <span class="muted small" id="evcount" style="margin-left:auto"></span>
+    </div>
+    <div id="states" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px"></div>
+    <div style="max-height:440px;overflow:auto">
+      <table>
+        <thead><tr><th>lifecycle</th><th>method</th><th>path</th><th>status</th></tr></thead>
+        <tbody id="evbody">
+          <tr><td colspan="4" class="muted small">아직 실행 없음 — 좌측에서 골라 <b>▶ Simulate</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+{% raw %}
+(function () {
+  var LCS = [], SEL = new Set(), TIMER = null;
+  var $ = function (s) { return document.querySelector(s); };
+  var esc = function (s) { return (s + "").replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
+
+  function render() {
+    var q = ($("#q").value || "").toLowerCase();
+    var rows = LCS.filter(function (l) {
+      return !q || l.id.toLowerCase().indexOf(q) >= 0 || (l.service || "").toLowerCase().indexOf(q) >= 0;
+    });
+    $("#lclist").innerHTML = rows.length ? rows.map(function (l) {
+      return '<label style="display:flex;gap:8px;align-items:center;padding:6px 11px;border-bottom:1px solid #eef1f3;cursor:pointer">'
+        + '<input type=checkbox data-id="' + esc(l.id) + '"' + (SEL.has(l.id) ? " checked" : "") + ">"
+        + '<span class="mono" style="font-size:12px">' + esc(l.id) + "</span>"
+        + '<span class="srv" style="margin-left:auto">' + esc(l.service || "") + "</span>"
+        + (l.heavy ? '<span class="tag heavy">heavy</span>' : "") + "</label>";
+    }).join("") : '<div class="muted small pad">일치 없음</div>';
+    Array.prototype.forEach.call($("#lclist").querySelectorAll("input"), function (c) {
+      c.onchange = function () {
+        c.checked ? SEL.add(c.dataset.id) : SEL.delete(c.dataset.id);
+        $("#selcount").textContent = SEL.size + " 선택";
+      };
+    });
+  }
+
+  function paint(j) {
+    var st = $("#runstat"); st.style.display = "";
+    st.textContent = j.run.status;
+    st.className = "status " + (j.run.status === "done" ? "done" : j.run.status === "running" ? "running" : "failed");
+    var STC = { done: "s-verified", running: "s-reached", fail: "s-regress", queued: "s-unobs" };
+    $("#states").innerHTML = Object.keys(j.states || {}).map(function (lc) {
+      var s = j.states[lc];
+      return '<span class="chip ' + (STC[s] || "s-unobs") + '">' + esc(lc) + ": " + s + "</span>";
+    }).join("");
+    var ev = (j.events || []).filter(function (e) { return e.kind === "step-end"; });
+    $("#evcount").textContent = (j.events || []).length + " events";
+    $("#evbody").innerHTML = ev.length ? ev.slice(-250).map(function (e) {
+      var mc = e.method === "GET" ? "read" : "mutation";
+      return "<tr><td class='mono small'>" + esc(e.lifecycle || "") + "</td>"
+        + "<td><span class='tag " + mc + "'>" + esc(e.method || "") + "</span></td>"
+        + "<td class='mono small'>" + esc(e.path || "") + "</td>"
+        + "<td>" + esc(e.status || "") + " <span class='muted'>" + esc(e.category || "") + "</span></td></tr>";
+    }).join("") : "<tr><td colspan=4 class='muted small'>…</td></tr>";
+  }
+
+  function poll(id) {
+    $("#runid").textContent = id;
+    if (TIMER) clearInterval(TIMER);
+    var tick = function () {
+      fetch("/api/local/runs/" + id + "/events").then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!j) return;
+          paint(j);
+          if (j.run.status !== "running") { clearInterval(TIMER); TIMER = null; }
+        });
+    };
+    TIMER = setInterval(tick, 400); tick();
+  }
+
+  function run(mode) {
+    if (!SEL.size) { alert("lifecycle을 하나 이상 고르세요"); return; }
+    if (mode === "live" && !confirm("실제 클라우드 자원을 생성/삭제합니다. 계속할까요?")) return;
+    var body = { lifecycle_ids: Array.from(SEL), mode: mode };
+    if (mode === "simulate") body.step_delay = 0.12;       // watchable pacing
+    if (mode === "live") body.heavy = $("#heavy").checked;
+    fetch("/api/local/run", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.run) poll(j.run.id); else alert("실행 시작 실패");
+    });
+  }
+
+  $("#q").oninput = render;
+  $("#runSim").onclick = function () { run("simulate"); };
+  $("#runLive").onclick = function () { run("live"); };
+
+  fetch("/api/local/lifecycles").then(function (r) { return r.json(); }).then(function (j) {
+    LCS = (j && j.lifecycles) || [];
+    // deep-link: ?pick=a,b auto-selects (also used for screenshots / demos)
+    try {
+      var pick = new URLSearchParams(location.search).get("pick");
+      if (pick) pick.split(",").forEach(function (id) { if (id) SEL.add(id); });
+      $("#selcount").textContent = SEL.size + " 선택";
+    } catch (e) {}
+    render();
+    if (new URLSearchParams(location.search).get("auto") === "1" && SEL.size) run("simulate");
+  });
+})();
+{% endraw %}
+</script>
+{% endblock %}
