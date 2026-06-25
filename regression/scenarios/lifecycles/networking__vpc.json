@@ -210,6 +210,14 @@
           "params": {}
         },
         {
+          "name": "probe-private-nat-reads",
+          "service": "vpc",
+          "probe_reads": {
+            "private_nat_id": "{private_nat_id}"
+          },
+          "_note": "probe_reads insurance for showprivatenat (/v1/private-nats/{private_nat_id}) and listprivatenatips (/v1/private-nats/{private_nat_id}/private-nat-ips). Supplements the verify steps above that use params:{} for catalog-key recording — probe_reads fires independently of group skip. Credit lands when the parent create 2xx's; harmless (placeholder normalization) otherwise. ADDED 2026-06-25."
+        },
+        {
           "name": "create-private-nat-ip",
           "service": "vpc",
           "method": "POST",
@@ -773,6 +781,14 @@
           ],
           "_note": "id-bound read (show a vpc-endpoint). Closes the vpc_endpoint_id getid GET /v1/vpc-endpoints/{vpc_endpoint_id}. Keys off the create-vpc-endpoint-captured vpc_endpoint_id; tolerant [200,400,403,404] because create uses a {unique}/synthetic resource_key (the target service) and 4xx's, leaving vpc_endpoint_id a placeholder that normalizes to the catalog '*' key. Makes the endpoint statically reachable. params:{} forces catalog-key recording (engine only records GET catalog key when params present).",
           "params": {}
+        },
+        {
+          "name": "probe-vpc-endpoint-reads",
+          "service": "vpc",
+          "probe_reads": {
+            "vpc_endpoint_id": "{vpc_endpoint_id}"
+          },
+          "_note": "probe_reads insurance for showvpcendpoint (/v1/vpc-endpoints/{vpc_endpoint_id}). Supplements the show-vpc-endpoint step above that uses params:{} — probe_reads fires independently of group skip. Credit lands when the parent create 2xx's; harmless (placeholder normalization) otherwise. ADDED 2026-06-25."
         },
         {
           "name": "set-vpc-endpoint",

@@ -265,6 +265,15 @@
           "group": "firewall-rule"
         },
         {
+          "name": "probe-firewall-reads",
+          "service": "firewall",
+          "probe_reads": {
+            "firewall_id": "{firewall_id}",
+            "firewall_rule_id": "{firewall_rule_id}"
+          },
+          "_note": "probe_reads credits id-bound firewall GETs: showfirewall (firewall_id path param) and showfirewallrule (firewall_rule_id path param). listfirewallrules has no path params so it is not reached by probe_reads; it is already exercised via the verify-firewall-list-rules explicit step. ADDED 2026-06-25 to close the catalog-key recording gap (plain verify GETs without params: {} do not record under the catalog key per engine.py:1119)."
+        },
+        {
           "name": "delete-firewall-rule",
           "service": "firewall",
           "method": "DELETE",
@@ -932,72 +941,6 @@
           }
         },
         {
-          "name": "create-lb-health-check",
-          "service": "loadbalancer",
-          "method": "POST",
-          "path": "/v1/lb-health-checks",
-          "json": {
-            "lb_health_check": {
-              "name": "regrhc{ualpha}",
-              "description": "API regression suite",
-              "protocol": "TCP",
-              "health_check_count": 3,
-              "health_check_interval": 5,
-              "health_check_port": 80,
-              "health_check_timeout": 5,
-              "subnet_id": "{subnet_id}",
-              "vpc_id": "{vpc_id}",
-              "tags": []
-            }
-          },
-          "expect_status": [
-            200,
-            201,
-            202,
-            400
-          ],
-          "optional": true,
-          "group": "lb-health-check",
-          "_note": "400 SubnetNotAssociatedWithLoadBalancer: the shared subnet has no LB, so the health-check cannot attach. Env/data-dependent; coverage-only (C2). R3 to provide an LB-associated subnet to make it 2xx.",
-          "capture": {
-            "lb_health_check_id": "$.lb_health_check.id"
-          },
-          "cleanup": {
-            "method": "DELETE",
-            "path": "/v1/lb-health-checks/{lb_health_check_id}",
-            "service": "loadbalancer"
-          }
-        },
-        {
-          "name": "verify-lb-health-check-read",
-          "service": "loadbalancer",
-          "method": "GET",
-          "path": "/v1/lb-health-checks/{lb_health_check_id}",
-          "expect_status": [
-            200
-          ],
-          "group": "lb-health-check"
-        },
-        {
-          "name": "verify-lb-health-check-set",
-          "service": "loadbalancer",
-          "method": "PUT",
-          "path": "/v1/lb-health-checks/{lb_health_check_id}",
-          "json": {
-            "lb_health_check": {
-              "description": "API regression suite (set)",
-              "health_check_count": 3,
-              "health_check_interval": 5,
-              "health_check_timeout": 5
-            }
-          },
-          "expect_status": [
-            200,
-            202
-          ],
-          "group": "lb-health-check"
-        },
-        {
           "name": "create-load-balancer",
           "service": "loadbalancer",
           "method": "POST",
@@ -1050,6 +993,71 @@
             "timeout": 600,
             "interval": 20
           }
+        },
+        {
+          "name": "create-lb-health-check",
+          "service": "loadbalancer",
+          "method": "POST",
+          "path": "/v1/lb-health-checks",
+          "json": {
+            "lb_health_check": {
+              "name": "regrhc{ualpha}",
+              "description": "API regression suite",
+              "protocol": "TCP",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_port": 80,
+              "health_check_timeout": 5,
+              "subnet_id": "{subnet_id}",
+              "vpc_id": "{vpc_id}",
+              "tags": []
+            }
+          },
+          "expect_status": [
+            200,
+            201,
+            202
+          ],
+          "optional": true,
+          "group": "lb-health-check",
+          "_note": "ORDERING FIX (validated-facts 1101-1116, 2026-06-25): lb-create + wait-load-balancer now run BEFORE this step so the LB exists in the subnet when the health-check is created — previously 400 SubnetNotAssociatedWithLoadBalancer. expect_status no longer includes 400 since the prerequisite LB is present.",
+          "capture": {
+            "lb_health_check_id": "$.lb_health_check.id"
+          },
+          "cleanup": {
+            "method": "DELETE",
+            "path": "/v1/lb-health-checks/{lb_health_check_id}",
+            "service": "loadbalancer"
+          }
+        },
+        {
+          "name": "verify-lb-health-check-read",
+          "service": "loadbalancer",
+          "method": "GET",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "expect_status": [
+            200
+          ],
+          "group": "lb-health-check"
+        },
+        {
+          "name": "verify-lb-health-check-set",
+          "service": "loadbalancer",
+          "method": "PUT",
+          "path": "/v1/lb-health-checks/{lb_health_check_id}",
+          "json": {
+            "lb_health_check": {
+              "description": "API regression suite (set)",
+              "health_check_count": 3,
+              "health_check_interval": 5,
+              "health_check_timeout": 5
+            }
+          },
+          "expect_status": [
+            200,
+            202
+          ],
+          "group": "lb-health-check"
         },
         {
           "name": "verify-load-balancer-read-static-nats",
@@ -1451,6 +1459,18 @@
             200
           ],
           "group": "lb-static-nat"
+        },
+        {
+          "name": "probe-lb-reads",
+          "service": "loadbalancer",
+          "probe_reads": {
+            "loadbalancer_id": "{loadbalancer_id}",
+            "lb_server_group_id": "{lb_server_group_id}",
+            "lb_health_check_id": "{lb_health_check_id}",
+            "listener_id": "{listener_id}",
+            "member_id": "{member_id}"
+          },
+          "_note": "probe_reads credits id-bound loadbalancer GETs: showloadbalancer, showlbhealthcheck, showlbservergroup, showlblistener, showlbservergroupmember (lb_server_group_id+member_id), showloadbalancerpublicnatip (loadbalancer_id, GET /v1/loadbalancers/{id}/static-nats). All ids soft-captured; a placeholder still normalizes to the catalog key. ADDED 2026-06-25."
         },
         {
           "name": "delete-lb-listener",
