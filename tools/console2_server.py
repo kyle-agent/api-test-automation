@@ -912,62 +912,25 @@ def _resource_kind_from_path(path: str) -> str | None:
 
 
 def _simulate_worker(rec: dict) -> None:
-    """DRY-RUN: replay the plan to the event stream (no cloud, deterministic). Walks
-    the dag_planner waves in order and, within each wave, each lifecycle's HTTP steps,
-    so the live view shows the real DAG order + the real API call sequence. Used to
-    confirm ordering quickly before a real run. Also emits clearly-synthetic
-    ``resource-tracked``/``resource-deleted`` events (ids prefixed ``sim-``) on
-    create/delete steps so the resource-inventory report renders without any cloud."""
+    """DRY-RUN: replay the plan to the event stream (no cloud, deterministic) via the
+    SHARED ``regression.scenarios.local_run.simulate_run`` — the SAME replay the
+    control-plane ``local`` executor uses (convergence S2). Walks the dag_planner
+    waves in DAG order + each lifecycle's HTTP steps so the live view shows the real
+    creation order + API sequence; synthetic ``resource-tracked``/``-deleted`` (ids
+    ``sim-…``) on create/delete render the resource view without any cloud."""
+    from regression.scenarios import local_run
     evp, logp = rec["events"], Path(rec["log"])
     try:
         plan = _plan(rec["lifecycle_ids"])
-        waves = plan["plan"]["waves"]
-        preview = plan["preview"]
         with open(logp, "w", encoding="utf-8") as f:
             f.write(f"# console2 SIMULATE {rec['id']} — replay of the dag_planner plan "
                     f"(no cloud calls)\n{plan['summary']}\n")
-        _emit_event(evp, "run-meta", mode="simulate", waves=len(waves),
-                    runnable=plan["runnable"])
-        # lifecycles in wave order (DAG order); inside a wave, sequential replay.
-        for wi, w in enumerate(waves):
-            _emit_event(evp, "wave-start", wave=wi, wave_kind=w["kind"],
-                        lifecycles=w["lifecycles"], vpc_slots=w.get("vpc_slots", 0))
-            for lid in w["lifecycles"]:
-                pv = preview.get(lid) or {"steps": [], "service": "", "heavy": False}
-                steps = [s for s in pv["steps"] if s.get("method")]  # HTTP steps only
-                _emit_event(evp, "lifecycle-start", lifecycle=lid,
-                            service=pv["service"], heavy=pv["heavy"],
-                            n_steps=len(steps), wave=wi)
-                for s in steps:
-                    _emit_event(evp, "step-start", lifecycle=lid, step=s["name"],
-                                method=s["method"], path=s["path"])
-                    # Pace each HTTP step so the live view is WATCHABLE — the user
-                    # can see 생성 중 → 테스트 중 → 삭제 중 advance through DAG order
-                    # rather than the whole run flashing by in ~1s. Tunable via
-                    # SCP_SIM_STEP_DELAY (seconds); default 0.35s per step.
-                    time.sleep(_SIM_STEP_DELAY)
-                    _emit_event(evp, "step-end", lifecycle=lid, step=s["name"],
-                                method=s["method"], path=s["path"],
-                                status=200, category="ok",
-                                elapsed_ms=int(_SIM_STEP_DELAY * 1000))
-                    # synthetic resource tracking (simulate-only; ids prefixed sim-)
-                    # so the "자원 (실자원 id)" report renders without any cloud call.
-                    # A short extra beat around create/delete so the resource view
-                    # visibly steps create → test → delete (not all at once).
-                    if s.get("kind") == "create":
-                        rtype = _sim_resource_type(s["path"])
-                        _emit_event(evp, "resource-tracked", lifecycle=lid,
-                                    resource_type=rtype,
-                                    resource_id="sim-" + uuid.uuid4().hex[:8],
-                                    path=s["path"])
-                        time.sleep(_SIM_BEAT)
-                    elif s.get("kind") == "delete":
-                        _emit_event(evp, "resource-deleted", lifecycle=lid,
-                                    resource_type=_sim_resource_type(s["path"]),
-                                    path=s["path"])
-                        time.sleep(_SIM_BEAT)
-                _emit_event(evp, "lifecycle-end", lifecycle=lid, status="passed")
-        _emit_event(evp, "run-end", status="done")
+        local_run.simulate_run(
+            plan["plan"]["waves"], plan["preview"],
+            lambda kind, **fields: _emit_event(evp, kind, **fields),
+            step_delay=_SIM_STEP_DELAY, beat=_SIM_BEAT, sleep=time.sleep,
+            new_id=lambda: "sim-" + uuid.uuid4().hex[:8],
+            meta={"runnable": plan["runnable"]})
         with _LOCK:
             rec["status"], rec["rc"], rec["ended"] = "done", 0, time.time()
     except Exception as exc:  # noqa: BLE001
