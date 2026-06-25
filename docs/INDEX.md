@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 45 docs · 32 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 50 docs · 34 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -24,6 +24,9 @@
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
 | [`working/CONTEXT.md`](working/CONTEXT.md) | orchestrator | Shared Context (CONTEXT.md) | 🟢 active |
+| [`working/console-platform-handoff.md`](working/console-platform-handoff.md) | all | Platform Console — 로컬 실행 플랫폼 핸드오프 | 🟢 active |
+| [`working/console2-ia-ux-review.md`](working/console2-ia-ux-review.md) | all | console2 — IA + UX Review (design backlog) |  backlog |
+| [`working/coverage-session-brief.md`](working/coverage-session-brief.md) | all | Coverage session — handoff brief | 🟢 active |
 
 ## Working — plans
 | Doc | For | Summary | Status |
@@ -31,6 +34,8 @@
 | [`working/plans/COVERAGE-GETID-PLAN.md`](working/plans/COVERAGE-GETID-PLAN.md) | coverage | the id-bound GET gap, classified and attacked | 🟢 active |
 | [`working/plans/COVERAGE-WAVE-PLAN.md`](working/plans/COVERAGE-WAVE-PLAN.md) | coverage | the remaining static gap, prioritized | 🟢 active |
 | [`working/plans/PARALLEL-EXECUTION-PLAN.md`](working/plans/PARALLEL-EXECUTION-PLAN.md) | all | Parallel execution plan — staged foundations + per-VPC lanes (DRAFT) | 🟡 draft |
+| [`working/plans/PLATFORM-CONVERGENCE.md`](working/plans/PLATFORM-CONVERGENCE.md) | owner + platform | 수렴 계획 — console2 → controlplane (척추 흡수) |  draft (오너 결정 반영 — 2026-06-25) |
+| [`working/plans/PLATFORM-IA-DIRECTION.md`](working/plans/PLATFORM-IA-DIRECTION.md) | owner + platform | 플랫폼 방향성 — 쉽게 정리 |  draft (오너 논의용 — 2026-06-25, 실제 코드 확인 후 정정) |
 | [`working/plans/PROBE-READS-PLAN.md`](working/plans/PROBE-READS-PLAN.md) | coverage | where the probe-read principle still needs applying | 🟢 active |
 | [`working/plans/COVERAGE-MAX-PLAN.md`](working/plans/COVERAGE-MAX-PLAN.md) | coverage | how to drive C3 coverage to its ceiling | ⚪ superseded |
 
