@@ -99,3 +99,46 @@ def simulate_run(
                     sleep(beat)
             emit("lifecycle-end", lifecycle=lid, status="passed")
     emit("run-end", status="done")
+
+
+def _step_kind(step: Mapping[str, Any]) -> str:
+    """Coarse create/delete classification for the synthetic simulate resources, by
+    HTTP method (POST→create, DELETE→delete); a wait/ready step is neither. Simpler
+    than console2's predicate table — it only affects which steps emit a synthetic
+    ``resource-tracked`` / ``-deleted`` in a dry run."""
+    name = (step.get("name") or "").lower()
+    if any(w in name for w in ("wait", "ready", "active")):
+        return "wait"
+    return {"POST": "create", "DELETE": "delete"}.get((step.get("method") or "").upper(), "step")
+
+
+def build_plan(lifecycle_ids: Sequence[str]) -> dict:
+    """Build the simulate inputs for a selection using ENGINE modules only — the same
+    ``dag_planner`` schedule + per-lifecycle step preview console2's ``_plan`` produces,
+    so the control-plane ``local`` executor is self-contained (no console2 import).
+
+    Returns ``{waves, preview, runnable, skipped_disabled, leaf_set}`` — hand
+    ``plan["waves"], plan["preview"]`` straight to :func:`simulate_run`.
+    """
+    from regression.scenarios import dag_planner, validate_dag
+    from regression.scenarios.loader import load_lifecycles
+    deps = validate_dag._load_deps()
+    all_lcs = validate_dag._load_lifecycles()
+    enabled = {lc["id"] for lc in all_lcs if lc.get("enabled")}
+    requested = list(lifecycle_ids or [])
+    runnable = [lid for lid in requested if lid in enabled]
+    # leaf set = the runnable subset of the SELECTION; None (= all enabled) ONLY when
+    # nothing was selected — never plan the whole platform for an all-disabled selection.
+    leaf_set = runnable if requested else None
+    p = dag_planner.plan(leaf_set=leaf_set, deps=deps, lifecycles=all_lcs)
+    lcs, _ = load_lifecycles(with_sources=True)
+    by_id = {lc["id"]: lc for lc in lcs}
+    preview: dict[str, dict] = {}
+    for lid in p.leaf_set:
+        lc = by_id.get(lid, {})
+        steps = [{"name": s.get("name", ""), "method": s.get("method"),
+                  "path": s.get("path"), "kind": _step_kind(s)} for s in lc.get("steps", [])]
+        preview[lid] = {"service": lc.get("service", ""), "heavy": bool(lc.get("heavy")),
+                        "n_steps": len(steps), "steps": steps}
+    return {"waves": p.to_dict()["waves"], "preview": preview, "runnable": runnable,
+            "skipped_disabled": sorted(set(requested) - enabled), "leaf_set": list(p.leaf_set)}

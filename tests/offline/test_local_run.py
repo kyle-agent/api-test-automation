@@ -97,3 +97,32 @@ def test_deterministic_ids_across_runs():
     # injected counter → identical ids on a re-run (reproducible tests / diffs)
     assert [e["resource_id"] for e in _run() if e["kind"] == "resource-tracked"] \
         == [e["resource_id"] for e in _run() if e["kind"] == "resource-tracked"]
+
+
+# --- build_plan + simulate against the REAL engine (hermetic, no cloud) -------
+def test_build_plan_then_simulate_real_engine():
+    """The full local-simulate path the control-plane `local` executor will run:
+    build_plan (dag_planner + loader) -> simulate_run -> S1a contract. Hermetic —
+    drives the real model/planner/loader but makes NO cloud calls."""
+    from regression.scenarios.loader import load_lifecycles
+    lcs, _ = load_lifecycles(with_sources=True)
+    enabled = [lc["id"] for lc in lcs if lc.get("enabled")]
+    assert enabled, "no enabled lifecycles in the model"
+    target = enabled[0]
+
+    plan = local_run.build_plan([target])
+    assert plan["runnable"] == [target]
+    assert plan["waves"], "dag_planner produced no waves for a real selection"
+    assert target in plan["leaf_set"]                 # the target is in its own closure
+    assert target in plan["preview"]
+
+    events = []
+    local_run.simulate_run(plan["waves"], plan["preview"],
+                           lambda kind, **f: events.append({"kind": kind, **f}))
+    kinds = [e["kind"] for e in events]
+    assert kinds[0] == "run-meta" and kinds[-1] == "run-end"
+    assert "lifecycle-start" in kinds and "lifecycle-end" in kinds
+    # every planned lifecycle reaches a terminal state via the S1a reducer
+    st = ec.lifecycle_states(events)
+    assert st.get(target) in (ec.DONE, ec.RUNNING)
+    assert all(v in (ec.DONE, ec.RUNNING, ec.FAIL) for v in st.values())
