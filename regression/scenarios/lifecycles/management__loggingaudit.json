@@ -46,7 +46,7 @@
             "target_resource_types": [],
             "user_total_yn": "Y",
             "target_users": [],
-            "service_watch_yn": "Y",
+            "service_watch_yn": "N",
             "organization_trail_yn": "N",
             "log_verification_yn": "N",
             "tag_create_requests": []
@@ -62,15 +62,17 @@
             "path": "/v1/trails/{trail_id}",
             "service": "loggingaudit"
           },
-          "_note": "Body fixed 2026-06-20: (1) added account_id (REQUIRED per TrailCreateRequestV1dot1 schema in api_docs.json — was causing 400 ValidationError 'Field required'); captured from iam capture-account-id pre-step. (2) changed log_type_total_yn N->Y for consistency (when N, target_log_types must be non-empty per API semantics; Y with empty array is safe). (3) replaced tags->tag_create_requests (correct field name per schema; 'tags' is not a valid TrailCreateRequest field). Source: data/api_docs.json key management/loggingaudit/trailcreaterequestv1dot1 (required fields: account_id, bucket_name, bucket_region, trail_name, trail_save_type). Response envelope $.trail.id confirmed by response_example. Shared test OBS bucket = do-not-delete-apitest (owner-provisioned, do NOT delete)."
+          "_note": "Body fixed 2026-06-25: service_watch_yn changed Y->N (LIVE-VERIFIED 2026-06-25: Y causes 400 'invalid service watch values'; N returns 201). Body fixed 2026-06-20: (1) added account_id (REQUIRED per TrailCreateRequestV1dot1 schema in api_docs.json — was causing 400 ValidationError 'Field required'); captured from iam capture-account-id pre-step. (2) changed log_type_total_yn N->Y for consistency (when N, target_log_types must be non-empty per API semantics; Y with empty array is safe). (3) replaced tags->tag_create_requests (correct field name per schema; 'tags' is not a valid TrailCreateRequest field). Source: data/api_docs.json key management/loggingaudit/trailcreaterequestv1dot1 (required fields: account_id, bucket_name, bucket_region, trail_name, trail_save_type). Response envelope $.trail.id confirmed by response_example. Shared test OBS bucket = do-not-delete-apitest (owner-provisioned, do NOT delete)."
         },
         {
           "name": "show-trail",
           "method": "GET",
           "path": "/v1/trails/{trail_id}",
+          "params": {},
           "expect_status": [200, 400, 403, 404],
           "optional": true,
-          "group": "la-trail"
+          "group": "la-trail",
+          "_note": "params:{} triggers catalog-key recording (engine line 1119: id-bound GETs without params are NOT recorded under catalog key). LIVE-VERIFIED 2026-06-25: GET /v1/trails/{trail_id} returns 200 when trail_id is captured from createtrail."
         },
         {
           "name": "set-trail",
@@ -87,14 +89,14 @@
             "target_resource_types": [],
             "user_total_yn": "Y",
             "target_users": [],
-            "service_watch_yn": "Y",
+            "service_watch_yn": "N",
             "organization_trail_yn": "N",
             "log_verification_yn": "N"
           },
           "expect_status": [200, 202, 400, 403, 404, 409, 422],
           "optional": true,
           "group": "la-trail",
-          "_note": "Body from api_docs.json settrail request_example (2026-06-20). No bucket_name/bucket_region on update (immutable). Fields match the PUT schema: trail_description, trail_save_type, and all yn-flag arrays. log_type_total_yn changed N->Y (consistent with createtrail fix: when N the API may require non-empty target_log_types)."
+          "_note": "Body from api_docs.json settrail request_example (2026-06-20). Fixed 2026-06-25: service_watch_yn changed Y->N (must match createtrail fix — LIVE-VERIFIED 2026-06-25). No bucket_name/bucket_region on update (immutable). Fields match the PUT schema: trail_description, trail_save_type, and all yn-flag arrays. log_type_total_yn changed N->Y (consistent with createtrail fix: when N the API may require non-empty target_log_types)."
         },
         {
           "name": "start-trail",

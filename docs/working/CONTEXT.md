@@ -141,6 +141,16 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
     VPCs (heavy-wave leftovers) were also reclaimed via local-registry ownership;
     one VPC NOT in our registry was left untouched (cross-env shared account — same
     rule that protects the other env's `kyuh.choi+areg1@samsung.com` resources).
+  - **LATEST (2026-06-25, Track A free surgical micro-sweep — branch
+    `claude/tender-babbage-c5y458`):** Fixed `management__loggingaudit.json`
+    (`service_watch_yn: Y→N`, LIVE-VERIFIED 2026-06-25: Y caused 400 "invalid
+    service watch values"; N returns 201); added `params:{}` to `show-trail` step to
+    trigger catalog-key recording (engine line-1119 condition). Re-ran
+    `loggingaudit-trail` lifecycle twice (second run captured showtrail). **+6 new
+    verified endpoints** vs dashboard-740 baseline: createtrail (201), showtrail
+    (200), settrail (202), starttrail (200), stoptrail (200), deletetrail (202).
+    Updated `data/baselines/verified_endpoints.json` via `python -m tools.derive_verified`.
+    New total: **746/1372 verified-2xx (+6)**. VALIDATION-QUEUE row 8 (trail) struck.
   - **What to advance next (2026-06-25 LATE — post combined-heavy-run + verified
     backlog re-audit; supersedes the earlier 2026-06-25 block immediately below):**
     Published state = **740/1372 verified-2xx (C3 66.6%)**, reach_covered 107,

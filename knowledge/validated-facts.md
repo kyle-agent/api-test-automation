@@ -145,6 +145,17 @@ until stable; prior-curated constraints stay intact/UNPROVEN. Path base uses
   and any test that needs a real, pre-existing OBS bucket. Object Storage itself is
   NOT in the tested catalog (no objectstorage service), so this bucket is the only
   way to supply a real bucket ref on the shared account.
+  **LIVE-VERIFIED 2026-06-25 (6 new endpoints confirmed):**
+  - `service_watch_yn` MUST be `"N"` in createtrail body — `"Y"` causes 400 "invalid
+    service watch values" regardless of other fields. Verified 201 with `"N"`. Also
+    apply `"N"` in the settrail body for consistency.
+  - `showtrail` (GET /v1/trails/{trail_id}) step needs `"params": {}` in the lifecycle
+    JSON to trigger catalog-key observation recording (engine line-1119 condition: id-bound
+    GETs without `params` key are recorded only under lifecycle-step key, NOT catalog key).
+  - Full trail lifecycle confirmed 2xx: createtrail(201), showtrail(200), settrail(202),
+    starttrail(200), stoptrail(200), deletetrail(202). Trail teardown via cleanup block.
+  - `downloadlogs` (POST /v1/logs/download) returns 200 without a trail_id (downloads
+    raw activity logs, not trail-archived data); already in dashboard-740.
 - **resourcemanager**: tags ≤50 per resource.
 - **resourcemanager `showresourcebycomponents`** (`GET /v1/resources/{region}/{service}/{resource_type}/{resource_identifier}`) — **LIVE-VERIFIED 200, 2026-06-20.** Component-addressed sibling of `showresource` (which uses a b64 `{srn}`). The 4 path segments are **PLAIN, not base64** (unlike `{srn}`/`{key}`), and the 4th segment is the resource **`id`** — in the `/v1/resources` list response `$.resources[i].resource_identifier` is **null**, so capture `$.resources[i].id`. Returns `$.resource` (singular). Wired into `resourcemanager-tag-lifecycle` (step `show-resource-by-components`); closed the last resourcemanager id-GET reachability gap.
 - **iam resource-policies use the SAME base64-SRN decoder as resourcemanager** (LIVE-CONFIRMED 2026-06-20): `PUT/DELETE /v1/resource-policies/{srn}`, `POST .../statements`, etc. require the `{srn}` path segment base64-encoded — plain SRN -> 400 'SRN decoding error', b64 -> decode succeeds. Wired in `management__iam.json` (iam-resource-policy: list resourcemanager /v1/resources -> capture $.resources[0].srn -> b64_encode -> {iam_srn_b64}). Residual: the policy `Action` must match the target resource's service (a servicewatch SRN rejects `iam:*` with Iam.UnSupportedActionInPolicy).

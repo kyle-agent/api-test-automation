@@ -57,7 +57,7 @@ pull a heavy prereq into the closure.
 | 5 | data-analytics/quick-query | `quick-query-list`, `quick-query-image-versions`, `quick-query-validate` | light | — | no | the 3 read/validate-only QQ nodes (the `quick-query` create itself is gated, see Gated) |
 | 6 | platform/sts | `sts-token` | light | — | no | token issue; no teardown, no cost |
 | 7 | financial-management/budget | `account-budget` | light | — | no | account-scoped budget create |
-| 8 | management/loggingaudit | `trail` | light | — | no | account-scoped trail |
+| ~~8~~ | ~~management/loggingaudit~~ | ~~`trail`~~ | ~~light~~ | ~~—~~ | ~~no~~ | **PROMOTED 2026-06-25** — createtrail/showtrail/settrail/starttrail/stoptrail/deletetrail all 2xx (fix: service_watch_yn N; params:{} on show-trail step). +6 verified. Branch `claude/tender-babbage-c5y458`. |
 | 9 | management/network-logging | `network-logging-storage` | light | — | no | account-scoped |
 | 10 | management/resourcemanager | `resource-group-bulk` | light | — | no | bulk resource-group; reuses existing ids |
 | 11 | management/servicewatch | `sw-metric-catalog`, `alert`, `dashboard`, `sw-custom-metric-meta`, `sw-custom-log-collect` | light | — | no | **deep (5 docs nodes)**; mostly metric/alert/dashboard reads+creates, no heavy infra |
