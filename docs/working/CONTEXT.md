@@ -108,6 +108,42 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **LATEST (2026-06-25 EOD — A/B/C execution session, branch
+  `claude/tender-babbage-c5y458`):** ran the three user-selected tracks live,
+  sequentially (one run at a time, Hard Rule 4). **PUBLISHED → dashboard-data:
+  C3 66.6%→69.5%, verified-2xx 740→746, reach_covered 107→138/138, C2-called 94.2%.**
+  - **Track C (reachability) ✅ +31 → 138/138 (100%).** Live-touched all 6
+    reachability-only services (sqlserver 33 / iam-identity-center 32 /
+    archivestorage 25 / searchengine 22 / vertica 19 / parallel-filestorage 7);
+    each returned a structured 4xx (license/entitlement) = reached. Non-billable
+    (synthetic ids / access-check), 0 resources created. Commit `c30f1022`.
+  - **Track A (free surgical) ✅ +6 verified-2xx (→746).** Real fix:
+    `management__loggingaudit.json` `service_watch_yn` Y→N (was 400) unblocked the
+    6 trail endpoints. Commits `323451c5` (+6) + `97b9af5a` (model provenance
+    131→148 nodes, reconciled to PRE-EXISTING evidence — NOT new live 2xx). The
+    remaining free candidates are now DEEP-WORK, not surgical (sts 404 entitlement,
+    secretvault quota, certmgr/configinspection 400 body, iam-role/quick-query 500
+    ContactAdmin, cm-event-policy needs-running-VM) — verified-2xx is at the
+    practical ceiling for this single non-admin account; +6 matched the low end of
+    the estimate.
+  - **Track B (heavy DB, billable opt-in) ⚠️ +0 new.** Bounded
+    `database-postgresql-cluster` (1 PG cluster, 49.6 min) PASSED but added 0
+    verified (derive_verified 1948 keys unchanged; postgres evidence 86→86). The
+    only potentially-new sub-ops FAILED on the fresh cluster (pg-backup 401
+    AuthNFailed, pg-param 400 "major version invalid"); the rest were already
+    verified in prior heavy runs. **Low-ROI billable CONFIRMED (prior +5 → this +0);
+    don't repeat DB-heavy purely for coverage.** Commit `fe79059b` (count churn).
+  - **Teardown CLEAN — 0 residual.** PG cluster deleted by the lifecycle; reconciler
+    (`SCP_ALLOW_DESTRUCTIVE=true SCP_SWEEP_NOWAIT=true`) then reclaimed the leftover
+    shared VPC + accumulated owner-tagged orphans (secrets/kms-transit/log-group);
+    non-owned resources (keypairs/policies/the 2 stranded SCF/dashboards) correctly
+    skipped (name-mismatch). Live now: VPC 0, kms/transit 0, clusters 0.
+  - **⚠️ Publish gotcha (for next session):** this remote container's
+    `reports/results/` store is ephemeral + gitignored, so the dashboard MUST be
+    built with `prior` = dashboard-data's cumulative `verified_endpoints.json` (740)
+    + `endpoint_status.json` (mirror CI `api-test.yml` ~L1013-1035) or it
+    UNDERCOUNTS — a no-prior local build showed verified-2xx 509 (would have
+    regressed the published 740). Always verify merged ≥ prior before pushing.
 - **LATEST (2026-06-25, hand-driven heavy coverage session — committed DIRECTLY to
   `main` at user request, NOT a feature branch):** three HEAVY live runs landed on
   `main` (origin/main tip `44db7896` at handoff; verify with `git log --oneline -1
