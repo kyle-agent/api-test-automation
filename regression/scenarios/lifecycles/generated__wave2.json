@@ -373,8 +373,41 @@
       "id": "gen-wave2-scf",
       "service": "compute/scf",
       "enabled": true,
-      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred)",
+      "_note": "recomposed after run 27417986669 triage (interface port-only, trigger cron, fs volume_id, private-acl deferred). 2026-06-25: +6 FREE coverage fixes: (1) list-runtimes/sample-codes/check-name-duplication bare-GET steps added (never reached by smoke); (2) list-triggers step with required cloud_function_id query param; (3) logs/metrics steps converted from inline ?time=1h path to params:{time} dict so engine credits the catalog key (engine line 1119: GET step credited only when 'params' key present).",
       "steps": [
+        {
+          "name": "list-runtimes",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/runtimes",
+          "expect_status": [200, 400, 403],
+          "optional": true,
+          "group": "scf-bare-reads",
+          "_note": "bare GET, no path or required query params. NEVER REACHED by smoke (smoke runner does not appear to run standalone SCF bare-GET probes). Covered by explicit step here."
+        },
+        {
+          "name": "list-sample-codes",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/sample-codes",
+          "expect_status": [200, 400, 403],
+          "optional": true,
+          "group": "scf-bare-reads",
+          "_note": "bare GET, no path or required query params. Same rationale as list-runtimes."
+        },
+        {
+          "name": "check-function-name-duplication",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/cloud-functions/check-duplication",
+          "params": {
+            "name": "regrscf{unique}"
+          },
+          "expect_status": [200, 400, 403],
+          "optional": true,
+          "group": "scf-bare-reads",
+          "_note": "name is a REQUIRED query param (api_catalog_params.json). Must supply via params dict (not inline path) so engine records catalog key. Value regrscf{unique} is a non-existent name -> 200 available response expected."
+        },
         {
           "name": "create-scf-function",
           "service": "scf",
@@ -505,25 +538,49 @@
           "name": "verify-scf-function-read-logs",
           "service": "scf",
           "method": "GET",
-          "path": "/v1/cloud-functions/{cloud_function_id}/logs?time=1h",
+          "path": "/v1/cloud-functions/{cloud_function_id}/logs",
+          "params": {
+            "time": "1h"
+          },
           "expect_status": [
             200,
             400
           ],
           "group": "scf-function",
-          "_note": "run 27399448835: 'must select either time or period' — docs엔 전부 optional로 기재된 미문서 필수 (undiscoverable-params 클래스). time 포맷 1h 추정"
+          "_note": "FIXED 2026-06-25: was /logs?time=1h inline path — engine only credits catalog key for GET steps with explicit 'params' dict (engine.py line 1119). Undocumented required param: API returns 400 'must select either time or period' without time/period (run 27399448835)."
         },
         {
           "name": "verify-scf-function-read-metrics",
           "service": "scf",
           "method": "GET",
-          "path": "/v1/cloud-functions/{cloud_function_id}/metrics?time=1h",
+          "path": "/v1/cloud-functions/{cloud_function_id}/metrics",
+          "params": {
+            "time": "1h"
+          },
           "expect_status": [
             200,
             400
           ],
           "group": "scf-function",
-          "_note": "logs와 동일 — time 포맷 미문서"
+          "_note": "FIXED 2026-06-25: same inline-path-to-params fix as logs above."
+        },
+        {
+          "name": "list-triggers",
+          "service": "scf",
+          "method": "GET",
+          "path": "/v1/triggers",
+          "params": {
+            "cloud_function_id": "{cloud_function_id}"
+          },
+          "expect_status": [
+            200,
+            400,
+            403,
+            404
+          ],
+          "optional": true,
+          "group": "scf-function",
+          "_note": "listcloudfunctiontriggers: cloud_function_id is REQUIRED query param (api_catalog_params.json). Needs params dict so: (a) engine credits catalog key, (b) required param is supplied. Must run after create-scf-function so cloud_function_id is captured."
         },
         {
           "name": "create-scf-cronjob-trigger",

@@ -265,28 +265,28 @@
     },
     {
       "service": "scf",
-      "covered": 17,
+      "covered": 23,
       "total": 36,
-      "gap": 19,
+      "gap": 13,
       "heavy": false,
       "blockers": [
-        "soft-param: listcloudfunctiontriggers needs cloud_function_id query (not in smoke defaults).",
-        "hidden-required-param: showcloudfunctionlogs/metrics need time-or-period despite docs marking optional (400 'must select either time or period').",
-        "needs-mutations: showcloudfunctiontrigger + 19 mutating endpoints (covered by enabled lifecycles).",
-        "heavy-prereq: setcloudfunctioncodefile needs Java runtime fn + OBS jar.",
         {
           "key": "approveprivatelinkendpoint+connectprivatelinkendpoint: product-bug-404",
-          "reason": "PUT .../approval and PUT .../connection both return 404 scp-cloud-function.privatelink-endpoint-not-found even with valid endpoint_id from listprivatelinkendpoint (same id works in /request and DELETE). These two SCF endpoints are non-functional - approval/connection must be done via VPC /v1/privatelink-endpoints/{id}/approval and /connection. Confirmed LIVE 2026-06-24.",
+          "reason": "PUT .../approval and PUT .../connection both return 404 scp-cloud-function.privatelink-endpoint-not-found even with valid endpoint_id. Confirmed LIVE 2026-06-24. Also updateprivatelinkservice+deleteprivatelinkendpoint+requestprivatelinkendpoint+createprivatelinkendpoint all 403 in recent runs. These 5 PL endpoints are blocked by SCF-side product bugs / entitlement.",
           "kind": "product-bug"
-        }
+        },
+        "heavy-prereq: setcloudfunctioncodefile needs Java runtime fn + OBS jar.",
+        "listruntimes/listsamplecodes/checkfunctionnameduplication: never reached by smoke (SCF bare-GETs not covered by standalone smoke runner). Fixed by adding explicit steps in gen-wave2-scf (2026-06-25).",
+        "showcloudfunctionlogs/metrics: was 400 due to inline ?time=1h in path not triggering catalog-key credit. Fixed by switching to params dict in gen-wave2-scf (2026-06-25).",
+        "listcloudfunctiontriggers: was never reached because cloud_function_id required query param not supplied. Fixed by adding list-triggers step with params in gen-wave2-scf (2026-06-25)."
       ],
       "next_levers": [
-        "MUTATIONS+DESTRUCTIVE: 4 SCF lifecycles cover all 36 (gen-wave2-scf id-GETs with time=1h)",
-        "Add 'time' to read_chains shared query values to fix logs/metrics read-only",
-        "approveprivatelinkendpoint/connectprivatelinkendpoint: product bug - needs backend fix"
+        "DONE 2026-06-25 (offline edits): +6 new endpoints in gen-wave2-scf: listruntimes, listsamplecodes, checkfunctionnameduplication (bare GETs), showcloudfunctionlogs (params fix), showcloudfunctionmetrics (params fix), listcloudfunctiontriggers (params fix). Ceiling 29/36 after next run.",
+        "approveprivatelinkendpoint/connectprivatelinkendpoint: product bugs confirmed - needs backend fix.",
+        "setcloudfunctioncodefile: needs Java runtime fn + OBS jar (heavy prereq)."
       ],
-      "notes": "HEAVY PL run 2026-06-24: +4 new SCF PL endpoints (updateprivatelinkservice 202, showprivatelinkservice 200, listprivatelinkendpoint 200, createprivatelinkendpoint 200, requestprivatelinkendpoint 200, deleteprivatelinkendpoint 204 -> 17 total). Key findings: (1) PL endpoint response key is endpoint_id (not id); list key is privatelink_endpoints (not endpoints). (2) PL service stuck in CREATING for >40min - cannot disable until ACTIVE (400 invalid state). (3) createprivatelinkendpoint body: {endpoint: {alias, service_id}}. (4) SCF approve/connect are product bugs (404 with valid IDs). (5) SCF fn must be READY (not DEPLOYING) to create PLE. Previous: 13/36 (2026-06-23, prior 16 was mutation-run count).",
-      "updated": "2026-06-24T10:00:00Z",
+      "notes": "LEDGER UPDATED 2026-06-25: live observations show 23 covered (ledger was stale at 17). OFFLINE EDITS 2026-06-25: gen-wave2-scf updated with 6 FREE coverage fixes. (1) list-runtimes/sample-codes/check-name-duplication added as explicit steps (never reached by smoke runner). (2) logs/metrics steps converted from inline ?time=1h path to params:{time:1h} dict (engine.py line 1119: GET step only credited under catalog key when params dict present). (3) list-triggers step added with params:{cloud_function_id} (required query param). Expected ceiling after next run: 29/36 (23 already + 6 new). PL-family blockers: approveprivatelinkendpoint+connectprivatelinkendpoint 404 product bugs; updateprivatelinkservice/delete/request/create 403. HEAVY PL run 2026-06-24: +4 new SCF PL endpoints. Previous: 17/36 (2026-06-24).",
+      "updated": "2026-06-25T00:00:00Z",
       "stranded_resources": [
         "9e231b01e2394d7aaa8dcca218e770cb",
         "3aac2e34203a42cab56b089336bbd18d"
@@ -362,18 +362,22 @@
     },
     {
       "service": "postgresql",
-      "covered": 0,
+      "covered": 21,
       "total": 47,
-      "gap": 47,
+      "gap": 26,
       "heavy": true,
       "blockers": [
-        "product-bug-5xx: createcluster 500 ContactAdmin (other 4 engines create fine w/ identical body -> backend fault, baselined)"
+        "product-bug-5xx: createcluster 500 ContactAdmin (other 4 engines create fine w/ identical body -> backend fault, baselined). Blocks all cluster sub-op writes.",
+        "cluster-sub-op-writes: 22 writes (restart/stop/start/replica/restore/patch/etc.) are all 400/401 because no live cluster exists (createcluster 500 blocks provisioning).",
+        "listclusters/listengineversions/listservertypes/listparametergroups/listparameters: never reached in prior runs (bare GETs, no cluster needed). Fixed by adding explicit steps to postgresql-read-coverage (2026-06-25)."
       ],
       "next_levers": [
-        "postgresql sub-op id-GETs blocked until createcluster 500 is fixed upstream"
+        "DONE 2026-06-25 (offline edits): postgresql-read-coverage updated with list-server-types + list-parameter-groups -> capture dbaas_parameter_group_id -> list-parameters (params dict). Also added dbaas_parameter_group_id to probe_reads seed. Expected +2 new 2xx on next run (listparametergroups + listparameters). listservertypes also newly explicit.",
+        "postgresql sub-op id-GETs blocked until createcluster 500 is fixed upstream (Tier-4 backend bug).",
+        "When createcluster backend bug fixed: postgresql-cluster-subops-guarded covers remaining ~22 writes."
       ],
-      "notes": "postgresql createcluster 500s (PF, baselined); the 4 other engines covered their sub-ops this run.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "LEDGER UPDATED 2026-06-25: live observations show 21 covered (ledger was stale at 0 — run since ledger was written). OFFLINE EDITS 2026-06-25: postgresql-read-coverage lifecycle updated to add 3 account-level bare-GET steps (list-server-types, list-parameter-groups, list-parameters) and seed dbaas_parameter_group_id into probe_reads. The list-parameter-groups -> list-parameters chain mirrors the proven cachestore pattern (same /v1/parameter-groups + /v1/parameters?dbaas_parameter_group_id endpoints, validated 2026-06-24). Expected: postgresqllistparametergroups + postgresqllistparameters 2xx on next run (+2), postgresqllistservertypes also now explicit. createcluster 500 PF baselined in known_issues.json. Previous: 0/47 (stale ledger, 2026-06-24).",
+      "updated": "2026-06-25T00:00:00Z"
     },
     {
       "service": "scr",

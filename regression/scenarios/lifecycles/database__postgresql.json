@@ -771,7 +771,7 @@
       "service": "database/postgresql",
       "enabled": true,
       "heavy": false,
-      "_note": "COVERAGE-ONLY read lifecycle for postgresql id-bound GETs. Soft-captures an existing cluster_id (from /v1/clusters) and dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY postgresql catalog GET whose path params are satisfied (replicas via cluster_id, engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected).",
+      "_note": "COVERAGE-ONLY read lifecycle for postgresql id-bound GETs. Soft-captures an existing cluster_id (from /v1/clusters) and dbaas_engine_version_id (from /v1/engine-versions), then a probe_reads step exercises EVERY postgresql catalog GET whose path params are satisfied (replicas via cluster_id, engine-version properties via dbaas_engine_version_id, requests via a literal placeholder request_id) so each id-bound GET is CALLED and RECORDED under its own catalog key (a 4xx counts as covered). 100% read-only: every step optional + grouped, broad expect_status. requests/{request_id} is KNOWN-HARD: request_id is returned only by async ops and is not listable, so a literal placeholder id is used purely so the endpoint is reached (4xx expected). 2026-06-25: added list-server-types, list-parameter-groups -> list-parameters chain (account-level reads, no cluster needed). dbaas_parameter_group_id is REQUIRED query for listparameters; uses explicit params dict so engine credits catalog key.",
       "steps": [
         {
           "name": "list-clusters",
@@ -804,6 +804,53 @@
           }
         },
         {
+          "name": "list-server-types",
+          "method": "GET",
+          "path": "/v1/server-types",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov",
+          "_note": "postgresqllistservertypes: bare GET, no path or required query params. Never reached by prior runs. Explicit step ensures catalog key is credited."
+        },
+        {
+          "name": "list-parameter-groups",
+          "method": "GET",
+          "path": "/v1/parameter-groups",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov",
+          "capture_soft": {
+            "dbaas_parameter_group_id": "$.contents[0].id"
+          },
+          "_note": "postgresqllistparametergroups: account-level read, no cluster needed. Captures dbaas_parameter_group_id for the list-parameters step. Path/response shape identical to cachestore (proven 2026-06-24: ParameterGroupListResponse $.contents[])."
+        },
+        {
+          "name": "list-parameters",
+          "method": "GET",
+          "path": "/v1/parameters",
+          "params": {
+            "dbaas_parameter_group_id": "{dbaas_parameter_group_id}",
+            "size": 20,
+            "page": 0
+          },
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "group": "read-cov",
+          "_note": "postgresqllistparameters: dbaas_parameter_group_id is REQUIRED query param (api_catalog_params.json). params dict required so engine credits catalog key (engine.py line 1119). If list-parameter-groups returned empty, dbaas_parameter_group_id stays literal -> 400/404 (still records). Proven path via cachestore (same /v1/parameters endpoint, same required param name, 2026-06-24)."
+        },
+        {
           "name": "get-cluster-replicas",
           "method": "GET",
           "path": "/v1/clusters/{cluster_id}/replicas",
@@ -832,6 +879,7 @@
           "probe_reads": {
             "cluster_id": "{cluster_id}",
             "dbaas_engine_version_id": "{dbaas_engine_version_id}",
+            "dbaas_parameter_group_id": "{dbaas_parameter_group_id}",
             "request_id": "00000000-0000-0000-0000-000000000000"
           }
         }
