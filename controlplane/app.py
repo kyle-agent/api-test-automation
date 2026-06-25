@@ -738,6 +738,17 @@ def api_local_lifecycles():
     return {"lifecycles": out}
 
 
+@app.get("/api/local/plan")
+def api_local_plan(lifecycle_ids: str = ""):
+    """The dag_planner plan (waves = creation-order levels) for a selection, so the
+    Local Run screen can draw the level DAG and color it by live run state."""
+    from regression.scenarios import local_run
+    ids = [s for s in lifecycle_ids.split(",") if s]
+    if not ids:
+        return {"waves": [], "runnable": [], "leaf_set": []}
+    return local_run.build_plan(ids)
+
+
 @app.get("/local-run")
 def local_run_page(request: Request):
     """Local Run screen (S3) — pick a selection → run simulate/live in-process →
