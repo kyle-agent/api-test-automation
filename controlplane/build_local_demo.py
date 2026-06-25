@@ -41,6 +41,7 @@ MOCK_JS = r"""
   window.fetch = function (url, opts) {
     url = "" + url;
     if (url.indexOf("/api/local/lifecycles") >= 0) return ok({ lifecycles: D.lifecycles || [] });
+    if (url.indexOf("/api/local/graph") >= 0) return ok(D.graph || { nodes: [], edges: [], node_lifecycle: {} });
     if (url.indexOf("/api/local/plan") >= 0) return ok(D.plan || { waves: [] });
     if (url.indexOf("/api/local/run") >= 0 && opts && opts.method === "POST")
       return ok({ ok: true, run: { id: "demo-run", mode: "simulate", status: "running" } });
@@ -73,8 +74,18 @@ def bake() -> dict:
                            lambda k, **f: raw.append({"kind": k, **f}), step_delay=0.12)
     norm = [e for ev in raw for e in events_contract.normalize(ev, "console")]
     states = events_contract.lifecycle_states(norm)
-    return {"lifecycles": lifecycles, "plan": plan, "events": norm,
-            "states": states, "sel": [s for s in DEMO_SEL if s in plan["runnable"]]}
+    # composition DAG (scene renderer) + node->lifecycle, same as /api/local/graph
+    from regression.scenarios import composer
+    model = composer.load_model()
+    sel = set(DEMO_SEL)
+    targets = sorted(nid for nid, task in model.items()
+                     if ((task.get("source") or {}).get("lifecycle")) in sel)
+    graph = composer.graph_view(targets, model=model) if targets else {"nodes": [], "edges": []}
+    graph["node_lifecycle"] = {
+        n["id"]: (((model.get(n["id"]) or {}).get("source") or {}).get("lifecycle") or "")
+        for n in graph.get("nodes", [])}
+    return {"lifecycles": lifecycles, "plan": plan, "events": norm, "states": states,
+            "graph": graph, "sel": [s for s in DEMO_SEL if s in plan["runnable"]]}
 
 
 def build() -> Path:
@@ -90,6 +101,11 @@ def build() -> Path:
         '실행은 모의) — 실제 실행은 control plane 호스트에서</div>\n')
     # mock-api must monkeypatch fetch BEFORE the page script runs -> inject in <head>.
     html = html.replace("</head>", inject + "</head>", 1)
+    # inline the scene renderer (the absolute "/resource_graph.js" src won't resolve
+    # under the Pages sub-path) so the demo is fully self-contained.
+    rgjs = (ROOT / "controlplane" / "static" / "resource_graph.js").read_text(encoding="utf-8")
+    html = html.replace('<script src="/resource_graph.js"></script>',
+                        "<script>/* inlined resource_graph.js */\n" + rgjs + "</script>", 1)
     (OUT / "index.html").write_text(html, encoding="utf-8")
     (OUT / "README.md").write_text(
         "# Local Run — static demo\n\nBackend-free snapshot built by "
