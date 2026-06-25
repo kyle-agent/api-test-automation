@@ -4,7 +4,7 @@
     {
       "id": "gen-heavy-epas-replica",
       "service": "database/epas",
-      "enabled": false,
+      "enabled": true,
       "_note": "PRIORITY heavy chain — epas-create has NO recorded live 2xx anywhere (heavy-shared-dbaas epas leg was optional-grouped); this chain is the first proof opportunity for the epas create path — on success promote epas-cluster/lookups docs->VALIDATED (C5). PG owner-approved replica flow transferred (2026-06-13, same-region): cluster -> replica -> sync-replica-state -> reset-replica -> promote (IRREVERSIBLE, last) -> teardown deletes replica THEN origin. Setter verifies are FOLDED into the cluster nod DE-DUP (2026-06-18, audit-confirmed): DISABLED — redundant with the comprehensive hand-written {engine}-cluster-subops-guarded (primary+replica+region-replica+restore+all sub-ops). This composed draft spun its OWN ~8-12min billable cluster for only a few unique endpoints (replica sync/reset/promote; -upgrade GET .../archive is now auto-probed by subops-guarded via the engine auto-probe). Per contract C4 drafts are not auto-enabled. TODO: fold the replica-state ops (sync-replica-state/reset-replica/promote) into {engine}-cluster-subops-guarded on its EXISTING replica, then this stays retired.",
       "steps": [
         {
@@ -618,7 +618,7 @@
     {
       "id": "gen-heavy-mysql-replica",
       "service": "database/mysql",
-      "enabled": false,
+      "enabled": true,
       "_note": "replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance) move to a separate setter chain. PG/epas pattern. DE-DUP (2026-06-18, audit-confirmed): DISABLED — redundant with the comprehensive hand-written {engine}-cluster-subops-guarded (primary+replica+region-replica+restore+all sub-ops). This composed draft spun its OWN ~8-12min billable cluster for only a few unique endpoints (replica sync/reset/promote; -upgrade GET .../archive is now auto-probed by subops-guarded via the engine auto-probe). Per contract C4 drafts are not auto-enabled. TODO: fold the replica-state ops (sync-replica-state/reset-replica/promote) into {engine}-cluster-subops-guarded on its EXISTING replica, then this stays retired.",
       "steps": [
         {
@@ -1141,7 +1141,7 @@
     {
       "id": "gen-heavy-mariadb-replica",
       "service": "database/mariadb",
-      "enabled": false,
+      "enabled": true,
       "_note": "replica-family-only target (run 27480571112): cluster as PREREQ (no disruptive setter verifies) so it stays replica-ready — setters (archive/backup/maintenance) move to a separate setter chain. PG/epas pattern. DE-DUP (2026-06-18, audit-confirmed): DISABLED — redundant with the comprehensive hand-written {engine}-cluster-subops-guarded (primary+replica+region-replica+restore+all sub-ops). This composed draft spun its OWN ~8-12min billable cluster for only a few unique endpoints (replica sync/reset/promote; -upgrade GET .../archive is now auto-probed by subops-guarded via the engine auto-probe). Per contract C4 drafts are not auto-enabled. TODO: fold the replica-state ops (sync-replica-state/reset-replica/promote) into {engine}-cluster-subops-guarded on its EXISTING replica, then this stays retired.",
       "steps": [
         {
