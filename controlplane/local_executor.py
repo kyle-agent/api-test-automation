@@ -30,7 +30,7 @@ _LOCK = threading.Lock()
 _SEQ = itertools.count(1)        # disambiguates ids when two runs start in the same ms
 
 _PUBLIC_KEYS = ("id", "mode", "status", "lifecycle_ids", "runnable",
-                "started", "ended", "error")
+                "started", "ended", "error", "rc", "gates")
 
 
 def _append(evpath: str, evkind: str, **fields) -> None:
@@ -80,6 +80,46 @@ def start_simulate(lifecycle_ids, *, step_delay: float = 0.0, sleep=None) -> dic
                 _append(evp, "run-end", status="error", error=str(exc))
             except Exception:
                 pass
+            with _LOCK:
+                rec["status"], rec["ended"], rec["error"] = "error", time.time(), str(exc)
+
+    t = threading.Thread(target=_worker, daemon=True)
+    rec["_thread"] = t
+    t.start()
+    return _public(rec)
+
+
+def start_live(lifecycle_ids, *, mutations: bool = True, destructive: bool = True,
+               heavy: bool = False, parallel=None) -> dict:
+    """Start a LIVE run in a daemon thread — REAL cloud calls (needs SCP creds + egress).
+    Runs ``regression.scenarios.local_run.live_run`` (provision→pytest→teardown); the
+    engine streams the SAME fine console-events to the per-run file, so the live DAG
+    view is identical to simulate. Gates are EXPLICIT (caller opt-in); ``heavy`` stays
+    off unless the caller sets it (Hard Rule 1). The raw pytest log goes to a sibling
+    ``.log``. Returns the run record immediately; poll :func:`read_events`."""
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    run_id = "local-%d-%d" % (int(time.time() * 1000), next(_SEQ))
+    evp = str(RUN_DIR / f"{run_id}.jsonl")
+    logp = str(RUN_DIR / f"{run_id}.log")
+    open(evp, "w").close()
+    rec = {"id": run_id, "mode": "live", "status": "running",
+           "lifecycle_ids": list(lifecycle_ids), "runnable": list(lifecycle_ids),
+           "events_path": evp, "log_path": logp, "rc": None,
+           "gates": {"mutations": mutations, "destructive": destructive, "heavy": heavy},
+           "started": time.time(), "ended": None, "error": None}
+    with _LOCK:
+        _RUNS[run_id] = rec
+
+    def _worker():
+        try:
+            res = local_run.live_run(lifecycle_ids, evp, logp, mutations=mutations,
+                                     destructive=destructive, heavy=heavy, parallel=parallel)
+            with _LOCK:
+                rec["rc"] = res.get("rc")
+                rec["runner_missing"] = res.get("runner_missing")
+                rec["status"] = "done" if res.get("rc") == 0 else "fail"
+                rec["ended"] = time.time()
+        except Exception as exc:                          # surface; never crash the host
             with _LOCK:
                 rec["status"], rec["ended"], rec["error"] = "error", time.time(), str(exc)
 

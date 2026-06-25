@@ -695,13 +695,21 @@ async def api_local_run(request: Request):
     ids = payload.get("lifecycle_ids") or []
     if not ids:
         raise HTTPException(400, "lifecycle_ids required")
-    try:
-        step_delay = float(payload.get("step_delay", 0) or 0)
-    except (TypeError, ValueError):
-        step_delay = 0.0
-    rec = local_executor.start_simulate(ids, step_delay=step_delay)
+    mode = (payload.get("mode") or "simulate").lower()
+    if mode == "live":
+        # LIVE = real cloud calls. Gates are explicit opt-ins; heavy defaults OFF.
+        rec = local_executor.start_live(
+            ids, mutations=bool(payload.get("mutations", True)),
+            destructive=bool(payload.get("destructive", True)),
+            heavy=bool(payload.get("heavy", False)))
+    else:
+        try:
+            step_delay = float(payload.get("step_delay", 0) or 0)
+        except (TypeError, ValueError):
+            step_delay = 0.0
+        rec = local_executor.start_simulate(ids, step_delay=step_delay)
     # surface in the run list too (gh_run_id = the local run id)
-    db.create_run("(local simulate)", "", trigger="local", gh_run_id=rec["id"],
+    db.create_run(f"(local {mode})", "", trigger="local", gh_run_id=rec["id"],
                   detail="lifecycle_ids=" + ",".join(map(str, ids)))
     return {"ok": True, "run": rec}
 

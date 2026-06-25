@@ -22,7 +22,14 @@ The **live** pipeline (provision→pytest→teardown) is the next slice; it stay
 from __future__ import annotations
 
 import itertools
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Sequence
+
+_ROOT = Path(__file__).resolve().parents[2]      # repo root (regression/scenarios/..)
 
 
 def resource_type(path: str) -> str:
@@ -142,3 +149,104 @@ def build_plan(lifecycle_ids: Sequence[str]) -> dict:
                         "n_steps": len(steps), "steps": steps}
     return {"waves": p.to_dict()["waves"], "preview": preview, "runnable": runnable,
             "skipped_disabled": sorted(set(requested) - enabled), "leaf_set": list(p.leaf_set)}
+
+
+# --------------------------------------------------------------------------- #
+# live pipeline — the REAL run path (provision shared VPC -> pytest tests/crud ->
+# precise teardown). Extracted from console2_server._run_worker so the control-plane
+# `local` executor doesn't import the console2 dev server. Safety gates are EXPLICIT
+# args (the caller's opt-in) — never defaulted on "to make a test pass" (Hard Rule 1).
+# The engine emits fine console-events to events_path during pytest, so the live view
+# is identical to simulate. Needs SCP creds + egress (real cloud calls).
+# --------------------------------------------------------------------------- #
+def provision_shared(env: dict, f) -> dict:
+    """Provision ONE session-shared VPC+subnet so adopter lifecycles don't skip under
+    ``-n``. Best-effort: on failure adopters self-skip and self-creators still run.
+    ``f`` is the run's open log file. Returns the ``SCP_SHARED_*`` env to merge into
+    the pytest env."""
+    f.write("\n=== provision shared VPC (adopters need this under -n) ===\n")
+    f.flush()
+    out = subprocess.run([sys.executable, "-m", "regression.scenarios.shared_infra", "--provision"],
+                         cwd=str(_ROOT), env=env, stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT, text=True)
+    f.write(out.stdout or "")
+    shared: dict = {}
+    for line in (out.stdout or "").splitlines():
+        if line.startswith("SCP_SHARED_") and "=" in line:
+            k, _, v = line.partition("=")
+            if v.strip():
+                shared[k.strip()] = v.strip()
+    if shared.get("SCP_SHARED_VPC_ID"):
+        shared["SCP_VPC_SHARED_RESERVED"] = "1"
+        f.write(f"\n[provision] shared VPC ready: {shared['SCP_SHARED_VPC_ID']}\n")
+    else:
+        f.write("\n[provision] no shared VPC id — adopters will skip (self-creators still run)\n")
+    f.flush()
+    return shared
+
+
+def teardown_shared(env: dict, shared: dict, f) -> None:
+    """Delete the session shared VPC precisely by id (no name-guessing — Hard Rule 3)."""
+    if not shared.get("SCP_SHARED_VPC_ID"):
+        return
+    f.write("\n=== teardown shared VPC (precise, by id) ===\n")
+    f.flush()
+    subprocess.run([sys.executable, "-m", "regression.scenarios.shared_infra", "--teardown"],
+                   cwd=str(_ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT)
+
+
+def pytest_did_not_run(rc: int, pytest_out: str) -> bool:
+    """True when the pytest runner itself never executed (e.g. pytest not installed) —
+    so there are no results to trust AND nothing was created (skip teardown/sweep)."""
+    low = (pytest_out or "").lower()
+    if "no module named pytest" in low or "no module named 'pytest'" in low:
+        return True
+    has_outcome = bool(re.search(r"\d+\s+(passed|failed|skipped|error|xfailed|deselected)",
+                                 pytest_out or ""))
+    return rc in (3, 4) and not has_outcome
+
+
+def live_run(lifecycle_ids, events_path: str, log_path: str, *, mutations: bool,
+             destructive: bool, heavy: bool, parallel: int | None = None) -> dict:
+    """REAL run: provision shared VPC (heavy only) → ``pytest tests/crud -m crud`` with
+    ``SCP_CRUD_IDS`` + ``SCP_CONSOLE_EVENTS`` + the EXPLICIT safety gates → precise
+    teardown. Per-run cleanup is teardown-scoped (the lifecycle deletes what it created);
+    the account-wide reconciler sweep stays the manual 강제 클린업 (it can't scope to one
+    run). Returns ``{rc, runner_missing}``; everything else surfaces in ``log_path``."""
+    ids = list(lifecycle_ids)
+    env = {**os.environ, "PYTHONPATH": str(_ROOT),
+           "SCP_CRUD_IDS": ",".join(ids), "SCP_CONSOLE_EVENTS": events_path,
+           "SCP_ALLOW_MUTATIONS": "true" if mutations else "false",
+           "SCP_ALLOW_DESTRUCTIVE": "true" if destructive else "false",
+           "SCP_RUN_HEAVY": "true" if heavy else "false"}
+    n = str(parallel or max(1, min(6, len(ids) or 2)))
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write(f"# local live run  lifecycle_ids={ids}\n"
+                f"# gates: mutations={mutations} destructive={destructive} heavy={heavy}  parallel={n}\n")
+        f.flush()
+        shared = provision_shared(env, f) if heavy else {}
+        f.write("\n=== pytest ===\n")
+        f.flush()
+        pos = f.tell()
+        rc = subprocess.run(
+            [sys.executable, "-m", "pytest", "tests/crud", "-m", "crud",
+             "-n", n, "-o", "addopts=", "-q"],
+            cwd=str(_ROOT), env={**env, **shared}, stdout=f, stderr=subprocess.STDOUT).returncode
+        f.flush()
+        try:
+            with open(log_path, encoding="utf-8") as rf:
+                rf.seek(pos)
+                pytest_out = rf.read()
+        except Exception:
+            pytest_out = ""
+        runner_missing = pytest_did_not_run(rc, pytest_out)
+        if runner_missing:
+            f.write("\n⚠ pytest runner missing — no tests ran; skipping teardown/sweep "
+                    "(nothing was created).\n")
+        else:
+            teardown_shared(env, shared, f)
+            f.write("\n=== per-run cleanup: teardown-scoped ===\n"
+                    "  this run's resources were deleted by the lifecycle teardown above.\n"
+                    "  account-wide reaping = the manual 강제 클린업 (POST /api/cleanup).\n")
+        f.flush()
+    return {"rc": rc, "runner_missing": runner_missing}
