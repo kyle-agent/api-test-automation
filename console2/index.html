@@ -12,7 +12,11 @@
      Test Planning | Test Execution sub-tabs. -->
 <script>if(new URLSearchParams(location.search).has('embed'))document.documentElement.classList.add('embed');</script>
 <style>html.embed .top>div:first-child,html.embed .top>nav.nav{display:none}
-html.embed .top{justify-content:center;padding:7px 22px;min-height:0}</style>
+html.embed .top{justify-content:center;padding:7px 22px;min-height:0}
+/* embedded full-bleed: use the whole width + keep the left-selection | right-DAG
+   2-column (build = Test Planning, run = Test Execution) even if it must be wide. */
+html.embed .wrap{max-width:none}
+html.embed .cols.build,html.embed .cols.run{grid-template-columns:320px minmax(0,1fr)!important}</style>
 </head>
 <body>
 <div class="wrap">

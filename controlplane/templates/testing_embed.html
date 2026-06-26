@@ -5,6 +5,10 @@
    here inside the spine's nav shell so the 4-stage nav stays put. ?embed=1 hides
    console2's own brand/external-nav but keeps its 구성|실행 toggle. The iframe is
    sized to fill the viewport below the nav (JS, robust to header height). #}
+<style>/* Testing is full-bleed: break base.html's 1180px main cap so console2's
+   left-selection | right-DAG (.cols.build) stays 2-column instead of collapsing
+   (its single-column @media kicks in at ≤1180px). */
+  main{max-width:none!important;padding:0!important}</style>
 <iframe id="tcon" src="/testing/console/?embed=1" title="Testing 실행 콘솔"
         style="width:100%;border:0;display:block"></iframe>
 <script>
