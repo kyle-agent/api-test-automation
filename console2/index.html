@@ -11,8 +11,11 @@
      external nav (the spine supplies those), KEEP the ①구성/②실행 toggle = the
      Test Planning | Test Execution sub-tabs. -->
 <script>if(new URLSearchParams(location.search).has('embed'))document.documentElement.classList.add('embed');</script>
-<style>html.embed .top>div:first-child,html.embed .top>nav.nav{display:none}
-html.embed .top{justify-content:center;padding:7px 22px;min-height:0}
+<style>/* hide console2's brand + the redundant external links (📊 대시보드 lives in the
+   spine nav now; resource model is just a label) — but KEEP 🌐 런타임 뷰 (no spine
+   equivalent: live account topology). */
+html.embed .top>div:first-child,html.embed #dashLink,html.embed #modelLink{display:none}
+html.embed .top{justify-content:space-between;padding:7px 22px;min-height:0}
 /* embedded full-bleed: use the whole width + keep the left-selection | right-DAG
    2-column (build = Test Planning, run = Test Execution) even if it must be wide. */
 html.embed .wrap{max-width:none}

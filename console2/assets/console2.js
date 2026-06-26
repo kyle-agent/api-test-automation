@@ -175,7 +175,7 @@ function wireNav() {
   const rl = $("runtimeLink");
   if (rl) rl.onclick = (e) => {
     e.preventDefault();
-    const url = window.__C2_STATIC__ ? "runtime.html" : "runtime";
+    const url = window.__C2_STATIC__ ? "runtime.html" : "/runtime";
     window.open(url, "scp-runtime", "width=1320,height=900,scrollbars=yes,resizable=yes");
   };
 }

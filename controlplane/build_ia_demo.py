@@ -139,7 +139,7 @@ def _nav_rewrite(html: str) -> str:
         ('class="brand" href="/"', 'class="brand" href="index.html"'),
         # --- links with no offline target -> '#' (kept clickable, no 404) ---
         ('href="/knowledge"', 'href="#"'),
-        ('href="/dashboard/index.html"', 'href="#"'),
+        ('href="/dashboard/index.html"', 'href="../"'),  # demo: 면② public dashboard = Pages root
         # --- Plan stepper sub-nav (_plan_steps.html, modeling page) ---
         ('href="/planning?step=catalog"', 'href="index.html"'),
         ('href="/planning?step=model"', 'href="modeling.html"'),
