@@ -133,7 +133,7 @@ def _nav_rewrite(html: str) -> str:
     repl = [
         # --- the 4-stage nav + brand (base.html) ---
         ('href="/planning/resources/map"', 'href="modeling.html"'),
-        ('href="/testing/embed"', 'href="testing/index.html"'),
+        ('href="/testing/embed"', 'href="testing.html"'),
         ('href="/reporting/coverage"', 'href="reporting.html"'),
         ('href="/catalog"', 'href="index.html"'),
         ('class="brand" href="/"', 'class="brand" href="index.html"'),
@@ -244,6 +244,20 @@ def _build_testing() -> None:
         idx.write_text(html, encoding="utf-8")
 
 
+def _build_testing_shell(c, *, htmx: bool) -> None:
+    """③ Testing — the embed SHELL (base.html nav + an iframe of the console2 bundle),
+    so the demo's Testing keeps the 4-stage nav instead of jumping to raw console2.
+    Mirrors the live ``/testing/embed`` page; the iframe is repointed at the static
+    ``testing/`` bundle with ``?embed=1`` (console2 hides its own brand/nav and shows
+    the Test Planning | Test Execution toggle). Build AFTER ``_build_testing``."""
+    html = c.get("/testing/embed").text
+    html = html.replace('src="/testing/console/?embed=1"', 'src="testing/index.html?embed=1"')
+    html = _vendor_htmx(html, available=htmx)
+    html = _nav_rewrite(html)
+    html = _inject_banner(html)
+    (OUT / "testing.html").write_text(html, encoding="utf-8")
+
+
 def _write_readme() -> None:
     files = sorted(str(p.relative_to(OUT)) for p in OUT.rglob("*") if p.is_file())
     (OUT / "README.md").write_text(
@@ -263,8 +277,9 @@ def _write_readme() -> None:
         "- **Modeling** (`modeling.html`): fetches `modeling.map.json`, draws the "
         "DAG via `resource_graph.js`. (Node-click opens the edit form, which has "
         "no offline page — graph focus still works.)\n"
-        "- **Testing** (`testing/`): the console2 static bundle "
-        "(`console2/build_static.py`), which keeps its own chrome.\n"
+        "- **Testing** (`testing.html`): the console2 bundle (`testing/`) embedded in "
+        "the spine shell via an iframe (`?embed=1`), so the 4-stage nav stays put and "
+        "the toggle reads Test Planning | Test Execution.\n"
         "- **Reporting** (`reporting.html`): fetches `reporting.map.json`, same "
         "shared renderer.\n\n"
         "## Publish\n"
@@ -289,6 +304,7 @@ def build() -> Path:
     _build_reporting(c, htmx=htmx)
     _build_renderer(c)
     _build_testing()
+    _build_testing_shell(c, htmx=htmx)
     _write_readme()
     return OUT
 

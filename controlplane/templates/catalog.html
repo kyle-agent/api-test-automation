@@ -3,11 +3,11 @@
 {% block content %}
 
 <section>
-  <h2>Catalog › API 인벤토리 (① 재료)
+  <h2>Catalog › API 인벤토리
     <span class="hint">읽기 전용 — 그래프 이전의 전체 목록</span></h2>
   <p class="muted">Samsung Cloud Platform Open API 전체 엔드포인트
     <b>{{ total }}</b>개를 카테고리 ▸ 서비스로 묶어 보여줍니다. 각 행은
-    <code>METHOD path</code>. 서비스 헤더의 <b>레시피 편집</b> 링크로
+    <code>METHOD path</code>. 서비스 헤더의 <b>정의 편집</b> 링크로
     Modeling 노드 에디터로 바로 이동합니다 (자원 모델로 매핑된 서비스는
     그 노드, 아니면 service 프리필).</p>
   <div class="cards">
@@ -47,7 +47,7 @@
       {% if svc.modeled %}<span class="chip s-verified">modeled</span>{% endif %}
       <span class="muted small">({{ svc.count }})</span>
       <a href="{{ svc.recipe }}" style="margin-left:auto;font-weight:600"
-         title="Modeling 노드 에디터로 이동{% if svc.node_id %} (노드: {{ svc.node_id }}){% endif %}">✏️ 레시피 편집 →</a>
+         title="Modeling 노드 에디터로 이동{% if svc.node_id %} (노드: {{ svc.node_id }}){% endif %}">✏️ 정의 편집 →</a>
     </div>
     <table>
       <tr><th style="width:90px">method</th><th>path</th><th style="width:230px">name</th></tr>
