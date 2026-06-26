@@ -468,6 +468,13 @@ def testing(request: Request, suite: str = "", service: str = "",
                    preview=_run_preview_data(), prefill=prefill)
 
 
+@app.get("/testing/embed", response_class=HTMLResponse)
+def testing_embed(request: Request):
+    """Testing(③) inside the spine shell — base.html nav + console2 (absorbed) in an
+    iframe with its own brand/nav suppressed (?embed=1). Keeps the 4-stage nav put."""
+    return _render(request, "testing_embed.html", "testing")
+
+
 @app.get("/partials/runs", response_class=HTMLResponse)
 def runs_partial(request: Request, limit: int = 15):
     return templates.TemplateResponse(request, "_runs_table.html",

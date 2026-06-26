@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Testing — 실행 콘솔{% endblock %}
+{% block content %}
+{# Testing(③) = console2 absorbed, served whole at /testing/console and embedded
+   here inside the spine's nav shell so the 4-stage nav stays put. ?embed=1 hides
+   console2's own brand/external-nav but keeps its 구성|실행 toggle. The iframe is
+   sized to fill the viewport below the nav (JS, robust to header height). #}
+<iframe id="tcon" src="/testing/console/?embed=1" title="Testing 실행 콘솔"
+        style="width:100%;border:0;display:block"></iframe>
+<script>
+(function () {
+  var f = document.getElementById('tcon');
+  function sz() { f.style.height = Math.max(420, window.innerHeight - f.getBoundingClientRect().top - 2) + 'px'; }
+  sz(); window.addEventListener('resize', sz);
+})();
+</script>
+{% endblock %}
