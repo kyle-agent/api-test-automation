@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}모델 지도{% endblock %}
+{% block content %}
+
+{% include "_plan_steps.html" %}
+
+<style>
+  /* model-map(② 레시피 저작 — 그래프 얼굴) — 페이지 한정 스타일. 렌더러/팔레트는
+     공유(resource_graph.js)이고 여기선 stage/zoom/사이드패널만 꾸민다. */
+  .mapwrap{display:grid;grid-template-columns:1fr 0;gap:0;transition:grid-template-columns .18s ease}
+  .mapwrap.open{grid-template-columns:1fr minmax(360px,440px);gap:14px}
+  .stage-wrap{position:relative}
+  .stage{position:relative;overflow:hidden;height:620px;background:
+      linear-gradient(0deg,#fbfcfd,#fff);border:1px solid var(--border);
+      border-radius:12px;box-shadow:var(--shadow);cursor:grab}
+  .stage.grabbing{cursor:grabbing}
+  .stage .scene-svg{position:absolute;left:0;top:0;will-change:transform}
+  .hint-pill{position:absolute;left:12px;bottom:12px;background:rgba(255,255,255,.92);
+      border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:11.5px;
+      color:var(--muted);max-width:70%}
+  .hint-pill .focusinfo{font-weight:700;color:var(--blue)}
+  .zoomctl{position:absolute;right:12px;bottom:12px;display:flex;gap:5px}
+  .zoomctl button{width:30px;height:30px;padding:0;border-radius:8px;background:var(--surface);
+      border:1px solid var(--border);color:var(--text);font-size:15px;font-weight:700;line-height:1;cursor:pointer}
+  .zoomctl button.fit{width:auto;padding:0 11px;font-size:12px}
+  .dag-toolbar{display:flex;gap:8px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
+  .tgroup{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .tgroup button{padding:6px 11px;border:0;border-right:1px solid var(--border);background:var(--surface);
+      color:var(--muted);font-size:12px;font-weight:600;cursor:pointer}
+  .tgroup button:last-child{border-right:0}
+  .tgroup button.on{background:var(--blue-bg);color:var(--blue)}
+  .minibtn{padding:6px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);
+      color:var(--text);font-size:12px;font-weight:600;cursor:pointer}
+  .statchip{font-size:11.5px;color:var(--muted);margin-left:auto}
+  /* 사이드패널: 노드 클릭 → 기존 편집 폼(/{node_id})을 iframe으로(라우트 재사용, DOM 충돌 0) */
+  .editpanel{border:1px solid var(--border);border-radius:12px;background:var(--surface);
+      box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+  .editpanel .ph{display:flex;align-items:center;gap:9px;padding:9px 13px;border-bottom:1px solid var(--border);
+      background:var(--surface2)}
+  .editpanel .ph b{font-size:13px}
+  .editpanel .ph .x{margin-left:auto;cursor:pointer;border:1px solid var(--border);border-radius:7px;
+      background:var(--surface);color:var(--muted);width:26px;height:26px;font-size:14px;font-weight:700}
+  .editpanel iframe{flex:1;width:100%;border:0;min-height:560px;background:var(--surface)}
+  .editpanel .empty{padding:18px;color:var(--muted);font-size:12.5px}
+  .leg{display:flex;gap:15px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:2px 0 12px}
+  .leg .sw{width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:5px;border:1.5px solid}
+</style>
+
+<section>
+  <h2>Planning › 모델 지도 (model map)
+    <span class="hint">— provenance/완성도 색칠 · 노드 클릭 = 그 레시피 편집</span>
+    <a href="/planning/resources" style="font-size:13px;font-weight:600;margin-left:auto">목록 보기 →</a></h2>
+  <p class="muted">합성기(<code>composer.graph_view</code>)가 만든 <b>전체 의존
+    그래프</b>를 공유 렌더러로 그린다. 색은 노드의 <b>provenance/완성도</b>:
+    <span style="color:var(--green);font-weight:700">VALIDATED</span> ·
+    <span style="color:var(--amber);font-weight:700">docs</span> ·
+    <span style="color:var(--grey);font-weight:700">불완전(⚠)</span>.
+    노드를 클릭하면 그 노드의 기존 <b>편집 폼</b>이 오른쪽에 열린다 — "그래프
+    위에서 레시피 저작".</p>
+
+  <div class="cards" style="margin-bottom:12px">
+    <div class="card"><div class="num">{{ anchors }}</div><div class="lbl">생성 가능 노드(닻)</div></div>
+    <div class="card"><div class="num">{{ validated }}</div>
+      <div class="lbl" style="color:var(--green)">VALIDATED</div></div>
+    <div class="card"><div class="num">{{ docs }}</div>
+      <div class="lbl" style="color:var(--amber)">docs (모델됨)</div></div>
+    <div class="card"><div class="num">{{ incomplete }}</div>
+      <div class="lbl" style="color:var(--grey)">불완전 (endpoint/requires 결손)</div></div>
+  </div>
+
+  <div class="leg">
+    <span><i class="sw" style="background:var(--green-bg);border-color:var(--green)"></i>VALIDATED (역추출 검증)</span>
+    <span><i class="sw" style="background:var(--amber-bg);border-color:var(--amber)"></i>docs (모델만)</span>
+    <span><i class="sw" style="background:var(--grey-bg);border-color:var(--grey)"></i>⚠ 불완전</span>
+    <span class="muted">접힌 그룹 = 카테고리 · 클릭=펼치기 · 자원 노드 클릭=편집</span>
+  </div>
+
+  <div class="dag-toolbar">
+    <div class="tgroup" id="map-gran">
+      <button data-gran="category" class="on">카테고리</button>
+      <button data-gran="service">서비스</button>
+      <button data-gran="resource">전체 펼침</button>
+    </div>
+    <button class="minibtn" id="map-collapse">⊟ 전체 접기</button>
+    <span class="statchip" id="map-stat"></span>
+  </div>
+
+  <div class="mapwrap" id="mapwrap">
+    <div class="stage-wrap">
+      <div class="stage" id="map-stage">
+        <svg id="map-svg" class="scene-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="hint-pill" id="map-hint"></div>
+        <div class="zoomctl">
+          <button id="map-zin" title="확대">+</button>
+          <button id="map-zout" title="축소">−</button>
+          <button id="map-zfit" class="fit" title="전체 보기">맞춤</button>
+        </div>
+      </div>
+    </div>
+    <aside class="editpanel" id="map-panel" hidden>
+      <div class="ph"><b id="map-panel-id">노드</b>
+        <span class="muted small">레시피 편집</span>
+        <a id="map-panel-open" href="#" target="_blank" class="minibtn" style="margin-left:6px"
+           title="새 탭에서 폼 열기">↗</a>
+        <button class="x" id="map-panel-x" title="닫기">×</button></div>
+      <iframe id="map-frame" title="resource edit form"></iframe>
+    </aside>
+  </div>
+</section>
+
+<!-- 공유 SVG 렌더러: lead가 controlplane/static 을 /static 에 마운트한다(계약). -->
+<script src="/static/resource_graph.js"></script>
+<script>
+(function () {
+  var svg = document.getElementById("map-svg");
+  var stage = document.getElementById("map-stage");
+  var wrap = document.getElementById("mapwrap");
+  var panel = document.getElementById("map-panel");
+  var frame = document.getElementById("map-frame");
+  var panelId = document.getElementById("map-panel-id");
+  var panelOpen = document.getElementById("map-panel-open");
+  var META = {};            // {id: {provenance, complete, missing[]}} from map.json
+  var scene = null;
+
+  // provenance/완성도 → 색(계약 §4 Modeling overlay). VALIDATED 초록 · docs 주황 ·
+  // 불완전(endpoint/requires 결손) 회색 + ⚠ badge. null = 렌더러 기본색.
+  var COL = {
+    val:  { fill: "#e7f6ed", stroke: "#15924f" },   // green
+    docs: { fill: "#fdf3e2", stroke: "#b5740b" },   // amber
+    bad:  { fill: "#eef1f4", stroke: "#7a838d" },   // grey
+  };
+  function overlay(id) {
+    var m = META[id];
+    if (!m) return null;
+    if (!m.complete) return { fill: COL.bad.fill, stroke: COL.bad.stroke, badge: "⚠" };
+    if (m.provenance === "VALIDATED") return { fill: COL.val.fill, stroke: COL.val.stroke, badge: "✓" };
+    if (m.provenance === "docs") return { fill: COL.docs.fill, stroke: COL.docs.stroke };
+    return { fill: COL.bad.fill, stroke: COL.bad.stroke };
+  }
+
+  // 노드 클릭(focus) → 그 노드의 기존 편집 폼을 사이드패널 iframe으로 (라우트 재사용).
+  function openEditor(nodeId) {
+    var url = "/planning/resources/" + encodeURIComponent(nodeId);
+    panelId.textContent = nodeId;
+    panelOpen.href = url;
+    frame.src = url;
+    panel.hidden = false;
+    wrap.classList.add("open");
+    if (scene) scene.fit();        // 패널이 stage 폭을 줄였으니 다시 맞춤
+  }
+  function closeEditor() {
+    panel.hidden = true;
+    wrap.classList.remove("open");
+    frame.src = "about:blank";
+    if (scene) { scene.clearFocus(); scene.fit(); }
+  }
+  document.getElementById("map-panel-x").addEventListener("click", closeEditor);
+
+  function boot(data) {
+    META = data.meta || {};
+    if (!window.ResourceGraph || !data.nodes || !data.nodes.length) {
+      svg.innerHTML = '<text x="14" y="26" fill="#656d76">그릴 모델 그래프가 없습니다 — '
+        + '먼저 자원 노드를 모델링하세요.</text>';
+      return;
+    }
+    scene = window.ResourceGraph.scene(svg, stage, data, {
+      overlay: overlay,
+      hint: document.getElementById("map-hint"),
+      stat: document.getElementById("map-stat"),
+      // READ-ONLY 지도: 대상 선택(onToggleTarget/isSelectable) 미배선 → 노드 코너에
+      // provenance 점만. 노드 클릭 = focus → 편집 폼 열기.
+      onFocus: function (info) {
+        // 비-null focus = 자원 노드 클릭(그룹 클릭은 펼치기라 focus를 안 냄).
+        // info.label = 그 자원 id. 실제 노드(META에 있음)일 때만 편집 폼을 연다.
+        if (info && info.label && META[info.label]) openEditor(info.label);
+        // focus 해제(null)는 패널을 강제로 닫지 않는다(사용자가 ×로 닫음).
+      },
+    });
+    scene.start();
+
+    // 툴바 배선 (console2와 동일한 컨트롤러 API)
+    var granBtns = document.querySelectorAll("#map-gran button");
+    granBtns.forEach(function (b) {
+      b.onclick = function () {
+        granBtns.forEach(function (x) { x.classList.toggle("on", x === b); });
+        if (b.dataset.gran === "resource") scene.expandAll();
+        else scene.setGranularity(b.dataset.gran);
+      };
+    });
+    document.getElementById("map-collapse").onclick = function () {
+      granBtns.forEach(function (x) { x.classList.toggle("on", x.dataset.gran === "category"); });
+      scene.setGranularity("category");
+    };
+    document.getElementById("map-zin").onclick = function () { scene.zoomIn(); };
+    document.getElementById("map-zout").onclick = function () { scene.zoomOut(); };
+    document.getElementById("map-zfit").onclick = function () { scene.zoomToFit(); };
+  }
+
+  fetch("/planning/resources/map.json")
+    .then(function (r) { return r.json(); })
+    .then(boot)
+    .catch(function (e) {
+      svg.innerHTML = '<text x="14" y="26" fill="#cf222e">map.json 로드 실패: '
+        + (e && e.message ? e.message : e) + "</text>";
+    });
+})();
+</script>
+
+{% endblock %}

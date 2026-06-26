@@ -104,6 +104,52 @@ def _compose_nodes(model: dict) -> list[dict]:
     return sorted(rows, key=lambda r: (r["code"] or "zzz", r["id"]))
 
 
+# --- 모델 지도(model map) 메타 — provenance/완성도 (계약 §4 Modeling overlay) -----------
+#
+# 그래프는 composer.graph_view(전체 lifecycle-bearing 노드)를 공유 렌더러로 그리고,
+# overlay(id)는 이 meta로 색칠한다: VALIDATED=초록 · docs=주황 · 불완전=회색+badge.
+# "불완전" = create.endpoint 부재 OR requires 참조 중 모델에 없는 노드(미해결)가 있음.
+
+def _missing_requires(node: dict, known: set) -> list[str]:
+    """이 노드 requires 중 모델에 (아직) 없는 대상 — 완성도 게이지의 결손."""
+    miss: list[str] = []
+    for r in node.get("requires") or []:
+        if isinstance(r, str):
+            if r not in known:
+                miss.append(r)
+        elif isinstance(r, dict) and "one_of" in r:
+            alts = [(a.get("ref") if isinstance(a, dict) else a)
+                    for a in (r.get("one_of") or [])]
+            alts = [a for a in alts if a]
+            if alts and not any(a in known for a in alts):
+                miss.append("one_of(" + ", ".join(str(a) for a in alts) + ")")
+        elif isinstance(r, dict) and "ref" in r:
+            if r["ref"] not in known:
+                miss.append(str(r["ref"]))
+    return miss
+
+
+def _map_meta(model: dict) -> tuple[list[str], dict]:
+    """(targets, meta) — targets=생성 가능한(create.endpoint 보유) 노드 = 지도의 닻.
+    meta[id] = {provenance, has_endpoint, complete, missing[]} for overlay()."""
+    known = set(model)
+    targets: list[str] = []
+    meta: dict[str, dict] = {}
+    for nid in sorted(model):
+        node = model[nid]
+        has_ep = bool((node.get("create") or {}).get("endpoint"))
+        missing = _missing_requires(node, known)
+        meta[nid] = {
+            "provenance": str(node.get("provenance") or "?"),
+            "has_endpoint": has_ep,
+            "missing": missing,
+            "complete": has_ep and not missing,
+        }
+        if has_ep:
+            targets.append(nid)
+    return targets, meta
+
+
 def _plan_dict(plan) -> dict:
     """C2 Plan — dict 계약이지만 dataclass류여도 표시용으로 degrade."""
     if isinstance(plan, dict):
@@ -226,6 +272,49 @@ def graph_demo():
     contract (graph.json / graph.js) stays — the composer + node forms use it."""
     from fastapi.responses import RedirectResponse
     return RedirectResponse("/planning/dependencies", status_code=301)
+
+
+# --- 모델 지도(② 레시피 저작 — 그래프 얼굴) -------------------------------------------
+#     같은 graph_view 데이터를 공유 렌더러(resource_graph.js)로 그리고, overlay()만
+#     provenance/완성도 색으로 바꾼다(계약 §1, §4 Modeling). 노드 클릭 → 그 노드의
+#     기존 편집 폼(/{node_id})을 사이드패널로 연다(htmx). map.json / map 둘 다
+#     "/{node_id}"보다 먼저 선언해 노드 id로 라우팅되지 않게 한다.
+
+@router.get("/map.json")
+def map_json():
+    """모델 지도 데이터 — 전체 lifecycle-bearing 노드의 graph_view + per-node meta.
+
+    `meta[id] = {provenance, has_endpoint, complete, missing[]}` 로 클라이언트
+    overlay(id)가 provenance/완성도 색칠을 한다(서버가 단일 source of truth)."""
+    model = resource_model.load_model()
+    targets, meta = _map_meta(model)
+    if not targets:
+        return JSONResponse({"nodes": [], "edges": [], "levels": [0],
+                             "shared": [], "peak_quota": {}, "order": [],
+                             "teardown": [], "meta": {}})
+    try:
+        view = composer.graph_view(targets, None, None, model)
+    except Exception as exc:  # ComposeError 등 -> 빈 그래프(페이지는 살아있게), 400 아님
+        return JSONResponse({"error": str(exc), "nodes": [], "edges": [],
+                             "levels": [0], "meta": meta}, status_code=200)
+    view["meta"] = meta
+    return JSONResponse(view)
+
+
+@router.get("/map", response_class=HTMLResponse)
+def map_page(request: Request):
+    """모델 지도 페이지 — 공유 SVG 렌더러로 그래프를 그리고 노드 클릭으로 편집."""
+    model = resource_model.load_model()
+    targets, meta = _map_meta(model)
+    total = len(model)
+    validated = sum(1 for v in meta.values() if v["provenance"] == "VALIDATED")
+    docs = sum(1 for v in meta.values() if v["provenance"] == "docs")
+    incomplete = sum(1 for v in meta.values() if not v["complete"])
+    return _render(request, "resource_map.html", plan_step="model",
+                   active="modeling",  # 계약 §4: Modeling 얼굴 (lead가 nav 배선)
+                   total=total, validated=validated, docs=docs,
+                   incomplete=incomplete, anchors=len(targets),
+                   has_composer=True)
 
 
 @router.get("/compose", response_class=HTMLResponse)
