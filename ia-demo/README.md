@@ -7,7 +7,7 @@ Each page's REAL production HTML is fetched in-process via Starlette `TestClient
 
 - **Catalog** (`index.html` = `catalog.html`): server-rendered, no fetch.
 - **Modeling** (`modeling.html`): fetches `modeling.map.json`, draws the DAG via `resource_graph.js`. (Node-click opens the edit form, which has no offline page — graph focus still works.)
-- **Testing** (`testing/`): the console2 static bundle (`console2/build_static.py`), which keeps its own chrome.
+- **Testing** (`testing.html`): the console2 bundle (`testing/`) embedded in the spine shell via an iframe (`?embed=1`), so the 4-stage nav stays put and the toggle reads Test Planning | Test Execution.
 - **Reporting** (`reporting.html`): fetches `reporting.map.json`, same shared renderer.
 
 ## Publish
@@ -22,6 +22,7 @@ Copy this directory to the Pages branch: `dashboard-data:/ia-demo/`.
 - `reporting.html`
 - `reporting.map.json`
 - `resource_graph.js`
+- `testing.html`
 - `testing/README.md`
 - `testing/assets/console2.css`
 - `testing/assets/console2.js`

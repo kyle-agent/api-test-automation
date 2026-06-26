@@ -225,7 +225,7 @@ window.__iaFetch = function (name) {
       <span class="arrow">→</span>
       <a href="modeling.html" class="active">Modeling</a>
       <span class="arrow">→</span>
-      <a href="testing/index.html" class="">Testing</a>
+      <a href="testing.html" class="">Testing</a>
       <span class="arrow">→</span>
       <a href="reporting.html" class="">Reporting</a>
       <a href="#" style="margin-left:10px"
@@ -299,8 +299,8 @@ window.__iaFetch = function (name) {
 </style>
 
 <section>
-  <h2>Planning › 모델 지도 (model map)
-    <span class="hint">— provenance/완성도 색칠 · 노드 클릭 = 그 레시피 편집</span>
+  <h2>Modeling › 모델 지도 (model map)
+    <span class="hint">— provenance/완성도 색칠 · 노드 클릭 = 그 노드 정의 편집</span>
     <a href="#" style="font-size:13px;font-weight:600;margin-left:auto">목록 보기 →</a></h2>
   <p class="muted">합성기(<code>composer.graph_view</code>)가 만든 <b>전체 의존
     그래프</b>를 공유 렌더러로 그린다. 색은 노드의 <b>provenance/완성도</b>:
@@ -308,7 +308,7 @@ window.__iaFetch = function (name) {
     <span style="color:var(--amber);font-weight:700">docs</span> ·
     <span style="color:var(--grey);font-weight:700">불완전(⚠)</span>.
     노드를 클릭하면 그 노드의 기존 <b>편집 폼</b>이 오른쪽에 열린다 — "그래프
-    위에서 레시피 저작".</p>
+    위에서 정의 편집".</p>
 
   <div class="cards" style="margin-bottom:12px">
     <div class="card"><div class="num">273</div><div class="lbl">생성 가능 노드(닻)</div></div>
@@ -351,7 +351,7 @@ window.__iaFetch = function (name) {
     </div>
     <aside class="editpanel" id="map-panel" hidden>
       <div class="ph"><b id="map-panel-id">노드</b>
-        <span class="muted small">레시피 편집</span>
+        <span class="muted small">정의 편집</span>
         <a id="map-panel-open" href="#" target="_blank" class="minibtn" style="margin-left:6px"
            title="새 탭에서 폼 열기">↗</a>
         <button class="x" id="map-panel-x" title="닫기">×</button></div>
