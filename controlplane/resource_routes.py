@@ -150,6 +150,38 @@ def _map_meta(model: dict) -> tuple[list[str], dict]:
     return targets, meta
 
 
+def _worklist(model: dict) -> tuple[list[dict], list[dict]]:
+    """저작 작업 큐 — 손봐야 할 노드를 (불완전, 미검증) 두 묶음으로.
+
+    _map_meta가 이미 계산한 완성도/provenance를 그대로 재사용한다(지도와 한 소스).
+      · 불완전(incomplete) = create.endpoint 부재 OR requires 참조 미해결 →
+        최우선 저작 대상. why = "생성 endpoint 없음" / "미해결 참조: …".
+      · 미검증(docs-only) = provenance:docs 인데 완성된 노드 → 검증(2xx) 대상.
+        (불완전과 겹치면 불완전 쪽에만 넣어 중복을 피한다.)
+    각 행은 편집 폼(/planning/resources/{id}) 딥링크용 id/service/why 를 담는다.
+    """
+    _, meta = _map_meta(model)
+    incomplete: list[dict] = []
+    docs_only: list[dict] = []
+    for nid in sorted(model):
+        m = meta[nid]
+        service = str(model[nid].get("service") or "")
+        if not m["complete"]:
+            why = []
+            if not m["has_endpoint"]:
+                why.append("생성 endpoint 없음")
+            if m["missing"]:
+                why.append("미해결 참조: " + ", ".join(m["missing"]))
+            incomplete.append({"id": nid, "service": service,
+                               "why": " · ".join(why) or "정의 미완성",
+                               "provenance": m["provenance"]})
+        elif m["provenance"] == "docs":
+            docs_only.append({"id": nid, "service": service,
+                              "why": "실제 2xx 미검증 (모델만)",
+                              "provenance": "docs"})
+    return incomplete, docs_only
+
+
 def _plan_dict(plan) -> dict:
     """C2 Plan — dict 계약이지만 dataclass류여도 표시용으로 degrade."""
     if isinstance(plan, dict):
@@ -315,6 +347,21 @@ def map_page(request: Request):
                    total=total, validated=validated, docs=docs,
                    incomplete=incomplete, anchors=len(targets),
                    has_composer=True)
+
+
+@router.get("/worklist", response_class=HTMLResponse)
+def worklist_page(request: Request):
+    """저작 작업 큐 — 지도가 보여주는 '상태'를 '할 일'로 바꾼 목록.
+
+    지도(/map)와 같은 완성도/provenance(_map_meta)를 써서 손봐야 할 노드만 추려
+    각 노드 편집 폼으로 바로 가는 딥링크를 준다. "/{node_id}" 보다 먼저 선언."""
+    model = resource_model.load_model()
+    incomplete, docs_only = _worklist(model)
+    return _render(request, "resource_worklist.html", plan_step="model",
+                   active="modeling",  # Modeling nav 탭 강조
+                   incomplete=incomplete, docs_only=docs_only,
+                   n_incomplete=len(incomplete), n_docs=len(docs_only),
+                   total=len(model))
 
 
 @router.get("/compose", response_class=HTMLResponse)
