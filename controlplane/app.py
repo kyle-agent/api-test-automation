@@ -55,6 +55,18 @@ app.include_router(ai_routes.router)
 from controlplane import resource_routes  # noqa: E402
 app.include_router(resource_routes.router)
 
+# Testing(③) — console2 ABSORBED into the spine (convergence S3, IA =
+# Catalog·Modeling·Testing·Reporting). console_api serves console2's exact /api/*
+# contract by delegating to tools.console2_server's real engine; the unchanged
+# console2 frontend is mounted at /testing/console (its 구성|실행 screen-toggle IS
+# the Test Planning | Test Execution sub-tabs). console2.js runs verbatim.
+from controlplane import console_api  # noqa: E402
+app.include_router(console_api.router)
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+app.mount("/testing/console",
+          StaticFiles(directory=str(ROOT / "console2"), html=True),
+          name="testing-console")
+
 
 def _catalog() -> dict:
     """Suites + profiles for the trigger forms (live from the repo files).
