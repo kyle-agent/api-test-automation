@@ -1,5 +1,5 @@
 ---
-status: draft (오너 논의용 — 2026-06-25, 실제 코드 확인 후 정정)
+status: CONFIRMED (오너 확정 — 2026-06-26 · IA = Catalog · Modeling · Testing · Reporting)
 for: owner + platform
 ---
 
@@ -15,6 +15,58 @@ for: owner + platform
 같은 일을 **두 앱(controlplane + console2)이 따로** 하고 있어 흐름이 쪼개져 보이는 것.
 → **새로 그리지 말고, 이미 있는 둘을 한 흐름으로 수렴**하고(면 1), **공개 커버리지
 대시보드는 별도 유지**(면 2)하면 된다.
+
+---
+
+## ✅ 확정 IA (2026-06-26) — `Catalog · Modeling · Testing · Reporting`
+
+> 아래 "쉽게 정리"(§1~§6, 2026-06-25 탐색)를 오너와 끝까지 좁혀 **확정**한 최종 정보구조.
+> 본문은 여기에 이르는 배경·근거이며, **네이밍·배치는 이 절이 정본**이다.
+
+**면 2개**: 면① = 일하는 콘솔 하나(이 4메뉴 = controlplane 척추) · 면② = 공개 커버리지
+대시보드(별도 발행 · Reporting에서 링크아웃).
+
+**면① 상단 네비 = 4단계 흐름 (좌→우 = ①→④):**
+
+```
+Catalog          Modeling              Testing                          Reporting
+(① 재료)         (② 레시피 저작)        (③ 요리)                          (④ 평가)
+──────────       ──────────────        ─────────────────────────        ──────────
+API 1,372    ─✏️→  노드편집 = 모델 지도    ┌ Test Planning  (구성·큐)        커버리지
+읽기전용(RO)       click 노드 = 레시피     └ Test Execution (실행·런타임·중단)  색칠지도+2축+추세
+                                          = console2 통째 (서브탭)           └→ 면② 공개본
+```
+
+| 메뉴 | 단계 | 무엇 | 그래프 얼굴 | RO/RW | 코드(오늘) |
+|---|---|---|---|---|---|
+| **Catalog** | ① 재료 | API 인벤토리 1,372 · 검색·서비스 그룹 | (그래프 *전* — 목록) | **RO** | `data/api_catalog` · catalog 뷰 |
+| **Modeling** | ② 레시피 저작 | 리소스 노드 저작: 의존·생성바인딩·옵션·캡처·검증·삭제 | **모델 지도 · 편집** | RW | `resource_form`+`resource_model`+`authoring` → `knowledge/formal/resources/*.yaml` |
+| **Testing** | ③ 요리 | `Test Planning`(선택→합성DAG→큐) ∣ `Test Execution`(실행·실시간·중단·런 리포트) | **합성 + 라이브** | RW | **console2 흡수** → `console_api.py` + console2 프론트 |
+| **Reporting** | ④ 평가 | 커버리지 색칠지도(서비스→리소스) · 2축(regression+conformance) · 추세 · 공개본 링크 | **색칠** | RO | `reporting` / `dashboard` |
+
+**핵심 원칙 — "그림 하나, 여러 얼굴":** 중심 위젯은 `composer.graph_view` + scene 렌더러
+**하나**. Modeling(모델지도·편집) · Testing(합성+라이브) · Reporting(색칠) 셋이 **같은
+그래프에 데이터만 갈아끼움**. Catalog만 그래프 *이전*(목록). (S1b 렌더러 통일이 그 토대.)
+
+**확정 시 풀린 쟁점(근거):**
+1. **B(레시피 저작) ≠ C(시나리오 합성)** — 저작(B: `*.yaml` git·가끔·깊게·담당자)과 합성
+   (C: 휘발·매실행·빠르게·운영자)은 *다른 일*. → **B = Modeling**(영속 설계), **C = Testing의
+   Test Planning**(실행 준비). 혼선은 console2 "구성"(=C)을 한때 Planning이라 부른 데서 왔고,
+   C를 Testing 제자리로 보내 해소.
+2. **이름 "Modeling"(≠ Planning)** — (a) "Planning"을 Testing 하위 *Test Planning* 으로 쓰므로
+   상단 재사용 시 충돌, (b) 레시피 저작은 "계획"이 아니라 *모델링*(코드의 `resource_model`과
+   일치). 표준 QA의 *Test Planning(설계) / Test Execution(실행)* 은 Testing **하위**에 그대로.
+3. **Catalog는 순수 RO** — `api_catalog`는 자동추출 → 손편집은 재추출 때 소실 → 편집 레이어
+   (리소스 yaml)는 물리적으로 분리. 단 "보다가 바로 고치기"는 Catalog 행의 **`✏️ 레시피 편집 →`**
+   링크가 **Modeling 에디터**를 여는 것으로 제공(입구만, 편집은 Modeling).
+4. **console2는 안 쪼갬** — 구성+실행을 Testing **서브탭**으로 통째 흡수(큐가 두 서브탭의
+   이음매). 별도 상단메뉴로 쪼개면 console2의 한 흐름·큐 상태가 깨짐.
+
+**네이밍 규칙:** Catalog = 명사(참조), Modeling·Testing·Reporting = 동명사(활동 영역).
+
+**수렴 매핑(앱 3개 → 메뉴 4개):** controlplane Catalog → **Catalog** · controlplane
+Model(`resource_form`) → **Modeling** · console2(구성 + 실행&리포트) → **Testing** ·
+dashboard + reporting → **Reporting**(+ 면② 공개본).
 
 ---
 
