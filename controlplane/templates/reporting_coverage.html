@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}커버리지 지도 — SCP API Regression{% endblock %}
+{% block content %}
+<style>
+  /* DAG stage + toolbar — mirrors local_run.html so the shared renderer reads
+     the same on every face (그림 하나, 여러 얼굴). */
+  .dag-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 8px}
+  .tgroup{display:flex;border:1px solid #d8dde3;border-radius:7px;overflow:hidden}
+  .tgroup button{background:#fff;border:none;border-left:1px solid #e4e7eb;color:#6b7480;
+    padding:5px 11px;cursor:pointer;font-size:11.5px;font-weight:700}
+  .tgroup button:first-child{border-left:none}
+  .tgroup button.on{background:#eef1f4;color:#1d2530}
+  .gran-note{font-size:11px;color:#6b7480}
+  .statchip{font-size:11px;color:#6b7480;background:#f5f7f9;border:1px solid #e4e7eb;border-radius:13px;
+    padding:3px 11px;font-variant-numeric:tabular-nums}
+  .statchip b{color:#1d2530}
+  .stage-wrap{position:relative;border:1px solid #e4e7eb;border-radius:8px;overflow:hidden;background:#fff}
+  .stage{position:relative;width:100%;height:min(66vh,520px);min-height:360px;overflow:hidden;cursor:grab;
+    background:radial-gradient(circle,#eef1f4 1px,transparent 1px);background-size:26px 26px}
+  .stage.grabbing{cursor:grabbing}
+  #cov-svg{position:absolute;top:0;left:0;transform-origin:0 0}
+  .stage svg text{fill:#1d2530}
+  g.rg-unit{cursor:pointer} g.rg-unit .nrect{transition:opacity .12s}
+  g.rg-unit.dimmed{opacity:.13} g.rg-selbox{cursor:pointer}
+  .rg-edge{stroke:#cfd6dd;stroke-width:1.3;fill:none}
+  .rg-edge.hot{stroke:#2563c9;stroke-width:2.2} .rg-edge.dim{opacity:.08}
+  .rg-active{filter:drop-shadow(0 0 3px rgba(37,99,201,.45))}
+  .zoomctl{position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:5px;z-index:5}
+  .zoomctl button{width:30px;height:30px;border:1px solid #e4e7eb;background:#fff;border-radius:7px;cursor:pointer;
+    font-size:15px;font-weight:700;color:#1d2530;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(31,35,40,.12)}
+  .zoomctl button:hover{border-color:#2563c9;color:#2563c9} .zoomctl button.fit{font-size:10.5px}
+  .cov-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:11.5px;color:#6b7480}
+  .cov-legend span{display:inline-flex;align-items:center;gap:6px}
+  .cov-legend i{width:13px;height:13px;border-radius:4px;display:inline-block;border:1.6px solid}
+  .axis-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+  @media (max-width:760px){.axis-grid{grid-template-columns:1fr}}
+  .axis-head{font-weight:800;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .axis-head .q{font-weight:400;font-size:11.5px;color:var(--muted)}
+  .barrow{display:flex;align-items:center;gap:9px;margin:7px 0}
+  .barrow .lab{width:120px;font-size:11.5px;color:var(--muted)}
+  .barrow .bar{flex:1;height:9px;background:var(--surface2);border-radius:6px;overflow:hidden}
+  .barrow .bar i{display:block;height:100%}
+  .barrow .pct{width:46px;text-align:right;font-size:11.5px;font-weight:700}
+  .sysrow{font-size:11.5px;color:var(--muted);padding:3px 0;border-top:1px solid var(--border)}
+</style>
+
+<h2>🎨 커버리지 지도
+  <span class="hint">같은 그래프 · 커버리지 얼굴 — tested(초록) / modeled(주황) / untested(회색),
+    서비스→리소스 단위 (API 하나하나 아님). 출처: <code>reports/results/*.jsonl</code> 관측.</span>
+</h2>
+
+{# ===================== 2-axis evaluation summary ===================== #}
+<div class="axis-grid">
+  {# --- AXIS 1: regression --- #}
+  {% set rg = summary.regression %}
+  <div class="card pad">
+    <div class="axis-head">① 회귀 <span class="q">— 됨? (does it work?)</span></div>
+    <div class="tiles" style="margin-top:0;grid-template-columns:repeat(auto-fit,minmax(96px,1fr))">
+      <div class="card tile"><div class="v" style="color:var(--green)">{{ rg.ok }}</div>
+        <div class="k">ok (2xx)</div></div>
+      <div class="card tile"><div class="v" style="color:var(--amber)">{{ rg.soft }}</div>
+        <div class="k">soft (4xx)</div></div>
+      <div class="card tile"><div class="v" style="color:var({{ '--red' if rg.fail else '--muted' }})">{{ rg.fail }}</div>
+        <div class="k">fail (5xx/auth)</div></div>
+      <div class="card tile"><div class="v">{{ rg.endpoints }}</div>
+        <div class="k">관측 endpoint</div></div>
+    </div>
+    <div class="barrow" style="margin-top:12px">
+      <span class="lab">서비스 tested</span>
+      <span class="bar"><i style="width:{{ rg.services_tested_pct }}%;background:var(--green)"></i></span>
+      <span class="pct" style="color:var(--green)">{{ rg.services_tested_pct }}%</span>
+    </div>
+    <p class="small muted" style="margin:2px 0 0">
+      서비스 {{ rg.services_total }}개 중 <b style="color:var(--green)">{{ rg.services_tested }}</b> tested ·
+      <b style="color:var(--amber)">{{ rg.services_modeled }}</b> modeled ·
+      <b style="color:var(--grey)">{{ rg.services_untested }}</b> untested</p>
+  </div>
+
+  {# --- AXIS 2: conformance --- #}
+  {% set cf = summary.conformance %}
+  <div class="card pad">
+    <div class="axis-head">② 정합성 <span class="q">— 잘 설계됨? (well-designed & AI-usable?)</span></div>
+    {% if cf.published %}
+      {% set p = cf.published %}
+      <div class="tiles" style="margin-top:0;grid-template-columns:repeat(auto-fit,minmax(96px,1fr))">
+        <div class="card tile"><div class="v" style="color:var(--green)">{{ p.get('green', '—') }}</div>
+          <div class="k">green</div></div>
+        <div class="card tile"><div class="v" style="color:var(--amber)">{{ p.get('yellow', '—') }}</div>
+          <div class="k">yellow</div></div>
+        <div class="card tile"><div class="v" style="color:var(--red)">{{ p.get('red', '—') }}</div>
+          <div class="k">red 결함</div></div>
+      </div>
+      <p class="small muted" style="margin:9px 0 0">정합성 정식 출처 = 발행 대시보드의
+        conformance.json(red/yellow/green). 아래는 control-plane 로컬 findings.</p>
+    {% endif %}
+    <div class="tiles" style="margin-top:11px;grid-template-columns:repeat(auto-fit,minmax(96px,1fr))">
+      <div class="card tile"><div class="v" style="color:var(--red)">{{ cf.red }}</div>
+        <div class="k">로컬 red</div></div>
+      <div class="card tile"><div class="v" style="color:var(--amber)">{{ cf.yellow }}</div>
+        <div class="k">로컬 yellow</div></div>
+      <div class="card tile"><div class="v">{{ cf.findings }}</div>
+        <div class="k">findings 총</div></div>
+    </div>
+    {% if cf.systemic %}
+    <div style="margin-top:11px">
+      {% for s in cf.systemic[:5] %}
+      <div class="sysrow"><b>{{ s.get('rule_id', s.get('rule','?')) }}</b>
+        × {{ s.get('count', 0) }} <span class="muted">{{ s.get('detail','')|truncate(70) }}</span></div>
+      {% endfor %}
+    </div>
+    {% elif not cf.published and cf.findings == 0 %}
+    <p class="small muted" style="margin:9px 0 0">정합성 findings 없음 —
+      <code>findings.jsonl</code> 비어있거나 dashboard-data 미연결.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ===================== Coverage color map (shared scene) ===================== #}
+<h2 style="margin-top:24px">서비스 커버리지 색칠 지도
+  <span class="hint">{{ node_count }} 자원 · 그룹 클릭=펼치기 · 노드 클릭=focus · 휠/드래그=줌·이동</span></h2>
+<div class="card pad">
+  <div class="dag-toolbar">
+    <div class="tgroup" id="granctl">
+      <button data-g="category" class="on">카테고리</button>
+      <button data-g="service">서비스</button>
+      <button data-g="resource">리소스</button>
+    </div>
+    <button class="btn" id="collapseAll" style="padding:5px 11px;font-size:11.5px;border:1px solid #d8dde3;border-radius:7px;background:#fff;cursor:pointer">전체 접기</button>
+    <span class="gran-note" id="granNote"></span>
+    <span class="statchip" id="statchip" style="margin-left:auto"></span>
+  </div>
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <svg id="cov-svg"></svg>
+      <div class="zoomctl">
+        <button id="zin" title="확대">+</button>
+        <button id="zout" title="축소">−</button>
+        <button class="fit" id="zfit" title="맞춤">맞춤</button>
+      </div>
+    </div>
+  </div>
+  <div class="cov-legend">
+    {% for state, m in legend.items() %}
+    <span><i style="background:{{ m.fill }};border-color:{{ m.stroke }}"></i>{{ m.label }}</span>
+    {% endfor %}
+    <span style="margin-left:auto;color:var(--faint)">노드 테두리/채움 = 그 노드 서비스의 커버리지 상태</span>
+  </div>
+  <div class="muted small" id="covhint" style="margin-top:9px"></div>
+</div>
+
+{# ===================== run history + link-out ===================== #}
+<h2 style="margin-top:24px">최근 커버리지 추세
+  <span class="hint">발행 대시보드(면②) history.jsonl — 정식 추세/서비스별 상세는 공개 대시보드</span></h2>
+<div class="card pad">
+  {% if history %}
+  <table>
+    <thead><tr><th>시각(ts)</th><th>C3 검증%</th><th>GET%</th><th>write-op%</th><th>신규 fail</th></tr></thead>
+    <tbody>
+    {% for h in history|reverse %}
+      <tr>
+        <td class="muted small">{{ h.get('ts','') }}</td>
+        <td><b style="color:var(--green)">{{ h.get('cov_c3','-') }}%</b></td>
+        <td>{{ h.get('cov_get','-') }}%</td>
+        <td>{{ h.get('cov_op','-') }}%</td>
+        <td><span class="{{ 'chip s-regress' if (h.get('fail_new') or 0) else 'muted' }}">{{ h.get('fail_new', 0) }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted small">추세 데이터 없음 — dashboard-data 브랜치를 읽을 수 없습니다(또는 아직 발행 전).</p>
+  {% endif %}
+  <p class="small" style="margin-top:11px">
+    <a href="/dashboard/index.html" target="_blank">📊 공개 대시보드 열기 (면②) ↗</a>
+    <span class="muted">— C1/C2/C3 사다리 · 서비스 nav · conformance 결함 단일 렌더링</span>
+  </p>
+</div>
+
+{# resource_graph.js is served by the lead at /static/resource_graph.js at integration. #}
+<script src="/static/resource_graph.js"></script>
+<script>
+{% raw %}
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  // coverage state -> {fill, stroke} (matches the server-side legend tokens)
+  var PAL = {
+    tested:   { fill: "#e7f6ed", stroke: "#15924f" },
+    modeled:  { fill: "#fdf3e2", stroke: "#b5740b" },
+    untested: { fill: "#eef1f4", stroke: "#9aa3ad" }
+  };
+  var SCENE = null, GRAPH = null, COV = {}, NODE_SVC = {};
+
+  // overlay(id): the ONE thing this face customizes. id = graph_view node id;
+  // we look up that node's service, then the service's coverage state -> color.
+  function coverageOverlay(id) {
+    var svc = NODE_SVC[id] || "";
+    var state = COV[svc] || "untested";
+    var c = PAL[state] || PAL.untested;
+    var badge = state === "tested" ? "✓" : state === "modeled" ? "◌" : "·";
+    return { fill: c.fill, stroke: c.stroke, badge: badge };
+  }
+  // group(collapsed) coloring: aggregate members' coverage so a collapsed
+  // category/service card still reads its dominant state + a tested ratio.
+  function groupOverlay(u) {
+    var members = u.members || [];
+    if (!members.length) return null;
+    var tested = 0, modeled = 0;
+    members.forEach(function (id) {
+      var st = COV[NODE_SVC[id] || ""] || "untested";
+      if (st === "tested") tested++; else if (st === "modeled") modeled++;
+    });
+    var state = tested ? (tested === members.length ? "tested" : "modeled")
+      : (modeled ? "modeled" : "untested");
+    var c = PAL[state] || PAL.untested;
+    return { fill: c.fill, stroke: c.stroke, badge: tested + "/" + members.length };
+  }
+
+  function buildScene() {
+    var svg = $("#cov-svg"), stage = $("#stage");
+    if (!window.ResourceGraph || !window.ResourceGraph.scene) {
+      $("#covhint").textContent = "렌더러(resource_graph.js)를 불러오지 못했습니다.";
+      return;
+    }
+    if (SCENE && SCENE.destroy) SCENE.destroy();
+    SCENE = window.ResourceGraph.scene(svg, stage, GRAPH, {
+      overlay: coverageOverlay, groupOverlay: groupOverlay,
+      stat: $("#statchip"), granNote: $("#granNote"),
+      onFocus: function (info) {
+        $("#covhint").textContent = info
+          ? ("focus: " + info.label + " — 의존 경로 " + info.unitCount + " 단위 · 빈곳/노드 클릭=해제")
+          : "";
+      }
+    });
+    SCENE.start();
+    Array.prototype.forEach.call($("#granctl").children, function (x) {
+      x.classList.toggle("on", x.dataset.g === SCENE.gran);
+    });
+  }
+
+  // toolbar / zoom wiring (same controller API local_run.html uses)
+  $("#granctl").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-g]"); if (!b || !SCENE) return;
+    Array.prototype.forEach.call($("#granctl").children, function (x) { x.classList.remove("on"); });
+    b.classList.add("on"); SCENE.setGranularity(b.dataset.g);
+  });
+  $("#collapseAll").onclick = function () { if (SCENE) SCENE.collapseAll(); };
+  $("#zin").onclick = function () { if (SCENE) SCENE.zoomIn(); };
+  $("#zout").onclick = function () { if (SCENE) SCENE.zoomOut(); };
+  $("#zfit").onclick = function () { if (SCENE) SCENE.zoomToFit(); };
+
+  fetch("/reporting/coverage/map.json").then(function (r) { return r.json(); }).then(function (d) {
+    GRAPH = d.graph || { nodes: [], edges: [] };
+    COV = d.coverage || {};
+    (GRAPH.nodes || []).forEach(function (n) { NODE_SVC[n.id] = n.service || ""; });
+    if (GRAPH.nodes && GRAPH.nodes.length) {
+      buildScene();
+      if (!d.has_results) $("#covhint").textContent = "아직 관측 결과 없음 — 전부 modeled/untested로 표시됩니다.";
+    } else {
+      $("#covhint").textContent = d.has_model
+        ? "그래프를 구성할 수 없습니다."
+        : "리소스 모델이 비어 있습니다 — 색칠할 노드가 없습니다.";
+    }
+  }).catch(function () {
+    $("#covhint").textContent = "커버리지 데이터를 불러오지 못했습니다.";
+  });
+})();
+{% endraw %}
+</script>
+{% endblock %}
