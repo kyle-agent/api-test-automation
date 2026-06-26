@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Catalog — API 인벤토리{% endblock %}
+{% block content %}
+
+<section>
+  <h2>Catalog › API 인벤토리 (① 재료)
+    <span class="hint">읽기 전용 — 그래프 이전의 전체 목록</span></h2>
+  <p class="muted">Samsung Cloud Platform Open API 전체 엔드포인트
+    <b>{{ total }}</b>개를 카테고리 ▸ 서비스로 묶어 보여줍니다. 각 행은
+    <code>METHOD path</code>. 서비스 헤더의 <b>레시피 편집</b> 링크로
+    Modeling 노드 에디터로 바로 이동합니다 (자원 모델로 매핑된 서비스는
+    그 노드, 아니면 service 프리필).</p>
+  <div class="cards">
+    <div class="card"><div class="num">{{ total }}</div><div class="lbl">엔드포인트</div></div>
+    <div class="card"><div class="num">{{ n_categories }}</div><div class="lbl">카테고리</div></div>
+    <div class="card"><div class="num">{{ n_services }}</div><div class="lbl">서비스</div></div>
+    <div class="card"><div class="num">{{ n_modeled }}</div>
+      <div class="lbl">모델링된 서비스 (✏️ 노드 deep-link)</div></div>
+  </div>
+  <div class="fchips" style="margin-top:13px">
+    <input type="text" id="catalog-search" class="search" autocomplete="off"
+           placeholder="검색 — method · path · service · 카테고리…"
+           oninput="filterCatalog(this.value)" style="width:340px">
+    <span class="note" id="catalog-count"></span>
+  </div>
+</section>
+
+{% if not categories %}
+<section>
+  <p class="muted">API 카탈로그를 읽을 수 없습니다 —
+    <code>data/api_catalog.json</code> 가 없거나 비어 있습니다.</p>
+</section>
+{% endif %}
+
+{% for cat in categories %}
+<section class="cat-block" data-text="{{ cat.category|lower }}">
+  <h2>{{ cat.category }}
+    <span class="cat">{{ cat.category }}</span>
+    <span class="muted">({{ cat.services|length }} 서비스 · {{ cat.count }} 엔드포인트)</span></h2>
+
+  {% for svc in cat.services %}
+  <div class="svc-block" data-text="{{ (cat.category ~ ' ' ~ svc.service_key ~ ' ' ~ svc.service)|lower }}"
+       style="margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:10px 0 6px">
+      <span class="srv">{{ svc.service }}</span>
+      <span class="muted small">{{ svc.service_key }}</span>
+      {% if svc.modeled %}<span class="chip s-verified">modeled</span>{% endif %}
+      <span class="muted small">({{ svc.count }})</span>
+      <a href="{{ svc.recipe }}" style="margin-left:auto;font-weight:600"
+         title="Modeling 노드 에디터로 이동{% if svc.node_id %} (노드: {{ svc.node_id }}){% endif %}">✏️ 레시피 편집 →</a>
+    </div>
+    <table>
+      <tr><th style="width:90px">method</th><th>path</th><th style="width:230px">name</th></tr>
+      {% for ep in svc.endpoints %}
+      <tr class="ep-row"
+          data-text="{{ (ep.method ~ ' ' ~ ep.path ~ ' ' ~ ep.name ~ ' ' ~ svc.service_key ~ ' ' ~ cat.category)|lower }}">
+        <td><span class="tag {{ 'read' if ep.method == 'GET' else ('destructive' if ep.method == 'DELETE' else 'mutation') }}">{{ ep.method }}</span></td>
+        <td><code>{{ ep.path }}</code></td>
+        <td class="muted small">
+          {% if ep.doc_url %}<a href="{{ ep.doc_url }}" target="_blank" rel="noopener">{{ ep.name }}</a>{% else %}{{ ep.name }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endfor %}
+</section>
+{% endfor %}
+
+<script>
+// 클라이언트 측 검색 — 행/서비스/카테고리 블록을 텍스트로 필터(서버 왕복 없음).
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.ep-row'));
+  var svcs = Array.prototype.slice.call(document.querySelectorAll('.svc-block'));
+  var cats = Array.prototype.slice.call(document.querySelectorAll('.cat-block'));
+  var countEl = document.getElementById('catalog-count');
+  var total = rows.length;
+
+  window.filterCatalog = function (q) {
+    q = (q || '').trim().toLowerCase();
+    var terms = q ? q.split(/\s+/) : [];
+    var shown = 0;
+    rows.forEach(function (r) {
+      var hay = r.getAttribute('data-text') || '';
+      var ok = terms.every(function (t) { return hay.indexOf(t) !== -1; });
+      r.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    // 자식 행이 모두 숨으면 서비스 블록을, 서비스가 모두 숨으면 카테고리 블록을 숨긴다.
+    svcs.forEach(function (s) {
+      var any = s.querySelector('.ep-row:not([style*="display: none"])');
+      s.style.display = any ? '' : 'none';
+    });
+    cats.forEach(function (c) {
+      var any = c.querySelector('.svc-block:not([style*="display: none"])');
+      c.style.display = any ? '' : 'none';
+    });
+    if (countEl) {
+      countEl.textContent = q
+        ? (shown + ' / ' + total + ' 엔드포인트')
+        : (total + ' 엔드포인트');
+    }
+  };
+  window.filterCatalog('');
+})();
+</script>
+
+{% endblock %}
