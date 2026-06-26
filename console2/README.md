@@ -1,18 +1,23 @@
 # console2 — local execution console (UI skeleton)
 
-A single-page console that wires the whole loop: **선택 → Plan → 실행 → 라이브 리포트**,
-served by `tools/console2_server.py`. Pure client-side (one `/api/model` fetch on load)
-until you start a run.
+A single-page console that wires the whole loop: **선택 → Plan → 실행 → 라이브 리포트**.
 
-## Run it
+> **RETIRED as a standalone app (convergence S4).** The console is no longer run via
+> its own `tools/console2_server.py` server — it has been **absorbed into the
+> control-plane spine**: `controlplane/console_api.py` answers the same `/api/*`
+> contract by delegating to `console2_server`'s (now library-only) functions, and this
+> frontend is served + embedded under controlplane **Testing**.
+
+## Run it (via the spine)
 
 ```bash
-python tools/console2_server.py          # http://127.0.0.1:9100/
-PORT=9123 python tools/console2_server.py # override the port
+uvicorn controlplane.app:app --host 0.0.0.0 --port 8800
+#  → Testing (this console, embedded):  http://localhost:8800/testing/embed
 ```
 
-Then open the URL. The console fetches `/api/model`, sets `window.MODEL`, loads the
-shared graph engine (`assets/viz.js`), and renders.
+The `index.html` + `assets/*` here are the SAME files the spine serves (mounted at
+`/testing/console`). The console fetches `/api/model`, loads the shared graph renderer
+(`assets/resource_graph.js`), and renders.
 
 ## Concept model (vocabulary used throughout the UI)
 
@@ -57,7 +62,7 @@ shared graph engine (`assets/viz.js`), and renders.
 | `index.html` | shell: 4-stage tabs, global context bar, column scaffolding |
 | `assets/console2.js` | the app: model fetch, all 4 stages, live event polling |
 | `assets/console2.css` | dark theme (adapted from the PoC layered-DAG canvas) |
-| `assets/viz.js` | shared graph engine (copied from `poc/scenario-viz/assets/`) — closure/depths/layout |
+| `assets/resource_graph.js` | shared graph renderer (scene controller: group/collapse/focus/zoom) — the SAME engine the spine serves at `/static/resource_graph.js` |
 
 ## simulate vs live
 

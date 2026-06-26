@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
-"""console2 — local execution console (browse → plan → run → live report).
+"""console2 — local execution console ENGINE (browse → plan → run → live report).
 
-A zero-dependency (stdlib ``http.server``) backend for ``console2/``. Run it on a
+RETIRED as a standalone server (convergence S4): the stdlib ``http.server`` is no
+longer started. The console is served by the control-plane spine
+(``controlplane/console_api.py`` answers the same ``/api/*`` contract by delegating to
+the builder/worker functions below) and the ``console2/`` frontend is embedded under
+controlplane **Testing**. This module is kept as the shared ENGINE LIBRARY — imported
+by ``console_api`` + ``console2.build_static``; ``main()`` only prints how to run the
+console now (``Handler``/``ThreadingHTTPServer`` below are kept, unused, so the
+retirement stays trivially reversible).
+
+Originally a zero-dependency (stdlib ``http.server``) backend for ``console2/``. Run it on a
 machine that has the repo + working SCP creds; it serves the console AND drives
 the real composition/scheduling engine so you can watch a run unfold **in DAG
 order, "which API is being tested right now"**.
@@ -1365,22 +1374,19 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    if not (WEB / "index.html").exists():
-        sys.exit(f"console2 not found at {WEB} — run from the repo root")
-    try:
-        m = _model()
-        print(f"  model: {m['node_count']} resources / {len(m['categories'])} categories / "
-              f"{m['lifecycle_count']} lifecycles ({m['validated']} VALIDATED)")
-    except Exception as exc:  # noqa: BLE001
-        print(f"  warning: model build failed at startup ({exc}); /api/model will retry")
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    print(f"console2 + executor: http://127.0.0.1:{PORT}/")
-    print("  browse → plan (real dag_planner) → run (simulate | live) → live DAG-order report")
-    print(f"  run logs + events: {RUN_DIR}")
-    try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        print("\nbye")
+    # RETIRED (convergence S4): the standalone stdlib server is no longer started. The
+    # console's engine (the builder/worker functions above) is served by the control-
+    # plane spine via controlplane/console_api.py, and the console2 frontend is embedded
+    # under controlplane Testing. Handler/ThreadingHTTPServer above are kept (unused) so
+    # this retirement is trivially reversible; main() just prints how to run it now.
+    print(
+        "tools/console2_server.py — STANDALONE console2 server RETIRED (convergence S4).\n"
+        "Run the console from the control-plane spine instead:\n\n"
+        "    uvicorn controlplane.app:app --host 0.0.0.0 --port 8800\n"
+        "    -> Testing (this console, embedded):  http://localhost:8800/testing/embed\n\n"
+        "This module's builder/worker functions remain the shared engine — imported by\n"
+        "controlplane.console_api (the /api/* routes) and console2.build_static."
+    )
 
 
 if __name__ == "__main__":
