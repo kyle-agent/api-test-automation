@@ -206,13 +206,13 @@
   <div class="navrow">
     <a class="brand" href="/">SCP API Regression</a>
     <nav class="nav">
-      <a href="/" class="{{ 'active' if active == 'home' else '' }}">Overview</a>
+      <a href="/catalog" class="{{ 'active' if active == 'catalog' else '' }}">Catalog</a>
       <span class="arrow">→</span>
-      <a href="/planning" class="{{ 'active' if active == 'planning' else '' }}">Plan</a>
+      <a href="/planning/resources/map" class="{{ 'active' if active == 'modeling' else '' }}">Modeling</a>
       <span class="arrow">→</span>
-      <a href="/testing" class="{{ 'active' if active == 'testing' else '' }}">Run</a>
+      <a href="/testing/console/" class="{{ 'active' if active == 'testing' else '' }}">Testing</a>
       <span class="arrow">→</span>
-      <a href="/reporting" class="{{ 'active' if active == 'reporting' else '' }}">Report</a>
+      <a href="/reporting/coverage" class="{{ 'active' if active == 'reporting' else '' }}">Reporting</a>
       <a href="/knowledge" style="margin-left:10px"
          class="{{ 'active' if active == 'knowledge' else '' }}">Knowledge</a>
     </nav>

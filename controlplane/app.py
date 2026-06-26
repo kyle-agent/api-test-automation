@@ -67,6 +67,15 @@ app.mount("/testing/console",
           StaticFiles(directory=str(ROOT / "console2"), html=True),
           name="testing-console")
 
+# Catalog(①) + Reporting(④) faces of the confirmed IA — each its own router (built in
+# parallel; Modeling(②) rides resource_routes, Testing(③) is console_api above).
+from controlplane import catalog_routes, reporting_routes  # noqa: E402
+app.include_router(catalog_routes.router)
+app.include_router(reporting_routes.router)
+# shared scene renderer (controlplane/static/resource_graph.js) for the graph faces —
+# Modeling's model-map and Reporting's coverage-map load it from /static/.
+app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
+
 
 def _catalog() -> dict:
     """Suites + profiles for the trigger forms (live from the repo files).
