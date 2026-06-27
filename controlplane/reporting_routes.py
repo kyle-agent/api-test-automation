@@ -66,14 +66,42 @@ def _load_model() -> dict:
         return {}
 
 
-def _service_of_key(endpoint_key: str) -> str:
-    """``category/service/op`` observation key -> ``category/service`` (the
-    coverage aggregation unit). Empty string when the key is too short."""
-    parts = (endpoint_key or "").split("/")
+def _lifecycle_services() -> dict[str, str]:
+    """``lifecycle_id -> 'category/service'`` from the loader — the SAME source
+    the live model uses (``regression.scenarios.loader.load_lifecycles``).
+
+    This is what makes the Testing→Reporting arrow actually carry signal: the
+    Testing engine records observations under a ``lifecycle:step`` endpoint_key
+    (e.g. ``gen-cost-reads:create-cost-reads``), NOT the ``category/service/op``
+    shape the read-only smoke/crud sweep uses. Without this map every live
+    lifecycle run is invisible to coverage. Empty dict on any failure (the page
+    then falls back to the slash-key path only)."""
+    try:
+        from regression.scenarios.loader import load_lifecycles
+        return {lc["id"]: lc.get("service", "")
+                for lc in load_lifecycles() if lc.get("id")}
+    except Exception:
+        return {}
+
+
+def _service_of_key(endpoint_key: str, lc_services: dict[str, str]) -> str:
+    """Observation endpoint_key -> ``category/service`` coverage unit. Two shapes:
+
+      * ``lifecycle:step`` (what the Testing engine records) -> the lifecycle's
+        declared service via ``lc_services``.
+      * ``category/service/op`` (read-only smoke/crud sweep) -> first 2 segments.
+
+    The two are unambiguous: lifecycle ids are hyphenated with no ``/``; sweep
+    keys carry no ``:``. Empty string when neither resolves."""
+    ek = endpoint_key or ""
+    if ":" in ek:
+        return lc_services.get(ek.split(":", 1)[0], "")
+    parts = ek.split("/")
     return "/".join(parts[:2]) if len(parts) >= 2 else ""
 
 
-def _tested_services(observations: list[dict]) -> set[str]:
+def _tested_services(observations: list[dict],
+                     lc_services: dict[str, str]) -> set[str]:
     """Services (``category/service``) with at least one 2xx observation."""
     tested: set[str] = set()
     for o in observations:
@@ -82,13 +110,14 @@ def _tested_services(observations: list[dict]) -> set[str]:
         except (TypeError, ValueError):
             code = 0
         if 200 <= code < 300:
-            svc = _service_of_key(o.get("endpoint_key") or "")
+            svc = _service_of_key(o.get("endpoint_key") or "", lc_services)
             if svc:
                 tested.add(svc)
     return tested
 
 
-def _coverage_by_service(model: dict, observations: list[dict]) -> dict[str, str]:
+def _coverage_by_service(model: dict, observations: list[dict],
+                         lc_services: dict[str, str]) -> dict[str, str]:
     """Map every ``category/service`` present in the model to a coverage state.
 
     Service→resource granularity (NOT per-API): a service is ``tested`` when ANY
@@ -97,7 +126,7 @@ def _coverage_by_service(model: dict, observations: list[dict]) -> dict[str, str
     node carries no provenance at all (or there are no results). This is exactly
     the contract's tested/modeled/untested ladder, lifted to the service.
     """
-    tested = _tested_services(observations)
+    tested = _tested_services(observations, lc_services)
     # provenance present per service (any node with a non-empty provenance)
     has_prov: dict[str, bool] = {}
     for task in model.values():
@@ -149,7 +178,8 @@ def _fold_observations(observations: list[dict]) -> dict[str, str]:
 
 
 def _two_axis_summary(model: dict, observations: list[dict],
-                      findings: list[dict]) -> dict:
+                      findings: list[dict],
+                      lc_services: dict[str, str]) -> dict:
     """The 2-axis evaluation summary (contract §4): regression (does it work?)
     from observations, conformance (well-designed?) from findings + the
     published conformance summary. Counts + percentages, no recompute of the
@@ -160,7 +190,7 @@ def _two_axis_summary(model: dict, observations: list[dict],
     fail = sum(1 for c in folded.values() if c == "fail")
     n_obs = len(folded)
 
-    cov = _coverage_by_service(model, observations)
+    cov = _coverage_by_service(model, observations, lc_services)
     svc_total = len(cov)
     svc_tested = sum(1 for s in cov.values() if s == TESTED)
     svc_modeled = sum(1 for s in cov.values() if s == MODELED)
@@ -203,9 +233,10 @@ def _coverage_payload() -> dict:
     model = _load_model()
     observations = core_results.load_observations()
     findings = core_results.load_findings()
+    lc_services = _lifecycle_services()
     graph = _graph_view(model)
-    coverage = _coverage_by_service(model, observations)
-    summary = _two_axis_summary(model, observations, findings)
+    coverage = _coverage_by_service(model, observations, lc_services)
+    summary = _two_axis_summary(model, observations, findings, lc_services)
     legend = {
         TESTED: {"fill": "#e7f6ed", "stroke": "#15924f", "label": "tested · 2xx 관측"},
         MODELED: {"fill": "#fdf3e2", "stroke": "#b5740b", "label": "modeled · 모델만"},

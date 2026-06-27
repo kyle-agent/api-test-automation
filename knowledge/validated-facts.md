@@ -743,6 +743,27 @@ First coverage-max dispatch (`docs/working/plans/COVERAGE-MAX-PLAN.md` Tier 0). 
   register-log-export-config / upgrade-kernel return 500 ContactAdminForAssistance
   on all 4 engines — product bugs, now baselined (`known_issues.json`).
 
+## observation `endpoint_key` has TWO shapes — service-aggregation MUST handle both (2026-06-27, branch ecstatic-tesla)
+
+> conf: 0.95 · seen: 2026-06-27 · obs: 2 (reports/results/*.jsonl direct read + live Reporting fix)
+
+`reports/results/observations-*.jsonl` carries `endpoint_key` in **two distinct
+formats**, by source:
+- **`category/service/op`** (slash) — the read-only smoke/crud sweep
+  (`regression/smoke.py`, `read_chains.py`). e.g. `networking/security-group/deletesecuritygroup`.
+- **`<lifecycle>:<step>`** (colon) — the **lifecycle engine** (`engine.py`, what an
+  actual Testing run records). e.g. `gen-cost-reads:create-cost-reads`.
+
+They are unambiguous: lifecycle ids are hyphenated with no `/`; sweep keys carry no `:`.
+**Any code that aggregates observations → service MUST resolve the colon shape via
+the lifecycle→service map** (`loader.load_lifecycles()[id]['service']`), else every
+live Testing run is invisible to coverage. This bit the new Reporting surface
+(`controlplane/reporting_routes.py _service_of_key`) — a run turned 3 services green
+(quick-query / costexplorer / kms) yet coverage read +0 until fixed. Format-agnostic
+consumers (`tools/derive_verified.py`, which keys by the *whole* endpoint_key) are
+unaffected. Note a "soft" 404 (e.g. `gen-cm-account-resource` → `/v1/cloudmonitorings/product/v2/accounts/products`,
+a v1/v2 path smell) passes pytest but correctly does **not** count as tested.
+
 ## id-bound GET coverage: the "create→get-by-id should raise coverage" question (2026-06-18, branch adoring-heisenberg)
 
 > conf: 0.8 · seen: 2026-06-18 · obs: 1 (full static cross-ref of 302 id-GETs vs reports/results/observations.jsonl)
