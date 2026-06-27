@@ -3,6 +3,7 @@
 {% block content %}
 
 <div class="subtabs">
+  <a href="/reporting/coverage">🎨 커버리지 지도</a>
   {% for key, label in tabs %}
   <a href="/reporting?tab={{ key }}" class="{{ 'active' if tab == key else '' }}">{{ label }}</a>
   {% endfor %}

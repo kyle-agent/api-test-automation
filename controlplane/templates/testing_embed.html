@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Testing — 실행 콘솔{% endblock %}
 {% block content %}
+<div class="subtabs" style="padding:7px 18px 0;margin-bottom:4px">
+  <a href="/testing/embed" class="active">▶ 실행 콘솔</a>
+  <a href="/testing">🗓 스케줄 · 트리거</a>
+</div>
 {# Testing(③) = console2 absorbed, served whole at /testing/console and embedded
    here inside the spine's nav shell so the 4-stage nav stays put. ?embed=1 hides
    console2's own brand/external-nav but keeps its 구성|실행 toggle. The iframe is
