@@ -2,8 +2,6 @@
 {% block title %}자원 노드 — {{ node_id }}{% endblock %}
 {% block content %}
 
-{% include "_plan_steps.html" %}
-
 <section>
   <h2><a href="/planning/resources">자원 모델</a> › <code>{{ node_id }}</code>
     {% if is_new %}<span class="cat">신규</span>
@@ -176,6 +174,40 @@ ResourceGraph.load(document.getElementById("dep-svg"),
 </section>
 
 <section>
+  <h2>검증 스텝 (verify) — 행 추가식</h2>
+  <p class="muted">이 노드가 생성된 뒤 함께 호출하는 커버리지 스텝
+    (주로 <b>GET</b>으로 산출 자원을 읽어 확인). endpoint는
+    <code>METHOD /path</code> 형식, expect_status는 허용 코드(콤마로 여럿,
+    예: <code>200, 202</code>). name/note는 선택. 빈 행은 무시됩니다.
+    PUT/POST 검증 스텝의 본문(json) 등 폼 밖 항목은 그대로 보존됩니다.</p>
+  <table>
+    <tbody id="verify-rows">
+      <tr><th style="width:120px">name</th><th>endpoint (METHOD /path)</th>
+          <th style="width:140px">expect_status</th><th>note</th></tr>
+      {% for v in verify_rows %}
+      <tr>
+        <td><input type="text" name="verify_name" value="{{ v.name }}" size="12"></td>
+        <td><input type="text" name="verify_endpoint" value="{{ v.endpoint }}"
+                   placeholder="GET /v1/…/{id}" style="width:96%"></td>
+        <td><input type="text" name="verify_expect" value="{{ v.expect }}" size="12"></td>
+        <td><input type="text" name="verify_note" value="{{ v.note }}" style="width:96%">
+            <input type="hidden" name="verify_extra" value="{{ v.extra }}"></td>
+      </tr>
+      {% endfor %}
+      <tr class="proto">
+        <td><input type="text" name="verify_name" value="" size="12" placeholder="이름(선택)"></td>
+        <td><input type="text" name="verify_endpoint" value=""
+                   placeholder="GET /v1/…/{id}" style="width:96%"></td>
+        <td><input type="text" name="verify_expect" value="" size="12" placeholder="200"></td>
+        <td><input type="text" name="verify_note" value="" style="width:96%">
+            <input type="hidden" name="verify_extra" value=""></td>
+      </tr>
+    </tbody>
+  </table>
+  <button type="button" class="ghost" onclick="addRow('verify-rows')">행 추가</button>
+</section>
+
+<section>
   <h2>capture · ready · delete</h2>
   <p class="muted">capture — 생성 응답에서 뽑을 산출물
     (<code>변수: $.jsonpath</code> 한 줄씩):</p>
@@ -199,6 +231,42 @@ ResourceGraph.load(document.getElementById("dep-svg"),
       <option value="no" {{ '' if delete.get('destructive', True) else 'selected' }}>no</option>
     </select></label>
   </p>
+</section>
+
+<section>
+  <h2>연계 lifecycle (enabled · heavy)</h2>
+  {% if not lifecycle.linked %}
+  <p class="muted">이 노드에는 연계된 lifecycle(<code>source.lifecycle</code>)이
+    없습니다 — enabled/heavy 토글 대상이 없습니다.</p>
+  {% else %}
+  <p class="muted">연계 lifecycle <code>{{ lifecycle.id }}</code>
+    {% if lifecycle.source %}(<code>{{ lifecycle.source }}</code>){% endif %}의
+    실행 플래그입니다. <b>enabled</b>=run 선택에 포함, <b>heavy</b>=과금/대형
+    (별도 opt-in 필요). 이 플래그는 노드 정의(yaml)가 아니라 lifecycle 파일에
+    기록됩니다.</p>
+    {% if lifecycle.found and lifecycle.writable %}
+    <p class="inline">
+      <label><input type="checkbox" name="lifecycle_enabled" value="yes"
+             {{ 'checked' if lifecycle.enabled else '' }}> enabled</label>
+      <label><input type="checkbox" name="lifecycle_heavy" value="yes"
+             {{ 'checked' if lifecycle.heavy else '' }}> heavy</label>
+      <input type="hidden" name="lifecycle_toggle" value="1">
+    </p>
+    <p class="muted" style="font-size:12px">저장 시 verify/노드 정의와 함께
+      <code>{{ lifecycle.source }}</code>의 이 lifecycle 엔트리에 기록됩니다.</p>
+    {% else %}
+    <p class="inline">
+      <span class="status {{ 'done' if lifecycle.enabled else '' }}">enabled:
+        {{ 'on' if lifecycle.enabled else 'off' }}</span>
+      <span class="status {{ 'dispatched' if lifecycle.heavy else '' }}">heavy:
+        {{ 'on' if lifecycle.heavy else 'off' }}</span>
+      <span class="cat">읽기 전용</span>
+    </p>
+    <p class="muted" style="font-size:12px">⚠ {{ lifecycle.reason }} — 여기서는
+      값만 표시합니다. 변경이 필요하면 lead/해당 lifecycle 소유 에이전트에게
+      문의하세요.</p>
+    {% endif %}
+  {% endif %}
 </section>
 
 <section>

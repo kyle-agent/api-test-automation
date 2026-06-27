@@ -433,6 +433,7 @@ def resource_form(request: Request, node_id: str, service: str = ""):
     is_new = node is None
     node = node or {"service": service.strip(), "provenance": "docs"}
     return _render(request, "resource_form.html", plan_step="model",
+                   active="modeling",  # Modeling nav 탭 강조
                    node_id=node_id, node=node, is_new=is_new,
                    file=sources.get(node_id, ""),
                    node_ids=sorted(model),
@@ -440,6 +441,8 @@ def resource_form(request: Request, node_id: str, service: str = ""):
                    opt_rows=resource_model.options_rows(node),
                    body_text=resource_model.body_text(node),
                    capture_text=resource_model.capture_text(node),
+                   verify_rows=resource_model.verify_rows(node),
+                   lifecycle=resource_model.lifecycle_info(node),
                    ready=node.get("ready") or {},
                    delete=node.get("delete") or {},
                    option_types=resource_model.OPTION_TYPES,
@@ -457,6 +460,34 @@ async def resource_save(request: Request, node_id: str):
                   "rel": "", "commit": "", "pushed": False, "file": ""}
     else:
         result = resource_model.save_node(node_id, node)
+        _apply_lifecycle_toggle(form, node_id, result)
     return templates.TemplateResponse(
         request, "resource_save_result.html",
         {"result": result, "saved": result["ok"], "node_id": node_id})
+
+
+def _apply_lifecycle_toggle(form, node_id: str, result: dict) -> None:
+    """노드 저장이 성공하면, 폼이 보낸 lifecycle enabled/heavy 토글을 연계
+    lifecycle 프래그먼트에 반영한다(쓰기 가능할 때만 lifecycle_toggle 가 옴).
+    토글 자체의 실패는 노드 저장을 무르지 않고 warning 으로만 알린다 — 두 산출물
+    (노드 yaml · lifecycle json)은 서로 다른 파일/관심사라 부분 성공을 허용한다."""
+    if not result.get("ok") or str(form.get("lifecycle_toggle") or "") != "1":
+        return
+    # source.lifecycle 은 폼이 편집하지 않으므로 현재 저장된 노드에서 가져온다.
+    existing = resource_model.load_model().get(node_id) or {}
+    info = resource_model.lifecycle_info(existing)
+    result.setdefault("warnings", [])
+    if not info["writable"]:
+        result["warnings"].append(
+            f"lifecycle 토글을 적용하지 못했습니다: {info['reason']}")
+        return
+    enabled = resource_model._yes(form.get("lifecycle_enabled") or "")
+    heavy = resource_model._yes(form.get("lifecycle_heavy") or "")
+    res = resource_model.set_lifecycle_flags(existing, enabled=enabled, heavy=heavy)
+    if not res["ok"]:
+        result["warnings"].append(
+            "lifecycle 토글 실패: " + "; ".join(res["errors"]))
+    elif res["changed"]:
+        result["warnings"].append(
+            f"lifecycle <code>{res['id']}</code>: enabled={enabled}, "
+            f"heavy={heavy} 로 <code>{res['file']}</code>에 기록했습니다.")

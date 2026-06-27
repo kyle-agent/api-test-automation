@@ -37,10 +37,13 @@ DRAFT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 OPTION_TYPES = ("cidr", "enum", "ref", "string")
 PROVENANCE = ("VALIDATED", "docs")
 
-# 폼이 관리하는 §1 키 — 저장 시 이 키들만 교체하고 나머지(verify, notes 등
+# 폼이 관리하는 §1 키 — 저장 시 이 키들만 교체하고 나머지(source, notes 등
 # 폼 밖의 지식)는 기존 정의에서 그대로 보존한다.
 MANAGED_KEYS = ("code", "service", "group", "requires", "create",
-                "capture", "ready", "delete", "quota", "provenance")
+                "capture", "ready", "delete", "quota", "provenance", "verify")
+
+# verify 스텝에서 폼이 직접 편집하는 키 (나머지 json/임의 키는 hidden으로 보존).
+VERIFY_FORM_KEYS = ("name", "endpoint", "expect_status", "note")
 
 
 # --- 위치 ---------------------------------------------------------------------------
@@ -172,6 +175,34 @@ def capture_text(node: dict) -> str:
                           default_flow_style=False).strip() if cap else ""
 
 
+def _expect_text(expect) -> str:
+    """expect_status (int | list[int]) -> 폼 표시용 콤마 문자열."""
+    if isinstance(expect, (list, tuple)):
+        return ", ".join(str(v) for v in expect)
+    return "" if expect is None else str(expect)
+
+
+def verify_rows(node: dict) -> list[dict]:
+    """§1 verify -> 폼 행 [{name, endpoint, expect, note, extra}].
+
+    폼은 name/endpoint/expect_status/note 만 직접 편집한다. 그 외 키(json 본문
+    등 PUT/POST 검증 스텝의 페이로드)는 'extra'에 JSON으로 담아 hidden으로 실어
+    저장 시 그대로 복원한다 — round-trip에서 본문이 유실되지 않게."""
+    rows = []
+    for v in node.get("verify") or []:
+        if not isinstance(v, dict):
+            continue
+        extra = {k: val for k, val in v.items() if k not in VERIFY_FORM_KEYS}
+        rows.append({
+            "name": str(v.get("name") or ""),
+            "endpoint": str(v.get("endpoint") or ""),
+            "expect": _expect_text(v.get("expect_status")),
+            "note": str(v.get("note") or ""),
+            "extra": json.dumps(extra, ensure_ascii=False) if extra else "",
+        })
+    return rows
+
+
 def _vals(form, key: str) -> list[str]:
     return [str(v) for v in form.getlist(key)]
 
@@ -190,6 +221,8 @@ def parse_form(form) -> tuple[dict, list[str]]:
       create_endpoint · create_body(JSON)
       opt_name[] opt_type[] opt_required[] opt_vary[] opt_default[]
       opt_enum[] opt_target[] opt_pick[] opt_of[] opt_note[]
+      verify_name[] verify_endpoint[] verify_expect[] verify_note[]
+                                              verify_extra[](hidden JSON, 보존용)
       capture(YAML 매핑) · ready_field/ready_until/ready_timeout
       delete_endpoint · delete_destructive
     """
@@ -304,6 +337,51 @@ def parse_form(form) -> tuple[dict, list[str]]:
         create["options"] = options
     if create:
         node["create"] = create
+
+    # verify — GET-커버리지 스텝 행 (endpoint + expect_status, name/note 선택).
+    # extra(hidden JSON)는 폼이 직접 편집하지 않는 json 본문 등을 보존한다.
+    verify: list = []
+    v_name, v_ep = _vals(form, "verify_name"), _vals(form, "verify_endpoint")
+    v_expect, v_note = _vals(form, "verify_expect"), _vals(form, "verify_note")
+    v_extra = _vals(form, "verify_extra")
+
+    def vcol(vals: list[str], i: int) -> str:
+        return vals[i].strip() if i < len(vals) else ""
+
+    for i, raw in enumerate(v_ep):
+        endpoint = raw.strip()
+        if not endpoint:
+            continue  # 빈 행(추가용)은 무시
+        if not ENDPOINT_RE.match(endpoint):
+            errors.append(f"verify.endpoint {endpoint!r}: 'METHOD /path' 형식이어야 합니다")
+        step: dict = {}
+        # 보존된 extra(json 본문 등)를 먼저 깔고 폼 필드로 덮어쓴다.
+        raw_extra = vcol(v_extra, i)
+        if raw_extra:
+            try:
+                ex = json.loads(raw_extra)
+                if isinstance(ex, dict):
+                    step.update(ex)
+            except ValueError:
+                pass  # 손상된 hidden 값은 무시 (폼 필드가 진실)
+        if vcol(v_name, i):
+            step["name"] = vcol(v_name, i)
+        step["endpoint"] = endpoint
+        expect_raw = vcol(v_expect, i)
+        codes = [c for c in re.split(r"[,\s]+", expect_raw) if c]
+        nums: list[int] = []
+        for c in codes:
+            try:
+                nums.append(int(c))
+            except ValueError:
+                errors.append(f"verify {endpoint!r}: expect_status {c!r}는 정수여야 합니다")
+        if nums:
+            step["expect_status"] = nums[0] if len(nums) == 1 else nums
+        if vcol(v_note, i):
+            step["note"] = vcol(v_note, i)
+        verify.append(step)
+    if verify:
+        node["verify"] = verify
 
     # capture / ready / delete / quota / provenance
     raw_cap = str(form.get("capture") or "").strip()
@@ -472,6 +550,114 @@ def save_node(node_id: str, node: dict, *, validate_only: bool = False) -> dict:
             "수행했습니다 (전체 검증은 R1 validator 머지 후 자동 적용)")
     result["file"] = rel
     return result
+
+
+# --- 노드 ↔ lifecycle 연계 (enabled/heavy 토글) -----------------------------------------
+#
+# 노드는 source.lifecycle 로 lifecycle id 를 가리킨다. lifecycle 본체는 두 곳에
+# 흩어져 있다(loader.load_lifecycles 가 병합): 공유 scenarios.json(병렬 캠페인이
+# 공유 — 절대 쓰지 않는다) 과 lifecycles/<category>__<service>.json 프래그먼트
+# (서비스당 1파일 — 이쪽만 안전하게 쓴다). 그래서 lifecycle_info 는 enabled/heavy
+# 와 함께 writable(=프래그먼트 거주 여부) 를 돌려주고, set_lifecycle_flags 는
+# 프래그먼트가 아니면 거부한다.
+
+def _lifecycle_id_of(node: dict) -> str:
+    return str(((node.get("source") or {}).get("lifecycle")) or "").strip()
+
+
+def lifecycle_info(node: dict) -> dict:
+    """노드의 연계 lifecycle 상태 — 폼의 lifecycle 섹션이 쓰는 단일 소스.
+
+    반환: {linked, id, found, enabled, heavy, source, writable, reason}.
+      · linked   — 노드에 source.lifecycle 이 있는가
+      · found    — 그 id 가 실제 lifecycle 로 해석되는가
+      · writable — 프래그먼트(lifecycles/*.json)에 있어 토글을 저장할 수 있는가
+                   (공유 scenarios.json 거주분은 읽기 전용)
+      · reason   — writable=False 일 때 사람이 읽을 사유
+    로더가 없거나 깨져도(병렬 머지 전) 페이지가 살아있게 best-effort 로 degrade."""
+    info = {"linked": False, "id": "", "found": False, "enabled": None,
+            "heavy": None, "source": "", "writable": False, "reason": ""}
+    lid = _lifecycle_id_of(node)
+    if not lid:
+        info["reason"] = "이 노드에는 연계된 lifecycle(source.lifecycle)이 없습니다"
+        return info
+    info["linked"] = True
+    info["id"] = lid
+    try:
+        from regression.scenarios import loader as _loader
+        lcs, src = _loader.load_lifecycles(with_sources=True)
+    except Exception as exc:  # 로더 부재/중복 id 등 -> 읽기 전용 degrade
+        info["reason"] = f"lifecycle 로더를 읽지 못했습니다: {exc}"
+        return info
+    entry = next((x for x in lcs if x.get("id") == lid), None)
+    if entry is None:
+        info["reason"] = f"lifecycle {lid!r}를 찾을 수 없습니다 (병렬 머지 전일 수 있음)"
+        return info
+    info["found"] = True
+    info["enabled"] = bool(entry.get("enabled"))
+    info["heavy"] = bool(entry.get("heavy"))
+    info["source"] = src.get(lid, "")
+    if info["source"] == "scenarios.json":
+        info["reason"] = ("공유 scenarios.json 에 정의된 lifecycle 입니다 — 병렬 "
+                          "캠페인 충돌 방지를 위해 여기서는 읽기 전용입니다")
+    elif info["source"]:
+        info["writable"] = True
+    else:
+        info["reason"] = "lifecycle 출처 파일을 알 수 없습니다"
+    return info
+
+
+def set_lifecycle_flags(node: dict, *, enabled: bool, heavy: bool) -> dict:
+    """노드의 연계 lifecycle 프래그먼트에 enabled/heavy 를 안전하게 기록한다.
+
+    프래그먼트(lifecycles/*.json) 거주분만 쓴다 — scenarios.json/미해결은 거부.
+    파일의 다른 lifecycle 엔트리와 키 순서는 그대로 두고 해당 엔트리의 두 플래그만
+    바꾼 뒤 통째로 다시 직렬화한다. 반환 {ok, changed, errors, file, id}."""
+    out = {"ok": False, "changed": False, "errors": [], "file": "", "id": ""}
+    info = lifecycle_info(node)
+    out["id"] = info["id"]
+    out["file"] = info["source"]
+    if not info["found"]:
+        out["errors"].append(info["reason"] or "연계 lifecycle 을 찾을 수 없습니다")
+        return out
+    if not info["writable"]:
+        out["errors"].append(info["reason"] or
+                             "이 lifecycle 은 여기서 저장할 수 없습니다")
+        return out
+
+    from regression.scenarios import loader as _loader
+    path = _loader.FRAGMENTS_DIR / info["source"]
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        out["errors"].append(f"{info['source']}: 읽기/파싱 실패 — {exc}")
+        return out
+    if not isinstance(doc, dict) or not isinstance(doc.get("lifecycles"), list):
+        out["errors"].append(f"{info['source']}: 예상한 {{'lifecycles': [...]}} 구조가 "
+                             "아니라 토글을 적용하지 않았습니다")
+        return out
+
+    hit = False
+    for lc in doc["lifecycles"]:
+        if isinstance(lc, dict) and lc.get("id") == info["id"]:
+            if lc.get("enabled") != enabled or lc.get("heavy") != heavy:
+                out["changed"] = True
+            lc["enabled"] = enabled
+            lc["heavy"] = heavy
+            hit = True
+            break
+    if not hit:
+        out["errors"].append(f"{info['source']}에서 lifecycle {info['id']!r} "
+                             "엔트리를 찾지 못했습니다")
+        return out
+    try:
+        path.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8")
+    except OSError as exc:
+        out["errors"].append(f"{info['source']}: 쓰기 실패 — {exc}")
+        return out
+    out["ok"] = True
+    return out
 
 
 # --- 합성 draft (C4: drafts/lifecycle-gen-*.json) ---------------------------------------
