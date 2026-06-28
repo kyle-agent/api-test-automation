@@ -118,6 +118,97 @@ def group_of(node_id: str, node: dict) -> str:
     return code or "(미분류)"
 
 
+# --- 완성도/provenance 판정 (모델 지도 overlay + 저작 작업 큐의 단일 source) ----------
+#
+# resource_routes(map.json overlay · map_page 카운트 · worklist)가 모두 이 함수를
+# 쓴다 — fastapi-free라 오프라인 단위 테스트가 가능하다(계약 §4 Modeling).
+# "불완전" = create.endpoint 부재 OR requires 참조 미해결. 단 **no_api 노드**
+# (docker push 산물 등 REST create가 설계상 없는 노드)는 endpoint가 없는 게
+# 정상이므로 불완전이 아니라 '설계상 완성(graph-only)'으로 따로 다룬다.
+
+def missing_requires(node: dict, known: set) -> list[str]:
+    """이 노드 requires 중 모델에 (아직) 없는 대상 — 완성도 게이지의 결손."""
+    miss: list[str] = []
+    for r in node.get("requires") or []:
+        if isinstance(r, str):
+            if r not in known:
+                miss.append(r)
+        elif isinstance(r, dict) and "one_of" in r:
+            alts = [(a.get("ref") if isinstance(a, dict) else a)
+                    for a in (r.get("one_of") or [])]
+            alts = [a for a in alts if a]
+            if alts and not any(a in known for a in alts):
+                miss.append("one_of(" + ", ".join(str(a) for a in alts) + ")")
+        elif isinstance(r, dict) and "ref" in r:
+            if r["ref"] not in known:
+                miss.append(str(r["ref"]))
+    return miss
+
+
+def node_meta(model: dict) -> tuple[list[str], dict]:
+    """(anchors, meta) — anchors=생성 가능한(create.endpoint 보유) 노드 = 지도의 닻.
+
+    meta[id] = {provenance, has_endpoint, no_api, missing[], complete}.
+    complete = no_api(설계상 완성) OR (create.endpoint 보유 AND requires 모두 해결).
+    no_api 노드는 endpoint가 없어도 불완전이 아니다(REST create가 설계상 부재)."""
+    known = set(model)
+    anchors: list[str] = []
+    meta: dict[str, dict] = {}
+    for nid in sorted(model):
+        node = model[nid]
+        has_ep = bool((node.get("create") or {}).get("endpoint"))
+        no_api = bool(node.get("no_api"))
+        missing = missing_requires(node, known)
+        meta[nid] = {
+            "provenance": str(node.get("provenance") or "?"),
+            "has_endpoint": has_ep,
+            "no_api": no_api,
+            "missing": missing,
+            "complete": no_api or (has_ep and not missing),
+        }
+        if has_ep:
+            anchors.append(nid)
+    return anchors, meta
+
+
+def worklist(model: dict) -> dict:
+    """저작 작업 큐 — 손봐야 할 노드를 묶음으로. node_meta와 한 소스.
+
+      · incomplete  = create.endpoint 부재 OR requires 미해결 → 최우선 저작 대상.
+      · docs_only   = 완성됐지만 provenance:docs (실제 2xx 미검증) → 검증 대상.
+      · no_api      = REST create가 설계상 없는 노드(docker push 산물 등) →
+                      저작·API검증 둘 다 불가(R3 push 러너 전까지). 투명성을 위해
+                      별도 묶음으로만 surface — incomplete/docs_only에 넣지 않는다.
+    각 행은 편집 폼(/planning/resources/{id}) 딥링크용 id/service/why 를 담는다."""
+    _, meta = node_meta(model)
+    incomplete: list[dict] = []
+    docs_only: list[dict] = []
+    no_api: list[dict] = []
+    for nid in sorted(model):
+        m = meta[nid]
+        service = str(model[nid].get("service") or "")
+        if m["no_api"]:
+            no_api.append({"id": nid, "service": service,
+                           "why": "REST create 없음 (docker push 산물 등) — "
+                                  "R3 push 러너 전까지 그래프 문서화 전용",
+                           "provenance": m["provenance"]})
+            continue
+        if not m["complete"]:
+            why = []
+            if not m["has_endpoint"]:
+                why.append("생성 endpoint 없음")
+            if m["missing"]:
+                why.append("미해결 참조: " + ", ".join(m["missing"]))
+            incomplete.append({"id": nid, "service": service,
+                               "why": " · ".join(why) or "정의 미완성",
+                               "provenance": m["provenance"]})
+        elif m["provenance"] == "docs":
+            docs_only.append({"id": nid, "service": service,
+                              "why": "실제 2xx 미검증 (모델만)",
+                              "provenance": "docs"})
+    return {"incomplete": incomplete, "docs_only": docs_only, "no_api": no_api}
+
+
 # --- 폼 표현 <-> §1 구조 ---------------------------------------------------------------
 
 def requires_rows(node: dict) -> list[dict]:

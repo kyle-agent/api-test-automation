@@ -18,9 +18,11 @@
       <div class="lbl" style="color:var(--grey)">불완전 (정의 미완성)</div></div>
     <div class="card"><div class="num">{{ n_docs }}</div>
       <div class="lbl" style="color:var(--amber)">미검증 (모델만)</div></div>
+    {% if n_no_api %}<div class="card"><div class="num">{{ n_no_api }}</div>
+      <div class="lbl" style="color:var(--grey)">graph-only (no_api)</div></div>{% endif %}
   </div>
   <p class="muted small" style="margin:0">
-    불완전 {{ n_incomplete }} · 미검증 {{ n_docs }}</p>
+    불완전 {{ n_incomplete }} · 미검증 {{ n_docs }}{% if n_no_api %} · graph-only(no_api) {{ n_no_api }}{% endif %}</p>
 </section>
 
 <section>
@@ -67,5 +69,27 @@
   <p class="muted">미검증 노드가 없습니다 — 완성된 노드는 모두 VALIDATED입니다.</p>
   {% endif %}
 </section>
+
+{% if no_api %}
+<section>
+  <h2>③ graph-only (no_api)
+    <span class="muted">— REST create가 설계상 없는 노드 ({{ n_no_api }})</span></h2>
+  <p class="muted small" style="margin-top:0">docker push 산물 등으로 Open API
+    <code>create</code> 엔드포인트가 없어 저작·API 검증 둘 다 불가합니다 — 불완전이
+    아니라 <b>설계상 완성</b>입니다. R3 push 러너가 생기기 전까지 그래프 문서화 전용.</p>
+  <table>
+    <tr><th>노드 id</th><th>service</th><th>왜 graph-only인가</th><th>상태</th><th></th></tr>
+    {% for n in no_api %}
+    <tr>
+      <td><a href="/planning/resources/{{ n.id }}"><code>{{ n.id }}</code></a></td>
+      <td class="muted">{{ n.service or '—' }}</td>
+      <td>{{ n.why }}</td>
+      <td><span class="chip">graph-only</span></td>
+      <td><a href="/planning/resources/{{ n.id }}">보기 →</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
 
 {% endblock %}

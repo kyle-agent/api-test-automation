@@ -110,76 +110,9 @@ def _compose_nodes(model: dict) -> list[dict]:
 # overlay(id)는 이 meta로 색칠한다: VALIDATED=초록 · docs=주황 · 불완전=회색+badge.
 # "불완전" = create.endpoint 부재 OR requires 참조 중 모델에 없는 노드(미해결)가 있음.
 
-def _missing_requires(node: dict, known: set) -> list[str]:
-    """이 노드 requires 중 모델에 (아직) 없는 대상 — 완성도 게이지의 결손."""
-    miss: list[str] = []
-    for r in node.get("requires") or []:
-        if isinstance(r, str):
-            if r not in known:
-                miss.append(r)
-        elif isinstance(r, dict) and "one_of" in r:
-            alts = [(a.get("ref") if isinstance(a, dict) else a)
-                    for a in (r.get("one_of") or [])]
-            alts = [a for a in alts if a]
-            if alts and not any(a in known for a in alts):
-                miss.append("one_of(" + ", ".join(str(a) for a in alts) + ")")
-        elif isinstance(r, dict) and "ref" in r:
-            if r["ref"] not in known:
-                miss.append(str(r["ref"]))
-    return miss
-
-
-def _map_meta(model: dict) -> tuple[list[str], dict]:
-    """(targets, meta) — targets=생성 가능한(create.endpoint 보유) 노드 = 지도의 닻.
-    meta[id] = {provenance, has_endpoint, complete, missing[]} for overlay()."""
-    known = set(model)
-    targets: list[str] = []
-    meta: dict[str, dict] = {}
-    for nid in sorted(model):
-        node = model[nid]
-        has_ep = bool((node.get("create") or {}).get("endpoint"))
-        missing = _missing_requires(node, known)
-        meta[nid] = {
-            "provenance": str(node.get("provenance") or "?"),
-            "has_endpoint": has_ep,
-            "missing": missing,
-            "complete": has_ep and not missing,
-        }
-        if has_ep:
-            targets.append(nid)
-    return targets, meta
-
-
-def _worklist(model: dict) -> tuple[list[dict], list[dict]]:
-    """저작 작업 큐 — 손봐야 할 노드를 (불완전, 미검증) 두 묶음으로.
-
-    _map_meta가 이미 계산한 완성도/provenance를 그대로 재사용한다(지도와 한 소스).
-      · 불완전(incomplete) = create.endpoint 부재 OR requires 참조 미해결 →
-        최우선 저작 대상. why = "생성 endpoint 없음" / "미해결 참조: …".
-      · 미검증(docs-only) = provenance:docs 인데 완성된 노드 → 검증(2xx) 대상.
-        (불완전과 겹치면 불완전 쪽에만 넣어 중복을 피한다.)
-    각 행은 편집 폼(/planning/resources/{id}) 딥링크용 id/service/why 를 담는다.
-    """
-    _, meta = _map_meta(model)
-    incomplete: list[dict] = []
-    docs_only: list[dict] = []
-    for nid in sorted(model):
-        m = meta[nid]
-        service = str(model[nid].get("service") or "")
-        if not m["complete"]:
-            why = []
-            if not m["has_endpoint"]:
-                why.append("생성 endpoint 없음")
-            if m["missing"]:
-                why.append("미해결 참조: " + ", ".join(m["missing"]))
-            incomplete.append({"id": nid, "service": service,
-                               "why": " · ".join(why) or "정의 미완성",
-                               "provenance": m["provenance"]})
-        elif m["provenance"] == "docs":
-            docs_only.append({"id": nid, "service": service,
-                              "why": "실제 2xx 미검증 (모델만)",
-                              "provenance": "docs"})
-    return incomplete, docs_only
+# 완성도/provenance 판정은 resource_model로 옮겨 fastapi 없이 단위 테스트되게 했다
+# (한 소스). 라우트는 표시용 얇은 래퍼만 둔다.
+_map_meta = resource_model.node_meta
 
 
 def _plan_dict(plan) -> dict:
@@ -356,12 +289,13 @@ def worklist_page(request: Request):
     지도(/map)와 같은 완성도/provenance(_map_meta)를 써서 손봐야 할 노드만 추려
     각 노드 편집 폼으로 바로 가는 딥링크를 준다. "/{node_id}" 보다 먼저 선언."""
     model = resource_model.load_model()
-    incomplete, docs_only = _worklist(model)
+    wl = resource_model.worklist(model)
+    incomplete, docs_only, no_api = wl["incomplete"], wl["docs_only"], wl["no_api"]
     return _render(request, "resource_worklist.html", plan_step="model",
                    active="modeling",  # Modeling nav 탭 강조
-                   incomplete=incomplete, docs_only=docs_only,
+                   incomplete=incomplete, docs_only=docs_only, no_api=no_api,
                    n_incomplete=len(incomplete), n_docs=len(docs_only),
-                   total=len(model))
+                   n_no_api=len(no_api), total=len(model))
 
 
 @router.get("/compose", response_class=HTMLResponse)

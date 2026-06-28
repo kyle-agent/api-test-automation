@@ -108,6 +108,22 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **LATEST (2026-06-28, platform worklist correctness fix):** the new Modeling
+  **authoring worklist** (`/planning/resources/worklist`) was mis-flagging the 2
+  **`no_api`** nodes (`scr-image`, `scr-tag` — docker-push-born, no REST `create`
+  by design) as **① 불완전 (incomplete authoring targets)**, permanently polluting
+  its top-priority bucket with un-actionable rows. Fixed: the completeness logic
+  (`_map_meta`/`_worklist`) was **moved out of `resource_routes.py` into the
+  fastapi-free `controlplane/resource_model.py`** (`node_meta`/`worklist`, now
+  unit-testable — `tests/offline/test_resource_worklist.py`, 4 tests) and a
+  `no_api` node is now treated as **complete-by-design**: it lands in a new **③
+  graph-only (no_api)** bucket, never in incomplete/docs-only. Worklist now reads
+  **incomplete 0 · docs-only 142 · graph-only(no_api) 2** (was incomplete 2). So
+  the **real offline authoring backlog is 0**; the per-service coverage frontier
+  is converting the **142 docs-only → VALIDATED via live runs** (≈57 are heavy DB
+  engines: sqlserver 16 · mariadb/mysql 11 · epas 10 · postgresql 9; rest lighter:
+  iam 8 · virtualserver 7 · backup 6 · organization 6 · iam-IdC 5 · vpc/cloudmon 4 …).
+  CI lane CLEAR (last `api-test.yml` run completed 2026-06-19). No live calls made.
 - **LATEST (2026-06-25, hand-driven heavy coverage session — committed DIRECTLY to
   `main` at user request, NOT a feature branch):** three HEAVY live runs landed on
   `main` (origin/main tip `44db7896` at handoff; verify with `git log --oneline -1
