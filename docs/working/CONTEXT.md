@@ -108,7 +108,28 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-06-25, hand-driven heavy coverage session — committed DIRECTLY to
+- **LATEST (2026-06-28, platform convergence + live coverage push — branch
+  `claude/ecstatic-tesla-fo1g3b`; reporting fix FF-merged to `main` at `8237e153`):**
+  console2 absorbed into the controlplane as ONE unified 4-stage console
+  (**Catalog · Modeling · Testing · Reporting**); console2 app retired (S4). **Fixed a
+  convergence bug**: the Reporting coverage surface keyed only on the smoke sweep's
+  `category/service/op` endpoint_key and was BLIND to the engine's `<lifecycle>:<step>`
+  keys — so every live Testing run showed +0 coverage. Now resolves lifecycle→service
+  via `loader.load_lifecycles` (`controlplane/reporting_routes.py`; regression test
+  `tests/offline/test_reporting_coverage_key.py`; fact in `knowledge/validated-facts.md`).
+  **Coverage push (read-only, zero-resource):** ran the 37 read-only VPC-free non-heavy
+  lifecycles via Testing `/api/run` (mut OFF) → **service-level tested 13→33 / 59 (+20
+  newly green)**, e.g. all 6 database read services (mysql/postgresql/mariadb/epas/
+  sqlserver/cachestore), data-analytics (vertica/searchengine/eventstreams/data-flow/
+  data-ops), ske, quota, support, loggingaudit, cloudmonitoring, pricing, product,
+  configinspection, iam-identity-center. `cloud-ml` stays modeled (secret/SCR-gated →
+  `GET /v1/cloud-ml/images` 404). **Durable:** `data/baselines/verified_endpoints.json`
+  **1035→1167 (+132)** — folds this session's read-only batch + the earlier heavy-VS run
+  (`compute-virtualserver-full:*` creates/deletes) + light-validate, which derive had
+  never captured (it defaulted to the singular `observations.jsonl`). Local runs ⇒ empty
+  `first_run`/`last_run` (backfilled by future CI). Verify clean: only the known
+  IAM-undeletable log-group survives (read-only ⇒ no new resources).
+- **PRIOR (2026-06-25, hand-driven heavy coverage session — committed DIRECTLY to
   `main` at user request, NOT a feature branch):** three HEAVY live runs landed on
   `main` (origin/main tip `44db7896` at handoff; verify with `git log --oneline -1
   origin/main`). Coverage gains: **filestorage 8→17/21** (snapshot+schedule CRUD +
