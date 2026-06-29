@@ -273,31 +273,15 @@ lifecycle `heavy-asg-full-coverage` in
 
 ## networking / firewall
 
-- **Host:** regional. 8 endpoints. Firewalls are VPC-bound resources; the account
-  must have at least one VPC/firewall provisioned before most endpoints are reachable.
-- `GET /v1/firewalls` (listfirewalls) returns 200 OK even with zero firewalls (empty
-  list `{"count":0,"firewalls":[],"page":0,"size":20}`). No required query params.
-  Covered in read-only smoke. **Live confirmed 2026-06-20: account has 0 firewalls.**
-- `GET /v1/firewalls/rules` (listfirewallrules) requires **`firewall_id` query param**
-  (marked required in `data/api_catalog_params.json`); bare call returns 400. Probe
-  with dummy id returns 404 `ResourceNotFound` — backend is reachable. Not coverable
-  read-only without a real firewall_id. `firewall_id` not in smoke _REQUIRED_QUERY_DEFAULTS
-  (no safe synthetic value — any guess returns 404, not 200).
-- `GET /v1/firewalls/{firewall_id}` (showfirewall) returns 404 `ResourceNotFound` with
-  dummy id. `GET /v1/firewalls/rules/{firewall_rule_id}` (showfirewallrule) also 404.
-  Both backend-reachable; no resources provisioned in account. **Live confirmed 2026-06-20.**
-- All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule
-  PUT, deletefirewallrule DELETE) need `SCP_ALLOW_MUTATIONS=true` (and DELETE needs
-  `SCP_ALLOW_DESTRUCTIVE=true`) plus existing firewall/rule IDs from a prior create.
-- **Intermittent 503s** are normal transient gateway timeouts; the client retries and
-  the smoke test picks up 200 on retry. Not a persistent backend bug.
-- **Coverage path (mutations required):** firewalls are auto-created with a VPC when
-  `firewall_enabled: true`; use `$.firewalls[0].id` from listfirewalls response.
-  `showfirewall` + `listfirewallrules?firewall_id=X` unlock. Create a rule via
-  POST /v1/firewalls/rules to get `$.firewall_rule.id` → `showfirewallrule`,
-  `setfirewallrule`, `deletefirewallrule`. `setfirewall` body: `{flavor_name, loggable}`.
-- **Read-only ceiling: 1/8** (listfirewalls). 7 remaining are mutation-gated or
-  require a real resource id (no firewalls in account). Confirmed 2026-06-20.
+- **Host:** regional (`firewall.<region>.<env>.samsungsdscloud.com`). 8 endpoints. Firewalls are VPC-bound resources; auto-created implicitly when a carrier resource (IGW/Direct Connect/LB) is created with `firewall_enabled: true`. No standalone `POST /v1/firewalls` endpoint exists.
+- **LIFECYCLE FIXED 2026-06-29:** `networking-firewall-rule` lifecycle now starts with a `listfirewalls` GET step (unconditionally 200). Lifecycle is now light-runnable.
+- `GET /v1/firewalls` (listfirewalls): returns 200 OK even with zero firewalls — `{"count":0,"firewalls":[],"page":0,"size":20}`. No required query params. **Live confirmed 2026-06-20 and 2026-06-29.** First step in `networking-firewall-rule` lifecycle.
+- `GET /v1/firewalls/rules` (listfirewallrules): requires `firewall_id` query param (REQUIRED per api_docs). Probe with dummy id returns 404 `{"code":"ResourceNotFound"}` — real JSON error (backend reachable, not portal). Not coverable read-only without a real firewall_id.
+- `GET /v1/firewalls/{firewall_id}` (showfirewall): 404 `ResourceNotFound` with any dummy id. `GET /v1/firewalls/rules/{firewall_rule_id}` (showfirewallrule): same. Both backend-reachable. **Live confirmed 2026-06-29.**
+- All 4 mutating endpoints (createfirewallrule POST, setfirewall PUT, setfirewallrule PUT, deletefirewallrule DELETE) need existing firewall/rule IDs from a prior VPC+IGW create.
+- **Intermittent 503s** are normal transient gateway timeouts; the client retries handle them. Not a persistent backend bug.
+- **Coverage path (heavy — VPC+IGW required):** create VPC with `firewall_enabled: true` → listfirewalls captures `$.firewalls[0].id` → showfirewall/listfirewallrules/showfirewallrule/createfirewallrule/setfirewallrule/deletefirewallrule/setfirewall all unlock (7 endpoints). setfirewall body: `{flavor_name: EXSMALL, loggable: false}`. createfirewallrule captures `$.firewall_rule.id`.
+- **Read-only ceiling: 1/8** (listfirewalls). 7 remaining need real firewall_id (VPC+IGW create → needs-heavy). Confirmed 2026-06-20 and 2026-06-29.
 
 ## networking / security-group
 
