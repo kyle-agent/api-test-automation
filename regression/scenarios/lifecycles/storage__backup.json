@@ -42,6 +42,15 @@
           "expect_status": [200]
         },
         {
+          "name": "list-backup-agent-targets",
+          "method": "GET",
+          "path": "/v1/backup-agents/targets",
+          "optional": true,
+          "params": {"server_category": "VIRTUAL_SERVER"},
+          "expect_status": [200],
+          "_note": "listbackupagenttargets: server_category is a REQUIRED query param (400 without it). VIRTUAL_SERVER returns 200 empty list. Confirmed live 2026-06-29."
+        },
+        {
           "name": "check-backup-agent-connection-state",
           "method": "GET",
           "path": "/v1/backup-agents/{backup_agent_id}/check-connection-state",
@@ -119,6 +128,15 @@
           "path": "/v1/backups",
           "optional": true,
           "expect_status": [200]
+        },
+        {
+          "name": "get-backup-target-list",
+          "method": "GET",
+          "path": "/v1/backups/backup-targets",
+          "optional": true,
+          "params": {"server_category": "VIRTUAL_SERVER", "policy_type": "FILESYSTEM"},
+          "expect_status": [200],
+          "_note": "getbackuptargetlist: policy_type=VM_IMAGE returns 500 (known backend bug, baselined); FILESYSTEM returns 200 empty list. Confirmed live 2026-06-29."
         },
         {
           "name": "get-backup-schedules",

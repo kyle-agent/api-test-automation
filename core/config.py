@@ -54,9 +54,13 @@ def _forbidden() -> frozenset:
 
 # Account-scoped (region-less) services, verified by DNS against the platform:
 # their host is <service>.<env>.samsungsdscloud.com (no region segment).
+# sts: confirmed GLOBAL 2026-06-29 — sts.e.samsungsdscloud.com returns JSON API
+# responses (Content-Type: application/json, Strict-Transport-Security header present);
+# the regional host sts.<region>.e.samsungsdscloud.com returns the Samsung Cloud
+# Platform web portal HTML 404 page (Content-Type: text/html, wrong gateway).
 DEFAULT_GLOBAL_SERVICES = frozenset({
     "billingplan", "budget", "cloudcontrol", "costexplorer", "iam",
-    "organization", "pricing", "product", "quota", "resourcemanager", "support",
+    "organization", "pricing", "product", "quota", "resourcemanager", "sts", "support",
 })
 
 

@@ -5,8 +5,15 @@
       "service": "networking/firewall",
       "enabled": true,
       "heavy": false,
-      "_note": "COVERAGE-ONLY firewall lifecycle (Wave 2, NOT runtime-proven). A firewall is an attribute of a vpc/igw/direct-connect (created implicitly with firewall_enabled:true), NOT a standalone create endpoint — there is no POST /v1/firewalls, only POST /v1/firewalls/rules (needs an existing firewall_id) and PUT /v1/firewalls/{firewall_id}. We have no cheap way to mint a firewall_id in this fragment, so every write is an OPTIONAL probe using a builtin {unique} token in the id path segment: the engine fires the call ({unique} normalizes to catalog '*' and is a builtin so the validator accepts it), records 400/403/404, and counts coverage without a false failure or an undefined-placeholder error. The createfirewallrule body references firewall_id:{unique} (a fake id; expected 4xx). Bodies from data/api_docs.json request_example: createfirewallrule wraps the rule in {firewall_id, firewall_rule:{...}}; setfirewall takes {flavor_name, loggable}; setfirewallrule takes a bare rule body. order_rule_id omitted (an existing rule id we don't have) so order_direction dropped too. createfirewallrule response envelope is $.firewall_rule.id. Promote to a real create->delete chain once a firewall-bearing resource (igw/direct-connect) is wired in as a prerequisite. Covers all 4 firewall WRITE ops: POST /v1/firewalls/rules, PUT /v1/firewalls/rules/{firewall_rule_id}, DELETE /v1/firewalls/rules/{firewall_rule_id}, PUT /v1/firewalls/{firewall_id}.",
+      "_note": "Firewall lifecycle — anchored by listfirewalls GET (light-runnable, 200 confirmed live 2026-06-20 and 2026-06-29). A firewall is auto-created implicitly when a VPC carrier resource (IGW/Direct Connect/LB) is created with firewall_enabled:true — there is NO POST /v1/firewalls standalone endpoint. The listfirewalls step anchors the lifecycle as light-runnable (returns 200 with empty list when no firewalls exist). The 4 write ops and 3 id-bound GETs (showfirewall, listfirewallrules?firewall_id=, showfirewallrule) all require a real firewall_id which only exists after a VPC+IGW create (needs-heavy). Write steps remain optional probes using {unique} as a fake id (expected ResourceNotFound 404 — api returns JSON error, not portal HTML, confirming backend routing is correct). listfirewallrules GET requires firewall_id query param (REQUIRED per api_docs) — not coverable read-only without a real id. Bodies from api_docs.json: createfirewallrule wraps the rule in {firewall_id, firewall_rule:{...}}; setfirewall takes {flavor_name, loggable}; setfirewallrule takes a bare rule body. Promote write ops to a real create->delete chain once a firewall-bearing IGW is wired in as a prerequisite (see networking__firewall.yaml carrier-capture).",
       "steps": [
+        {
+          "name": "listfirewalls",
+          "method": "GET",
+          "path": "/v1/firewalls",
+          "expect_status": [200, 403],
+          "_note": "listfirewalls: unconditionally 200 even with zero firewalls in account (confirmed live 2026-06-20 and 2026-06-29). No required query params. Anchors this lifecycle as light-runnable."
+        },
         {
           "name": "createfirewallrule",
           "method": "POST",
