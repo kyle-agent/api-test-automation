@@ -170,17 +170,18 @@
       "covered": 6,
       "total": 34,
       "gap": 28,
-      "heavy": true,
+      "heavy": false,
       "blockers": [
         "needs-resource: 8 id-GETs (showloadbalancer/lblistener/servergroup/member/natip etc.) - 0 LBs in account (404 not 403); showloadbalancercertificate needs a cert from certificatemanager.",
         "mutation-gated+heavy: 20 writes need MUTATIONS+DESTRUCTIVE+RUN_HEAVY; 2 lifecycles model all."
       ],
       "next_levers": [
-        "HEAVY+MUTATIONS+DESTRUCTIVE: gen-heavy-lb-members (full VPC->subnet->HC->LB->SG->listener->member->static-nat) -> ~33/34",
+        "LIGHT: networking-loadbalancer-reads (NEW 2026-06-29): 5 collection GETs all confirmed 200 live (listloadbalancers, listlbhealthchecks, listlblisteners, listlbservergroups, listloadbalancercertificates). Ceiling 6/34 without heavy.",
+        "HEAVY+MUTATIONS+DESTRUCTIVE: networking-loadbalancer-members-nat (full VPC->subnet->HC->LB->SG->listener->member->static-nat) -> ~33/34",
         "Pre-provision LB cert for showloadbalancercertificate; private-static-nat needs vpc/nat ids"
       ],
-      "notes": "0->6/34. 5 smoke GETs + showlbhealthcheck (5 real system HC ids). HC before SG (LbHealthCheckNotFound). Listener routing_action enum LB_SERVER_GROUP|URL_REDIRECT. Added listener create/delete + listener_id to probe_reads (GET verify steps don't credit catalog keys; only probe_reads). Account 0 LBs/listeners/SGs/members/certs.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "0->6/34. 5 smoke GETs + showlbhealthcheck (5 real system HC ids). HC before SG (LbHealthCheckNotFound). Listener routing_action enum LB_SERVER_GROUP|URL_REDIRECT. Added listener create/delete + listener_id to probe_reads (GET verify steps don't credit catalog keys; only probe_reads). Account 0 LBs/listeners/SGs/members/certs. 2026-06-29: NEW light lifecycle networking-loadbalancer-reads added (5 collection GETs all confirmed 200 live). heavy flag corrected to false (5 collection GETs are light-coverable; heavy lifecycle remains for writes+id-GETs).",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "cachestore",
@@ -625,11 +626,12 @@
         "mutation-gated+heavy: 6 writes need MUTATIONS+DESTRUCTIVE+RUN_HEAVY + VPC+public-ip."
       ],
       "next_levers": [
+        "LIGHT: networking-vpn-reads (NEW 2026-06-29): listvpngateways+listvpntunnels both confirmed 200 live. Ceiling 2/10 without heavy.",
         "HEAVY+MUTATIONS+DESTRUCTIVE: networking-vpn-gateway-tunnel -> 10/10 (create needs VPC+public-ip)",
         "IKE/IPSec enum values (phase1/phase2) still docs-estimates"
       ],
-      "notes": "2/10 read-only ceiling. listvpngateways+listvpntunnels 200 empty. id-GETs 404 not-found (no entitlement). createvpngateway needs name/ip_id/ip_type/vpc_id/description; createvpntunnel needs name/vpn_gateway_id/phase1/phase2. Region kr-west1/east1/south3.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "2/10 read-only ceiling. listvpngateways+listvpntunnels 200 empty. id-GETs 404 not-found (no entitlement). createvpngateway needs name/ip_id/ip_type/vpc_id/description; createvpntunnel needs name/vpn_gateway_id/phase1/phase2. Region kr-west1/east1/south3. 2026-06-29: NEW light lifecycle networking-vpn-reads added (2 collection GETs confirmed 200 live).",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "cdn",
@@ -658,11 +660,12 @@
         "mutation-gated: 5 writes (create/set/createroutingrule/delete x2); physical circuit but no entitlement wall confirmed."
       ],
       "next_levers": [
+        "LIGHT: networking-direct-connect-reads (NEW 2026-06-29): listdirectconnects confirmed 200 live (empty account). Ceiling 1/8 without heavy.",
         "MUTATIONS+DESTRUCTIVE: networking-direct-connect-routing -> create auto-covers show+listroutingrules -> 8/8",
         "Verify circuit-provisioning entitlement (control-plane create may succeed independently)"
       ],
-      "notes": "1/8 (listdirectconnects 200, empty). CONFIRMED: id-GETs 404 ResourceNotFound (not 403). 503s transient. mutation ceiling 8/8.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "1/8 (listdirectconnects 200, empty). CONFIRMED: id-GETs 404 ResourceNotFound (not 403). 503s transient. mutation ceiling 8/8. 2026-06-29: NEW light lifecycle networking-direct-connect-reads added (listdirectconnects confirmed 200 live).",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "firewall",

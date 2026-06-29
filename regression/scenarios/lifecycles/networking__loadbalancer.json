@@ -1,6 +1,45 @@
 {
   "lifecycles": [
     {
+      "id": "networking-loadbalancer-reads",
+      "service": "networking/loadbalancer",
+      "enabled": true,
+      "heavy": false,
+      "_note": "Light read-only lifecycle: covers all collection GETs that 2xx with no resource. Five endpoints confirmed live 2026-06-29: GET /v1/loadbalancers (listloadbalancers) 200, GET /v1/lb-health-checks (listlbhealthchecks) 200, GET /v1/lb-listeners (listlblisteners) 200, GET /v1/lb-server-groups (listlbservergroups) 200, GET /v1/loadbalancers/certificates (listloadbalancercertificates) 200. The id-bound GETs (showloadbalancer, showlbhealthcheck, showlblistener, showlbservergroup, showlbservergroupmember, showloadbalancercertificate, showloadbalancerpublicnatip, showloadbalancerprivatenatip) and GET /v1/lb-server-groups/{id}/members (listlbservergroupmembers) all need real ids (ledger: 0 LBs in account). This lifecycle deliberately targets only the safely reachable collection endpoints. No teardown required (read-only). Ceiling for this lifecycle: 5/34. All write ops + id-bound GETs remain in the heavy lifecycle (networking-loadbalancer-members-nat). Note: ledger shows 6/34 already covered (5 smoke GETs + showlbhealthcheck from system HCs); this lifecycle re-anchors those 5 collection GETs explicitly.",
+      "steps": [
+        {
+          "name": "list-loadbalancers",
+          "method": "GET",
+          "path": "/v1/loadbalancers",
+          "expect_status": [200]
+        },
+        {
+          "name": "list-lb-health-checks",
+          "method": "GET",
+          "path": "/v1/lb-health-checks",
+          "expect_status": [200]
+        },
+        {
+          "name": "list-lb-listeners",
+          "method": "GET",
+          "path": "/v1/lb-listeners",
+          "expect_status": [200]
+        },
+        {
+          "name": "list-lb-server-groups",
+          "method": "GET",
+          "path": "/v1/lb-server-groups",
+          "expect_status": [200]
+        },
+        {
+          "name": "list-loadbalancer-certificates",
+          "method": "GET",
+          "path": "/v1/loadbalancers/certificates",
+          "expect_status": [200]
+        }
+      ]
+    },
+    {
       "id": "networking-loadbalancer-members-nat",
       "service": "networking/loadbalancer",
       "enabled": true,

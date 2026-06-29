@@ -1,6 +1,27 @@
 {
   "lifecycles": [
     {
+      "id": "networking-vpn-reads",
+      "service": "networking/vpn",
+      "enabled": true,
+      "heavy": false,
+      "_note": "Light read-only lifecycle: covers the two collection GETs that 2xx with no resource. GET /v1/vpn-gateways (listvpngateways) and GET /v1/vpn-tunnels (listvpntunnels) both return 200 on an empty account — confirmed live 2026-06-29. The id-bound GETs (showvpngateway, showvpntunnel) need real ids; none exist in the account (ledger: 0 gateways/tunnels, 404 not 403 with fake ids). This lifecycle targets only the safely reachable collection endpoints. No teardown required (read-only). Ceiling for this lifecycle: 2/10. All 6 write ops + id-bound shows remain in the heavy lifecycle (networking-vpn-gateway-tunnel). Region gate: VPN only in kr-west1/kr-east1/kr-south3; the collection GETs are still safe to call on other regions (empty list 200).",
+      "steps": [
+        {
+          "name": "list-vpn-gateways",
+          "method": "GET",
+          "path": "/v1/vpn-gateways",
+          "expect_status": [200]
+        },
+        {
+          "name": "list-vpn-tunnels",
+          "method": "GET",
+          "path": "/v1/vpn-tunnels",
+          "expect_status": [200]
+        }
+      ]
+    },
+    {
       "id": "networking-vpn-gateway-tunnel",
       "service": "networking/vpn",
       "enabled": true,
