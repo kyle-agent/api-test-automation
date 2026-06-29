@@ -182,6 +182,11 @@ def _required_param_candidates(endpoint: Endpoint) -> list[dict]:
         # `os_type` is also required on financial-management/billingplan; keep
         # this LINUX default scoped to the backup-agent installer-path endpoint.
         return [{"os_type": "LINUX"}]
+    if p.endswith("/backup-targets"):
+        # getbackuptargetlist: policy_type=VM_IMAGE returns 500 (known backend bug,
+        # baselined 2026-06-20); FILESYSTEM returns 200 for all server_categories.
+        # Override the global policy_type=VM_IMAGE default here to use FILESYSTEM.
+        return [{"server_category": "VIRTUAL_SERVER", "policy_type": "FILESYSTEM"}]
     # Sidecar-driven: supply defaults for every REQUIRED query param we know a
     # safe value for (region/category/db-engine). Skip if any required param has
     # no known default (a synthetic guess would just 400 differently).
