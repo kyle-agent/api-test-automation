@@ -150,6 +150,51 @@ def _map_meta(model: dict) -> tuple[list[str], dict]:
     return targets, meta
 
 
+def _dependents_index(model: dict) -> dict[str, list[str]]:
+    """역방향 의존: target_id -> [이 노드를 requires 하는 노드 id …] (정렬).
+    노드 폼의 "나를 require 하는 노드" + 표의 dependents 카운트에 쓴다."""
+    rev: dict[str, set] = {}
+    for nid, node in model.items():
+        for r in node.get("requires") or []:
+            tgts: list[str] = []
+            if isinstance(r, str):
+                tgts = [r]
+            elif isinstance(r, dict) and "ref" in r:
+                tgts = [str(r["ref"])]
+            elif isinstance(r, dict) and "one_of" in r:
+                tgts = [(a.get("ref") if isinstance(a, dict) else a)
+                        for a in (r.get("one_of") or [])]
+            for t in tgts:
+                if t:
+                    rev.setdefault(str(t), set()).add(nid)
+    return {k: sorted(v) for k, v in rev.items()}
+
+
+def _modeling_rows(model: dict, meta: dict, deps_idx: dict) -> list[dict]:
+    """Modeling 표 행 — 노드별 한 줄: 무엇이 모델링됐고 무엇이 결손인지 한눈에.
+    필터/정렬은 클라이언트(JS)에서 이 행들 위에서 한다(서버는 단일 source)."""
+    rows = []
+    for nid in sorted(model):
+        node = model[nid]
+        m = meta[nid]
+        service = str(node.get("service") or "")
+        rows.append({
+            "id": nid,
+            "code": str(node.get("code") or ""),
+            "service": service,
+            "category": service.split("/")[0] if "/" in service else "",
+            "provenance": m["provenance"],
+            "complete": m["complete"],
+            "has_endpoint": m["has_endpoint"],
+            "missing": m["missing"],
+            "requires": _requires_summary(node),
+            "n_requires": len(node.get("requires") or []),
+            "dependents": len(deps_idx.get(nid, [])),
+            "options": len(((node.get("create") or {}).get("options")) or {}),
+        })
+    return rows
+
+
 def _worklist(model: dict) -> tuple[list[dict], list[dict]]:
     """저작 작업 큐 — 손봐야 할 노드를 (불완전, 미검증) 두 묶음으로.
 
@@ -335,18 +380,23 @@ def map_json():
 
 @router.get("/map", response_class=HTMLResponse)
 def map_page(request: Request):
-    """모델 지도 페이지 — 공유 SVG 렌더러로 그래프를 그리고 노드 클릭으로 편집."""
+    """Modeling 통합 화면 — 기본은 '표'(무엇이 모델링/불완전/미검증인지 한눈에,
+    필터·정렬), '그림' 토글로 같은 데이터를 공유 SVG 그래프로. 행/노드 클릭 = 그
+    노드 편집 폼을 사이드패널에서 연다."""
     model = resource_model.load_model()
     targets, meta = _map_meta(model)
+    deps_idx = _dependents_index(model)
+    rows = _modeling_rows(model, meta, deps_idx)
     total = len(model)
     validated = sum(1 for v in meta.values() if v["provenance"] == "VALIDATED")
     docs = sum(1 for v in meta.values() if v["provenance"] == "docs")
     incomplete = sum(1 for v in meta.values() if not v["complete"])
+    services = sorted({r["service"] for r in rows if r["service"]})
     return _render(request, "resource_map.html", plan_step="model",
                    active="modeling",  # 계약 §4: Modeling 얼굴 (lead가 nav 배선)
                    total=total, validated=validated, docs=docs,
                    incomplete=incomplete, anchors=len(targets),
-                   has_composer=True)
+                   rows=rows, services=services, has_composer=True)
 
 
 @router.get("/worklist", response_class=HTMLResponse)
@@ -432,11 +482,15 @@ def resource_form(request: Request, node_id: str, service: str = ""):
     node = model.get(node_id)
     is_new = node is None
     node = node or {"service": service.strip(), "provenance": "docs"}
+    # M2 의존 저작 보조: 역방향(나를 require 하는 노드) + 미해결 참조(존재하지 않는 대상)
+    dependents = _dependents_index(model).get(node_id, [])
+    unresolved = _missing_requires(node, set(model))
     return _render(request, "resource_form.html", plan_step="model",
                    active="modeling",  # Modeling nav 탭 강조
                    node_id=node_id, node=node, is_new=is_new,
                    file=sources.get(node_id, ""),
                    node_ids=sorted(model),
+                   dependents=dependents, unresolved=unresolved,
                    req_rows=resource_model.requires_rows(node),
                    opt_rows=resource_model.options_rows(node),
                    body_text=resource_model.body_text(node),

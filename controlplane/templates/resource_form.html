@@ -74,6 +74,19 @@ ResourceGraph.load(document.getElementById("dep-svg"),
 
 <section>
   <h2>전제조건 (requires) — 행 추가식</h2>
+  {% if unresolved %}
+  <p style="background:#fff5f5;border:1px solid #ffc9c9;color:#c92a2a;padding:8px 12px;border-radius:8px;font-size:12.5px">
+    ⚠ <b>미해결 참조: {{ unresolved|join(', ') }}</b> — 아래 requires 가 모델에 없는 노드를
+    가리킵니다. 그 대상을 먼저 모델링하거나 id 를 고치세요 (대상 칸은 자동완성 지원). 저장은
+    되지만 지도/그래프에서 이 노드는 <b>불완전</b>으로 표시됩니다.
+  </p>
+  {% endif %}
+  <p class="muted" style="font-size:12px;margin:0 0 8px">
+    ↓ 이 노드를 <b>require 하는 노드 ({{ dependents|length }})</b> —
+    requires 를 바꾸면 이들에 영향:
+    {% if dependents %}{% for d in dependents %}<a href="/planning/resources/{{ d }}">{{ d }}</a>{% if not loop.last %} · {% endif %}{% endfor %}{% else %}<span class="faint">없음</span>{% endif %}
+    <span class="faint">(위 "의존 그래프"에서 좌=상류·우=하류로 시각 확인)</span>
+  </p>
   <p class="muted">type: <b>ref</b>(단일 의존) · <b>count</b>(다중성, 예: vpc×2) ·
     <b>one_of</b>(OR-의존 — 대상에 콤마로 대안 나열, 항목은 <code>id</code> 또는
     <code>id:use</code> 예: <code>load-balancer, server:ip</code>).
