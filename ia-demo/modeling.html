@@ -245,19 +245,6 @@ window.__iaFetch = function (name) {
 <main>
 
 
-
-
-<div class="subtabs" style="margin-bottom:18px">
-  <a href="index.html"
-     class="">① Catalog</a>
-  <a href="modeling.html"
-     class="active">② Model</a>
-  <a href="#"
-     class="">③ Compose</a>
-  <a href="#"
-     class="">④ Validate</a>
-</div>
-
 <style>
   /* model-map(② 레시피 저작 — 그래프 얼굴) — 페이지 한정 스타일. 렌더러/팔레트는
      공유(resource_graph.js)이고 여기선 stage/zoom/사이드패널만 꾸민다. */
@@ -303,7 +290,9 @@ window.__iaFetch = function (name) {
 <section>
   <h2>Modeling › 모델 지도 (model map)
     <span class="hint">— provenance/완성도 색칠 · 노드 클릭 = 그 노드 정의 편집</span>
-    <a href="#" style="font-size:13px;font-weight:600;margin-left:auto">목록 보기 →</a></h2>
+    <a href="/planning/resources/worklist"
+       style="font-size:13px;font-weight:600;margin-left:auto">저작 작업 큐 →</a>
+    <a href="#" style="font-size:13px;font-weight:600">목록 보기 →</a></h2>
   <p class="muted">합성기(<code>composer.graph_view</code>)가 만든 <b>전체 의존
     그래프</b>를 공유 렌더러로 그린다. 색은 노드의 <b>provenance/완성도</b>:
     <span style="color:var(--green);font-weight:700">VALIDATED</span> ·

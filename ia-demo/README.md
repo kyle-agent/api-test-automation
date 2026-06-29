@@ -28,7 +28,6 @@ Copy this directory to the Pages branch: `dashboard-data:/ia-demo/`.
 - `testing/assets/console2.js`
 - `testing/assets/mock-api.js`
 - `testing/assets/resource_graph.js`
-- `testing/assets/viz.js`
 - `testing/data/static-data.js`
 - `testing/index.html`
 - `testing/runtime.html`
