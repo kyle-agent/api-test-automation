@@ -1,0 +1,60 @@
+{
+  "lifecycles": [
+    {
+      "id": "billingplan-light-reads",
+      "service": "financial-management/billingplan",
+      "enabled": true,
+      "heavy": false,
+      "_note": "LIGHT all-GET read coverage for billingplan (financial-management/billingplan). All 5 steps are read-only GETs with no path params — none requires any resource to exist, no mutations, no cleanup. LIVE-VERIFIED 2026-06-29: all 4 bare-GET steps return 200 (contract-types, os-types, server-types, service-types, planned-computes list). showplannedcompute (GET /v1/planned-computes/{planned_compute_id}) soft-captured from the list — returns 200 when a plan exists, silently skips when the account has none (current account has 0 planned computes). listplannedcomputeinstances (GET /v1/planned-computes/instances) is excluded: it returns 500 ContactAdminForAssistance for all param combos (os_type OPEN_SOURCE/RHEL/WINDOWS/SLES all 500; baselined Product Bug). showcancellationfee (POST) and updateplannedcompute (PUT) and createplannedcomputes (POST) are writes — covered in the heavy lifecycle billingplan-planned-computes-guarded. This lifecycle provides the read-only floor: running it light (no SCP_RUN_HEAVY) covers listcontracttypes + listostypes + listplannedcomputeservertypes + listplannedcomputeservicetypes + listplannedcomputes = 5 endpoints -> 2xx. showplannedcompute is a conditional +1 if any planned compute exists.",
+      "steps": [
+        {
+          "name": "list-contract-types",
+          "method": "GET",
+          "path": "/v1/planned-computes/contract-types",
+          "expect_status": [200],
+          "_note": "LIVE 200 2026-06-29. Response: {contract_types:[{code,display_name}], extension_types:[{code,display_name}]}. Codes confirmed: 01=1-year, 03=3-year, 05=5-year. No params required."
+        },
+        {
+          "name": "list-os-types",
+          "method": "GET",
+          "path": "/v1/planned-computes/os-types",
+          "expect_status": [200],
+          "_note": "LIVE 200 2026-06-29. Response: {os_types:[{display_name,os_type_id,os_type_value}]}. os_type_id values: OPEN_SOURCE, RHEL, WINDOWS, SLES (uppercase tokens for query params). os_type_value: opensource, rhel, windows, sles (lowercase for create body). No params required."
+        },
+        {
+          "name": "list-server-types",
+          "method": "GET",
+          "path": "/v1/planned-computes/server-types",
+          "expect_status": [200],
+          "_note": "LIVE 200 2026-06-29. Response: {server_types:[{server_type,server_type_description,core,memory_gb,...}]}. First entry server_type=css1v1m2 (not s1v1m2 — the docs example was wrong). No params required. NOTE: in prior sessions this endpoint was seen as 500 (baselined Product Bug); it currently returns 200. The 500 was observed when queried with params (service_id, os_type, server_type, start_date, end_date) for listplannedcomputeinstances — the parameterless server-types list itself is 200."
+        },
+        {
+          "name": "list-service-types",
+          "method": "GET",
+          "path": "/v1/planned-computes/service-types",
+          "expect_status": [200],
+          "_note": "LIVE 200 2026-06-29. Response: {services:[{display_name,service_id}]}. Includes VERTICA, SQLSERVER, EPAS, EVENTSTREAMS, SEARCHENGINE, GPU_NODE, GPU_SERVER, VIRTUAL_SERVER, and others. No params required."
+        },
+        {
+          "name": "list-planned-computes",
+          "method": "GET",
+          "path": "/v1/planned-computes",
+          "expect_status": [200],
+          "capture_soft": {
+            "planned_compute_id": "$.planned_computes[0].id"
+          },
+          "_note": "LIVE 200 2026-06-29. Response: {current_page, planned_computes:[], total_count:0, total_pages:0} (account has 0 plans). capture_soft: planned_compute_id is set when a plan exists, otherwise stays unset and the show step below silently skips. Envelope key is 'planned_computes' (confirmed). List is empty on this account — no planned compute purchased."
+        },
+        {
+          "name": "show-planned-compute",
+          "method": "GET",
+          "path": "/v1/planned-computes/{planned_compute_id}",
+          "optional": true,
+          "group": "pc-show",
+          "expect_status": [200, 404],
+          "_note": "id-bound GET (showplannedcompute). Runs only when planned_compute_id is soft-captured from list-planned-computes. On the current account (0 plans) this step is skipped. When a plan exists: 200 {planned_compute:{...}}. expect_status includes 404 in case the captured id is stale at runtime."
+        }
+      ]
+    }
+  ]
+}

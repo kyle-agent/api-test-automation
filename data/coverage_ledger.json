@@ -456,8 +456,8 @@
         "Cover GETs from a dedicated org-management account with a Landing Zone",
         "target_type enum confirmed ACCOUNT|OU (ROOT->400); params now in fragment"
       ],
-      "notes": "0/15. Structural entitlement wall re-verified live 2026-06-20. Fragment now carries listguardrailsfortarget+listtargetsforguardrail with proven params.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "0/15. Structural entitlement wall re-verified live 2026-06-20 and confirmed 2026-06-29: all 5 bare GETs remain 403 CloudControl.CloudControlForbidden or Forbidden (IAM action missing). Needs org-master + Landing Zone. NOT light-possible: zero GETs return 2xx on this account. Fragment carries listguardrailsfortarget (needs target_id) + listtargetsforguardrail (needs guardrail_id + target_type=ACCOUNT|OU) with proven params. Assessment 2026-06-29: BACKEND-BLOCKED (entitlement wall). All 6 GETs 403, 9 writes 403+mutation-gated. No read-only path to 2xx from this account.",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "baremetal",
@@ -545,10 +545,29 @@
       "total": 10,
       "gap": 10,
       "heavy": false,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [
+        {
+          "key": "listplannedcomputeinstances: product-bug-500",
+          "reason": "GET /v1/planned-computes/instances returns 500 ContactAdminForAssistance for ALL param combos (os_type OPEN_SOURCE/RHEL/WINDOWS/SLES x any server_type). Confirmed live 2026-06-29. Cannot be fixed by param changes. Backend bug.",
+          "kind": "product-bug"
+        },
+        {
+          "key": "showplannedcompute: needs-resource",
+          "reason": "GET /v1/planned-computes/{planned_compute_id} requires a real planned_compute_id. Account has 0 planned computes (GET /v1/planned-computes -> total_count:0). Soft-captured in light lifecycle; will 2xx when a plan exists.",
+          "kind": "needs-resource"
+        },
+        {
+          "key": "createplannedcomputes/showcancellationfee/updateplannedcompute: heavy-billable",
+          "reason": "3 write endpoints require SCP_RUN_HEAVY (BILLABLE financial commitment). Modeled in billingplan-planned-computes-guarded with expected 4xx (coverage-only probe, no actual purchase).",
+          "kind": "heavy-prereq"
+        }
+      ],
+      "next_levers": [
+        "LIGHT: run billingplan-light-reads (financial-management__billingplan-light.json, heavy=false) -> 5 GETs 200 immediately: listcontracttypes + listostypes + listplannedcomputeservertypes + listplannedcomputeservicetypes + listplannedcomputes = +5 covered",
+        "HEAVY (mutation-gated): billingplan-planned-computes-guarded covers showcancellationfee+createplannedcomputes+updateplannedcompute (expected 4xx on shared account)"
+      ],
+      "notes": "LIGHT-READY 2026-06-29. 5 bare GETs confirmed 200 live: contract-types, os-types, server-types, service-types, list. New light lifecycle billingplan-light-reads added (financial-management__billingplan-light.json). Validators clean (230 lifecycles, 0 errors). Key facts: (1) server-types endpoint returns 200 parameterless - prior '500 baselined' was listplannedcomputeinstances with params, NOT this endpoint. (2) server_type value is css1v1m2 (not s1v1m2 as docs said). (3) listplannedcomputes envelope is planned_computes[] not contents[]. (4) os_type_id OPEN_SOURCE for queries; os_type_value opensource for create body.",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "parallel-filestorage",

@@ -1091,6 +1091,25 @@ VALIDATED 2026-06-23. 5/5 endpoints covered (100%). Global service (no region).
 - **Teardown:** delete → 204; verified account returns to 0 budgets post-run.
 - **Fragment:** `regression/scenarios/lifecycles/financial-management__budget.json` (lifecycle `budget-account-budget`).
 
+## financial-management / billingplan
+
+**10 endpoints.** LIGHT-READY (5 of 10 are bare GET returning 200 without any resource). LIVE-VERIFIED 2026-06-29.
+
+- **Host:** global (`billingplan.e.samsungsdscloud.com`; in global_services).
+- **Light-coverable GETs (5, all 200 live 2026-06-29):**
+  - `GET /v1/planned-computes/contract-types` (listcontracttypes) — response `{contract_types:[{code,display_name}], extension_types:[...]}`. Codes: 01=1yr, 03=3yr, 05=5yr.
+  - `GET /v1/planned-computes/os-types` (listostypes) — response `{os_types:[{os_type_id,os_type_value,display_name}]}`. os_type_id: OPEN_SOURCE/RHEL/WINDOWS/SLES (uppercase for query params); os_type_value: opensource/rhel/windows/sles (lowercase for create body).
+  - `GET /v1/planned-computes/server-types` (listplannedcomputeservertypes) — response `{server_types:[{server_type,server_type_description,...}]}`. First entry: `css1v1m2` (NOT `s1v1m2` — the docs example was wrong). Confirmed 200 on parameterless call; prior 500 bug was when called WITH query params (service_id/os_type/server_type/start_date/end_date — those are for `listplannedcomputeinstances`, not this endpoint).
+  - `GET /v1/planned-computes/service-types` (listplannedcomputeservicetypes) — response `{services:[{service_id,display_name}]}`. Includes VERTICA, SQLSERVER, EPAS, EVENTSTREAMS, SEARCHENGINE, GPU_NODE, GPU_SERVER, VIRTUAL_SERVER and others.
+  - `GET /v1/planned-computes` (listplannedcomputes) — response `{current_page,planned_computes:[],total_count:0,total_pages:0}`. Envelope key is `planned_computes` (NOT `contents`). Account has 0 plans.
+- **Soft-coverable id-GET (1):** `GET /v1/planned-computes/{planned_compute_id}` (showplannedcompute) — soft-captured from list. Skipped when account has 0 plans (current state).
+- **Product bug (confirmed 500):** `GET /v1/planned-computes/instances` (listplannedcomputeinstances) — ALL param combos return 500 ContactAdminForAssistance (os_type OPEN_SOURCE/RHEL/WINDOWS/SLES × any server_type). This is a backend product bug. Excluded from light lifecycle.
+- **Writes (3, heavy/mutation gated):** `POST /v1/planned-computes` (createplannedcomputes), `POST /v1/planned-computes/cancellation-fee` (showcancellationfee), `PUT /v1/planned-computes/{id}` (updateplannedcompute). Covered in `billingplan-planned-computes-guarded` (heavy=true). createplannedcomputes is BILLABLE (reserves committed compute for 1-5 year term); NOT chained to delete; lifecycle deliberately expects 4xx.
+- **Light lifecycle:** `billingplan-light-reads` (`financial-management__billingplan-light.json`, heavy=false). Covers 5 GETs (light 2xx floor). Validated + validate_dag clean 2026-06-29.
+- **Heavy lifecycle:** `billingplan-planned-computes-guarded` (`financial-management__billingplan.json`, heavy=true). Covers remaining 3 writes (expected 4xx on shared account — coverage-only probe, no actual purchase).
+- **server_type note:** The resource model and lifecycle used `s1v1m2` as example but the real API returns `css1v1m2` as the first server type from listplannedcomputeservertypes (2026-06-29). The create body field accepted value is unproven without a real purchase.
+- **os_type duality:** `os_type_id` (OPEN_SOURCE) for query filters; `os_type_value` (opensource) for create body.
+
 ## security / secretvault
 
 - **5 endpoints** total: listsecretvault, createsecretvault, showsecretvault, terminatedsecretvault, gettemporarykey.
