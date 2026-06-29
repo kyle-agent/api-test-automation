@@ -1,0 +1,20 @@
+{
+  "lifecycles": [
+    {
+      "id": "parallel-filestorage-light-reads",
+      "service": "storage/parallel-filestorage",
+      "enabled": true,
+      "heavy": false,
+      "_note": "LIGHT read coverage for storage/parallel-filestorage. GET /v1/volumes (routed to the parallel-filestorage host via the lifecycle service, same routing the existing parallel-filestorage-capacity-restore lifecycle uses) returns 200 {count:0, parallel_filestorages:[]} with no params/resources — confirmed live 2026-06-29 by the storage coverage agent. listsnapshots needs ?volume_id (REQUIRED), id-bound GETs and 7 write ops need a real PFS volume (1 TB min, billable, MNGC-attached) — those stay in the heavy lifecycle parallel-filestorage-capacity-restore. This fragment provides the read-only floor.",
+      "steps": [
+        {
+          "name": "list-volumes",
+          "method": "GET",
+          "path": "/v1/volumes",
+          "expect_status": [200],
+          "_note": "LIVE 200 2026-06-29. Routed to parallel-filestorage host via lifecycle service (storage/parallel-filestorage). Response {count:0, parallel_filestorages:[]}."
+        }
+      ]
+    }
+  ]
+}

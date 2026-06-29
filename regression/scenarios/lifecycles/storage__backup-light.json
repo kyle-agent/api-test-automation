@@ -1,0 +1,34 @@
+{
+  "lifecycles": [
+    {
+      "id": "backup-light-reads",
+      "service": "storage/backup",
+      "enabled": true,
+      "heavy": false,
+      "_note": "LIGHT all-GET read coverage for storage/backup. 3 no-param GETs confirmed 200 live 2026-06-29 by the storage coverage agent: GET /v1/backups, GET /v1/backup-agents, GET /v1/backups/region-relationship. No params, no resource, no mutation, no cleanup. The param-gated reads (backup-agents/targets?server_category=, backups/backup-targets?...policy_type=FILESYSTEM) and the write/heavy endpoints live in the heavy lifecycles backup-agent/backup-job. This fragment provides the read-only floor so storage/backup registers a 2xx without SCP_RUN_HEAVY (smoke skips these because the catalog marks them as needing params this account does have safe defaults for).",
+      "steps": [
+        {
+          "name": "list-backups",
+          "method": "GET",
+          "path": "/v1/backups",
+          "expect_status": [200],
+          "_note": "LIVE 200 2026-06-29, no params."
+        },
+        {
+          "name": "list-backup-agents",
+          "method": "GET",
+          "path": "/v1/backup-agents",
+          "expect_status": [200],
+          "_note": "LIVE 200 2026-06-29, no params."
+        },
+        {
+          "name": "list-region-relationship",
+          "method": "GET",
+          "path": "/v1/backups/region-relationship",
+          "expect_status": [200],
+          "_note": "LIVE 200 2026-06-29, no params."
+        }
+      ]
+    }
+  ]
+}
