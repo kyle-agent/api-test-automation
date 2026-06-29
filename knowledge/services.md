@@ -107,6 +107,17 @@ lifecycle `heavy-asg-full-coverage` in
 ## storage / backup
 
 - **Host:** regional. Service key: `backup`.
+- **getbackuptargetlist** (`GET /v1/backups/backup-targets`): REQUIRED params `server_category` AND `policy_type`.
+  `policy_type=VM_IMAGE` returns 500 ContactAdminForAssistance for VIRTUAL_SERVER+GPU_SERVER (known backend bug, baselined 2026-06-20).
+  `policy_type=FILESYSTEM` returns 200 for all server categories. CONFIRMED LIVE 2026-06-29.
+  smoke.py now overrides policy_type=FILESYSTEM for this path (path-specific rule in `_required_param_candidates`).
+- **listbackupagenttargets** (`GET /v1/backup-agents/targets`): REQUIRED param `server_category`.
+  `?server_category=VIRTUAL_SERVER` → 200 empty list. Confirmed live 2026-06-29.
+  smoke.py handles via `server_category=VIRTUAL_SERVER` global default.
+- **showinstallfilepath** (`GET /v1/backup-agents/agent-install-file-path`): REQUIRED param `os_type`.
+  `?os_type=LINUX` → 200 `{install_file_path: "https://...NetBackup_10.4.0.1_CLIENTS2.tar.gz"}`.
+  `?os_type=WINDOWS` → 200 `{install_file_path: "https://...NetBackup_10.4.0.1_Win.zip"}`.
+  Confirmed live 2026-06-29. smoke.py handles via path-specific rule.
 - **checkfilesystemduplication** (`GET /v1/backups/check-filesystem-duplication`):
   requires BOTH `filesystem_path` (string) AND `server_uuid` (UUID of a VM) as query params.
   CONFIRMED LIVE (2026-06-20): returns 404 `Backup.NotFoundCreatedBackupAgent` for any
@@ -119,6 +130,42 @@ lifecycle `heavy-asg-full-coverage` in
   `?backup_name=regrtest` → `{"result":false}`.
 - **listbackups** list envelope: `{contents:[], count}` (NOT `{backups:[], ...}`).
 - **createbackup** returns 500 `ContactAdminForAssistance` — product-bug (baselined).
+
+## storage / archivestorage
+
+- **Host:** regional. Service key: `archivestorage`.
+- **Entitlement wall (permanent):** ALL 25 endpoints return 401 `scp-archivestorage_hmac not in service account catalog`.
+  This is a gateway/catalog reject BEFORE routing — the service account does not have archivestorage subscribed.
+  No param or body fix unblocks. Requires archivestorage subscription/catalog enrollment.
+- **Bare GET endpoints (6 no-path-param):** `GET /v1/archiving-histories`, `/v1/archiving-policies`,
+  `/v1/buckets`, `/v1/recovery-histories`, `/v1/archiving-histories/detail`, `/v1/recovery-histories/detail`
+  — all return 401 gateway reject. Not 403 entitlement, not 404 routing: the HMAC catalog does not have this service.
+- **Confirmed LIVE 2026-06-29:** all 6 no-path-param GETs 401. Backend entitlement wall confirmed.
+
+## storage / baremetal-blockstorage
+
+- **Host:** regional. Service key: `baremetal-blockstorage`.
+- **listvolumes** (`GET /v1/volumes`): 200 with body `{total_count:0, volumes:[]}`. No path params, no required query
+  params. Confirmed live 2026-06-29.
+- **listvolumegroups** (`GET /v1/volume-groups`): 200 with body `{total_count:0, volume_groups:[]}`. No path params, no
+  required query params. Confirmed live 2026-06-29.
+- **createvolume** blocker: REQUIRED `attachments` array (1..8 BM server UUIDs). Sending `attachments:[]` returns 400.
+  No BM server on this account → all volume-dependent endpoints (40 of 41) require a real BM server.
+- **Light fragment added:** `blockstorage-list-reads` (non-heavy, enabled) covers listvolumes + listvolumegroups.
+- **All other 39 endpoints:** need a BM server (heavy-prereq). BM provisioning is billable and time-intensive.
+
+## storage / parallel-filestorage
+
+- **Host:** regional. Service key: `parallel-filestorage`.
+- **listvolumes** (`GET /v1/volumes`): 200 with body `{count:0, parallel_filestorages:[]}`. Note: list key is
+  `parallel_filestorages` NOT `volumes`. Covered (ledger: 1/11, 2026-06-24).
+- **listsnapshots** (`GET /v1/snapshots`): REQUIRED query param `volume_id`. Without it: 400 ValidationError.
+  With fake UUID: 404 `parallel-filestorage.Notfound.volume`. Needs a real volume (heavy prereq).
+- **listaccessrule** (`GET /v1/volumes/{volume_id}/access-rules`): needs real volume_id (path param). Heavy prereq.
+- **showvolume** (`GET /v1/volumes/{volume_id}`): needs real volume_id. Heavy prereq.
+- **createvolume** body: `{name, capacity_tb: 1, tags:[]}`. Minimum 1 TB (BILLABLE). Name pattern: `^[a-z]([a-z0-9_]){2,20}$`.
+  Volume attaches ONLY to Multi-node GPU Cluster (mngc-prereq).
+- **All writes + id-GETs:** need a real PFS volume (heavy, billable 1TB minimum). 10 of 11 endpoints are heavy-prereq.
 
 ## storage / filestorage
 
@@ -1045,20 +1092,21 @@ CONFIRMED LIVE 2026-06-20. Global account-scoped catalog service. All 4 endpoint
 
 ## platform / sts (Security Token Service)
 
-FIRST ANALYSIS 2026-06-20. 3 endpoints, ALL POST (mutating). 0 coverable read-only. Coverage requires SCP_ALLOW_MUTATIONS=true.
+3 endpoints, ALL POST (mutating). 0 coverable read-only. Coverage requires SCP_ALLOW_MUTATIONS=true.
 
-- **Host:** `sts.<region>.e.samsungsdscloud.com` (REGIONAL, NOT in global_services). Host template: `https://sts.kr-west1.e.samsungsdscloud.com/v1/...`
-- **All 3 endpoints are POST (mutating):** smoke skips them (`is_mutating=True`), lifecycle engine skips them when `allow_mutations=False` (engine.py line ~691). Read-only coverage = structural 0/3.
-- **CRITICAL body field correction (2026-06-20):** Prior fragment used wrong field names. Correct field names from `api_docs.json` models:
+- **HOST BUG FIXED 2026-06-29:** `sts` is GLOBAL (not regional). Was missing from `DEFAULT_GLOBAL_SERVICES` in `core/config.py`, causing calls to route to `sts.kr-west1.e.samsungsdscloud.com` which is the Samsung Cloud Platform web portal (returns `text/html` HTML 404, no `Strict-Transport-Security` header). CORRECT host: `sts.e.samsungsdscloud.com` — returns `application/json` responses with `Strict-Transport-Security` header (real API gateway). Fix applied: added `"sts"` to `DEFAULT_GLOBAL_SERVICES` in `core/config.py`. Confirmed live 2026-06-29: GET /v1/assume-role at global host returns `403 {"errors":[{"code":"Forbidden",...}]}` (real API JSON, not portal HTML).
+- **All 3 endpoints are POST (mutating):** smoke skips them, lifecycle engine skips them when `allow_mutations=False`. Read-only coverage = structural 0/3.
+- **Paths confirmed correct** (api_docs.json 2026-06-20): `/v1/assume-role`, `/v1/assume-role-with-saml`, `/v1/object-store-authorization`.
+- **Body field names confirmed** (api_docs.json models):
   - `assumerole` (POST /v1/assume-role): `role_indicator` (REQUIRED, NOT `role_arn`), `role_session_name` (REQUIRED, 1-64 chars), `duration_seconds` (optional, default 900). `role_indicator` format: `[offering:account_id:role_name]`, pattern `^[^:]+:[^:]+:[^:]+$`, minLength 32. Example: `e:ec11538abf8f46d2953539521f745366:OrganizationAccountAccessRole`.
-  - `assumerolewithsaml` (POST /v1/assume-role-with-saml): `role_indicator` (REQUIRED), `principal_indicator` (REQUIRED, same format as role_indicator, [offering:account_id:principal_name]), `saml_assertion` (REQUIRED base64 SAML doc, minLength 1), `duration_seconds` (optional). Account has 0 SAML providers.
-  - `objectstoreauthorization` (POST /v1/object-store-authorization): `method` (REQUIRED, HTTP verb), `url` (REQUIRED, full object-store URL), `x_amz_content_sha256` (REQUIRED, SHA256 of request body), `x_amz_date` (REQUIRED, AMZ date format YYYYMMDDTHHmmssZ), `region` (optional, default kr-west1), `service` (optional, default s3). NOT bucket_name/duration_seconds (old fragment was wrong). This generates an S3-compatible Authorization header from the caller's STS session token.
-- **Role indicator format:** `e:ACCOUNT_ID:ROLE_NAME`. IAM roles do NOT expose an `srn`/`arn`/`role_arn` field in the list/show response — only `id` (32-hex UUID) and `name`. The offering code `e` matches `SCP_ENV=e`.
-- **Existing roles (2026-06-20):** `SCPServiceRoleForScf`, `SCPServiceRoleForApiGateway`, `OrganizationAccountAccessRole` (id: f07f5921c1df42089e59c90408599261, trust policy allows Account 73eab1a74c6347c1be9c892efc7f1102). assuemRole likely 403 (trust policy does not allow our account to assume roles for itself).
-- **Blocker:** assume-role likely 403 unless the role's trust policy allows our account. objectstoreauthorization requires a valid session_token in the caller's HMAC auth (not just access_key). No plain-key call can 200 on objectstoreauthorization.
-- **Safety:** lifecycle does NOT capture session_token/access_key_id/secret_access_key from any 200 response (safety hard rule: no credential exfiltration).
-- **Fragment:** `regression/scenarios/lifecycles/platform__sts.json` (sts-token-issuance-coverage lifecycle, corrected 2026-06-20).
-- **Coverage 2026-06-20 (read-only):** 0/3. All 3 endpoints POST-only, mutation-gated. With SCP_ALLOW_MUTATIONS: expect 400/403 on assumerole (trust policy mismatch), 400/422 on assumerolewithsaml (no real SAML provider + fake assertion), 400/401/403 on objectstoreauthorization (no session_token in auth). Coverage counting requires category=ok (2xx); 4xx from invalid credentials does NOT count.
+  - `assumerolewithsaml` (POST /v1/assume-role-with-saml): `role_indicator` (REQUIRED), `principal_indicator` (REQUIRED, same format, [offering:account_id:principal_name]), `saml_assertion` (REQUIRED base64 SAML doc, minLength 1), `duration_seconds` (optional). Account has 0 SAML providers.
+  - `objectstoreauthorization` (POST /v1/object-store-authorization): `method` (REQUIRED, HTTP verb), `url` (REQUIRED, full object-store URL), `x_amz_content_sha256` (REQUIRED, SHA256 of request body), `x_amz_date` (REQUIRED, AMZ date format YYYYMMDDTHHmmssZ), `region` (optional, default kr-west1), `service` (optional, default s3). NOT bucket_name/duration_seconds. Generates S3-compatible Authorization header from caller's STS session token.
+- **Role indicator format:** `e:ACCOUNT_ID:ROLE_NAME`. IAM roles expose `id` (32-hex UUID) and `name` only (no `srn`/`arn`/`role_arn`). Offering code `e` matches `SCP_ENV=e`.
+- **Existing roles:** `SCPServiceRoleForScf`, `SCPServiceRoleForApiGateway`, `OrganizationAccountAccessRole` (trust policy allows Account 73eab1a74c6347c1be9c892efc7f1102 only — not our account). After host fix: assumerole expected 403.
+- **Remaining blockers for 2xx:** (1) IAM createrole returns 500 (PF-bug) — cannot create self-assumable role; (2) assumerolewithsaml needs real SAML provider + assertion; (3) objectstoreauthorization needs session_token from prior assumerole 200 (sequential dep).
+- **Safety:** lifecycle does NOT capture session_token/access_key_id/secret_access_key from any 200 response.
+- **Fragment:** `regression/scenarios/lifecycles/platform__sts.json` (sts-token-issuance-coverage lifecycle).
+- **Coverage:** 0/3 (all POST, mutation-gated). With mutations enabled and host fix applied: expect 403 on assumerole, 400/404 on assumerolewithsaml, 400/401 on objectstoreauthorization. 2xx requires self-assumable role + trust policy fix.
 
 ## financial-management / budget
 

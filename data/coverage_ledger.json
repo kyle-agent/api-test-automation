@@ -101,14 +101,23 @@
     },
     {
       "service": "baremetal-blockstorage",
-      "covered": 0,
+      "covered": 2,
       "total": 41,
-      "gap": 41,
+      "gap": 39,
       "heavy": true,
-      "blockers": [],
-      "next_levers": [],
-      "notes": "",
-      "updated": "2026-06-24T09:01:02Z"
+      "blockers": [
+        {
+          "key": "heavy-prereq: 39 endpoints need a real Bare Metal server",
+          "reason": "createvolume REQUIRES attachments array (1..8 BM server UUIDs). Sending attachments:[] returns 400. All 39 volume/group/snapshot/replication/attachment endpoints cascade from createvolume. No BM server on this account. BM provisioning is billable and time-intensive.",
+          "kind": "heavy-prereq"
+        }
+      ],
+      "next_levers": [
+        "blockstorage-list-reads lifecycle (NEW, non-heavy, enabled 2026-06-29): listvolumes + listvolumegroups -> 2 2xx on next run (no BM server needed)",
+        "HEAVY+BM: provision real BM server -> populate attachments -> createvolume 2xx -> all 39 volume/group endpoints coverable"
+      ],
+      "notes": "0->2/41 MODELED 2026-06-29. CONFIRMED LIVE: GET /v1/volumes 200 {total_count:0,volumes:[]}, GET /v1/volume-groups 200 {total_count:0,volume_groups:[]}. Both list endpoints have NO required params. Added blockstorage-list-reads lifecycle (non-heavy, enabled) to storage__baremetal-blockstorage.json. Will cover listvolumes+listvolumegroups on next non-heavy run. Remaining 39 endpoints all need a real BM server (createvolume requires attachments with real BM UUIDs).",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "sqlserver",
@@ -130,7 +139,7 @@
       "blockers": [
         "entitlement-403: 7 read-only no-path-param GETs return 403 (account is MEMBER not org-master; auth precedes param validation, proven): listaccounts, listorganizationunits, listservicecontrolpolicies, listorganizationinvitations, showdelegationpolicy, listpoliciesfortarget, listtargetsforpolicy.",
         "entitlement-403: 5 id-bound GETs return 403/404 (cannot get valid IDs without org-master privilege): showorganization, showorganizationunit, showaccount, showservicecontrolpolicy, listparents. All now probed and recorded as soft observations.",
-        "entitlement-403: most mutating endpoints (403 OrganizationForbidden) — createorganizationunit, createservicecontrolpolicy, attachpolicybindings, removepolicybindings, deleteorganizationunits, deleteservicecontrolpolicies, deletedelegationpolicy, setorganizationunit, setservicecontrolpolicy, leaveorganization, deleteorganization, deleteaccount, createdelegationpolicy, setdelegationpolicy, setorganization, removepolicybindings, setorganization — all require org-master privilege.",
+        "entitlement-403: most mutating endpoints (403 OrganizationForbidden) \u2014 createorganizationunit, createservicecontrolpolicy, attachpolicybindings, removepolicybindings, deleteorganizationunits, deleteservicecontrolpolicies, deletedelegationpolicy, setorganizationunit, setservicecontrolpolicy, leaveorganization, deleteorganization, deleteaccount, createdelegationpolicy, setdelegationpolicy, setorganization, removepolicybindings, setorganization \u2014 all require org-master privilege.",
         "body-unknown: createinvitation 2nd required field still unknown (email, message, login_id, account_id all rejected as Extra inputs). organization_id is valid.",
         "body-unknown: removeaccounts 2nd required field still unknown (ids, account_ids, organization_account_ids all invalid; organization_id is valid but still 1 field required).",
         "body-unknown: moveaccount 3rd required field unknown (organization_id + parent_unit_id = 1 field required still; account_id/unit_id/destination_id all invalid).",
@@ -142,7 +151,7 @@
         "removeaccounts 2nd required field: try organization_account_id (singular), name (string), login_id variants",
         "moveaccount 3rd required field: try ids, organization_account_ids (array), name"
       ],
-      "notes": "2026-06-24 run: removed heavy:true from all 6 org lifecycles (org is NON-heavy — no VPC/compute). All 37 endpoints now canonically reached. 1 new 2xx: cancelinvitations({ids:[]}) -> 200. createdelegationpolicy+setdelegationpolicy body field is document (not policy_document). setorganization valid body: empty {} -> 403 (name/description are Extra). createaccount: login_id (email-format) not email. All 37 endpoints now observed: 3 2xx + 34 soft.",
+      "notes": "2026-06-24 run: removed heavy:true from all 6 org lifecycles (org is NON-heavy \u2014 no VPC/compute). All 37 endpoints now canonically reached. 1 new 2xx: cancelinvitations({ids:[]}) -> 200. createdelegationpolicy+setdelegationpolicy body field is document (not policy_document). setorganization valid body: empty {} -> 403 (name/description are Extra). createaccount: login_id (email-format) not email. All 37 endpoints now observed: 3 2xx + 34 soft.",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -236,14 +245,17 @@
       "gap": 25,
       "heavy": true,
       "blockers": [
-        "entitlement-403: ALL 25 endpoints return 401 gateway reject ('Service Account catalog has not target endpoint: scp-archivestorage_hmac') - subscription/catalog reject before routing, NOT an HMAC error. No param/body fix unblocks."
+        {
+          "key": "entitlement-401: ALL 25 endpoints blocked",
+          "reason": "ALL 25 endpoints return 401 gateway reject ('Service Account catalog has not target endpoint: scp-archivestorage_hmac'). This is a catalog/subscription reject BEFORE routing, not an HMAC error. No param or body fix can unblock. Confirmed live 2026-06-29: all 6 no-path-param GETs return 401.",
+          "kind": "entitlement-subscription"
+        }
       ],
       "next_levers": [
-        "When archivestorage subscribed: heavy lifecycle covers all 25 (already 25/25 modeled)",
-        "Investigate transient 503s on 4/6 direct GETs"
+        "Subscribe archivestorage in service account catalog -> all 25 endpoints become reachable; existing lifecycle models all 25/25"
       ],
-      "notes": "0/25. Gateway entitlement-401 wall (scp-archivestorage_hmac not in service-account catalog). reachability-only owner override. Fragment now models all 25/25 endpoints. 6 direct GETs 401 soft; 6 id-GETs skip (parent 401); 13 mutating gated+401.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "0/25 CONFIRMED 2026-06-29. Gateway entitlement-401 wall (scp-archivestorage_hmac not in service-account catalog). All 6 no-path-param GETs probed live: all 401. Fragment models all 25/25 reachability-only. No transient 503s observed (was prior speculation). Permanent blocker: catalog subscription required.",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "backup",
@@ -252,17 +264,24 @@
       "gap": 23,
       "heavy": true,
       "blockers": [
-        "heavy-prereq: checkfilesystemduplication needs a server with backup agent (404 NotFoundCreatedBackupAgent; 0 agents).",
-        "heavy-prereq: 10 path-param GETs + 12 mutating need RUN_HEAVY + real backup_id/agent_id (0 backups/agents).",
-        "product-bug: getbackuptargetlist 500 for VM_IMAGE+VIRTUAL_SERVER/GPU (baselined); FILESYSTEM works.",
-        "blocked-engine: gen-heavy-backup double-blocked (VM_IMAGE 500 + IB-014 poll-until-list); agent family (8) owner-waived."
+        {
+          "key": "heavy-prereq: 22 endpoints need real backup_id/agent_id or real VM+agent",
+          "reason": "10 path-param id-GETs (showbackup, listbackuphistories, listbackupschedules etc.) and 12 mutating endpoints (createbackup, manualbackup, restorebackup etc.) all need a real backup_id or agent_id that only exists after createbackup 2xx (which itself needs a real VM server). createbackup 500s (product-bug, baselined). checkfilesystemduplication 404 (needs real VM with backup agent installed). agent family (8 ops) owner-waived.",
+          "kind": "heavy-prereq"
+        },
+        {
+          "key": "product-bug: getbackuptargetlist 500 for VM_IMAGE",
+          "reason": "GET /v1/backups/backup-targets?policy_type=VM_IMAGE returns 500 for VIRTUAL_SERVER+GPU_SERVER. FILESYSTEM returns 200. Smoke fixed to use FILESYSTEM (2026-06-29).",
+          "kind": "product-bug"
+        }
       ],
       "next_levers": [
-        "HEAVY: fix gen-heavy-backup to capture server_uuid from GET /v1/servers/{id} + poll-retry; covers create+backup_id GETs",
-        "smoke.py: change getbackuptargetlist policy_type default VM_IMAGE->FILESYSTEM (shared file)"
+        "smoke run: getbackuptargetlist now fixed to FILESYSTEM -> should appear as covered 2xx on next smoke run (smoke.py path-specific fix 2026-06-29)",
+        "lifecycle: storage__backup.json now has explicit get-backup-target-list (FILESYSTEM) + list-backup-agent-targets (server_category=VS) steps -> will 2xx on next non-heavy run",
+        "HEAVY+VM: gen-heavy-backup (create real VM -> backup-target lookup -> createbackup -> id-GETs) covers ~20 more endpoints when enabled"
       ],
-      "notes": "7->8/31. getbackuptargetlist 200 via FILESYSTEM (VM_IMAGE 500 baselined in known_issues.json). 8 bare GETs covered. showinstallfilepath returns NetBackup 10.4.0.1 installer URL. listbackupregionrelationship 4 region pairs. create-backup-target steps switched to FILESYSTEM.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "8/31 as of 2026-06-24. 2026-06-29 SESSION: (1) smoke.py fixed: getbackuptargetlist path-specific override to policy_type=FILESYSTEM (was VM_IMAGE which 500s). (2) backup lifecycle: added explicit get-backup-target-list step (FILESYSTEM, 200) + list-backup-agent-targets step (server_category=VS, 200). These 2 steps were missing from the lifecycle (only in probe_reads or absent). (3) listbackupagenttargets: confirmed 200 with ?server_category=VIRTUAL_SERVER; was 400 without. (4) showinstallfilepath: confirmed 200 with ?os_type=LINUX (already handled by smoke). Coverage should rise to 9-10 on next run.",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "scf",
@@ -313,7 +332,7 @@
       "heavy": true,
       "blockers": [],
       "next_levers": [
-        "listimages now has scp_original_image_type=k8s param — should count as covered on next smoke run",
+        "listimages now has scp_original_image_type=k8s param \u2014 should count as covered on next smoke run",
         "Remaining 21 gaps need SCP_ALLOW_MUTATIONS + SCP_RUN_HEAVY (cluster+nodepool lifecycle)"
       ],
       "notes": "listimages (GET /v1/images): scp_original_image_type=k8s is REQUIRED (400 without; 200 with, count:15). Fixed in container__ske.json (new list-images step) and generated__heavy-ske.json (inline params -> params dict). Confirmed 200 live 2026-06-20.",
@@ -326,19 +345,19 @@
       "gap": 21,
       "heavy": false,
       "blockers": [
-        "product-bug-5xx: createrole 500 ContactAdminForAssistance CONFIRMED LIVE 2026-06-23 — blocks createrole+deleterole (cannot create to test/delete). Role-mut ops worked around via iam-role-existing lifecycle. File as PF.",
+        "product-bug-5xx: createrole 500 ContactAdminForAssistance CONFIRMED LIVE 2026-06-23 \u2014 blocks createrole+deleterole (cannot create to test/delete). Role-mut ops worked around via iam-role-existing lifecycle. File as PF.",
         "entitlement-403: adduserpolicybinding/removeuserpolicybinding -> 403 'The user is not part of the project'. Project-membership wall. GET listuserpolicybindings is 200 for any user_id.",
         "needs-real-iam-user: addgroupmember/removegroupmember/getiamuser -> 404 'No User found'. Account has 0 IAM users. No API to create without SCP_RUN_HEAVY.",
-        "heavy-gated: 13 endpoints (accesskey CRUD x5, iam-user CRUD x4 [deletebulkiamuser now covered], saml-provider CRUD x4 [showsamlprovider/createsamlprovider/setsamlprovider/deletesamlproviders]) — SCP_RUN_HEAVY required. All in iam-credentials-heavy lifecycle.",
-        "blast-radius-waived: deletepolicies DELETE /v1/policies/bulk — CONFIRMED deletes ALL account policies (waivers.json). Cannot probe safely."
+        "heavy-gated: 13 endpoints (accesskey CRUD x5, iam-user CRUD x4 [deletebulkiamuser now covered], saml-provider CRUD x4 [showsamlprovider/createsamlprovider/setsamlprovider/deletesamlproviders]) \u2014 SCP_RUN_HEAVY required. All in iam-credentials-heavy lifecycle.",
+        "blast-radius-waived: deletepolicies DELETE /v1/policies/bulk \u2014 CONFIRMED deletes ALL account policies (waivers.json). Cannot probe safely."
       ],
       "next_levers": [
         "SCP_RUN_HEAVY: iam-credentials-heavy lifecycle covers 13 remaining HEAVY endpoints (accesskey/iam-user/saml-provider create/CRUD). No VPC needed.",
         "Fix createrole product bug (contact support) -> unblocks createrole+deleterole (2 remaining role endpoints).",
         "Entitlement: project membership for user -> adduserpolicybinding/removeuserpolicybinding 200.",
-        "No more non-heavy non-entitlement fixable gaps — all remaining 21 gaps are classified blockers."
+        "No more non-heavy non-entitlement fixable gaps \u2014 all remaining 21 gaps are classified blockers."
       ],
-      "notes": "CONFIRMED 41/62 (66%) 2026-06-24. Session gains vs prior 33/62: setgroup 200 (body requires name field), addgrouppolicybinding 200, setresourcepolicy 200 (kms:* on KMS SRN), showresourcepolicy 200, addpermission 201, setpermission 200, removepermission 204, deleteresourcepolicy 204, removegrouppolicybinding 204 (2026-06-23). 2026-06-24 gains: setrole 200, setroletrustpolicy 200, addrolepolicybindings 200, removerolepolicybinding 204, removebulkrolepolicybindings 204 (via iam-role-existing lifecycle, OrganizationAccountAccessRole id f07f5921c1df42089e59c90408599261), deletebulkrole 204 (empty role_ids []), deletebulkiamuser 204 (empty user_ids []), setpolicygroupbinding 200 (gen-wave5-iam-bindings lifecycle). KEY FIXES: (1) setgroup {ualpha} bug — capture iam_group_name from create response, use in set-group body. (2) deletesamlproviders body key is 'ids' not 'saml_provider_ids'. (3) deletebulkrole/deletebulkiamuser with empty arrays are 204 no-ops. account_id=ec11538abf8f46d2953539521f745366.",
+      "notes": "CONFIRMED 41/62 (66%) 2026-06-24. Session gains vs prior 33/62: setgroup 200 (body requires name field), addgrouppolicybinding 200, setresourcepolicy 200 (kms:* on KMS SRN), showresourcepolicy 200, addpermission 201, setpermission 200, removepermission 204, deleteresourcepolicy 204, removegrouppolicybinding 204 (2026-06-23). 2026-06-24 gains: setrole 200, setroletrustpolicy 200, addrolepolicybindings 200, removerolepolicybinding 204, removebulkrolepolicybindings 204 (via iam-role-existing lifecycle, OrganizationAccountAccessRole id f07f5921c1df42089e59c90408599261), deletebulkrole 204 (empty role_ids []), deletebulkiamuser 204 (empty user_ids []), setpolicygroupbinding 200 (gen-wave5-iam-bindings lifecycle). KEY FIXES: (1) setgroup {ualpha} bug \u2014 capture iam_group_name from create response, use in set-group body. (2) deletesamlproviders body key is 'ids' not 'saml_provider_ids'. (3) deletebulkrole/deletebulkiamuser with empty arrays are 204 no-ops. account_id=ec11538abf8f46d2953539521f745366.",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -478,8 +497,8 @@
       "heavy": false,
       "blockers": [
         "backend-bug-400: getproducteventlist+getaccounteventlist+geteventpolicyhistories ALL 400 (server-side date->resourceType misparse, all date formats tried; no workaround; X-ResourceType IS forwarded correctly).",
-        "account-prereq-400: puteventpolicy+modifyeventpolicy+deleteeventpolicy return 400 InvalidRequest params=[null] (all Object Storage products are NE state, not enrolled in monitoring backend; isLogMetric MUST be string 'N' not boolean — confirmed 2026-06-24).",
-        "account-prereq-404: getmetricperfdatalist 404 productResourceInfos (products NE state; tried both productResourceId scalar and productResourceInfos array body shapes — both blocked by NE state).",
+        "account-prereq-400: puteventpolicy+modifyeventpolicy+deleteeventpolicy return 400 InvalidRequest params=[null] (all Object Storage products are NE state, not enrolled in monitoring backend; isLogMetric MUST be string 'N' not boolean \u2014 confirmed 2026-06-24).",
+        "account-prereq-404: getmetricperfdatalist 404 productResourceInfos (products NE state; tried both productResourceId scalar and productResourceInfos array body shapes \u2014 both blocked by NE state).",
         "no-real-data-404: geteventdetail+geteventnotificationstates+geteventpolicydetail+geteventpolicynotification+getadressbookmemberlist all 404 (0 events, 0 policies, 0 addrbooks in account; endpoint routing is correct; will 2xx when real IDs exist)."
       ],
       "next_levers": [
@@ -488,7 +507,7 @@
         "All 18 endpoints are now REACHED (0 never-reached after this session). Coverage 6/18 verified 2xx.",
         "No further lever: all remaining gaps are classified blockers (backend-bug / account-prereq / no-real-data)."
       ],
-      "notes": "6/18 verified 2xx (unchanged from 2026-06-20). SESSION GAINS 2026-06-24: (1) modifyeventpolicy+deleteeventpolicy probe steps added — now 0 never-reached endpoints (was 2). (2) isLogMetric confirmed as string 'N' not boolean false (body shape corrected in lifecycle). (3) productResourceInfos array body shape tested for metric-data — blocked by NE state regardless. ALL 18 endpoints have observations.jsonl entries. Remaining 12 gaps are all classified blockers (see blockers field).",
+      "notes": "6/18 verified 2xx (unchanged from 2026-06-20). SESSION GAINS 2026-06-24: (1) modifyeventpolicy+deleteeventpolicy probe steps added \u2014 now 0 never-reached endpoints (was 2). (2) isLogMetric confirmed as string 'N' not boolean false (body shape corrected in lifecycle). (3) productResourceInfos array body shape tested for metric-data \u2014 blocked by NE state regardless. ALL 18 endpoints have observations.jsonl entries. Remaining 12 gaps are all classified blockers (see blockers field).",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -576,15 +595,28 @@
       "gap": 10,
       "heavy": false,
       "blockers": [
-        "needs-heavy-prereq: listsnapshots(volume_id REQUIRED query)+showvolume+listaccessrule need a volume (0 volumes; billable).",
-        "needs-heavy-lifecycle: 7 mutating (create/snapshot/setcapacity/restore/setaccessrule/delete x2) - billable parallel volume (1TB min)."
+        {
+          "key": "listsnapshots: volume_id REQUIRED, no real volume",
+          "reason": "GET /v1/snapshots requires ?volume_id= query param. Without it: 400 ValidationError. With fake UUID: 404 parallel-filestorage.Notfound.volume. Needs a real PFS volume (heavy-prereq, 1TB billable minimum).",
+          "kind": "heavy-prereq"
+        },
+        {
+          "key": "showvolume/listaccessrule: path param volume_id needed",
+          "reason": "Both need real volume_id in path. 0 PFS volumes in account. Heavy prereq (1TB minimum).",
+          "kind": "heavy-prereq"
+        },
+        {
+          "key": "7 mutating endpoints: billable volume required",
+          "reason": "createvolume (1TB min, billable), createsnapshot, setvolumecapacity, restoresnapshot, setaccessrule, deletesnapshot, deletevolume all need real volume. setaccessrule body shape: {object_id, object_type, action} (needs real MNGC server). Restore: '추후 제공될 예정' (not yet released).",
+          "kind": "heavy-prereq"
+        }
       ],
       "next_levers": [
-        "HEAVY+MUTATIONS+DESTRUCTIVE: parallel-filestorage-capacity-restore -> all 10",
-        "setaccessrule body shape unknown"
+        "HEAVY+MUTATIONS+DESTRUCTIVE: parallel-filestorage-capacity-restore lifecycle (enabled, heavy) -> covers all 10 remaining when SCP_RUN_HEAVY=true",
+        "setaccessrule needs real MNGC server id as object_id (needs-peer dependency)"
       ],
-      "notes": "0->1/11 (listvolumes 200; list field is parallel_filestorages not volumes). Added list-snapshots step (volume_id required, probe_reads can't supply query params). deletesnapshot ALSO needs ?volume_id. capture $.snapshot.id. heavy:true (billable).",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "1/11 confirmed (listvolumes 200; list field is parallel_filestorages not volumes; confirmed live 2026-06-29). All remaining 10 endpoints need a real PFS volume (heavy-prereq, 1TB min billable). listsnapshots requires ?volume_id= REQUIRED query param (400 without, 404 with fake). Lifecycle parallel-filestorage-capacity-restore models all writes (reachability-only, heavy). No new non-heavy endpoints coverable without a real volume.",
+      "updated": "2026-06-29T00:00:00Z"
     },
     {
       "service": "queueservice",
@@ -596,7 +628,7 @@
       "next_levers": [
         "fifo-only dedup ops need a .fifo queue (optional groups already isolate)"
       ],
-      "notes": "12/12 — getqueueattributes needs attributes=All (case-sensitive) + name=<queue>. Fixed 41858cb.",
+      "notes": "12/12 \u2014 getqueueattributes needs attributes=All (case-sensitive) + name=<queue>. Fixed 41858cb.",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -693,15 +725,28 @@
       "gap": 7,
       "heavy": false,
       "blockers": [
-        "needs-peer-resource: listfirewallrules(firewall_id REQUIRED query)+showfirewall+showfirewallrule - 0 firewalls in account (404 with fake id, not entitlement).",
-        "mutation-gated: createfirewallrule/setfirewall/setfirewallrule/deletefirewallrule need VPC+firewall."
+        {
+          "key": "listfirewallrules: firewall_id required query param",
+          "reason": "GET /v1/firewalls/rules requires firewall_id (REQUIRED per api_docs); bare call returns 400, fake id returns ResourceNotFound 404. Not coverable read-only without a real firewall in account.",
+          "kind": "needs-resource"
+        },
+        {
+          "key": "showfirewall / showfirewallrule: no firewalls in account",
+          "reason": "GET /v1/firewalls/{id} and GET /v1/firewalls/rules/{id} return ResourceNotFound 404 with any fake id. 0 firewalls in account confirmed live 2026-06-29.",
+          "kind": "needs-resource"
+        },
+        {
+          "key": "createfirewallrule/setfirewall/setfirewallrule/deletefirewallrule: need VPC+IGW with firewall_enabled",
+          "reason": "All 4 mutating endpoints need a real firewall_id. Firewalls are implicitly created when a VPC carrier (IGW/DC/LB) is created with firewall_enabled:true. No standalone POST /v1/firewalls. Requires VPC creation -> needs-heavy lifecycle to unlock.",
+          "kind": "needs-heavy"
+        }
       ],
       "next_levers": [
-        "MUTATIONS: create VPC with firewall_enabled:true -> capture firewall_id -> rules chain unlocks",
-        "firewall_id has no safe synthetic default for smoke"
+        "HEAVY: create VPC with firewall_enabled:true IGW -> listfirewalls captures firewall_id -> showfirewall/listfirewallrules/showfirewallrule/createfirewallrule/setfirewallrule/deletefirewallrule/setfirewall all unlock (7 endpoints)",
+        "light-runnable: listfirewalls GET step added to networking-firewall-rule lifecycle (2026-06-29) -> lifecycle now anchored 2xx"
       ],
-      "notes": "1/8 (listfirewalls 200, empty). No standalone POST /v1/firewalls (firewall auto-attaches to VPC). setfirewall body {flavor_name:EXSMALL,loggable}. createfirewallrule captures $.firewall_rule.id. 503s transient.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "1/8 (listfirewalls 200, confirmed live 2026-06-20 and 2026-06-29 \u2014 empty list {count:0,firewalls:[]}). No standalone POST /v1/firewalls endpoint (firewall auto-attaches to VPC carrier). listfirewalls GET step now first step in networking-firewall-rule lifecycle making it light-runnable. 7 remaining endpoints all need real firewall_id (VPC+IGW create). setfirewall body: {flavor_name:EXSMALL,loggable}. createfirewallrule captures $.firewall_rule.id.",
+      "updated": "2026-06-29T08:35:54Z"
     },
     {
       "service": "loggingaudit",
@@ -774,7 +819,7 @@
         "DevOps admin user service activation on the account would unblock create (+1 2xx) and cascade to show/check-deletable/delete (+3 2xx) = 6/6 total",
         "check-duplication 200 now solid in smoke (2026-06-23 fix: tenant_code candidate added to smoke.py _required_param_candidates)"
       ],
-      "notes": "2026-06-20: 0->2/6. listdevopsservices 200 + checkduplicationdevopsservice 200 (EXACTLY ONE of tenant_code OR tenant_name). 2026-06-23: smoke.py fixed (added tenant_code candidate for /check-duplication). createdevopsservice LIVE-PROVEN blocker: 409 not-found-admin-user-service even with real IAM user id — platform entitlement, not a params/body issue. Body shape: DevOpsServiceCreateRequest{tenant_name,tenant_code,members[str>=1]}. Real user id confirmed: f2b627e6bf4f4b3996f04de4f877bd11 (account ec11538abf8f46d2953539521f745366).",
+      "notes": "2026-06-20: 0->2/6. listdevopsservices 200 + checkduplicationdevopsservice 200 (EXACTLY ONE of tenant_code OR tenant_name). 2026-06-23: smoke.py fixed (added tenant_code candidate for /check-duplication). createdevopsservice LIVE-PROVEN blocker: 409 not-found-admin-user-service even with real IAM user id \u2014 platform entitlement, not a params/body issue. Body shape: DevOpsServiceCreateRequest{tenant_name,tenant_code,members[str>=1]}. Real user id confirmed: f2b627e6bf4f4b3996f04de4f877bd11 (account ec11538abf8f46d2953539521f745366).",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -870,7 +915,7 @@
       "heavy": false,
       "blockers": [],
       "next_levers": [],
-      "notes": "9/9 COMPLETE (100%) 2026-06-23 LIVE. Two lifecycles: (1) networking-security-group covers createsecuritygroup+createsecuritygrouprule+showsecuritygroup+showsecuritygrouprule+listsecuritygrouprules+deletesecuritygrouprule+deletesecuritygroup; (2) networking-security-group-update covers setsecuritygroup. KEY FACTS: SGs are account/region-scoped (NO VPC needed). setsecuritygroup (PUT) body fields are {description, loggable} ONLY — 'name' is NOT a valid field (confirmed from API docs). listsecuritygrouprules requires security_group_id as REQUIRED query param (400 without it, 200 with). createsecuritygroup body: {name, description, loggable, tags[]}. createsecuritygrouprule body: {security_group_id, direction, ethertype, protocol, port_range_min, port_range_max, remote_ip_prefix, description}. Teardown: clean 0 leftover SGs or rules (both delete steps confirmed 204).",
+      "notes": "9/9 COMPLETE (100%) 2026-06-23 LIVE. Two lifecycles: (1) networking-security-group covers createsecuritygroup+createsecuritygrouprule+showsecuritygroup+showsecuritygrouprule+listsecuritygrouprules+deletesecuritygrouprule+deletesecuritygroup; (2) networking-security-group-update covers setsecuritygroup. KEY FACTS: SGs are account/region-scoped (NO VPC needed). setsecuritygroup (PUT) body fields are {description, loggable} ONLY \u2014 'name' is NOT a valid field (confirmed from API docs). listsecuritygrouprules requires security_group_id as REQUIRED query param (400 without it, 200 with). createsecuritygroup body: {name, description, loggable, tags[]}. createsecuritygrouprule body: {security_group_id, direction, ethertype, protocol, port_range_min, port_range_max, remote_ip_prefix, description}. Teardown: clean 0 leftover SGs or rules (both delete steps confirmed 204).",
       "updated": "2026-06-24T09:01:02Z"
     },
     {
@@ -892,11 +937,11 @@
       "heavy": false,
       "blockers": [
         "entitlement/credential: gettemporarykey (GET /v1/temporarykey/{id}) needs vault-issued Svaccesskey/Svsignature/Svtimestamp/Svclienttype headers NOT derivable from SCP API credentials. Live-confirmed 400 ValidationError even with real vault id. PERMANENT BLOCKER.",
-        "key-in-use: createsecretvault 400 Access key is already in use — 1 auth key per vault; existing vault occupies the key until it auto-deletes after 7-day waiting period (2026-06-30). lifecycle handles gracefully via capture_soft (list captures existing vault for show probe)."
+        "key-in-use: createsecretvault 400 Access key is already in use \u2014 1 auth key per vault; existing vault occupies the key until it auto-deletes after 7-day waiting period (2026-06-30). lifecycle handles gracefully via capture_soft (list captures existing vault for show probe)."
       ],
       "next_levers": [
         "createsecretvault full 2xx lifecycle: wait until 2026-06-30 for existing regrsvtest vault to auto-delete, then re-run security-secretvault-vault lifecycle. Auth key UUID is now correctly captured via fetch-iam-key-id pre-step.",
-        "gettemporarykey 2xx: would need vault-issued vault-token auth headers (Sv*) — feature request or dedicated vault-token injection mechanism; classify as PERMANENT unless platform provides a mechanism."
+        "gettemporarykey 2xx: would need vault-issued vault-token auth headers (Sv*) \u2014 feature request or dedicated vault-token injection mechanism; classify as PERMANENT unless platform provides a mechanism."
       ],
       "notes": "4/5 covered (2026-06-23). LIVE-VALIDATED: create 201, show 200, terminate 200. KEY FACT: access_key_id = IAM key UUID ($.access_keys[0].id), NOT access_key string. Fixed in lifecycle via fetch-iam-key-id pre-step. gettemporarykey PERMANENT blocker (vault-issued headers). See knowledge/services.md security/secretvault section.",
       "updated": "2026-06-24T09:01:02Z"
@@ -984,17 +1029,39 @@
       "gap": 3,
       "heavy": false,
       "blockers": [
-        "mutation-gated: all 3 are POST (assumerole/assumerolewithsaml/objectstoreauthorization) - structural 0/3 read-only ceiling (no GETs).",
-        "entitlement-403-likely: assumerole - existing roles' trust policies don't allow our account; createrole 500 (IAM PF-bug) blocks making a self-assumable role.",
-        "needs-saml-provider: assumerolewithsaml needs real SAML provider+assertion.",
-        "needs-sts-session-token: objectstoreauthorization needs a session_token from a prior assumerole 200 (sequential dep)."
+        {
+          "key": "host-routing-bug: sts was treated as REGIONAL, now FIXED",
+          "reason": "sts was missing from DEFAULT_GLOBAL_SERVICES in core/config.py. Calls went to sts.kr-west1.e.samsungsdscloud.com which returns Samsung Cloud Platform web portal HTML 404. Fixed 2026-06-29: added sts to DEFAULT_GLOBAL_SERVICES; sts.e.samsungsdscloud.com (global) returns JSON API 403 (real API gateway).",
+          "kind": "fixed"
+        },
+        {
+          "key": "all 3 endpoints POST-only: structural 0/3 read-only ceiling",
+          "reason": "No GET endpoints in STS catalog. All 3 are POST token-minting ops. Smoke always skips them. Coverage requires SCP_ALLOW_MUTATIONS=true.",
+          "kind": "structural"
+        },
+        {
+          "key": "assumerole: role trust policy does not allow self-assume",
+          "reason": "Existing roles trust policy allows only Account 73eab1a74c6347c1be9c892efc7f1102 to assume. IAM createrole returns 500 (PF-bug) blocking creation of self-assumable role. Expected 403 from real gateway once routing is fixed.",
+          "kind": "entitlement-403"
+        },
+        {
+          "key": "assumerolewithsaml: no SAML provider in account",
+          "reason": "Account has 0 SAML providers. Without a real SAML provider + valid SAML assertion, this endpoint returns 400/404.",
+          "kind": "needs-saml-provider"
+        },
+        {
+          "key": "objectstoreauthorization: needs session_token from prior assumerole 200",
+          "reason": "objectstoreauthorization generates S3-compatible auth headers using the caller's STS session_token. Regular access_key auth returns 400/401. Sequential dependency: assumerole must 200 first.",
+          "kind": "needs-peer"
+        }
       ],
       "next_levers": [
-        "MUTATIONS: sts-token-issuance-coverage records 4xx (reached, not 2xx)",
-        "TRUE 2xx needs: fix IAM createrole 500 -> create self-assumable role -> assumerole 200 -> objectstoreauthorization 200"
+        "HOST BUG FIXED 2026-06-29: sts added to DEFAULT_GLOBAL_SERVICES in core/config.py. Gateway now returns JSON 403 instead of HTML 404.",
+        "TRUE 2xx: fix IAM createrole 500 -> create self-assumable role with trust policy allowing our account -> assumerole 200 -> objectstoreauthorization 200 chain",
+        "Paths are CORRECT: /v1/assume-role, /v1/assume-role-with-saml, /v1/object-store-authorization (confirmed api_docs.json 2026-06-20)"
       ],
-      "notes": "0/3 read-only (all POST). FIXED 3 invented bodies: assumerole role_indicator (e:ACCOUNT:ROLE, not role_arn); assumerolewithsaml role_indicator+principal_indicator+saml_assertion(b64); objectstoreauthorization method+url+x_amz_content_sha256+x_amz_date (not bucket_name). STS host REGIONAL not global.",
-      "updated": "2026-06-24T09:01:02Z"
+      "notes": "0/3 read-only (all POST). HOST BUG FIXED 2026-06-29: sts is GLOBAL not REGIONAL \u2014 sts.e.samsungsdscloud.com returns JSON API responses; sts.kr-west1.e.samsungsdscloud.com was returning HTML portal. Body shapes correct from api_docs.json: assumerole=role_indicator+role_session_name+duration_seconds; assumerolewithsaml=role_indicator+principal_indicator+saml_assertion+duration_seconds; objectstoreauthorization=method+url+x_amz_content_sha256+x_amz_date+region+service.",
+      "updated": "2026-06-29T08:35:54Z"
     }
   ]
 }
