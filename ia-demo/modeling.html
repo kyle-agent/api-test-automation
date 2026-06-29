@@ -6191,7 +6191,7 @@ window.MD = (function () {
 
   // ---- 공유 편집 패널 ----
   function open(nodeId) {
-    var url = "/planning/resources/" + encodeURIComponent(nodeId);
+    var url = "node-" + encodeURIComponent(nodeId) + ".html";
     idEl.textContent = nodeId; openEl.href = url; frame.src = url;
     panel.hidden = false; wrap.classList.add("open");
     if (scene) scene.fit && scene.fit();
