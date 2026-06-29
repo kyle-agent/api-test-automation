@@ -108,7 +108,23 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-06-28, platform convergence + live coverage push — branch
+- **LATEST (2026-06-29, parallel-agent coverage campaign — branch `claude/ecstatic-tesla-fo1g3b`):**
+  drove service coverage **42 → 55 / 59 (93%)** on the unified Testing console, measured on
+  the (now-fixed) Reporting surface; durable `verified_endpoints.json` **1187 → 1234**.
+  Sequence: B2 consequential live batch (cdn/gslb/filestorage green; dns create-public-domain
+  500s — backend defect) → **4 parallel modeling agents** (firewall/sts · net-infra · storage ·
+  billing/cloudcontrol/org), no live mutations, disjoint per-service fragments → light-ready
+  harvest (+6: billingplan, direct-connect, firewall, loadbalancer, vpn, baremetal-blockstorage)
+  → read-only smoke refresh (+2: organization, dns) → 2 borderline light read lifecycles
+  (+2: backup, parallel-filestorage). Every batch verify-clean, **owned == 0** (no leaks).
+  Notable fix: `core/config.py` adds `sts` to `DEFAULT_GLOBAL_SERVICES` (sts is GLOBAL —
+  was routing regional → portal HTML 404). **Hard ceiling = 4 services unreachable in THIS
+  account, not a modeling gap:** cloud-ml (SCR-credential-gated 404), cloudcontrol (403 —
+  needs org-master + Landing Zone), sts (all-POST; IAM `createrole` 500s, no self-assumable
+  role), archivestorage (401 — `scp-archivestorage_hmac` not in this account's service catalog).
+  Light/read coverage is now MAXED; remaining gains are endpoint-DEPTH inside the 55 green
+  services via **heavy** (billable) lifecycles, or backend/entitlement fixes outside our control.
+- **PRIOR (2026-06-28, platform convergence + live coverage push — branch
   `claude/ecstatic-tesla-fo1g3b`; reporting fix FF-merged to `main` at `8237e153`):**
   console2 absorbed into the controlplane as ONE unified 4-stage console
   (**Catalog · Modeling · Testing · Reporting**); console2 app retired (S4). **Fixed a
