@@ -30,9 +30,18 @@ touch app.py / base.html / the routers, and it does not publish or commit.
 """
 from __future__ import annotations
 
+import re
 import shutil
 import warnings
 from pathlib import Path
+
+# strip the live-only dep-graph block from node form pages (it fetch()es graph.json
+# from the server). Marked in resource_form.html with IA_STRIP_START/END.
+_STRIP_RE = re.compile(r"<!--IA_STRIP_START-->.*?<!--IA_STRIP_END-->", re.S)
+# a bare node deep-link  href="/planning/resources/<id>"  (no further '/'): the
+# catalog recipe links + the form's reverse-deps links. Run AFTER _nav_rewrite so
+# the menu link …/resources/map is already gone (else 'map' looks like a node).
+_NODE_LINK_RE = re.compile(r'href="/planning/resources/([^"/]+)"')
 
 # TestClient pulls in a noisy httpx deprecation warning under starlette; mute it
 # so the build log stays readable (purely cosmetic).
@@ -153,13 +162,21 @@ def _nav_rewrite(html: str) -> str:
     return html
 
 
-def _rewrite_recipe_links(html: str) -> str:
-    """Catalog only: the per-service ``✏️ 레시피 편집 →`` deep-links point at the
-    Modeling node-edit form (``/planning/resources/<node_id>``), which has no
-    offline page. Land them on the Modeling map instead. Done as a blunt prefix
-    replace AFTER ``_nav_rewrite`` has already fixed the exact ``…/map`` nav link,
-    so only the remaining node deep-links are caught."""
-    return html.replace('href="/planning/resources/', 'href="modeling.html" data-offline-recipe="')
+def _rewrite_node_links(html: str) -> str:
+    """Repoint bare node deep-links ``href="/planning/resources/<id>"`` at the baked
+    per-node detail page ``node-<id>.html``. Used by Catalog (✏️ recipe links) AND
+    the node form pages (reverse-deps links). MUST run after ``_nav_rewrite`` so the
+    ``…/resources/map`` menu link is already rewritten (not seen as node 'map')."""
+    return _NODE_LINK_RE.sub(lambda m: f'href="node-{m.group(1)}.html"', html)
+
+
+def _strip_marked(html: str) -> str:
+    """Remove the IA_STRIP_START..END block(s) — the form's live dep-graph that
+    fetch()es from the server (no offline target). The node's recipe + reverse-deps
+    list (server-rendered) stay; the visual DAG lives on the Modeling 그림 toggle."""
+    return _STRIP_RE.sub(
+        '<p class="muted" style="font-size:12px">의존 그래프는 라이브 콘솔 또는 '
+        'Modeling 표→그림 토글에서 확인 (정적 데모에서는 생략).</p>', html)
 
 
 def _build_catalog(c, *, htmx: bool) -> None:
@@ -167,7 +184,7 @@ def _build_catalog(c, *, htmx: bool) -> None:
     rewrite + htmx + banner. Written as BOTH catalog.html and index.html (landing)."""
     html = c.get("/catalog").text
     html = _nav_rewrite(html)
-    html = _rewrite_recipe_links(html)
+    html = _rewrite_node_links(html)  # ✏️ recipe deep-links -> node-<id>.html
     html = _vendor_htmx(html, available=htmx)
     html = _inject_banner(html)
     (OUT / "catalog.html").write_text(html, encoding="utf-8")
@@ -189,11 +206,38 @@ def _build_modeling(c, *, htmx: bool) -> None:
     html = _inline_data(html, "modeling.map.json", map_json)
     html = _vendor_htmx(html, available=htmx)
     html = _nav_rewrite(html)
+    # the table/graph node-click opens the edit form in the side-panel iframe via
+    # ``"/planning/resources/" + id``; repoint at the baked ``node-<id>.html`` so the
+    # detail renders offline (the ↗ open-in-tab uses the same ``url`` var).
+    html = html.replace('"/planning/resources/" + encodeURIComponent(nodeId)',
+                        '"node-" + encodeURIComponent(nodeId) + ".html"')
     html = _inject_banner(html)
-    # node-click opens an iframe to /planning/resources/<id> (the edit form), which
-    # does not exist offline -> the side panel shows the iframe's 404. We leave the
-    # click wired (graph focus still works); noted in the report + README.
     (OUT / "modeling.html").write_text(html, encoding="utf-8")
+
+
+def _build_node_pages(c, *, htmx: bool) -> int:
+    """Per-node DETAIL pages — the Modeling table/graph + Catalog recipe links open
+    these. Each node's REAL edit form (server-rendered recipe: requires/options/body/
+    verify/capture/delete/flags + the M2 reverse-deps list), with the live dep-graph
+    block stripped and node/nav links repointed at relative ``node-<id>.html``. This
+    is what makes '상세' viewable offline (was a 404)."""
+    from controlplane import resource_model
+    model = resource_model.load_model()
+    n = 0
+    for nid in sorted(model):
+        try:
+            html = c.get(f"/planning/resources/{nid}").text
+        except Exception:
+            continue
+        html = _strip_marked(html)        # drop the live dep-graph fetch block
+        html = _vendor_htmx(html, available=htmx)
+        html = _nav_rewrite(html)         # top nav + breadcrumb -> relative/#
+        html = _rewrite_node_links(html)  # reverse-deps links -> node-<id>.html (after nav!)
+        html = re.sub(r'href="/planning/edit[^"]*"', 'href="#"', html)  # raw-YAML editor: no offline page
+        html = _inject_banner(html)
+        (OUT / f"node-{nid}.html").write_text(html, encoding="utf-8")
+        n += 1
+    return n
 
 
 def _build_reporting(c, *, htmx: bool) -> None:
@@ -301,6 +345,8 @@ def build() -> Path:
     c = TestClient(app)
     _build_catalog(c, htmx=htmx)
     _build_modeling(c, htmx=htmx)
+    nodes = _build_node_pages(c, htmx=htmx)
+    print(f"  node detail pages: {nodes}")
     _build_reporting(c, htmx=htmx)
     _build_renderer(c)
     _build_testing()
@@ -349,20 +395,34 @@ def verify() -> dict:
               if m.type in ("error", "warning") else None)
         pg.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
-        for f in ["index.html", "modeling.html", "reporting.html"]:
+        # spot-check one node detail page too (the formerly-404 '상세').
+        sample_node = sorted(OUT.glob("node-*.html"))
+        pages = ["index.html", "modeling.html", "reporting.html"]
+        if sample_node:
+            pages.append(sample_node[0].name)
+        for f in pages:
             errors.clear()
             pg.goto((OUT / f).as_uri())
             pg.wait_for_timeout(2500)
             page_report: dict = {"errors": list(errors)}
-            # the graph pages must have drawn SVG node groups (.rg-unit) from the
-            # relative *.json + renderer; a count > 0 proves the fetch+render path.
-            if f in ("modeling.html", "reporting.html"):
-                svg_id = "#map-svg" if f == "modeling.html" else "#cov-svg"
-                page_report["rg_units"] = pg.eval_on_selector_all(
-                    f"{svg_id} g.rg-unit", "els => els.length")
-                shot = OUT / ("_verify_" + f.replace(".html", "") + ".png")
+            if f == "modeling.html":
+                # table-first now: prove the server-rendered rows are present (the
+                # graph is a lazy toggle, so rg-units is 0 until clicked — not a fault).
+                page_report["rows"] = pg.eval_on_selector_all(
+                    "#model-table tbody tr", "els => els.length")
+                shot = OUT / "_verify_modeling.png"
                 pg.screenshot(path=str(shot))
                 page_report["screenshot"] = str(shot)
+            elif f == "reporting.html":
+                page_report["rg_units"] = pg.eval_on_selector_all(
+                    "#cov-svg g.rg-unit", "els => els.length")
+                shot = OUT / "_verify_reporting.png"
+                pg.screenshot(path=str(shot))
+                page_report["screenshot"] = str(shot)
+            elif f.startswith("node-"):
+                # the recipe form must be present (proves '상세' renders offline).
+                page_report["recipe"] = pg.eval_on_selector_all(
+                    "section h2", "els => els.some(e => e.textContent.indexOf('전제조건') >= 0)")
             report[f] = page_report
         b.close()
     return report
@@ -381,13 +441,24 @@ def main() -> None:
     ok = True
     for page, r in rep.items():
         errs = r.get("errors") or []
-        units = r.get("rg_units")
-        extra = f" · rg-units={units}" if units is not None else ""
-        status = "OK" if not errs and (units is None or units > 0) else "CHECK"
+        # each page proves itself by a different signal: graph pages by rg-units,
+        # modeling by table rows, node detail by the recipe form, index by no-errors.
+        metric = None
+        good = True
+        if "rg_units" in r:
+            metric = f"rg-units={r['rg_units']}"
+            good = r["rg_units"] > 0
+        elif "rows" in r:
+            metric = f"rows={r['rows']}"
+            good = r["rows"] > 0
+        elif "recipe" in r:
+            metric = f"recipe={r['recipe']}"
+            good = bool(r["recipe"])
+        extra = f" · {metric}" if metric else ""
+        status = "OK" if (not errs and good) else "CHECK"
         if status != "OK":
             ok = False
-        print(f"  {page:16s} {status}{extra}"
-              + (f"  errors={errs}" if errs else ""))
+        print(f"  {page:24s} {status}{extra}" + (f"  errors={errs}" if errs else ""))
     print("verify:", "clean ✅" if ok else "issues ⚠ (see above)")
 
 

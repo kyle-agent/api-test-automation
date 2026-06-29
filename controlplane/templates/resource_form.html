@@ -16,6 +16,7 @@
 </section>
 
 {% if not is_new %}
+<!--IA_STRIP_START-->{# 정적 데모 빌드(build_ia_demo)는 이 블록을 떼어낸다 — graph.js fetch 는 서버 필요 #}
 <section>
   <h2>의존 그래프 <span class="muted" style="font-size:13px;font-weight:400">— 이 노드의 의존(좌) · 피의존(우). 클릭=이동</span></h2>
   <div style="display:flex;gap:14px;font-size:12px;color:#90a4ba;flex-wrap:wrap;margin-bottom:6px">
@@ -33,6 +34,7 @@ ResourceGraph.load(document.getElementById("dep-svg"),
   "/planning/resources/graph.json?focus={{ node_id }}",
   {onClick:function(id){location.href="/planning/resources/"+encodeURIComponent(id);}});
 </script>
+<!--IA_STRIP_END-->
 {% endif %}
 
 <datalist id="node-ids">
