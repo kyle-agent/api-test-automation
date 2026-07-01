@@ -108,7 +108,45 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **LATEST (2026-06-29, parallel-agent coverage campaign — branch `claude/ecstatic-tesla-fo1g3b`):**
+- **▶ SESSION HANDOFF / RESUME HERE (2026-06-29 close, branch `claude/ecstatic-tesla-fo1g3b`).**
+  Everything is committed, pushed, and FF-merged — **`main` = feature = `origin` = `101e08c2`,
+  working tree CLEAN, live owned == 0** (last verify post-D1 cleanup; re-run `POST /api/cleanup`
+  on resume to reconfirm). Nothing is mid-execution.
+  - **Done this session:** (1) platform convergence — console2 → ONE unified 4-stage console
+    (Catalog · Modeling · Testing · Reporting), console2 retired; Reporting `lifecycle:step`
+    attribution bug fixed. (2) Coverage campaign **13 → 55 / 59 services (93%)** (read-only batch
+    +20, config-create batches +9, consequential +3, 4 parallel modeling agents + light harvest
+    +6, smoke +2, backup/pfs +2); durable `verified_endpoints.json` **1035 → 1250**. (3) **Modeling
+    UX reworked** (user-driven): table view grouped by **category ▸ service** with an authoring
+    tally (✓/⚠/docs), **full-page** node edit (no cramped side-panel), a Catalog-vs-Modeling
+    explainer, + deps aids (reverse-deps list, unresolved-ref warning; autocomplete already
+    existed). (4) **Static demo now has per-node detail** — `build_ia_demo` bakes 275
+    `node-<id>.html` recipe pages; Modeling/Catalog links open them (was 404). Republished to
+    `dashboard-data:/ia-demo/` → **https://kyle-agent.github.io/api-test-automation/ia-demo/**
+    (needs repo Settings→Pages = dashboard-data root). (5) `cloudcontrol` + `archivestorage`
+    added as **reachability-only** waivers (261 total).
+  - **Coverage ceiling — 4 services stay `modeled`, NOT fixable in this account (don't retry):**
+    `ai-ml/cloud-ml` (SCR-credential-gated 404), `platform/sts` (all-POST; IAM `createrole` 500s),
+    `management/cloudcontrol` + `storage/archivestorage` (reachability-only by design → 403/401 =
+    access evidence, never a verified 2xx). Light/read coverage is MAXED.
+  - **OPEN / DEFERRED (what a next session could pick up):**
+    · **Heavy deep-coverage D2–D7** (mysql/backup/epas/mariadb/sqlserver/cachestore) — **HALTED**.
+      D1(postgresql) timed out at ~40% in-session, cluster CREATE went `FAILED` + leaked → recovered
+      via force `POST /api/cleanup` (owned==0 confirmed). Each run is ~1.5–2h, **billable**, leak-prone,
+      and adds **endpoint-DEPTH only (0 new service coverage — DBs already green)**. → **Run via the
+      CI heavy lane (`api-test.yml`), NOT an in-session TestClient poll** (the in-process run + my
+      1h poll timeout is what caused the leak). Partial PG depth (+16 endpoints) is already banked.
+    · `build_ia_demo` is now ~5 min (275 node pages + console2 bundle); optimise with a cached
+      `load_model()` if it matters. Its Playwright `verify()` step is slow — for a quick rebuild use
+      `python -c "from controlplane.build_ia_demo import build; build()"` (skips verify).
+    · Pre-existing (not this session, flagged): 3 `test_compose_*` failures in
+      `controlplane/tests_resources_offline.py` (from the b5a8295c rename); flaky-timing
+      `dag_runner/dag_scheduler` tests (pass in isolation, fail under full-suite load); the ~69
+      `scenarios.json`-backed nodes whose lifecycle enabled/heavy is read-only (parallel-campaign rule).
+  - **Resume commands:** `python -m spec.summary` (coverage) · `git log --oneline -6 main` ·
+    live app `uvicorn controlplane.app:app` then `/planning/resources/map` (Modeling) ·
+    verify clean `POST /api/cleanup`. Safety gates unchanged (CLAUDE.md Hard Rules).
+- **PRIOR (2026-06-29, parallel-agent coverage campaign detail — branch `claude/ecstatic-tesla-fo1g3b`):**
   drove service coverage **42 → 55 / 59 (93%)** on the unified Testing console, measured on
   the (now-fixed) Reporting surface; durable `verified_endpoints.json` **1187 → 1234**.
   Sequence: B2 consequential live batch (cdn/gslb/filestorage green; dns create-public-domain
