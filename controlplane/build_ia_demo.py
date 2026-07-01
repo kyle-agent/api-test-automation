@@ -38,10 +38,12 @@ from pathlib import Path
 # strip the live-only dep-graph block from node form pages (it fetch()es graph.json
 # from the server). Marked in resource_form.html with IA_STRIP_START/END.
 _STRIP_RE = re.compile(r"<!--IA_STRIP_START-->.*?<!--IA_STRIP_END-->", re.S)
-# a bare node deep-link  href="/planning/resources/<id>"  (no further '/'): the
-# catalog recipe links + the form's reverse-deps links. Run AFTER _nav_rewrite so
-# the menu link …/resources/map is already gone (else 'map' looks like a node).
-_NODE_LINK_RE = re.compile(r'href="/planning/resources/([^"/]+)"')
+# a bare node deep-link  href="/planning/resources/<id>"  where <id> is node-id
+# shaped ([A-Za-z0-9_-], closing quote right after — so query links like
+# compose?… never match): the catalog recipe links + the form's reverse-deps +
+# the modeling table rows. Run AFTER _nav_rewrite (so …/resources/map|worklist are
+# already rewritten and 'map'/'worklist' aren't mistaken for nodes).
+_NODE_LINK_RE = re.compile(r'href="/planning/resources/([A-Za-z0-9][A-Za-z0-9_-]*)"')
 
 # TestClient pulls in a noisy httpx deprecation warning under starlette; mute it
 # so the build log stays readable (purely cosmetic).
@@ -154,7 +156,9 @@ def _nav_rewrite(html: str) -> str:
         ('href="/planning?step=model"', 'href="modeling.html"'),
         ('href="/planning?step=compose"', 'href="#"'),
         ('href="/planning/validate"', 'href="#"'),
-        # --- modeling map page's "목록 보기 →" link to the (offline-absent) list ---
+        # --- modeling: 작업 큐 + the (offline-absent) list/breadcrumb -> '#' ---
+        ('href="/planning/resources/worklist"', 'href="#"'),
+        ('href="/planning/resources/"', 'href="#"'),
         ('href="/planning/resources"', 'href="#"'),
     ]
     for a, b in repl:
@@ -206,11 +210,11 @@ def _build_modeling(c, *, htmx: bool) -> None:
     html = _inline_data(html, "modeling.map.json", map_json)
     html = _vendor_htmx(html, available=htmx)
     html = _nav_rewrite(html)
-    # the table/graph node-click opens the edit form in the side-panel iframe via
-    # ``"/planning/resources/" + id``; repoint at the baked ``node-<id>.html`` so the
-    # detail renders offline (the ↗ open-in-tab uses the same ``url`` var).
-    html = html.replace('"/planning/resources/" + encodeURIComponent(nodeId)',
-                        '"node-" + encodeURIComponent(nodeId) + ".html"')
+    html = _rewrite_node_links(html)  # table row id/편집 links -> node-<id>.html
+    # the graph pane navigates via ``NODE_URL + encodeURIComponent(id)`` — repoint at
+    # the baked ``node-<id>.html`` so a node click opens the full detail offline.
+    html = html.replace("NODE_URL + encodeURIComponent(id)",
+                        '"node-" + encodeURIComponent(id) + ".html"')
     html = _inject_banner(html)
     (OUT / "modeling.html").write_text(html, encoding="utf-8")
 
@@ -233,7 +237,9 @@ def _build_node_pages(c, *, htmx: bool) -> int:
         html = _vendor_htmx(html, available=htmx)
         html = _nav_rewrite(html)         # top nav + breadcrumb -> relative/#
         html = _rewrite_node_links(html)  # reverse-deps links -> node-<id>.html (after nav!)
-        html = re.sub(r'href="/planning/edit[^"]*"', 'href="#"', html)  # raw-YAML editor: no offline page
+        # any remaining server-only /planning link (compose, edit, save, …) -> '#'
+        # (node links already became node-<id>.html above, so they're safe from this).
+        html = re.sub(r'href="/planning[^"]*"', 'href="#"', html)
         html = _inject_banner(html)
         (OUT / f"node-{nid}.html").write_text(html, encoding="utf-8")
         n += 1

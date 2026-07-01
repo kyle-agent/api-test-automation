@@ -195,6 +195,35 @@ def _modeling_rows(model: dict, meta: dict, deps_idx: dict) -> list[dict]:
     return rows
 
 
+def _modeling_tree(rows: list[dict]) -> list[dict]:
+    """Group the flat modeling rows into category ▸ service, each carrying an
+    AUTHORING tally (완성/불완전/미검증) — the Modeling-specific lens that sets this
+    view apart from Catalog's read-only endpoint inventory. Sorted, counts rolled up."""
+    cats: dict[str, dict] = {}
+    for r in rows:
+        cat = r["category"] or "(기타)"
+        svc = r["service"] or "(기타)"
+        c = cats.setdefault(cat, {"category": cat, "services": {},
+                                  "n": 0, "val": 0, "docs": 0, "inc": 0})
+        s = c["services"].setdefault(svc, {"service": svc, "nodes": [],
+                                           "n": 0, "val": 0, "docs": 0, "inc": 0})
+        s["nodes"].append(r)
+        for scope in (c, s):
+            scope["n"] += 1
+            if not r["complete"]:
+                scope["inc"] += 1
+            elif r["provenance"] == "VALIDATED":
+                scope["val"] += 1
+            elif r["provenance"] == "docs":
+                scope["docs"] += 1
+    out = []
+    for cat in sorted(cats):
+        c = cats[cat]
+        c["services"] = [c["services"][s] for s in sorted(c["services"])]
+        out.append(c)
+    return out
+
+
 def _worklist(model: dict) -> tuple[list[dict], list[dict]]:
     """저작 작업 큐 — 손봐야 할 노드를 (불완전, 미검증) 두 묶음으로.
 
@@ -387,6 +416,7 @@ def map_page(request: Request):
     targets, meta = _map_meta(model)
     deps_idx = _dependents_index(model)
     rows = _modeling_rows(model, meta, deps_idx)
+    tree = _modeling_tree(rows)
     total = len(model)
     validated = sum(1 for v in meta.values() if v["provenance"] == "VALIDATED")
     docs = sum(1 for v in meta.values() if v["provenance"] == "docs")
@@ -396,7 +426,7 @@ def map_page(request: Request):
                    active="modeling",  # 계약 §4: Modeling 얼굴 (lead가 nav 배선)
                    total=total, validated=validated, docs=docs,
                    incomplete=incomplete, anchors=len(targets),
-                   rows=rows, services=services, has_composer=True)
+                   tree=tree, services=services, has_composer=True)
 
 
 @router.get("/worklist", response_class=HTMLResponse)
