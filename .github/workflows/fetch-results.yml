@@ -52,8 +52,9 @@ jobs:
 
       - uses: actions/setup-python@v5
         with: { python-version: '3.11' }
-      - name: Install boto3
-        run: python -m pip install boto3
+      - name: Install deps
+        # requests too: core/__init__ (pulled in by core.oplog) imports core.http_client
+        run: python -m pip install boto3 requests
 
       - name: Mirror to oplog bucket
         if: steps.req.outputs.run_id != ''
