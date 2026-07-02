@@ -1,8 +1,8 @@
-# D2–D7 phase 2 (2026-07-02): REAL DB sub-op depth via the new self-sufficient
-# *-cluster-subops-full lifecycles (create->wait->subops->delete; proven create
-# bodies; replica/restore excluded as leak-unsafe). Phase 1 (28595785223) proved
-# the guarded variants bank nothing without a live cluster. 4 clusters in
-# parallel, ~40min create wait each; results artifact now uploaded.
+# D2–D7 phase 3 (2026-07-02): re-run the 4 subops-full chains WITH the
+# ExistInprogress pacing fix (settle-poll after every mutating sub-op).
+# Phase 2 banked +73 verified; this opens the serialized tail
+# (archive set/sync/delete, log-export register/set/export/delete,
+# patch, kernel-upgrade, restart/stop/start, resize, sg-rules).
 action=run
 mutations=true
 destructive=true
