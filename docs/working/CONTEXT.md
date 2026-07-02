@@ -144,6 +144,34 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
     (6) GitHub MCP token expired mid-session — re-auth needed for run-status/log API
     (oplog-bucket evidence path unaffected); (7) `.github/chat-heavy-request` left at
     `action=noop`.
+- **PLATFORM pass (2026-07-02, same branch — remaining platformization work executed):**
+  - **M4 worker executor VERIFIED in-process (read-only E2E):** uvicorn
+    `PLATFORM_EXECUTOR=worker` → `/runs/trigger` (smoke × service=quota) queued a
+    `dispatched` record → `python -m runner.worker --once` claimed it
+    (`local-1783030980`), ran validate → smoke (47 live GETs pass; mutation gates
+    forced false — worker `build_env` override beats a gate-arming host `.env`) →
+    dashboard → snapshot (64 files to `runs/local-…/snapshot/` on the real oplog
+    bucket) → finalize; DB milestones + final status `done`. Zero worker-code fixes
+    needed. **Still needs docker/owner:** Docker build + compose up (server+worker
+    containers) and a worker-path mutation run (docs/PLATFORM-PLAN.md M4).
+  - **Scheduler 1.0-d first step (flag-gated, non-disruptive):** `chat-heavy.yml`
+    now understands request-file keys `dag=true` (+ optional `dag_targets=`) — runs
+    `tools/dag_run_live.py` (SCP_DAG_RUNNER + AIMD) instead of pytest-xdist; the
+    default path is untouched (`dag` absent → xdist exactly as before). Evidence
+    upload/oplog-mirror/sweep steps apply to both paths. Full 1.0-d cutover (making
+    dag the default) still needs a validated heavy dag run — owner-gated.
+  - **Validator debt cleared (offline):** `requires_env` registered as a known
+    lifecycle key (engine reads it — engine.py:714; clears the generated__cloudml
+    warning), and the 10 untagged disabled lifecycles got IB-030 `_status`
+    (quota/support-reads, dns-hosted-zone, 4× gen-heavy-*-replica,
+    gen-heavy-mariadb-upgrade → `stale` [retired/superseded/de-dup notes];
+    certificatemanager-import, iam-role → `blocked-owner`). Validator now
+    237 lifecycles / 0 errors / **5 warnings** (was 16; rest are path-typo infos).
+  - **IB-019 verified done** (backlog row: billingplan + devopsservice bodies already
+    re-derived; no drift work left). `controlplane/tests_offline.py` hermeticity fix:
+    host `.env` re-armed `SCP_ALLOW_DESTRUCTIVE` via `_load_dotenv` setdefault after
+    the pop → gate now pinned `"false"` (18/18 again). All offline suites green:
+    tests/offline 392/392, controlplane 18+18+16+16, runner 16/16.
 - **PRIOR (2026-06-29 close, branch `claude/ecstatic-tesla-fo1g3b`).**
   Everything is committed, pushed, and FF-merged — **`main` = feature = `origin` = `101e08c2`,
   working tree CLEAN, live owned == 0** (last verify post-D1 cleanup; re-run `POST /api/cleanup`

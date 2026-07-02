@@ -12,6 +12,10 @@ for: all
 > **상태 (2026-06-12): M0~M3 DONE, M4 DONE(live/docker 검증 대기 — 컷오버는
 > 마지막), M5는 R1·R2 DONE / R3 검증 웨이브 진행 중.** §0의 갭 표는 채택
 > 당시 진단으로 보존한다 — 표의 갭 항목은 이후 마일스톤에서 전부 구현됐다.
+> **(2026-07-02 갱신: M4 worker 실행기는 in-process read-only E2E 검증 완료 —
+> 남은 것은 Docker 빌드/compose 기동 + worker 경유 mutation run뿐, M4 절 참고.
+> Scheduler 1.0-d는 chat-heavy.yml에 flag-gated `dag=true` 경로로 첫 발 —
+> 기본 경로 무변경.)**
 
 ---
 
@@ -401,6 +405,17 @@ regression의 가치는 결정적·재현 가능·저비용 실행인데, 같은
 - 오프라인 테스트: `runner/tests_offline.py` (claim 단일 승자 · suite→게이트
   매핑 · 스테이지 시퀀싱/게이팅 · 실패해도 sweep/dashboard · 마일스톤 기록).
   Docker 빌드/compose 기동은 실 호스트에서 검증 필요.
+- [x] **worker 실행기 in-process live 검증 (2026-07-02, read-only):**
+      `PLATFORM_EXECUTOR=worker`로 uvicorn 기동 → `/runs/trigger`
+      (suite=smoke, service=quota) → run 레코드 큐잉(`dispatched`,
+      gh_run_id NULL) → `python -m runner.worker --once`가 claim
+      (`local-1783030980`) → validate → smoke(47 live GET pass, mutation
+      게이트 전부 false — 호스트 .env가 게이트를 arm해도 `build_env`의
+      명시 override가 이김) → dashboard build → snapshot 64파일 S3 업로드
+      (`runs/local-…/snapshot/`) → finalize, DB 마일스톤 타임라인 + status
+      `done` 확인. **코드 수정 0건** — 남은 M4 검증은 Docker 빌드/compose
+      기동(server+worker 컨테이너) + worker 경유 mutation run뿐이며 실
+      호스트/owner 윈도우 필요.
 
 ### M5 — 자원 모델 기반 시나리오 합성 (owner 제안 2026-06-11 채택) — R1·R2 DONE, R3 진행 중
 - 자원 타입별 task 정의(최소 의존조건 + 생성 옵션 + 검증된 body 템플릿)

@@ -1367,3 +1367,23 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   sub-ops are baselined 500 ContactAdmin (2026-06-18) — the paced full run
   tests whether the ExistInprogress-supersession seen on mysql/mariadb/epas
   also holds for pg (if not, expect ~7 of the 29 to stay 500-blocked).
+- **M4 worker executor E2E-verified in-process (2026-07-02, read-only; conf HIGH,
+  obs run `local-1783030980`).** `PLATFORM_EXECUTOR=worker` + `/runs/trigger`
+  (suite=smoke, service=quota) queues a `dispatched`/`gh_run_id NULL` record;
+  `python -m runner.worker --once` claims it (`local-<ts>`), runs
+  validate → smoke (47 live GETs passed) → dashboard → `core.snapshot upload`
+  (64 files → `s3://apitest-oplog-permanent/runs/local-…/snapshot/`) → finalize,
+  writes milestones directly to the platform DB, and finishes `done`. Two
+  gotchas verified: (1) worker `build_env` explicitly forces
+  `SCP_ALLOW_MUTATIONS/DESTRUCTIVE/RUN_HEAVY` from the suite gates, so a host
+  `.env` that arms the gates CANNOT leak into a read-only worker run; (2) the
+  remaining unverified M4 surface is Docker only (image build, compose up,
+  mutation run via worker) — needs a real host, not this sandbox.
+- **Offline-test hermeticity trap: `os.environ.pop` is undone by `.env`
+  (2026-07-02, conf HIGH).** `core.config._load_dotenv()` runs at first `core`
+  import and `setdefault()`s every `.env` value back into `os.environ`. A test
+  harness that pops `SCP_ALLOW_DESTRUCTIVE` BEFORE importing app code gets it
+  re-armed (and `_bool` defaults that gate to **True**, so even `""` flips it
+  on — empty counts as unset). Hermetic pattern: SET the gate to the explicit
+  string `"false"` (existing env always wins over `.env`). Applied in
+  `controlplane/tests_offline.py`.

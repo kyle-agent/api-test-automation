@@ -24,6 +24,12 @@ for var in ("PLATFORM_INGEST_TOKEN", "SCP_ALLOW_DESTRUCTIVE",
             "SCP_OPLOG_ACCESS_KEY", "SCP_OPLOG_SECRET_KEY",
             "PLATFORM_GIT_PUSH", "SCP_BUDGET_LIMITS"):
     os.environ.pop(var, None)
+# pop alone is NOT hermetic: core.config._load_dotenv() (triggered by the app
+# import below) setdefault()s values from a host .env back INTO os.environ, and
+# _bool("SCP_ALLOW_DESTRUCTIVE") defaults True — so on a host whose .env arms
+# the gate, test_delete_gated_without_destructive_env broke. Pin the gate OFF
+# explicitly (existing env vars always win over .env). 2026-07-02.
+os.environ["SCP_ALLOW_DESTRUCTIVE"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
