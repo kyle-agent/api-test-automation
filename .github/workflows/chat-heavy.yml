@@ -132,6 +132,21 @@ jobs:
             python -m pytest $ARGS || true
           fi
 
+      # Persist the run's evidence. The runner is ephemeral and this workflow has no
+      # other observation sink (oplog only carries resource events), so without this
+      # upload the per-step observations — the ONLY real-2xx evidence a verified fold
+      # can use — die with the runner (lost for run 28595785223, found 2026-07-02).
+      - name: Upload results (observations/findings/junit)
+        if: always() && steps.req.outputs.action == 'run'
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ github.run_id }}
+          path: |
+            reports/results/
+            reports/junit-crud.xml
+          if-no-files-found: warn
+          retention-days: 30
+
       # ALWAYS reclaim our tag-scoped resources for a 'run' or 'stop' — on success,
       # on heavy failure, AND when this run was CANCELLED by a later action=stop push
       # (the stop lever). NEVER sweep on 'noop' (it would touch a concurrent run's
