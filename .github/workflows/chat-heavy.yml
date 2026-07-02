@@ -70,6 +70,11 @@ jobs:
           echo "category=$(get category)"     >> "$GITHUB_OUTPUT"
           echo "service=$(get service)"       >> "$GITHUB_OUTPUT"
           echo "parallel=$(get parallel)"     >> "$GITHUB_OUTPUT"
+          # scheduler 1.0-d (flag-gated, default OFF): dag=true switches the heavy
+          # step from pytest-xdist to the dependency-DAG live runner. Absent/other
+          # values keep the default xdist path exactly as before.
+          echo "dag=$(get dag)"               >> "$GITHUB_OUTPUT"
+          echo "dag_targets=$(get dag_targets)">> "$GITHUB_OUTPUT"
           echo "----- chat-heavy-request -----"; cat "$F" || true
 
       - name: No-op / stop (skip the heavy work)
@@ -111,7 +116,7 @@ jobs:
       #     xdist distribution, so they start at t=0 instead of late);
       #   * warm per-host connection pool -> core.http_client.ApiClient.
       - name: Run heavy CRUD lifecycles (xdist — shared longest-first + warm pool)
-        if: steps.req.outputs.action == 'run'
+        if: steps.req.outputs.action == 'run' && steps.req.outputs.dag != 'true'
         env:
           SCP_ALLOW_MUTATIONS: ${{ steps.req.outputs.mutations || 'true' }}
           SCP_ALLOW_DESTRUCTIVE: ${{ steps.req.outputs.destructive || 'true' }}
@@ -131,6 +136,26 @@ jobs:
           else
             python -m pytest $ARGS || true
           fi
+
+      # Scheduler 1.0-d cutover experiment (OPT-IN via `dag=true` in the request
+      # file — the default path above is untouched). Runs the SAME enabled plan
+      # through the dependency-DAG live runner (SCP_DAG_RUNNER + AIMD adaptive
+      # concurrency, tools/dag_run_live.py) instead of pytest-xdist. Targets:
+      # `dag_targets=<catalog targets>` narrows to their dependency closure,
+      # default ALL. The provisioned SCP_SHARED_* ids above are adopted as-is
+      # (dag_runner_live env-adoption branch). Evidence lands in reports/results/
+      # like the xdist path, so the upload/mirror/sweep steps below apply
+      # unchanged. `|| true` keeps the always() sweep semantics identical.
+      - name: Run heavy CRUD via dependency-DAG runner (opt-in dag=true)
+        if: steps.req.outputs.action == 'run' && steps.req.outputs.dag == 'true'
+        env:
+          SCP_ALLOW_MUTATIONS: ${{ steps.req.outputs.mutations || 'true' }}
+          SCP_ALLOW_DESTRUCTIVE: ${{ steps.req.outputs.destructive || 'true' }}
+          SCP_RUN_HEAVY: ${{ steps.req.outputs.heavy || 'true' }}
+          SCP_VPC_SHARED_RESERVED: '1'
+        run: |
+          T="${{ steps.req.outputs.dag_targets }}"
+          python tools/dag_run_live.py ${T:-ALL} || true
 
       # Persist the run's evidence. The runner is ephemeral and this workflow has no
       # other observation sink (oplog only carries resource events), so without this
