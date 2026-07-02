@@ -147,6 +147,28 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+      # Also mirror the same evidence to the PERMANENT oplog bucket: chat sessions
+      # cannot download GitHub artifacts (the session proxy blocks api.github.com;
+      # MCP has no artifact-download tool) but they read this bucket directly.
+      # Best-effort — never fails the run.
+      - name: Mirror results to oplog bucket (S3)
+        if: always() && steps.req.outputs.action == 'run'
+        run: |
+          python - <<'EOF' || echo "oplog mirror failed (non-fatal)"
+          import glob, os
+          from core.oplog import _client
+          c, cfg = _client()
+          if not c:
+              print("[mirror] oplog disabled — skipping"); raise SystemExit
+          rid = os.environ["APITEST_RUN_ID"]
+          for p in glob.glob("reports/results/*.jsonl") + ["reports/junit-crud.xml"]:
+              if not os.path.exists(p):
+                  continue
+              key = f"runs/{rid}/artifact/{os.path.basename(p)}"
+              c.upload_file(p, cfg["bucket"], key)
+              print("[mirror]", p, "->", key)
+          EOF
+
       # ALWAYS reclaim our tag-scoped resources for a 'run' or 'stop' — on success,
       # on heavy failure, AND when this run was CANCELLED by a later action=stop push
       # (the stop lever). NEVER sweep on 'noop' (it would touch a concurrent run's
