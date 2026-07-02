@@ -1349,3 +1349,21 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
 - **backup-agent/backup-job** need a LIVE VM (`server_uuid` in the create body
   is a stale hardcoded id → 404 `Backup.NotFoundVirtualServerForSearchError`);
   bank them during a future VM-window (compute-virtualserver-full) run.
+- **Next-batch prep (2026-07-02 offline, COVERAGE-PREP).** ROI over
+  `verified_endpoints.json` (1400 keys → 558 distinct verified catalog ops):
+  `postgresql-cluster-subops-guarded` had the largest reachable gap (33/35 ops
+  unverified) → built **`postgresql-cluster-subops-full`** (database__subops-full.json,
+  67 steps, targets **29** unverified pg ops incl. create-path
+  listparametervalues/listlogexportconfigs/deletecluster; replica/restore
+  excluded as leak-unsafe). pg create is PROVEN (2xx in verified set,
+  database-postgresql-cluster) but FLAKY+SLOW: 500 ContactAdmin 2026-06-19
+  (known_issues) + 1 fail 2026-06-29, ~40min — dispatch pg ALONE so it never
+  gates other engines. `epas-cluster-subops-full` retry targets **23** ops
+  (P3 create 500 = transient; P2 body proven, run 28599889165). **Blocked from
+  the -full pattern (create body has NO live 2xx anywhere — do not invent):**
+  eventstreams (13 ops unverified), searchengine (18), vertica (15) — their
+  guarded lifecycles stay window-only until a proven create exists; sqlserver
+  (29) stays license-gated reachability-only. pg archive/log-export/kernel
+  sub-ops are baselined 500 ContactAdmin (2026-06-18) — the paced full run
+  tests whether the ExistInprogress-supersession seen on mysql/mariadb/epas
+  also holds for pg (if not, expect ~7 of the 29 to stay 500-blocked).
