@@ -1,1 +1,10 @@
-action=noop
+# Next-batch run α (prep 467e87d0): epas-cluster-subops-full RETRY — P3 create 500
+# was transient (body proven-good in P2 run 28599889165); engine now has
+# poll.give_up_status so a failed create stays cheap. Single engine.
+# Target: 23 unverified epas ops (archive/log-export/patch/kernel/stop/start/resize tail).
+action=run
+mutations=true
+destructive=true
+heavy=true
+crud_filter=epas-cluster-subops-full
+parallel=1
