@@ -1305,3 +1305,47 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   per-id, layered on the existing per-collection `_CONVERGED` cache, and **never widens
   ownership** — selection still goes through `is_owned`/`is_expired`; stuck-tracking only
   suppresses a known-futile retry so the sweep CONVERGES instead of looping to its cap.
+
+## DBaaS sub-op depth: window-only guarded lifecycles, ExistInprogress pacing, chat-heavy evidence sink (2026-07-02, branch upbeat-ritchie)
+
+> conf: 0.8 · seen: 2026-07-02 · obs: 2 (runs 28595785223 + 28599889165)
+
+- **`*-cluster-subops-guarded` bank NOTHING dispatched alone.** They soft-capture
+  an EXISTING cluster from `GET /v1/clusters` (live-cluster-window design, per
+  their `_note`); with no cluster up they "pass" in <90s recording only
+  reachability 4xx/5xx (run 28595785223: 5 guarded lifecycles, 0 real depth).
+  For standalone depth use the **self-sufficient `*-cluster-subops-full`**
+  variants (`database__subops-full.json`): dedicated create→wait→subops→delete
+  reusing the live-proven heavy-shared-dbaas / database-mysql-cluster blocks.
+  Replica/restore groups are EXCLUDED there (a successful create has no
+  capture/cleanup → untracked billable cluster); they belong to
+  `gen-heavy-*-replica/-restore`.
+- **DBaaS serializes cluster ops → 400 `Dbaas.ValidationError.ExistInprogress`.**
+  Back-to-back mutating sub-ops on a live cluster 400 with ExistInprogress (run
+  28599889165: ALL archive/log-export/patch/kernel ops). This SUPERSEDES the
+  earlier "sub-op 500s need a live-cluster window" reading for these ops: with a
+  live cluster the 500 becomes a 400 pacing error — i.e. NOT product-blocked.
+  Fix = the proven database-mysql-cluster pattern: an optional
+  `wait-after-<op>` poll (`$.service_state` until RUNNING/ACTIVE/AVAILABLE;
+  accept STOPPED after stop-cluster) after EVERY mutating sub-op.
+- **Small DBaaS cluster create→RUNNING ≈ 10 min** (mysql/mariadb/epas created
+  15:04 → sub-ops at 15:15, run 28599889165); a 4-cluster parallel
+  create+subops+delete CRUD step took 17.7 min wall. Cheap enough to iterate.
+- **Real 2xx yield of the first paced-less full run: +73 verified endpoints**
+  (1250→1323 in `verified_endpoints.json`): per-engine create/show/delete
+  cluster, list backup-histories / engine-version-properties / log-export-configs
+  / parameter-values / replicas, show archive-config, set-maintenance,
+  parameter set/sync, cachestore list/sync-commands.
+- **chat-heavy evidence sink.** The lane's runner is ephemeral and the workflow
+  had NO artifact upload → run 28595785223's observations are permanently lost
+  (fold impossible; do NOT trust "8 passed" as 2xx evidence). Now: (1)
+  `actions/upload-artifact` + (2) an oplog-bucket mirror step
+  (`runs/<APITEST_RUN_ID>/artifact/…`) run after every chat-heavy run — chat
+  sessions CANNOT download GitHub artifacts (session proxy blocks
+  api.github.com; MCP has no download tool) but read the bucket directly.
+  For older runs use the push-triggered `fetch-results.yml` bridge
+  (`.github/fetch-results-request`, needs `permissions: actions: read`; install
+  `requests` alongside boto3 — `core.oplog` imports `core.http_client`).
+- **backup-agent/backup-job** need a LIVE VM (`server_uuid` in the create body
+  is a stale hardcoded id → 404 `Backup.NotFoundVirtualServerForSearchError`);
+  bank them during a future VM-window (compute-virtualserver-full) run.
