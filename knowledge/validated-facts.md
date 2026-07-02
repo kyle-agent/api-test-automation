@@ -1387,3 +1387,45 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   on — empty counts as unset). Hermetic pattern: SET the gate to the explicit
   string `"false"` (existing env always wins over `.env`). Applied in
   `controlplane/tests_offline.py`.
+
+## Cleanup-map gaps: CDN / IAM-policy / launch-config / server-group leaks + CDN disable-before-delete quirks (2026-07-02, branch upbeat-ritchie)
+
+> conf: 0.9 · seen: 2026-07-02 · obs: full-inventory sweep (225 param-less list-GETs
+> across all 59 catalog services) + live teardown of every found leak
+
+- **Why the regular sweeps missed them:** the reconciler walks a FIXED collection
+  map; anything not in the map never gets listed. The 2026-07-02 full inventory
+  (every catalog GET without path params, `retry=False, timeout=15`) found 19
+  owned-flagged items; the genuine leaks were all either (a) collections absent
+  from the map — `/v1/cdns` (**7 ACTIVE `regr{ualpha}` CDN distributions**, oldest
+  2026-06-20), `/v1/launch-configurations` (`regrlc371da604`),
+  `/v1/server-groups` (4 `regrsgrp*`) — or (b) name-prefix lists too narrow for
+  the lifecycle's actual template: keypair `regrlckp*` (launch-config lifecycle)
+  missed by `("regrkey",)`; IAM policies `regrgrpbpol*` (group-binding test)
+  missed by `("regrpol",)`. Map + prefixes extended in `cleanup/reconciler.py`
+  (launch-configurations before keypairs — an LC pins a platform-derived
+  `regrlckp{run}-{lc_id}` keypair; policy prefixes now
+  `regrpol/regrgrpbpol/regrrolepol`; keypair prefixes
+  `regrkey/regrlckp/regraskp`).
+- **CDN disable-before-delete state machine (all live-proven on the 7 leaks):**
+  - `DELETE /v1/cdns/{id}` on an **ACTIVE or STOPPING** distribution returns
+    **404 ResourceNotFound** ("Not found with ID …") even though GET/PUT/stop on
+    the SAME id work — a **masked state error**. A CDN DELETE 404 must NEVER be
+    trusted as "already gone" (the generic `_is_2xx_or_gone` rule would silently
+    leak it forever); verify with GET or gate on state instead.
+  - `POST /v1/cdns/{id}/stop` (body-less) → 202; `cdn_service_state` sits in
+    STOPPING **~10-15 min** before STOPPED.
+  - DELETE on STOPPED while `cdn_service_activation_state` is still
+    PENDING_DEACTIVATION → **400
+    `scp-network.cdn.service.property-invalid-state-delete`** (transitional —
+    do NOT stuck-mark it); once deactivation settles (a few more min) DELETE →
+    202. The reconciler's cdn pass is therefore a state machine: ACTIVE → issue
+    stop and defer; STOPPING → skip; else attempt DELETE counting ONLY 2xx.
+- **IAM policy detail body has `policy_name`, not `name`** (list items too) —
+  name checks against `item["name"]` silently skip policies.
+  `GET /v1/policies/{id}/bindings` → `{count, groups, roles, users, …}`; both
+  leaked `regrgrpbpol*` policies had 0 bindings and deleted with a plain 204.
+- **Deliberately left in the account** (known, documented): the 2 deadlocked SCF
+  functions `regrw5trg57f68be7`/`regrw5trgd7ff680d` (auto-expire 2026-07-31),
+  the IAM-gated SKE log-group `47fabeca13f24958a0344a00011a274d`, and
+  `regrsec1846e085` already "To be terminated" (secrets self-purge).

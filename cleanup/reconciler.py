@@ -720,9 +720,36 @@ def run_sweep(client) -> int:
             deleted += 1
             _wait_gone(c, "virtualserver", f"/v1/servers/{it['id']}", 300, 15)
 
-    # 2. keypairs + security-groups (independent)
+    # 2. launch-configurations, then keypairs + security-groups.
+    # 2-lc. launch-configurations (regrlc*/regrasglc*) — full-inventory sweep
+    # 2026-07-02 found a leaked ``regrlc371da604`` (compute__virtualserver /
+    # wave4 lifecycles create them; the collection was never in this map).
+    # Delete BEFORE keypairs: an LC pins a platform-derived keypair named
+    # ``regrlckp{run}-{lc_id}`` that is only freed with the LC.
+    for it in _select(c, "virtualserver", "/v1/launch-configurations",
+                      name_prefixes=("regrlc", "regrasglc")):
+        if it.get("id") and _note_progress(
+                _delete(c, "virtualserver",
+                        f"/v1/launch-configurations/{it['id']}"), it):
+            deleted += 1
+
+    # 2-sg. server groups (regrsgrp*, wave1 lifecycle) — same 2026-07-02 sweep
+    # found 4 leaked; the collection was never in this map. No dependencies
+    # once the servers (step 1) are gone.
+    for it in _select(c, "virtualserver", "/v1/server-groups",
+                      name_prefixes=("regrsgrp",)):
+        if it.get("id") and _note_progress(
+                _delete(c, "virtualserver",
+                        f"/v1/server-groups/{it['id']}"), it):
+            deleted += 1
+
+    # 2. keypairs + security-groups (independent). Keypair name families:
+    # regrkey* (canonical), regrlckp* (launch-config lifecycle + its
+    # platform-derived ``regrlckp{run}-{lc_id}``), regraskp*/regraskpc*
+    # (auto-scaling lifecycles) — the narrow ("regrkey",) list left a
+    # regrlckp* keypair behind (full-inventory sweep 2026-07-02).
     for it in _select(c, "virtualserver", "/v1/keypairs",
-                      name_prefixes=("regrkey",)):
+                      name_prefixes=("regrkey", "regrlckp", "regraskp")):
         if _delete(c, "virtualserver",
                    f"/v1/keypairs/{it.get('name')}"):
             deleted += 1
@@ -1047,13 +1074,68 @@ def run_sweep(client) -> int:
                 c, "apigateway", f"/v1/apis/{it['id']}"):
             deleted += 1
 
+    # cdn distributions (regr{ualpha}, networking__cdn lifecycle) — VPC-free
+    # control-plane resources; the collection was never in this map, so 7 leaked
+    # ACTIVE distributions accumulated (full-inventory sweep 2026-07-02). The
+    # /v1/cdns collection holds ONLY CDN distributions and nothing in this
+    # account names one regr* but us (same family-root argument as
+    # _VPC_NAME_PREFIXES).
+    #
+    # DISABLE-BEFORE-DELETE QUIRKS (all live-proven 2026-07-02):
+    #   * DELETE on an ACTIVE/STOPPING distribution -> **404 ResourceNotFound**
+    #     even though GET/PUT/stop on the same id work — a MASKED state error.
+    #     A CDN DELETE 404 therefore must NEVER be trusted as "already gone".
+    #   * DELETE on STOPPED while activation is still PENDING_DEACTIVATION ->
+    #     400 scp-network.cdn.service.property-invalid-state-delete.
+    #   * Only a FULLY deactivated distribution deletes (202). stop (POST
+    #     /v1/cdns/{id}/stop, body-less, 202) -> STOPPING for ~10-15 min ->
+    #     STOPPED, then deactivation settles a few more minutes.
+    # So this pass is a state machine, not a delete+retry: ACTIVE -> issue stop
+    # and move on (a later round / the next sweep reaps it once deactivation
+    # completes); STOPPING -> wait (skip); anything else -> attempt DELETE and
+    # count ONLY a 2xx (the 404 trap). A 400 invalid-state is transitional and
+    # deliberately NOT fed to the stuck-tracker.
+    for it in _select(c, "cdn", "/v1/cdns", name_prefixes=("regr", "zznet")):
+        cid = it.get("id")
+        if not cid:
+            continue
+        state = str(it.get("cdn_service_state") or "").upper()
+        if state in ("ACTIVE", "DEPLOYING", "UPDATING"):
+            try:  # stop takes no body (start/stop documented body-less)
+                r = c.post(f"/v1/cdns/{cid}/stop", service="cdn")
+                print(f"  cdn {_name_of(it)} ({cid}) {state} -> stop "
+                      f"{r.status}; delete deferred to a later round/sweep")
+            except core.MutationBlocked as exc:
+                print(f"  blocked: {exc}")
+            except Exception as exc:
+                print(f"  cdn stop {cid} -> {exc}")
+            continue
+        if state == "STOPPING":
+            print(f"  cdn {_name_of(it)} ({cid}) STOPPING — not yet deletable")
+            continue
+        st = _delete(c, "cdn", f"/v1/cdns/{cid}")
+        if st and 200 <= st < 300:
+            _note_progress(st)      # genuine teardown (no stuck-marking arg)
+            deleted += 1
+            _wait_gone(c, "cdn", f"/v1/cdns/{cid}", 300, 15)
+        else:
+            # 404 here is the masked state error (resource persists) and 400
+            # is the transitional invalid-state — both resolve with time, so
+            # report and let a later round / the next sweep retry.
+            print(f"  cdn {_name_of(it)} ({cid}) state={state} delete -> {st}")
+
     # iam groups (regrgrp) + policies (regrpol)
     for it in _select(c, "iam", "/v1/groups",
                       name_prefixes=("regrgrp",)):
         if it.get("id") and _delete(c, "iam", f"/v1/groups/{it['id']}"):
             deleted += 1
+    # policy name families: regrpol*/regrpolx* (canonical), regrgrpbpol*
+    # (group-binding test), regrrolepol* (role-binding test) — the narrow
+    # ("regrpol",) list left 2 regrgrpbpol* policies behind (full-inventory
+    # sweep 2026-07-02). Account built-ins (BillingplanFullAccess, …) never
+    # carry a regr* name, so the family roots stay safe.
     for it in _select(c, "iam", "/v1/policies",
-                      name_prefixes=("regrpol",)):
+                      name_prefixes=("regrpol", "regrgrpbpol", "regrrolepol")):
         if it.get("id") and _delete(c, "iam", f"/v1/policies/{it['id']}"):
             deleted += 1
 
