@@ -1,12 +1,11 @@
-# D2–D7 heavy deep-coverage batch (2026-07-02, user-approved billable run).
-# Depth-only: DB engines already service-green; this banks the *-cluster-subops
-# + mysql full-cluster + backup endpoint depth that D1(postgresql) left on the
-# table. Runs on the chat-heavy lane (NOT in-session — D1 leak lesson).
-# Expected new step-level coverage ~173 (mysql 21+23, epas 37, mariadb 34,
-# sqlserver 30, cachestore 21, backup 6+21). Sweep always runs at the end.
+# D2–D7 phase 2 (2026-07-02): REAL DB sub-op depth via the new self-sufficient
+# *-cluster-subops-full lifecycles (create->wait->subops->delete; proven create
+# bodies; replica/restore excluded as leak-unsafe). Phase 1 (28595785223) proved
+# the guarded variants bank nothing without a live cluster. 4 clusters in
+# parallel, ~40min create wait each; results artifact now uploaded.
 action=run
 mutations=true
 destructive=true
 heavy=true
-crud_filter=database-mysql-cluster or mysql-cluster-subops-guarded or epas-cluster-subops-guarded or mariadb-cluster-subops-guarded or sqlserver-cluster-subops-guarded or cachestore-cluster-subops-guarded or backup-agent or backup-job
-parallel=6
+crud_filter=mysql-cluster-subops-full or epas-cluster-subops-full or mariadb-cluster-subops-full or cachestore-cluster-subops-full
+parallel=4
