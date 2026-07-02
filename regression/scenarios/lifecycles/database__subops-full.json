@@ -308,6 +308,28 @@
           "group": "param"
         },
         {
+          "name": "wait-after-set-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "param"
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -322,6 +344,28 @@
             422
           ],
           "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "wait-after-sync-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "param"
         },
         {
@@ -353,6 +397,28 @@
           "group": "log-export"
         },
         {
+          "name": "wait-after-register-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "log-export"
+        },
+        {
           "name": "set-log-export-config",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
@@ -379,6 +445,28 @@
           "group": "log-export"
         },
         {
+          "name": "wait-after-set-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "log-export"
+        },
+        {
           "name": "export-log",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
@@ -400,6 +488,28 @@
           "group": "log-export"
         },
         {
+          "name": "wait-after-export-log",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "log-export"
+        },
+        {
           "name": "unregister-log-export-config",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
@@ -415,6 +525,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "log-export"
+        },
+        {
+          "name": "wait-after-unregister-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "log-export"
         },
         {
@@ -447,6 +579,28 @@
           "group": "sg-rules"
         },
         {
+          "name": "wait-after-set-security-group-rules",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "sg-rules"
+        },
+        {
           "name": "switchover-cluster",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/switchover",
@@ -465,6 +619,28 @@
           "group": "ha"
         },
         {
+          "name": "wait-after-switchover-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "ha"
+        },
+        {
           "name": "sync-cluster-state",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
@@ -480,6 +656,28 @@
             422
           ],
           "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "ha"
         },
         {
@@ -503,6 +701,28 @@
           "group": "backup-hist"
         },
         {
+          "name": "wait-after-remove-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "backup-hist"
+        },
+        {
           "name": "patch-minor-version",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/patch",
@@ -521,6 +741,28 @@
           "group": "patch"
         },
         {
+          "name": "wait-after-patch-minor-version",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "patch"
+        },
+        {
           "name": "upgrade-kernel",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
@@ -536,6 +778,28 @@
             422
           ],
           "optional": true,
+          "group": "patch"
+        },
+        {
+          "name": "wait-after-upgrade-kernel",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "patch"
         },
         {
@@ -993,6 +1257,28 @@
           "group": "maint"
         },
         {
+          "name": "wait-after-set-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "maint"
+        },
+        {
           "name": "unset-maintenance",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/maintenance",
@@ -1008,6 +1294,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "maint"
+        },
+        {
+          "name": "wait-after-unset-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "maint"
         },
         {
@@ -1033,6 +1341,28 @@
           "group": "backup"
         },
         {
+          "name": "wait-after-create-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "backup"
+        },
+        {
           "name": "remove-backup-histories",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
@@ -1053,6 +1383,28 @@
           "group": "backup"
         },
         {
+          "name": "wait-after-remove-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "backup"
+        },
+        {
           "name": "delete-backup",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/backups",
@@ -1068,6 +1420,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "backup"
+        },
+        {
+          "name": "wait-after-delete-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "backup"
         },
         {
@@ -1097,6 +1471,28 @@
           "group": "param"
         },
         {
+          "name": "wait-after-set-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "param"
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -1111,6 +1507,28 @@
             422
           ],
           "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "wait-after-sync-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "param"
         },
         {
@@ -1135,6 +1553,28 @@
           "group": "archive"
         },
         {
+          "name": "wait-after-set-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "archive"
+        },
+        {
           "name": "sync-archive",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/archive/sync",
@@ -1149,6 +1589,28 @@
             422
           ],
           "optional": true,
+          "group": "archive"
+        },
+        {
+          "name": "wait-after-sync-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "archive"
         },
         {
@@ -1170,6 +1632,28 @@
           "group": "archive"
         },
         {
+          "name": "wait-after-delete-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "archive"
+        },
+        {
           "name": "set-audit-log",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/audit-log",
@@ -1187,6 +1671,28 @@
             422
           ],
           "optional": true,
+          "group": "audit"
+        },
+        {
+          "name": "wait-after-set-audit-log",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "audit"
         },
         {
@@ -1218,6 +1724,28 @@
           "group": "log-export"
         },
         {
+          "name": "wait-after-register-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "log-export"
+        },
+        {
           "name": "set-log-export-config",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
@@ -1244,6 +1772,28 @@
           "group": "log-export"
         },
         {
+          "name": "wait-after-set-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "log-export"
+        },
+        {
           "name": "export-log",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
@@ -1258,6 +1808,28 @@
             422
           ],
           "optional": true,
+          "group": "log-export"
+        },
+        {
+          "name": "wait-after-export-log",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "log-export"
         },
         {
@@ -1276,6 +1848,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "log-export"
+        },
+        {
+          "name": "wait-after-delete-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "log-export"
         },
         {
@@ -1300,6 +1894,28 @@
           "group": "sg-rules"
         },
         {
+          "name": "wait-after-set-security-group-rules",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "sg-rules"
+        },
+        {
           "name": "restart-cluster",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/restart",
@@ -1314,6 +1930,28 @@
             422
           ],
           "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-restart-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "lifecycle"
         },
         {
@@ -1334,6 +1972,29 @@
           "group": "lifecycle"
         },
         {
+          "name": "wait-after-stop-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "lifecycle"
+        },
+        {
           "name": "start-cluster",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/start",
@@ -1351,6 +2012,28 @@
           "group": "lifecycle"
         },
         {
+          "name": "wait-after-start-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "lifecycle"
+        },
+        {
           "name": "sync-cluster-state",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
@@ -1365,6 +2048,28 @@
             422
           ],
           "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "lifecycle"
         },
         {
@@ -1389,6 +2094,28 @@
           "group": "patch"
         },
         {
+          "name": "wait-after-patch-minor-version",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "patch"
+        },
+        {
           "name": "upgrade-kernel",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
@@ -1403,6 +2130,28 @@
             422
           ],
           "optional": true,
+          "group": "patch"
+        },
+        {
+          "name": "wait-after-upgrade-kernel",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "patch"
         },
         {
@@ -1873,6 +2622,28 @@
           "group": "maint"
         },
         {
+          "name": "wait-after-set-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "maint"
+        },
+        {
           "name": "unset-maintenance",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/maintenance",
@@ -1888,6 +2659,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "maint"
+        },
+        {
+          "name": "wait-after-unset-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "maint"
         },
         {
@@ -1913,6 +2706,28 @@
           "group": "backup"
         },
         {
+          "name": "wait-after-create-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "backup"
+        },
+        {
           "name": "remove-backup-histories",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
@@ -1933,6 +2748,28 @@
           "group": "backup"
         },
         {
+          "name": "wait-after-remove-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "backup"
+        },
+        {
           "name": "delete-backup",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/backups",
@@ -1948,6 +2785,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "backup"
+        },
+        {
+          "name": "wait-after-delete-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "backup"
         },
         {
@@ -1977,6 +2836,28 @@
           "group": "param"
         },
         {
+          "name": "wait-after-set-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "param"
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -1991,6 +2872,28 @@
             422
           ],
           "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "wait-after-sync-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "param"
         },
         {
@@ -2015,6 +2918,28 @@
           "group": "archive"
         },
         {
+          "name": "wait-after-set-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "archive"
+        },
+        {
           "name": "sync-archive",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/archive/sync",
@@ -2029,6 +2954,28 @@
             422
           ],
           "optional": true,
+          "group": "archive"
+        },
+        {
+          "name": "wait-after-sync-archive",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "archive"
         },
         {
@@ -2049,6 +2996,28 @@
             422
           ],
           "optional": true,
+          "group": "audit"
+        },
+        {
+          "name": "wait-after-set-audit-log",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "audit"
         },
         {
@@ -2080,6 +3049,28 @@
           "group": "log-export"
         },
         {
+          "name": "wait-after-register-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "log-export"
+        },
+        {
           "name": "set-log-export-config",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}",
@@ -2106,6 +3097,28 @@
           "group": "log-export"
         },
         {
+          "name": "wait-after-set-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "log-export"
+        },
+        {
           "name": "export-log",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/log-export-configs/{log_type}/export",
@@ -2120,6 +3133,28 @@
             422
           ],
           "optional": true,
+          "group": "log-export"
+        },
+        {
+          "name": "wait-after-export-log",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "log-export"
         },
         {
@@ -2138,6 +3173,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "log-export"
+        },
+        {
+          "name": "wait-after-delete-log-export-config",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "log-export"
         },
         {
@@ -2162,6 +3219,28 @@
           "group": "sg-rules"
         },
         {
+          "name": "wait-after-set-security-group-rules",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "sg-rules"
+        },
+        {
           "name": "restart-cluster",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/restart",
@@ -2176,6 +3255,28 @@
             422
           ],
           "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-restart-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "lifecycle"
         },
         {
@@ -2196,6 +3297,29 @@
           "group": "lifecycle"
         },
         {
+          "name": "wait-after-stop-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "lifecycle"
+        },
+        {
           "name": "start-cluster",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/start",
@@ -2213,6 +3337,28 @@
           "group": "lifecycle"
         },
         {
+          "name": "wait-after-start-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "lifecycle"
+        },
+        {
           "name": "sync-cluster-state",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/sync-state",
@@ -2227,6 +3373,28 @@
             422
           ],
           "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "lifecycle"
         },
         {
@@ -2251,6 +3419,28 @@
           "group": "patch"
         },
         {
+          "name": "wait-after-patch-minor-version",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "patch"
+        },
+        {
           "name": "upgrade-kernel",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/kernel-upgrade",
@@ -2265,6 +3455,28 @@
             422
           ],
           "optional": true,
+          "group": "patch"
+        },
+        {
+          "name": "wait-after-upgrade-kernel",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "patch"
         },
         {
@@ -2716,6 +3928,28 @@
           "group": "maint"
         },
         {
+          "name": "wait-after-set-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "maint"
+        },
+        {
           "name": "unset-maintenance",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/maintenance",
@@ -2731,6 +3965,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "maint"
+        },
+        {
+          "name": "wait-after-unset-maintenance",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "maint"
         },
         {
@@ -2755,6 +4011,28 @@
           "group": "backup"
         },
         {
+          "name": "wait-after-create-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "backup"
+        },
+        {
           "name": "remove-backup-histories",
           "method": "PUT",
           "path": "/v1/clusters/{cluster_id}/backup-histories",
@@ -2775,6 +4053,28 @@
           "group": "backup"
         },
         {
+          "name": "wait-after-remove-backup-histories",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "backup"
+        },
+        {
           "name": "delete-backup",
           "method": "DELETE",
           "path": "/v1/clusters/{cluster_id}/backups",
@@ -2790,6 +4090,28 @@
           ],
           "optional": true,
           "destructive": true,
+          "group": "backup"
+        },
+        {
+          "name": "wait-after-delete-backup",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "backup"
         },
         {
@@ -2819,6 +4141,28 @@
           "group": "param"
         },
         {
+          "name": "wait-after-set-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "param"
+        },
+        {
           "name": "sync-parameters",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/parameters/sync",
@@ -2833,6 +4177,28 @@
             422
           ],
           "optional": true,
+          "group": "param"
+        },
+        {
+          "name": "wait-after-sync-parameters",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "param"
         },
         {
@@ -2862,6 +4228,28 @@
           "group": "commands"
         },
         {
+          "name": "wait-after-set-commands",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "commands"
+        },
+        {
           "name": "sync-commands",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/commands/sync",
@@ -2876,6 +4264,28 @@
             422
           ],
           "optional": true,
+          "group": "commands"
+        },
+        {
+          "name": "wait-after-sync-commands",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "commands"
         },
         {
@@ -2900,6 +4310,28 @@
           "group": "sg-rules"
         },
         {
+          "name": "wait-after-set-security-group-rules",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "sg-rules"
+        },
+        {
           "name": "restart-cluster",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/restart",
@@ -2914,6 +4346,28 @@
             422
           ],
           "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-restart-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "lifecycle"
         },
         {
@@ -2934,6 +4388,29 @@
           "group": "lifecycle"
         },
         {
+          "name": "wait-after-stop-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "STOPPED",
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "lifecycle"
+        },
+        {
           "name": "start-cluster",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/start",
@@ -2948,6 +4425,28 @@
             422
           ],
           "optional": true,
+          "group": "lifecycle"
+        },
+        {
+          "name": "wait-after-start-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "lifecycle"
         },
         {
@@ -2968,6 +4467,28 @@
           "group": "lifecycle"
         },
         {
+          "name": "wait-after-sync-cluster-state",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
+          "group": "lifecycle"
+        },
+        {
           "name": "switchover-cluster",
           "method": "POST",
           "path": "/v1/clusters/{cluster_id}/switchover",
@@ -2982,6 +4503,28 @@
             422
           ],
           "optional": true,
+          "group": "ha"
+        },
+        {
+          "name": "wait-after-switchover-cluster",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "ha"
         },
         {
@@ -3003,6 +4546,28 @@
             422
           ],
           "optional": true,
+          "group": "patch"
+        },
+        {
+          "name": "wait-after-patch-minor-version",
+          "method": "GET",
+          "path": "/v1/clusters/{cluster_id}",
+          "expect_status": [
+            200,
+            400,
+            404
+          ],
+          "optional": true,
+          "poll": {
+            "field": "$.service_state",
+            "until": [
+              "RUNNING",
+              "ACTIVE",
+              "AVAILABLE"
+            ],
+            "timeout": 900,
+            "interval": 20
+          },
           "group": "patch"
         },
         {
