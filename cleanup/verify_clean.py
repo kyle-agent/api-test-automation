@@ -15,9 +15,8 @@ os.environ.setdefault("SCP_SWEEP_IGNORE_TTL", "true")  # count unexpired too (fu
 os.environ.setdefault("SCP_TIMEOUT", "8")
 os.environ.setdefault("SCP_MAX_RETRIES", "1")
 import time as _t
-_t.sleep = lambda *a, **k: None                        # no internal waits/backoff
-import cleanup.reconciler as r  # noqa: E402 — must follow the env/sleep setup above
-import core  # noqa: E402 — must follow the env/sleep setup above
+import cleanup.reconciler as r  # noqa: E402 — must follow the env setup above
+import core  # noqa: E402 — must follow the env setup above
 
 
 def scan_owned(client=None) -> list[dict]:
@@ -39,12 +38,13 @@ def scan_owned(client=None) -> list[dict]:
     def fake_wait(*a, **k):
         return True
 
-    orig_delete, orig_wait = r._delete, r._wait_gone
+    orig_delete, orig_wait, orig_sleep = r._delete, r._wait_gone, _t.sleep
     r._delete, r._wait_gone = fake_delete, fake_wait
+    _t.sleep = lambda *a, **k: None     # no internal waits/backoff DURING the scan only
     try:
         r.run_sweep(client or core.ApiClient(core.settings))
     finally:
-        r._delete, r._wait_gone = orig_delete, orig_wait
+        r._delete, r._wait_gone, _t.sleep = orig_delete, orig_wait, orig_sleep
     return [{"service": svc, "path": path} for svc, path in attempts]
 
 
