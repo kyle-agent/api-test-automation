@@ -1,11 +1,7 @@
-# D2–D7 phase 3 (2026-07-02): re-run the 4 subops-full chains WITH the
-# ExistInprogress pacing fix (settle-poll after every mutating sub-op).
-# Phase 2 banked +73 verified; this opens the serialized tail
-# (archive set/sync/delete, log-export register/set/export/delete,
-# patch, kernel-upgrade, restart/stop/start, resize, sg-rules).
-action=run
-mutations=true
-destructive=true
-heavy=true
-crud_filter=mysql-cluster-subops-full or epas-cluster-subops-full or mariadb-cluster-subops-full or cachestore-cluster-subops-full
-parallel=4
+# STOP phase-3 (run 28602725440, 2026-07-02 17:15Z): mysql/mariadb/cachestore
+# subops-full all ENDED passed (oplog); epas create was never accepted (0 audit
+# events since 15:46) and the lifecycle is burning its optional wait-after polls
+# (900s each vs a nonexistent cluster) — pure waste until the 240min cap.
+# Cancel-in-progress preserves the always() mirror + sweep; evidence for the 3
+# finished engines is already in the incrementally-written observations files.
+action=stop
