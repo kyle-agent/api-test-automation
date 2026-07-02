@@ -67,3 +67,23 @@ for: all
 - **gen-wave-mgmisc** vs **gen-wave2-cmep** — both target cm-event-policy on management/cloudmonitoring with overlapping but differently-described reasons (wrong request shape vs 404 no-VM). Likely the same target tested in two waves; one may be the superseded copy. Needs Meta-Orch judgment on which to keep/enable and whether the EventPolicyInfo research is done. Both marked **STALE / ?**.
 - **idc-\*** (5 lifecycles) — tagged BLOCKED-OWNER under STOP-1/4 (account-structural SSO, blast radius). They are intentionally coverage-only (every mutating step `optional` + broad `expect_status` so a 403/400 still records coverage). If run-dispatch judges the coverage-only design safe on the shared account, these could instead be treated as live-runnable-as-is (denial = recorded coverage). Left BLOCKED-OWNER pending owner sign-off; no blocking IB row exists (loosely related to IB-008 C-class live-proof backlog).
 - The 5 **TIMING-GATED** restore chains are model-green and live-runnable, but only in a window where the cluster/backup has aged past its first scheduled backup (or a pre-aged cluster is supplied). They are NOT blocked — just window-specific. Tracked under IB-006 (owner-approved heavy/destructive staged enablement).
+
+## Addendum 2026-07-02 — 10 previously-untagged disabled lifecycles now carry `_status` in-JSON
+
+The IB-030 validator warned on 10 disabled lifecycles missing `_status`; tagged
+directly in the lifecycle JSON (platform pass 2026-07-02). Validator summary is
+now the machine-readable census (`python -m regression.scenarios.validate` →
+"Disabled-lifecycle _status summary (28 tagged)"); this table records the rationale.
+
+| id | file | _status | rationale |
+|---|---|---|---|
+| quota-reads | scenarios.json | stale | RETIRED 2026-06-13 — superseded by live-green gen-wave3-quota/support; pending physical deletion |
+| support-reads | scenarios.json | stale | same retirement batch as quota-reads |
+| networking-dns-hosted-zone | scenarios.json | stale | SUPERSEDED 2026-06-11 by networking-dns-hosted-zone-private (networking__dns.json) |
+| security-certificatemanager-import | scenarios.json | blocked-owner | gateway rejects runtime-minted self-signed PEM; needs real CA-signed cert material (STOP-2) |
+| iam-role | scenarios.json | blocked-owner | POST /v1/roles → 500 ContactAdminForAssistance (product backend, STOP-3; same wall as gen-wave5-iam-role/PF-20) |
+| gen-heavy-epas-replica | generated__heavy-dbaas.json | stale | DE-DUP-retired 2026-06-18 vs subops-guarded, but 2026-07-02 handoff reassigns replica depth here (subops-full excludes replica as leak-unsafe) → re-check |
+| gen-heavy-mysql-replica | generated__heavy-dbaas.json | stale | same DE-DUP retirement + same 2026-07-02 reassignment → re-check |
+| gen-heavy-mariadb-replica | generated__heavy-dbaas.json | stale | same DE-DUP retirement + same 2026-07-02 reassignment → re-check |
+| gen-heavy-mariadb-upgrade | generated__heavy-dbaas.json | stale | was DISPATCH-READY then DE-DUP-retired (kernel-upgrade now proven inside mariadb-cluster-subops-full, run 28602725440) — re-check whether anything unique remains |
+| gen-heavy-pg-replica | generated__heavy-pg.json | stale | same DE-DUP retirement; pg replica ops (sync/reset/promote) still have no live 2xx → re-check |

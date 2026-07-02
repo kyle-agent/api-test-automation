@@ -32,7 +32,8 @@ _HERE = Path(__file__).parent
 _PLACEHOLDER = re.compile(r"\{([a-zA-Z0-9_]+)\}")
 
 LIFECYCLE_KEYS = {"id", "service", "enabled", "heavy", "steps", "credentials",
-                  "needs_cert_material", "_note", "_comment", "_disabled_reason",
+                  "needs_cert_material", "requires_env",
+                  "_note", "_comment", "_disabled_reason",
                   "_status"}
 # Machine-readable disposition for enabled:false lifecycles (IB-030). Derived
 # from docs/working/trackers/LIVE-READINESS-GATES.md. Advisory only — a missing/invalid _status

@@ -156,6 +156,7 @@
       "id": "quota-reads",
       "service": "management/quota",
       "enabled": false,
+      "_status": "stale",
       "_note": "Read-only: list account-quotas + quota-requests, soft-capture an id each, probe the 2 path-param GETs (showaccountquota/showquotarequest). No writes/cleanup. Envelope/id grounded from docs ($.account_quotas[].id, $.quota_requests[].id). Runs in CRUD mode (engine gates all lifecycles on SCP_ALLOW_MUTATIONS); env-dependent (records SOFT if the account has no quota-requests).",
       "steps": [
         {
@@ -194,6 +195,7 @@
       "id": "support-reads",
       "service": "management/support",
       "enabled": false,
+      "_status": "stale",
       "_note": "Read-only: list inquiries + service-requests, soft-capture an id each, probe showinquiry/showservicerequest. No writes/cleanup. Env-dependent (records SOFT if the account has no inquiries/tickets — there is no create-ticket API in the catalog).",
       "steps": [
         {
@@ -1009,6 +1011,7 @@
       "id": "security-certificatemanager-import",
       "service": "security/certificatemanager",
       "enabled": false,
+      "_status": "blocked-owner",
       "needs_cert_material": true,
       "_note": "DISABLED: certificatemanager check-validation/import reject a runtime-minted self-signed key/cert regardless of PEM encoding (PKCS#8 and PKCS#1 both return 'This private key is not a PEM format'), so a synthetic keypair cannot satisfy the gateway's CA validation and there is no way to supply a real CA-signed cert in CI. The self-sign lifecycle already covers the create/read/delete spine; this import-only lifecycle stays disabled until real cert material is available. A throwaway self-signed cert+key is minted at runtime via openssl ({cert_body}/{private_key}/{cert_chain}); the lifecycle skips environmentally when openssl is unavailable. Synchronous.",
       "steps": [
@@ -6037,6 +6040,7 @@
       "id": "networking-dns-hosted-zone",
       "service": "networking/dns",
       "enabled": false,
+      "_status": "stale",
       "heavy": false,
       "_note": "DISABLED — SUPERSEDED 2026-06-11 by networking-dns-hosted-zone-private (regression/scenarios/lifecycles/networking__dns.json), which encodes the full userguide chain: create private-dns -> poll Active -> connect shared VPC -> hosted zone -> A record -> reverse teardown (zone before private-dns delete). Per the ingested userguide facts (networking__dns.yaml private-dns-account-global), an ACTIVATE call is only needed when re-using the account-global private-dns name in ANOTHER region — a fresh create in the run region polls straight to Active, so no activate sub-flow is required. Kept disabled as a historical record; bodies here lack the required private_dns_id chain. Real response shapes (framework/api_bodies.json + api_docs response examples): createprivatedns $.private_dns.id; createhostedzone and createhostedzonerecord return BARE envelopes — the id is $.id (not $.hosted_zone.id / $.record.id).",
       "steps": [
@@ -8467,6 +8471,7 @@
       "id": "iam-role",
       "service": "management/iam",
       "enabled": false,
+      "_status": "blocked-owner",
       "_note": "Light, self-contained: create a USER_DEFINED role (no path-param POST /v1/roles), read it, probe the 2 role-id path-param GETs, delete. Body grounded on management/iam/createrole example; assume_role_policy_document copied verbatim (sts:AssumeRole). policy_ids/principals sent empty to avoid referencing non-existent users. Create response envelope $.role.id confirmed from the doc 202 example. RISK: the trust-policy / principals validation is account-specific — if the gateway requires a real principal SRN, create returns 400 and this lifecycle should be disabled; everything else is grounded.",
       "steps": [
         {
