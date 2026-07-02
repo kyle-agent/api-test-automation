@@ -952,89 +952,217 @@
     "path": "/v1/budgets/account/{budget_id}"
   },
   "cachestore-cluster-subops-full:cache-create": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "cachestore-cluster-subops-full:cache-delete": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "DELETE",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "cachestore-cluster-subops-full:cache-find-stype": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
   "cachestore-cluster-subops-full:cache-find-version": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/engine-versions",
     "path": "/v1/engine-versions"
   },
   "cachestore-cluster-subops-full:cache-wait": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "cachestore-cluster-subops-full:capture-subop-ids": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
-  "cachestore-cluster-subops-full:list-clusters": {
+  "cachestore-cluster-subops-full:create-backup": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups",
+    "path": "/v1/clusters/{cluster_id}/backups"
+  },
+  "cachestore-cluster-subops-full:list-clusters": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
-  "cachestore-cluster-subops-full:set-maintenance": {
+  "cachestore-cluster-subops-full:restart-cluster": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/restart",
+    "path": "/v1/clusters/{cluster_id}/restart"
+  },
+  "cachestore-cluster-subops-full:set-maintenance": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters/*/maintenance",
     "path": "/v1/clusters/{cluster_id}/maintenance"
   },
-  "cachestore-cluster-subops-full:sync-commands": {
+  "cachestore-cluster-subops-full:sync-cluster-state": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/sync-state",
+    "path": "/v1/clusters/{cluster_id}/sync-state"
+  },
+  "cachestore-cluster-subops-full:sync-commands": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters/*/commands/sync",
     "path": "/v1/clusters/{cluster_id}/commands/sync"
   },
-  "cachestore-cluster-subops-full:wait-subnet": {
+  "cachestore-cluster-subops-full:unset-maintenance": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "DELETE",
+    "norm_path": "v1/clusters/*/maintenance",
+    "path": "/v1/clusters/{cluster_id}/maintenance"
+  },
+  "cachestore-cluster-subops-full:wait-after-create-backup": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-patch-minor-version": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-restart-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-set-commands": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-set-maintenance": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-set-security-group-rules": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-start-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-stop-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-switchover-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-sync-cluster-state": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-sync-commands": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-after-unset-maintenance": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "cachestore-cluster-subops-full:wait-subnet": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
   },
   "cachestore-cluster-subops-full:wait-vpc": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -2984,25 +3112,25 @@
     "path": "/v1/vpcs/{vpc_id}"
   },
   "database/cachestore/cachestorecreatecluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "database/cachestore/cachestoredeletecluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "DELETE",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/cachestore/cachestorelistbackuphistories": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/backup-histories",
     "path": "/v1/clusters/{cluster_id}/backup-histories"
@@ -3016,17 +3144,17 @@
     "path": "/v1/clusters"
   },
   "database/cachestore/cachestorelistcommands": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/commands",
     "path": "/v1/clusters/{cluster_id}/commands"
   },
   "database/cachestore/cachestorelistengineversionproperties": {
-    "count": 16,
+    "count": 17,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/engine-versions/*/properties",
     "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties"
@@ -3056,9 +3184,9 @@
     "path": "/v1/parameters"
   },
   "database/cachestore/cachestorelistparametervalues": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
@@ -3071,29 +3199,61 @@
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
-  "database/cachestore/cachestoresetmaintenance": {
+  "database/cachestore/cachestorerestartcluster": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/restart",
+    "path": "/v1/clusters/{cluster_id}/restart"
+  },
+  "database/cachestore/cachestoresetbackup": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups",
+    "path": "/v1/clusters/{cluster_id}/backups"
+  },
+  "database/cachestore/cachestoresetmaintenance": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters/*/maintenance",
     "path": "/v1/clusters/{cluster_id}/maintenance"
   },
   "database/cachestore/cachestoreshowcluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
-  "database/cachestore/cachestoresynccommands": {
+  "database/cachestore/cachestoresyncclusterstate": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/sync-state",
+    "path": "/v1/clusters/{cluster_id}/sync-state"
+  },
+  "database/cachestore/cachestoresynccommands": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters/*/commands/sync",
     "path": "/v1/clusters/{cluster_id}/commands/sync"
+  },
+  "database/cachestore/cachestoreunsetmaintenance": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "DELETE",
+    "norm_path": "v1/clusters/*/maintenance",
+    "path": "/v1/clusters/{cluster_id}/maintenance"
   },
   "database/epas/epascreatecluster": {
     "count": 1,
@@ -3128,9 +3288,9 @@
     "path": "/v1/clusters"
   },
   "database/epas/epaslistengineversionproperties": {
-    "count": 16,
+    "count": 17,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/engine-versions/*/properties",
     "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties"
@@ -3223,26 +3383,34 @@
     "norm_path": "v1/clusters/*/parameters/sync",
     "path": "/v1/clusters/{cluster_id}/parameters/sync"
   },
+  "database/mariadb/mariadbaddblockstorages": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/instance-groups/*/block-storage-groups",
+    "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups"
+  },
   "database/mariadb/mariadbcreatecluster": {
-    "count": 3,
+    "count": 4,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "database/mariadb/mariadbdeletecluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "DELETE",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/mariadb/mariadblistbackuphistories": {
-    "count": 2,
+    "count": 3,
     "first_run": "27588002895",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/backup-histories",
     "path": "/v1/clusters/{cluster_id}/backup-histories"
@@ -3256,9 +3424,9 @@
     "path": "/v1/clusters"
   },
   "database/mariadb/mariadblistengineversionproperties": {
-    "count": 16,
+    "count": 17,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/engine-versions/*/properties",
     "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties"
@@ -3272,9 +3440,9 @@
     "path": "/v1/engine-versions"
   },
   "database/mariadb/mariadblistlogexportconfigs": {
-    "count": 2,
+    "count": 3,
     "first_run": "27588002895",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/log-export-configs",
     "path": "/v1/clusters/{cluster_id}/log-export-configs"
@@ -3296,17 +3464,17 @@
     "path": "/v1/parameters"
   },
   "database/mariadb/mariadblistparametervalues": {
-    "count": 2,
+    "count": 3,
     "first_run": "27588002895",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "database/mariadb/mariadblistreplicas": {
-    "count": 2,
+    "count": 3,
     "first_run": "27588002895",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/replicas",
     "path": "/v1/clusters/{cluster_id}/replicas"
@@ -3319,10 +3487,42 @@
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
-  "database/mariadb/mariadbsetmaintenance": {
+  "database/mariadb/mariadbrestartcluster": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/restart",
+    "path": "/v1/clusters/{cluster_id}/restart"
+  },
+  "database/mariadb/mariadbsetarchiveconfig": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/archive",
+    "path": "/v1/clusters/{cluster_id}/archive"
+  },
+  "database/mariadb/mariadbsetauditlog": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/audit-log",
+    "path": "/v1/clusters/{cluster_id}/audit-log"
+  },
+  "database/mariadb/mariadbsetbackup": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups",
+    "path": "/v1/clusters/{cluster_id}/backups"
+  },
+  "database/mariadb/mariadbsetmaintenance": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters/*/maintenance",
     "path": "/v1/clusters/{cluster_id}/maintenance"
@@ -3336,20 +3536,52 @@
     "path": "/v1/clusters/{cluster_id}/security-group-rules"
   },
   "database/mariadb/mariadbshowarchiveconfig": {
-    "count": 2,
+    "count": 3,
     "first_run": "27588002895",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/archive",
     "path": "/v1/clusters/{cluster_id}/archive"
   },
   "database/mariadb/mariadbshowcluster": {
-    "count": 2,
+    "count": 3,
     "first_run": "27588002895",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
+  },
+  "database/mariadb/mariadbstartcluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/start",
+    "path": "/v1/clusters/{cluster_id}/start"
+  },
+  "database/mariadb/mariadbstopcluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/stop",
+    "path": "/v1/clusters/{cluster_id}/stop"
+  },
+  "database/mariadb/mariadbsyncarchiveconfig": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/archive/sync",
+    "path": "/v1/clusters/{cluster_id}/archive/sync"
+  },
+  "database/mariadb/mariadbsyncclusterstate": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/sync-state",
+    "path": "/v1/clusters/{cluster_id}/sync-state"
   },
   "database/mariadb/mariadbsyncparametervalues": {
     "count": 1,
@@ -3359,26 +3591,42 @@
     "norm_path": "v1/clusters/*/parameters/sync",
     "path": "/v1/clusters/{cluster_id}/parameters/sync"
   },
+  "database/mariadb/mariadbunsetmaintenance": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "DELETE",
+    "norm_path": "v1/clusters/*/maintenance",
+    "path": "/v1/clusters/{cluster_id}/maintenance"
+  },
+  "database/mariadb/mariadbupgradekernel": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/kernel-upgrade",
+    "path": "/v1/clusters/{cluster_id}/kernel-upgrade"
+  },
   "database/mysql/mysqlcreatecluster": {
-    "count": 3,
+    "count": 4,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "database/mysql/mysqldeletecluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "DELETE",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/mysql/mysqllistbackuphistories": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/backup-histories",
     "path": "/v1/clusters/{cluster_id}/backup-histories"
@@ -3392,9 +3640,9 @@
     "path": "/v1/clusters"
   },
   "database/mysql/mysqllistengineversionproperties": {
-    "count": 18,
+    "count": 19,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/engine-versions/*/properties",
     "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties"
@@ -3408,9 +3656,9 @@
     "path": "/v1/engine-versions"
   },
   "database/mysql/mysqllistlogexportconfigs": {
-    "count": 3,
+    "count": 4,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/log-export-configs",
     "path": "/v1/clusters/{cluster_id}/log-export-configs"
@@ -3432,17 +3680,17 @@
     "path": "/v1/parameters"
   },
   "database/mysql/mysqllistparametervalues": {
-    "count": 3,
+    "count": 4,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "database/mysql/mysqllistreplicas": {
-    "count": 5,
+    "count": 6,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/replicas",
     "path": "/v1/clusters/{cluster_id}/replicas"
@@ -3472,36 +3720,52 @@
     "path": "/v1/clusters/{cluster_id}/maintenance"
   },
   "database/mysql/mysqlsetparametervalues": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "PUT",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "database/mysql/mysqlshowarchiveconfig": {
-    "count": 3,
+    "count": 4,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/archive",
     "path": "/v1/clusters/{cluster_id}/archive"
   },
   "database/mysql/mysqlshowcluster": {
-    "count": 5,
+    "count": 6,
     "first_run": "27583285457",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/mysql/mysqlshowrequest": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/requests/*",
     "path": "/v1/requests/{request_id}"
+  },
+  "database/mysql/mysqlsyncclusterstate": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/sync-state",
+    "path": "/v1/clusters/{cluster_id}/sync-state"
+  },
+  "database/mysql/mysqlsyncparametervalues": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/parameters/sync",
+    "path": "/v1/clusters/{cluster_id}/parameters/sync"
   },
   "database/mysql/mysqlunsetmaintenance": {
     "count": 2,
@@ -3510,6 +3774,14 @@
     "method": "DELETE",
     "norm_path": "v1/clusters/*/maintenance",
     "path": "/v1/clusters/{cluster_id}/maintenance"
+  },
+  "database/mysql/mysqlupgradekernel": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/kernel-upgrade",
+    "path": "/v1/clusters/{cluster_id}/kernel-upgrade"
   },
   "database/postgresql/postgresqlcreatecluster": {
     "count": 1,
@@ -3672,9 +3944,9 @@
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "epas-cluster-subops-full:capture-server-type": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
@@ -3704,17 +3976,17 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "epas-cluster-subops-full:epas-find-stype": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
   "epas-cluster-subops-full:epas-find-version": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/engine-versions",
     "path": "/v1/engine-versions"
@@ -3728,9 +4000,9 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "epas-cluster-subops-full:list-clusters": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
@@ -3752,17 +4024,17 @@
     "path": "/v1/clusters/{cluster_id}/parameters/sync"
   },
   "epas-cluster-subops-full:wait-subnet": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
   },
   "epas-cluster-subops-full:wait-vpc": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -7447,77 +7719,149 @@
     "norm_path": "v1/service-requests/*",
     "path": "/v1/service-requests/{service_request_id}"
   },
-  "mariadb-cluster-subops-full:capture-log-type": {
+  "mariadb-cluster-subops-full:add-block-storages": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/instance-groups/*/block-storage-groups",
+    "path": "/v1/instance-groups/{instance_group_id}/block-storage-groups"
+  },
+  "mariadb-cluster-subops-full:capture-log-type": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/log-export-configs",
     "path": "/v1/clusters/{cluster_id}/log-export-configs"
   },
   "mariadb-cluster-subops-full:capture-subop-ids": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
-  "mariadb-cluster-subops-full:list-clusters": {
+  "mariadb-cluster-subops-full:create-backup": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups",
+    "path": "/v1/clusters/{cluster_id}/backups"
+  },
+  "mariadb-cluster-subops-full:list-clusters": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "mariadb-cluster-subops-full:maria-create": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "mariadb-cluster-subops-full:maria-delete": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "DELETE",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "mariadb-cluster-subops-full:maria-find-stype": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
   "mariadb-cluster-subops-full:maria-find-version": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/engine-versions",
     "path": "/v1/engine-versions"
   },
   "mariadb-cluster-subops-full:maria-wait": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
-  "mariadb-cluster-subops-full:set-maintenance": {
+  "mariadb-cluster-subops-full:restart-cluster": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/restart",
+    "path": "/v1/clusters/{cluster_id}/restart"
+  },
+  "mariadb-cluster-subops-full:set-archive": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/archive",
+    "path": "/v1/clusters/{cluster_id}/archive"
+  },
+  "mariadb-cluster-subops-full:set-audit-log": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/audit-log",
+    "path": "/v1/clusters/{cluster_id}/audit-log"
+  },
+  "mariadb-cluster-subops-full:set-maintenance": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters/*/maintenance",
     "path": "/v1/clusters/{cluster_id}/maintenance"
+  },
+  "mariadb-cluster-subops-full:start-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/start",
+    "path": "/v1/clusters/{cluster_id}/start"
+  },
+  "mariadb-cluster-subops-full:stop-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/stop",
+    "path": "/v1/clusters/{cluster_id}/stop"
+  },
+  "mariadb-cluster-subops-full:sync-archive": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/archive/sync",
+    "path": "/v1/clusters/{cluster_id}/archive/sync"
+  },
+  "mariadb-cluster-subops-full:sync-cluster-state": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/sync-state",
+    "path": "/v1/clusters/{cluster_id}/sync-state"
   },
   "mariadb-cluster-subops-full:sync-parameters": {
     "count": 1,
@@ -7527,18 +7871,170 @@
     "norm_path": "v1/clusters/*/parameters/sync",
     "path": "/v1/clusters/{cluster_id}/parameters/sync"
   },
-  "mariadb-cluster-subops-full:wait-subnet": {
+  "mariadb-cluster-subops-full:unset-maintenance": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "DELETE",
+    "norm_path": "v1/clusters/*/maintenance",
+    "path": "/v1/clusters/{cluster_id}/maintenance"
+  },
+  "mariadb-cluster-subops-full:upgrade-kernel": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/kernel-upgrade",
+    "path": "/v1/clusters/{cluster_id}/kernel-upgrade"
+  },
+  "mariadb-cluster-subops-full:wait-after-create-backup": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-delete-log-export-config": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-export-log": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-patch-minor-version": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-register-log-export-config": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-restart-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-set-archive": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-set-audit-log": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-set-log-export-config": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-set-maintenance": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-set-security-group-rules": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-start-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-stop-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-sync-archive": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-sync-cluster-state": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-unset-maintenance": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-after-upgrade-kernel": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mariadb-cluster-subops-full:wait-subnet": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
   },
   "mariadb-cluster-subops-full:wait-vpc": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
@@ -7608,97 +8104,217 @@
     "path": "/v1/gpu-nodes"
   },
   "mysql-cluster-subops-full:capture-log-type": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/log-export-configs",
     "path": "/v1/clusters/{cluster_id}/log-export-configs"
   },
   "mysql-cluster-subops-full:capture-param-id": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "mysql-cluster-subops-full:capture-subop-ids": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-subops-full:create-cluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "mysql-cluster-subops-full:delete-cluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "DELETE",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-subops-full:find-engine-version": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/engine-versions",
     "path": "/v1/engine-versions"
   },
   "mysql-cluster-subops-full:find-server-type": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
   "mysql-cluster-subops-full:list-clusters": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "mysql-cluster-subops-full:set-parameters": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "PUT",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
-  "mysql-cluster-subops-full:wait-cluster": {
+  "mysql-cluster-subops-full:sync-cluster-state": {
     "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/sync-state",
+    "path": "/v1/clusters/{cluster_id}/sync-state"
+  },
+  "mysql-cluster-subops-full:sync-parameters": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/parameters/sync",
+    "path": "/v1/clusters/{cluster_id}/parameters/sync"
+  },
+  "mysql-cluster-subops-full:upgrade-kernel": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/kernel-upgrade",
+    "path": "/v1/clusters/{cluster_id}/kernel-upgrade"
+  },
+  "mysql-cluster-subops-full:wait-after-export-log": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-patch-minor-version": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-register-log-export-config": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-remove-backup-histories": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-set-log-export-config": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-set-parameters": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-set-security-group-rules": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-switchover-cluster": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-sync-cluster-state": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-sync-parameters": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-unregister-log-export-config": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-after-upgrade-kernel": {
+    "count": 1,
+    "first_run": "28602725440",
+    "last_run": "28602725440",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "mysql-cluster-subops-full:wait-cluster": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "mysql-cluster-subops-full:wait-subnet": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
   },
   "mysql-cluster-subops-full:wait-vpc": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28602725440",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"

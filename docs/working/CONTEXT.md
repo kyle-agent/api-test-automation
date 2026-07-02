@@ -108,7 +108,43 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
-- **▶ SESSION HANDOFF / RESUME HERE (2026-06-29 close, branch `claude/ecstatic-tesla-fo1g3b`).**
+- **▶ SESSION HANDOFF / RESUME HERE (2026-07-02, branch `claude/upbeat-ritchie-ieus5u`).**
+  All committed & pushed; **live owned == 0** (verified post-phase-3 + stop-sweep). Durable
+  `verified_endpoints.json` **1250 → 1400 (+150)** — the D2–D7 DB depth campaign, executed on
+  the **chat-heavy lane** (`.github/chat-heavy-request` push → `chat-heavy.yml`; note
+  `api-test.yml` push automation stays owner-disabled, so "CI heavy lane" = chat-heavy).
+  - **D2–D7 in 3 phases:** P1 (run 28595785223) proved `*-cluster-subops-guarded` bank NOTHING
+    dispatched alone (window-only design; only `database-mysql-cluster` ran real depth; its
+    observations were LOST — the lane had no artifact upload). P2 (28599889165): new
+    **self-sufficient `*-cluster-subops-full`** lifecycles (`database__subops-full.json`,
+    create→wait→subops→delete from proven blocks; replica/restore excluded as leak-unsafe)
+    → **+73**. P3 (28602725440): **ExistInprogress pacing fix** (settle-poll after every
+    mutating sub-op) opened the serialized tail (archive/audit-log/backup/stop/start/
+    kernel-upgrade/add-block-storages/…) → **+77**. mysql/mariadb/cachestore sub-op depth
+    is now MAXED to what the account allows; details in `knowledge/validated-facts.md`
+    (2026-07-02 block).
+  - **Evidence pipeline (NEW, load-bearing):** chat-heavy now uploads `reports/results/` as
+    an artifact AND mirrors it to the oplog bucket (`runs/<APITEST_RUN_ID>/artifact/`) —
+    sessions cannot download GitHub artifacts (proxy blocks api.github.com). For older runs:
+    push-triggered `fetch-results.yml` bridge. Fold with
+    `GITHUB_RUN_ID=<id> python -m tools.derive_verified --observations <file> --out data/baselines/verified_endpoints.json`.
+  - **Engine:** new `poll.give_up_status` (end a settle-poll on 4xx instead of burning its
+    timeout — P3's epas create was rejected and its ~15 wait-polls each burned 900s; run was
+    action=stop'ed after 3/4 engines passed; evidence survived via always() mirror).
+  - **Offline fixes landed:** 3 `test_compose_*` failures (real cause = e2be5356 WS4 refactor,
+    not b5a8295c), dag_runner/dag_scheduler "flake" root-caused (= `cleanup/verify_clean.py`
+    no-op'ing `time.sleep` PROCESS-WIDE at import; stub now scoped inside `scan_owned`) —
+    **full offline suite 390/390**. `build_ia_demo` loaders memoized (build-scoped).
+  - **OPEN / next:** (1) **epas** subops-full single-engine retry (create 500'd this round —
+    transient/capacity; body is proven-good from P2); (2) backup-agent/backup-job need a live
+    VM window (stale `server_uuid` 404) — bank during a compute-virtualserver-full run;
+    (3) replica/restore depth belongs to `gen-heavy-*-replica/-restore` (disabled, need
+    capture/teardown validation); (4) sqlserver stays license-gated reachability-only;
+    (5) SCF stranded pair auto-expires 2026-07-31 (PLS state still 403-unreadable);
+    (6) GitHub MCP token expired mid-session — re-auth needed for run-status/log API
+    (oplog-bucket evidence path unaffected); (7) `.github/chat-heavy-request` left at
+    `action=noop`.
+- **PRIOR (2026-06-29 close, branch `claude/ecstatic-tesla-fo1g3b`).**
   Everything is committed, pushed, and FF-merged — **`main` = feature = `origin` = `101e08c2`,
   working tree CLEAN, live owned == 0** (last verify post-D1 cleanup; re-run `POST /api/cleanup`
   on resume to reconfirm). Nothing is mid-execution.
