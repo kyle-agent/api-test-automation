@@ -110,9 +110,19 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 - **▶ SESSION HANDOFF / RESUME HERE (2026-07-02, branch `claude/upbeat-ritchie-ieus5u`).**
   All committed & pushed; **live owned == 0** (verified post-phase-3 + stop-sweep). Durable
-  `verified_endpoints.json` **1250 → 1400 (+150)** — the D2–D7 DB depth campaign, executed on
+  `verified_endpoints.json` **1250 → 1464 (+214)** — the D2–D7 DB depth campaign (+150) plus the
+  next-batch α/β runs (+64: epas partial +13 run 28628073176, pg full +51 run 28631983945), all on
   the **chat-heavy lane** (`.github/chat-heavy-request` push → `chat-heavy.yml`; note
   `api-test.yml` push automation stays owner-disabled, so "CI heavy lane" = chat-heavy).
+  **Batch-2 lessons (2026-07-03):** (a) settle-polls must also end on terminal-bad states —
+  epas pinned at `service_state=UNKNOWN` after a Parameter Modify Error and 200+UNKNOWN
+  defeats `give_up_status`; all 94+23 wait-after polls now carry FAILED/ERROR/UNKNOWN in
+  `until`. (b) **Never dispatch while a prior run's sweep is still converging** — β retry-1
+  lost its shared VPC to the α stop-run's sweep 2s after provision (audit 01:06:03→01:06:05);
+  gate every dispatch on owned==0 AND ~5min audit silence. (c) pg backend was FAST today
+  (create 8min, full chain 22min); Parameter Modify → async Error is common to epas+pg
+  (recorded as 2xx accept then errors — triage material, not a blocker). epas tail
+  (archive/log-export/patch/kernel/stop/start/resize) remains open — backend flaky.
   - **D2–D7 in 3 phases:** P1 (run 28595785223) proved `*-cluster-subops-guarded` bank NOTHING
     dispatched alone (window-only design; only `database-mysql-cluster` ran real depth; its
     observations were LOST — the lane had no artifact upload). P2 (28599889165): new
