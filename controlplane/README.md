@@ -13,18 +13,20 @@ run 레코드/스케줄/UI는 두 모드에서 동일합니다. Docker Compose �
 
 ## IA — 두 런타임 (2026-06-17 reorg)
 
-정보 구조(IA)의 단일 소스는 **`docs/IA.md`** 입니다. 두 런타임으로 깔끔히
-분리됩니다:
+정보 구조(IA)의 단일 소스는 **`docs/working/plans/PLATFORM-IA-DIRECTION.md`**
+§"✅ 확정 IA (2026-06-26)" 입니다 (오너 확정: **`Catalog · Modeling · Testing ·
+Reporting`**; 구 `docs/IA.md`는 SUPERSEDED). 두 런타임으로 깔끔히 분리됩니다:
 
-- **정적 대시보드** (GitHub Pages) — 정식 **Results + Ops**. `dashboard/build.py`가
-  커버리지 래더·conformance를 한 번만 렌더하고, `ops.html`이 라이브 ops를 보여줌.
-- **라이브 control plane** (이 서버) — 인터랙티브 **Plan + Run + 저작/개입**.
+- **정적 대시보드** (GitHub Pages, 면②) — 공개 커버리지·conformance.
+  `dashboard/build.py`가 한 번만 렌더하고, `ops.html`이 라이브 ops를 보여줌.
+- **라이브 control plane** (이 서버, 면①) — 4단계 작업 콘솔.
 
-상단 네비게이션은 **`Overview · Plan · Run · Report · Knowledge`** 입니다. 헤더의
-장식용 환경/스위트 선택 셀렉트는 제거됐고(ctxbar는 발행 스냅샷 상태만 표시),
-`/ai/*`는 top-nav 섹션이 아니라 Plan(Model/Compose) 안의 **인라인 어시스트**입니다.
-정식 Report가 표준이라 bare `/runs` 리디렉트는 **제거**됐습니다(`/runs/{id}` 상세는
-유지).
+상단 네비게이션은 **`Catalog · Modeling · Testing · Reporting (+ Knowledge)`**
+입니다 — ① 재료(카탈로그 RO) → ② 레시피 저작(모델 지도·노드 편집) → ③ 요리
+(Test Planning · Test Execution = console2) → ④ 평가(커버리지·runs·triage,
+면② 링크아웃). 헤더의 장식용 환경/스위트 셀렉트는 제거됐고(ctxbar는 발행
+스냅샷 상태만 표시), 정식 Report가 표준이라 bare `/runs` 리디렉트는 **제거**
+됐습니다(`/runs/{id}` 상세는 유지).
 
 ## 기능
 
