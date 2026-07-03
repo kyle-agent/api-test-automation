@@ -342,9 +342,11 @@ def _knowledge_view(service: str, cap: int = 24) -> dict:
 # yet → a 수집 중 placeholder that auto-refreshes. Needs creds (no creds → error
 # card). One harvest at a time (the `generating` flag).
 # --------------------------------------------------------------------------- #
-_RUNTIME_CACHE: dict = {"html": None, "ts": 0.0, "hours": None, "generating": False}
+_RUNTIME_CACHE: dict = {"events": None, "oplog": None, "meta": None, "error": None,
+                        "ts": 0.0, "hours": None, "generating": False}
 _RUNTIME_TTL = 60.0
 _RUNTIME_LOCK = threading.Lock()
+_RUNTIME_HOURS = (1, 6, 24)          # UI window choices (default 1)
 
 
 def _runtime_error_html(msg: str) -> str:
@@ -370,40 +372,107 @@ def _runtime_wait_html(hours: float) -> str:
 
 
 def _runtime_generate(hours: float) -> None:
-    """The slow part (harvest + render_flow) — runs in a bg thread, updates cache."""
+    """The slow part (loggingaudit harvest + oplog-bucket read) — runs in a bg
+    thread, updates the cache with RAW events (+ the run-id-tagged oplog events);
+    rendering/filtering is cheap and happens per request in _runtime_view."""
     from datetime import datetime, timezone, timedelta
+    from audit import live_view as lv
+    now = datetime.now(timezone.utc)
+    end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    start = (now - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    error = None
+    events: list[dict] = []
+    oplog_events = None
     try:
-        from audit import live_view as lv
-        now = datetime.now(timezone.utc)
-        end = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-        start = (now - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
         ev_path = str(ROOT / "reports" / "audit" / "_runtime.jsonl")
-        events: list[dict] = []
         lv.harvest(start, end, ev_path)             # loggingaudit → jsonl (needs creds)
         for line in open(ev_path, encoding="utf-8"):
             line = line.strip()
             if line:
                 events.append(json.loads(line))
-        spans = lv.build_spans(events, now, ours_only=True)
-        html_out = lv.render_flow(spans, now, {"start": start, "end": end}, refresh=0)
+        # oplog join (origin annotation) — best-effort; None = bucket unreachable
+        start_ms = int((now - timedelta(hours=hours)).timestamp() * 1000)
+        oplog_events = lv.fetch_oplog_res_events(start_ms)
     except Exception as exc:                         # noqa: BLE001
-        html_out = _runtime_error_html(str(exc))
+        error = str(exc)
     with _RUNTIME_LOCK:
-        _RUNTIME_CACHE.update(html=html_out, ts=time.monotonic(), hours=hours, generating=False)
+        _RUNTIME_CACHE.update(events=events, oplog=oplog_events, error=error,
+                              meta={"start": start, "end": end},
+                              ts=time.monotonic(), hours=hours, generating=False)
 
 
-def _runtime_view(hours: float = 6.0):
-    """Return ``(html_or_None, ready)`` without blocking — kick a bg harvest when the
-    cache is stale so the popup never hangs on a cold load."""
+def _local_run_ids() -> list[str]:
+    """This console's OWN run-rec ids (the local origin set for the oplog join)."""
+    with _LOCK:
+        return list(_RUNS.keys())
+
+
+def _local_run_active() -> bool:
+    with _LOCK:
+        return any(r.get("status") in ("running", "queued") for r in _RUNS.values())
+
+
+def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"):
+    """Return ``(html_or_None, ready)`` without blocking — kick a bg harvest when
+    the cache is stale so the popup never hangs on a cold load.
+
+    scope=mine (default) keeps only spans attributable (via the oplog join) to a
+    run THIS console started; when that yields zero spans and no local run is in
+    flight it auto-falls back to scope=all with a banner. deleted=hide (default)
+    drops already-deleted spans; hours ∈ {1,6,24}."""
+    from datetime import datetime, timezone
+    from audit import live_view as lv
+    scope = scope if scope in ("mine", "all") else "mine"
+    deleted = deleted if deleted in ("hide", "show") else "hide"
     with _RUNTIME_LOCK:
-        if (_RUNTIME_CACHE["html"] and _RUNTIME_CACHE["hours"] == hours
-                and (time.monotonic() - _RUNTIME_CACHE["ts"]) < _RUNTIME_TTL):
-            return _RUNTIME_CACHE["html"], True
-        if not _RUNTIME_CACHE["generating"]:
+        fresh = (_RUNTIME_CACHE["events"] is not None
+                 and _RUNTIME_CACHE["hours"] == hours
+                 and (time.monotonic() - _RUNTIME_CACHE["ts"]) < _RUNTIME_TTL)
+        if not fresh and not _RUNTIME_CACHE["generating"]:
             _RUNTIME_CACHE["generating"] = True
             threading.Thread(target=_runtime_generate, args=(hours,), daemon=True).start()
-        stale = _RUNTIME_CACHE["html"] if _RUNTIME_CACHE["hours"] == hours else None
-        return stale, False
+        # fresh cache → render it; stale-but-same-window cache → still useful
+        usable = (_RUNTIME_CACHE["events"] is not None
+                  and _RUNTIME_CACHE["hours"] == hours)
+        events = list(_RUNTIME_CACHE["events"] or []) if usable else None
+        oplog_events = _RUNTIME_CACHE["oplog"] if usable else None
+        meta = dict(_RUNTIME_CACHE["meta"] or {}) if usable else {}
+        error = _RUNTIME_CACHE["error"] if usable else None
+    if events is None:
+        return None, False
+    if error and not events:
+        return _runtime_error_html(error), fresh
+    now = datetime.now(timezone.utc)
+    spans = lv.build_spans(events, now, ours_only=True)
+    lv.annotate_origins(spans, oplog_events, local_run_ids=_local_run_ids())
+    banner = note = None
+    eff_scope = scope
+    if scope == "mine" and oplog_events is None:
+        # origin join unavailable → scoping is impossible; render as today (all)
+        eff_scope = "all"
+        shown = lv.filter_spans(spans, scope="all", deleted=deleted)
+    elif scope == "mine":
+        mine = lv.filter_spans(spans, scope="mine", deleted=deleted)
+        if not mine and not _local_run_active():
+            # nothing attributable to my runs and nothing in flight → show the
+            # account instead of an empty page, and SAY so.
+            eff_scope = "all"
+            note = ("내 실행으로 귀속되는 자원이 없어 계정 전체 뷰로 전환했습니다 "
+                    "(로컬 실행이 시작되면 기본 '내 실행' 범위로 보세요).")
+            shown = lv.filter_spans(spans, scope="all", deleted=deleted)
+        else:
+            shown = mine
+    else:
+        shown = lv.filter_spans(spans, scope="all", deleted=deleted)
+    if eff_scope == "all":
+        banner = "계정 전체 뷰 — 다른 run·CI 자원 포함"
+    if oplog_events is None:
+        note = ((note + " · ") if note else "") + \
+            "oplog 버킷에 접근할 수 없어 출처(origin) 배지를 붙이지 못했습니다."
+    chrome = {"scope": scope, "hours": int(hours), "deleted": deleted,
+              "banner": banner, "note": note}
+    html_out = lv.render_flow(shown, now, meta, refresh=0, chrome=chrome)
+    return html_out, fresh
 
 
 # --------------------------------------------------------------------------- #
@@ -831,6 +900,9 @@ def _run_worker(rec: dict) -> None:
     appends step-level events to rec['events'] (core.console_events)."""
     logp = Path(rec["log"])
     env = {**os.environ, "PYTHONPATH": str(ROOT),
+           # stamp the run-rec id so oplog resource events land under
+           # runs/<rec id>/res/* — the /runtime origin join (scope=mine) keys off it
+           "APITEST_RUN_ID": rec["id"],
            "SCP_CRUD_IDS": ",".join(rec["lifecycle_ids"]),
            "SCP_CONSOLE_EVENTS": rec["events"],
            "SCP_ALLOW_MUTATIONS": "true" if rec["mutations"] else "false",
@@ -955,7 +1027,7 @@ def _cleanup_worker(rec: dict) -> None:
     logp = Path(rec["log"])
     env = {**os.environ, "PYTHONPATH": str(ROOT), "SCP_ALLOW_MUTATIONS": "true",
            "SCP_ALLOW_DESTRUCTIVE": "true", "SCP_SWEEP_IGNORE_TTL": "true",
-           "SCP_SWEEP_NOWAIT": "true"}
+           "SCP_SWEEP_NOWAIT": "true", "APITEST_RUN_ID": rec["id"]}
     try:
         with open(logp, "w", encoding="utf-8") as f:
             f.write(f"# console2 FORCE cleanup {rec['id']}\n\n"
@@ -1215,10 +1287,13 @@ class Handler(BaseHTTPRequestHandler):
             # blocking — a cold load returns the 수집 중 placeholder (auto-refresh).
             q = parse_qs(urlparse(self.path).query)
             try:
-                hours = float((q.get("hours") or ["6"])[0] or 6)
+                hours = float((q.get("hours") or ["1"])[0] or 1)
             except ValueError:
-                hours = 6.0
-            out, _ready = _runtime_view(hours)
+                hours = 1.0
+            hours = hours if hours in _RUNTIME_HOURS else 1.0
+            scope = (q.get("scope") or ["mine"])[0]
+            deleted = (q.get("deleted") or ["hide"])[0]
+            out, _ready = _runtime_view(hours, scope=scope, deleted=deleted)
             if not out:
                 out = _runtime_wait_html(hours)
             body = out.encode("utf-8")

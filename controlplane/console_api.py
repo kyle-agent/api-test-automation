@@ -142,11 +142,15 @@ def api_run(rid: str) -> JSONResponse:
 
 @router.get("/api/runtime", response_class=HTMLResponse)
 @router.get("/runtime", response_class=HTMLResponse)
-def api_runtime(hours: float = 6.0) -> HTMLResponse:
-    """Runtime topology (loggingaudit) as standalone HTML for the 런타임 뷰 popup.
+def api_runtime(hours: float = 1.0, scope: str = "mine",
+                deleted: str = "hide") -> HTMLResponse:
+    """Runtime topology (loggingaudit × oplog origin join) as standalone HTML.
+    scope=mine|all (default mine; auto-falls back to all when mine is empty and
+    nothing local is running) · hours∈{1,6,24} (default 1) · deleted=hide|show.
     Best-effort: a cold load returns the '수집 중' auto-refresh placeholder."""
+    hours = hours if hours in c2._RUNTIME_HOURS else 1.0
     try:
-        out, _ready = c2._runtime_view(hours)
+        out, _ready = c2._runtime_view(hours, scope=scope, deleted=deleted)
     except Exception:                                      # noqa: BLE001
         out = None
     if not out:
