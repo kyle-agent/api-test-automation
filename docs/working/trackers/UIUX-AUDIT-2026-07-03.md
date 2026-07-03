@@ -32,25 +32,39 @@
 
 ## 2. 우선순위 개선 목록
 
+> **구현 현황 (2026-07-03, IA/CX phase 1 — branch `claude/upbeat-ritchie-ieus5u`):**
+> P1-1 ✅ `33bf61f4` · P1-2 ✅ `98c3b25f` · P1-4 부분(✅ `/local-run` 301, `98c3b25f`;
+> `/testing` 서브탭 라벨/배너는 미착수) · P1-5 ✅ `f686601d` · P1-6 ✅ `1aa96408`.
+> P1-3, P2, P3 은 미착수 (후속 phase).
+
 ### P1 — 혼란/위험 유발
-1. **`/runtime` 스코프 없음** — 최근 6시간 계정 전체 loggingaudit 토폴로지를 렌더 →
+1. ✅ **DONE `33bf61f4`** — **`/runtime` 스코프 없음** — 최근 6시간 계정 전체 loggingaudit 토폴로지를 렌더 →
    타 run(CI 포함)의 삭제된 자원 취소선 20개+가 "내 라이브 실행"과 혼재. run/origin
    배지 전무, `?hours=`는 UI 미노출. 개선: 기본 스코프 = 현재 로컬 run, "계정 전체"
    토글, origin 배지(local/CI run-id/외부), 시간 윈도우 셀렉트, 삭제됨 기본 숨김. (중)
-2. **잔존 자원 표면 4개가 서로 다른 답** — `/testing/resources`(ingest만, "0 live") vs
+   → 구현: oplog(runs/<id>/res/*) join 으로 origin 주석, scope=mine 기본(빈 결과 +
+   로컬 실행 없음 → all 폴백+배너), hours∈{1,6,24}, deleted 기본 숨김, Testing 셸 헤더.
+2. ✅ **DONE `98c3b25f`** — **잔존 자원 표면 4개가 서로 다른 답** — `/testing/resources`(ingest만, "0 live") vs
    `/runtime` vs console2 `/api/owned` 패널 vs `/local-run`. 개선: `/api/owned`
    (reconciler 소유 태그)를 단일 정본으로 한 화면에 통합, 타 표면은 인용+출처 명시. (중)
+   → 구현: /testing/resources 상단 '지금 남은 것 (실측)' = scan_owned 비동기 스캔
+   (행별 삭제 + pre-scan 강제 클린업 모달 + known_issues.stuck_resources 접힘 그룹),
+   ingest 표는 '이력'으로 강등 + 출처 한계 명시.
 3. **ctxbar 스냅샷 불일치** — catalog/modeling/reporting-coverage/ai 라우터가
    `ctx_snapshot` 미주입 → "발행 스냅샷 정보 없음" 오탐 문구. IA.md의 "같은 sha를
    모든 화면에" 계약 위반. 개선: `_catalog()`의 ctx_snapshot을 공유 의존성으로 추출. (소)
-4. **실행 표면 3중화 + 게이트 경로 상이** — 로컬 엔진(`/testing/embed`) / CI dispatch
+4. 🔶 **부분 DONE `98c3b25f`** — **실행 표면 3중화 + 게이트 경로 상이** — 로컬 엔진(`/testing/embed`) / CI dispatch
    (`/testing`) / 고아 `/local-run`. 개선: `/local-run` 제거 또는 301, `/testing` 서브탭
    라벨 "CI 디스패치 · 스케줄"로, 상단에 실행 경로 대비 배너. (중)
-5. **pre-flight confirm의 blast radius 불충분** — native `confirm()`에 lifecycle 수·heavy
+   → `/local-run` 은 301 → /testing/resources (러너 UI 은퇴); 서브탭 라벨/배너 미착수.
+5. ✅ **DONE `f686601d`** — **pre-flight confirm의 blast radius 불충분** — native `confirm()`에 lifecycle 수·heavy
    수·VPC peak만; 서비스/생성·삭제 예상/과금/ETA/"destructive 항상 ON" 없음; preflight
    조회 실패에도 실행 허용. 개선: HTML 모달(대상 서비스·heavy 목록·생성/삭제 예상·ETA·
    게이트 명시, heavy 시 추가 체크), preflight 실패 시 실행 차단. (중)
-6. **홈 파이프라인 스트립이 구 IA로 연결** — PLAN 타일→구 스테퍼, 어휘 PLAN/RUN/REPORT.
+   → 구현: 서비스별 표 + est_creates/deletes + 실측 ETA(durations.json) + heavy 명명
+   목록/필수 체크, preflight 실패 = 완전 차단(우회 없음); 강제 클린업 confirm 2곳도
+   fresh /api/owned 목록 모달로.
+6. ✅ **DONE `1aa96408`** — **홈 파이프라인 스트립이 구 IA로 연결** — PLAN 타일→구 스테퍼, 어휘 PLAN/RUN/REPORT.
    개선: 4-stage 4칸으로 교체, `/planning`→`/planning/resources/map` 리다이렉트, 스테퍼 은퇴. (소)
 
 ### P2 — 효율

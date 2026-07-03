@@ -108,6 +108,26 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **IA/CX phase 1 (2026-07-03, branch `claude/upbeat-ritchie-ieus5u` — owner-approved
+  4-item batch, no live mutations, .github/ untouched):** tracker =
+  `docs/working/trackers/UIUX-AUDIT-2026-07-03.md` §2 (구현 현황 표 참조).
+  (1) 홈 파이프라인 = 확정 IA 4칸(Catalog·Modeling·Testing·Reporting), `/planning`
+  구 스테퍼 301→`/planning/resources/map`, planning.html/_plan_steps.html 삭제
+  (`1aa96408`); (2) `/runtime` scope=mine 기본 — loggingaudit×oplog origin join
+  (local/CI/unknown 배지), hours∈{1,6,24}, deleted 숨김 기본, mine 0건+로컬 실행
+  없음 → all 폴백+배너, standalone Testing 셸 (`33bf61f4`; 로컬 run 워커가 이제
+  `APITEST_RUN_ID=<rec id>` 를 스탬프); (3) `/testing/resources` = 잔존 자원 단일
+  정본 — 실측 owned 스캔(비동기+캐시) 상단, ingest 표 '이력' 강등,
+  `known_issues.json` 에 `stuck_resources` 3건 신설(접힘 '기지 항목'), 강제 클린업
+  pre-scan 모달 + 사전 409 표기, `/local-run` 301 (`98c3b25f`); (4) console2
+  pre-flight blast-radius HTML 모달 — 서비스별 생성~삭제 예상 + 실측 ETA(durations
+  .json) + heavy 명명/필수 체크, preflight 실패 = 완전 차단, 강제 클린업 confirm
+  2곳도 owned-목록 모달로 (`f686601d`; `_plan` preview 에 est_creates/est_deletes/
+  duration_s 추가).
+  - **OPEN (IA/CX 후속):** P1-3 ctxbar ctx_snapshot 공유 의존성 · P1-4 잔여
+    (`/testing` 서브탭 라벨 "CI 디스패치 · 스케줄" + 경로 대비 배너) · P2 초장문
+    페이지 접기 · P2-8 Reporting 서브탭 단일 include · 한/영 정책(P3).
+    `local_run.html` 템플릿은 build_local_demo 가 참조해 보존(라우트만 301).
 - **MODEL-PROMOTION pass (2026-07-03, same branch — offline only, no dispatch/live calls):**
   - **18 docs→VALIDATED promoted** off service-scoped 2xx evidence via the NEW
     `python -m tools.promote_validated` (dry-run default; `--apply` = targeted
