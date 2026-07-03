@@ -19,7 +19,7 @@ resources:
     capture: {direct_connect_id: "$.direct_connect.id"}
     delete: {endpoint: "DELETE /v1/direct-connects/{direct_connect_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/direct-connect/createdirectconnect (run 28648339307)
     source: {lifecycle: networking-direct-connect-routing,
              steps: [create-direct-connect, delete-direct-connect]}
     notes: "서비스존당 VPC와 1:1 (공유 VPC 위 중복 생성은 4xx — cross-service dc-prereq 참조); 이름은 3-20 영숫자만. capture는 소스에서 capture_soft($.direct_connect.id) — envelope UNPROVEN이라 docs. firewall_enabled: true는 firewall을 암묵 생성한다 (firewall 노드 참조; 소스는 true로 보냈으나 표준 생성형은 false 유지). [USERGUIDE 2026-06-15] direct_connect/overview 확인: (1) **계정 기준 서비스존당 Direct Connect 최대 5개**, 그리고 **서비스존 내 VPC당 1:1** 생성 — 기존 1:1 노트 확정 + 서비스존당 5개 한도는 새 사실(quota 모델링 후보, LOCK 후보). (2) 선행조건 = VPC + **Security Group**(서버 트래픽 제어 가상 방화벽) — requires에는 vpc만 있으나 userguide는 SG도 전제로 명시; cross-service.yaml dc-prereq에 SG edge가 있는지 확인 권장. (3) Direct Connect Firewall(access control) + 라우트 구성 기능 지원 — firewall_enabled 옵션 및 firewall 암묵 생성과 정합. (4) 인스턴스당 고객 선택 단일 VPC 연결. [UNPROVEN] userguide는 이름 길이/charset과 bandwidth 허용값을 명시하지 않음 — body의 '3-20 영숫자'와 bandwidth:1은 소스 lifecycle 유래로 여전히 UNPROVEN(라이브 확인 대상)."

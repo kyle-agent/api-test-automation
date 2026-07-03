@@ -2023,18 +2023,42 @@
     "norm_path": "v1/servers/*/security-groups",
     "path": "/v1/servers/{server_id}/security-groups"
   },
+  "compute/virtualserver/createautoscalinggroup": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/auto-scaling-groups",
+    "path": "/v1/auto-scaling-groups"
+  },
+  "compute/virtualserver/createautoscalinggrouppolicy": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/auto-scaling-groups/*/policies",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies"
+  },
+  "compute/virtualserver/createautoscalinggroupschedule": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/auto-scaling-groups/*/schedules",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules"
+  },
   "compute/virtualserver/createkeypair": {
-    "count": 27,
+    "count": 28,
     "first_run": "27583285457",
-    "last_run": "",
+    "last_run": "28648339307",
     "method": "POST",
     "norm_path": "v1/keypairs",
     "path": "/v1/keypairs"
   },
   "compute/virtualserver/createlaunchconfiguration": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "POST",
     "norm_path": "v1/launch-configurations",
     "path": "/v1/launch-configurations"
@@ -2095,13 +2119,45 @@
     "norm_path": "v1/volume-transfer",
     "path": "/v1/volume-transfer"
   },
+  "compute/virtualserver/deleteautoscalinggroup": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/auto-scaling-groups/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}"
+  },
+  "compute/virtualserver/deleteautoscalinggrouppolicy": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/auto-scaling-groups/*/policies/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}"
+  },
+  "compute/virtualserver/deleteautoscalinggroupschedule": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/auto-scaling-groups/*/schedules/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}"
+  },
   "compute/virtualserver/deletekeypair": {
-    "count": 11,
+    "count": 12,
     "first_run": "27583285457",
-    "last_run": "",
+    "last_run": "28648339307",
     "method": "DELETE",
     "norm_path": "v1/keypairs/*",
     "path": "/v1/keypairs/regrkey{unique}"
+  },
+  "compute/virtualserver/deletelaunchconfiguration": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/launch-configurations/*",
+    "path": "/v1/launch-configurations/{launch_configuration_id}"
   },
   "compute/virtualserver/deleteservergroup": {
     "count": 11,
@@ -2462,6 +2518,22 @@
     "method": "POST",
     "norm_path": "v1/servers/*/stop",
     "path": "/v1/servers/{server_id}/stop"
+  },
+  "compute/virtualserver/updateautoscalinggroup": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PUT",
+    "norm_path": "v1/auto-scaling-groups/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}"
+  },
+  "compute/virtualserver/updateautoscalinggroupservercount": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PUT",
+    "norm_path": "v1/auto-scaling-groups/*/server-count",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/server-count"
   },
   "compute/virtualserver/updateservervolume": {
     "count": 7,
@@ -4527,6 +4599,62 @@
     "norm_path": "v1/reports/prices",
     "path": "/v1/reports/prices"
   },
+  "gen-alert:create-alert": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/alerts",
+    "path": "/v1/alerts"
+  },
+  "gen-alert:create-sw-metric-catalog": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/metrics",
+    "path": "/v1/metrics"
+  },
+  "gen-alert:delete-alert": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/alerts",
+    "path": "/v1/alerts"
+  },
+  "gen-alert:verify-alert-read": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/alerts/*",
+    "path": "/v1/alerts/{alert_id}"
+  },
+  "gen-alert:verify-alert-set": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PATCH",
+    "norm_path": "v1/alerts/*",
+    "path": "/v1/alerts/{alert_id}"
+  },
+  "gen-alert:verify-alert-set-activated": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PATCH",
+    "norm_path": "v1/alerts/*/activated",
+    "path": "/v1/alerts/{alert_id}/activated"
+  },
+  "gen-alert:verify-alert-set-description": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PATCH",
+    "norm_path": "v1/alerts/*/description",
+    "path": "/v1/alerts/{alert_id}/description"
+  },
   "gen-cost-reads:create-cost-reads": {
     "count": 14,
     "first_run": "",
@@ -4550,6 +4678,30 @@
     "method": "GET",
     "norm_path": "v1/usages",
     "path": "/v1/usages"
+  },
+  "gen-direct-connect:create-direct-connect": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/direct-connects",
+    "path": "/v1/direct-connects"
+  },
+  "gen-direct-connect:verify-direct-connect": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/direct-connects/*",
+    "path": "/v1/direct-connects/{direct_connect_id}"
+  },
+  "gen-direct-connect:wait-vpc": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
   },
   "gen-gpu-node-image:create-gpu-node-image": {
     "count": 7,
@@ -4967,6 +5119,22 @@
     "norm_path": "v1/volumes/*",
     "path": "/v1/volumes/{vol_id}"
   },
+  "gen-lb-members-light:wait-subnet": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/subnets/*",
+    "path": "/v1/subnets/{subnet_id}"
+  },
+  "gen-lb-members-light:wait-vpc": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
+  },
   "gen-pricing-reads:create-pricing-reads": {
     "count": 7,
     "first_run": "",
@@ -4990,6 +5158,46 @@
     "method": "GET",
     "norm_path": "v1/reports/prices",
     "path": "/v1/reports/prices"
+  },
+  "gen-private-nat:create-tgw-vpc-connection": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/transit-gateways/*/vpc-connections",
+    "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
+  },
+  "gen-private-nat:create-transit-gateway": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/transit-gateways",
+    "path": "/v1/transit-gateways"
+  },
+  "gen-private-nat:wait-tgw-vpc-connection": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/transit-gateways/*/vpc-connections",
+    "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
+  },
+  "gen-private-nat:wait-transit-gateway": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/transit-gateways/*",
+    "path": "/v1/transit-gateways/{transit_gateway_id}"
+  },
+  "gen-private-nat:wait-vpc": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
   },
   "gen-quick-query-image-versions:create-quick-query-image-versions": {
     "count": 7,
@@ -5086,6 +5294,14 @@
     "method": "GET",
     "norm_path": "v1/volume-types/*",
     "path": "/v1/volume-types/{volume_type_id}"
+  },
+  "gen-vpc-endpoint:wait-vpc": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
   },
   "gen-wave-apigw:create-apigw-access-control": {
     "count": 4,
@@ -5911,53 +6127,197 @@
     "norm_path": "v1/inquiries/sr-260613-00001-nuri-scp",
     "path": "/v1/inquiries/sr-260613-00001-nuri-scp"
   },
+  "gen-wave4-asg:create-asg-policy": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/auto-scaling-groups/*/policies",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies"
+  },
+  "gen-wave4-asg:create-asg-schedule": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/auto-scaling-groups/*/schedules",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules"
+  },
+  "gen-wave4-asg:create-auto-scaling-group": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/auto-scaling-groups",
+    "path": "/v1/auto-scaling-groups"
+  },
   "gen-wave4-asg:create-image": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "GET",
     "norm_path": "v1/images",
     "path": "/v1/images?status=active&scp_original_image_type=standard&visibility=public&limit=50"
   },
   "gen-wave4-asg:create-keypair": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "POST",
     "norm_path": "v1/keypairs",
     "path": "/v1/keypairs"
   },
   "gen-wave4-asg:create-launch-configuration": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "POST",
     "norm_path": "v1/launch-configurations",
     "path": "/v1/launch-configurations"
   },
   "gen-wave4-asg:create-security-group": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "POST",
     "norm_path": "v1/security-groups",
     "path": "/v1/security-groups"
   },
   "gen-wave4-asg:create-server-type": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
+  "gen-wave4-asg:delete-asg-policy": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/auto-scaling-groups/*/policies/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}"
+  },
+  "gen-wave4-asg:delete-asg-schedule": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/auto-scaling-groups/*/schedules/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}"
+  },
+  "gen-wave4-asg:delete-auto-scaling-group": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/auto-scaling-groups/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}"
+  },
+  "gen-wave4-asg:delete-keypair": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/keypairs/*",
+    "path": "/v1/keypairs/regrkey{unique}"
+  },
+  "gen-wave4-asg:delete-launch-configuration": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/launch-configurations/*",
+    "path": "/v1/launch-configurations/{launch_configuration_id}"
+  },
+  "gen-wave4-asg:delete-security-group": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/security-groups/*",
+    "path": "/v1/security-groups/{sg_id}"
+  },
+  "gen-wave4-asg:verify-asg-policy": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/auto-scaling-groups/*/policies/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/policies/{policy_id}"
+  },
+  "gen-wave4-asg:verify-asg-schedule": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/auto-scaling-groups/*/schedules/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/schedules/{schedule_id}"
+  },
+  "gen-wave4-asg:verify-auto-scaling-group-list-lb-server-groups": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/auto-scaling-groups/*/lb-server-groups",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/lb-server-groups"
+  },
+  "gen-wave4-asg:verify-auto-scaling-group-list-virtual-servers": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/auto-scaling-groups/*/virtual-servers",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/virtual-servers"
+  },
+  "gen-wave4-asg:verify-auto-scaling-group-read": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/auto-scaling-groups/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}"
+  },
+  "gen-wave4-asg:verify-auto-scaling-group-server-count": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PUT",
+    "norm_path": "v1/auto-scaling-groups/*/server-count",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}/server-count"
+  },
+  "gen-wave4-asg:verify-auto-scaling-group-update": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PUT",
+    "norm_path": "v1/auto-scaling-groups/*",
+    "path": "/v1/auto-scaling-groups/{auto_scaling_group_id}"
+  },
   "gen-wave4-asg:verify-launch-configuration": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "GET",
     "norm_path": "v1/launch-configurations/*",
     "path": "/v1/launch-configurations/{launch_configuration_id}"
+  },
+  "gen-wave4-asg:wait-subnet": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/subnets/*",
+    "path": "/v1/subnets/{subnet_id}"
+  },
+  "gen-wave4-asg:wait-vpc": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
   },
   "gen-wave4-nlog:create-network-logging-storage": {
     "count": 10,
@@ -6334,6 +6694,22 @@
     "method": "GET",
     "norm_path": "v1/apis/*/usage-plans/*",
     "path": "/v1/apis/{api_id}/usage-plans/{usage_plan_id}"
+  },
+  "gen-wave5-apigw-privatelink:wait-subnet": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/subnets/*",
+    "path": "/v1/subnets/{subnet_id}"
+  },
+  "gen-wave5-apigw-privatelink:wait-vpc": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "GET",
+    "norm_path": "v1/vpcs/*",
+    "path": "/v1/vpcs/{vpc_id}"
   },
   "gen-wave5-fw:create-firewall": {
     "count": 2,
@@ -7703,6 +8079,14 @@
     "norm_path": "v1/tags/bulk",
     "path": "/v1/tags/bulk"
   },
+  "management/servicewatch/createalert": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/alerts",
+    "path": "/v1/alerts"
+  },
   "management/servicewatch/createcustomlogevents": {
     "count": 4,
     "first_run": "27583285457",
@@ -7758,6 +8142,14 @@
     "method": "POST",
     "norm_path": "v1/log-groups/*/log-streams",
     "path": "/v1/log-groups/{log_group_id}/log-streams"
+  },
+  "management/servicewatch/deletebulkalerts": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "DELETE",
+    "norm_path": "v1/alerts",
+    "path": "/v1/alerts"
   },
   "management/servicewatch/deletebulkdashboards": {
     "count": 14,
@@ -7824,12 +8216,36 @@
     "path": "/v1/metrics/data"
   },
   "management/servicewatch/listmetricinfos": {
-    "count": 4,
+    "count": 5,
     "first_run": "27583285457",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "POST",
     "norm_path": "v1/metrics",
     "path": "/v1/metrics"
+  },
+  "management/servicewatch/setalert": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PATCH",
+    "norm_path": "v1/alerts/*",
+    "path": "/v1/alerts/{alert_id}"
+  },
+  "management/servicewatch/setalertactivated": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PATCH",
+    "norm_path": "v1/alerts/*/activated",
+    "path": "/v1/alerts/{alert_id}/activated"
+  },
+  "management/servicewatch/setalertdescription": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "PATCH",
+    "norm_path": "v1/alerts/*/description",
+    "path": "/v1/alerts/{alert_id}/description"
   },
   "management/servicewatch/setdashboard": {
     "count": 4,
@@ -9079,6 +9495,14 @@
     "norm_path": "v1/cdns/*/description",
     "path": "/v1/cdns/{cdn_id}/description"
   },
+  "networking/direct-connect/createdirectconnect": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/direct-connects",
+    "path": "/v1/direct-connects"
+  },
   "networking/direct-connect/listdirectconnects": {
     "count": 7,
     "first_run": "27583285457",
@@ -9304,9 +9728,9 @@
     "path": "/v1/lb-health-checks/{lb_health_check_id}"
   },
   "networking/security-group/createsecuritygroup": {
-    "count": 42,
+    "count": 43,
     "first_run": "27583285457",
-    "last_run": "",
+    "last_run": "28648339307",
     "method": "POST",
     "norm_path": "v1/security-groups",
     "path": "/v1/security-groups"
@@ -9320,12 +9744,12 @@
     "path": "/v1/security-group-rules"
   },
   "networking/security-group/deletesecuritygroup": {
-    "count": 26,
+    "count": 27,
     "first_run": "27583285457",
-    "last_run": "",
+    "last_run": "28648339307",
     "method": "DELETE",
     "norm_path": "v1/security-groups/*",
-    "path": "/v1/security-groups/{sg2_id}"
+    "path": "/v1/security-groups/{sg_id}"
   },
   "networking/security-group/deletesecuritygrouprule": {
     "count": 8,
@@ -9424,12 +9848,20 @@
     "path": "/v1/subnets/{subnet_id}/vips"
   },
   "networking/vpc/createtransitgateway": {
-    "count": 4,
+    "count": 5,
     "first_run": "27593608514",
-    "last_run": "27599547083",
+    "last_run": "28648339307",
     "method": "POST",
     "norm_path": "v1/transit-gateways",
     "path": "/v1/transit-gateways"
+  },
+  "networking/vpc/createtransitgatewayvpcconnection": {
+    "count": 1,
+    "first_run": "28648339307",
+    "last_run": "28648339307",
+    "method": "POST",
+    "norm_path": "v1/transit-gateways/*/vpc-connections",
+    "path": "/v1/transit-gateways/{transit_gateway_id}/vpc-connections"
   },
   "networking/vpc/createvpc": {
     "count": 35,

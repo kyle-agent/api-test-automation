@@ -378,7 +378,7 @@ resources:
     delete: {endpoint: "DELETE /v1/transit-gateways/{transit-gateway.transit_gateway_id}/vpc-connections/{vpc_connection_id}",
              destructive: true,
              retry_on_status: [409], retries: 4, retry_interval: 15}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/vpc/createtransitgatewayvpcconnection (run 28648339307)
     source: {lifecycle: gen-wave5-privnat,
              steps: [create-tgw-vpc-connection, wait-tgw-vpc-connection,
                      delete-tgw-vpc-connection]}

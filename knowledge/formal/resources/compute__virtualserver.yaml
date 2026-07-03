@@ -393,7 +393,7 @@ resources:
          expect_status: [200]}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto_scaling_group_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: compute/virtualserver/createautoscalinggroup (run 28648339307)
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-auto-scaling-group, delete-auto-scaling-group]}
     notes: "비용 경고: ASG는 REAL billable VM을 관리한다 — desired 1이 성공하면 VM 1대가 켜진다 (소스는 그래서 synthetic id로 4xx 보장). body/capture UNPROVEN(docs); 라이브 검증 전 합성 run은 비용·잔존 VM 리스크를 명시 승인해야 한다."
@@ -421,7 +421,7 @@ resources:
          endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/policies/{policy_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: compute/virtualserver/createautoscalinggrouppolicy (run 28648339307)
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-asg-policy, list-asg-policies, read-asg-policy, delete-asg-policy]}
     notes: "comparison_operator=ge VERIFIED (run 27466988779). UNVERIFIED enums — metric_type CPU, metric_method AVG, scale_type SCALE_OUT, scale_method AMOUNT — NOT flagged by the API (comparison_operator validated first); may also need short-code values, error-driven on the next run. 정책 자체는 무자원이지만 부모 ASG가 billable — auto-scaling-group 노트 참조."
@@ -447,7 +447,7 @@ resources:
          endpoint: "GET /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}"}
     delete: {endpoint: "DELETE /v1/auto-scaling-groups/{auto-scaling-group.auto_scaling_group_id}/schedules/{schedule_id}",
              destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: compute/virtualserver/createautoscalinggroupschedule (run 28648339307)
     source: {lifecycle: vs-autoscaling-coverage,
              steps: [create-asg-schedule, list-asg-schedules, read-asg-schedule, delete-asg-schedule]}
     notes: "UNPROVEN. start_time은 {today_plus_5y} builtin으로 원샷 스케줄을 먼 미래에 묶는다 (소스 verbatim — 실제로 스케일이 발화하지 않게 하는 안전장치)."
