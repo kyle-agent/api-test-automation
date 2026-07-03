@@ -1,10 +1,1 @@
-# Run β retry 2 (2026-07-03): postgresql-cluster-subops-full. Retry 1 (28631595361)
-# was killed by the α stop-run's still-converging sweep reclaiming the shared VPC
-# 2s after provision (audit: Vpc Create End 01:06:03 -> Vpc Delete End 01:06:05).
-# Lane verified quiet: owned==0 + 5min audit silence before this push.
-action=run
-mutations=true
-destructive=true
-heavy=true
-crud_filter=postgresql-cluster-subops-full
-parallel=1
+action=noop
