@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 51 docs · 34 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 52 docs · 34 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -9,7 +9,7 @@
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | all | SCP API Regression Test Platform — Architecture | 🟢 active |
 | [`COVERAGE-CRITERIA.md`](COVERAGE-CRITERIA.md) | all | Coverage criteria — what does "100%" mean? | 🟢 active |
 | [`DEPLOY.md`](DEPLOY.md) | human-ops | 호스트 불문 단일 패키지 배포 runbook (M4) | 🟢 active |
-| [`IA.md`](IA.md) | all | one-graph / step-overlay console (v3, 2026-06-17) | 🟢 active |
+| [`IA.md`](IA.md) | all | one-graph / step-overlay console (v3, 2026-06-17) |  SUPERSEDED (2026-06-26 owner decision) |
 | [`M6-DESIGN.md`](M6-DESIGN.md) | all | M6 설계 — 자율 운영 가능한 SCP API 회귀 테스트 플랫폼 | 🟢 active |
 | [`OPS-DASHBOARD.md`](OPS-DASHBOARD.md) | human-ops | Ops dashboard — 영구 oplog 버킷(apitest-oplog-permanent) + 정적 뷰어 | 🟢 active |
 | [`PLATFORM-PLAN.md`](PLATFORM-PLAN.md) | all | SCP API Regression Test Platform — 업그레이드 계획 | 🟢 active |
@@ -66,6 +66,7 @@
 | [`working/trackers/PRODUCT-FINDINGS.md`](working/trackers/PRODUCT-FINDINGS.md) | validation | consolidated ledger of product/API findings | 🟢 active |
 | [`working/trackers/READ-REACHABILITY.md`](working/trackers/READ-REACHABILITY.md) | coverage | id-bound GET reachability from the resource model | 🟢 active |
 | [`working/trackers/SERVICE-GAP-REPORTS.md`](working/trackers/SERVICE-GAP-REPORTS.md) | coverage | 서비스별 커버리지 갭 리포트 (병렬 agent 분석, 2026-06-13) | 🟢 active |
+| [`working/trackers/UIUX-AUDIT-2026-07-03.md`](working/trackers/UIUX-AUDIT-2026-07-03.md) | all | SCP 컨트롤플레인 UI — IA/UX 감사 보고서 (2026-07-03) | 🟢 active |
 | [`working/trackers/VALIDATION-QUEUE.md`](working/trackers/VALIDATION-QUEUE.md) | validation | prioritized order for the coverage-validator | 🟢 active |
 | [`working/trackers/harness-tests.md`](working/trackers/harness-tests.md) | all | Harness adversarial safety-rail tests (Tier-0) | 🟢 active |
 | [`working/trackers/run-parallelism-optimization.md`](working/trackers/run-parallelism-optimization.md) | all | Heavy-run wall-clock optimization (2026-06-19) | 🟢 active |
