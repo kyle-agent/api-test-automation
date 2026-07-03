@@ -1,10 +1,7 @@
-# Next-batch run β (prep 467e87d0, repaired 37761b34): postgresql-cluster-subops-full —
-# NEW self-sufficient pg depth chain (create verbatim from live-proven
-# database-postgresql-cluster; settle-poll after every mutating sub-op with
-# give_up_status [400,404] AND terminal-bad until states; replica/restore excluded).
-# pg ALONE by design: create ~40min and flaky (500 ContactAdmin 2026-06-19 baselined;
-# 1 fail 2026-06-29) — must not gate others. Target: 29 unverified pg ops; ~7
-# (archive/log-export/kernel) may stay 500-blocked. On create 500: transient, retry later.
+# Run β retry 2 (2026-07-03): postgresql-cluster-subops-full. Retry 1 (28631595361)
+# was killed by the α stop-run's still-converging sweep reclaiming the shared VPC
+# 2s after provision (audit: Vpc Create End 01:06:03 -> Vpc Delete End 01:06:05).
+# Lane verified quiet: owned==0 + 5min audit silence before this push.
 action=run
 mutations=true
 destructive=true
