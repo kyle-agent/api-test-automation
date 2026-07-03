@@ -108,6 +108,37 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
 
 ## Current state (keep this updated as work progresses)
 
+- **MODEL-PROMOTION pass (2026-07-03, same branch — offline only, no dispatch/live calls):**
+  - **18 docs→VALIDATED promoted** off service-scoped 2xx evidence via the NEW
+    `python -m tools.promote_validated` (dry-run default; `--apply` = targeted
+    provenance-line edit + `# evidence: <key> (run <id>)`; join mechanics + the
+    /v1/clusters cross-service collision guard in `knowledge/validated-facts.md`
+    2026-07-03 block). Model now **149 VALIDATED / 126 docs / 0 incomplete** (was
+    131/144/2 — `no_api` nodes now count complete in the Modeling UI, the honest fix).
+  - **34 docs nodes carry `gated: <reason>`** (license/entitlement-403/org-master/
+    credential — validate.py GATED_VALUES + FORMAT.md convention): the Modeling
+    map/worklist now separate 게이트(할 수 없음, 34) from the actionable docs queue (92).
+  - **light-batch-2 DISPATCH-READY (NOT dispatched — owner rule):** 9-lifecycle
+    light batch (5 newly composed in `generated__light-batch2.json`: gen-vpc-endpoint ·
+    gen-private-nat(+tgw-vpc-connection) · gen-direct-connect · gen-cm-event-policy ·
+    gen-lb-members-light; + enabled gen-alert · gen-quick-query-validate · gen-wave4-asg
+    (ASG desired 0 = no VM) · gen-wave5-apigw-privatelink). validate 243/0 err ·
+    validate_dag 0 gaps (adopt_edges +4) · collect-only = exactly 9. Request block:
+    `action=run` `mutations=true` `destructive=true` `heavy=false`
+    `crud_ids=gen-vpc-endpoint,gen-private-nat,gen-direct-connect,gen-cm-event-policy,gen-lb-members-light,gen-alert,gen-quick-query-validate,gen-wave4-asg,gen-wave5-apigw-privatelink`
+    → expected yield up to 15 promotions (run `python -m tools.derive_verified` on the
+    evidence, then `python -m tools.promote_validated --apply`).
+  - **OPEN:** (1) dispatch light-batch-2 when the chat-heavy lane is clear (owned==0 +
+    ~5min audit silence — batch-2 lesson); (2) **heavy-60 breakdown pending** — the
+    remaining ~57 actionable docs nodes are heavy-parented (DB log-export ×4,
+    bm/pfs snapshots, lb-static-nat, subops tails …): bank them onto their engines'
+    next heavy windows; (3) env-conditional light leftovers need owner input:
+    devops-service (iam-member id), secretvault-vault (iam-temp-auth-key), trail
+    (account_id + OBS bucket), iam-group-member/iam-user-policy-binding (user_id),
+    iam-resource-policy (srn); blocked: iam-role(+binding) blocked-owner,
+    iam-saml-provider blocked-engine, image-registration (no real image source, 4xx
+    by design), fs-replication (DR-region kr-east1 teardown — supervised run only),
+    asg-notification (user_id + IB-026 list envelope), cm-event (data-dependent lookup).
 - **▶ SESSION HANDOFF / RESUME HERE (2026-07-02, branch `claude/upbeat-ritchie-ieus5u`).**
   All committed & pushed; **live owned == 0** (verified post-phase-3 + stop-sweep). Durable
   `verified_endpoints.json` **1250 → 1464 (+214)** — the D2–D7 DB depth campaign (+150) plus the

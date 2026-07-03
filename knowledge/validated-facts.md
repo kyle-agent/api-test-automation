@@ -1429,3 +1429,43 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   functions `regrw5trg57f68be7`/`regrw5trgd7ff680d` (auto-expire 2026-07-31),
   the IAM-gated SKE log-group `47fabeca13f24958a0344a00011a274d`, and
   `regrsec1846e085` already "To be terminated" (secrets self-purge).
+
+## docs→VALIDATED promotion mechanics: service-scoped evidence join + gate markers (2026-07-03, branch upbeat-ritchie)
+
+> conf: 0.9 · seen: 2026-07-03 · obs: 1
+
+- **The promoter is now a tool** — `python -m tools.promote_validated` (dry-run;
+  `--apply` rewrites). Rule (IB-041 consumer): a resource-model docs node may
+  become VALIDATED **only if its CREATE endpoint has a real-2xx entry in
+  `data/baselines/verified_endpoints.json`** (a GET-create lookup node counts if
+  that GET has 2xx). Applied 2026-07-03: **18 promotions** (mariadb stop/start/
+  restart/kernel-upgrade/add-block-storage · pg parameter/kernel-upgrade/
+  add-block-storage · epas instance-group/parameter · mysql-kernel-upgrade ·
+  gslb · cdn · account-budget · volume-type · gpu-node-image ·
+  cm-account-resource · cm-addrbook) → model 131→149 VALIDATED.
+- **Join mechanics (load-bearing).** Verified keys are `category/service/op`
+  carrying `{method, norm_path}` (norm_path = query-stripped, leading-slash-
+  stripped, id segments→`*`, e.g. `v1/clusters/*/stop`); node create endpoints
+  are `"METHOD /path"` with `{ref.field}` placeholders, normalised by the SAME
+  `tools.derive_verified.norm_path`. **The join MUST be service-scoped** (node
+  `service` tail == verified key middle segment): `/v1/clusters` collides across
+  mysql/pg/epas/cachestore/sqlserver/vertica/searchengine/eventstreams/ske — an
+  unscoped (method, norm_path) match wrongly promotes sqlserver/vertica off
+  cachestore evidence. Regression-tested in
+  `tests/offline/test_promote_validated.py` (cachestore-vs-sqlserver collision).
+- **Apply is a targeted line edit, not a YAML redump** — the model files carry
+  hand-written comments; the tool flips only the `provenance: docs` line,
+  appends `# evidence: <verified key> (run <last_run>)`, then reparses and
+  diffs against the expected one-field change (reverts on any drift).
+- **Account-gate marker `gated: <reason>`** (validate.py `GATED_VALUES`:
+  license · entitlement-403 · console-only · org-master · credential; convention
+  in `knowledge/formal/FORMAT.md`). 34 docs nodes marked 2026-07-03 (sqlserver
+  ×16 + searchengine + vertica = license; archivestorage ×2 = entitlement-403;
+  cloudcontrol-landing-zone + organization ×4 + idc-account-assignment =
+  org-master; cloud-ml ×2, sts-token, scr-image/scr-tag, certificate-import,
+  iam-user, diagnosis = credential). `gated` never changes provenance; the
+  Modeling worklist separates 게이트(할 수 없음) from the actionable docs queue.
+- **`no_api: true` is UI-complete now** — controlplane `_map_meta` counts an
+  API-less node (scr-image/scr-tag, docker-push-born) as complete when its refs
+  resolve; the "생성 endpoint 없음" incomplete bucket went 2→0 truthfully (the
+  validator always allowed no_api; only the UI check was dishonest).
