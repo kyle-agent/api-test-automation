@@ -300,6 +300,7 @@ resources:
     delete: {endpoint: "DELETE /v1/accounts/{opt.account_id}/users/{user_id}",
              destructive: true}
     provenance: docs
+    gated: credential  # account_id 콘솔 전용 — owner credential 게이트 (notes)
     source: {lifecycle: iam-credentials-heavy, steps: [create-account-user, update-account-user, set-account-user-password, delete-account-user],
              docs: "management/iam/createiamuser (iamusercreaterequest: user_name+password+temporary_password REQUIRED) + getiamuser/listiamuser/updateiamuser/updateiamuserpassword/deleteiamuser"}
     notes: "실 로그인 가능 principal을 만드는 노드라 게이트 (runner 인증에는 영향 없으나 테넌트-침습적). password는 합성 1회용 + temporary_password:true(첫 로그인 시 변경 강제) + group_ids/policy_ids 빈 배열 = 권한 0인 사용자 → 생성 직후 verify 후 삭제. updateiamuser(iamuserupdaterequest)는 password_reuse_count가 REQUIRED인 특이 DTO — 0 사용 (Maximum 24). create envelope FLAT $.id (iamcreateuserresponse). deletebulkiamuser는 bulk-delete 클래스로 미모델. userguide(2026-06-15 how_to_guides/user) 확정: user_name 64자 이내 + '영문/숫자/특수문자(+=,.@-_)' (한글 없음 — policy_name과 차이); password 9-20자 + 대/소/숫/특(!@#$%&*^) 각 1+ + 3-반복/4-연속/ID포함/사전어/이전키 재사용 금지 + 90일 회전 (model body의 'Regr9x!{ualpha}'는 8+영숫특 조합으로 ualpha:3자 보완 시 9자 충족 — 라이브 정제 시 길이 확인); temporary_password=true는 최초 로그인 시 변경 강제, false면 admin reset만 가능. ★account_id는 콘솔의 사용자 생성 화면/로그인 정보 팝업에 표시 — API 발견 경로 미문서(콘솔 전용) → opt.account_id 게이트 의도 확정(STOP-2가 아니라 owner credential 게이트로 보수적 유지)."

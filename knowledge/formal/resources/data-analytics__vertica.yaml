@@ -68,6 +68,7 @@ resources:
     capture: {cluster_id: "$.resource.id"}
     delete: {endpoint: "DELETE /v1/clusters/{cluster_id}", destructive: true}
     provenance: docs
+    gated: license  # owner override 2026-06-16 — license-gated engine, reachability-only
     source: {lifecycle: vertica-cluster-subops-guarded,
              steps: [list-clusters, capture-subop-ids]}
     notes: "소스 lifecycle은 기존 cluster adopt형 coverage probe — create body는 api_bodies verticacreatecluster 형상의 UNPROVEN(docs) 템플릿. capture envelope $.resource.id는 DBaaS AsyncResponse 패턴 추론 — UNPROVEN. userguide 확정 (2026-06-14, overview + how_to_guides): Data Warehouse 기반 고가용성 분석 DB, \"Masterless\" MPP 토폴로지 (단일 장애점 없음, 모든 노드에서 쿼리 시작 — instance_groups role_type 단일 ACTIVE 그룹이 자연스러움). 선행=VPC/Subnet 필수. cluster name ^[a-zA-Z]*$ 3-20, instance_name_prefix ^[a-z][a-zA-Z0-9\\-]*$ 3-13(postfix 001/002 자동), database_locale 기본 ko_KR.utf8, DB port 1200-65535. 노드 수 1-10 (HA 위해 최소 2 권장). storage size_gb 16-5120 GB 8의 배수 (최대 9개 추가 디스크), tags 최대 50. SearchEngine과 달리 add-instances/dashboard-restart/patch 엔드포인트 없음 (카탈로그 확인 2026-06-14) — 라이프사이클: create→(modify: resize-server-type/resize-block-storage/add-block-storages)·start/stop/restart→backup/restore→delete. 백업: retention 7-35일, 시작 '시'만 선택(분은 자동), 즉시 아님; restore는 완료된 백업 선행 필수 + 새 클러스터 생성(네트워크 미상속, IP 접근제어 재구성 필요, DATA 용량 ≥ 원본·storage 유형 동일). restore/backup sub-op은 task가 아닌 lifecycle 영역."

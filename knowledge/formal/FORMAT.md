@@ -34,7 +34,37 @@ every non-encoded combo carries a `review:` block with a valid `decision`.
 - `provenance: VALIDATED` — confirmed by a real 2xx at runtime. Trust it.
 - `provenance: docs` — taken from the API Reference, not yet runtime-confirmed.
 
-Never promote `docs` → `VALIDATED` without a real successful run.
+Never promote `docs` → `VALIDATED` without a real successful run. The
+mechanical promoter is `python -m tools.promote_validated` (dry-run; `--apply`
+rewrites): it promotes a docs node only when its CREATE endpoint has real 2xx
+evidence in `data/baselines/verified_endpoints.json`, joined **service-scoped**
+(node `service` tail == verified key's middle segment — `/v1/clusters` collides
+across the DB engines, so an unscoped match would promote off another service's
+evidence). It appends `# evidence: <verified key> (run <id>)` on the
+provenance line.
+
+### Account-gate marker — `gated:` (resource nodes, 2026-07-03)
+
+A resource node that **cannot be validated in this account** for a documented
+reason carries a machine-readable `gated: <reason>` so the Modeling UI can
+separate "할 수 없음" from "할 일" (validate.py `GATED_VALUES`):
+
+- `license` — engine needs a commercial license (sqlserver / searchengine /
+  vertica; owner override 2026-06-16 = reachability-only).
+- `entitlement-403` — the account lacks the service entitlement; 401/403 is
+  the terminal answer (e.g. archivestorage hmac not in the account catalog).
+- `console-only` — a required input is only issuable in the console UI.
+- `org-master` — needs the organization master account / Landing Zone.
+- `credential` — needs an externally-issued credential/material we do not
+  hold (SCR auth key, CA-signed cert, assumable role, inspectable account key).
+
+Rules: the gate MUST be documented in the node's `notes` (validator warns
+otherwise); `gated` does **not** change provenance — the node stays `docs`
+until real evidence exists; remove the marker the moment the gate falls
+(license purchased, entitlement granted, credential provisioned). Nodes whose
+resources are born outside the API (e.g. `docker push`) use `no_api: true`
+with a note — that is a *shape* fact, not an account gate (scr-image/scr-tag
+carry both).
 
 ## Probe-read completion (owner principle, 2026-06-15)
 

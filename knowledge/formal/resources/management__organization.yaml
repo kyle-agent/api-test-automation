@@ -27,6 +27,7 @@ resources:
     capture: {organization_id: "$.organization.id"}
     delete: {endpoint: "DELETE /v1/organizations/{organization_id}", destructive: true}
     provenance: docs
+    gated: org-master  # 비-master 계정 403 — org 트리 재구성 IRREVERSIBLE
     source: {lifecycle: org-organizations-guarded, steps: [create-organization, delete-organization]}
     notes: "계정 계층의 root — 생성/삭제/탈퇴는 공유 계정 트리를 재구성/단절시키며 대부분 IRREVERSIBLE. 비-master 계정에선 403 (소스는 의도적으로 create를 delete에 체이닝하지 않음). capture envelope $.organization.id는 추정 — 소스는 read-only list($.contents[0].id)에서만 soft-capture. body UNPROVEN."
 
@@ -58,6 +59,7 @@ resources:
     capture: {account_id: "$.organization_account.id"}
     delete: {endpoint: "DELETE /v1/organization-accounts/{account_id}", destructive: true}
     provenance: docs
+    gated: org-master  # 비-master 계정 403 예상 (source coverage-only)
     source: {lifecycle: org-accounts-guarded, steps: [create-organization-account, delete-organization-account]}
     notes: "member 계정 생성은 BILLABLE + 실 인프라 프로비저닝, 삭제/제거는 실계정 폐쇄/분리로 IRREVERSIBLE — 절대 자동 합성 대상이 아님 (소스도 create를 delete에 체이닝하지 않는 coverage-only). 비-master 계정 403 예상. body(name/email)/capture UNPROVEN. bulk 제거는 DELETE /v1/organization-accounts + body {ids:[...]} (별도 오퍼레이션)."
 
@@ -101,6 +103,7 @@ resources:
                Action: ["organization:ListAccounts"], Resource: ["*"]}
     delete: {endpoint: "DELETE /v1/delegation-policies", destructive: true}
     provenance: docs
+    gated: org-master  # 비-master 계정 403 예상 (고위험 위임)
     source: {lifecycle: org-policy-bindings-and-delegation-guarded,
              steps: [create-delegation-policy, delete-delegation-policy]}
     notes: "org당 단일(싱글톤) 추정 — create/PUT/DELETE 모두 path-id 없음, capture 불필요. member 계정에 org 자원에 대한 위임 관리자를 부여 — 고위험, 비-master 계정 403 예상. body UNPROVEN."
@@ -120,5 +123,6 @@ resources:
       json: {ids: ["{invitation_id}"]}
       destructive: true
     provenance: docs
+    gated: org-master  # 비-master 403 + 실제 메일 발송 위험
     source: {lifecycle: org-invitations-guarded, steps: [create-invitation, cancel-invitations]}
     notes: "외부 계정을 org로 초대 (실제 메일 발송 가능) — 비-master 403 예상, accept에 체이닝 금지(실 멤버십 변경). teardown verb는 하드 DELETE가 아닌 PUT /v1/invitations/cancel + {ids:[...]} body — composer의 비-DELETE teardown 지원은 R3 과제. capture envelope 추정 — 소스는 organization-invitations/account-invitations list에서만 soft-capture. body UNPROVEN."
