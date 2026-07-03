@@ -1,10 +1,7 @@
-# Next-batch run α (prep 467e87d0): epas-cluster-subops-full RETRY — P3 create 500
-# was transient (body proven-good in P2 run 28599889165); engine now has
-# poll.give_up_status so a failed create stays cheap. Single engine.
-# Target: 23 unverified epas ops (archive/log-export/patch/kernel/stop/start/resize tail).
-action=run
-mutations=true
-destructive=true
-heavy=true
-crud_filter=epas-cluster-subops-full
-parallel=1
+# STOP run α (2026-07-03 00:3xZ): epas cluster wedged in service_state=UNKNOWN
+# since the 23:46 Parameter Modify Error — settle-polls wait only for the
+# RUNNING set and the 200+UNKNOWN response defeats give_up_status, so each
+# remaining mutating step burns its full 900s while the cluster bills idle.
+# Banked before the wedge: create/maintenance set+unset/backup-config 2xx.
+# Fix to follow: settle-polls must also end on terminal-bad states.
+action=stop
