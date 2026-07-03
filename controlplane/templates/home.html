@@ -16,6 +16,10 @@
       마지막 스냅샷에서 새로 깨진 5xx/auth 없음, known-red {{ fail_known }}.
       다음 레버: 쓰기 커버리지(cov_op {{ coverage.get('cov_op','-') }}%).
       {% endif %}
+      <span class="muted small">— 스냅샷 {{ coverage.get('ts','') }}{% if snap_age is defined and snap_age %}
+        <b>({{ snap_age }})</b>{% endif %}</span>
+      {% if snap_stale is defined and snap_stale %}<span class="chip s-reached"
+        title="발행 후 48시간 이상 경과 — 이 배너는 현재 상태가 아니라 그 시점의 결과입니다">노후 스냅샷</span>{% endif %}
     </div>
   </div>
 

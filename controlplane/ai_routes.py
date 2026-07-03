@@ -17,9 +17,7 @@ from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 
-from controlplane import ai_pipelines, db, dispatch, triage
-from core import profiles as core_profiles
-from core import suites as core_suites
+from controlplane import ai_pipelines, common, db
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -28,15 +26,9 @@ router = APIRouter(prefix="/ai")
 
 
 def _render(request: Request, name: str, **ctx) -> HTMLResponse:
-    """app._render equivalent — base.html nav context, active=planning."""
-    base = {
-        "suites": [s.get("id") for s in core_suites.list_suites()],
-        "profiles": [p.get("id") for p in core_profiles.list_profiles()],
-        "dispatch_ok": dispatch.configured(),
-        "triage_ok": triage.enabled(),
-        "active": "planning",
-        "ai_ok": ai_pipelines.enabled(),
-    }
+    """app._render equivalent — shared base context (common.base_ctx, P1-3)
+    with active='ai' so the nav's AI entry highlights (no more orphan, C3)."""
+    base = {**common.base_ctx("ai"), "ai_ok": ai_pipelines.enabled()}
     return templates.TemplateResponse(request, name, {**base, **ctx})
 
 

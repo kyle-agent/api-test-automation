@@ -29,7 +29,7 @@ from fastapi import FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from controlplane import (authoring, compare, dashdata, db, dispatch,
+from controlplane import (authoring, common, compare, dashdata, db, dispatch,
                           local_executor, resources, scheduler, snapshots, triage)
 from core import profiles as core_profiles
 from core import suites as core_suites
@@ -77,22 +77,11 @@ app.include_router(reporting_routes.router)
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
 
-def _catalog() -> dict:
-    """Suites + profiles for the trigger forms (live from the repo files).
-    ctx_snapshot feeds the header ctxbar — which published snapshot the
-    numbers on screen come from (best-effort, degrades to None)."""
-    return {
-        "suites": [s.get("id") for s in core_suites.list_suites()],
-        "profiles": [p.get("id") for p in core_profiles.list_profiles()],
-        "dispatch_ok": dispatch.configured(),
-        "triage_ok": triage.enabled(),
-        "ctx_snapshot": dashdata.latest_coverage(),
-    }
-
-
 def _render(request: Request, name: str, active: str, **ctx) -> HTMLResponse:
+    """Every page rides the shared base context (controlplane.common — P1-3):
+    suites/profiles for the trigger forms + ctx_snapshot for the ctxbar."""
     return templates.TemplateResponse(request, name,
-                                      {**_catalog(), "active": active, **ctx})
+                                      {**common.base_ctx(active), **ctx})
 
 
 # --- home ----------------------------------------------------------------------

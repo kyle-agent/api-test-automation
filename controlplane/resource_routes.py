@@ -23,9 +23,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from regression.scenarios import composer
-from controlplane import dispatch, resource_model, triage
-from core import profiles as core_profiles
-from core import suites as core_suites
+from controlplane import common, resource_model
 
 HERE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -34,15 +32,10 @@ router = APIRouter(prefix="/planning/resources")
 
 
 def _render(request: Request, name: str, **ctx) -> HTMLResponse:
-    """app._render equivalent — base.html nav context, active=planning."""
-    base = {
-        "suites": [s.get("id") for s in core_suites.list_suites()],
-        "profiles": [p.get("id") for p in core_profiles.list_profiles()],
-        "dispatch_ok": dispatch.configured(),
-        "triage_ok": triage.enabled(),
-        "active": "planning",
-    }
-    return templates.TemplateResponse(request, name, {**base, **ctx})
+    """app._render equivalent — shared base context (common.base_ctx, P1-3)
+    so the ctxbar's published-snapshot line renders here too."""
+    return templates.TemplateResponse(
+        request, name, {**common.base_ctx("planning"), **ctx})
 
 
 # --- 표시용 변환 ---------------------------------------------------------------------

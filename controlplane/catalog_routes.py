@@ -25,7 +25,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from controlplane import resource_model
+from controlplane import common, resource_model
 
 ROOT = Path(__file__).resolve().parent.parent
 HERE = Path(__file__).resolve().parent
@@ -147,5 +147,5 @@ def catalog_index(request: Request):
     return templates.TemplateResponse(
         request,
         "catalog.html",
-        {"active": "catalog", **view},
+        {**common.base_ctx("catalog"), **view},
     )
