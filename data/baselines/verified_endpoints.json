@@ -3256,9 +3256,9 @@
     "path": "/v1/clusters/{cluster_id}/maintenance"
   },
   "database/epas/epascreatecluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
@@ -3272,9 +3272,9 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "database/epas/epaslistbackuphistories": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*/backup-histories",
     "path": "/v1/clusters/{cluster_id}/backup-histories"
@@ -3288,9 +3288,9 @@
     "path": "/v1/clusters"
   },
   "database/epas/epaslistengineversionproperties": {
-    "count": 17,
+    "count": 18,
     "first_run": "27583285457",
-    "last_run": "28602725440",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/engine-versions/*/properties",
     "path": "/v1/engine-versions/{dbaas_engine_version_id}/properties"
@@ -3304,9 +3304,9 @@
     "path": "/v1/engine-versions"
   },
   "database/epas/epaslistlogexportconfigs": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*/log-export-configs",
     "path": "/v1/clusters/{cluster_id}/log-export-configs"
@@ -3328,17 +3328,17 @@
     "path": "/v1/parameters"
   },
   "database/epas/epaslistparametervalues": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "database/epas/epaslistreplicas": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*/replicas",
     "path": "/v1/clusters/{cluster_id}/replicas"
@@ -3351,26 +3351,42 @@
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
-  "database/epas/epassetmaintenance": {
+  "database/epas/epassetbackup": {
     "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups",
+    "path": "/v1/clusters/{cluster_id}/backups"
+  },
+  "database/epas/epassetmaintenance": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "POST",
     "norm_path": "v1/clusters/*/maintenance",
     "path": "/v1/clusters/{cluster_id}/maintenance"
   },
-  "database/epas/epasshowarchiveconfig": {
+  "database/epas/epassetparametervalues": {
     "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/parameters",
+    "path": "/v1/clusters/{cluster_id}/parameters"
+  },
+  "database/epas/epasshowarchiveconfig": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*/archive",
     "path": "/v1/clusters/{cluster_id}/archive"
   },
   "database/epas/epasshowcluster": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
@@ -3382,6 +3398,14 @@
     "method": "POST",
     "norm_path": "v1/clusters/*/parameters/sync",
     "path": "/v1/clusters/{cluster_id}/parameters/sync"
+  },
+  "database/epas/epasunsetmaintenance": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "DELETE",
+    "norm_path": "v1/clusters/*/maintenance",
+    "path": "/v1/clusters/{cluster_id}/maintenance"
   },
   "database/mariadb/mariadbaddblockstorages": {
     "count": 1,
@@ -3928,41 +3952,49 @@
     "path": "/v1/devops-services"
   },
   "epas-cluster-subops-full:capture-log-type": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*/log-export-configs",
     "path": "/v1/clusters/{cluster_id}/log-export-configs"
   },
   "epas-cluster-subops-full:capture-param-id": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*/parameters",
     "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "epas-cluster-subops-full:capture-server-type": {
-    "count": 2,
+    "count": 3,
     "first_run": "28599889165",
-    "last_run": "28602725440",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
   "epas-cluster-subops-full:capture-subop-ids": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
-  "epas-cluster-subops-full:epas-create": {
+  "epas-cluster-subops-full:create-backup": {
     "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "POST",
+    "norm_path": "v1/clusters/*/backups",
+    "path": "/v1/clusters/{cluster_id}/backups"
+  },
+  "epas-cluster-subops-full:epas-create": {
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "POST",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
@@ -3976,44 +4008,52 @@
     "path": "/v1/clusters/{cluster_id}"
   },
   "epas-cluster-subops-full:epas-find-stype": {
-    "count": 2,
+    "count": 3,
     "first_run": "28599889165",
-    "last_run": "28602725440",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/server-types",
     "path": "/v1/server-types"
   },
   "epas-cluster-subops-full:epas-find-version": {
-    "count": 2,
+    "count": 3,
     "first_run": "28599889165",
-    "last_run": "28602725440",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/engine-versions",
     "path": "/v1/engine-versions"
   },
   "epas-cluster-subops-full:epas-wait": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters/*",
     "path": "/v1/clusters/{cluster_id}"
   },
   "epas-cluster-subops-full:list-clusters": {
-    "count": 2,
+    "count": 3,
     "first_run": "28599889165",
-    "last_run": "28602725440",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/clusters",
     "path": "/v1/clusters"
   },
   "epas-cluster-subops-full:set-maintenance": {
-    "count": 1,
+    "count": 2,
     "first_run": "28599889165",
-    "last_run": "28599889165",
+    "last_run": "28628073176",
     "method": "POST",
     "norm_path": "v1/clusters/*/maintenance",
     "path": "/v1/clusters/{cluster_id}/maintenance"
+  },
+  "epas-cluster-subops-full:set-parameters": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "PUT",
+    "norm_path": "v1/clusters/*/parameters",
+    "path": "/v1/clusters/{cluster_id}/parameters"
   },
   "epas-cluster-subops-full:sync-parameters": {
     "count": 1,
@@ -4023,18 +4063,82 @@
     "norm_path": "v1/clusters/*/parameters/sync",
     "path": "/v1/clusters/{cluster_id}/parameters/sync"
   },
+  "epas-cluster-subops-full:unset-maintenance": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "DELETE",
+    "norm_path": "v1/clusters/*/maintenance",
+    "path": "/v1/clusters/{cluster_id}/maintenance"
+  },
+  "epas-cluster-subops-full:wait-after-create-backup": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-subops-full:wait-after-set-archive": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-subops-full:wait-after-set-maintenance": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-subops-full:wait-after-set-parameters": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-subops-full:wait-after-sync-archive": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-subops-full:wait-after-sync-parameters": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
+  "epas-cluster-subops-full:wait-after-unset-maintenance": {
+    "count": 1,
+    "first_run": "28628073176",
+    "last_run": "28628073176",
+    "method": "GET",
+    "norm_path": "v1/clusters/*",
+    "path": "/v1/clusters/{cluster_id}"
+  },
   "epas-cluster-subops-full:wait-subnet": {
-    "count": 2,
+    "count": 3,
     "first_run": "28599889165",
-    "last_run": "28602725440",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/subnets/*",
     "path": "/v1/subnets/{subnet_id}"
   },
   "epas-cluster-subops-full:wait-vpc": {
-    "count": 2,
+    "count": 3,
     "first_run": "28599889165",
-    "last_run": "28602725440",
+    "last_run": "28628073176",
     "method": "GET",
     "norm_path": "v1/vpcs/*",
     "path": "/v1/vpcs/{vpc_id}"
