@@ -12,4 +12,6 @@ boto3>=1.34
 
 # OPTIONAL features (lazy-imported — the server runs without them):
 #   AI triage / AI pipelines:  pip install -r controlplane/requirements-ai.txt
-#   offline tests (dev only):  pip install httpx
+#   offline tests (dev only):  pip install httpx2
+#     (starlette >=1.3 renamed its TestClient dependency httpx -> httpx2;
+#      without it `controlplane/tests_resources_offline.py` fails at import)
