@@ -174,7 +174,7 @@ resources:
       - {name: detail-read,
          endpoint: "GET /v1/clusters/{epas-cluster.cluster_id}",
          expect_status: [200]}
-    provenance: docs
+    provenance: VALIDATED  # evidence: database/epas/epasshowcluster (run 28628073176)
     source: {lifecycle: epas-cluster-subops-guarded,
              steps: [capture-subop-ids]}
     notes: "InstanceGroupResponse {id, block_storage_groups[].id, ...} (api_docs show DTO — PG run 27258520218 라이브 캡처와 동일 envelope; epas 자체는 미검증). addblockstorages/setblockstoragesize/setservertype 액션 노드들이 여기 매달린다."
@@ -226,7 +226,7 @@ resources:
       - {name: syncparametervalues,
          endpoint: "POST /v1/clusters/{epas-cluster.cluster_id}/parameters/sync",
          expect_status: [200, 202, 409]}
-    provenance: docs
+    provenance: VALIDATED  # evidence: database/epas/epaslistparametervalues (run 28628073176)
     source: {lifecycle: epas-cluster-subops-guarded,
              steps: [set-parameters, sync-parameters]}
     notes: "create=GET listparametervalues — ParametersResponse $.contents[] {id, applied_value, is_modifiable, ...} (PG와 동일 DTO). where_prefix 'True'는 엔진 _capture의 str(bool) prefix 매칭. applied_value 빈 문자열 첫 매치 시 set 400 가능 — 라이브 정제 예상 (PG와 동일 주의)."

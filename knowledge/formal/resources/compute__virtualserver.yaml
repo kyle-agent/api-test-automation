@@ -87,7 +87,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/volume-types/{volume_type_id}",
          expect_status: [200, 404]}
-    provenance: docs
+    provenance: VALIDATED  # evidence: compute/virtualserver/listvolumetypes
     source: {lifecycle: vs-volume-transfer-coverage, steps: [list-volume-types, read-volume-type]}
     notes: "읽기 전용 LOOKUP 노드 (image/server-type와 동형) — create가 GET이고 teardown 없음이 의도. 응답 봉투 VolumeTypeListResponse = {volume_types:[{id,name,extra_specs,...}]} (api_docs listvolumetypes), capture $.volume_types[0].id verbatim. showvolumetype(GET /v1/volume-types/{volume_type_id})은 gap_getid였던 마지막 볼륨 카탈로그 read — 이 lookup이 list+show로 닫는다. /v1/volume-types/default(showdefaultvolumetype)은 path-param 없는 GET이라 smoke floor가 이미 커버. UNPROVEN(docs) — 라이브 GET 후 VALIDATED 승급."
 

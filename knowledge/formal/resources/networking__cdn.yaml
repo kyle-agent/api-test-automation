@@ -51,7 +51,7 @@ resources:
     verify:
       - {name: read, endpoint: "GET /v1/cdns/{cdn_id}", expect_status: [200]}
     delete: {endpoint: "DELETE /v1/cdns/{cdn_id}", destructive: true}
-    provenance: docs
+    provenance: VALIDATED  # evidence: networking/cdn/createcdnservice
     source: {lifecycle: networking-cdn-service, steps: [create-cdn, delete-cdn]}
     notes: "선행 서비스 없음 — 계정 스코프, VPC-free (cdn-no-prereq-services).
       REGION GATE: kr-west1/kr-east1 전용 (cdn-region-availability — 엔진
