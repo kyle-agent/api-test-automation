@@ -81,6 +81,7 @@
     <div class="card"><div class="num">{{ total }}</div><div class="lbl">레시피 노드</div></div>
     <div class="card"><div class="num">{{ validated }}</div><div class="lbl" style="color:var(--green)">VALIDATED (2xx 검증)</div></div>
     <div class="card"><div class="num">{{ docs }}</div><div class="lbl" style="color:var(--amber)">docs (모델만·미검증)</div></div>
+    <div class="card"><div class="num">{{ gated }}</div><div class="lbl" style="color:var(--grey)">게이트 (이 계정에선 불가)</div></div>
     <div class="card"><div class="num">{{ incomplete }}</div><div class="lbl" style="color:#b26a00">불완전 (endpoint/requires 결손)</div></div>
   </div>
 
@@ -114,14 +115,14 @@
           <td colspan="8"><span class="caret">▾</span>
             <span class="catname">{{ cat.category }}</span>
             <span class="tally">{{ cat.services|length }} 서비스 · {{ cat.n }} 노드 ·
-              <span class="v">✓{{ cat.val }}</span> <span class="i">⚠{{ cat.inc }}</span> <span class="d">docs {{ cat.docs }}</span></span></td>
+              <span class="v">✓{{ cat.val }}</span> <span class="i">⚠{{ cat.inc }}</span> <span class="d">docs {{ cat.docs }}</span>{% if cat.gated %} <span class="g" title="계정 게이트 — 할 수 없음">🔒{{ cat.gated }}</span>{% endif %}</span></td>
         </tr>
         {% for svc in cat.services %}
         <tr class="svc" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}">
           <td colspan="8"><span class="caret">▾</span>
             <span class="srv">{{ svc.service }}</span>
             <span class="tally">{{ svc.n }} 노드 · <span class="v">✓{{ svc.val }}</span>
-              <span class="i">⚠{{ svc.inc }}</span> <span class="d">docs {{ svc.docs }}</span></span></td>
+              <span class="i">⚠{{ svc.inc }}</span> <span class="d">docs {{ svc.docs }}</span>{% if svc.gated %} <span class="g" title="계정 게이트 — 할 수 없음">🔒{{ svc.gated }}</span>{% endif %}</span></td>
         </tr>
           {% for r in svc.nodes %}
           <tr class="node" data-cat="{{ cat.category }}" data-svc="{{ svc.service }}"
@@ -129,7 +130,7 @@
               data-search="{{ (r.id ~ ' ' ~ r.service)|lower }}" data-deps="{{ r.dependents }}" data-opt="{{ r.options }}">
             <td class="muted">{{ r.code }}</td>
             <td class="idc"><a href="/planning/resources/{{ r.id }}">{{ r.id }}</a></td>
-            <td>{% if r.complete %}<span class="ok">✓ 완성</span>{% else %}<span class="bad">⚠</span>
+            <td>{% if r.complete %}<span class="ok">✓ 완성</span>{% if r.no_api %} <span class="miss" title="API 생성 없음 — docker push 등 외부 수단 산물">no-API</span>{% endif %}{% if r.gated %} <span class="miss" title="계정 게이트 — 이 계정에선 검증 불가">🔒{{ r.gated }}</span>{% endif %}{% else %}<span class="bad">⚠</span>
               {% if not r.has_endpoint %}<span class="miss">endpoint 없음</span>{% endif %}
               {% if r.missing %}<span class="miss">미해결 {{ r.missing|join(', ') }}</span>{% endif %}{% endif %}</td>
             <td>{% if r.provenance == 'VALIDATED' %}<span class="prov val">VALIDATED</span>

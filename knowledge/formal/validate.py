@@ -29,6 +29,8 @@ Layers / checks:
                        create, no teardown by design) so the create-without-
                        delete warning is suppressed for them; a lookup whose
                        create is NOT a GET is an ERROR (IB-004) ·
+                       `gated: <reason>` marks account-gated nodes (reason ∈
+                       GATED_VALUES, gate documented in notes) ·
                        divergence from the cross-service.yaml requires graph
                        is a WARNING (the two co-exist during R1-R3) ·
                        _groups.yaml = {groups: {"nw-vpc": {label, category}}}
@@ -330,8 +332,22 @@ REQUIRES_MODES = {"existing_or_create"}
 TASK_KEYS = {"code", "service", "group", "requires", "create", "capture",
              "capture_soft", "ready", "verify", "delete", "quota",
              "provenance", "adopt", "heavy", "no_api", "lookup",
-             "needs_cert_material",
+             "needs_cert_material", "gated",
              "notes", "note", "source", "_note"}
+# gated: <reason> — machine-readable ACCOUNT-GATE marker (2026-07-03): this
+# node cannot be validated in THIS account for a documented reason, so the
+# Modeling UI can separate "할 수 없음" from "할 일". Values:
+#   license         engine needs a commercial license (sqlserver/searchengine/
+#                   vertica — owner override 2026-06-16, reachability-only)
+#   entitlement-403 account lacks the service entitlement (401/403 is the
+#                   terminal answer, e.g. archivestorage hmac not in catalog)
+#   console-only    a required input is only issuable in the console UI
+#   org-master      needs the organization master account / Landing Zone
+#   credential      needs an externally-issued credential/material we don't
+#                   hold (SCR auth key, CA-signed cert, assumable role, ...)
+# A gated node MUST document its gate in notes/note (warning otherwise).
+GATED_VALUES = {"license", "entitlement-403", "console-only", "org-master",
+                "credential"}
 _TOKEN_RE_SRC = r"\{([A-Za-z0-9_][A-Za-z0-9_.\-]*)\}"
 
 
@@ -617,6 +633,15 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
             err(f"{where}: service '{svc}' not found in the catalog")
         if task.get("provenance") not in PROVENANCE:
             err(f"{where}: provenance must be one of {sorted(PROVENANCE)}")
+
+        gate = task.get("gated")
+        if gate is not None:
+            if gate not in GATED_VALUES:
+                err(f"{where}: gated must be one of {sorted(GATED_VALUES)} "
+                    f"(got {gate!r})")
+            if not (task.get("notes") or task.get("note")):
+                warn(f"{where}: gated node should document its gate in "
+                     "notes/note")
 
         gid = _group_of(nid, task)
         if gid and groups and gid not in groups:

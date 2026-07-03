@@ -131,19 +131,25 @@ def _missing_requires(node: dict, known: set) -> list[str]:
 
 def _map_meta(model: dict) -> tuple[list[str], dict]:
     """(targets, meta) — targets=생성 가능한(create.endpoint 보유) 노드 = 지도의 닻.
-    meta[id] = {provenance, has_endpoint, complete, missing[]} for overlay()."""
+    meta[id] = {provenance, has_endpoint, no_api, gated, complete, missing[]}
+    for overlay(). `no_api: true` 노드(예: scr-image — docker push 산물)는 생성
+    endpoint가 '없는 게 맞는' 노드이므로 endpoint 부재를 불완전으로 세지 않는다
+    (validate.py의 no_api 허용과 같은 판정 — UI만 다르게 세면 거짓 결손)."""
     known = set(model)
     targets: list[str] = []
     meta: dict[str, dict] = {}
     for nid in sorted(model):
         node = model[nid]
         has_ep = bool((node.get("create") or {}).get("endpoint"))
+        no_api = bool(node.get("no_api"))
         missing = _missing_requires(node, known)
         meta[nid] = {
             "provenance": str(node.get("provenance") or "?"),
             "has_endpoint": has_ep,
+            "no_api": no_api,
+            "gated": str(node.get("gated") or ""),
             "missing": missing,
-            "complete": has_ep and not missing,
+            "complete": (has_ep or no_api) and not missing,
         }
         if has_ep:
             targets.append(nid)
@@ -186,6 +192,8 @@ def _modeling_rows(model: dict, meta: dict, deps_idx: dict) -> list[dict]:
             "provenance": m["provenance"],
             "complete": m["complete"],
             "has_endpoint": m["has_endpoint"],
+            "no_api": m["no_api"],
+            "gated": m["gated"],
             "missing": m["missing"],
             "requires": _requires_summary(node),
             "n_requires": len(node.get("requires") or []),
@@ -204,9 +212,11 @@ def _modeling_tree(rows: list[dict]) -> list[dict]:
         cat = r["category"] or "(기타)"
         svc = r["service"] or "(기타)"
         c = cats.setdefault(cat, {"category": cat, "services": {},
-                                  "n": 0, "val": 0, "docs": 0, "inc": 0})
+                                  "n": 0, "val": 0, "docs": 0, "inc": 0,
+                                  "gated": 0})
         s = c["services"].setdefault(svc, {"service": svc, "nodes": [],
-                                           "n": 0, "val": 0, "docs": 0, "inc": 0})
+                                           "n": 0, "val": 0, "docs": 0,
+                                           "inc": 0, "gated": 0})
         s["nodes"].append(r)
         for scope in (c, s):
             scope["n"] += 1
@@ -214,6 +224,8 @@ def _modeling_tree(rows: list[dict]) -> list[dict]:
                 scope["inc"] += 1
             elif r["provenance"] == "VALIDATED":
                 scope["val"] += 1
+            elif r["gated"]:
+                scope["gated"] += 1   # 할 수 없음 (계정 게이트) ≠ 할 일(docs)
             elif r["provenance"] == "docs":
                 scope["docs"] += 1
     out = []
@@ -242,7 +254,7 @@ def _worklist(model: dict) -> tuple[list[dict], list[dict]]:
         service = str(model[nid].get("service") or "")
         if not m["complete"]:
             why = []
-            if not m["has_endpoint"]:
+            if not m["has_endpoint"] and not m["no_api"]:
                 why.append("생성 endpoint 없음")
             if m["missing"]:
                 why.append("미해결 참조: " + ", ".join(m["missing"]))
@@ -250,8 +262,14 @@ def _worklist(model: dict) -> tuple[list[dict], list[dict]]:
                                "why": " · ".join(why) or "정의 미완성",
                                "provenance": m["provenance"]})
         elif m["provenance"] == "docs":
-            docs_only.append({"id": nid, "service": service,
-                              "why": "실제 2xx 미검증 (모델만)",
+            if m["gated"]:
+                why = f"게이트({m['gated']}) — 이 계정에선 검증 불가 (할 일 아님)"
+            elif m["no_api"]:
+                why = "API 생성 없음(no_api) — 외부 수단(docker push 등) 검증 대상"
+            else:
+                why = "실제 2xx 미검증 (모델만)"
+            docs_only.append({"id": nid, "service": service, "why": why,
+                              "gated": m["gated"], "no_api": m["no_api"],
                               "provenance": "docs"})
     return incomplete, docs_only
 
@@ -419,12 +437,14 @@ def map_page(request: Request):
     tree = _modeling_tree(rows)
     total = len(model)
     validated = sum(1 for v in meta.values() if v["provenance"] == "VALIDATED")
-    docs = sum(1 for v in meta.values() if v["provenance"] == "docs")
+    gated = sum(1 for v in meta.values()
+                if v["gated"] and v["provenance"] != "VALIDATED")
+    docs = sum(1 for v in meta.values() if v["provenance"] == "docs") - gated
     incomplete = sum(1 for v in meta.values() if not v["complete"])
     services = sorted({r["service"] for r in rows if r["service"]})
     return _render(request, "resource_map.html", plan_step="model",
                    active="modeling",  # 계약 §4: Modeling 얼굴 (lead가 nav 배선)
-                   total=total, validated=validated, docs=docs,
+                   total=total, validated=validated, docs=docs, gated=gated,
                    incomplete=incomplete, anchors=len(targets),
                    tree=tree, services=services, has_composer=True)
 
@@ -437,11 +457,12 @@ def worklist_page(request: Request):
     각 노드 편집 폼으로 바로 가는 딥링크를 준다. "/{node_id}" 보다 먼저 선언."""
     model = resource_model.load_model()
     incomplete, docs_only = _worklist(model)
+    n_gated = sum(1 for d in docs_only if d.get("gated"))
     return _render(request, "resource_worklist.html", plan_step="model",
                    active="modeling",  # Modeling nav 탭 강조
                    incomplete=incomplete, docs_only=docs_only,
                    n_incomplete=len(incomplete), n_docs=len(docs_only),
-                   total=len(model))
+                   n_gated=n_gated, total=len(model))
 
 
 @router.get("/compose", response_class=HTMLResponse)
