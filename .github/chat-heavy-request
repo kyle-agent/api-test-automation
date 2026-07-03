@@ -1,7 +1,13 @@
-# STOP run α (2026-07-03 00:3xZ): epas cluster wedged in service_state=UNKNOWN
-# since the 23:46 Parameter Modify Error — settle-polls wait only for the
-# RUNNING set and the 200+UNKNOWN response defeats give_up_status, so each
-# remaining mutating step burns its full 900s while the cluster bills idle.
-# Banked before the wedge: create/maintenance set+unset/backup-config 2xx.
-# Fix to follow: settle-polls must also end on terminal-bad states.
-action=stop
+# Next-batch run β (prep 467e87d0, repaired 37761b34): postgresql-cluster-subops-full —
+# NEW self-sufficient pg depth chain (create verbatim from live-proven
+# database-postgresql-cluster; settle-poll after every mutating sub-op with
+# give_up_status [400,404] AND terminal-bad until states; replica/restore excluded).
+# pg ALONE by design: create ~40min and flaky (500 ContactAdmin 2026-06-19 baselined;
+# 1 fail 2026-06-29) — must not gate others. Target: 29 unverified pg ops; ~7
+# (archive/log-export/kernel) may stay 500-blocked. On create 500: transient, retry later.
+action=run
+mutations=true
+destructive=true
+heavy=true
+crud_filter=postgresql-cluster-subops-full
+parallel=1
