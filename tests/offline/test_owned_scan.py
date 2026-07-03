@@ -1,6 +1,15 @@
 """/testing/resources 실측(owned) 스캔 — scan_owned 결과의 행 확장 + 기지 항목
 (known_issues.stuck_resources) 매칭의 오프라인 단위 테스트 (네트워크 없음)."""
-from controlplane import resources
+import os
+import tempfile
+
+# controlplane.db 는 import 시점에 PLATFORM_DB 를 고정한다 — 이 모듈이 같은 pytest
+# 세션의 controlplane/tests_offline.py 보다 먼저 import 되어도 실 DB 를 건드리지
+# 않도록, import 전에 throwaway 경로를 먼저 지정한다 (이미 지정돼 있으면 존중).
+os.environ.setdefault("PLATFORM_DB", os.path.join(
+    tempfile.mkdtemp(prefix="owned-scan-test-"), "platform.db"))
+
+from controlplane import resources  # noqa: E402
 
 
 def test_expand_scan_generic_kms_keypairs_bulk():
