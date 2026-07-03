@@ -97,6 +97,15 @@ def _render(request: Request, name: str, active: str, **ctx) -> HTMLResponse:
 
 # --- home ----------------------------------------------------------------------
 
+def _catalog_count() -> int:
+    """엔드포인트 수 — 홈 파이프라인의 ① Catalog 칸 (best-effort, 부재 시 0)."""
+    try:
+        from controlplane import catalog_routes
+        return len(catalog_routes._load_catalog())
+    except Exception:
+        return 0
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request):
     runs = db.list_runs(limit=50)
@@ -109,7 +118,9 @@ def home(request: Request):
                    runs=runs[:5], running=running, runs_today=runs_today,
                    schedules=db.list_schedules(),
                    coverage=dashdata.latest_coverage(),
-                   scenario_stats=_scenario_stats())
+                   scenario_stats=_scenario_stats(),
+                   catalog_count=_catalog_count(),
+                   model_stats=_model_stats())
 
 
 # --- Planning ------------------------------------------------------------------
@@ -160,27 +171,12 @@ def _model_stats() -> dict:
         return {"nodes": 0, "validated": 0, "docs": 0, "groups": 0}
 
 
-PLAN_STEPS = ("catalog", "model", "compose", "validate")
-
-
-@app.get("/planning", response_class=HTMLResponse)
-def planning(request: Request, step: str = "catalog"):
-    """Plan = one linear flow (IA.md). The stepper ① Catalog → ② Model →
-    ③ Compose → ④ Validate is the single entry; ?step= selects the stage.
-    Validate is its own route (/planning/validate) since it runs a subprocess."""
-    if step == "validate":
-        return RedirectResponse("/planning/validate", status_code=307)
-    if step not in PLAN_STEPS:
-        step = "catalog"
-    rows = _scenario_rows()
-    return _render(request, "planning.html", "planning", plan_step=step,
-                   profile_list=core_profiles.list_profiles(),
-                   suite_list=core_suites.list_suites(),
-                   scenario_stats=_scenario_stats(),
-                   scenario_rows=rows,
-                   model_stats=_model_stats(),
-                   gen_count=sum(1 for r in rows if r["id"].startswith("gen-")),
-                   disabled_count=sum(1 for r in rows if not r["enabled"]))
+@app.get("/planning", include_in_schema=False)
+def planning_legacy():
+    """구 4단계 스테퍼(?step=) 은퇴 (IA 확정: Catalog·Modeling·Testing·Reporting).
+    Modeling의 정본 진입은 /planning/resources/map — 하위 라우트
+    (/planning/edit·view·validate·dependencies·scenarios·resources/*)는 유지."""
+    return RedirectResponse("/planning/resources/map", status_code=301)
 
 
 def _run_validate() -> dict:

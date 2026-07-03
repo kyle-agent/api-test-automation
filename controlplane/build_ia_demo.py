@@ -152,10 +152,7 @@ def _nav_rewrite(html: str) -> str:
         # --- links with no offline target -> '#' (kept clickable, no 404) ---
         ('href="/knowledge"', 'href="#"'),
         ('href="/dashboard/index.html"', 'href="../"'),  # demo: 면② public dashboard = Pages root
-        # --- Plan stepper sub-nav (_plan_steps.html, modeling page) ---
-        ('href="/planning?step=catalog"', 'href="index.html"'),
-        ('href="/planning?step=model"', 'href="modeling.html"'),
-        ('href="/planning?step=compose"', 'href="#"'),
+        # (구 Plan 스테퍼 sub-nav 는 은퇴 — /planning 은 이제 modeling map 으로 301)
         ('href="/planning/validate"', 'href="#"'),
         # --- modeling: 작업 큐 + the (offline-absent) list/breadcrumb -> '#' ---
         ('href="/planning/resources/worklist"', 'href="#"'),

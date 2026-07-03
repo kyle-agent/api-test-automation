@@ -56,24 +56,30 @@
       git 원격 접근을 확인하세요.</div></div>
 {% endif %}
 
-<h2>파이프라인 <span class="hint">단계별 현황 — 클릭하면 해당 영역으로</span></h2>
+<h2>파이프라인 <span class="hint">4단계 현황 — 클릭하면 해당 영역으로 (상단 네비와 동일)</span></h2>
 <div class="pipe">
-  <a class="pstage" href="/planning">
-    <div class="pl">Plan</div>
-    <div class="pv">{{ scenario_stats.total }}</div>
-    <div class="ps">시나리오 ({{ scenario_stats.enabled }} enabled ·
-      {{ scenario_stats.services }} 서비스)</div>
+  <a class="pstage" href="/catalog">
+    <div class="pl">Catalog</div>
+    <div class="pv">{{ catalog_count }}</div>
+    <div class="ps">API 엔드포인트 (재료 인벤토리)</div>
     <span class="chev">→</span>
   </a>
-  <a class="pstage" href="/testing">
-    <div class="pl">Run</div>
+  <a class="pstage" href="/planning/resources/map">
+    <div class="pl">Modeling</div>
+    <div class="pv">{{ model_stats.validated }}<span
+      style="font-size:13px;font-weight:600;color:var(--muted)">/{{ model_stats.nodes }}</span></div>
+    <div class="ps">VALIDATED / 전체 노드 (레시피 저작)</div>
+    <span class="chev">→</span>
+  </a>
+  <a class="pstage" href="/testing/embed">
+    <div class="pl">Testing</div>
     <div class="pv">{{ running|length }}
       <span style="font-size:12px;font-weight:500;color:var(--muted)">진행 중</span></div>
     <div class="ps">스케줄 {{ schedules|length }} · 오늘 실행 {{ runs_today }}</div>
     <span class="chev">→</span>
   </a>
   <a class="pstage" href="/reporting">
-    <div class="pl">Report</div>
+    <div class="pl">Reporting</div>
     <div class="pv">{{ coverage.get('cov_c3','-') if coverage else '-' }}%</div>
     <div class="ps">C3 검증 · 신규 회귀 {{ (coverage.get('fail_new') or 0) if coverage else '-' }}</div>
   </a>
