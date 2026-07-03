@@ -513,7 +513,30 @@ def schedule_delete(schedule_id: int):
     return RedirectResponse("/testing", status_code=303)
 
 
-# --- Testing: 리소스 인벤토리 + 단일 리소스 삭제 (M2 §2.5) -------------------------
+# --- Testing: 잔존 자원 단일 정본 (실측 owned 스캔) + ingest 이력 + 단일 삭제 (M2 §2.5)
+
+def _cleanup_busy() -> tuple[bool, str]:
+    """강제 클린업의 409 조건(실행/대기 중인 run 존재)을 클릭 '전에' 계산 — 화면이
+    버튼을 비활성화+사유 표기할 수 있도록. console2 엔진의 admission 상태가 출처."""
+    try:
+        from tools import console2_server as c2
+        with c2._ADMIT:
+            n_run, n_q = len(c2._RESERVED), len(c2._QUEUE)
+        if n_run or n_q:
+            return True, (f"진행 중 {n_run}건 · 대기 {n_q}건 — reconciler 는 owner-tag "
+                          "전체를 reap 하므로 모든 실행이 끝난 뒤에만 가능합니다.")
+    except Exception:
+        pass
+    return False, ""
+
+
+def _owned_ctx() -> dict:
+    st = resources.owned_state()
+    busy, busy_reason = _cleanup_busy()
+    return {"owned": st, "owned_age": resources._age_label(st["age_s"]),
+            "busy": busy, "busy_reason": busy_reason,
+            "destructive": resources.destructive_enabled()}
+
 
 @app.get("/testing/resources", response_class=HTMLResponse)
 def testing_resources(request: Request, gh_run_id: str = "", msg: str = ""):
@@ -522,8 +545,40 @@ def testing_resources(request: Request, gh_run_id: str = "", msg: str = ""):
     return _render(request, "resources.html", "testing",
                    rows=rows, gh_run_id=gh_run_id, msg=msg[:300],
                    live_count=sum(1 for r in rows if r["live"]),
-                   destructive=resources.destructive_enabled(),
-                   run_ids=run_ids)
+                   run_ids=run_ids, **_owned_ctx())
+
+
+@app.get("/testing/resources/owned", response_class=HTMLResponse)
+def testing_resources_owned(request: Request):
+    """실측(owned 스캔) 섹션 fragment — 스캔 중일 때 htmx 가 폴링한다."""
+    return templates.TemplateResponse(request, "_owned_section.html", _owned_ctx())
+
+
+@app.post("/testing/resources/scan")
+def testing_resources_scan():
+    """owned 스캔(read-only LIST 인벤토리)을 백그라운드로 시작하고 돌아온다."""
+    resources.start_owned_scan()
+    return RedirectResponse("/testing/resources", status_code=303)
+
+
+@app.post("/testing/resources/cleanup")
+def testing_resources_cleanup():
+    """계정 전체 강제 클린업 (reconciler FORCE sweep) — console2 의 /api/cleanup 과
+    같은 엔진·같은 409 가드. 버튼 앞의 pre-scan 모달이 삭제 대상 목록을 보여준 뒤
+    호출된다."""
+    busy, reason = _cleanup_busy()
+    if busy:
+        msg = "강제 클린업 차단 — " + reason
+    else:
+        try:
+            from tools import console2_server as c2
+            rec = c2._start("cleanup", c2._cleanup_worker)
+            msg = (f"강제 클린업 시작 (run {rec['id']}) — 진행 로그는 Testing 콘솔 "
+                   "실행 기록에서, 끝나면 [다시 스캔]으로 확인하세요.")
+        except Exception as exc:
+            msg = f"강제 클린업 시작 실패: {exc}"
+    q = urlencode({"msg": msg})
+    return RedirectResponse(f"/testing/resources?{q}", status_code=303)
 
 
 @app.post("/testing/resources/delete")
@@ -821,8 +876,10 @@ def api_local_log(run_id: str):
     return res
 
 
-@app.get("/local-run")
-def local_run_page(request: Request):
-    """Local Run screen (S3) — pick a selection → run simulate/live in-process →
-    watch the live event stream + per-lifecycle state, driven by /api/local/*."""
-    return templates.TemplateResponse(request, "local_run.html", {"active": "testing"})
+@app.get("/local-run", include_in_schema=False)
+def local_run_page():
+    """RETIRED (고아 페이지 — UIUX-AUDIT P1-4): 러너 UI는 Testing 콘솔(/testing/embed)
+    이, 계정 위생 역할은 /testing/resources(실측 owned 스캔 단일 정본)가 대체.
+    /api/local/* 는 콘솔이 계속 쓰므로 유지. local_run.html 템플릿은
+    build_local_demo(정적 데모 발행기)가 아직 참조하여 남겨둠."""
+    return RedirectResponse("/testing/resources", status_code=301)

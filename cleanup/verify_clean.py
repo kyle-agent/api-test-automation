@@ -29,10 +29,10 @@ def scan_owned(client=None) -> list[dict]:
     module-level ``r._delete`` / ``r._wait_gone`` is local to this call and restored
     afterwards, so importing this module has no lingering effect on the reconciler.
     """
-    attempts: list[tuple[str, str]] = []  # (service, path) — every delete the sweep WOULD issue
+    attempts: list[tuple[str, str, object]] = []  # (service, path, json body) per WOULD-delete
 
     def fake_delete(client, service, path, json=None):
-        attempts.append((service, path))
+        attempts.append((service, path, json))
         return 200          # pretend success so the pass proceeds
 
     def fake_wait(*a, **k):
@@ -45,7 +45,11 @@ def scan_owned(client=None) -> list[dict]:
         r.run_sweep(client or core.ApiClient(core.settings))
     finally:
         r._delete, r._wait_gone, _t.sleep = orig_delete, orig_wait, orig_sleep
-    return [{"service": svc, "path": path} for svc, path in attempts]
+    # 'json' rides along when the sweep's delete carried a body (bulk ids /
+    # secrets waiting_time) so consumers can expand bulk deletes to per-id rows;
+    # existing consumers only read service/path and are unaffected.
+    return [{"service": svc, "path": path, **({"json": body} if body else {})}
+            for svc, path, body in attempts]
 
 
 def _main() -> None:

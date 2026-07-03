@@ -1,15 +1,29 @@
 {% extends "base.html" %}
-{% block title %}리소스 인벤토리{% endblock %}
+{% block title %}리소스 — 잔존 자원 (실측 정본){% endblock %}
 {% block content %}
 
+{% if msg %}<p class="warn" style="margin-bottom:10px"><b>{{ msg }}</b></p>{% endif %}
+
 <section>
-  <h2>리소스 인벤토리 — 살아있는 테스트 리소스 ({{ live_count }}개 live)</h2>
-  {% if msg %}<p class="warn"><b>{{ msg }}</b></p>{% endif %}
+  <h2>지금 남은 것 (실측)
+    <span class="hint">단일 정본 — reconciler 소유-태그 스윕의 read-only 인벤토리
+      (console2 '남은 자원' 패널과 같은 /api/owned 엔진) ·
+      활동 흐름 → <a href="/runtime?scope=mine">runtime</a></span></h2>
   {% if not destructive %}
-  <p class="warn">SCP_ALLOW_DESTRUCTIVE=true 미설정 — 삭제 버튼이 비활성화되어
+  <p class="warn">SCP_ALLOW_DESTRUCTIVE=true 미설정 — 단일 삭제 버튼이 비활성화되어
      있습니다. 서버 환경변수로 활성화하면 단일 리소스 삭제(reconciler와 동일한
      DELETE 매핑)가 가능합니다.</p>
   {% endif %}
+  {% include "_owned_section.html" %}
+</section>
+
+<section>
+  <h2>이력 (플랫폼이 본 것)
+    <span class="hint">ingest 이벤트 기반 추정 — 실측이 아니라 기록입니다
+      ({{ live_count }}개 live 추정)</span></h2>
+  <p class="muted small">⚠ 출처 한계: 이 표는 <b>플랫폼으로 ingest된 이벤트만</b>
+    반영합니다 — APITEST_PLATFORM_URL 미러 없이 실행된 run(CI 포함)의 리소스는
+    나타나지 않습니다. 실제 잔존 여부는 위 <b>실측</b> 섹션이 정본입니다.</p>
   <form class="inline" method="get" action="/testing/resources" style="margin-bottom:10px">
     <input type="text" name="gh_run_id" value="{{ gh_run_id }}"
            placeholder="gh_run_id 필터" size="14" list="run-ids">
@@ -57,7 +71,7 @@
     <tr><td colspan="9" class="muted">표시할 리소스 이벤트가 없습니다.
         이 목록은 <b>플랫폼으로 ingest된 이벤트만</b> 반영합니다 —
         APITEST_PLATFORM_URL 미러 없이 실행된 run의 리소스는 나타나지 않으며,
-        그런 리소스는 전량 sweep(cleanup.reconciler)으로 정리하세요.</td></tr>
+        실제 잔존 여부는 위 실측 섹션에서 스캔하세요.</td></tr>
     {% endfor %}
   </table>
   <p class="muted">created → live, deleted/platform-delete(성공) → gone —
