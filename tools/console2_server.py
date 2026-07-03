@@ -612,12 +612,28 @@ def _plan(lifecycle_ids: list[str]) -> dict:
     leaf_set = runnable if lifecycle_ids else None
     p = dag_planner.plan(leaf_set=leaf_set, deps=deps, lifecycles=all_lcs)
     m = _model()
-    # per-lifecycle step preview (which APIs each leaf will exercise)
+    # measured wall durations (rolling avg per lifecycle, learned across runs) —
+    # data/optimizer/durations.json via schedule_optimizer; absent → None (UI: 미측정)
+    try:
+        from regression.scenarios.schedule_optimizer import load_durations
+        durations = load_durations()
+    except Exception:  # noqa: BLE001
+        durations = {}
+    # per-lifecycle step preview (which APIs each leaf will exercise) + the
+    # pre-flight blast-radius facts: est creates/deletes (POST/DELETE steps) and
+    # the measured duration when we have one.
     preview = {}
     for lid in p.leaf_set:
         lc = m["lifecycles"].get(lid, {})
+        steps = lc.get("steps", [])
+        dur = durations.get(lid) or {}
         preview[lid] = {"service": lc.get("service", ""), "heavy": lc.get("heavy", False),
-                        "n_steps": lc.get("n_steps", 0), "steps": lc.get("steps", [])}
+                        "n_steps": lc.get("n_steps", 0), "steps": steps,
+                        "est_creates": sum(1 for s in steps if s.get("kind") == "create"),
+                        "est_deletes": sum(1 for s in steps if s.get("kind") == "delete"),
+                        "duration_s": (round(float(dur["avg_s"]), 1)
+                                       if dur.get("avg_s") else None),
+                        "duration_n": int(dur.get("n") or 0)}
     return {
         "requested": lifecycle_ids,
         "runnable": runnable,

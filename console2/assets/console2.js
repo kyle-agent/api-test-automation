@@ -1176,18 +1176,13 @@ function drawLeftover() {
   $("lo-cleanup").onclick = () => {
     if (busy) return;
     const errEl = $("lo-err"); if (errEl) errEl.style.display = "none";
-    if (!confirm("강제 클린업: owner=apitest 가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?")) return;
-    fetch("/api/cleanup", { method: "POST" }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
-      if (!ok || j.error) {                 // 409 (busy) or any error → show inline, no crash
-        const el = $("lo-err");
-        if (el) { el.textContent = j.error || "강제 클린업 실패"; el.style.display = ""; }
-        return;
-      }
+    // blind confirm 대신 fresh /api/owned 스캔이 채운 '삭제 대상 N건' 모달
+    cleanupConfirm(j => {
       runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
       drawReport(); startR4Poll();
       // after a force cleanup, auto re-scan so the panel reflects the new state
       setTimeout(scanOwned, 1200);
-    }).catch(() => { const el = $("lo-err"); if (el) { el.textContent = "서버 연결 실패"; el.style.display = ""; } });
+    });
   };
 }
 
@@ -1232,48 +1227,215 @@ function drawRunSettings() {
   $("run-toconf").onclick = () => go("build");
 }
 
+// ================= pre-flight blast-radius 모달 (native confirm 대체) ==========
+// 실행 전 '무엇이 얼마나 만들어지고 지워지는가'를 서비스 단위 표(생성~삭제 예상 ·
+// 실측 ETA · 과금 배지)로 보여주고, heavy(과금)가 있으면 명시 체크 후에만 LIVE 가
+// 열린다. plan/capacity 사전 점검 실패 = 실행 '완전 차단' — [다시 점검]만 제공
+// (우회 confirm 없음, env 탈출구 없음). 디스패치 성공 시 모달은 성공 상태로 남아
+// /runtime?scope=mine(내 실행 활동 흐름) 링크를 제공한다.
+
+function pfEnsure() {
+  if ($("pf-modal")) return;
+  const scrim = document.createElement("div");
+  scrim.className = "scrim"; scrim.id = "pf-scrim";
+  const modal = document.createElement("div");
+  modal.className = "modal"; modal.id = "pf-modal";
+  modal.innerHTML = '<div class="mh"><h3 id="pf-title"></h3>' +
+    '<button class="mclose" id="pf-close">×</button></div>' +
+    '<div class="mbody" id="pf-body"></div>' +
+    '<div class="mfoot" id="pf-foot"></div>';
+  document.body.appendChild(scrim); document.body.appendChild(modal);
+  $("pf-close").onclick = pfClose;
+  scrim.onclick = pfClose;
+}
+function pfOpen(title) {
+  pfEnsure();
+  $("pf-title").textContent = title;
+  $("pf-body").innerHTML = ""; $("pf-foot").innerHTML = "";
+  $("pf-modal").classList.add("open"); $("pf-scrim").classList.add("open");
+}
+function pfClose() {
+  if ($("pf-modal")) { $("pf-modal").classList.remove("open"); $("pf-scrim").classList.remove("open"); }
+}
+function fmtDur(s) {
+  if (s == null) return "미측정";
+  if (s < 90) return Math.round(s) + "초";
+  if (s < 5400) return (s / 60).toFixed(1) + "분";
+  return (s / 3600).toFixed(1) + "시간";
+}
+
 // Runs are always LIVE. Before posting, fetch the plan + capacity (parallel) and
-// show a pre-flight confirm spelling out lifecycles, heavy count, VPC peak vs the
-// current headroom, and whether it will QUEUE. On confirm, POST /api/run (mode
-// live; the server derives the gates) and drive the existing report flow.
+// show the pre-flight blast-radius modal. On [LIVE 실행], POST /api/run (mode live;
+// the server derives the gates) and drive the existing report flow.
 function startRun() {
   if (!targets.size) return;
   const sel = selectionPayload();
+  pfOpen("⚠ LIVE 실행 사전 점검 (blast radius)");
+  $("pf-body").innerHTML = '<p class="muted small">사전 점검 중… (plan + capacity)</p>';
   Promise.all([
     fetch("/api/plan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sel) }).then(r => r.json()),
     fetch("/api/capacity").then(r => r.json()),
   ]).then(([plan, capacity]) => {
     plan = plan || {}; capacity = capacity || {};
-    const N_lc = plan.runnable ? plan.runnable.length : (plan.lifecycle_ids ? plan.lifecycle_ids.length : 0);
-    const peak = plan.peak_vpcs || 0;
-    const headroom = capacity.headroom != null ? capacity.headroom : 0;
-    const heavyM = Object.values(plan.preview || {}).filter(p => p && p.heavy).length;
-    const heavy = heavyM > 0;
-    const lines = [
-      "실행 — 실제 클라우드 자원을 만들고 삭제합니다.",
-      "",
-      `라이프사이클: ${N_lc}개`,
-      heavy ? `⚠️ heavy(billable): ${heavyM}개` : "heavy: 없음",
-      `VPC 소모(peak): ${peak} · 현재 여유: ${headroom}`,
-    ];
-    if (peak > headroom) lines.push("→ 여유보다 커서 대기 큐에 들어갑니다.");
-    lines.push("진행할까요?");
-    if (confirm(lines.join("\n"))) postRun(sel);
-  }).catch(e => {
-    // plan/capacity pre-flight failed → still allow the run, but tell the user.
-    if (confirm("사전 점검(plan/capacity) 실패: " + e.message + "\n그래도 LIVE 실행할까요?")) postRun(sel);
+    // preflight FAILURE = 실행 차단 (우회 없음) — 이유 + [다시 점검]만.
+    if (plan.error || capacity.error || capacity.headroom == null) {
+      pfFail(plan.error || capacity.error || "capacity 응답이 불완전합니다 (headroom 없음)");
+      return;
+    }
+    pfRender(plan, capacity, sel);
+  }).catch(e => pfFail(e.message));
+}
+
+// preflight 실패 상태: 실행 경로 없음 — 이유 + [다시 점검] 버튼만.
+function pfFail(msg) {
+  $("pf-body").innerHTML =
+    '<p><b style="color:var(--red)">사전 점검(plan/capacity) 실패 — 실행이 차단되었습니다.</b></p>' +
+    '<p class="muted small">' + esc(msg || "") + "</p>" +
+    '<p class="muted small">서버가 계획/용량을 답하지 못하면 blast radius 를 알 수 없어 ' +
+    "LIVE 실행을 허용하지 않습니다 (우회 없음).</p>";
+  $("pf-foot").innerHTML = '<button class="btn" id="pf-retry">↻ 다시 점검</button>';
+  $("pf-retry").onclick = startRun;
+}
+
+function pfRender(plan, capacity, sel) {
+  const N_lc = plan.runnable ? plan.runnable.length : (plan.lifecycle_ids ? plan.lifecycle_ids.length : 0);
+  const peak = plan.peak_vpcs || 0;
+  const headroom = capacity.headroom != null ? capacity.headroom : 0;
+  // 서비스 단위 집계 (per-lifecycle preview → service rows)
+  const bySvc = {}; const heavyIds = [];
+  let tCreates = 0, tDeletes = 0, tDur = 0, tMeasured = 0, tN = 0;
+  Object.keys(plan.preview || {}).sort().forEach(lid => {
+    const p = plan.preview[lid] || {};
+    const svc = p.service || "?";
+    const a = bySvc[svc] = bySvc[svc] || { n: 0, creates: 0, deletes: 0, dur: 0, measured: 0, heavy: 0 };
+    a.n++; tN++;
+    a.creates += p.est_creates || 0; tCreates += p.est_creates || 0;
+    a.deletes += p.est_deletes || 0; tDeletes += p.est_deletes || 0;
+    if (p.duration_s != null) { a.dur += p.duration_s; a.measured++; tDur += p.duration_s; tMeasured++; }
+    if (p.heavy) { a.heavy++; heavyIds.push(lid); }
   });
+  const eta = a => !a.measured ? '<span class="muted">미측정</span>'
+    : "~" + fmtDur(a.dur) + (a.measured < a.n ? ' <span class="muted small">(미측정 ' + (a.n - a.measured) + ")</span>" : "");
+  const rows = Object.keys(bySvc).sort().map(svc => {
+    const a = bySvc[svc];
+    return "<tr><td><b>" + esc(svc) + "</b></td><td>" + a.n + "</td>" +
+      "<td>" + a.creates + " ~ " + a.deletes + "</td><td>" + eta(a) + "</td>" +
+      "<td>" + (a.heavy ? '<span style="color:var(--red);font-weight:700">⚠️과금 ' + a.heavy + "</span>" : "—") + "</td></tr>";
+  }).join("");
+  const heavy = heavyIds.length > 0;
+  const gates =
+    '<div class="chiprow" style="margin:2px 0 8px">' +
+    '<span class="chip" style="border-color:var(--red)">✔ mutations ON</span>' +
+    '<span class="chip" style="border-color:var(--red)">✔ destructive ON</span>' +
+    '<span class="chip" style="border-color:' + (heavy ? "var(--red)" : "var(--line)") + '">' +
+    (heavy ? "✔" : "✕") + " heavy 자동 " + heavyIds.length + "</span></div>";
+  const queueNote = peak > headroom
+    ? '<p class="muted small" style="color:var(--amber)">→ VPC 여유(' + headroom + ') 초과: 즉시 실행되지 않고 <b>대기 큐</b>에 들어갑니다.</p>' : "";
+  const skipped = (plan.skipped_disabled || []).length
+    ? '<p class="muted small">disabled 로 건너뜀: ' + plan.skipped_disabled.map(esc).join(", ") + "</p>" : "";
+  const heavyBlock = heavy
+    ? '<div class="note" style="border-color:var(--red);border-left-color:var(--red)"><b style="color:var(--red)">heavy(과금) 라이프사이클 ' + heavyIds.length + "개:</b> " +
+      heavyIds.map(id => "<code>" + esc(id) + "</code>").join(" · ") +
+      '<br><label style="display:inline-flex;gap:6px;align-items:center;margin-top:7px;cursor:pointer">' +
+      '<input type="checkbox" id="pf-heavy-ok"> <b>과금 실행임을 확인했습니다</b></label></div>'
+    : "";
+  $("pf-body").innerHTML =
+    '<p class="muted small">실제 클라우드 자원을 만들고 삭제합니다 — 게이트는 선택(폐포)에서 파생됩니다.</p>' +
+    gates +
+    '<table class="tbl"><thead><tr><th>service</th><th>lifecycle</th><th>생성~삭제 예상</th><th>실측 ETA</th><th>과금</th></tr></thead>' +
+    "<tbody>" + rows + "</tbody>" +
+    '<tfoot><tr class="lc-head"><td>합계</td><td>' + N_lc + "</td><td>" + tCreates + " ~ " + tDeletes + "</td><td>" +
+    (tMeasured ? "~" + fmtDur(tDur) + (tMeasured < tN ? ' <span class="muted small">(미측정 ' + (tN - tMeasured) + ")</span>" : "") : '<span class="muted">미측정</span>') +
+    "</td><td>" + (heavy ? '<span style="color:var(--red);font-weight:700">⚠️ ' + heavyIds.length + "</span>" : "—") + "</td></tr></tfoot></table>" +
+    '<p class="muted small" style="margin:7px 0 0">ETA = 라이프사이클 실측 평균의 순차 합산 (병렬 실행 시 단축) · ' +
+    "VPC 소모(peak) <b>" + peak + "</b> vs 현재 여유 <b>" + headroom + "</b></p>" +
+    queueNote + skipped + heavyBlock;
+  $("pf-foot").innerHTML =
+    '<span class="muted small">취소해도 선택은 유지됩니다.</span>' +
+    '<button class="btn ghost" id="pf-cancel">취소</button>' +
+    '<button class="btn warn" id="pf-go"' + (heavy ? " disabled" : "") + ">⚠ LIVE 실행 ▶</button>";
+  $("pf-cancel").onclick = pfClose;
+  if (heavy) $("pf-heavy-ok").onchange = e => { $("pf-go").disabled = !e.target.checked; };
+  $("pf-go").onclick = () => {
+    $("pf-go").disabled = true;
+    $("pf-go").textContent = "실행 요청 중…";
+    postRun(sel, (err, j) => {
+      if (err) {
+        $("pf-body").innerHTML = '<p><b style="color:var(--red)">실행 실패:</b> ' + esc(err) + "</p>";
+        $("pf-foot").innerHTML = '<button class="btn ghost" id="pf-cancel2">닫기</button>';
+        $("pf-cancel2").onclick = pfClose;
+        return;
+      }
+      const queued = j && j.status === "queued";
+      $("pf-body").innerHTML =
+        "<p><b>" + (queued ? "⌛ 대기 큐에 등록됨" : "✅ LIVE 실행 시작") + "</b> — run <code>" + esc(j.id) + "</code></p>" +
+        '<p class="muted small">진행은 아래 리포트에서, 실제 자원 토폴로지는 활동 흐름에서 확인하세요.</p>';
+      $("pf-foot").innerHTML =
+        '<a class="btn ghost" href="/runtime?scope=mine" target="_blank">🌐 활동 흐름 → /runtime?scope=mine</a>' +
+        '<button class="btn" id="pf-done">리포트 보기</button>';
+      $("pf-done").onclick = pfClose;
+    });
+  };
+}
+
+// ---- 강제 클린업 confirm 업그레이드 (item 4/5 정합): blind confirm 대신 fresh
+// /api/owned 스캔이 채운 '삭제 대상 N건' 목록 모달 — pre-flight 모달과 같은 셸.
+// 스캔이 실패하면 클린업도 차단([다시 점검]만). onStarted(rec) = 클린업 run 시작 후.
+function cleanupConfirm(onStarted) {
+  pfOpen("🧹 강제 클린업 — 계정 전체 (owner=apitest)");
+  $("pf-body").innerHTML = '<p class="muted small">⏳ 삭제 대상 스캔 중… (read-only 인벤토리 /api/owned)</p>';
+  fetch("/api/owned", { method: "POST" }).then(r => r.json()).then(j => {
+    if (j.error) return cleanupScanFail(j.error, onStarted);
+    const poll = () => fetch("/api/runs/" + j.id).then(r => r.json()).then(rec => {
+      if (rec.status === "running") return setTimeout(poll, 800);
+      if (rec.status !== "done") return cleanupScanFail(rec.error || "스캔 실패", onStarted);
+      cleanupRender(rec.owned || [], onStarted);
+    }).catch(e => cleanupScanFail(e.message, onStarted));
+    poll();
+  }).catch(e => cleanupScanFail(e.message, onStarted));
+}
+function cleanupScanFail(msg, onStarted) {
+  $("pf-body").innerHTML =
+    '<p><b style="color:var(--red)">삭제 대상 스캔 실패 — 강제 클린업이 차단되었습니다.</b></p>' +
+    '<p class="muted small">' + esc(msg || "") + "</p>";
+  $("pf-foot").innerHTML = '<button class="btn ghost" id="pf-cl-cancel">취소</button>' +
+    '<button class="btn" id="pf-rescan">↻ 다시 점검</button>';
+  $("pf-cl-cancel").onclick = pfClose;
+  $("pf-rescan").onclick = () => cleanupConfirm(onStarted);
+}
+function cleanupRender(owned, onStarted) {
+  const n = owned.length;
+  const rows = owned.map(o => "<tr><td><b>" + esc(o.service || "?") + "</b></td><td><code>" +
+    esc(o.path || "") + "</code></td></tr>").join("");
+  $("pf-body").innerHTML =
+    "<p><b>삭제 대상 " + n + "건</b> <span class=\"muted small\">— 방금 실측한 owned 인벤토리 (owner-tag 전체, TTL 무시)</span></p>" +
+    (n ? '<div style="max-height:280px;overflow:auto"><table class="tbl"><thead><tr><th>service</th><th>path</th></tr></thead><tbody>' + rows + "</tbody></table></div>"
+       : '<p class="muted small">지울 것이 없습니다 — 계정이 이미 깨끗합니다 ✅</p>') +
+    '<p class="muted small">우리 소유가 아닌 자원은 절대 건드리지 않습니다.</p>';
+  $("pf-foot").innerHTML =
+    '<button class="btn ghost" id="pf-cl-cancel">취소</button>' +
+    '<button class="btn warn" id="pf-cl-go"' + (n ? "" : " disabled") + ">삭제 대상 " + n + "건 — 강제 클린업 실행</button>";
+  $("pf-cl-cancel").onclick = pfClose;
+  $("pf-cl-go").onclick = () => {
+    $("pf-cl-go").disabled = true;
+    fetch("/api/cleanup", { method: "POST" }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+      if (!ok || j.error) return cleanupScanFail(j.error || "강제 클린업 실패", onStarted);  // 409 포함
+      pfClose();
+      if (onStarted) onStarted(j);
+    }).catch(e => cleanupScanFail("서버 연결 실패: " + e.message, onStarted));
+  };
 }
 
 // POST /api/run (always mode live) and drive the existing report flow. Tolerates a
 // "queued" status (pollEvents shows the wait banner until it flips to running).
-function postRun(sel) {
+// `cb(err, rec)` (optional) lets the pre-flight modal show its success/fail state.
+function postRun(sel, cb) {
   const body = Object.assign({ mode: "live" }, sel);
   if (screen !== "run") go("run");
   $("report-main").innerHTML = '<p class="muted small">실행 요청 중…</p>';
   fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).then(j => {
-      if (j.error) { $("report-main").innerHTML = '<p class="empty">실행 실패: ' + esc(j.error) + "</p>"; return; }
+      if (j.error) { $("report-main").innerHTML = '<p class="empty">실행 실패: ' + esc(j.error) + "</p>"; if (cb) cb(j.error, null); return; }
       runId = j.id; runEvents = []; runStatus = j.status || "running";
       detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;   // fresh run → reconcile auto-selects
       // A QUEUED run has no events / no live scene yet: show the wait banner and let
@@ -1288,7 +1450,8 @@ function postRun(sel) {
       }
       pollEvents();
       drawCapBar();   // reflect the new run in the capacity bar (refreshes on next poll)
-    }).catch(e => { $("report-main").innerHTML = '<p class="empty">실행 연결 실패: ' + esc(e.message) + "</p>"; });
+      if (cb) cb(null, j);
+    }).catch(e => { $("report-main").innerHTML = '<p class="empty">실행 연결 실패: ' + esc(e.message) + "</p>"; if (cb) cb(e.message, null); });
 }
 
 // ---- poll the live event stream until run-end / status done ----
@@ -1994,14 +2157,12 @@ function reportR4() {
       </div>
       <pre class="runlog" id="r4-log" data-logkey="${esc(key)}">로그 로딩…</pre>`;
     $("btn-reflog").onclick = () => loadLog(true);   // manual refresh → snap to bottom
-    $("btn-cleanup").onclick = () => {
-      if (!confirm("강제 클린업: owner=apitest 가 만든 모든 자원을 TTL 무시하고 삭제합니다.\n(우리 소유가 아닌 자원은 절대 건드리지 않습니다.)\n진행할까요?")) return;
-      fetch("/api/cleanup", { method: "POST" }).then(r => r.json()).then(j => {
-        if (j.error) { alert(j.error); return; }
+    $("btn-cleanup").onclick = () =>
+      // blind confirm 대신 fresh /api/owned 스캔이 채운 '삭제 대상 N건' 모달
+      cleanupConfirm(j => {
         runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
         drawReport(); startR4Poll();
-      }).catch(() => alert("서버 연결 실패"));
-    };
+      });
     $("btn-verify").onclick = () => {
       fetch("/api/verify", { method: "POST" }).then(r => r.json()).then(j => {
         if (j.error) { alert(j.error); return; }
