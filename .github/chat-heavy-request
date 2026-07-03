@@ -1,1 +1,9 @@
-action=noop
+# light-batch-2 (2026-07-03, model-promotion pass E): 9 light lifecycles to bank
+# up to 15 docs->VALIDATED promotions. Non-billable (heavy=false; ASG desired 0).
+# Lane verified quiet before push: owned==0 + 6min audit silence.
+action=run
+mutations=true
+destructive=true
+heavy=false
+crud_ids=gen-vpc-endpoint,gen-private-nat,gen-direct-connect,gen-cm-event-policy,gen-lb-members-light,gen-alert,gen-quick-query-validate,gen-wave4-asg,gen-wave5-apigw-privatelink
+parallel=4
