@@ -1517,3 +1517,117 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   (`networking__vpc.yaml` transit-gateway/tgw-vpc-connection — two-stage
   `ready:` list, composer now accepts a ready LIST and passes `give_up_status`
   through, so a recompose keeps the fix).
+
+## docs-research — 7 body-unknown endpoints resolved from `data/api_docs.json` (2026-07-04, branch upbeat-ritchie, read-only) — 미검증-docs유래 unless noted
+
+> conf: 0.5 (schema) / 0.3 (value domains still open) · seen: 2026-07-04 · obs: 1
+> Full writeup + draft bodies: `docs/working/plans/CAMPAIGN-C3-100-docs-research.md`.
+> Source for all of these: `data/api_docs.json` `endpoints[*].request_example` +
+> `models[*].fields` — the SCP API Reference "Example HTTP request" block, scraped
+> verbatim by `spec.scrape_docs`. **None of the bodies below have a real 2xx** unless
+> explicitly marked VALIDATED; provenance stays **docs** until one lands.
+
+- **networking/vpn createvpntunnel/setvpntunnel — official example values differ from
+  the current lifecycle.** `models["networking/vpn/vpnphase1createrequestv1dot1"]` /
+  `vpnphase2createrequestv1dot1` (docs): `phase1_diffie_hellman_groups`/
+  `phase2_diffie_hellman_groups` are `array[integer]` (not a formal enum) — official
+  doc example `[30, 31, 32]`; `phase1_encryptions` example `["des-md5",
+  "chacha20poly1305-prfsha256"]`, `phase2_encryptions` example `["null-md5",
+  "aes128gcm", "chacha20poly1305"]`. The ONE true enum is `perfect_forward_secrecy:
+  (ENABLE, DISABLE)`. The CURRENT `regression/scenarios/lifecycles/networking__vpn.json`
+  body instead sends `phase1_diffie_hellman_groups:[14]` +
+  `phase1_encryptions:["aes256-sha256"]` — self-admitted "docs-example guesses" that do
+  NOT actually match the official doc example. Recommend swapping to the values above
+  on the next VPN live attempt (HB4). provenance: docs.
+- **compute/virtualserver importimage — WRONG FIELD NAME in the current coverage
+  lifecycle.** `models["compute/virtualserver/imageimportrequest"]` (docs, official):
+  `ImageImportRequest` has exactly ONE field, `url` (required, pattern `.*\.qcow2$`).
+  `regression/scenarios/lifecycles/compute__virtualserver.json` `import-image` step
+  sends `{"source": "regression-coverage-probe"}` — `source` is not a real field;
+  this is a guaranteed schema-level 400 until swapped to `{"url": "<qcow2 URL>"}`.
+  provenance: docs.
+- **compute/virtualserver createimage — body schema LIVE-CONFIRMED past validation
+  (2026-06-18, `vs-image-write-coverage` lifecycle, still short of a real 2xx).**
+  `{name, os_distro, disk_format, container_format, min_disk, min_ram, visibility,
+  url, tags}` (matches `models["compute/virtualserver/imagecreaterequest"]` verbatim,
+  `os_distro` enum `alma|centos|rhel|rocky|ubuntu|windows|oracle`) sent live got
+  `Image.InvalidObjectStorageUrl` (a resource-lookup error), NOT a `ValidationError`
+  — i.e. the body shape itself is proven to pass validation; only a real uploaded
+  `.qcow2` Object Storage URL (heavy/billable, out of scope) stands between this and
+  a 2xx. provenance: docs schema + live partial (schema-pass only, not full 2xx).
+- **storage/backup createbackup FILESYSTEM — full enum schema confirmed via docs,
+  blocked on the Agent-backup prerequisite (owner waiver 2026-06-10).**
+  `models["storage/backup/backupcreaterequest1dot2"]`: `policy_category` enum
+  `(AGENTLESS, AGENT)`, `policy_type` enum `(VM_IMAGE, FILESYSTEM)`,
+  `server_category` enum `(VIRTUAL_SERVER, GPU_SERVER, BAREMETAL_SERVER)`,
+  `retention_period` enum `(WEEK_2, MONTH_1, MONTH_3, MONTH_6, YEAR_1)`. FILESYSTEM
+  body = `{policy_category: AGENT, policy_type: FILESYSTEM, server_category,
+  server_uuid, server_guid, is_all_filesystem, filesystem_paths, schedules,
+  retention_period, region, tags}` (draft in the plan doc). Reaching a live 2xx
+  needs a server with a Backup Agent installed FIRST (`storage/backup` service
+  yaml `server-prereq`, docs) — the 8 agent-family ops are already owner-waived
+  ("agent 없는 백업으로만", 2026-06-10), so this stays practically unreachable
+  until that waiver is revisited, even though the create-body schema itself is
+  fully known. `getbackuptargetlist` with `policy_type=FILESYSTEM` is already
+  LIVE-VALIDATED 200 (known_issues.json, 2026-06-20) so the discovery path works;
+  it just returns an empty list without an installed agent. provenance: docs
+  (schema) / VALIDATED (getbackuptargetlist FILESYSTEM 200 only).
+- **networking/dns activateprivatedns — body confirmed, single field.**
+  `models["networking/dns/privatednsactivaterequest"]` (docs, official): body is
+  just `{"name": "<private-dns name>"}` — activates an ALREADY-CREATED,
+  account-global private-dns name in another region (matches
+  `private-dns-account-global` quirk above). Same body already used by the
+  disabled legacy `dns-activate` step in `regression/scenarios/scenarios.json`
+  (disabled because a same-region create never needs it, not because the body was
+  wrong). provenance: docs.
+- **data-analytics/data-flow createdataflow/createdataflowserviceconsole — full
+  official body recovered, already matches current lifecycle.** Docs
+  `models["data-analytics/data-flow/dataflowbodycreate"]` /
+  `dataflowservicecreaterequest` request_example gives the complete field set
+  (`account`, `cluster_id`, `data_flow_name`, `domain`, `dsc_domain`,
+  `host_alias_list`, `image_id`, `ingress_controller_name`, `instance_id`,
+  `node_selector`, `storage_class_name`, `tags` for create-flow; `service_workload
+  {nifi, nifi_registry, zookeeper}` with REAL non-empty example values — cpu 2000,
+  memory 1024, nifi/nifi_registry replica 1, zookeeper replica 3, versions
+  1.27.1/3.9.2 — for create-service). The current
+  `regression/scenarios/lifecycles/data-analytics__data-flow.json` bodies already
+  match this schema field-for-field (optional fields account/dsc_domain/
+  instance_id/node_selector omitted, harmlessly). Body-shape "unknown" is resolved;
+  remaining unknown is whether the doc's example VALUES clear a live create (heavy,
+  HB7). provenance: docs.
+- **data-analytics/data-ops createdataopsservice service_workload — schema
+  confirmed, value DOMAIN still genuinely undocumented (matches the 2026-06-24 live
+  400s).** `models["data-analytics/data-ops/dataopsservicecreaterequest"]`:
+  `service_workload` is typed as a bare `object` with sub-fields `cpu`/`memory`/
+  `replica`/`version` all typed `string` with NO enum/pattern/example (docs leaves
+  them blank, unlike data-flow's equivalent) — so the doc scrape cannot supply
+  valid values, only the shape (`{scheduler, web_server, worker}` each
+  `{cpu, memory, replica, version}`), which already matches what the guarded
+  lifecycle sends. `worker_type` is also a bare `string` (not a formal enum) —
+  the userguide's `Kubernetes|Celery` wording (`data-analytics__data-ops.yaml`
+  `worker-executor-choice`, docs) does not confirm the exact API token
+  (`KubernetesExecutor` is a guess). New lead for next live attempt:
+  `GET /v1/data-ops/image-versions` (`getdataopsimageversionv1`, read-only) returns
+  `contents[].version` — a real discoverable Airflow version string instead of the
+  hardcoded guess `"2.7.3"`; not yet tried. Not a waiver candidate — recommend one
+  more live attempt (HB7) seeded from this GET before giving up. provenance: docs
+  (schema only, value domain open).
+- **data-analytics/eventstreams createcluster — schema 100% confirmed; topology
+  is a carried-forward HYPOTHESIS (commit `700f72a0`, "ZK quorum" fix), still
+  NEVER live-retested since that fix landed (2026-06-19).** `instance_groups[].
+  role_type` enum confirmed `{ZOOKEEPER_BROKER, BROKER, ZOOKEEPER, AKHQ, CONSOLE}`
+  (docs, `EventStreamsClusterCreateRequestV1Dot1` — the doc's own request_example
+  wrongly reuses `role_type: ACTIVE`, a different engine's value). The
+  `data/api_bodies.json` entry for this key was hand-edited in commit `700f72a0`
+  (2026-06-19, "eventstreams ZK quorum") to 3× combined `ZOOKEEPER_BROKER`
+  instances + `is_combined: true` + `server_type_name: db1v2m4` — a reasoned guess,
+  not a docs scrape. `knowledge/formal/resources/data-analytics__eventstreams.yaml`
+  (commit `ada47e7d`, 2026-06-12, i.e. BEFORE the ZK-quorum fix) still records the
+  create as "KNOWN-BLOCKED: undocumented topology value_error" — that failure
+  predates this fix and has never been re-tried. A 2026-07-04 SCP userguide summary
+  fetch (`.../userguide/analytics/event_streams/overview/`, page render truncated
+  the exact quote) suggests combined Zookeeper+Broker deployment is a real
+  documented mode ("3 or more is typical") — directionally consistent with the
+  ZK-quorum guess but not a confirmation. Recommend this body be the FIRST thing
+  tried in the next eventstreams live slot (HB2) before any further guessing.
+  provenance: docs (schema) / UNPROVEN (topology hypothesis, untested since fix).
