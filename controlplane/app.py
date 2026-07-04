@@ -606,17 +606,17 @@ def add_run_command(gh_run_id: str, action: str = Form(...), target: str = Form(
 
 # --- Reporting -----------------------------------------------------------------
 
-REPORT_TABS = (("summary", "Summary"),
-               ("dashboard", "Coverage & Conformance"),
-               ("runs", "Runs & Archive"), ("triage", "Triage"))
+# tab keys only — labels live in the single subtab include
+# (templates/_reporting_tabs.html, P2-8; coverage/compare are sibling routes).
+REPORT_TABS = ("summary", "dashboard", "runs", "triage")
 
 
 @app.get("/reporting", response_class=HTMLResponse)
 def reporting(request: Request, tab: str = "summary"):
-    if tab not in {t for t, _ in REPORT_TABS}:
+    if tab not in REPORT_TABS:
         tab = "summary"
     return _render(request, "reporting.html", "reporting",
-                   tab=tab, tabs=REPORT_TABS,
+                   tab=tab,
                    coverage=dashdata.latest_coverage(),
                    runs=db.list_runs(limit=100),
                    archive=snapshots.archive_index(limit=100))

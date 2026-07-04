@@ -2,12 +2,8 @@
 {% block title %}Report — SCP API Regression{% endblock %}
 {% block content %}
 
-<div class="subtabs">
-  <a href="/reporting/coverage">🎨 커버리지 지도</a>
-  {% for key, label in tabs %}
-  <a href="/reporting?tab={{ key }}" class="{{ 'active' if tab == key else '' }}">{{ label }}</a>
-  {% endfor %}
-</div>
+{% set rtab = tab %}
+{% include "_reporting_tabs.html" %}
 
 {# ===================== Summary ===================== #}
 {% if tab == 'summary' %}
@@ -62,7 +58,10 @@
 {# ============ Coverage & Conformance (canonical dashboard embed) ============ #}
 {% elif tab == 'dashboard' %}
   <h2>커버리지 &amp; 정합성 <span class="hint">정식 출처 = 발행 대시보드
-    (build.py → index.html) · 여기서는 임베드만</span></h2>
+    (build.py → index.html) · 여기서는 임베드만</span>
+    <a href="/dashboard/index.html" target="_blank"
+       style="margin-left:auto;font-size:12.5px;font-weight:600"
+       title="커버리지 추세(history.jsonl)·서비스별 상세의 정식 렌더링은 공개 대시보드(면②)">📈 추세 → 공개 대시보드(면②) ↗</a></h2>
   <div class="card pad" style="padding:0;overflow:hidden">
     <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
       <span class="muted small">C1/C2/C3 사다리 · 서비스 nav · conformance 결함 —

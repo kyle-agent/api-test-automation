@@ -1,0 +1,12 @@
+{# Reporting 서브탭 — 단일 정의 (UIUX-AUDIT P2-8).
+   reporting.html · reporting_coverage.html · compare.html 이 모두 이 include를
+   쓴다 (하드코딩 이원화 금지). 활성 탭은 include 전에 `rtab` 변수로 지정:
+     {% set rtab = 'coverage'|'summary'|'dashboard'|'runs'|'triage'|'compare' %} #}
+<div class="subtabs">
+  <a href="/reporting/coverage" class="{{ 'active' if rtab == 'coverage' else '' }}">🎨 색칠지도</a>
+  <a href="/reporting?tab=summary" class="{{ 'active' if rtab == 'summary' else '' }}">📊 요약</a>
+  <a href="/reporting?tab=dashboard" class="{{ 'active' if rtab == 'dashboard' else '' }}">📈 대시보드</a>
+  <a href="/reporting?tab=runs" class="{{ 'active' if rtab == 'runs' else '' }}">🗂 실행 기록</a>
+  <a href="/reporting/compare" class="{{ 'active' if rtab == 'compare' else '' }}">⚖️ 비교</a>
+  <a href="/reporting?tab=triage" class="{{ 'active' if rtab == 'triage' else '' }}">🩺 트리아지</a>
+</div>

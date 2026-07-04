@@ -1,12 +1,8 @@
 {% extends "base.html" %}
 {% block title %}커버리지 지도 — SCP API Regression{% endblock %}
 {% block content %}
-<div class="subtabs">
-  <a href="/reporting/coverage" class="active">🎨 커버리지 지도</a>
-  <a href="/reporting?tab=summary">📊 요약</a>
-  <a href="/reporting?tab=runs">🗂 실행 기록</a>
-  <a href="/reporting?tab=triage">🩺 트리아지</a>
-</div>
+{% set rtab = 'coverage' %}
+{% include "_reporting_tabs.html" %}
 <style>
   /* DAG stage + toolbar — mirrors local_run.html so the shared renderer reads
      the same on every face (그림 하나, 여러 얼굴). */
