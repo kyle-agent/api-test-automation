@@ -52,6 +52,10 @@ html.bare-console #backToShell{display:inline}</style>
   <span class="seg">로딩 중…</span>
 </div>
 
+<!-- NOW-PLAYING (신규4): persistent strip above the tabs — 지금 실행 중인
+     lifecycle:step + METHOD path + 경과/평균(durations.json). Hidden when idle. -->
+<div class="nowplaying hidden" id="nowplaying"></div>
+
 <!-- ======================= ① 구성 ======================= -->
 <section id="screen-build" class="screen">
   <div class="cols build">

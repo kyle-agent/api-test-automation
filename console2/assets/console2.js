@@ -47,6 +47,18 @@ let lastLogText = null;     // last log text written to the 로그 <pre> (in-pla
 let r4LogTimer = null;      // dedicated slow (2s) log poller while running (detail 로그 tab)
 let expandedApi = null;     // key of the currently-expanded API row (detail API tab)
 
+// ---- run 뷰 바인딩 (F1·F2): the master 흐름 graph binds to the RUN, not to the
+// 구성 selection. runGraph = /api/runs/<id>/graph (the run's lifecycle closure,
+// same composer.graph_view + resource_graph.js contract); graphMode toggles
+// between "run 뷰" and "구성 미리보기" (manual chip; default = run when bound).
+let runGraph = null;        // the loaded run's own composition DAG
+let runGraphFor = null;     // runId the runGraph belongs to
+let graphMode = "run";      // "run" (run 뷰) | "build" (구성 미리보기)
+const endToastShown = {};   // runId -> true once the run-end toast fired
+const lateAlertSeen = {};   // runId -> true once its 늦출현 alert was surfaced
+let cleanupJustRan = false; // a force-cleanup finished → post-rescan hint (신규7)
+let graphPending = false;   // /api/graph in flight → '포함 API' shows a spinner
+
 // ---- B1 master→detail report state ----------------------------------------
 // 흐름 is the persistent MASTER (the B2 scene). The DETAIL pane is scoped to ONE
 // lifecycle (detailScope = its id) or to the cross-run aggregate (detailScope="*").
@@ -80,14 +92,10 @@ function fatal(html) {
 }
 
 function init() {
-  // a small, meaningful default so the DAG isn't empty
-  ["vpc", "subnet"].forEach(id => { if (N[id] && N[id].lifecycle) targets.add(id); });
-  if (!targets.size) {
-    const id = Object.keys(N).find(i => N[i].lifecycle);
-    if (id) targets.add(id);
-  }
-  // a ?service=<cat>/<svc> deep-link (the dashboard's per-service "Platform →"
-  // links) overrides the default and pre-selects that service.
+  // 기본 선택 = 비어 있음 (신규6 — pre-selected vpc+subnet was noise): restore
+  // the user's own last selection from sessionStorage (iframe reload / tab
+  // navigation safe); a ?service= deep-link still overrides.
+  restoreSelection();
   deepLinkService();
   wireNav();
   wireModal();
@@ -95,6 +103,47 @@ function init() {
   wireLaunch();
   wireSuites();
   go("build");
+  reattachActiveRun();      // page load with an active run → auto-rebind to it
+}
+
+// ---- selection persistence across iframe reloads (sessionStorage) ----------
+const SEL_KEY = "c2.selection.v1";
+function restoreSelection() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(SEL_KEY) || "[]");
+    if (Array.isArray(saved)) saved.forEach(id => { if (N[id] && N[id].lifecycle) targets.add(id); });
+  } catch (e) { /* corrupt/absent → empty default */ }
+}
+function persistSelection() {
+  try { sessionStorage.setItem(SEL_KEY, JSON.stringify([...targets])); } catch (e) { /* quota/file:// */ }
+}
+
+// ---- auto-reattach (A·2): on load, if a run is active (running/queued) bind the
+// console to it — graph(run 뷰) + 진행 리스트 + 상세 + 로그 — instead of an idle
+// screen that pretends nothing is happening. Static demo / fetch error → no-op.
+function reattachActiveRun() {
+  fetch("/api/runs").then(r => r.json()).then(j => {
+    const act = (j.runs || []).find(r => r.status === "running" || r.status === "queued");
+    if (!act || runId) return;
+    runId = act.id; runEvents = []; runStatus = act.status || "running";
+    detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;
+    graphMode = "run"; ensureRunGraph();
+    go("run");
+    pollEvents();
+  }).catch(() => { /* static demo or server unreachable — stay idle */ });
+}
+
+// fetch the run's OWN graph (lifecycle closure) once per run — the 흐름 master
+// scene binds to THIS in run 모드 (F1: it used to render the 구성 selection).
+function ensureRunGraph() {
+  if (!runId || runGraphFor === runId) return;
+  const id = runId;
+  runGraphFor = id; runGraph = null;
+  fetch("/api/runs/" + id + "/graph").then(r => r.json()).then(g => {
+    if (runId !== id || g.error || !g.nodes) return;
+    runGraph = g;
+    if (screen === "run") drawReport();
+  }).catch(() => { /* keep 구성 preview as fallback */ });
 }
 
 // ---- ?service=<cat>/<svc> deep-link (from the dashboard's per-service links) ----
@@ -193,14 +242,22 @@ function go(scr) {
   ["build", "run"].forEach(s => $("screen-" + s).classList.toggle("hidden", s !== scr));
   els("#screenToggle button").forEach(b => b.classList.toggle("on", b.dataset.scr === scr));
   ctxBar();
+  renderNowPlaying();       // persistent strip — follows the run on BOTH screens
   if (scr === "build") drawBuild();
   else drawRunScreen();
 }
 window.go = go;
 
 // ---- global context bar ----
+// '포함 API' = 선택의 의존 폐쇄집합 크기 (구 라벨 '폐포' — 신규9). 재계산 중이면
+// 스피너(⟳)를 보여 '0'이 잠깐 참값처럼 보이는 것을 막는다.
+const CLOSURE_TITLE = "선택한 리소스가 의존성으로 자동으로 끌어오는 전체 자원(폐쇄집합)의 크기 — " +
+  "이만큼의 생성·검증·삭제 API가 실행 대상에 포함됩니다";
+function closureCount() {
+  if (graphPending) return '<span class="spin" title="재계산 중">⟳</span>';
+  return lastGraph ? lastGraph.nodes.length : "…";
+}
 function ctxBar() {
-  const closureK = lastGraph ? lastGraph.nodes.length : "…";
   const svcs = new Set([...targets].map(id => N[id].service));
   const heavyTargets = [...targets].some(id => N[id].heavy);
   const heavyClosure = lastGraph ? lastGraph.nodes.some(n => n.heavy) : heavyTargets;
@@ -208,7 +265,7 @@ function ctxBar() {
     `<span class="seg">env <b>local</b></span>
      <span class="seg">· 선택 <b>${targets.size}</b> 리소스</span>
      <span class="seg">· 서비스 <b>${svcs.size}</b></span>
-     <span class="seg">· 폐포 <b>${closureK}</b></span>
+     <span class="seg" title="${esc(CLOSURE_TITLE)}">· 포함 API <b>${closureCount()}</b></span>
      <span class="seg">· heavy <b>${heavyClosure ? "🜂 포함" : "없음"}</b></span>
      <span class="seg">· 모델 <b>${MODEL.node_count}</b> 자원 / <b>${MODEL.lifecycle_count}</b> lifecycle</span>
      <span class="badge live">LIVE</span>`;
@@ -305,10 +362,10 @@ function toggleAll() {
 // the selection readout: 선택: N 서비스 · M 리소스 · 폐포 K (+ heavy flag)
 function selReadout() {
   const svcs = new Set([...targets].map(id => N[id].service));
-  const K = lastGraph ? lastGraph.nodes.length : "…";
   const heavy = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
   $("sel-readout").innerHTML =
-    `선택: <b>${svcs.size}</b> 서비스 · <b>${targets.size}</b> 리소스 · 폐포 <b>${K}</b>` +
+    `선택: <b>${svcs.size}</b> 서비스 · <b>${targets.size}</b> 리소스 · ` +
+    `<span title="${esc(CLOSURE_TITLE)}">포함 API <b>${closureCount()}</b></span>` +
     `<span class="${heavy ? "hvflag" : ""}">${heavy ? " · 🜂 heavy" : ""}</span>`;
   // sync the "전체 선택" toggle state
   const svcsAll = allSelectableServices();
@@ -409,6 +466,7 @@ function drawSvcTree() {
 
 // any selection change: re-render the tree (state), readout, and re-fetch the DAG
 function selectionChanged() {
+  persistSelection();       // survive iframe reloads (신규6)
   if (screen === "build") drawSvcTree();
   selReadout();
   ctxBar();
@@ -419,17 +477,19 @@ function selectionChanged() {
 // ---- live composition DAG via /api/graph (debounced) ----
 function refreshGraph() {
   if (graphTimer) clearTimeout(graphTimer);
+  graphPending = true;                       // '포함 API' shows ⟳ while stale
   graphTimer = setTimeout(fetchGraph, 180);
 }
 function fetchGraph() {
   const body = selectionPayload();
   fetch("/api/graph", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
     .then(r => r.json()).then(g => {
+      graphPending = false;
       if (g.error) { renderGraphError(g.error); return; }
       lastGraph = g;
       renderGraph(g);
       ctxBar(); selReadout(); launchSummary();
-    }).catch(e => renderGraphError(e.message));
+    }).catch(e => { graphPending = false; renderGraphError(e.message); });
 }
 function renderGraphError(msg) {
   $("dag-svg").innerHTML = `<text x="12" y="24" fill="#cf222e">graph: ${esc(msg)}</text>`;
@@ -846,11 +906,11 @@ function wireSuites() {
 }
 function launchSummary() {
   const svcs = new Set([...targets].map(id => N[id].service));
-  const K = lastGraph ? lastGraph.nodes.length : "…";
   const heavy = lastGraph ? lastGraph.nodes.some(n => n.heavy) : [...targets].some(id => N[id].heavy);
   const pq = lastGraph ? Object.values(lastGraph.peak_quota || {}).reduce((a, b) => a + b, 0) : 0;
   $("launchSum").innerHTML =
-    `대상 <b>${svcs.size}</b> svc / <b>${targets.size}</b> 리소스 · 폐포 <b>${K}</b> · peak quota <b>${pq}</b> · ` +
+    `대상 <b>${svcs.size}</b> svc / <b>${targets.size}</b> 리소스 · ` +
+    `<span title="${esc(CLOSURE_TITLE)}">포함 API <b>${closureCount()}</b></span> · peak quota <b>${pq}</b> · ` +
     `🜂heavy <span class="${heavy ? "hv" : ""}">${heavy ? "포함" : "없음"}</span>`;
   const go = $("launch-go");
   if (go) {
@@ -898,7 +958,7 @@ function drawStagedPanel() {
       const over = (it.peak_vpcs || 0) > headroom;
       const summary = `<b>${it.nServices}</b> 서비스 · <b>${it.nResources}</b> 리소스 · VPC <b>${it.peak_vpcs || 0}</b> 필요${it.heavy ? " 🜂" : ""}`;
       const detail = open ? `<div class="staged-detail">
-          <div class="staged-facts">필요 VPC <b>${it.peak_vpcs || 0}</b> · 폐포 <b>${it.closure}</b> · 현재 여유 <b>${headroom}</b></div>
+          <div class="staged-facts">필요 VPC <b>${it.peak_vpcs || 0}</b> · <span title="${esc(CLOSURE_TITLE)}">포함 API <b>${it.closure}</b></span> · 현재 여유 <b>${headroom}</b></div>
           ${over ? `<div class="staged-over">여유 부족 → 대기 큐로 들어갑니다</div>` : ""}
           <div class="staged-act">
             <button class="minibtn go" data-stage-run="${esc(it.id)}">▶ 실행</button>
@@ -959,7 +1019,7 @@ function renderStagedPreview() {
   host.dataset.preview = item.id;
   host.innerHTML = `<div class="nowbar sp-head"><span class="dot" style="background:var(--accent)"></span>
       <b>대기열 미리보기</b>
-      <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · 폐포 ${item.closure} · VPC <b>${item.peak_vpcs || 0}</b> 필요 · 현재 여유 <b id="sp-headroom">…</b>${item.heavy ? " · 🜂 heavy" : ""}</span>
+      <span class="muted small">${item.nServices} 서비스 · ${item.nResources} 리소스 · <span title="${esc(CLOSURE_TITLE)}">포함 API ${item.closure}</span> · VPC <b>${item.peak_vpcs || 0}</b> 필요 · 현재 여유 <b id="sp-headroom">…</b>${item.heavy ? " · 🜂 heavy" : ""}</span>
       <span class="sp-act">
         <span id="sp-overbadge"></span>
         <button class="minibtn go" id="sp-run" title="이 계획을 실제 실행(LIVE) — cap 아래면 ADMIT, 아니면 대기 큐로">▶ 실행</button>
@@ -1025,6 +1085,7 @@ function runStaged(item) {
       drawStagedPanel();
       runId = j.id; runEvents = []; runStatus = j.status || "running";
       detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;
+      graphMode = "run"; ensureRunGraph();
       if (runStatus === "queued") {
         $("report-main").innerHTML =
           '<div class="nowbar"><span class="dot"></span><b>대기 큐에서 대기 중</b> — 여유가 생기면 자동 실행</div>';
@@ -1053,7 +1114,12 @@ function startCapPoll() {
       lastCapacity = c;
       if (screen === "run") { drawCapBar(); drawStagedPanel(); drawLeftover(); updateStagedPreviewBudget(); }
     }).catch(() => { /* transient — keep last good capacity */ })
-      .finally(() => { if (screen === "run") capTimer = setTimeout(tick, 2000); });
+      .finally(() => {
+        // ride the same cadence to keep 실행 기록 fresh AFTER a run ends — the
+        // +5m/+15m 재스캔 결과·늦출현 알림은 이벤트 폴이 끝난 뒤에 도착한다.
+        if (screen === "run") loadRunRecords();
+        if (screen === "run") capTimer = setTimeout(tick, 2000);
+      });
   };
   capTimer = setTimeout(tick, 2000);
 }
@@ -1097,7 +1163,9 @@ function drawCapBar() {
     <div class="cap-head"><b>현재 계정 VPC ${acct}/${cap}</b>
       <span class="muted small">· 지금 실제 떠 있는 실측 (/v1/vpcs · 내 실행 + 기존 포함)</span></div>
     <div class="cap-meter">${cells.join("")}</div>
-    <div class="cap-sub muted small">기존 <b>${baseline}</b> · 내 실행 예약 <b>${reserved}</b> · 여유 <b>${headroom}</b>
+    <div class="cap-sub muted small">기존 <b>${baseline}</b> · 내 실행 보유
+      <b title="내 실행이 지금 실제로 쥐고 있는 VPC (공유 VPC 포함 — run 의 자원 id 로 귀속)">${c.mine_live != null ? c.mine_live : 0}</b>
+      · 내 실행 예약 <b>${reserved}</b> · 여유 <b>${headroom}</b>
       <span class="cap-key"><i class="live"></i>떠 있음 <i class="resv"></i>내 예약 <i></i>여유</span></div>
     <div class="cap-grp"><span class="cap-lbl">진행중 (${running.length})</span><span class="cap-chips">${runChips}</span></div>
     <div class="cap-grp"><span class="cap-lbl">대기 (${queued.length})</span><span class="cap-chips">${queChips}</span></div>
@@ -1108,12 +1176,16 @@ function drawCapBar() {
 // load a run (by id) into the master→detail report — shared by the cap-bar chips
 // and the run-records list. Fetches the run's events, resets scope, and draws.
 function loadRunIntoReport(id) {
-  runId = id; runEvents = []; runStatus = "running";
+  // status starts UNKNOWN ("…") until the fetch answers — a finished history
+  // row must never flash "running" in the status tile (신규9).
+  runId = id; runEvents = []; runStatus = "…";
   detailScope = "*"; scopeAuto = true; expandedApi = null;
+  graphMode = "run"; ensureRunGraph();       // run 클릭 = run 뷰로 재바인딩 (F2)
   fetch("/api/runs/" + id + "/events").then(r => r.json()).then(j => {
     runEvents = j.events || []; runStatus = j.status || "done";
     if (runStatus === "running" || runStatus === "queued") pollEvents();
     drawReport();
+    renderNowPlaying();
   }).catch(() => drawReport());
 }
 
@@ -1132,18 +1204,31 @@ function drawLeftover() {
   } else if (s.status === "error") {
     head = `<span class="lo-warn">스캔 실패: ${esc(s.error || "")}</span>`;
   } else {
-    const n = s.owned_total != null ? s.owned_total : (s.owned || []).length;
+    // known_issues.stuck_resources 매칭(기지 항목)은 접힘 그룹으로 — 빨간 카운트에
+    // 절대 넣지 않는다 (/testing/resources 와 같은 folding, 신규8).
+    const all = s.owned || [];
+    const stuckRows = all.filter(o => o.known_stuck);
+    const active = all.filter(o => !o.known_stuck);
+    const n = active.length;
     // scan freshness is load-bearing: a cached scan mid-run showed stale rows
     // with no cue (2026-07-04) — show WHEN this inventory was measured, always.
     const ts = s.ended ? new Date(s.ended * 1000).toLocaleTimeString() : null;
+    const stuckNote = stuckRows.length ? ` <span class="muted small">(기지 ${stuckRows.length}건 제외)</span>` : "";
     head = (n === 0
-      ? '<span class="lo-ok">없음 ✅ — 남은 자원 0건</span>'
-      : `<span class="lo-warn">⚠️ ${n}건 — 실행 전 정리 권장</span>`)
+      ? `<span class="lo-ok">없음 ✅ — 남은 자원 0건${stuckNote}</span>`
+      : `<span class="lo-warn">⚠️ ${n}건 — 실행 전 정리 권장${stuckNote}</span>`)
       + (ts ? ` <b style="margin-left:8px">🕒 마지막 스캔 ${ts}</b>` : "");
+    // 클린업 직후 재스캔에 여전히 삭제 가능 항목이 남았다면 의존 잠금 힌트 (신규7)
+    if (cleanupJustRan && n > 0) {
+      head += '<div class="lo-warn" style="margin-top:5px">의존 잠금 가능성 — 클린업 재실행 필요 '
+        + '<span class="muted small">(자원이 의존 순서 때문에 이번 스윕에서 안 지워졌을 수 있음)</span></div>';
+    } else if (cleanupJustRan && n === 0) {
+      cleanupJustRan = false;                 // converged — hint no longer needed
+    }
     if (n > 0) {
       // group by service for a service · path · count rollup
       const bySvc = {};
-      (s.owned || []).forEach(o => {
+      active.forEach(o => {
         const k = o.service || "?";
         (bySvc[k] = bySvc[k] || {}).__n = (bySvc[k].__n || 0) + 1;
         bySvc[k][o.path] = (bySvc[k][o.path] || 0) + 1;
@@ -1158,7 +1243,19 @@ function drawLeftover() {
         <thead><tr><th>service</th><th>path</th><th>count</th></tr></thead>
         <tbody>${rows}</tbody></table></div>`;
     }
+    if (stuckRows.length) {
+      list += `<details class="lo-stuck"><summary>기지 항목 ${stuckRows.length}건
+          <span class="muted small">— 문서화된 잔존 (API로 삭제 불가 · known_issues.stuck_resources)</span></summary>
+        ${stuckRows.map(o => `<div class="lo-stuck-row"><b>${esc(o.service || "?")}</b>
+            <code>${esc(o.path || "")}</code>
+            <span class="muted small">${esc((o.known_stuck && o.known_stuck.reason) || "")}</span></div>`).join("")}
+      </details>`;
+    }
   }
+  // 종료 후 자원 늦출현 배너 (신규1) — 최근 알림을 패널 상단에 상시 고정
+  const lateBanner = lateAlertBanner
+    ? `<div class="lo-late">⚠ ${esc(lateAlertBanner)} <span class="muted small">— 아래 실측 목록 자동 갱신됨</span></div>`
+    : "";
   // 강제 클린업 is account-wide (reaps by owner-tag) so the server BLOCKS it (409)
   // while any run is running/queued — grey it out with a tooltip while busy, and
   // surface any non-OK {error} inline (no alert/crash).
@@ -1171,6 +1268,7 @@ function drawLeftover() {
     : "";
   host.innerHTML = `<div class="panel lo-panel">
     <h2>남은 자원(잔존) <span class="muted small">· 실행 전 점검 (read-only) + 강제 클린업</span></h2>
+    ${lateBanner}
     <div class="lo-head">${head}</div>
     ${busyWarn}
     ${list}
@@ -1191,10 +1289,22 @@ function drawLeftover() {
     cleanupConfirm(j => {
       runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
       drawReport(); startR4Poll();
-      // after a force cleanup, auto re-scan so the panel reflects the new state
-      setTimeout(scanOwned, 1200);
+      watchCleanup(j.id);   // 종료를 기다렸다가 실측 재스캔 (1.2s 후 조기 스캔 금지)
     });
   };
+}
+
+// force-cleanup 이 실제로 END난 뒤에 owned 재스캔 (신규7): 스윕은 몇 분 걸리는데
+// 예전 코드는 1.2초 뒤에 재스캔해 '여전히 N건'이라는 낡은 스냅샷을 보여줬다.
+// 재스캔 결과에 삭제 가능 항목이 남아 있으면 drawLeftover 가 의존 잠금 힌트를 단다.
+function watchCleanup(id) {
+  const poll = () => fetch("/api/runs/" + id).then(r => r.json()).then(rec => {
+    if (rec.status === "running" || rec.status === "queued") { setTimeout(poll, 2000); return; }
+    cleanupJustRan = true;
+    toast("강제 클린업 종료 — 남은 자원 실측 재스캔 중…");
+    scanOwned();
+  }).catch(() => setTimeout(poll, 3000));
+  setTimeout(poll, 2000);
 }
 
 // trigger the owned-resource scan (POST /api/owned) and poll its record for the list
@@ -1222,7 +1332,7 @@ function drawRunSettings() {
   // sends mutations+destructive; heavy auto iff the selection pulls a heavy
   // lifecycle. The panel just SHOWS what will be applied + the LIVE run button.
   $("run-settings").innerHTML = `<div class="panel" style="margin-top:14px"><h2>실행 설정 <span class="muted small">· 항상 LIVE — 게이트는 선택에서 파생</span></h2>
-    <p class="muted small">실제 클라우드 자원을 만들고 삭제합니다. 게이트는 선택(폐포)에서 자동으로 결정됩니다 — 별도 토글 없음. VPC 동시 실행 한도(cap) 아래에서 ADMIT 되거나 대기 큐에 들어갑니다.</p>
+    <p class="muted small">실제 클라우드 자원을 만들고 삭제합니다. 게이트는 선택(의존 폐쇄집합)에서 자동으로 결정됩니다 — 별도 토글 없음. VPC 동시 실행 한도(cap) 아래에서 ADMIT 되거나 대기 큐에 들어갑니다.</p>
     <h3>적용 게이트 <span class="muted small">(선택에서 파생)</span></h3>
     <div class="chiprow">
       <span class="chip" style="border-color:var(--red)">✔ mutations</span>
@@ -1328,10 +1438,12 @@ function pfRender(plan, capacity, sel) {
   });
   const eta = a => !a.measured ? '<span class="muted">미측정</span>'
     : "~" + fmtDur(a.dur) + (a.measured < a.n ? ' <span class="muted small">(미측정 ' + (a.n - a.measured) + ")</span>" : "");
+  // 표 안 서비스 표기는 한 형태로 통일: 짧은 이름 (신규9). 생성/삭제 예상은
+  // "26 ~ 15"(범위로 오독)가 아니라 "생성 ~26 · 삭제 ~15"로.
   const rows = Object.keys(bySvc).sort().map(svc => {
     const a = bySvc[svc];
-    return "<tr><td><b>" + esc(svc) + "</b></td><td>" + a.n + "</td>" +
-      "<td>" + a.creates + " ~ " + a.deletes + "</td><td>" + eta(a) + "</td>" +
+    return "<tr><td><b>" + esc(shortName(svc)) + "</b></td><td>" + a.n + "</td>" +
+      "<td>생성 ~" + a.creates + " · 삭제 ~" + a.deletes + "</td><td>" + eta(a) + "</td>" +
       "<td>" + (a.heavy ? '<span style="color:var(--red);font-weight:700">⚠️과금 ' + a.heavy + "</span>" : "—") + "</td></tr>";
   }).join("");
   const heavy = heavyIds.length > 0;
@@ -1352,11 +1464,11 @@ function pfRender(plan, capacity, sel) {
       '<input type="checkbox" id="pf-heavy-ok"> <b>과금 실행임을 확인했습니다</b></label></div>'
     : "";
   $("pf-body").innerHTML =
-    '<p class="muted small">실제 클라우드 자원을 만들고 삭제합니다 — 게이트는 선택(폐포)에서 파생됩니다.</p>' +
+    '<p class="muted small">실제 클라우드 자원을 만들고 삭제합니다 — 게이트는 선택(의존 폐쇄집합)에서 파생됩니다.</p>' +
     gates +
-    '<table class="tbl"><thead><tr><th>service</th><th>lifecycle</th><th>생성~삭제 예상</th><th>실측 ETA</th><th>과금</th></tr></thead>' +
+    '<table class="tbl"><thead><tr><th>service</th><th>lifecycle</th><th>생성·삭제 예상</th><th>실측 ETA</th><th>과금</th></tr></thead>' +
     "<tbody>" + rows + "</tbody>" +
-    '<tfoot><tr class="lc-head"><td>합계</td><td>' + N_lc + "</td><td>" + tCreates + " ~ " + tDeletes + "</td><td>" +
+    '<tfoot><tr class="lc-head"><td>합계</td><td>' + N_lc + "</td><td>생성 ~" + tCreates + " · 삭제 ~" + tDeletes + "</td><td>" +
     (tMeasured ? "~" + fmtDur(tDur) + (tMeasured < tN ? ' <span class="muted small">(미측정 ' + (tN - tMeasured) + ")</span>" : "") : '<span class="muted">미측정</span>') +
     "</td><td>" + (heavy ? '<span style="color:var(--red);font-weight:700">⚠️ ' + heavyIds.length + "</span>" : "—") + "</td></tr></tfoot></table>" +
     '<p class="muted small" style="margin:7px 0 0">ETA = 라이프사이클 실측 평균의 순차 합산 (병렬 실행 시 단축) · ' +
@@ -1450,6 +1562,7 @@ function postRun(sel, cb) {
       if (j.error) { $("report-main").innerHTML = '<p class="empty">실행 실패: ' + esc(j.error) + "</p>"; if (cb) cb(j.error, null); return; }
       runId = j.id; runEvents = []; runStatus = j.status || "running";
       detailScope = "*"; detailTab = "res"; scopeAuto = true; expandedApi = null;   // fresh run → reconcile auto-selects
+      graphMode = "run"; ensureRunGraph();   // 흐름 = 이 run 의 그래프 (F1)
       // A QUEUED run has no events / no live scene yet: show the wait banner and let
       // pollEvents own the report until it flips to running (drawReport here would
       // build+discard the r1 scene and momentarily show a misleading "완료" banner).
@@ -1492,9 +1605,87 @@ function pollEvents() {
     const ended = runEvents.some(e => e.kind === "run-end")
       || (runStatus !== "running" && runStatus !== "queued");
     if (screen === "run") drawReport();
+    renderNowPlaying();
     if (!ended) pollTimer = setTimeout(pollEvents, 700);
-    else { runStatus = runStatus === "running" ? "done" : runStatus; if (screen === "run") drawReport(); }
+    else {
+      runStatus = runStatus === "running" ? "done" : runStatus;
+      if (screen === "run") drawReport();
+      onRunEnded();
+    }
   }).catch(() => { pollTimer = setTimeout(pollEvents, 1000); });
+}
+
+// run 종료 시 1회: 완료/실패 토스트 + (열려 있으면) 로그 자동 새로고침 (F3/신규3).
+function onRunEnded() {
+  renderNowPlaying();
+  if (!runId || endToastShown[runId]) return;
+  endToastShown[runId] = true;
+  const st = lifecycleStates();
+  const ids = Object.keys(st);
+  const passed = ids.filter(l => st[l] === "done").length;
+  const failed = ids.filter(l => st[l] === "fail");
+  let msg = `run 종료: ${passed}/${ids.length} passed`;
+  if (failed.length) msg += ` — ${failed.length} failed: ${failed.join(", ")}`;
+  else if (ids.length) msg += " — 전부 통과 ✅";
+  toast(msg, failed.length ? "fail" : "ok");
+  if (screen === "run" && detailTab === "log" && isAggScope()) loadLog(true);
+  loadRunRecords();
+}
+
+// ---- 완료/실패 토스트 (콘솔 내 비차단 알림) ---------------------------------
+let toastTimer = null;
+function toast(msg, kind) {
+  let el = $("c2-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "c2-toast";
+    document.body.appendChild(el);
+  }
+  el.className = "c2toast " + (kind || "");
+  el.textContent = msg;
+  el.classList.add("show");
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 9000);
+}
+
+// ================= now-playing bar (신규4) ====================================
+// A persistent strip above the ①/② tabs: which lifecycle:step is running RIGHT
+// NOW (METHOD path), how long the step has been running, and the lifecycle's
+// measured average duration (data/optimizer/durations.json via /api/model) —
+// "서버 생성 대기 중 — 4m32s 경과 / 평균 ~12m".
+function fmtElapsed(s) {
+  if (s == null || !isFinite(s) || s < 0) return "";
+  s = Math.round(s);
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s";
+  return Math.floor(s / 3600) + "h" + String(Math.floor((s % 3600) / 60)).padStart(2, "0") + "m";
+}
+function renderNowPlaying() {
+  const host = $("nowplaying"); if (!host) return;
+  const inFlight = runId && (runStatus === "running" || runStatus === "queued");
+  if (!inFlight) { host.classList.add("hidden"); host.innerHTML = ""; return; }
+  host.classList.remove("hidden");
+  if (runStatus === "queued") {
+    host.innerHTML = `<span class="np-dot que"></span><b>대기 큐</b>
+      <span class="muted small">run ${esc(runId)} — 여유가 생기면 자동 실행</span>`;
+    return;
+  }
+  const prog = liveProgress();
+  if (!prog.active) {
+    host.innerHTML = `<span class="np-dot"></span><b>실행 중</b>
+      <span class="muted small">run ${esc(runId)} — 다음 step 대기…</span>`;
+    return;
+  }
+  const a = prog.active;
+  const stepElapsed = a.ts ? (Date.now() / 1000 - a.ts) : null;
+  const dur = (MODEL && MODEL.durations || {})[a.lifecycle];
+  const avg = dur && dur.avg_s ? `평균 ~${fmtElapsed(dur.avg_s)}` : "평균 미측정";
+  host.innerHTML = `<span class="np-dot run"></span>
+    <b>${esc(prog.phaseLabel || "진행 중")}</b>
+    <code class="np-step">${esc(a.lifecycle)} : ${esc(a.step || "")}</code>
+    <span class="mtag ${esc(a.method || "")}">${esc(a.method || "")}</span>
+    <code class="np-path">${esc(a.path || "")}</code>
+    <span class="np-time">${stepElapsed != null ? fmtElapsed(stepElapsed) + " 경과" : ""} / ${avg}</span>`;
 }
 
 // ================= 리포트 — master(흐름) → detail(자원·API·로그) + 전체 ===========
@@ -1544,7 +1735,13 @@ function groupEventsByLifecycle(events) {
     else if (e.kind === "lifecycle-start") { const b = ensure(id); b.status = "running";
       if (e.service) b.service = e.service; if (e.heavy) b.heavy = true; }
     else if (e.kind === "lifecycle-end") { const b = ensure(id);
-      b.status = e.status === "passed" ? "done" : e.status === "skipped" ? "skip" : "fail"; }
+      b.status = e.status === "passed" ? "done" : e.status === "skipped" ? "skip" : "fail";
+      // F3: CLOSE the lifecycle's still-open (⏳) api rows — a step that never
+      // emitted step-end (timeout / engine abort) must read as a FAIL, not hang
+      // as an in-flight row forever, and it must count in the fail KPI now.
+      b.api.forEach(c => {
+        if (c.category === "run") { c.category = "fail"; c.failNote = "timeout/중단"; b.failN++; }
+      }); }
     else if (e.kind === "step-start") { const b = ensure(id); const k = e.step;
       const c = { key: k, lifecycle: id, step: k, method: e.method, path: e.path,
         status: null, category: "run", ms: null, params: null, req_body: null, resp_snippet: null };
@@ -1789,6 +1986,13 @@ function r1Overlay(id) {
   }
   const s = r1NodeState(id);
   if (!s) return null;
+  // 삭제됨: a DONE lifecycle whose tracked resources were all deleted shows 🗑
+  // (대기/진행중(pulse)/완료/실패에 더해 run 뷰의 다섯 번째 상태).
+  if (s === "done" && lc) {
+    const b = groupedRun().lcs[lc];
+    if (b && b.resources.length && b.resources.every(r => r.deleted))
+      return { fill: R1_FILL.done, stroke: R1_STK.done, badge: "🗑" };
+  }
   return { fill: R1_FILL[s], stroke: R1_STK[s], badge: R1_BDG[s] };
 }
 // collapsed-group overlay — so a LARGE run is navigable while still showing progress:
@@ -1812,23 +2016,52 @@ function r1GroupOverlay(unit) {
 // FLICKER FIX (mirrors 로그): the shell (legend + scene stage) is built ONCE per run;
 // the fast poll only refreshes the banner/progress text + the scene overlay in place
 // (r1Scene.refresh()), so zoom / focus / collapse survive every poll.
+// which graph does the master 흐름 scene render? run 모드 = the run's OWN
+// lifecycle-closure graph (/api/runs/<id>/graph); 구성 미리보기 = the 구성
+// selection's graph (the ONLY behavior before F1 — it broke whenever the
+// selection was reset/empty). Falls back gracefully when one is missing.
+function reportGraphChoice() {
+  const runG = (graphMode !== "build" || !(lastGraph && lastGraph.nodes.length))
+    && runGraph && runGraph.nodes && runGraph.nodes.length ? runGraph : null;
+  if (graphMode === "run" && runG) return { g: runG, mode: "run" };
+  if (lastGraph && lastGraph.nodes.length) return { g: lastGraph, mode: "build" };
+  if (runGraph && runGraph.nodes && runGraph.nodes.length) return { g: runGraph, mode: "run" };
+  return { g: null, mode: "none" };
+}
+
+function graphModeChip(mode) {
+  const canRun = !!(runGraph && runGraph.nodes && runGraph.nodes.length);
+  const canBuild = !!(lastGraph && lastGraph.nodes.length);
+  const cur = mode === "run"
+    ? `<b>run 뷰: ${esc(runId || "")}</b> <span class="muted small">— 이 실행의 라이프사이클 폐쇄집합</span>`
+    : `<b>구성 미리보기</b> <span class="muted small">— ① 구성의 현재 선택</span>`;
+  const other = mode === "run"
+    ? (canBuild ? '<button class="minibtn" id="r1-mode-toggle">↔ 구성 미리보기</button>' : "")
+    : (canRun ? `<button class="minibtn" id="r1-mode-toggle">↔ run 뷰: ${esc((runId || "").slice(-6))}</button>` : "");
+  return `<div class="modechip mode-${esc(mode)}">${cur} ${other}</div>`;
+}
+
 function reportR1() {
   const prog = liveProgress();
   const activeLc = prog.activeLifecycle;
-  const g = lastGraph && lastGraph.nodes.length ? lastGraph : null;
+  const choice = reportGraphChoice();
+  const g = choice.g;
   const banner = prog.running
     ? `<div class="nowbar phase-${prog.phase || "test"}"><span class="dot"></span>
         <b>${esc(prog.phaseLabel)}</b> · <span class="mono">${esc(activeLc || "")}</span>
         ${prog.active ? `<span class="muted small">${esc((prog.active.method || "") + " " + (prog.active.path || ""))}</span>` : ""}</div>`
     : `<div class="nowbar done"><span class="dot"></span><b>완료</b> · 상태 ${esc(runStatus)}</div>`;
-  // (re)build the shell only when missing or the run changed (keeps the scene alive).
+  // (re)build the shell only when missing or the run/graph-binding changed
+  // (keeps the scene alive across polls).
+  const shellKey = String(runId) + "|" + choice.mode + "|" + (choice.mode === "run" ? String(runGraphFor) : "build");
   const shell = $("r1-stage-wrap");
-  const fresh = !shell || shell.dataset.run !== String(runId);
+  const fresh = !shell || shell.dataset.run !== shellKey;
   if (fresh) {
     if (r1Scene) { r1Scene.destroy(); r1Scene = null; }
     $("report-main").innerHTML = `<div id="r1-banner">${banner}</div>
+      ${graphModeChip(choice.mode)}
       <div class="legend">${legend([["#ffffff", "대기"], ["#e8f0fd", "진행 중"], ["#eaf7ee", "완료"], ["#fdeaea", "실패"]])}
-        <span>접힌 그룹 = done/total · 그룹 클릭=펼치기 · <b>노드 클릭 = focus + 그 라이프사이클 상세 열기</b></span></div>
+        <span>접힌 그룹 = done/total · 그룹 클릭=펼치기 · <b>노드 클릭 = focus + 그 라이프사이클 상세 열기</b> · 🗑 = 자원 삭제됨</span></div>
       <div class="dag-toolbar">
         <div class="tgroup" id="r1-gran"><button data-gran="category" class="on">카테고리</button><button data-gran="service">서비스</button><button data-gran="resource">전체 펼침</button></div>
         <button class="minibtn" id="r1-collapse">⊟ 전체 접기</button>
@@ -1843,7 +2076,12 @@ function reportR1() {
         </div>
       </div>
       <div id="r1-prog" style="margin-top:8px"></div>`;
-    $("r1-stage-wrap").dataset.run = String(runId);
+    $("r1-stage-wrap").dataset.run = shellKey;
+    const mt = $("r1-mode-toggle");
+    if (mt) mt.onclick = () => {
+      graphMode = choice.mode === "run" ? "build" : "run";
+      drawReport();
+    };
     if (g) {
       r1Scene = window.ResourceGraph.scene($("r1-svg"), $("r1-stage"), g, {
         hint: $("r1-hint"), stat: $("r1-stat"),
@@ -1874,7 +2112,9 @@ function reportR1() {
       $("r1-zout").onclick = () => r1Scene.zoomOut();
       $("r1-zfit").onclick = () => r1Scene.zoomToFit();
     } else {
-      $("r1-svg").innerHTML = '<text x="12" y="22" fill="#656d76">합성 그래프 없음</text>';
+      $("r1-svg").innerHTML = runGraphFor === runId && !runGraph
+        ? '<text x="12" y="22" fill="#656d76">run 그래프 로딩 중…</text>'
+        : '<text x="12" y="22" fill="#656d76">합성 그래프 없음</text>';
     }
   } else {
     // same run, subsequent poll: refresh the banner + overlay in place (no rebuild)
@@ -2011,7 +2251,7 @@ function reportR3() {
     const isOpen = expandedApi === k;
     const row = `<tr class="apirow ${isOpen ? "open" : ""}" data-apik="${esc(k)}">
       <td><span class="caret">${isOpen ? "▾" : "▸"}</span> <span class="mtag ${esc(c.method || "")}">${esc(c.method || "")}</span> <code>${esc(c.path || "")}</code></td>
-      <td>${badge(c.category)}</td>
+      <td>${badge(c.category)}${c.failNote ? ` <span class="muted small">(${esc(c.failNote)})</span>` : ""}</td>
       <td class="muted">${c.status != null ? esc(c.status) : "—"}</td>
       <td class="muted">${c.ms != null ? c.ms + " ms" : (c.category === "run" ? "⏳" : "—")}</td>
     </tr>`;
@@ -2174,6 +2414,7 @@ function reportR4() {
       cleanupConfirm(j => {
         runId = j.id; runEvents = []; runStatus = "running"; detailTab = "log"; scopeAuto = true;
         drawReport(); startR4Poll();
+        watchCleanup(j.id);   // 종료 후 실측 재스캔 + 의존 잠금 힌트 (신규7)
       });
     $("btn-verify").onclick = () => {
       fetch("/api/verify", { method: "POST" }).then(r => r.json()).then(j => {
@@ -2200,7 +2441,8 @@ function reportR4Scoped(d) {
   const b = (groupedRun().lcs[d.id]) || { api: [], status: "queued" };
   const lines = b.api.map(c => {
     const cls = c.category === "fail" ? "err" : c.category === "soft" ? "warn" : c.category === "run" ? "dim" : "ok";
-    const tag = c.category === "fail" ? "FAIL" : c.category === "soft" ? "SOFT" : c.category === "run" ? "…" : "ok";
+    const tag = c.category === "fail" ? (c.failNote ? "FAIL(" + c.failNote + ")" : "FAIL")
+      : c.category === "soft" ? "SOFT" : c.category === "run" ? "…" : "ok";
     const code = c.status != null ? c.status : "";
     return `<span class="meth">${esc(c.method || "")}</span> ${esc(c.path || "")} `
       + `<span class="dim">(${esc(c.step || "")})</span> → <span class="${cls}">${esc(code)} ${tag}</span>`
@@ -2256,23 +2498,46 @@ function stopR4Poll() {
 function loadRunRecords() {
   fetch("/api/runs").then(r => r.json()).then(j => {
     const runs = j.runs || [];
+    handleLateAlerts(runs);   // 종료 후 자원 늦출현 (신규1) — 알림 + 패널 재스캔
     const host = $("report-side"); if (!host) return;
     if (!runs.length) { host.innerHTML = '<p class="muted small">아직 실행 기록이 없습니다.</p>'; return; }
     const KIND = { simulate: "▶sim", lifecycle: "▶live", cleanup: "🧹", verify: "🔍" };
     host.innerHTML = runs.map(r => {
       const icon = r.status === "queued" ? "⌛" : r.status === "running" ? "⏳"
-        : r.status === "done" ? (r.rc === 0 ? "✅" : "⚠️") : "❌";
+        : r.status === "done" ? (r.rc === 0 ? "✅" : "⚠️")
+        : r.status === "unknown" ? "▪" : "❌";
       const dur = (r.ended && r.started) ? Math.round(r.ended - r.started) + "s"
         : (r.status === "running" ? "실행중…" : r.status === "queued" ? "대기 중…" : "");
       const on = runId === r.id;
       const tag = KIND[r.kind] || esc(r.kind || "");
+      // 복원됨 = a rec rehydrated from disk after a server restart (신규2)
+      const rehy = r.rehydrated
+        ? ' <span class="kindtag rehy" title="서버 재시작 후 디스크 기록에서 복원됨">복원됨</span>' : "";
+      const nScans = (r.rescans || []).length;
+      const late = r.late_alert
+        ? ` <span class="latealert" title="${esc(r.late_alert.msg || "")}">⚠ 종료 후 자원 늦출현 ${r.late_alert.delta}건</span>`
+        : (nScans && nScans < 3
+           ? ` <span class="muted small" title="종료 후 실측 재스캔 (+0·+5m·+15m)">재스캔 ${nScans}/3…</span>` : "");
       return `<div class="runrow ${on ? "on" : ""}" data-id="${esc(r.id)}">
-        <span><span class="kindtag">${tag}</span> <b class="small">${icon} ${esc(r.id)}</b>
-          <span class="muted small">${esc((r.lifecycle_ids || []).slice(0, 2).join(", "))}${(r.lifecycle_ids || []).length > 2 ? " …" : ""}</span></span>
+        <span><span class="kindtag">${tag}</span>${rehy} <b class="small">${icon} ${esc(r.id)}</b>
+          <span class="muted small">${esc((r.lifecycle_ids || []).slice(0, 2).join(", "))}${(r.lifecycle_ids || []).length > 2 ? " …" : ""}</span>${late}</span>
         <span class="muted small">${esc(r.summary || r.status)} · ${dur}</span></div>`;
     }).join("");
     els("#report-side .runrow").forEach(row => row.onclick = () => loadRunIntoReport(row.dataset.id));
   }).catch(() => { const host = $("report-side"); if (host) host.innerHTML = '<p class="muted small">서버 연결 실패</p>'; });
+}
+
+// a NEW late-resource alert (rescan found MORE than the +0 scan): prominent
+// toast + banner state + auto-refresh the 남은 자원 panel once per run (신규1).
+let lateAlertBanner = null;   // the newest alert text (rendered by drawLeftover)
+function handleLateAlerts(runs) {
+  (runs || []).forEach(r => {
+    if (!r.late_alert || lateAlertSeen[r.id]) return;
+    lateAlertSeen[r.id] = true;
+    lateAlertBanner = `run ${r.id}: ${r.late_alert.msg || ("종료 후 자원 늦출현 " + r.late_alert.delta + "건")}`;
+    toast("⚠ " + lateAlertBanner, "fail");
+    if (screen === "run") scanOwned();       // 남은 자원 패널 실측 자동 갱신
+  });
 }
 
 // ================= shared helpers =================
