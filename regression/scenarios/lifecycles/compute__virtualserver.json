@@ -441,11 +441,11 @@
         },
         {
           "name": "import-image",
-          "_note": "UNPROVEN. POST /v1/images/{image_id}/import kicks an async import job for the image.",
+          "_note": "Official ImageImportRequest has a single required field 'url' (pattern .*\\.qcow2$) — the earlier 'source' field name was wrong (fixed 2026-07-04, docs-research #5). Nonexistent object URL is intentional: schema passes, resource-stage error expected (same pattern as createimage's Image.InvalidObjectStorageUrl) — a real 2xx needs an uploaded .qcow2 (heavy/billable).",
           "method": "POST",
           "path": "/v1/images/{image_id}/import",
           "json": {
-            "source": "regression-coverage-probe"
+            "url": "https://object-store.kr-west1.s.samsungsdscloud.com/regression-coverage/nonexistent-{ualpha}.qcow2"
           },
           "expect_status": [200, 201, 202, 400, 403, 404, 409, 422],
           "optional": true,
