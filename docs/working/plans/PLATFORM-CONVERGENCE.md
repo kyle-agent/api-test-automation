@@ -1,8 +1,14 @@
 ---
-status: draft (오너 결정 반영 — 2026-06-25)
+status: superseded (이행 완료된 수렴 계획 — console2가 척추에 흡수됨)
 for: owner + platform
-supersedes-direction: docs/working/plans/PLATFORM-IA-DIRECTION.md (방향 확정분의 실행 계획)
+superseded_by: PLATFORM-IA-DIRECTION.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 이 수렴 계획은 **이행 완료**됐다: console2는
+> controlplane 척추로 흡수됐고(`controlplane/console_api.py` + Testing 임베드,
+> `tools/console2_server.py`는 라이브러리化 — `console2/README.md`), IA 정본은
+> [`PLATFORM-IA-DIRECTION.md`](PLATFORM-IA-DIRECTION.md) §"✅ 확정 IA (2026-06-26)",
+> 현재 상태는 `docs/working/CONTEXT.md`다. 아래는 수렴 당시 실행 계획의 역사 기록.
 
 # 수렴 계획 — console2 → controlplane (척추 흡수)
 

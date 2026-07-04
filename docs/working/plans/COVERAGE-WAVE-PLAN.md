@@ -1,7 +1,13 @@
 ---
-status: active
+status: superseded (2026-06-11 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체)
 for: coverage
+superseded_by: CAMPAIGN-C3-100.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 현행 커버리지 캠페인의 정본은
+> [`CAMPAIGN-C3-100.md`](CAMPAIGN-C3-100.md)다 (기준선·갭 분류·슬롯 스케줄).
+> 아래 수치(ceiling 86.3% 등)는 2026-06-11 당시 값 — 현재 값은
+> `python -m spec.coverage_gap` / `docs/working/CONTEXT.md`로 재측정하라.
 
 # COVERAGE-WAVE-PLAN — the remaining static gap, prioritized
 

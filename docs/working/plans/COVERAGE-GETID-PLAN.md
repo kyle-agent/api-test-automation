@@ -1,7 +1,14 @@
 ---
-status: active
+status: superseded (2026-06-12 스냅샷 플랜 — 커버리지 캠페인 정본으로 대체)
 for: coverage
+superseded_by: CAMPAIGN-C3-100.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04).** 현행 커버리지 캠페인의 정본은
+> [`CAMPAIGN-C3-100.md`](CAMPAIGN-C3-100.md)다. id-bound GET 갭의 내구 원칙
+> (probe-read: create가 id를 캡처하면 그 id의 GET을 `verify`로 부착)은
+> `knowledge/formal/FORMAT.md` § "Probe-read completion"이 정본. 아래 수치
+> (gap_getid 130 등)는 2026-06-12 당시 값 — `python -m spec.coverage_gap`으로 재측정하라.
 
 # COVERAGE-GETID-PLAN — the id-bound GET gap, classified and attacked
 
