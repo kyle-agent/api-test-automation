@@ -124,14 +124,16 @@ flat files are a fallback). Baseline: `data/baselines/known_issues.json`.
     `python -m cleanup.verify_clean` / console2 `/api/owned`). fold 후 hygiene 체크가
     빠지면 leak 이 다음 세션까지 조용히 살아남는다. 디스패치 게이트(owned==0 + ~5min
     audit silence)와 별개로, **fold 직후에도** 적용.
-  - **⚠ LIVE IS NOT CLEAN (2026-07-04 read-only 관측 — owner 의 "cleared" 기억과
-    상충, 현재 관측이 우선):** TGW `regrtgwhdljjdbg` (`1f037f35a87143f39a3b4c1346df2bf4`)
-    state=EDITING 잔존, 그 vpc-connection `d7544cf661a140d8b0856e488ff400c9` 는
-    02:36:59Z 부터 state=DELETING 고착, VPC `regrvpcsh6a47724b`
-    (`9c89d154785849ada348e7febd3dd19c`, ACTIVE) 를 여전히 pinning. 별도 공유 VPC
-    `regrvpcsh6a4871f8` (02:37:49Z 생성) 도 잔존. **이 세션은 mutation 금지라 정리
-    안 함** — 다음 정리 윈도우에서 고친 reconciler 로 FORCE sweep (connection 선삭제
-    포함) 실행 후 owned==0 재검증할 것.
+  - **✅ RESOLVED — 위 "LIVE NOT CLEAN" 관측은 정리 진행 중의 스냅샷이었음 (2026-07-04
+    후속 재검증):** 그 관측 시점(02:36~02:41Z)은 오케스트레이터가 정확히 그 체인을
+    수동 해체하던 detach 윈도우였다 — nested `DELETE /v1/transit-gateways/{tgw}/
+    vpc-connections/{conn}` 202 → TGW EDITING/invalid-state ~4분 → TGW DELETE 202 →
+    404 → VPC DELETE 204. 이후 재검증: TGW `1f037f35…` **404**, VPC `9c89d154…`
+    **404**. "잔존 두 번째 VPC" `regrvpcsh6a4871f8` (02:37:49Z 생성) 는 leak 이 아니라
+    **owner 의 당시 진행 중 로컬 run (20260704-113744-7350, compute-virtualserver-full)
+    의 공유 VPC** 였고, run 종료 후 정리됨 — 최종 관측: **regr VPC 0**. 남은 것은
+    문서화된 known-stuck 뿐. 교훈: 정리/실행이 겹치는 시간대의 단발 관측은 leak 판정
+    근거로 불충분 — 상태 전이(DELETING/EDITING)는 in-progress 로 읽을 것.
 - **IA/CX phase 1 (2026-07-03, branch `claude/upbeat-ritchie-ieus5u` — owner-approved
   4-item batch, no live mutations, .github/ untouched):** tracker =
   `docs/working/trackers/UIUX-AUDIT-2026-07-03.md` §2 (구현 현황 표 참조).
