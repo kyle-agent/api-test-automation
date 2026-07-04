@@ -353,6 +353,12 @@ _RUNTIME_CACHE: dict = {"events": None, "oplog": None, "meta": None, "error": No
 _RUNTIME_TTL = 60.0
 _RUNTIME_LOCK = threading.Lock()
 _RUNTIME_HOURS = (1, 6, 24)          # UI window choices (default 1)
+# memo for _local_res_index (bounded rescan of run events/registry shards)
+_LOCAL_RES_CACHE: dict = {"ts": 0.0, "val": None}
+_LOCAL_RES_TTL_S = 5.0
+# a local run younger than this with no tracked resources yet is NORMAL
+# startup, not an attribution failure (review finding 2026-07-04)
+_ATTRIB_GRACE_S = 180.0
 
 
 def _runtime_error_html(msg: str) -> str:
@@ -430,9 +436,24 @@ def _local_res_index() -> dict:
     2026-07-04): 'created' res events only reach the bucket after each create's
     polling completes (minutes after loggingaudit shows Create Start), and a
     console server process predating the APITEST_RUN_ID stamp files them under
-    ``runs/local/`` — so the bucket must never be the only attribution source."""
+    ``runs/local/`` — so the bucket must never be the only attribution source.
+
+    Bounded + TTL-cached (review finding 2026-07-04): this runs on every /runtime
+    request and ``_RUNS`` is never pruned, so an unbounded rescan of every run's
+    full events file would make the view progressively slower over a long console
+    session. Scope = active runs + runs that ended within the widest view window
+    (24h), newest 50; whole result memoized for a few seconds."""
+    now = time.time()
+    with _RUNTIME_LOCK:
+        c = _LOCAL_RES_CACHE
+        if c["val"] is not None and now - c["ts"] < _LOCAL_RES_TTL_S:
+            return c["val"]
     with _LOCK:
-        recs = [(rid, r.get("events")) for rid, r in _RUNS.items()]
+        recs = [(rid, r.get("events")) for rid, r in sorted(
+                    _RUNS.items(), key=lambda kv: kv[1].get("started") or 0,
+                    reverse=True)
+                if r.get("status") in ("running", "queued")
+                or (r.get("ended") or now) > now - 24 * 3600][:50]
     out: dict[str, dict] = {}
     for rid, evp in recs:
         ids: set[str] = set()
@@ -460,12 +481,23 @@ def _local_res_index() -> dict:
                 continue
         if ids or names:
             out[rid] = {"ids": ids, "names": names}
+    with _RUNTIME_LOCK:
+        _LOCAL_RES_CACHE.update(ts=now, val=out)
     return out
 
 
 def _local_run_active() -> bool:
     with _LOCK:
         return any(r.get("status") in ("running", "queued") for r in _RUNS.values())
+
+
+def _local_run_youngest_age() -> float:
+    """Seconds since the most recently STARTED active local run (inf if none)."""
+    now = time.time()
+    with _LOCK:
+        ages = [now - (r.get("started") or 0) for r in _RUNS.values()
+                if r.get("status") in ("running", "queued")]
+    return min(ages) if ages else float("inf")
 
 
 def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"):
@@ -518,12 +550,18 @@ def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"
         if mine:
             shown = mine
         elif _local_run_active():
-            # A local run IS in flight but nothing attributed — attribution
-            # failed (or its resources aren't visible in loggingaudit yet).
-            # NEVER render a blank page here (defect 2026-07-04): degrade to
-            # the account view with a distinct diagnose-me banner.
+            # A local run IS in flight but nothing attributed. NEVER render a
+            # blank page here (defect 2026-07-04): degrade to the account view.
+            # Within the startup grace window this is NORMAL (the engine emits
+            # resource-tracked only after the first create's polling captures
+            # an id — minutes on heavy chains), so don't cry defect yet
+            # (review finding 2026-07-04).
             eff_scope = "all"
-            banner = "내 실행 귀속 실패 — 계정 전체 표시 중, 귀속 로직 점검 필요"
+            if _local_run_youngest_age() < _ATTRIB_GRACE_S:
+                banner = ("내 실행 준비 중 — 자원 이벤트 대기 (계정 전체 표시 중, "
+                          "첫 자원이 잡히면 '내 실행'으로 자동 표시)")
+            else:
+                banner = "내 실행 귀속 실패 — 계정 전체 표시 중, 귀속 로직 점검 필요"
             shown = lv.filter_spans(spans, scope="all", deleted=deleted)
         else:
             # nothing attributable to my runs and nothing in flight → show the

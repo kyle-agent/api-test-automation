@@ -173,7 +173,8 @@ def _load_server():
     return mod
 
 
-def _prime(C2, tmp_path, monkeypatch, *, run_status, tracked=(), oplog=None):
+def _prime(C2, tmp_path, monkeypatch, *, run_status, tracked=(), oplog=None,
+           run_age_s=0.0):
     """합성 로컬 run rec(+events 파일) 1건과 fresh 런타임 캐시를 심는다."""
     monkeypatch.setattr(C2, "ROOT", tmp_path)   # registry 샤드 glob → tmp (비어있음)
     evfile = tmp_path / "rec.events.jsonl"
@@ -182,7 +183,9 @@ def _prime(C2, tmp_path, monkeypatch, *, run_status, tracked=(), oplog=None):
             fh.write(json.dumps({"ts": 1.0, "kind": "resource-tracked", **t},
                                 ensure_ascii=False) + "\n")
     C2._RUNS["t-rec-1"] = {"id": "t-rec-1", "kind": "run", "status": run_status,
-                           "events": str(evfile), "started": time.time()}
+                           "events": str(evfile),
+                           "started": time.time() - run_age_s}
+    C2._LOCAL_RES_CACHE.update(ts=0.0, val=None)   # memo 무효화 (테스트 간 격리)
     C2._RUNTIME_CACHE.update(events=list(AUDIT_EVENTS), oplog=oplog, error=None,
                              meta={"start": "s", "end": "e"},
                              ts=time.monotonic(), hours=1.0, generating=False)
@@ -205,14 +208,27 @@ def test_runtime_view_mine_from_local_records_without_bucket(tmp_path, monkeypat
 
 
 def test_runtime_view_active_run_attribution_failure_banner(tmp_path, monkeypatch):
-    """로컬 실행이 ACTIVE 인데 mine 귀속이 0건 — 절대 빈 페이지가 아니라 계정 전체
-    + 진단 배너로 폴백해야 한다 (오너가 맞은 최악 케이스)."""
+    """로컬 실행이 ACTIVE + grace 초과인데 mine 귀속이 0건 — 절대 빈 페이지가 아니라
+    계정 전체 + 진단 배너로 폴백해야 한다 (오너가 맞은 최악 케이스)."""
     C2 = _load_server()
-    _prime(C2, tmp_path, monkeypatch, run_status="running", oplog=None, tracked=[])
+    _prime(C2, tmp_path, monkeypatch, run_status="running", oplog=None, tracked=[],
+           run_age_s=C2._ATTRIB_GRACE_S + 60)
     html, _ready = C2._runtime_view(1.0, scope="mine", deleted="hide")
     assert "내 실행 귀속 실패 — 계정 전체 표시 중, 귀속 로직 점검 필요" in html
     assert "regrsub22222222" in html          # 계정 스팬이 실제로 렌더됨 (blank 아님)
     assert "regrvpc11111111" in html
+
+
+def test_runtime_view_startup_grace_banner_not_failure(tmp_path, monkeypatch):
+    """방금 시작한 로컬 실행(grace 이내)은 자원 이벤트가 아직 없는 게 정상 —
+    '준비 중' 안내를 내고 '귀속 실패' 진단 배너를 내지 않는다 (리뷰 지적 2026-07-04)."""
+    C2 = _load_server()
+    _prime(C2, tmp_path, monkeypatch, run_status="running", oplog=None, tracked=[],
+           run_age_s=0.0)
+    html, _ready = C2._runtime_view(1.0, scope="mine", deleted="hide")
+    assert "내 실행 준비 중 — 자원 이벤트 대기" in html
+    assert "귀속 실패" not in html
+    assert "regrsub22222222" in html          # 계정 전체 뷰로는 렌더됨 (blank 아님)
 
 
 def test_runtime_view_idle_fallback_note_preserved(tmp_path, monkeypatch):
