@@ -37,7 +37,7 @@ Reporting`**; 구 `docs/IA.md`는 SUPERSEDED). 두 런타임으로 깔끔히 분
 | 라이브 추적 | `core/oplog.py`의 `APITEST_PLATFORM_URL` 미러를 `/api/ingest/events`로 수신 → run 상태/마일스톤 타임라인 |
 | Run 히스토리 | DB 기록 + oplog 버킷 `index.json` 아카이브 병합 |
 | 스냅샷 복원 | `runs/<id>/snapshot/`(core/snapshot.py)을 프록시해 **과거 run의 대시보드를 그대로 다시 열기** |
-| Plan 스테퍼 | `/planning?step=…` 단일 선형 흐름 **① Catalog → ② Model → ③ Compose → ④ Validate**. Catalog의 커버리지 수치는 정식 대시보드로 **링크**(재렌더 없음), Model에 의존 그래프(`/planning/dependencies`)가 접혀 들어감, AI 초안은 Model/Compose 인라인 어시스트 |
+| Modeling (구 Plan 스테퍼는 은퇴) | 구 `/planning?step=…` 스테퍼는 301 → `/planning/resources/map` (확정 IA 4단계가 대체). 의존 그래프는 `/planning/dependencies`. **AI 초안은 독립 `/ai` 파이프라인**(A1 spec-diff 영향 · A2 시나리오 초안 · A3 fact 추출 · task-draft) — 인라인이 아니라 상단 네비 `🤖 AI` + Modeling 지도/노드 폼·compose의 "AI 초안 →" 딥링크로 진입, 결과는 전부 `drafts/` 검토용 |
 | Validate 패널 | `/planning/validate` — **신규 패널**: `python -m regression.scenarios.validate`를 가드된 서브프로세스로 실행해 clean/오류 표시 (이전엔 UI 없던 단계) |
 | Report (대시보드 임베드) | `/reporting?tab=…` — `summary` / `dashboard`(정식 커버리지·conformance 대시보드 **임베드**) / `runs`(목록·아카이브) / `triage`. 옛 coverage/conformance/trends 재렌더 탭은 제거 |
 | AI triage (B1) | run 종료 후 baseline 외 신규 fail을 Claude가 environment / spec_change / test_bug / real_regression으로 분류 + 조치 제안 |

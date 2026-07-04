@@ -12,7 +12,8 @@
     service에서 유도한 <code>&lt;category&gt;__&lt;service&gt;.yaml</code>{% endif %}에
     저장합니다 (authoring 파이프라인: 검증 통과 시에만 반영 + 로컬 git 커밋).
     {% if not is_new %}고급 사용자용 raw 편집:
-    <a href="/planning/edit?path=knowledge/formal/resources/{{ file }}&find={{ node_id }}">원본 YAML 편집기</a>{% endif %}</p>
+    <a href="/planning/edit?path=knowledge/formal/resources/{{ file }}&find={{ node_id }}">원본 YAML 편집기</a>{% endif %}
+    · <a href="/ai/task-draft" title="이 서비스의 자원 task 정의를 AI가 초안 — drafts/ 검토용">AI 초안 →</a></p>
 </section>
 
 {% if not is_new %}

@@ -43,6 +43,7 @@ API 1,372    ─✏️→  노드편집 = 모델 지도    ┌ Test Planning  (�
 | **Modeling** | ② 레시피 저작 | 리소스 노드 저작: 의존·생성바인딩·옵션·캡처·검증·삭제 | **모델 지도 · 편집** | RW | `resource_form`+`resource_model`+`authoring` → `knowledge/formal/resources/*.yaml` |
 | **Testing** | ③ 요리 | `Test Planning`(선택→합성DAG→큐) ∣ `Test Execution`(실행·실시간·중단·런 리포트) | **합성 + 라이브** | RW | **console2 흡수** → `console_api.py` + console2 프론트 |
 | **Reporting** | ④ 평가 | 커버리지 색칠지도(서비스→리소스) · 2축(regression+conformance) · 추세 · 공개본 링크 | **색칠** | RO | `reporting` / `dashboard` |
+| **+Knowledge** | 참조 (5번째 항목 — 단계 흐름 밖) | 지식 파일 브라우저: `knowledge/*.md` · `knowledge/formal/*` · suites · environments | (그래프 없음 — 목록) | **RO** | `/knowledge` — *2026-07-03 owner 확정 보강* |
 
 **핵심 원칙 — "그림 하나, 여러 얼굴":** 중심 위젯은 `composer.graph_view` + scene 렌더러
 **하나**. Modeling(모델지도·편집) · Testing(합성+라이브) · Reporting(색칠) 셋이 **같은
@@ -119,6 +120,13 @@ subnet:
    집계되어 **대시보드 커버리지 %**.
 2. **노드 단위 증거** → 위 yaml의 `provenance`가 **`docs`(문서 추정) → `VALIDATED`(실제 2xx
    검증)**로 승급. = "이 리소스는 커버됐다".
+
+> **(2026-07-03 보강 — gated 정본 명기)** provenance 정본 = **`VALIDATED | docs`**,
+> 여기에 **부가 상태 `gated: <reason>`** (예: `docs` + `gated: license`). 계정
+> 게이트(라이선스 · entitlement-403 · org-master · credential)로 **이 계정에선
+> 검증 자체가 불가능**한 노드 표시이며, `gated`는 provenance를 바꾸지 않는다
+> (노드는 `docs` 유지) — UI/작업 큐에서 "할 일(docs)"과 "할 수 없음(gated)"을
+> 분리하는 근거. 표기 규약 정본: `knowledge/formal/FORMAT.md` §Account-gate marker.
 
 **AI가 높이고, 막히면 사람이 저작 — 이 과정도 이미 정의돼 있다:**
 - AI(`coverage-service` 에이전트)가 위 yaml을 채우고/고쳐 커버리지를 올린다.
