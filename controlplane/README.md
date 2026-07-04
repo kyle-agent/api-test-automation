@@ -87,6 +87,14 @@ uvicorn controlplane.app:app --host 0.0.0.0 --port 8800
 (FastAPI/uvicorn/jinja2/croniter) + 선택적 `controlplane/requirements-ai.txt`
 (`anthropic` — AI 기능용; 없어도 서버는 완전 동작, AI 섹션만 비활성 표시).
 
+**worker 실행기 로컬 runbook** (M4 경로 — 상세: `docs/DEPLOY.md`):
+
+```sh
+PLATFORM_EXECUTOR=worker uvicorn controlplane.app:app --port 8800   # 트리거 = 큐잉만
+python -m runner.worker --once        # 큐에서 1건 claim → 같은 스테이지 시퀀스 실행
+python -m runner.worker --poll 15     # 상주 폴링 모드
+```
+
 ## 환경 변수
 
 | 변수 | 용도 |

@@ -43,6 +43,16 @@ across the DB engines, so an unscoped match would promote off another service's
 evidence). It appends `# evidence: <verified key> (run <id>)` on the
 provenance line.
 
+**Evidence → promotion runbook (offline, in this order):**
+
+```bash
+python knowledge/formal/validate.py          # R1 gate — after ANY edit here
+python -m tools.derive_verified              # observations.jsonl → data/baselines/verified_endpoints.json (2xx evidence, merge)
+python -m tools.promote_validated            # dry-run report of promotable docs nodes
+python -m tools.promote_validated --apply    # rewrite provenance (+ evidence citation)
+python -m tools.catalog_status               # rollup: VALIDATED/docs/gated per service (--json for machines)
+```
+
 ### Account-gate marker — `gated:` (resource nodes, 2026-07-03)
 
 A resource node that **cannot be validated in this account** for a documented
