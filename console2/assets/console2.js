@@ -1624,10 +1624,14 @@ function onRunEnded() {
   const ids = Object.keys(st);
   const passed = ids.filter(l => st[l] === "done").length;
   const failed = ids.filter(l => st[l] === "fail");
+  // 미종료(중단/크래시 — lifecycle-end 없음)는 정직하게 별도 표기: "3/7 passed"
+  // 만 보이면 나머지가 통과처럼 읽힌다 (리뷰 후속).
+  const unfin = ids.filter(l => st[l] === "running" || st[l] === "queued").length;
   let msg = `run 종료: ${passed}/${ids.length} passed`;
   if (failed.length) msg += ` — ${failed.length} failed: ${failed.join(", ")}`;
-  else if (ids.length) msg += " — 전부 통과 ✅";
-  toast(msg, failed.length ? "fail" : "ok");
+  if (unfin) msg += ` — ${unfin} 미종료(중단)`;
+  if (!failed.length && !unfin && ids.length) msg += " — 전부 통과 ✅";
+  toast(msg, (failed.length || unfin) ? "fail" : "ok");
   if (screen === "run" && detailTab === "log" && isAggScope()) loadLog(true);
   loadRunRecords();
 }

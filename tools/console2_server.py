@@ -1749,7 +1749,9 @@ def _rec_view(rec: dict, full: bool = False) -> dict:
         except Exception:
             log = ""
     v["summary"] = _summarize(rec, log)
-    if rec.get("status") in ("done", "error", "unknown") and not rec.get("rescans"):
+    # summary text is rescan-independent (pytest tail / worker markers), so a
+    # terminal rec can cache unconditionally — rescans only append log lines.
+    if rec.get("status") in ("done", "error", "unknown"):
         rec["_summary_cache"] = v["summary"]
     if full:
         v["log"] = "".join(log.splitlines(keepends=True)[-250:])
