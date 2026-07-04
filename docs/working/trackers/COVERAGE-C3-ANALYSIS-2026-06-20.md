@@ -1,7 +1,12 @@
 ---
-status: active
+status: superseded (2026-06-20 분석 스냅샷 — 커버리지 캠페인 정본으로 대체)
 for: coverage
+superseded_by: ../plans/CAMPAIGN-C3-100.md
 ---
+
+> **⚠️ SUPERSEDED (2026-07-04, 일자 스냅샷).** 현행 커버리지 캠페인의 기준선·갭
+> 분류·스케줄 정본은 [`../plans/CAMPAIGN-C3-100.md`](../plans/CAMPAIGN-C3-100.md)
+> (+ `CAMPAIGN-C3-100-A0-gaps.json`)다. 아래는 2026-06-20 당시 서비스별 분석의 역사 기록.
 
 # C3 Coverage Analysis & Plan — 2026-06-20
 
