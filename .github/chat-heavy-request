@@ -1,13 +1,13 @@
-# HB2 (CAMPAIGN-C3-100, 2026-07-04): database depth batch 2 — epas + cachestore
-# self-sufficient cluster subops-full lifecycles. Target: 33 gap keys
-# (epas 19 · cachestore 14; eventstreams deferred to HB2b — needs a -full
-# lifecycle authored first, create body is the unverified topology hypothesis).
-# Lane gates verified before push: HB1 concluded+folded+swept, no active runs,
-# owned==1 (muted known-stuck log-group only). parallel=2 (DB ≤3 rule);
-# HB1↔HB2 merge forbidden (DB cluster quota).
+# HB3 (CAMPAIGN-C3-100, 2026-07-04): virtualserver depth + image writes + backup chain
+# compute-virtualserver-full (55 steps, shared VPC adopt) + vs-image-write-coverage
+# + gen-heavy-backup (self-sufficient VM closure, own VPC; enabled this push,
+# heavy-gated; -restore stays disabled/leak-unsafe). Target: H 53 + W 3.
+# Known-issue expectation: delete-server 400 DeleteImpossible (backend, 2x
+# reproduced) — reconciler end-sweep reclaims. Lane gates verified: HB2 concluded
+# 23:31Z + folded + swept, owned==1 muted known-stuck log-group only.
 action=run
 mutations=true
 destructive=true
 heavy=true
-crud_ids=epas-cluster-subops-full,cachestore-cluster-subops-full
-parallel=2
+crud_ids=compute-virtualserver-full,vs-image-write-coverage,gen-heavy-backup
+parallel=3

@@ -188,3 +188,18 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   일부 PF→waiver), 119는 미시도/404(부모 실존 시 업사이드 — HB 배치 유효).**
   HB2 대상 51 = untried 37 + det 14 → 디스패치 가치 유지. mariadb 잔갭·mysql
   create 재시도는 수리 후 HB1b로.
+- 2026-07-04 23:00–23:31Z **HB2 종결 — 신규 커버 0**: run 28722435523 success
+  30.5m. cachestore 풀체인 완주(2xx 전부 D6 기검증), **epas는 create 500
+  `ContactAdminForAssistance`(PF — mysql·pg-13과 동일 클래스)로 체인 literal-404
+  강등**(live-watcher가 "epas 무활동"으로 본 것은 감사이벤트 부재 때문 — 실은
+  실행됨). 신규 결정적 서명 4건(cachestore): set-commands maxmemory-policy 값 ·
+  switchover value_error · stop/start InvalidState · resize-block-storage
+  InvalidBlockStorageRoleType — repair-log 후속 대상. **결론: DB 계열 잔갭은
+  PF(waiver 후보: epas·mysql create-500 계열 확대) + 값버그(3f139795 일부 수리)
+  뿐 — DB 재실행은 수리분 검증용 HB1b/HB2b로 축소, 슬롯은 비DB 서비스 우선.**
+  플랫폼 결함 발견: chat-heavy 아티팩트의 junit-crud.xml이 stale(HB1·HB2 동일
+  1063B, 무관 lifecycle 목록) — observations만 정본, junit 생성 경로 수리 백로그.
+- 2026-07-04 **HB3 디스패치 준비**: gen-heavy-backup enabled:true 전환(자족형
+  VM 클로저 — heavy 게이트 이중 잠금 유지; -restore는 leak-unsafe로 계속 비활성).
+  구성: compute-virtualserver-full + vs-image-write-coverage + gen-heavy-backup,
+  parallel=3, VPC shared 1 + backup 자체 1 = 2/5.
