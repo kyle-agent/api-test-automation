@@ -1,12 +1,3 @@
-# HB1 (CAMPAIGN-C3-100, 2026-07-04): database depth batch 1 — mysql + mariadb
-# self-sufficient cluster subops-full lifecycles (create→wait→subops→delete).
-# Heavy/billable per campaign schedule (owner-approved batches). Target: H 27.
-# Lane verified quiet before push: owned==1(known-stuck log-group, muted) +
-# no active workflow runs + persona local run concluded & account probed clean.
-# HB1↔HB2 merge forbidden (DB cluster quota); parallel=2 (DB ≤3 rule).
-action=run
-mutations=true
-destructive=true
-heavy=true
-crud_ids=mysql-cluster-subops-full,mariadb-cluster-subops-full
-parallel=2
+# Lane reset to noop — HB1 (run 28699129653) concluded 08:09Z & folded
+# (0 new gap coverage; see CAMPAIGN-C3-100 progress log 2026-07-04).
+action=noop
