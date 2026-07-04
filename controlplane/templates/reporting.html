@@ -14,7 +14,7 @@
     <div>
       {% if fail_new %}<b>REGRESSIONS — 신규 fail {{ fail_new }}건.</b>
       {% else %}<b>HEALTHY — 신규 회귀 0.</b>{% endif %}
-      호출 {{ coverage.get('tested','-') }} · ok {{ coverage.get('ok','-') }} ·
+      호출 EP {{ coverage.get('tested','-') }} · ok 관측 {{ coverage.get('ok','-') }} ·
       soft {{ coverage.get('soft','-') }} ·
       known-red {{ coverage.get('fail_known') or 0 }}
       (sha {{ coverage.get('sha','') }})
@@ -47,8 +47,8 @@
       <div class="k">write-op (cov_op)</div></div>
     <div class="card tile" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율"><div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
       <div class="k">GET (cov_get)</div></div>
-    <div class="card tile" title="이번 run이 호출한 엔드포인트 {{ tested }}개 중 {{ coverage.get('ok','-') }}개가 2xx(ok)"><div class="v">{{ coverage.get('tested','-') }} <span style="font-size:14px;color:var(--muted)">호출</span> · {{ coverage.get('ok','-') }} <span style="font-size:14px;color:var(--green)">ok</span></div>
-      <div class="k">호출 → ok(2xx)</div></div>
+    <div class="card tile" title="단위가 다른 두 수 (분수 아님) — 호출: 응답을 받은 고유 엔드포인트 수(C2) · ok: 2xx로 판정된 관측(호출) 건수, 같은 엔드포인트 반복 호출 포함이라 더 클 수 있음"><div class="v">{{ coverage.get('tested','-') }} <span style="font-size:14px;color:var(--muted)">호출 EP</span> · {{ coverage.get('ok','-') }} <span style="font-size:14px;color:var(--green)">ok 관측</span></div>
+      <div class="k">호출 엔드포인트 → ok(2xx) 관측</div></div>
     <div class="card tile" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보"><div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
       <div class="k">신규 fail</div></div>
   </div>
