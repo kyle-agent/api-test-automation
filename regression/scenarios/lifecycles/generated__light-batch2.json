@@ -256,7 +256,7 @@
       "id": "gen-private-nat",
       "service": "networking/vpc",
       "enabled": true,
-      "_note": "composed by regression/scenarios/composer.py — targets: private-nat; branches: {\"private-nat\": \"tgw-vpc-connection\"}",
+      "_note": "composed by regression/scenarios/composer.py — targets: private-nat; branches: {\"private-nat\": \"tgw-vpc-connection\"} | 2026-07-04 pacing fix (incident run 28648339307): wait-transit-gateway until 실enum 정정 + wait-tgw-vpc-connection 600s/terminal-bad/give_up_status + NEW wait-transit-gateway-active (TGW EDITING→ACTIVE 재확인) before create-private-nat. 모델 정본: knowledge/formal/resources/networking__vpc.yaml transit-gateway/tgw-vpc-connection ready (recompose 보존).",
       "steps": [
         {
           "name": "create-vpc",
@@ -337,13 +337,17 @@
             "field": "$.transit_gateway.state",
             "until": [
               "ACTIVE",
-              "CREATED",
-              "RUNNING",
-              "AVAILABLE"
+              "ERROR",
+              "DELETED"
             ],
-            "timeout": 300,
-            "interval": 15
-          }
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "TGW state enum = CREATING/ACTIVE/DELETING/DELETED/ERROR/EDITING (api_docs transitgateway) — 구 until의 CREATED/RUNNING/AVAILABLE 는 실재하지 않는 값. run 28648339307: TGW ACTIVE 도달에 ~3.5분. ERROR/DELETED = terminal-bad (즉시 종료), give_up_status 400/404 = create 거부 시 타임아웃 소진 방지 (database__subops-full 패턴)."
         },
         {
           "name": "create-tgw-vpc-connection",
@@ -379,11 +383,42 @@
           "poll": {
             "field": "$.transit_gateway_vpc_connections[0].state",
             "until": [
-              "ACTIVE"
+              "ACTIVE",
+              "ERROR",
+              "DELETED"
             ],
-            "timeout": 300,
-            "interval": 15
-          }
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "run 28648339307: connection 이 300s 내 ACTIVE 미도달 → 구 poll 이 조용히 타임아웃 (expect_status 200 충족) → create-private-nat 400 active-transit-gateway-not-found. 600s 로 연장 + terminal-bad/give_up. NESTED per-TGW list 는 200 (라이브 확인 2026-07-04); flat /v1/transit-gateway-vpc-connections 는 이 계정에서 403."
+        },
+        {
+          "name": "wait-transit-gateway-active",
+          "service": "vpc",
+          "method": "GET",
+          "path": "/v1/transit-gateways/{transit_gateway_id}",
+          "expect_status": [
+            200
+          ],
+          "poll": {
+            "field": "$.transit_gateway.state",
+            "until": [
+              "ACTIVE",
+              "ERROR",
+              "DELETED"
+            ],
+            "timeout": 600,
+            "interval": 15,
+            "give_up_status": [
+              400,
+              404
+            ]
+          },
+          "_note": "create-private-nat 의 실제 전제조건은 'TGW state == ACTIVE' (run 28648339307: 400 scp-network.private-nat.active-transit-gateway-not-found 'Cannot found the Transit Gateway(...) in ACTIVE state'). TGW 는 vpc-connection 부착/해제 중 EDITING 으로 전이 (라이브 관측 2026-07-04) — connection ACTIVE 대기만으로는 부족하여 TGW show 를 ACTIVE 까지 재확인. DBaaS ExistInprogress 와 같은 pacing 계열."
         },
         {
           "name": "create-private-nat",

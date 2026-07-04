@@ -770,8 +770,12 @@ def compose(targets: list, choices: dict | None = None,
 
     def _read_endpoint(task: dict) -> tuple[str, str]:
         ready = task.get("ready") or {}
-        if ready.get("endpoint"):
-            return _split_endpoint(ready["endpoint"])
+        # ready may be a LIST of specs (multi-stage readiness); the task-level
+        # read path comes from the first spec that names an endpoint.
+        specs = ready if isinstance(ready, list) else [ready]
+        for spec in specs:
+            if spec.get("endpoint"):
+                return _split_endpoint(spec["endpoint"])
         delete = task.get("delete") or {}
         if delete.get("endpoint"):
             return "GET", _split_endpoint(delete["endpoint"])[1]
@@ -846,18 +850,35 @@ def compose(targets: list, choices: dict | None = None,
 
         ready = task.get("ready")
         if ready:
-            rmethod, rpath = _read_endpoint(task)
-            until = ready.get("until")
-            poll = {"field": ready["field"],
-                    "until": until if isinstance(until, list) else [until],
-                    "timeout": ready.get("timeout", 180),
-                    "interval": ready.get("interval", 10)}
-            wstep = {"name": f"wait-{node}{sfx}"}
-            if svc:
-                wstep["service"] = svc
-            wstep.update({"method": rmethod, "path": ctx.sub(inst, rpath),
-                          "expect_status": [200], "poll": poll})
-            steps.append(wstep)
+            # ready may be ONE spec or a LIST of specs — multi-stage readiness
+            # (2026-07-04, incident run 28648339307): tgw-vpc-connection needs
+            # BOTH "connection ACTIVE on the nested LIST" and "parent TGW back
+            # to ACTIVE" (the TGW sits EDITING while a connection attaches, and
+            # private-nat's create enforces TGW==ACTIVE). Each spec may override
+            # the polled endpoint; `give_up_status` passes through so a 4xx ends
+            # the poll instead of burning the full timeout (subops pattern).
+            specs = ready if isinstance(ready, list) else [ready]
+            for ri, spec in enumerate(specs):
+                if spec.get("endpoint"):
+                    rmethod, rpath = _split_endpoint(spec["endpoint"])
+                else:
+                    rmethod, rpath = _read_endpoint(task)
+                until = spec.get("until")
+                poll = {"field": spec["field"],
+                        "until": until if isinstance(until, list) else [until],
+                        "timeout": spec.get("timeout", 180),
+                        "interval": spec.get("interval", 10)}
+                if spec.get("give_up_status"):
+                    poll["give_up_status"] = list(spec["give_up_status"])
+                wstep = {"name": f"wait-{node}{sfx}" if ri == 0
+                                 else f"wait-{node}{sfx}-{ri + 1}"}
+                if svc:
+                    wstep["service"] = svc
+                wstep.update({"method": rmethod, "path": ctx.sub(inst, rpath),
+                              "expect_status": [200], "poll": poll})
+                if spec.get("note"):
+                    wstep["_note"] = spec["note"]
+                steps.append(wstep)
 
         # verify: only for target nodes, grafted on the shared first
         # instance (a target that is also a prerequisite gets NO second

@@ -196,6 +196,7 @@ def _reset_campaign_state() -> None:
     _STUCK.clear()
     _REGION_CLIENTS.clear()
     _PROGRESS_THIS_ROUND[0] = 0
+    _INPROGRESS_THIS_ROUND[0] = 0
 
 
 def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
@@ -276,12 +277,25 @@ def _select(client, service, path, *, name_prefixes: tuple[str, ...] = (),
         if skipped:
             print(f"    skipped: {', '.join(skipped[:5])}"
                   + (" …" if len(skipped) > 5 else ""))
+    # In-progress accounting (2026-07-03 TGW incident): an item in a
+    # TRANSITIONAL deleting state (DELETING/TERMINATING/…) is mid-async-removal
+    # — it will vanish on its own, but until it does it may 409-block parents
+    # (a DELETING transit-gateway blocks its VPC). Count it so main() grants
+    # another bounded round instead of declaring convergence.
+    inprog = [it for it in picked if _is_async_deleting(it)]
+    if inprog:
+        _INPROGRESS_THIS_ROUND[0] += len(inprog)
+        print(f"  {path}: {len(inprog)} item(s) mid-async-deletion "
+              f"(transitional state) — waiting, not converging")
     # Convergence (Task C, change 1): this pass yields no further progress when
     # it picked nothing deletable, OR everything it picked is already in a
     # terminal pending-deletion state (PF-09) that the delete site skips. Either
     # way a later round would re-list the same un-actionable items, so cache the
-    # pass as converged and skip re-listing it next round.
-    if _converge_enabled() and (
+    # pass as converged and skip re-listing it next round. NEVER cache while a
+    # picked item is mid-ASYNC-deletion — that collection WILL change (the item
+    # drops out) and later rounds must re-observe it to keep the in-progress
+    # signal alive until the chain (e.g. TGW → VPC) actually clears.
+    if _converge_enabled() and not inprog and (
             not picked or all(_is_pending_deletion(it) for it in picked)):
         _CONVERGED.add((service, path))
     return picked
@@ -316,6 +330,14 @@ _DELETE_ISSUED: set = set()   # ids we have issued a DELETE for this campaign
 _STUCK: dict = {}             # id -> reason, for items still listed after delete
 _PROGRESS_THIS_ROUND = [0]    # genuinely-gone deletions in the current round
                               # (boxed so run_sweep can reset/read it per round)
+_INPROGRESS_THIS_ROUND = [0]  # owned items observed mid-async-deletion (state
+                              # DELETING/TERMINATING/…) or deferred behind such a
+                              # holder this round. NOT progress, NOT convergence:
+                              # main() grants another bounded round while > 0.
+                              # (2026-07-03 incident: a 202-accepted transit-
+                              # gateway lists as DELETING for minutes; counting it
+                              # as non-progress converged the sweep while it still
+                              # 409-blocked its VPC — regrtgw*/regrvpcsh* leak.)
 
 
 def _item_id(it: dict):
@@ -411,6 +433,43 @@ def _is_pending_deletion(item: dict) -> bool:
             continue
         norm = v.lower().replace(" ", "").replace("_", "").replace("-", "")
         if norm in _PENDING_DELETE_STATES:
+            return True
+    return False
+
+
+# TRANSITIONAL async-deletion states — distinct from the PF-09 SCHEDULED family
+# above. A KMS key in "To_Be_Terminated" sits in the list for its whole waiting
+# window (days): re-listing it is NOT progress and the sweep must CONVERGE past
+# it. A transit-gateway in "DELETING" is the opposite: its 202 DELETE is landing
+# within minutes, and while it lists it still 409-blocks its VPC — the sweep must
+# WAIT (grant another bounded round), not converge (2026-07-03 incident, CI run
+# 28648339307 + console2 FORCE log: TGW enum CREATING/ACTIVE/DELETING/DELETED/
+# ERROR/EDITING; the sweep stopped "converged" with the TGW mid-deletion and the
+# shared VPC leaked ~1 day). Deliberately EXCLUDES terminal spellings
+# ("deleted"/"terminated") and CDN's "stopping" (that pass defers by design).
+_ASYNC_DELETING_STATES = frozenset({
+    "deleting",
+    "terminating",
+    "releasing",
+    "deallocating",
+    "removing",
+    "destroying",
+    "purging",
+})
+
+
+def _is_async_deleting(item: dict) -> bool:
+    """True when the item reports a TRANSITIONAL deleting state — its removal is
+    in flight and it will drop out of the list on its own within minutes. Such an
+    item counts toward ``_INPROGRESS_THIS_ROUND`` (grants another bounded round)
+    and must never converge-cache its collection. Ownership-neutral, like
+    ``_is_pending_deletion``."""
+    for field in ("state", "status"):
+        v = item.get(field)
+        if not isinstance(v, str):
+            continue
+        norm = v.lower().replace(" ", "").replace("_", "").replace("-", "")
+        if norm in _ASYNC_DELETING_STATES:
             return True
     return False
 
@@ -523,6 +582,48 @@ def _purge_vpc_children(client, vid):
                 n += 1
                 _wait_gone(client, "vpc", f"/v1/subnets/{sn['id']}", 120, 10)
     return n
+
+
+def _vpc_409_holder(client, vid) -> str | None:
+    """Best-effort: NAME the still-present resource that 409-blocks a VPC delete
+    (all read-only GETs). When a holder is detectable the VPC pass burns ONE
+    attempt + prints "blocked by <holder>" and defers to the next round, instead
+    of 6 identical noisy 409s against a dependency that only time (or a later
+    pass/round) clears — the 2026-07-03 console2 FORCE log shape.
+
+    Detectable holders:
+      * an owned transit-gateway with a vpc-connection into this VPC. The
+        connection must be enumerated via the NESTED per-TGW list
+        (``GET /v1/transit-gateways/{id}/vpc-connections`` — 200, live-verified
+        2026-07-04); the FLAT ``/v1/transit-gateway-vpc-connections`` is 403 for
+        this account (knowledge/validated-facts.md 2026-07-04 block).
+      * a loadbalancer / NAT gateway whose ``vpc_id`` matches (they are reaped by
+        the pre-pass, but a mid-drain one still holds the VPC).
+    Returns a human-readable description, or None (caller falls back to the
+    blind purge-children + retry loop)."""
+    for t in _list_all(client, "vpc", "/v1/transit-gateways"):
+        if not (t.get("id") and _is_candidate(
+                t, name_prefixes=("regrtgw", "zznettgw"))):
+            continue
+        try:
+            conns = _items(client.get(
+                f"/v1/transit-gateways/{t['id']}/vpc-connections",
+                service="vpc").body)
+        except Exception:
+            conns = []
+        for cn in conns:
+            if isinstance(cn, dict) and str(cn.get("vpc_id")) == str(vid):
+                return (f"transit-gateway {_name_of(t) or t['id']} "
+                        f"vpc-connection {cn.get('id')} "
+                        f"(state={cn.get('state')})")
+    for svc, coll, label in (("loadbalancer", "/v1/loadbalancers",
+                              "loadbalancer"),
+                             ("vpc", "/v1/nat-gateways", "nat-gateway")):
+        for x in _list_all(client, svc, coll):
+            if isinstance(x, dict) and x.get("id") \
+                    and str(x.get("vpc_id")) == str(vid):
+                return f"{label} {_name_of(x) or x['id']} (state={x.get('state')})"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -885,13 +986,61 @@ def run_sweep(client) -> int:
                       name_prefixes=("regr",)):
         if it.get("id") and _delete(c, "dns", f"/v1/hosted-zones/{it['id']}"):
             deleted += 1
+    # transit-gateways + their vpc-connections. Live evidence (2026-07-03/04
+    # incident, run 28648339307 + console2 FORCE log): a TGW with a
+    # vpc-connection does NOT reliably cascade on DELETE — the connection sits
+    # DELETING (hours observed) while the TGW reports EDITING, and the pair
+    # 409-blocks the shared VPC. The FLAT /v1/transit-gateway-vpc-connections
+    # list is 403 for this account, but the NESTED per-TGW list is 200
+    # (live-verified 2026-07-04) — so enumerate + delete each owned TGW's
+    # connections FIRST, then the TGW. Transitional (DELETING) items count as
+    # in-progress (main() grants another bounded round) instead of converging;
+    # a rejected TGW delete is transitional (its connection is draining) and is
+    # retried next round, never stuck-marked.
     for it in _select(c, "vpc", "/v1/transit-gateways",
                       name_prefixes=("regrtgw", "zznettgw")):
-        if it.get("id") and _delete(
-                c, "vpc", f"/v1/transit-gateways/{it['id']}"):
+        tid = it.get("id")
+        if not tid:
+            continue
+        # 1) reap this owned TGW's vpc-connections (children; they block both
+        #    the TGW delete and the connected VPC's delete). Owned-safe: only
+        #    children of a TGW that already passed _select's ownership gate.
+        try:
+            conns = _items(c.get(
+                f"/v1/transit-gateways/{tid}/vpc-connections",
+                service="vpc").body)
+        except Exception:
+            conns = []
+        for cn in conns:
+            cnid = cn.get("id") if isinstance(cn, dict) else None
+            if not cnid:
+                continue
+            if _is_async_deleting(cn):
+                _INPROGRESS_THIS_ROUND[0] += 1
+                print(f"  tgw-vpc-connection {cnid} (tgw {tid}) already "
+                      f"{cn.get('state')} — waiting, not re-deleting")
+                continue
+            cst = _delete(
+                c, "vpc", f"/v1/transit-gateways/{tid}/vpc-connections/{cnid}")
+            if _note_progress(cst):
+                deleted += 1
+            print(f"  tgw-vpc-connection {cnid} (tgw {tid}) delete -> {cst}")
+        # 2) the TGW itself. Mid-deletion → skip the no-op re-DELETE (already
+        #    counted in-progress by _select's async check). A first 202 IS
+        #    genuine progress (_note_progress) — the old bare `if _delete(...)`
+        #    also counted a truthy 409 as a deletion, which inflated `reported`
+        #    and helped the premature "converged" stop.
+        if _is_async_deleting(it):
+            continue
+        st = _delete(c, "vpc", f"/v1/transit-gateways/{tid}")
+        if _is_2xx_or_gone(st):
+            _note_progress(st)
             deleted += 1
-            _wait_gone(c, "vpc",
-                       f"/v1/transit-gateways/{it['id']}", 300, 15)
+            _wait_gone(c, "vpc", f"/v1/transit-gateways/{tid}", 300, 15)
+        elif st is not None:
+            print(f"  transit-gateway {_name_of(it)} ({tid}) delete -> {st} "
+                  f"(transitional while its vpc-connection drains — "
+                  f"retried next round)")
 
     # Load balancers + nat gateways have no regr name; delete any whose
     # vpc_id matches a regr* vpc. These would otherwise 409-block the vpc.
@@ -915,7 +1064,14 @@ def run_sweep(client) -> int:
                         deleted += 1
                         _wait_gone(c, svc, f"{coll}/{it['id']}", 300, 15)
 
-    # 4. vpcs — retry on 409 (lingering child), deleting any stray subnets
+    # 4. vpcs — 409 handling is HOLDER-AWARE (2026-07-03 incident): when the
+    # blocker is detectable (an owned TGW's vpc-connection into this VPC, or a
+    # mid-drain LB/NAT gateway — _vpc_409_holder), burn ONE attempt, print
+    # "blocked by <holder>", count the VPC as deferred-in-progress (grants the
+    # next round) and move on — the old loop burned 6 identical noisy 409s per
+    # round against a dependency only time clears. Only when NO holder is
+    # detectable fall back to the blind purge-children + retry loop
+    # (un-prefixed child leaks).
     deleted_vpc_ids = []
     for it in _select(c, "vpc", "/v1/vpcs",
                       name_prefixes=_VPC_NAME_PREFIXES):
@@ -928,7 +1084,12 @@ def run_sweep(client) -> int:
                 deleted_vpc_ids.append(vid)
                 break
             if st == 409:
-                # Children remain — purge ALL of this vpc's children
+                holder = _vpc_409_holder(c, vid)
+                if holder:
+                    _INPROGRESS_THIS_ROUND[0] += 1
+                    print(f"    blocked by {holder} — deferring to next round")
+                    break
+                # No detectable holder — purge ALL of this vpc's children
                 # (name-agnostic, by vpc_id) to catch un-prefixed leaks,
                 # then retry.
                 deleted += _purge_vpc_children(c, vid)
@@ -1255,6 +1416,29 @@ def run_sweep(client) -> int:
     return deleted
 
 
+def _round_verdict(genuine: int, reported: int, inprog: int) -> str:
+    """Decide how main()'s fixed-point loop proceeds after a round.
+
+    * ``"continue"``     — genuine teardown (2xx/404) happened; keep sweeping.
+    * ``"grant-inprog"`` — nothing genuinely reaped THIS round, but ≥1 owned
+      resource was observed mid-ASYNC-deletion (state DELETING/…) or a VPC was
+      deferred behind such a holder. Stopping now would strand its 409-blocked
+      dependents — the 2026-07-03 incident ("no genuinely-removed resource this
+      round (reported=1); converged — stopping" while the regrtgw* TGW was
+      mid-deletion and regrvpcsh6a47724b stayed 409-blocked). Grant another
+      round, bounded by the existing SCP_SWEEP_ROUNDS cap.
+    * ``"stop"``         — nothing genuine, nothing in flight: converged. A
+      PF-09 scheduled-deletion re-list (KMS/secrets pending their waiting
+      window) contributes to neither counter, so it still converges here —
+      the behaviour the existing offline tests lock.
+    """
+    if genuine > 0:
+        return "continue"
+    if inprog > 0:
+        return "grant-inprog"
+    return "stop"
+
+
 def main() -> int:
     """Entry point for the account-wide reconciler sweep.
 
@@ -1282,23 +1466,39 @@ def main() -> int:
     for rnd in range(1, rounds + 1):
         print(f"--- sweep round {rnd} ---", flush=True)
         _PROGRESS_THIS_ROUND[0] = 0          # reset genuine-teardown counter
+        _INPROGRESS_THIS_ROUND[0] = 0        # reset async-in-flight counter
         reported = run_sweep(client)
         genuine = _PROGRESS_THIS_ROUND[0]
+        inprog = _INPROGRESS_THIS_ROUND[0]
         # Convergence stop (Bug 3): end the sweep as soon as a round makes no
         # REAL progress — i.e. nothing genuinely-gone (2xx/404) was reaped. This
         # is stricter than the legacy ``reported == 0`` because ``reported`` can
         # be inflated by passes that still tally a deceptive status; ``genuine``
         # counts only items that actually went away. Items that re-list after a
         # delete are now marked stuck (logged once) and not retried, so a sweep
-        # with only stuck/un-deletable owned items left converges here instead of
-        # looping to max rounds. Fall back to ``reported`` for any pass that
-        # hasn't been routed through _note_progress yet (still ends on a 0-round).
-        if genuine == 0 and reported == 0:
+        # with only stuck/un-deletable owned items left converges here instead
+        # of looping to max rounds. EXCEPTION (2026-07-03 incident): a round
+        # that observed an owned item mid-ASYNC-deletion (or a VPC deferred
+        # behind one) is NOT converged — the deletion is landing and its
+        # 409-blocked dependents need the next round; grant it (still bounded
+        # by the SCP_SWEEP_ROUNDS cap).
+        verdict = _round_verdict(genuine, reported, inprog)
+        if verdict == "stop":
+            if reported:
+                print(f"no genuinely-removed resource this round "
+                      f"(reported={reported}); converged — stopping.")
             break
-        if genuine == 0:
-            print(f"no genuinely-removed resource this round "
-                  f"(reported={reported}); converged — stopping.")
-            break
+        if verdict == "grant-inprog":
+            if rnd == rounds:
+                print(f"{inprog} owned resource(s) still mid-async-deletion at "
+                      f"the round cap ({rounds}) — reporting, not forcing; "
+                      f"re-run the sweep once they settle.")
+                break
+            pause = int(os.environ.get("SCP_SWEEP_INPROGRESS_SLEEP_S", "30"))
+            print(f"{inprog} owned resource(s) mid-async-deletion (or deferred "
+                  f"behind one) — granting another round after {pause}s")
+            time.sleep(pause)
+            continue
         # In FAST (no-wait) mode rounds fire back-to-back; pause briefly so
         # async deletes issued this round actually disappear before the next
         # pass retries their now-unblocked dependents.

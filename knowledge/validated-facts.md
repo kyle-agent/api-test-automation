@@ -1469,3 +1469,51 @@ live in `cleanup/reconciler.py` (offline-tested in `tests/offline/test_reconcile
   API-less node (scr-image/scr-tag, docker-push-born) as complete when its refs
   resolve; the "생성 endpoint 없음" incomplete bucket went 2→0 truthfully (the
   validator always allowed no_api; only the UI check was dishonest).
+
+## Transit-gateway teardown & private-nat pacing — the light-batch-2 leak (2026-07-04, branch upbeat-ritchie)
+
+> conf: 0.9 · seen: 2026-07-04 · obs: 2 (CI run 28648339307 + console2 FORCE cleanup log + live re-observation 2026-07-04)
+
+- **(a) TGW deletion is ASYNC-SLOW and 409-blocks the VPC delete the whole
+  time.** State enum `(CREATING, ACTIVE, DELETING, DELETED, ERROR, EDITING)`
+  (api_docs `transitgateway`); a 202-accepted DELETE leaves the TGW listing as
+  DELETING for minutes+, and while its vpc-connection exists the connected VPC's
+  DELETE → 409. The reconciler's genuinely-removed convergence rule (correct
+  for KMS/Secrets PF-09 scheduled deletion) misread this as "no progress" and
+  STOPPED mid-drain (console2 FORCE log: round 2 "no genuinely-removed resource
+  this round (reported=1); converged — stopping" with the TGW still listed) →
+  `regrtgw*` + connection + shared `regrvpcsh6a47724b` leaked ~1 day. Fix
+  (cleanup/reconciler.py): transitional deleting states (`_ASYNC_DELETING_STATES`)
+  count as **in-progress → grant another bounded round** (`_round_verdict`),
+  never converge-cache such a collection; PF-09 scheduled states still converge.
+  A VPC 409 with a detectable holder burns ONE attempt + a "blocked by <holder>"
+  line (was 6 identical 409s/round). NOTE the `reported=1` in that log was a
+  truthy-409 counted as a deletion by the old bare `if _delete(...)` TGW pass.
+- **(b) Connection enumeration is SPLIT: flat list 403, nested list 200.**
+  `GET /v1/transit-gateway-vpc-connections` (flat) → **403 Forbidden** for this
+  account (live 2026-07-04, req-97fdee97…) — a product finding: the catalog only
+  documents the NESTED `GET /v1/transit-gateways/{id}/vpc-connections`, which
+  works (200). So the sweep CAN enumerate connections per owned TGW — and MUST:
+  **TGW delete does NOT reliably cascade its connection.** Live 2026-07-04 (the
+  owner believed the account clean): TGW `regrtgwhdljjdbg` still present in
+  EDITING, its connection `d7544cf6…` stuck DELETING since 02:36:59Z, still
+  pinning VPC `regrvpcsh6a47724b` (ACTIVE). The reconciler now deletes an owned
+  TGW's connections (nested list) BEFORE the TGW.
+- **(c) private-nat create requires TGW state == ACTIVE** — live-proven 400
+  `scp-network.private-nat.active-transit-gateway-not-found` ("Cannot found the
+  Transit Gateway(…) in ACTIVE state", run 28648339307). Distinct from the older
+  `connectable-transit-gateway-not-found` (no ACTIVE connection at all, run
+  27466988779). **The TGW re-enters EDITING while a vpc-connection attaches/
+  detaches** (live-observed), so "connection ACTIVE" alone is not enough —
+  re-poll the TGW show until ACTIVE before create-private-nat. Pacing family,
+  same class as DBaaS ExistInprogress (2026-07-02 block). Also: the engine's
+  poll TIMEOUT is SILENT when the final HTTP status is in expect_status — the
+  old 300s connection wait timed out quietly and the chain marched into the 400;
+  the incident lifecycle failed mid-chain and the engine's one-shot teardown
+  (single DELETE per cleanup, no retry/wait — engine.py `_run_cleanup`) couldn't
+  clear connection→TGW in order, which is what leaked the chain. Fixes:
+  `generated__light-batch2.json` gen-private-nat (600s waits + terminal-bad
+  `until` + `give_up_status` + new `wait-transit-gateway-active`) and the model
+  (`networking__vpc.yaml` transit-gateway/tgw-vpc-connection — two-stage
+  `ready:` list, composer now accepts a ready LIST and passes `give_up_status`
+  through, so a recompose keeps the fix).

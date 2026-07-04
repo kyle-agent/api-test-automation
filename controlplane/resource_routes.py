@@ -543,7 +543,13 @@ def resource_form(request: Request, node_id: str, service: str = ""):
                    capture_text=resource_model.capture_text(node),
                    verify_rows=resource_model.verify_rows(node),
                    lifecycle=resource_model.lifecycle_info(node),
-                   ready=node.get("ready") or {},
+                   # ready may be a LIST of specs (multi-stage readiness,
+                   # composer 2026-07-04, e.g. tgw-vpc-connection) — this
+                   # single-spec form shows stage 1 only; edit such a node in
+                   # the YAML directly (a form save would flatten the list).
+                   ready=(node["ready"][0]
+                          if isinstance(node.get("ready"), list)
+                          and node["ready"] else node.get("ready") or {}),
                    delete=node.get("delete") or {},
                    option_types=resource_model.OPTION_TYPES,
                    has_composer=True)

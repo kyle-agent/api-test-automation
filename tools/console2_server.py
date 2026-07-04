@@ -177,6 +177,12 @@ def _build_model() -> dict:
             code = task.get("code") or ""
             group = task.get("group") or ("-".join(code.split("-")[:2]) if code else cat)
             ready = task.get("ready") or {}
+            # ready may be a LIST of specs (multi-stage readiness, composer
+            # 2026-07-04); the waits run sequentially, so the display timeout
+            # is their sum.
+            if isinstance(ready, list):
+                ready = {"timeout": sum(int(r.get("timeout", 180))
+                                        for r in ready if isinstance(r, dict))}
             verify = task.get("verify") or []
             delete = task.get("delete") or {}
             src = task.get("source") if isinstance(task.get("source"), dict) else {}

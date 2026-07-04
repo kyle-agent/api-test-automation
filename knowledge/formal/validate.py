@@ -816,19 +816,36 @@ def check_resources(services: set[str], l2_resources: dict) -> tuple[int, int]:
             warn(f"{where}: create without delete.endpoint — composed "
                  "lifecycles will have no teardown for it")
         if ready is not None:
-            if not isinstance(ready, dict) or not ready.get("field") \
-                    or ready.get("until") in (None, "", []):
-                err(f"{where}: ready needs 'field' and 'until'")
-            else:
-                if ready.get("endpoint"):
-                    _check_endpoint(f"{where} ready", ready["endpoint"],
-                                    methods)
-                elif not delete.get("endpoint"):
-                    err(f"{where}: ready without endpoint and without a "
+            # ready may be ONE spec or a LIST of specs (multi-stage readiness,
+            # composer 2026-07-04 — e.g. tgw-vpc-connection: connection ACTIVE
+            # then parent TGW back to ACTIVE). Validate each spec identically.
+            # A spec without its own endpoint falls back to composer's
+            # _read_endpoint(task): the first endpoint-carrying spec, else a
+            # GET on the delete endpoint — mirror that resolution here.
+            _rspecs = ready if isinstance(ready, list) else [ready]
+            if not _rspecs:
+                err(f"{where}: ready list must not be empty")
+            _r_fallback = any(isinstance(_rs, dict) and _rs.get("endpoint")
+                              for _rs in _rspecs) or bool(delete.get("endpoint"))
+            for _ri, _rs in enumerate(_rspecs):
+                _rw = f"{where}: ready" + (f"[{_ri}]" if len(_rspecs) > 1 else "")
+                if not isinstance(_rs, dict) or not _rs.get("field") \
+                        or _rs.get("until") in (None, "", []):
+                    err(f"{_rw} needs 'field' and 'until'")
+                    continue
+                if _rs.get("endpoint"):
+                    _check_endpoint(f"{_rw}", _rs["endpoint"], methods)
+                elif not _r_fallback:
+                    err(f"{_rw} without endpoint and without a "
                         "delete.endpoint to derive a read path from")
                 for k in ("timeout", "interval"):
-                    if k in ready and not isinstance(ready[k], int):
-                        err(f"{where}: ready.{k} must be an integer")
+                    if k in _rs and not isinstance(_rs[k], int):
+                        err(f"{_rw}.{k} must be an integer")
+                if _rs.get("give_up_status") is not None and not (
+                        isinstance(_rs["give_up_status"], list)
+                        and all(isinstance(s, int)
+                                for s in _rs["give_up_status"])):
+                    err(f"{_rw}.give_up_status must be a list of ints")
 
         verify = task.get("verify")
         if verify is not None and not isinstance(verify, list):
