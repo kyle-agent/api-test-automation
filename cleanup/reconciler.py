@@ -1470,6 +1470,10 @@ def main() -> int:
         reported = run_sweep(client)
         genuine = _PROGRESS_THIS_ROUND[0]
         inprog = _INPROGRESS_THIS_ROUND[0]
+        # Machine-readable genuine tally per round: consumers (console2 클린업
+        # 요약 등) must count only genuinely-removed resources — ``reported`` is
+        # inflated by deceptive 2xx deletes that re-list next round (신규7).
+        print(f"sweep round {rnd} genuine-removed: {genuine}", flush=True)
         # Convergence stop (Bug 3): end the sweep as soon as a round makes no
         # REAL progress — i.e. nothing genuinely-gone (2xx/404) was reaped. This
         # is stricter than the legacy ``reported == 0`` because ``reported`` can

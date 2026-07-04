@@ -705,10 +705,15 @@ def run_detail(request: Request, gh_run_id: str):
             request, "run_notfound.html",
             {**common.base_ctx("reporting"), "gh_run_id": gh_run_id},
             status_code=404)
+    # local (console2) runs: pass/fail summary from the run's events file
+    # (P2-9 잔여 — lifecycle pass/fail + api ok/soft/fail on the detail page).
+    local_summary = (console_api.local_run_summary(gh_run_id)
+                     if gh_run_id.startswith("local-") else None)
     return _render(request, "run_detail.html", "reporting",
                    gh_run_id=gh_run_id, run=run, meta=meta,
                    milestones=milestones, commands=commands,
-                   triage=tri, triage_detail=tri_detail)
+                   triage=tri, triage_detail=tri_detail,
+                   local_summary=local_summary)
 
 
 @app.post("/runs/{gh_run_id}/triage", response_class=HTMLResponse)

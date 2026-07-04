@@ -33,6 +33,32 @@
   </p>
 </section>
 
+{% if local_summary %}
+<section>
+  <h2>결과 요약 <span class="muted">· 로컬(console2) 실행 — 이벤트 파일 실측</span></h2>
+  {% set lc = local_summary.get('lifecycles', {}) %}
+  {% set api = local_summary.get('api', {}) %}
+  <table>
+    <tr><th>lifecycle</th>
+        <td><b>{{ lc.get('passed', 0) }}</b> passed
+            {% if lc.get('failed') %} · <b style="color:#b02a37">{{ lc.get('failed') }} failed</b>{% endif %}
+            {% if lc.get('skipped') %} · {{ lc.get('skipped') }} skipped{% endif %}
+            {% if lc.get('unfinished') %} · {{ lc.get('unfinished') }} 미종료{% endif %}
+            <span class="muted">/ {{ lc.get('total', 0) }}</span></td>
+        <th>API 호출</th>
+        <td><b>{{ api.get('ok', 0) }}</b> ok · {{ api.get('soft', 0) }} soft ·
+            {% if api.get('fail') %}<b style="color:#b02a37">{{ api.get('fail') }} fail</b>
+            {% else %}0 fail{% endif %}</td></tr>
+    {% if lc.get('failed_ids') %}
+    <tr><th>실패 lifecycle</th>
+        <td colspan="3">{% for f in lc.get('failed_ids') %}<code>{{ f }}</code>{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>
+    {% endif %}
+  </table>
+  <p class="muted">이 실행의 라이브 콘솔 기록은 <a href="/testing/embed">Testing 콘솔</a>의
+     실행 기록(복원됨) 행에서 다시 열 수 있습니다.</p>
+</section>
+{% endif %}
+
 {% if run and run['status'] == 'running' %}
 <section>
   <h2>개입 — 명령 채널 (엔진이 step 경계마다 폴링)</h2>

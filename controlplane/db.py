@@ -102,6 +102,33 @@ def create_run(suite: str, profile: str, trigger: str = "manual",
         return cur.lastrowid
 
 
+def record_local_run(gh_run_id: str, *, status: str = "done",
+                     suite: str = "console2", profile: str = "",
+                     trigger: str = "local", requested_at: str | None = None,
+                     finished_at: str | None = None, detail: str = "") -> int:
+    """Upsert a FINISHED local (console2) run into the runs table so Reporting ▸
+    실행 기록 and /runs/{id} show it (P2-9). Idempotent on gh_run_id: an existing
+    row keeps its original timestamps; status/detail converge to the latest."""
+    with connect() as con:
+        row = con.execute("SELECT id FROM runs WHERE gh_run_id = ?",
+                          (gh_run_id,)).fetchone()
+        if row:
+            con.execute(
+                "UPDATE runs SET status = ?,"
+                " finished_at = COALESCE(finished_at, ?),"
+                " detail = CASE WHEN detail = '' THEN ? ELSE detail END"
+                " WHERE id = ?",
+                (status, finished_at, detail[:2000], row["id"]))
+            return row["id"]
+        cur = con.execute(
+            "INSERT INTO runs (gh_run_id, suite, profile, trigger, status,"
+            " requested_at, started_at, finished_at, detail)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (gh_run_id, suite, profile, trigger, status,
+             requested_at or now(), requested_at, finished_at, detail[:2000]))
+        return cur.lastrowid
+
+
 def list_runs(limit: int = 50) -> list[sqlite3.Row]:
     with connect() as con:
         return con.execute(

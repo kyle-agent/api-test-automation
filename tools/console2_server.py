@@ -349,7 +349,10 @@ def _knowledge_view(service: str, cap: int = 24) -> dict:
 # card). One harvest at a time (the `generating` flag).
 # --------------------------------------------------------------------------- #
 _RUNTIME_CACHE: dict = {"events": None, "oplog": None, "meta": None, "error": None,
-                        "ts": 0.0, "hours": None, "generating": False}
+                        "ts": 0.0, "wall": 0.0, "hours": None, "generating": False}
+# 신선도 (신규5): a cached window older than this gets a "데이터 기준: N분 전"
+# chip + an auto-refreshing page so the popup converges to the regenerated view.
+_RUNTIME_STALE_S = 120.0
 _RUNTIME_TTL = 60.0
 _RUNTIME_LOCK = threading.Lock()
 _RUNTIME_HOURS = (1, 6, 24)          # UI window choices (default 1)
@@ -380,6 +383,8 @@ def _runtime_wait_html(hours: float) -> str:
             f"<div style='font-size:12px;color:#8c959f'>최근 {hours:g}시간 · 자동 새로고침</div>"
             "<div style='width:38px;height:38px;border:4px solid #d0d7de;border-top-color:#2563c9;"
             "border-radius:50%;animation:spin 1s linear infinite'></div>"
+            "<div style='font-size:12px;color:#8c959f'>첫 수집은 보통 30~90초 걸립니다 "
+            "(loggingaudit 페이지네이션 + oplog 조인) — 이 창은 준비되는 대로 자동 표시됩니다.</div>"
             "<style>@keyframes spin{to{transform:rotate(360deg)}}</style></body>")
 
 
@@ -410,7 +415,8 @@ def _runtime_generate(hours: float) -> None:
     with _RUNTIME_LOCK:
         _RUNTIME_CACHE.update(events=events, oplog=oplog_events, error=error,
                               meta={"start": start, "end": end},
-                              ts=time.monotonic(), hours=hours, generating=False)
+                              ts=time.monotonic(), wall=time.time(),
+                              hours=hours, generating=False)
 
 
 def _local_run_ids() -> list[str]:
@@ -532,8 +538,15 @@ def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"
         oplog_events = _RUNTIME_CACHE["oplog"] if usable else None
         meta = dict(_RUNTIME_CACHE["meta"] or {}) if usable else {}
         error = _RUNTIME_CACHE["error"] if usable else None
+        cache_wall = _RUNTIME_CACHE.get("wall") or 0.0
     if events is None:
         return None, False
+    # freshness (신규5): how old is the rendered WINDOW? Beyond ~2min the page
+    # says so explicitly and auto-refreshes until the bg regen lands — a popup
+    # must never silently show a 25-minutes-ago window as "now".
+    age_s = max(0.0, time.time() - cache_wall) if cache_wall else None
+    stale = age_s is not None and age_s > _RUNTIME_STALE_S
+    refresh = 12 if (stale or not fresh) else 0
     if error and not events:
         return _runtime_error_html(error), fresh
     now = datetime.now(timezone.utc)
@@ -577,9 +590,14 @@ def _runtime_view(hours: float = 1.0, scope: str = "mine", deleted: str = "hide"
     if oplog_events is None:
         note = ((note + " · ") if note else "") + \
             "oplog 버킷에 접근할 수 없어 CI 출처(origin) 배지가 불완전할 수 있습니다."
+    if age_s is not None and age_s >= 60:
+        chip = f"🕒 데이터 기준: {int(age_s // 60)}분 전 윈도우"
+        if stale:
+            chip += " — 재수집 중, 자동 새로고침"
+        note = chip + ((" · " + note) if note else "")
     chrome = {"scope": scope, "hours": int(hours), "deleted": deleted,
               "banner": banner, "note": note}
-    html_out = lv.render_flow(shown, now, meta, refresh=0, chrome=chrome)
+    html_out = lv.render_flow(shown, now, meta, refresh=refresh, chrome=chrome)
     return html_out, fresh
 
 
@@ -706,6 +724,39 @@ def _graph(sel: dict) -> dict:
     return composer.graph_view(targets, sel.get("choices") or None)
 
 
+_EMPTY_GRAPH = {"nodes": [], "edges": [], "levels": [0], "shared": [],
+                "peak_quota": {}, "order": [], "teardown": []}
+
+
+def _run_graph(rec: dict) -> dict:
+    """The composition DAG for a RUN's lifecycle closure — same
+    ``composer.graph_view`` + ``resource_graph.js`` contract as the 구성 graph
+    (IA-BUILD-CONTRACT: same graph, different overlay). Lets the master 흐름
+    scene rebind to any run (active or history row) instead of whatever the
+    구성 selection happens to be [F1·F2]."""
+    ids = set(rec.get("lifecycle_ids") or [])
+    if not ids:
+        return dict(_EMPTY_GRAPH)
+    m = _model()
+    targets = sorted(nid for nid, n in m["nodes"].items()
+                     if n.get("lifecycle") in ids)
+    if not targets:
+        return dict(_EMPTY_GRAPH)
+    from regression.scenarios import composer
+    return composer.graph_view(targets)
+
+
+def _durations_view() -> dict:
+    """Measured per-lifecycle wall durations (data/optimizer/durations.json) —
+    feeds the now-playing bar's '평균 ~12m' expectation [신규4]."""
+    try:
+        from regression.scenarios.schedule_optimizer import load_durations
+        return {k: {"avg_s": v.get("avg_s"), "n": v.get("n")}
+                for k, v in load_durations().items() if isinstance(v, dict)}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _plan(lifecycle_ids: list[str]) -> dict:
     """The REAL offline schedule for a leaf set, via regression.scenarios.dag_planner."""
     from regression.scenarios import dag_planner, validate_dag
@@ -791,6 +842,307 @@ def _emit_event(evpath: str, evkind: str, **fields) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# run-history observability (2026-07-04 Run 관측성 개편):
+#   * _events_summary  — fold an event stream to the run verdict (lifecycle
+#     pass/fail + api ok/soft/fail; still-open steps of a FAILED lifecycle are
+#     closed as fail so a timeout never leaves a phantom ⏳ row — mirrors
+#     console2.js groupEventsByLifecycle).
+#   * _rehydrate_runs  — rebuild _RUNS from reports/console2-runs/*.log/.events
+#     on server start (신규2: a console restart used to erase all run history).
+#   * _record_run_to_db / _backfill_runs_db — mirror finished local runs into
+#     the controlplane runs DB (gh_run_id = "local-<rec id>") so Reporting ▸
+#     실행 기록 and /runs/{id} show them (P2-9 완결).
+#   * _post_run_rescans — owned re-scans at +0/+5m/+15m after a run ends
+#     (신규1: run 64b5's timed-out image-create materialized 2 images +
+#     4 snapshots ~20min AFTER the '0건' scan — the +0 scan alone is false
+#     comfort). A later scan finding MORE than +0 raises rec["late_alert"].
+# --------------------------------------------------------------------------- #
+def _events_summary(events: list[dict]) -> dict:
+    """Pure fold: event stream -> {"lifecycles": {...}, "api": {...}}. Steps that
+    were started but never ended when their lifecycle ends count as ``fail``
+    (timeout/중단) — the in-flight row must CLOSE on failure [F3]."""
+    lc_state: dict[str, str] = {}
+    api = {"ok": 0, "soft": 0, "fail": 0}
+    open_steps: dict[tuple, dict] = {}
+    for e in events or []:
+        k = e.get("kind")
+        lid = e.get("lifecycle")
+        if k == "lifecycle-start":
+            lc_state.setdefault(lid, "running")
+        elif k == "step-start":
+            open_steps[(lid, e.get("step"))] = e
+        elif k == "step-end":
+            open_steps.pop((lid, e.get("step")), None)
+            cat = e.get("category")
+            if cat in api:
+                api[cat] += 1
+        elif k == "lifecycle-end":
+            st = e.get("status")
+            lc_state[lid] = ("passed" if st == "passed"
+                             else "skipped" if st == "skipped" else "failed")
+            # close this lifecycle's still-open steps as fail (timeout/중단)
+            for key in [key for key in open_steps if key[0] == lid]:
+                open_steps.pop(key)
+                api["fail"] += 1
+    failed_ids = sorted(k for k, v in lc_state.items() if v == "failed")
+    return {
+        "lifecycles": {
+            "total": len(lc_state),
+            "passed": sum(1 for v in lc_state.values() if v == "passed"),
+            "failed": len(failed_ids),
+            "skipped": sum(1 for v in lc_state.values() if v == "skipped"),
+            "unfinished": sum(1 for v in lc_state.values() if v == "running"),
+            "failed_ids": failed_ids,
+        },
+        "api": api,
+    }
+
+
+_REHY_KIND = (  # log-header marker -> rec kind (see the workers' first write)
+    ("# console2 SIMULATE", "simulate"),
+    ("# console2 FORCE cleanup", "cleanup"),
+    ("# console2 cleanup VERIFY", "verify"),
+    ("# console2 owned-resource scan", "owned"),
+    ("# console2 run ", "lifecycle"),
+)
+_PYTEST_SUMMARY_RE = re.compile(
+    r"(?m)^((?:\d+ (?:failed|passed|skipped|error(?:s)?|warnings?),? ?)+) ?in [\d.]+s")
+
+
+def _rehydrate_one(rid: str, logp: Path, evp: Path) -> dict | None:
+    """One run-id's on-disk remains -> a rec dict (or None when unparseable)."""
+    import ast
+    head = txt = ""
+    try:
+        if logp.exists():
+            txt = logp.read_text(encoding="utf-8", errors="replace")
+            head = "\n".join(txt.splitlines()[:3])
+    except OSError:
+        txt = head = ""
+    kind = "lifecycle"
+    for marker, k in _REHY_KIND:
+        if marker in head:
+            kind = k
+            break
+    lifecycle_ids: list = []
+    m = re.search(r"lifecycle_ids=(\[[^\n]*\])", head)
+    if m:
+        try:
+            lifecycle_ids = list(ast.literal_eval(m.group(1)))
+        except Exception:  # noqa: BLE001
+            lifecycle_ids = []
+    gates = {"mutations": "mutations=True" in head,
+             "destructive": "destructive=True" in head,
+             "heavy": "heavy=True" in head}
+    # verdict from the pytest tail (lifecycle runs) / worker markers (utilities)
+    status, rc = "unknown", None
+    ms = _PYTEST_SUMMARY_RE.search(txt or "")
+    if kind == "lifecycle":
+        if ms:
+            status = "done"
+            rc = 1 if re.search(r"\d+ failed", ms.group(1)) else 0
+    elif txt:
+        status, rc = "done", 0
+    # timestamps: event stream first/last ts, else file mtimes
+    started = ended = None
+    events: list[dict] = []
+    if evp.exists():
+        events = _read_events(str(evp))
+        if events:
+            started = events[0].get("ts")
+            ended = events[-1].get("ts")
+    try:
+        mt = logp.stat().st_mtime if logp.exists() else (
+            evp.stat().st_mtime if evp.exists() else None)
+    except OSError:
+        mt = None
+    if not txt and not events:
+        return None                # 0-byte remains (aborted starts) — pure noise
+    if started is None:
+        started = mt or 0.0
+    if ended is None:
+        ended = mt
+    rec = {"id": rid, "kind": kind, "mode": "live" if kind == "lifecycle" else kind,
+           "status": status, "lifecycle_ids": lifecycle_ids,
+           "heavy": gates["heavy"], "mutations": gates["mutations"],
+           "destructive": gates["destructive"],
+           "started": started, "ended": ended, "rc": rc,
+           "log": str(logp), "events": str(evp), "rehydrated": True}
+    if kind == "lifecycle" and events:
+        rec["events_summary"] = _events_summary(events)
+    return rec
+
+
+def _rehydrate_runs(run_dir: Path | None = None) -> int:
+    """Rebuild _RUNS from the per-run files on disk (server start). Never raises;
+    existing in-memory recs win. Returns the number of rehydrated recs."""
+    rd = run_dir or RUN_DIR
+    found: dict[str, dict] = {}
+    try:
+        for p in rd.glob("*.log"):
+            found.setdefault(p.name[:-len(".log")], {})["log"] = p
+        for p in rd.glob("*.events.jsonl"):
+            found.setdefault(p.name[:-len(".events.jsonl")], {})["events"] = p
+    except OSError:
+        return 0
+    n = 0
+    for rid, files in sorted(found.items()):
+        with _LOCK:
+            if rid in _RUNS:
+                continue
+        try:
+            rec = _rehydrate_one(rid, files.get("log") or rd / f"{rid}.log",
+                                 files.get("events") or rd / f"{rid}.events.jsonl")
+        except Exception:  # noqa: BLE001 — one bad file never blocks the rest
+            rec = None
+        if not rec:
+            continue
+        with _LOCK:
+            _RUNS.setdefault(rid, rec)
+        n += 1
+    return n
+
+
+def _iso_utc(ts) -> str | None:
+    try:
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(float(ts)))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _record_run_to_db(rec: dict) -> None:
+    """Best-effort mirror of a FINISHED local lifecycle run into the controlplane
+    runs DB (gh_run_id = ``local-<rec id>``) so Reporting ▸ 실행 기록 and
+    /runs/{id} can show it. Silent no-op on any failure (the console must never
+    die on DB trouble); only runs with a verdict (rc known) are recorded."""
+    if rec.get("kind") != "lifecycle" or rec.get("rc") is None:
+        return
+    try:
+        from controlplane import db as _cdb
+        summ = rec.get("events_summary")
+        if summ is None:
+            summ = _events_summary(_read_events(rec.get("events", "")))
+            rec["events_summary"] = summ
+        detail = json.dumps({"source": "console2-local",
+                             "lifecycle_ids": rec.get("lifecycle_ids") or [],
+                             "summary": summ}, ensure_ascii=False)
+        _cdb.record_local_run(
+            "local-" + rec["id"],
+            status="done" if rec.get("rc") == 0 else "failed",
+            requested_at=_iso_utc(rec.get("started")),
+            finished_at=_iso_utc(rec.get("ended")),
+            detail=detail)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _backfill_runs_db() -> int:
+    """Record every rehydrated finished lifecycle run into the controlplane DB
+    (idempotent — record_local_run upserts on gh_run_id)."""
+    with _LOCK:
+        recs = [r for r in _RUNS.values()
+                if r.get("rehydrated") and r.get("kind") == "lifecycle"
+                and r.get("rc") is not None]
+    for r in recs:
+        _record_run_to_db(r)
+    return len(recs)
+
+
+def _local_run_summary(gh_run_id: str) -> dict | None:
+    """Pass/fail summary for a ``local-*`` run id, from its events file — used by
+    the controlplane run-detail page (P2-9 잔여). Looks in this console's RUN_DIR
+    (id minus the ``local-`` prefix) and the worker executor's sink."""
+    rid = gh_run_id[len("local-"):] if gh_run_id.startswith("local-") else gh_run_id
+    with _LOCK:
+        rec = _RUNS.get(rid)
+    candidates = []
+    if rec:
+        if rec.get("events_summary"):
+            return rec["events_summary"]
+        if rec.get("events"):
+            candidates.append(Path(rec["events"]))
+    candidates += [RUN_DIR / f"{rid}.events.jsonl",
+                   ROOT / "reports" / "controlplane-local" / f"{gh_run_id}.jsonl"]
+    for p in candidates:
+        try:
+            if p.exists() and p.stat().st_size:
+                return _events_summary(_read_events(str(p)))
+        except OSError:
+            continue
+    return None
+
+
+# ---- 종료 후 지연 재스캔 (신규1) ---------------------------------------------
+_RESCAN_OFFSETS_S = (0.0, 300.0, 900.0)     # +0 · +5m · +15m
+
+
+def _default_owned_scan() -> list[dict]:
+    # read-only-ness guaranteed by scan_owned stubbing _delete/_wait_gone
+    os.environ.setdefault("SCP_ALLOW_DESTRUCTIVE", "false")
+    from cleanup.verify_clean import scan_owned
+    return scan_owned()
+
+
+def _post_run_rescans(rec: dict, offsets=_RESCAN_OFFSETS_S,
+                      scan=None, sleep=time.sleep) -> None:
+    """Owned re-scans at the given offsets after a run ends. Results accrue on
+    ``rec["rescans"]``; a later scan finding MORE items than the +0 scan sets
+    ``rec["late_alert"]`` (비동기 생성물 의심) — the UI surfaces it prominently.
+    ``scan``/``sleep`` are injectable so tests drive this with a fake clock."""
+    if scan is None:
+        scan = _default_owned_scan
+    with _LOCK:
+        rec["rescans"] = []
+    base = None
+    prev = 0.0
+    for off in offsets:
+        wait = float(off) - prev
+        prev = float(off)
+        if wait > 0:
+            sleep(wait)
+        label = f"+{int(off // 60)}m" if off >= 60 else f"+{int(off)}s"
+        try:
+            owned = scan()
+            from collections import Counter
+            entry = {"offset_s": float(off), "ts": time.time(),
+                     "total": len(owned),
+                     "by_service": dict(Counter(o.get("service", "?")
+                                                for o in owned))}
+        except Exception as exc:  # noqa: BLE001 — record the failure, keep going
+            entry = {"offset_s": float(off), "ts": time.time(),
+                     "total": None, "error": str(exc)}
+        with _LOCK:
+            rec.setdefault("rescans", []).append(entry)
+        line = (f"\n=== 종료 후 재스캔 {label}: "
+                + (f"{entry['total']}건" if entry.get("total") is not None
+                   else f"실패 ({entry.get('error', '')[:80]})") + " ===\n")
+        if entry.get("total") is not None:
+            if base is None:
+                base = entry["total"]
+            elif entry["total"] > base:
+                delta = entry["total"] - base
+                with _LOCK:
+                    rec["late_alert"] = {
+                        "delta": delta, "base": base, "found": entry["total"],
+                        "offset_s": float(off),
+                        "msg": (f"⚠ 종료 후 자원 늦출현 {delta}건 — "
+                                "비동기 생성물 의심 (+0 스캔 이후 나타남)")}
+                line += (f"⚠ 종료 후 자원 늦출현 {delta}건 — 비동기 생성물 의심 "
+                         f"(+0 스캔 {base}건 → {entry['total']}건)\n")
+        try:
+            with open(rec["log"], "a", encoding="utf-8") as f:
+                f.write(line)
+        except OSError:
+            pass
+
+
+def _schedule_post_run_rescans(rec: dict) -> None:
+    if os.environ.get("SCP_POST_RUN_RESCAN", "true").strip().lower() == "false":
+        return
+    threading.Thread(target=_post_run_rescans, args=(rec,), daemon=True).start()
+
+
+# --------------------------------------------------------------------------- #
 # run records + workers
 # --------------------------------------------------------------------------- #
 def _new_rec(kind: str, **extra) -> dict:
@@ -832,7 +1184,7 @@ _RESERVED: dict[str, int] = {}     # run_id -> reserved VPC slots (in flight)
 _QUEUE: list[str] = []             # run_ids waiting, FIFO
 _PENDING: dict[str, object] = {}   # run_id -> worker fn (for queued runs)
 _BASELINE = 0                      # account VPCs not attributable to our runs
-_VPCCNT = {"n": 0, "ts": 0.0}      # cached live account VPC count
+_VPCCNT = {"n": 0, "ts": 0.0, "rows": []}   # cached live account VPC count (+rows)
 
 
 def _vpc_cap() -> int:
@@ -841,25 +1193,62 @@ def _vpc_cap() -> int:
 
 
 def _account_vpc_count(ttl: float = 12.0) -> int:
-    """Live account VPC count via a read-only LIST (cached; best-effort)."""
+    """Live account VPC count via a read-only LIST (cached; best-effort). Also
+    caches the first page's ``{id, name}`` rows so the capacity view can key
+    '내 실행' attribution on the run's known resource ids (신규10)."""
     now = time.time()
     if now - _VPCCNT["ts"] < ttl:
         return _VPCCNT["n"]
     try:
         from core.config import Settings
         from core.http_client import ApiClient
-        r = ApiClient(Settings()).get("/v1/vpcs", params={"size": 1}, service="vpc",
+        r = ApiClient(Settings()).get("/v1/vpcs", params={"size": 100}, service="vpc",
                                       timeout=10, retry=False)
         if getattr(r, "ok", False):
             body = r.body if isinstance(r.body, dict) else {}
+            items = body.get("contents") or body.get("vpcs") or []
+            if not isinstance(items, list):
+                items = []
             n = body.get("totalCount")
             if n is None:
-                items = body.get("contents") or body.get("vpcs") or []
-                n = len(items) if isinstance(items, list) else 0
-            _VPCCNT.update(n=int(n), ts=now)
+                n = len(items)
+            rows = [{"id": str(it.get("id", "")), "name": str(it.get("name", ""))}
+                    for it in items if isinstance(it, dict)]
+            _VPCCNT.update(n=int(n), ts=now, rows=rows)
     except Exception:  # noqa: BLE001 — budget view is best-effort, never crash a run
         pass
     return _VPCCNT["n"]
+
+
+def _mine_resource_keys() -> tuple[set, set]:
+    """(ids, names) attributable to THIS console's runs: the per-run local
+    resource index (rec events + registry shards) plus each run's shared-VPC id
+    (the provision step stamps ``rec["shared_vpc_id"]``). Keys the capacity
+    view's '내 실행' classification so a run-held shared VPC never drifts to
+    '기존' (신규10)."""
+    ids: set = set()
+    names: set = set()
+    try:
+        for entry in _local_res_index().values():
+            ids |= set(entry.get("ids") or ())
+            names |= set(entry.get("names") or ())
+    except Exception:  # noqa: BLE001
+        pass
+    with _LOCK:
+        for r in _RUNS.values():
+            if r.get("shared_vpc_id"):
+                ids.add(str(r["shared_vpc_id"]))
+    return ids, names
+
+
+def _mine_live_vpcs() -> int:
+    """How many of the account's live VPCs belong to MY runs (id/name join
+    against the cached VPC rows). Best-effort — 0 when rows are unavailable."""
+    ids, names = _mine_resource_keys()
+    rows = _VPCCNT.get("rows") or []
+    return sum(1 for row in rows
+               if (row.get("id") and row["id"] in ids)
+               or (row.get("name") and row["name"] in names))
 
 
 def _selection_is_heavy(ids: list[str]) -> bool:
@@ -879,17 +1268,24 @@ def _capacity_view() -> dict:
     global _BASELINE
     cap = _vpc_cap()
     acct = _account_vpc_count()
+    # '내 실행' 귀속 (신규10): live VPCs whose id/name matches MY runs' known
+    # resources never count as '기존' — even between runs (a still-deleting
+    # shared VPC used to be absorbed into the baseline on resync).
+    mine_live = _mine_live_vpcs()
     with _ADMIT:
         if not _RESERVED:
-            _BASELINE = acct
+            _BASELINE = max(0, acct - mine_live)
         base, reserved = _BASELINE, sum(_RESERVED.values())
         running, queued = list(_RESERVED.keys()), list(_QUEUE)
 
     def _v(rid: str) -> dict:
         r = _RUNS.get(rid)
         return _rec_view(r) if r else {"id": rid}
+    # headroom: my footprint = max(reservations, actually-live mine) — a lingering
+    # (still-deleting) my-VPC occupies a real slot even with nothing reserved.
     return {"cap": cap, "baseline": base, "reserved": reserved, "account_live": acct,
-            "headroom": max(0, cap - base - reserved),
+            "mine_live": mine_live,
+            "headroom": max(0, cap - base - max(reserved, mine_live)),
             "running": [_v(r) for r in running], "queued": [_v(r) for r in queued]}
 
 
@@ -1024,6 +1420,9 @@ def _run_worker(rec: dict) -> None:
     appends step-level events to rec['events'] (core.console_events)."""
     logp = Path(rec["log"])
     env = {**os.environ, "PYTHONPATH": str(ROOT),
+           # line-buffer the child's stdout so the 로그 tab live-tails step output
+           # instead of seeing block-buffered bursts (F3 · 로그 라이브 tail)
+           "PYTHONUNBUFFERED": "1",
            # stamp the run-rec id so oplog resource events land under
            # runs/<rec id>/res/* — the /runtime origin join (scope=mine) keys off it.
            #
@@ -1054,6 +1453,11 @@ def _run_worker(rec: dict) -> None:
                     f"heavy={rec['heavy']}  parallel={n}\n")
             f.flush()
             shared = _provision_shared(env, f) if rec["heavy"] else {}
+            if shared.get("SCP_SHARED_VPC_ID"):
+                # run-keyed shared-VPC ownership: the capacity view uses this to
+                # keep the shared VPC under '내 실행' (신규10), never '기존'.
+                with _LOCK:
+                    rec["shared_vpc_id"] = shared["SCP_SHARED_VPC_ID"]
             f.write("\n=== pytest ===\n")
             f.flush()
             pos = f.tell()      # remember where the pytest output begins
@@ -1085,8 +1489,12 @@ def _run_worker(rec: dict) -> None:
                 # run and would reap unrelated OLD leftovers, flooding this run's
                 # log). Account-wide reaping = the manual 강제 클린업 button
                 # (POST /api/cleanup).
+                # honest wording (신규1): teardown was ATTEMPTED — async creations
+                # can still materialize later, so the measured re-scans below are
+                # the actual verdict, not this line.
                 f.write("\n=== per-run cleanup: teardown-scoped ===\n"
-                        "  이 실행이 만든 자원은 라이프사이클 teardown 으로 이미 삭제됨.\n"
+                        "  teardown 시도 완료 — 이 실행이 만든 자원의 라이프사이클 teardown 을 "
+                        "수행했습니다. 실측 재스캔 예약됨 (+0 · +5m · +15m; 비동기 생성물 감시).\n"
                         "  계정 전체 reconciler 청소는 자동 실행하지 않음 — '강제 클린업'(POST "
                         "/api/cleanup) 버튼으로 수동 실행하세요 (run-scoped 청소를 reconciler 가 "
                         "지원하지 않기 때문).\n")
@@ -1094,6 +1502,10 @@ def _run_worker(rec: dict) -> None:
         with _LOCK:
             rec["status"], rec["rc"], rec["ended"] = "done", rc, time.time()
             rec["runner_missing"] = runner_missing
+        rec["events_summary"] = _events_summary(_read_events(rec["events"]))
+        _record_run_to_db(rec)                     # Reporting ▸ 실행 기록 (P2-9)
+        if not runner_missing:
+            _schedule_post_run_rescans(rec)        # +0/+5m/+15m owned re-scans
     except Exception as exc:  # noqa: BLE001 — surface to the UI, never crash the server
         with _LOCK:
             rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
@@ -1197,6 +1609,37 @@ def _verify_worker(rec: dict) -> None:
             rec["status"], rec["error"], rec["ended"] = "error", str(exc), time.time()
 
 
+def _known_stuck_entries() -> list[dict]:
+    """data/baselines/known_issues.json ``stuck_resources`` — documented residues
+    that CANNOT be deleted via API. Same source /testing/resources folds (신규8)."""
+    try:
+        data = json.loads((ROOT / "data" / "baselines" / "known_issues.json")
+                          .read_text(encoding="utf-8"))
+        return [e for e in data.get("stuck_resources", []) if isinstance(e, dict)]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _annotate_known_stuck(owned: list[dict]) -> int:
+    """Tag owned items that match a documented stuck resource (by id or name in
+    the delete path / bulk-ids body) with ``known_stuck``; return the match count.
+    The UI folds these ('기지 항목') and keeps them OUT of the red count — same
+    folding /testing/resources applies (신규8)."""
+    stuck = _known_stuck_entries()
+    n = 0
+    for o in owned:
+        path = o.get("path", "") or ""
+        body = o.get("json") if isinstance(o.get("json"), dict) else {}
+        ids = [str(x) for x in (body.get("ids") or [])]
+        for e in stuck:
+            eid, nm = str(e.get("id", "")), str(e.get("name", ""))
+            if (eid and (eid in path or eid in ids)) or (nm and nm in path):
+                o["known_stuck"] = {"name": nm, "reason": e.get("reason", "")}
+                n += 1
+                break
+    return n
+
+
 def _owned_worker(rec: dict) -> None:
     """Read-only owned-resource inventory via cleanup.verify_clean.scan_owned — runs
     in-process (no subprocess) and stores the structured list on the record so the
@@ -1210,6 +1653,7 @@ def _owned_worker(rec: dict) -> None:
         os.environ.setdefault("SCP_ALLOW_DESTRUCTIVE", "false")
         from cleanup.verify_clean import scan_owned
         owned = scan_owned()
+        n_stuck = _annotate_known_stuck(owned)     # 기지 항목 (folded, not red)
         from collections import Counter
         by_svc = Counter(o["service"] for o in owned)
         with open(logp, "w", encoding="utf-8") as f:
@@ -1219,9 +1663,12 @@ def _owned_worker(rec: dict) -> None:
             for svc, n in by_svc.most_common():
                 f.write(f"  {svc:18} {n:3}\n")
             f.write(f"\nTOTAL owned survivors across all collections: {len(owned)}\n")
+            if n_stuck:
+                f.write(f"  (documented known-stuck among them: {n_stuck})\n")
         with _LOCK:
             rec["owned"] = owned
             rec["owned_total"] = len(owned)
+            rec["owned_known_stuck"] = n_stuck
             rec["status"], rec["rc"], rec["ended"] = "done", 0, time.time()
     except Exception as exc:  # noqa: BLE001 — surface to the UI, never crash the server
         try:
@@ -1246,7 +1693,11 @@ def _summarize(rec: dict, log: str) -> str:
         n = rec.get("owned_total")
         if n is None:
             return ""
-        return "없음 ✅ — 남은 자원 0건" if n == 0 else f"⚠️ 남은 자원 {n}건"
+        stuck = int(rec.get("owned_known_stuck") or 0)
+        active = max(0, n - stuck)                # red count EXCLUDES 기지 항목
+        note = f" (기지 {stuck}건 제외)" if stuck else ""
+        return (f"없음 ✅ — 남은 자원 0건{note}" if active == 0
+                else f"⚠️ 남은 자원 {active}건{note}")
     if kind == "simulate":
         evs = _read_events(rec["events"])
         nl = sum(1 for e in evs if e.get("kind") == "lifecycle-end")
@@ -1260,19 +1711,37 @@ def _summarize(rec: dict, log: str) -> str:
             return "✅ clean — owned survivors: 0" if m.group(1) == "0" else f"⚠️ {m.group(1)} owned survivors"
         return ""
     if kind == "cleanup":
+        # count only GENUINELY-removed resources (신규7): the per-round
+        # "sweep done: N" tally can be inflated by deceptive 2xx deletes that
+        # re-list next round; prefer the reconciler's genuine-removed lines.
+        g = re.findall(r"genuine-removed:\s*(\d+)", log)
+        if g:
+            return f"🧹 {sum(int(x) for x in g)} resource(s) deleted (실측)"
         m = re.findall(r"sweep done:\s*(\d+) resource\(s\) deleted", log)
         return f"🧹 {sum(int(x) for x in m)} resource(s) deleted" if m else ""
     m = re.findall(r"\d+ (?:passed|failed|skipped|error)[^\n]*", log)  # pytest summary
     return m[-1] if m else ""
 
 
+_REC_VIEW_KEYS = ("id", "kind", "mode", "status", "lifecycle_ids",
+                  "heavy", "mutations", "destructive", "rc", "started",
+                  "ended", "error", "runner_missing", "peak_vpcs", "queued",
+                  "rehydrated", "rescans", "late_alert")
+
+
 def _rec_view(rec: dict, full: bool = False) -> dict:
-    v = {k: rec.get(k) for k in ("id", "kind", "mode", "status", "lifecycle_ids",
-                                 "heavy", "mutations", "destructive", "rc", "started",
-                                 "ended", "error", "runner_missing", "peak_vpcs", "queued")}
+    v = {k: rec.get(k) for k in _REC_VIEW_KEYS}
     if rec.get("kind") == "owned":   # expose the structured owned-resource inventory
         v["owned"] = rec.get("owned", [])
         v["owned_total"] = rec.get("owned_total")
+        v["owned_known_stuck"] = rec.get("owned_known_stuck")
+    if rec.get("kind") == "lifecycle" and rec.get("events_summary"):
+        v["events_summary"] = rec.get("events_summary")
+    # a terminal run's summary is stable — cache it so /api/runs doesn't re-read
+    # every (possibly rehydrated) run's whole log on each 2s poll.
+    if not full and rec.get("_summary_cache") is not None:
+        v["summary"] = rec["_summary_cache"]
+        return v
     log = ""
     if Path(rec["log"]).exists():
         try:
@@ -1280,6 +1749,8 @@ def _rec_view(rec: dict, full: bool = False) -> dict:
         except Exception:
             log = ""
     v["summary"] = _summarize(rec, log)
+    if rec.get("status") in ("done", "error", "unknown") and not rec.get("rescans"):
+        rec["_summary_cache"] = v["summary"]
     if full:
         v["log"] = "".join(log.splitlines(keepends=True)[-250:])
     return v
@@ -1396,6 +1867,7 @@ class Handler(BaseHTTPRequestHandler):
                 # "METHOD norm(path)"; lazily built + cached.
                 m = dict(_model())
                 m["endpoint_params"] = _endpoint_params()
+                m["durations"] = _durations_view()   # now-playing 평균 ETA
                 return self._json(200, m)
             except Exception as exc:  # noqa: BLE001
                 return self._json(500, {"error": f"model build failed: {exc}"})
@@ -1483,6 +1955,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "no such run"})
             return self._json(200, {"id": rid, "status": rec["status"],
                                     "events": _read_events(rec["events"])})
+        if p.startswith("/api/runs/") and p.endswith("/graph"):
+            rid = p[len("/api/runs/"):-len("/graph")]
+            with _LOCK:
+                rec = _RUNS.get(rid)
+            if not rec:
+                return self._json(404, {"error": "no such run"})
+            try:
+                return self._json(200, {"id": rid, **_run_graph(rec)})
+            except Exception as exc:  # noqa: BLE001
+                return self._json(500, {"error": f"run graph failed: {exc}"})
         if p.startswith("/api/runs/"):
             rid = p.rsplit("/", 1)[-1]
             with _LOCK:
@@ -1600,6 +2082,18 @@ def main():
         "This module's builder/worker functions remain the shared engine — imported by\n"
         "controlplane.console_api (the /api/* routes) and console2.build_static."
     )
+
+
+# Rehydrate run history from disk at import (신규2 · P2-9): a console/server
+# restart used to erase all run records — /api/runs went blank even though the
+# per-run .log/.events.jsonl files survive under reports/console2-runs/. Recs
+# rehydrated here carry ``rehydrated: true`` (UI chip '복원됨'). Opt out with
+# SCP_CONSOLE_REHYDRATE=false (tests use explicit run_dir args instead).
+try:
+    if os.environ.get("SCP_CONSOLE_REHYDRATE", "true").strip().lower() != "false":
+        _rehydrate_runs()
+except Exception:  # noqa: BLE001 — history is a convenience, never block startup
+    pass
 
 
 if __name__ == "__main__":

@@ -59,6 +59,7 @@ def api_model() -> JSONResponse:
     try:
         m = dict(c2._model())
         m["endpoint_params"] = c2._endpoint_params()      # API-tab param schema
+        m["durations"] = c2._durations_view()             # now-playing 평균 ETA
         return _json(m)
     except Exception as exc:                               # noqa: BLE001
         return _json({"error": f"model build failed: {exc}"}, 500)
@@ -129,6 +130,22 @@ def api_run_events(rid: str) -> JSONResponse:
     if not rec:
         return _json({"error": "no such run"}, 404)
     return _json({"id": rid, "status": rec["status"], "events": c2._read_events(rec["events"])})
+
+
+@router.get("/api/runs/{rid}/graph")
+def api_run_graph(rid: str) -> JSONResponse:
+    """The run's OWN composition DAG (composer.graph_view over its lifecycle
+    closure) — the master 흐름 scene binds to THIS in run 모드, so navigating
+    away / clicking a history row never leaves it on the 구성 selection [F1·F2].
+    Same renderer contract as /api/graph (IA-BUILD-CONTRACT)."""
+    with c2._LOCK:
+        rec = c2._RUNS.get(rid)
+    if not rec:
+        return _json({"error": "no such run"}, 404)
+    try:
+        return _json({"id": rid, **c2._run_graph(rec)})
+    except Exception as exc:                               # noqa: BLE001
+        return _json({"error": f"run graph failed: {exc}"}, 500)
 
 
 @router.get("/api/runs/{rid}")
@@ -244,3 +261,21 @@ def api_verify() -> JSONResponse:
 @router.post("/api/owned")
 def api_owned() -> JSONResponse:
     return _json(c2._rec_view(c2._start("owned", c2._owned_worker)), 202)
+
+
+def local_run_summary(gh_run_id: str) -> dict | None:
+    """Pass/fail summary for a ``local-*`` run — used by the /runs/{id} detail
+    page (P2-9 잔여). Thin re-export of the engine helper."""
+    try:
+        return c2._local_run_summary(gh_run_id)
+    except Exception:                                      # noqa: BLE001
+        return None
+
+
+# Server start (spine import): mirror the rehydrated finished local runs into
+# the controlplane runs DB so Reporting ▸ 실행 기록 shows them (신규2 · P2-9).
+# c2 already rehydrated _RUNS at its own import; this only backfills the DB.
+try:
+    c2._backfill_runs_db()
+except Exception:                                          # noqa: BLE001
+    pass
