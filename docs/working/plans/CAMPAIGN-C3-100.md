@@ -177,3 +177,14 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
   cluster-subops-full, parallel=2, shared VPC 1 adopt 확인. live-watcher 감시 중
   (13분 주기, stall/leak/실패폭주 임계). 종료 후: fetch-results 브리지 →
   derive_verified → promote → HB2.
+- 2026-07-04 08:10Z **HB1 종결 — 신규 커버 0 (전략 교훈)**: 42m success, 88 obs
+  (ok 64 · soft 18 · fail 6). mariadb 풀체인 정상 완주했으나 2xx는 전부 D2–D7
+  기검증 키(+0 new); 갭 10키는 **전과 동일 서명으로 재실패**(log-export 3종
+  InvalidLogType · set-parameters 500 PF · remove-backup-histories 401 AuthN ·
+  patch-minor-version/set-server-type/set-block-storage validation ·
+  show-request 400). mysql은 create 500 `ContactAdminForAssistance`(PF, pg-13과
+  동류)로 체인 전체 스킵 — untried 12키 잔존. **교훈: H 갭 197 중 78은
+  결정적 재실패(재실행 무의미 — 엔드포인트별 body/enum/선조회/pacing 수리 필요,
+  일부 PF→waiver), 119는 미시도/404(부모 실존 시 업사이드 — HB 배치 유효).**
+  HB2 대상 51 = untried 37 + det 14 → 디스패치 가치 유지. mariadb 잔갭·mysql
+  create 재시도는 수리 후 HB1b로.
