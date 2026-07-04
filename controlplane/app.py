@@ -266,8 +266,37 @@ def planning_knowledge(request: Request):
                    env_files=listing("environments/*.yaml"))
 
 
+def _file_listing(pattern: str) -> list[dict]:
+    """Repo files matching pattern -> [{rel, kb}] (the knowledge-browser shape)."""
+    out = []
+    for p in sorted(ROOT.glob(pattern)):
+        if p.is_file():
+            out.append({"rel": p.relative_to(ROOT).as_posix(),
+                        "kb": round(p.stat().st_size / 1024, 1)})
+    return out
+
+
+def _file_picker(request: Request, mode: str) -> HTMLResponse:
+    """`?path=` 없이 /planning/edit·view에 오면 raw 422 JSON 대신 친절한 HTML
+    선택기를 보여준다 (UIUX-AUDIT P2-12)."""
+    groups = [
+        ("suites/ — 스위트 정의", _file_listing("suites/*.yaml")),
+        ("environments/ — 환경 프로파일", _file_listing("environments/*.yaml")),
+        ("regression/scenarios/ — 시나리오·의존",
+         _file_listing("regression/scenarios/*.json")
+         + _file_listing("regression/scenarios/lifecycles/*.json")),
+        ("knowledge/formal/ — 정형 지식",
+         _file_listing("knowledge/formal/*.yaml")
+         + _file_listing("knowledge/formal/*.md")),
+    ]
+    return _render(request, "file_picker.html", "planning",
+                   mode=mode, groups=groups)
+
+
 @app.get("/planning/view", response_class=HTMLResponse)
-def planning_view(request: Request, path: str):
+def planning_view(request: Request, path: str = ""):
+    if not path.strip():
+        return _file_picker(request, "view")
     f = _safe_repo_file(path)
     if not f:
         raise HTTPException(404, "file not found (or outside the browsable dirs)")
@@ -283,7 +312,9 @@ def planning_view(request: Request, path: str):
 # --- Planning: 저작 편집기 (M3 §3.1 — 검증 → 쓰기 → 로컬 git 커밋) -----------------
 
 @app.get("/planning/edit", response_class=HTMLResponse)
-def planning_edit(request: Request, path: str, find: str = ""):
+def planning_edit(request: Request, path: str = "", find: str = ""):
+    if not path.strip():
+        return _file_picker(request, "edit")
     f = authoring.editable_path(path)
     if not f or not f.is_file():
         raise HTTPException(404, "file not found (or outside the editable dirs)")
@@ -662,11 +693,21 @@ def run_detail(request: Request, gh_run_id: str):
             tri_detail = json.loads(tri["detail"])
         except ValueError:
             pass
+    meta = snapshots.meta(gh_run_id)
+    milestones = db.list_events(gh_run_id, kind="milestone")
+    commands = db.list_commands(gh_run_id)
+    # 어떤 근거도 없는 id는 404 (P2-12) — 아카이브에만 있는 과거 run은 스냅샷/
+    # index 근거가 있으므로 계속 200 + 내용으로 렌더된다.
+    if not (run or meta or milestones or commands or tri or any(
+            str(row.get("run_id", "")) == gh_run_id
+            for row in snapshots.archive_index(limit=500))):
+        return templates.TemplateResponse(
+            request, "run_notfound.html",
+            {**common.base_ctx("reporting"), "gh_run_id": gh_run_id},
+            status_code=404)
     return _render(request, "run_detail.html", "reporting",
-                   gh_run_id=gh_run_id, run=run,
-                   meta=snapshots.meta(gh_run_id),
-                   milestones=db.list_events(gh_run_id, kind="milestone"),
-                   commands=db.list_commands(gh_run_id),
+                   gh_run_id=gh_run_id, run=run, meta=meta,
+                   milestones=milestones, commands=commands,
                    triage=tri, triage_detail=tri_detail)
 
 

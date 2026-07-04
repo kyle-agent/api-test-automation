@@ -192,6 +192,34 @@ def test_empty_inventory_explains_ingest_only():
     assert "ingest된 이벤트만" in page
 
 
+# --- 3b. 에러/빈 상태 폴리시 (UIUX-AUDIT P2-12) -------------------------------------
+
+def test_error_empty_states():
+    # /planning/edit·view without ?path= -> friendly HTML picker, not raw 422
+    for mode in ("edit", "view"):
+        r = client.get(f"/planning/{mode}")
+        assert r.status_code == 200, (mode, r.status_code)
+        assert "파일을 선택하세요" in r.text, mode
+        assert "suites/smoke.yaml" in r.text, mode
+    # unknown run id -> 404 page with the "전체 목록" link (was a 200 empty page)
+    r = client.get("/runs/no-such-run-424242")
+    assert r.status_code == 404, r.status_code
+    assert "기록 없음" in r.text and "/reporting?tab=runs" in r.text
+    # a run the DB knows still renders 200 (archive-only runs ride snapshots/index)
+    db.create_run("smoke", "stage", gh_run_id="9200")
+    assert client.get("/runs/9200").status_code == 200
+
+
+def test_reporting_subtabs_single_include():
+    # 서브탭 단일 정의 (P2-8): 세 화면 모두 같은 6탭 세트를 렌더한다
+    for path in ("/reporting?tab=summary", "/reporting/coverage",
+                 "/reporting/compare"):
+        page = client.get(path).text
+        for label in ("색칠지도", "요약", "대시보드", "실행 기록", "비교",
+                      "트리아지"):
+            assert label in page, (path, label)
+
+
 # --- 4. run comparison ------------------------------------------------------------
 
 _OBS = {
@@ -396,6 +424,8 @@ TESTS = [
     test_inventory_platform_delete_marks_gone_only_on_ok,
     test_delete_gated_without_destructive_env,
     test_empty_inventory_explains_ingest_only,
+    test_error_empty_states,
+    test_reporting_subtabs_single_include,
     test_compare_diff_buckets,
     test_compare_view_with_stubbed_snapshots,
     test_editor_pages_render,
