@@ -1,6 +1,7 @@
 ---
-status: active
+status: superseded (historical handoff — current state lives in docs/working/CONTEXT.md)
 for: all
+superseded_by: ../CONTEXT.md
 ---
 
 # Handoff — 2026-06-20: scheduler v0.5 cutover LIVE-VALIDATED + path to 1.0

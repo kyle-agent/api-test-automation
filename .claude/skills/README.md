@@ -31,7 +31,7 @@ a parallel, conflicting system:
 | `harness-init` | `docs/agent-team.md` is the canonical custom harness |
 | `team-init` | already a multi-agent team (`docs/agent-team.md` + roles) |
 | `session-start` | `START_HERE.md` + `docs/working/CONTEXT.md` already do this |
-| `session-checkpoint` | `docs/SESSION-HANDOFF*.md` + `data/coordination/ledger.json` |
+| `session-checkpoint` | `docs/working/handoffs/` + `data/coordination/ledger.json` |
 | `project-init` | `docs/ROADMAP.md` / `docs/ARCHITECTURE.md` already exist (overwrite risk) |
 | `collab-audit` | generic; low priority |
 
@@ -44,8 +44,9 @@ tests). See `docs/working/CONTEXT.md` "프로세스/하니스 도구 추가 (202
 
 ## Notes
 
-- The rest of `.claude/` is git-ignored (local config); only `.claude/skills/`
-  is tracked — see the exception in `.gitignore`.
+- `.claude/` is git-ignored by default (local config) with tracked exceptions:
+  `.claude/skills/`, `.claude/agents/`, `.claude/hooks/`, `.claude/settings.json`
+  — see `.gitignore`.
 - `/token-audit` writes generated artifacts under `reports/`, which is
   git-ignored by design.
 - **Two distinct lesson/fact stores — don't conflate them.** `/retro` writes

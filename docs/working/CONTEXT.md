@@ -57,15 +57,20 @@ Supports: `spec/` (extract+diff the spec), `dashboard/` (visualize both axes),
 
 ## Safety gates (NON-NEGOTIABLE)
 
-| Operation | Default | Enable with |
-|-----------|---------|-------------|
+Mutations default **ON** (`core/config.py` — the project's purpose is real
+execution; the deliberate opt-in is the run **selection** + the console2
+pre-flight confirm, not an env flag; canonical wording: `CLAUDE.md` Hard Rules):
+
+| Operation | Default | Gate |
+|-----------|---------|------|
 | `GET` (read-only) | runs | always allowed |
-| `POST` / `PUT` / `PATCH` | **blocked** | `SCP_ALLOW_MUTATIONS=true` |
-| `DELETE` | **blocked** | `SCP_ALLOW_DESTRUCTIVE=true` |
-| Heavy/billable lifecycles (VM, K8s, DB) | **skipped** | `SCP_RUN_HEAVY=true` |
+| `POST` / `PUT` / `PATCH` | **allowed** | force read-only: `SCP_ALLOW_MUTATIONS=false` (CI smoke/conformance set it explicitly) or profile veto `SCP_PROFILE_FORBID` |
+| `DELETE` | **allowed** | disable: `SCP_ALLOW_DESTRUCTIVE=false` or profile veto |
+| Heavy/billable lifecycles (VM, K8s, DB) | **skipped** | explicit opt-in: `SCP_RUN_HEAVY=true` or a confirmed heavy selection |
 
 Smoke + read-chains only call `GET`s. Mutations happen exclusively through
-ordered CRUD scenarios. Never relax these as a shortcut.
+ordered CRUD scenarios / composed lifecycles. Never flip a gate just to make a
+test pass.
 
 **Run sequencing (owner rule, 2026-06-10):** one workflow run at a time — before
 pushing anything that triggers `api-test.yml` (any `.github/run-request` touch,

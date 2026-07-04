@@ -55,6 +55,14 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
 - **C1 (1차)**: 전수 인벤토리 → (a) 죽은 문서/소스 retire 후보 목록 (증거:
   참조 0 + 최근 미변경 + 기능 대체됨), (b) 문서 간 모순 목록 (정본 우선),
   (c) INDEX/진입점 정합. 삭제는 오케스트레이터 승인 후 별도 커밋.
+  - **C1 감사 DONE (2026-07-04)** →
+    `docs/working/trackers/REPO-AUDIT-2026-07-04.md`: retire 후보 9묶음
+    (핵심: poc/scenario-viz — 단 api-test.yml:1121 발행 스텝이 아직 소비, 교체
+    선행 필요 · console_server.py · build_local_demo+local_run.html · 1회성
+    publish *.sh · tracked reports/ 산출물 10파일), 모순 14건 중 10건 직접 수정
+    (게이트 기본값 표 README/START_HERE/CONTEXT, README 트리거 절, controlplane
+    README dispatch 주의, skills README 2건, 구 핸드오프 4+2건 supersede 헤더,
+    INDEX 재생성). C2 목표 트리 표 = 감사 문서 §4. **삭제 실행 대기: §2 승인.**
 - **C2 (2차)**: 내용 정비 — 과상세 문서를 "목적+계약+포인터"로 추상화 (AI 가
   자율 판단할 여지 확보), 부족한 곳 보강 (예: 운영 runbook 류). 정본 체계:
   PLATFORM-IA-DIRECTION(§확정 IA) > CONTEXT.md(현재 상태) > knowledge/(사실) >

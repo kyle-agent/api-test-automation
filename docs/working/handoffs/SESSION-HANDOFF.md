@@ -1,6 +1,7 @@
 ---
-status: active
+status: superseded (historical handoff — current state lives in docs/working/CONTEXT.md)
 for: all
+superseded_by: ../CONTEXT.md
 ---
 
 # SESSION HANDOFF — 2026-06-17 ~01:00 UTC

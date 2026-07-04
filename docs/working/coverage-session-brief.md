@@ -1,4 +1,14 @@
+---
+status: superseded (historical brief — the coverage campaign is now governed by docs/working/plans/CAMPAIGN-C3-100.md)
+for: all
+superseded_by: plans/CAMPAIGN-C3-100.md
+---
+
 # Coverage session — handoff brief
+
+> **⚠️ SUPERSEDED.** 현행 커버리지 캠페인의 진입점은
+> `docs/working/plans/CAMPAIGN-C3-100.md` (+ `docs/working/CONTEXT.md`)다.
+> 아래 내용은 2026-06-23 당시 브리프의 역사 기록.
 
 > For a **separate session** whose job is to RAISE per-service SCP API test
 > coverage, using the platform improvements landed on branch

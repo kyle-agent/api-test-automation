@@ -4,7 +4,11 @@ FastAPI + SQLite + htmx로 구현된 SCP API Regression Test Platform의 control
 plane입니다 (docs/PLATFORM-PLAN.md M1~M4). 실행기는
 `PLATFORM_EXECUTOR`로 전환합니다 (controlplane/dispatch.py):
 
-- `actions` (기본, 개발 기간) — `api-test.yml`을 `workflow_dispatch`로 트리거
+- `actions` (기본) — `api-test.yml`을 `workflow_dispatch`로 트리거.
+  **주의**: `api-test.yml`의 자동(push) 트리거는 오너가 비활성화했고(2026-06-18)
+  `workflow_dispatch`는 수동 전용 폴백이다 — 이 경로는 `PLATFORM_GITHUB_TOKEN`
+  이 있어야 동작하며, 현재 실운영 라이브 레인은 **로컬 콘솔(worker/console2)
+  또는 chat-heavy 레인**(`.github/chat-heavy-request` → `chat-heavy.yml`)이다.
 - `worker` (배포 모드) — run 레코드(status `dispatched`)가 곧 큐이고, 동일
   호스트의 `runner/worker.py`가 claim해 같은 스테이지 시퀀스를 실행
 
@@ -32,7 +36,7 @@ Reporting`**; 구 `docs/IA.md`는 SUPERSEDED). 두 런타임으로 깔끔히 분
 
 | 영역 | 내용 |
 |---|---|
-| 수동 실행 | suite × 환경 프로파일 선택 → `api-test.yml` dispatch |
+| 수동 실행 | suite × 환경 프로파일 선택 → `api-test.yml` dispatch (actions 실행기 — 수동 전용 폴백, 위 주의 참조) 또는 worker 큐잉 |
 | 스케줄 | cron(UTC) × suite × profile — 30초 폴링 데몬이 발화 |
 | 라이브 추적 | `core/oplog.py`의 `APITEST_PLATFORM_URL` 미러를 `/api/ingest/events`로 수신 → run 상태/마일스톤 타임라인 |
 | Run 히스토리 | DB 기록 + oplog 버킷 `index.json` 아카이브 병합 |

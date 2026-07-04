@@ -1,7 +1,7 @@
 # docs/ — index
 
 > **Generated** by `python -m tools.gen_index` from each doc's front-matter (`status` / `for`) + H1 title. Do not hand-edit — edit the doc and regenerate.
-> 52 docs · 34 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
+> 54 docs · 29 active · status ∈ {🟢 active · 🟡 draft · ⛔ blocked · ⚪ superseded}.
 
 ## Design & specs — `docs/` root (stable)
 | Doc | For | Summary | Status |
@@ -24,13 +24,14 @@
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
 | [`working/CONTEXT.md`](working/CONTEXT.md) | orchestrator | Shared Context (CONTEXT.md) | 🟢 active |
-| [`working/console-platform-handoff.md`](working/console-platform-handoff.md) | all | Platform Console — 로컬 실행 플랫폼 핸드오프 | 🟢 active |
+| [`working/console-platform-handoff.md`](working/console-platform-handoff.md) | all | Platform Console — 로컬 실행 플랫폼 핸드오프 |  superseded (legacy poc console/console_server.py — 현행은 controlplane 척추 + console2) |
 | [`working/console2-ia-ux-review.md`](working/console2-ia-ux-review.md) | all | console2 — IA + UX Review (design backlog) |  backlog |
-| [`working/coverage-session-brief.md`](working/coverage-session-brief.md) | all | Coverage session — handoff brief | 🟢 active |
+| [`working/coverage-session-brief.md`](working/coverage-session-brief.md) | all | Coverage session — handoff brief |  superseded (historical brief — the coverage campaign is now governed by docs/working/plans/CAMPAIGN-C3-100.md) |
 
 ## Working — plans
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
+| [`working/plans/CAMPAIGN-C3-100.md`](working/plans/CAMPAIGN-C3-100.md) | orchestrator + all campaign agents (다른 세션이 이어받을 때 이 문서가 진입점) | CAMPAIGN — C3 100% · 플랫폼 dogfood 개선 · 리포 정비 (3 워크스트림 병렬) |  ACTIVE campaign (2026-07-04, owner-directed autonomous run) |
 | [`working/plans/COVERAGE-GETID-PLAN.md`](working/plans/COVERAGE-GETID-PLAN.md) | coverage | the id-bound GET gap, classified and attacked | 🟢 active |
 | [`working/plans/COVERAGE-WAVE-PLAN.md`](working/plans/COVERAGE-WAVE-PLAN.md) | coverage | the remaining static gap, prioritized | 🟢 active |
 | [`working/plans/IA-BUILD-CONTRACT.md`](working/plans/IA-BUILD-CONTRACT.md) | the IA-build agents (Catalog · Modeling · Reporting) + integration owner | IA build contract — "그림 하나, 여러 얼굴" parallel build |  ACTIVE contract (2026-06-26) — parallel build of the confirmed IA |
@@ -43,10 +44,10 @@
 ## Working — handoffs
 | Doc | For | Summary | Status |
 |-----|-----|---------|--------|
-| [`working/handoffs/HANDOFF-2026-06-19-coverage-and-watcher.md`](working/handoffs/HANDOFF-2026-06-19-coverage-and-watcher.md) | all | Handoff — 2026-06-19 (Claude remote): coverage push, per-service agents, live-watcher | 🟢 active |
-| [`working/handoffs/HANDOFF-2026-06-19-platform-and-coverage.md`](working/handoffs/HANDOFF-2026-06-19-platform-and-coverage.md) | all | Handoff — 2026-06-19 (session 2): platform fixes + coverage round | 🟢 active |
-| [`working/handoffs/HANDOFF-2026-06-20-cutover-validation.md`](working/handoffs/HANDOFF-2026-06-20-cutover-validation.md) | all | Handoff — 2026-06-20: scheduler v0.5 cutover LIVE-VALIDATED + path to 1.0 | 🟢 active |
-| [`working/handoffs/SESSION-HANDOFF.md`](working/handoffs/SESSION-HANDOFF.md) | all | SESSION HANDOFF — 2026-06-17 ~01:00 UTC | 🟢 active |
+| [`working/handoffs/HANDOFF-2026-06-19-coverage-and-watcher.md`](working/handoffs/HANDOFF-2026-06-19-coverage-and-watcher.md) | all | Handoff — 2026-06-19 (Claude remote): coverage push, per-service agents, live-watcher |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
+| [`working/handoffs/HANDOFF-2026-06-19-platform-and-coverage.md`](working/handoffs/HANDOFF-2026-06-19-platform-and-coverage.md) | all | Handoff — 2026-06-19 (session 2): platform fixes + coverage round |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
+| [`working/handoffs/HANDOFF-2026-06-20-cutover-validation.md`](working/handoffs/HANDOFF-2026-06-20-cutover-validation.md) | all | Handoff — 2026-06-20: scheduler v0.5 cutover LIVE-VALIDATED + path to 1.0 |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
+| [`working/handoffs/SESSION-HANDOFF.md`](working/handoffs/SESSION-HANDOFF.md) | all | SESSION HANDOFF — 2026-06-17 ~01:00 UTC |  superseded (historical handoff — current state lives in docs/working/CONTEXT.md) |
 | [`working/handoffs/HANDOFF-2026-06-18-claude-remote.md`](working/handoffs/HANDOFF-2026-06-18-claude-remote.md) | all | Handoff — 2026-06-18 (→ next session: Claude remote, env vars set) | ⚪ superseded |
 | [`working/handoffs/HANDOFF-2026-06-18-session2.md`](working/handoffs/HANDOFF-2026-06-18-session2.md) | all | Handoff — 2026-06-18 session 2 (Claude remote, hand-driven runs) | ⚪ superseded |
 | [`working/handoffs/HANDOFF-crud-setter-validation.md`](working/handoffs/HANDOFF-crud-setter-validation.md) | all | Handoff — CRUD setter validation (PR #44, branch `claude/trusting-curie-Ql75T`) | ⚪ superseded |
@@ -65,6 +66,7 @@
 | [`working/trackers/POSTRUN-2026-06-20-fullheavy.md`](working/trackers/POSTRUN-2026-06-20-fullheavy.md) | all | Post-run Analysis: Full Heavy DAG Run — 2026-06-20 | 🟢 active |
 | [`working/trackers/PRODUCT-FINDINGS.md`](working/trackers/PRODUCT-FINDINGS.md) | validation | consolidated ledger of product/API findings | 🟢 active |
 | [`working/trackers/READ-REACHABILITY.md`](working/trackers/READ-REACHABILITY.md) | coverage | id-bound GET reachability from the resource model | 🟢 active |
+| [`working/trackers/REPO-AUDIT-2026-07-04.md`](working/trackers/REPO-AUDIT-2026-07-04.md) | orchestrator | 리포 하이진 감사 (C1, 2026-07-04) — 인벤토리 · retire 후보 · 문서 모순 · 진입점 | 🟢 active |
 | [`working/trackers/SERVICE-GAP-REPORTS.md`](working/trackers/SERVICE-GAP-REPORTS.md) | coverage | 서비스별 커버리지 갭 리포트 (병렬 agent 분석, 2026-06-13) | 🟢 active |
 | [`working/trackers/UIUX-AUDIT-2026-07-03.md`](working/trackers/UIUX-AUDIT-2026-07-03.md) | all | SCP 컨트롤플레인 UI — IA/UX 감사 보고서 (2026-07-03) | 🟢 active |
 | [`working/trackers/VALIDATION-QUEUE.md`](working/trackers/VALIDATION-QUEUE.md) | validation | prioritized order for the coverage-validator | 🟢 active |

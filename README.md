@@ -147,14 +147,17 @@ in `reports/`.
 
 ## Safety model
 
-The catalog includes destructive operations. A run never changes real cloud state
-unless explicitly opted in:
+The catalog includes destructive operations. Mutations default **ON** — the
+project's purpose is real execution; the deliberate opt-in is the run
+**selection** + the console2 pre-flight confirm, not an env flag
+(`core/config.py`; canonical wording: `CLAUDE.md` Hard Rules):
 
-| Operation | Default | Enable with |
-|-----------|---------|-------------|
+| Operation | Default | Gate |
+|-----------|---------|------|
 | `GET` (read-only) | runs | always allowed |
-| `POST` / `PUT` / `PATCH` | **blocked** | `SCP_ALLOW_MUTATIONS=true` |
-| `DELETE` | **blocked** | `SCP_ALLOW_DESTRUCTIVE=true` |
+| `POST` / `PUT` / `PATCH` | **allowed** | force read-only: `SCP_ALLOW_MUTATIONS=false` (CI smoke/conformance suites set it explicitly) or profile veto `SCP_PROFILE_FORBID` |
+| `DELETE` | **allowed** | disable: `SCP_ALLOW_DESTRUCTIVE=false` or profile veto |
+| Heavy/billable lifecycles (VM, K8s, DB) | **skipped** | explicit opt-in: `SCP_RUN_HEAVY=true` or a heavy run selection (console2 auto-derives + confirms) |
 
 Smoke + read-chains only call read-only `GET`s; mutating/parameterised endpoints
 are exercised by explicit, ordered CRUD scenarios.
@@ -294,20 +297,23 @@ and **conformance** (static + runtime + baseline) → **dashboard** (build +
 publish + `/platform/` static export) → **snapshot** (per-run archive).
 
 **Triggers are on-demand only** (live runs are expensive — no cron, no per-push
-runs). Three equivalent ways to start a run:
+runs). **`api-test.yml`'s automatic push trigger is owner-DISABLED (2026-06-18)**:
+pushing `.github/run-request` no longer starts a workflow run (the `push:` block
+is commented out in the workflow; `workflow_dispatch` is kept as a MANUAL-ONLY
+fallback). Ways a run actually starts today:
 
-1. **Run-request file**: touch **`.github/run-request`** and push (runs on that
-   branch; this is how a chat session starts a run). The file carries `KEY=VALUE`
-   options — `suite/profile/mutations/destructive/heavy/conformance/category/
-   service/crud_filter` — so every dispatch capability is chat-controllable.
-   Owner sequencing rule: never push a run-request commit while a previous run
-   (including its sweep) is still in progress.
-2. **workflow_dispatch** with the same inputs (named `suite` from `suites/*.yaml`
-   and `profile` from `environments/*.yaml` expand to gate defaults; explicit
-   inputs override).
-3. **The control plane UI** (`controlplane/`) — manual trigger or cron schedule;
-   dispatches via the Actions API today, or queues for `runner/worker.py` when
-   `PLATFORM_EXECUTOR=worker` (M4).
+1. **The chat-heavy lane**: push **`.github/chat-heavy-request`** (or drop a new
+   file in `.github/chat-heavy-request.d/`) → `chat-heavy.yml`. The file carries
+   `KEY=VALUE` options (`mutations/destructive/heavy/crud_ids/dag/…`). Owner
+   sequencing rule: never push a request commit while a previous run (including
+   its sweep) is still in progress.
+2. **The local platform console**: `controlplane/` + console2 Testing (worker
+   executor `PLATFORM_EXECUTOR=worker`, or the console2 local run path) — runs
+   execute on the host, with pre-flight confirm.
+3. **workflow_dispatch** on `api-test.yml` (manual fallback only; named `suite`
+   from `suites/*.yaml` and `profile` from `environments/*.yaml` expand to gate
+   defaults; explicit inputs override). The control plane's `actions` executor
+   dispatches this via the Actions API when a `PLATFORM_GITHUB_TOKEN` is set.
 
 Ordinary pushes/PRs run only the cheap offline gate `validate.yml`
 (scenario + knowledge validation, no credentials).
