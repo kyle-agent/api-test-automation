@@ -33,15 +33,99 @@ for: orchestrator + all campaign agents (다른 세션이 이어받을 때 이 �
 
 ## 워크스트림 A — C3 100% (커버리지)
 
-- **A0 기준선** (선행): C3 정의·분모·현재값을 dashboard 파이프라인으로 실측,
-  남은 갭을 서비스×난이도로 분류: `L`(light, 콘솔 dogfood 대상) / `H`(heavy,
-  CI chat-heavy 대상, VPC/quota 슬롯 명시) / `W`(window — 선행 자원 필요, 어느
-  heavy run 에 동승할지) / `G`(gated/waiver 심사). 산출물: 이 문서의 §A 레저
-  갱신 + 서비스별 실행 순서(슬롯 스케줄).
+- **A0 기준선**: ✅ DONE 2026-07-04 — 아래 §A 레저. 엔드포인트별 분류(344건)는
+  `docs/working/plans/CAMPAIGN-C3-100-A0-gaps.json` (A1..An 입력).
 - **A1..An 서비스 에이전트**: coverage-service 표준 패턴 (독립 fragment 저작,
   compose→validate→오케스트레이터에 디스패치 블록 제출; 직접 디스패치 금지).
 - 실행: L 배치는 플랫폼 콘솔로 (B 가 관찰), H 배치는 chat-heavy 로. fold →
   promote → 레저 갱신 매 배치.
+
+## §A 레저 — A0 실측 기준선 (2026-07-04)
+
+### C3 기준선 (dashboard/build.py 공식: `C3 = ((verified-2xx − excluded_waivers) ∪ reach_covered) / (1372 − excluded_waivers)`)
+
+| 증거 기반 | verified-2xx | C3 | 비고 |
+|---|---|---|---|
+| repo `data/baselines/verified_endpoints.json` (1518키; lifecycle:step → service-스코프 해석 944건) | 596 | 742/1264 = **58.7%** | derive_verified 누적분만 |
+| published `dashboard-data:verified_endpoints.json` (2026-06-26) | 746 | 890/1264 = **70.4%** | 대시보드 누적 |
+| **UNION (캠페인 기준선)** | **776** | **920/1264 = 72.78%** | reach_covered 149/153 |
+
+- Waiver 261 = **excluded 108** (blast-radius 24 + entitlement 14 + unsatisfiable 6 + billing 64; 분모 제외) + **reachability 153** (touched=covered; 미터치 4 = cloudcontrol landing-zone 4종 → L 터치 배치).
+- **증거 저장소 불일치 (조치 필요)**: dashboard 누적에는 있으나 repo 파일에 없는 검증 키 **180개** (관측 fold 누락), 반대 방향 30개 (6/26 이후 미발행). → 다음 fold 때 양방향 백필 권장 (promote_validated 정확성에 직결).
+- 남은 갭 = **344 엔드포인트** (미검증 & 미waive; 미터치 reach-waiver 4 포함).
+
+### 갭 분류 (L=light/console · H=heavy/chat-heavy · W=window/동승 · G=gated/waiver) — 상세: `CAMPAIGN-C3-100-A0-gaps.json`
+
+**총계: L 14 · H 197 · W 16 · G 117 (=344)**
+
+| 서비스 | 갭 | L | H | W | G | 핵심 레버 / 게이트 |
+|---|---|---|---|---|---|---|
+| networking/vpc | 26 | 1 | 17 | 8 | 0 | TGW/endpoint/peering 라이프사이클; private-nat 7은 DC 동승 |
+| database/epas | 23 | 0 | 19 | 0 | 4 | 실클러스터+subops-guarded; 4건 PF-500 |
+| compute/virtualserver | 21 | 0 | 21 | 0 | 0 | VS full run + image/interface ops (createimage/importimage body 미검증) |
+| container/scr | 20 | 0 | 0 | 0 | 20 | image/tags 19 = docker-push 전용; createregistry quota 1EA 점유 |
+| management/iam | 19 | 0 | 11 | 0 | 8 | iam-credentials-heavy (VPC 불요); createrole/accesskeycreate 500 PF |
+| data-analytics/eventstreams | 18 | 0 | 18 | 0 | 0 | 실 Kafka 클러스터 (create body 미검증) |
+| storage/backup | 17 | 1 | 16 | 0 | 0 | 실 VM+agent 필요 (HB3 동반); createbackup FILESYSTEM 시도 |
+| database/mysql | 15 | 0 | 14 | 0 | 1 | 실클러스터+subops |
+| database/cachestore | 14 | 0 | 14 | 0 | 0 | 실클러스터+subops (remove-backup-histories 401 quirk) |
+| database/mariadb | 14 | 0 | 13 | 0 | 1 | 실클러스터+subops |
+| database/postgresql | 13 | 0 | 0 | 0 | 13 | createcluster 500 PF — 전체 cascade 차단 |
+| data-analytics/data-flow | 12 | 0 | 10 | 2 | 0 | NiFi heavy; SKE-종속 2건은 HB6 동승; create body 미검증 |
+| data-analytics/data-ops | 12 | 0 | 10 | 0 | 2 | Airflow heavy; **createdataopsservice body 미상 (docs 조사)**; 2건 403 |
+| management/organization | 12 | 0 | 0 | 0 | 12 | member 계정 (org-master 아님) — entitlement |
+| networking/loadbalancer | 11 | 0 | 10 | 1 | 0 | LB members-nat run; cert는 selfsign 사전단계 |
+| ai-ml/cloud-ml | 9 | 0 | 0 | 0 | 9 | 제품 미구독 (404 라우팅) — entitlement |
+| data-analytics/quick-query | 9 | 0 | 0 | 0 | 9 | create/validate 500 PF — cascade 차단 |
+| networking/dns | 9 | 0 | 4 | 0 | 5 | private hosted-zone run; public-domain 5 = 유료 등록 |
+| networking/vpn | 8 | 0 | 8 | 0 | 0 | GW+tunnel (VPC+publicip); IKE/IPSec enum 미검증 |
+| ai-ml/aimlops-platform | 6 | 0 | 4 | 2 | 0 | gen-heavy-aimlops (~48m); internal 2건 release 설치 후 동승 |
+| application-service/apigateway | 6 | 0 | 0 | 0 | 6 | PL entitlement-403 ×5 + PF-23 create-500 |
+| compute/scf | 5 | 2 | 0 | 1 | 2 | logs/metrics time 파라미터(L); codefile은 OBS jar 필요(W); PL approve/connect PF |
+| financial-management/billingplan | 5 | 0 | 0 | 0 | 5 | 유료 약정 4 + listinstances 500 PF |
+| networking/cdn | 5 | 5 | 0 | 0 | 0 | 기존 ACTIVE CDN 대상 writes — 콘솔 L 배치 |
+| networking/direct-connect | 5 | 0 | 5 | 0 | 0 | create 시도 (entitlement 미확인 — 실패 시 G 전환) |
+| security/configinspection | 5 | 0 | 0 | 0 | 5 | 피검사 계정 auth_key_id 필요 — entitlement |
+| devops-tools/devopsservice | 4 | 0 | 0 | 0 | 4 | admin-user-service 미활성 409 — entitlement |
+| management/cloudcontrol | 4 | 4 | 0 | 0 | 0 | reachability-waived 미터치 — C2 터치만 (안전: 403 벽) |
+| platform/sts | 3 | 0 | 0 | 0 | 3 | createrole PF + SAML 부재로 체인 차단 |
+| storage/filestorage | 3 | 0 | 0 | 1 | 2 | setaccessrule은 HB3 VM 동승; replication 2건 DR-측 전용 |
+| storage/parallel-filestorage | 3 | 0 | 3 | 0 | 0 | 1TB 볼륨 (billable) |
+| security/certificatemanager | 2 | 0 | 0 | 0 | 2 | 실 CA 서명 cert 필요 — unsatisfiable |
+| container/ske | 1 | 0 | 0 | 1 | 0 | kubeconfig — HB6 클러스터 동승 |
+| quota · servicewatch · kms · secretsmanager · secretvault | 5 | 1 | 0 | 0 | 4 | sw custom-metrics(L); 나머지 구조적 차단 |
+
+### 슬롯 스케줄 (배치 ≤4 lifecycle · VPC cap 5 = shared-adopt 1 + 자체생성 ≤4 · 라이브 레인 1개; est는 durations.json 기반)
+
+| 배치 | 레인 | lifecycles (≤4) | VPC | 커버 | est |
+|---|---|---|---|---|---|
+| **LB1** | 콘솔(L) | networking-cdn-service · cloudcontrol-landing-zone-guarded(터치) · servicewatch custom-metrics · scoped smoke(scf time-param + backup dup-param) | 0 | L 13 | ~25m |
+| **LB2** | 콘솔(L) | vpc-subnet-vip-nat (+publicip 사전생성 → deletesubnetvipnatip) | 1 | L 1 | ~15m |
+| **HB1** | chat-heavy | database-mysql-cluster+subops · mariadb cluster+subops | shared 1 | H 27 | ~75m |
+| **HB2** | chat-heavy | epas · cachestore · eventstreams (실클러스터 3 + subops; 클러스터 병렬≤4) | shared 1 | H 51 | ~90m |
+| **HB3** | chat-heavy | compute-virtualserver-full · vs-image-write-coverage · gen-heavy-backup(VM 동승) | 1+shared | H 53 + W 3 (fs setaccessrule, vpc vipport, scf codefile*) | ~60m |
+| **HB4** | chat-heavy | networking-loadbalancer-members-nat · networking-vpn-gateway-tunnel · vpc-transit-gateway-children · vpc-endpoint | 3+shared | H 31 + W 1 (lb cert selfsign) | ~40m |
+| **HB5** | chat-heavy | vpc-peering(VPC 2, free≥3 확인) · networking-direct-connect-routing · vpc-private-nat(DC 동승) · networking-dns-hosted-zone-private(+private-dns 1/3) | 3+shared | H 13 + W 7 | ~45m |
+| **HB6** | chat-heavy | container-ske-cluster-nodepool · gen-heavy-aimlops | 1+shared | H 4 + W 5 (ske kubeconfig, aimlops internal×2, data-flow SKE-종속×2) | ~75m |
+| **HB7** | chat-heavy | data-flow-service-and-flow-guarded · data-ops(**docs 조사 후**) · parallel-filestorage-capacity-restore | shared 1 | H 23 | ~60m |
+| **HB8** | chat-heavy | iam-credentials-heavy | 0 | H 11 | ~10m |
+
+합계 벽시간 ≈ L 40m + H 6.5–7.5h (단일 레인 직렬; HB1↔HB2는 DB 클러스터 quota로 병합 금지). L+H+W 전부 2xx 시 C3 ≈ 90.7% → **+ waiver 승인 시 100%** (분모 조작 없음). 선택 특수 레인: **SCR docker-push** (러너 docker + registry 자격 필요) 승인 시 G 19 → H 전환.
+
+### Waiver 제안 (G 117 — 사람 승인 필요; 클래스는 기존 컨벤션)
+
+| 클래스 | 건수 | 대상 |
+|---|---|---|
+| entitlement (분모 제외) | 39 | organization 12 · cloud-ml 9 · apigateway-PL 5 · configinspection 5 · devopsservice 4 · iam user-policy-binding 2 · data-ops 403 2 |
+| unsatisfiable-flow (분모 제외) | 26 | scr docker-push 19(docker 레인 승인 시 철회) · certificatemanager 2 · filestorage DR-측 2 · quota 1 · kms managed-key 1 · secretvault temporarykey 1 |
+| billing-prohibitive (분모 제외) | 9 | dns public-domain 5 · billingplan 약정 4 |
+| reachability (touched=covered 유지) | 43 | postgresql 13(PF createcluster-500) · quick-query 9(PF) · iam 6(PF 500+cascade) · epas 4(PF) · sts 3(PF-체인) · scf-PL 2(PF) · mysql/mariadb 각 1(PF) · apigw create-PL 1(PF-23) · billingplan listinstances 1(PF) · secretsmanager kms-key 1 · scr createregistry 1(quota) |
+
+주: reachability 제안분은 PF(제품버그) 수리 시 waiver 철회 + 실 2xx 재도전이 원칙. 엔드포인트별 근거는 `CAMPAIGN-C3-100-A0-gaps.json`의 `note` 필드.
+
+### SCP docs 조사 필요 (request body 미상 — 다음 에이전트 입력; **body 창작 금지**)
+
+`data-ops createdataopsservice(service_workload)` · `data-flow createdataflow/createdataflowserviceconsole` · `eventstreams createcluster` · `vpn phase1/phase2 enum` · `virtualserver createimage/importimage` · `backup createbackup(FILESYSTEM)` · `dns activateprivatedns`
 
 ## 워크스트림 B — dogfood 테스트 + 플랫폼 개선
 
