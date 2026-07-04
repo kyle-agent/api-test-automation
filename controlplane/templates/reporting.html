@@ -14,40 +14,42 @@
     <div>
       {% if fail_new %}<b>REGRESSIONS — 신규 fail {{ fail_new }}건.</b>
       {% else %}<b>HEALTHY — 신규 회귀 0.</b>{% endif %}
-      {{ coverage.get('ok','-') }} ok · soft {{ coverage.get('soft','-') }} ·
+      호출 {{ coverage.get('tested','-') }} · ok {{ coverage.get('ok','-') }} ·
+      soft {{ coverage.get('soft','-') }} ·
       known-red {{ coverage.get('fail_known') or 0 }}
-      ({{ coverage.get('tested','-') }} calls · sha {{ coverage.get('sha','') }})
+      (sha {{ coverage.get('sha','') }})
     </div>
   </div>
 
-  <h2>커버리지 사다리 <span class="hint">C1 도달 → C2 호출 → C3 검증</span></h2>
+  <h2>커버리지 사다리 <span class="hint">C1 도달 → C2 호출 → C3 검증
+    (정의: docs/COVERAGE-CRITERIA.md)</span></h2>
   <div class="card pad">
-    <div class="lad"><span class="lv">C3</span>
+    <div class="lad"><span class="lv" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인 (reachability waiver 서비스는 도달충족 포함) = covered. 헤드라인 지표, 목표 100%">C3</span>
       <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--green)"></i></div>
       <span class="pct" style="color:var(--green)">{{ coverage.get('cov_c3','-') }}%</span>
       <span class="desc">검증됨 · 누적 — 동작 확인</span></div>
     {% set total = coverage.get('total') or 0 %}
     {% set tested = coverage.get('tested') or 0 %}
     {% set c2pct = (tested * 100 / total)|round(1) if total else 0 %}
-    <div class="lad"><span class="lv">C2</span>
+    <div class="lad"><span class="lv" title="C2 호출됨(Called) — 실제 run에서 4xx 포함 어떤 응답이든 수신. '이 API는 호출은 된다'(라우팅/인증/경로 증명), 2xx 보장 아님">C2</span>
       <div class="bar"><i style="width:{{ c2pct }}%;background:var(--amber)"></i></div>
       <span class="pct" style="color:var(--amber)">{{ c2pct }}%</span>
       <span class="desc">호출됨 · 이번 run {{ tested }}/{{ total }}</span></div>
-    <div class="lad"><span class="lv">C1</span>
+    <div class="lad"><span class="lv" title="C1 도달가능(Plannable) — enabled 시나리오가 정적으로 도달 가능(라이브 호출 없음). 저작 진척 지표">C1</span>
       <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
       <span class="pct" style="color:var(--blue)">{{ coverage.get('reachable_pct','-') }}%</span>
       <span class="desc">도달가능 · static reachable / {{ total }} API</span></div>
   </div>
 
-  <h2>이번 스냅샷 <span class="hint">{{ coverage.get('ts','') }}</span></h2>
+  <h2>이번 스냅샷 <span class="hint">{{ coverage.get('ts','') }}{% if snap_age is defined and snap_age %} ({{ snap_age }}){% endif %}</span></h2>
   <div class="tiles" style="margin-top:6px">
-    <div class="card tile"><div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
+    <div class="card tile" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체({{ total }}). 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)"><div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
       <div class="k">write-op (cov_op)</div></div>
-    <div class="card tile"><div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
+    <div class="card tile" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율"><div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
       <div class="k">GET (cov_get)</div></div>
-    <div class="card tile"><div class="v">{{ coverage.get('ok','-') }}/{{ coverage.get('tested','-') }}</div>
-      <div class="k">ok / 호출</div></div>
-    <div class="card tile"><div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
+    <div class="card tile" title="이번 run이 호출한 엔드포인트 {{ tested }}개 중 {{ coverage.get('ok','-') }}개가 2xx(ok)"><div class="v">{{ coverage.get('tested','-') }} <span style="font-size:14px;color:var(--muted)">호출</span> · {{ coverage.get('ok','-') }} <span style="font-size:14px;color:var(--green)">ok</span></div>
+      <div class="k">호출 → ok(2xx)</div></div>
+    <div class="card tile" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보"><div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
       <div class="k">신규 fail</div></div>
   </div>
   {% else %}

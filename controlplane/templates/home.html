@@ -24,31 +24,31 @@
   </div>
 
   <div class="tiles">
-    <div class="card tile">
+    <div class="card tile" title="cov_op — 이번 스냅샷에서 실제 2xx로 검증된 엔드포인트 ÷ 카탈로그 전체. 4xx는 포함하지 않는 헤드라인 검증 커버리지 (dashboard/build.py)">
       <div class="v" style="color:var(--amber)">{{ coverage.get('cov_op','-') }}%</div>
       <div class="k">write-op 커버리지 (cov_op)</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_op',0) }}%;background:var(--amber)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile">
+    <div class="card tile" title="cov_get — GET 엔드포인트 중 실제 2xx 검증 비율">
       <div class="v" style="color:var(--green)">{{ coverage.get('cov_get','-') }}%</div>
       <div class="k">GET 커버리지 (cov_get)</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_get',0) }}%;background:var(--green)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile">
+    <div class="card tile" title="C3 검증됨(Verified) — 실제 run에서 2xx로 동작 확인(누적, reachability waiver는 도달충족 포함) = covered. 헤드라인 지표">
       <div class="v">{{ coverage.get('cov_c3','-') }}%</div>
       <div class="k">누적 C3 검증</div>
       <div class="bar"><i style="width:{{ coverage.get('cov_c3',0) }}%;background:var(--blue)"></i></div>
       <div class="goal">목표 100%</div>
     </div>
-    <div class="card tile">
+    <div class="card tile" title="C1 도달가능(Plannable) — enabled 시나리오가 정적으로 도달 가능한 엔드포인트(라이브 호출 없음). 저작 진척 지표">
       <div class="v">{{ coverage.get('reachable_pct','-') }}%</div>
       <div class="k">C1 static reachable</div>
       <div class="bar"><i style="width:{{ coverage.get('reachable_pct',0) }}%;background:var(--blue)"></i></div>
       <div class="goal">전체 {{ coverage.get('total','-') }} API</div>
     </div>
-    <div class="card tile">
+    <div class="card tile" title="fail_new — baseline(data/baselines/known_issues.json)에 없는 새로 깨진 5xx/auth. 알림 대상 = 진짜 회귀 후보">
       <div class="v" style="color:var({{ '--red' if fail_new else '--green' }})">{{ fail_new }}</div>
       <div class="k">신규 fail</div>
       <div class="goal" style="margin-top:8px">{{ '회귀 발생 — Triage 확인' if fail_new else '회귀 없음' }}</div>

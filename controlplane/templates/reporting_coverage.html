@@ -156,7 +156,11 @@
 <div class="card pad">
   {% if history %}
   <table>
-    <thead><tr><th>시각(ts)</th><th>C3 검증%</th><th>GET%</th><th>write-op%</th><th>신규 fail</th></tr></thead>
+    <thead><tr><th>시각(ts)</th>
+      <th title="C3 검증됨 — 실제 2xx 동작 확인(누적) = covered, 헤드라인 지표">C3 검증%</th>
+      <th title="cov_get — GET 엔드포인트 중 2xx 검증 비율">GET%</th>
+      <th title="cov_op — 검증(2xx) 엔드포인트 ÷ 카탈로그 전체 (이번 스냅샷)">write-op%</th>
+      <th title="fail_new — baseline에 없는 새로 깨진 5xx/auth (알림 대상)">신규 fail</th></tr></thead>
     <tbody>
     {% for h in history|reverse %}
       <tr>
